@@ -19,7 +19,7 @@ public sealed class Bookmark
 {
     public string Id { get; set; } = string.Empty;            // string surrogate (Marten default)
     public string OwnerId { get; set; } = string.Empty;       // the bookmarking resident
-    public string TargetKind { get; set; } = string.Empty;    // closed set: post | event | todo | announcement | page
+    public string TargetKind { get; set; } = string.Empty;    // closed set: post | event | todo | announcement | page | project | board (ADR 0118 amendment, 2026-10-16)
     public string TargetId { get; set; } = string.Empty;      // the target's doc id
     public DateTimeOffset Created { get; set; }               // never mutated (D4)
     // ADR 0168 D2 — the owner's folder id (the M37 NoteFolder shape

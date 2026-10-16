@@ -63,7 +63,9 @@ public sealed record BookmarkRow(
 /// <summary>
 /// One group in the bookmark list, keyed by the closed <c>TargetKind</c>
 /// set {<c>post</c>, <c>event</c>, <c>todo</c>, <c>announcement</c>,
-/// <c>page</c>} (design doc §2.2, D1). <see cref="FolderId"/> is the owner's
+/// <c>page</c>, <c>project</c>, <c>board</c>} (design doc §2.2, D1 — the
+/// project / board kinds joined by the ADR 0118 amendment, 2026-10-16).
+/// <see cref="FolderId"/> is the owner's
 /// folder id the group's items sit in (ADR 0168 D2 — the M37
 /// <c>NoteGroup.FolderId</c> shape re-applied; <c>null</c> = the
 /// unfiled bucket at the root of the owner's tree). Defaults to

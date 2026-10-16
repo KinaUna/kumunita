@@ -391,12 +391,306 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     [Fact]
     public void TargetKind_IsTheClosedStringSet()
     {
+        // The ADR 0118 amendment (2026-10-16) added the project / board
+        // kinds — the M37 PersonalNotes closed-set vocabulary already
+        // carried them; the M17 surface now matches. The set is now
+        // SEVEN kinds (was five at M17 ship, the M5 KanbanStatuses shape
+        // pin still holds: string, not enum, closed, drift-guarded).
         var expected = new HashSet<string>(StringComparer.Ordinal)
-            { "post", "event", "todo", "announcement", "page" };
+            { "post", "event", "todo", "announcement", "page", "project", "board" };
 
-        // The closed set is exactly five kinds (D1, the M5 KanbanStatuses shape).
         Assert.Equal(expected, new HashSet<string>(BookmarkService.ClosedTargetKinds, StringComparer.Ordinal));
-        Assert.Equal(5, BookmarkService.ClosedTargetKinds.Count);
+        Assert.Equal(7, BookmarkService.ClosedTargetKinds.Count);
+    }
+
+    // ── ADR 0118 amendment (2026-10-16) — the project / board bookmark
+    //    lanes (the M37 PersonalNotes closed-set vocabulary re-applied to
+    //    the M17 surface) ───────────────────────────────────────────────
+    //
+    // The ADR 0118 amendment (2026-10-16) added the project / board kinds
+    // to the closed set. The D3 write-lane check re-runs the owning
+    // surface's own frozen IProjectService.GetProjectAsync / GetBoardAsync
+    // read — the same call the /projects/{id} / /projects/boards/{id}
+    // detail page uses (the M37 PersonalNotes "project" / "board" D3 shape
+    // re-applied). These tests pin that the new kinds behave identically
+    // to the existing five (F1 idempotency, D3 write-lane check, D4
+    // physical removal, D5 list resolution).
+
+    // ── 16 — F2_ProjectBookmark_WriteLanePositive (D3, positive) ───────
+
+    [Fact]
+    public async Task F2_ProjectBookmark_WriteLanePositive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-16-owner";
+        const string projectId = "p-16-project";
+
+        // Plant a visible project (author = owner — the author branch of
+        // the frozen Decide() passes CanAsync(Read)).
+        await Plant(store, new Project
+        {
+            Id = projectId,
+            AuthorId = owner,
+            Title = "16 test project",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        // The D3 check passes (the author branch): a visible target is
+        // bookmarkable, the row is created.
+        var result = await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, result.Status);
+
+        // The row is keyed on the (owner, "project", projectId) tuple.
+        var rows = await Bookmarks(store, owner);
+        Assert.Single(rows, b => b.TargetKind == "project" && b.TargetId == projectId);
+
+        // Idempotency (F1 — the unique index witness):
+        var second = await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        Assert.Equal(BookmarkToggleStatus.AlreadyBookmarked, second.Status);
+        Assert.Single(await Bookmarks(store, owner), b => b.TargetKind == "project");
+    }
+
+    // ── 17 — F2_ProjectBookmark_InvisibleRefused (D3, negative) ────────
+
+    [Fact]
+    public async Task F2_ProjectBookmark_InvisibleRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-17-owner";
+        const string author = "u-17-author";
+        const string projectId = "p-17-project";
+
+        // A project authored by a *different* resident, with an audience that
+        // grants only the author — the owner is neither the author nor in the
+        // audience, has no role standing: the frozen CanAsync(Read) denies →
+        // Refused (the M16 create-gate posture, the 404-not-403 Web mapping).
+        // (Audience = null would be community-visible, ADR 0036 — so the
+        // restricted audience is what makes the target invisible.)
+        await Plant(store, new Project
+        {
+            Id = projectId,
+            AuthorId = author,
+            Title = "17 invisible project",
+            Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var result = await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        Assert.Equal(BookmarkToggleStatus.Refused, result.Status);
+
+        // No Bookmark row survives (the D3 table: a denied / absent /
+        // soft-deleted target is Refused, no row is created).
+        var rows = await Bookmarks(store, owner);
+        Assert.DoesNotContain(rows, b => b.TargetKind == "project" && b.TargetId == projectId);
+    }
+
+    // ── 18 — F2_BoardBookmark_WriteLanePositive (D3, positive) ─────────
+
+    [Fact]
+    public async Task F2_BoardBookmark_WriteLanePositive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-18-owner";
+        const string boardId = "b-18-board";
+
+        // Plant a visible board (author = owner — the author branch of
+        // the frozen Decide() passes CanAsync(Read)).
+        await Plant(store, new KanbanBoard
+        {
+            Id = boardId,
+            AuthorId = owner,
+            Title = "18 test board",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var result = await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, result.Status);
+
+        var rows = await Bookmarks(store, owner);
+        Assert.Single(rows, b => b.TargetKind == "board" && b.TargetId == boardId);
+
+        // Idempotency (F1):
+        var second = await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+        Assert.Equal(BookmarkToggleStatus.AlreadyBookmarked, second.Status);
+        Assert.Single(await Bookmarks(store, owner), b => b.TargetKind == "board");
+    }
+
+    // ── 19 — F2_BoardBookmark_InvisibleRefused (D3, negative) ──────────
+
+    [Fact]
+    public async Task F2_BoardBookmark_InvisibleRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-19-owner";
+        const string author = "u-19-author";
+        const string boardId = "b-19-board";
+
+        // A board authored by a *different* resident, with an audience that
+        // grants only the author — the owner has no standing: the frozen
+        // CanAsync(Read) denies → Refused. (Audience = null would be
+        // community-visible, ADR 0036 — so the restricted audience is what
+        // makes the target invisible.)
+        await Plant(store, new KanbanBoard
+        {
+            Id = boardId,
+            AuthorId = author,
+            Title = "19 invisible board",
+            Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var result = await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+        Assert.Equal(BookmarkToggleStatus.Refused, result.Status);
+
+        var rows = await Bookmarks(store, owner);
+        Assert.DoesNotContain(rows, b => b.TargetKind == "board" && b.TargetId == boardId);
+    }
+
+    // ── 20 — F4_ProjectBoardRowsResolveTitleAndLink (D5, positive) ─────
+
+    [Fact]
+    public async Task F4_ProjectBoardRowsResolveTitleAndLink()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-20-owner";
+        const string projectId = "p-20-project";
+        const string boardId = "b-20-board";
+
+        await Plant(store, new Project
+        {
+            Id = projectId,
+            AuthorId = owner,
+            Title = "20 test project",
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = boardId,
+            AuthorId = owner,
+            Title = "20 test board",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+
+        var list = await bm.ListAsync(owner);
+
+        // The project group (the "project" kind, the canonical order puts
+        // it after "page" in the ClosedTargetKindsOrdered array).
+        var projectGroup = Assert.Single(list.Groups, g => g.Kind == "project");
+        var projectRow = Assert.Single(projectGroup.Items);
+        Assert.False(projectRow.Degraded);
+        Assert.Equal("20 test project", projectRow.Title);
+        Assert.Equal($"/projects/projects/{projectId}", projectRow.Link);
+
+        // The board group (the "board" kind, last in the canonical order).
+        var boardGroup = Assert.Single(list.Groups, g => g.Kind == "board");
+        var boardRow = Assert.Single(boardGroup.Items);
+        Assert.False(boardRow.Degraded);
+        Assert.Equal("20 test board", boardRow.Title);
+        Assert.Equal($"/projects/boards/{boardId}", boardRow.Link);
+    }
+
+    // ── 21 — F4_ProjectBoardDanglingRowsDegrade (D5, negative) ─────────
+
+    [Fact]
+    public async Task F4_ProjectBoardDanglingRowsDegrade()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-21-owner";
+        const string ghostProjectId = "p-21-ghost-project";
+        const string ghostBoardId = "b-21-ghost-board";
+
+        // Plant the bookmark rows directly (no toggle — the targets are
+        // absent, so the D3 check would refuse).
+        await Plant(store, new Bookmark
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerId = owner,
+            TargetKind = "project",
+            TargetId = ghostProjectId,
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new Bookmark
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerId = owner,
+            TargetKind = "board",
+            TargetId = ghostBoardId,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var list = await bm.ListAsync(owner);
+
+        // The project group — the dangling row degrades to (null, null),
+        // Degraded = true (the D5 / C-M17·5 pin — exactly one static
+        // bm.list.degraded label, no <a> tag, no title, no TargetId).
+        var projectGroup = Assert.Single(list.Groups, g => g.Kind == "project");
+        var projectRow = Assert.Single(projectGroup.Items);
+        Assert.True(projectRow.Degraded);
+        Assert.Null(projectRow.Title);
+        Assert.Null(projectRow.Link);
+        Assert.Equal(ghostProjectId, projectRow.TargetId);
+
+        // The board group — same D5 degrade shape.
+        var boardGroup = Assert.Single(list.Groups, g => g.Kind == "board");
+        var boardRow = Assert.Single(boardGroup.Items);
+        Assert.True(boardRow.Degraded);
+        Assert.Null(boardRow.Title);
+        Assert.Null(boardRow.Link);
+        Assert.Equal(ghostBoardId, boardRow.TargetId);
+    }
+
+    // ── 22 — F4_SoftDeletedProjectBoardRefused (D3, soft-delete) ───────
+
+    [Fact]
+    public async Task F4_SoftDeletedProjectBoardRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-22-owner";
+        const string projectId = "p-22-project";
+        const string boardId = "b-22-board";
+
+        // A soft-deleted project (IsDeleted = true, the ADR 0024 flag) —
+        // the owning surface's frozen GetProjectAsync throws
+        // KeyNotFoundException on absent / soft-deleted (the C3 split),
+        // which the D3 table maps to Refused.
+        await Plant(store, new Project
+        {
+            Id = projectId,
+            AuthorId = owner,
+            Title = "22 soft-deleted project",
+            Created = DateTimeOffset.UtcNow,
+            IsDeleted = true,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = boardId,
+            AuthorId = owner,
+            Title = "22 soft-deleted board",
+            Created = DateTimeOffset.UtcNow,
+            IsDeleted = true,
+        });
+
+        var projectResult = await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        Assert.Equal(BookmarkToggleStatus.Refused, projectResult.Status);
+
+        var boardResult = await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+        Assert.Equal(BookmarkToggleStatus.Refused, boardResult.Status);
+
+        // No rows survive (the D3 table: absent / soft-deleted → Refused,
+        // no row is created).
+        var rows = await Bookmarks(store, owner);
+        Assert.DoesNotContain(rows, b => b.TargetKind == "project" && b.TargetId == projectId);
+        Assert.DoesNotContain(rows, b => b.TargetKind == "board" && b.TargetId == boardId);
     }
 
     // ── Shared helpers ──────────────────────────────────────────────────
@@ -412,6 +706,7 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.Storage.Add<AuthorizationFeature>();
             CoreDocTypes.Configure(opts);
             PostDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
             BookmarkDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

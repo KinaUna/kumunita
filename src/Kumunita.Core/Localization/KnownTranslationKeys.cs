@@ -2381,6 +2381,12 @@ public static class KnownTranslationKeys
             ["bm.list.kind.todo"]           = "To-dos",
             ["bm.list.kind.announcement"]   = "Announcements",
             ["bm.list.kind.page"]           = "Pages",
+            // ADR 0118 amendment (2026-10-16) — the project / board kinds join the closed
+            // set (the M37 PersonalNotes closed-set vocabulary already carried them;
+            // the M17 surface now matches). The terminology matches the M37
+            // pn.list.kind.project / pn.list.kind.board labels (one label, one word).
+            ["bm.list.kind.project"]        = "Projects",
+            ["bm.list.kind.board"]          = "Boards",
             ["bm.list.unbookmark"]          = "Remove",
             ["bm.button.bookmark"]          = "Bookmark",
             ["bm.button.bookmarked"]        = "Bookmarked",
@@ -5120,6 +5126,12 @@ public static class KnownTranslationKeys
             ["bm.list.kind.todo"]           = "Aufgaben",
             ["bm.list.kind.announcement"]   = "Ankündigungen",
             ["bm.list.kind.page"]           = "Seiten",
+            // ADR 0118 amendment (2026-10-16) — the project / board kinds join the closed
+            // set (the M37 PersonalNotes closed-set vocabulary already carried them;
+            // the M17 surface now matches). The terminology matches the M37
+            // pn.list.kind.project / pn.list.kind.board labels.
+            ["bm.list.kind.project"]        = "Projekte",
+            ["bm.list.kind.board"]          = "Boards",
             ["bm.list.unbookmark"]          = "Entfernen",
             ["bm.button.bookmark"]          = "Merken",
             ["bm.button.bookmarked"]        = "Gemerkt",
@@ -7752,6 +7764,12 @@ public static class KnownTranslationKeys
             ["bm.list.kind.todo"]           = "À faire",
             ["bm.list.kind.announcement"]   = "Annonces",
             ["bm.list.kind.page"]           = "Pages",
+            // ADR 0118 amendment (2026-10-16) — the project / board kinds join the closed
+            // set (the M37 PersonalNotes closed-set vocabulary already carried them;
+            // the M17 surface now matches). The terminology matches the M37
+            // pn.list.kind.project / pn.list.kind.board labels.
+            ["bm.list.kind.project"]        = "Projets",
+            ["bm.list.kind.board"]          = "Tableaux",
             ["bm.list.unbookmark"]          = "Retirer",
             ["bm.button.bookmark"]          = "Signeter",
             ["bm.button.bookmarked"]        = "Signeté",
@@ -10369,6 +10387,12 @@ public static class KnownTranslationKeys
             ["bm.list.kind.todo"]           = "Opgaver",
             ["bm.list.kind.announcement"]   = "Bekendtgørelser",
             ["bm.list.kind.page"]           = "Sider",
+            // ADR 0118 amendment (2026-10-16) — the project / board kinds join the closed
+            // set (the M37 PersonalNotes closed-set vocabulary already carried them;
+            // the M17 surface now matches). The terminology matches the M37
+            // pn.list.kind.project / pn.list.kind.board labels.
+            ["bm.list.kind.project"]        = "Projekter",
+            ["bm.list.kind.board"]          = "Brætter",
             ["bm.list.unbookmark"]          = "Fjern",
             ["bm.button.bookmark"]          = "Bogmærk",
             ["bm.button.bookmarked"]        = "Bogmærket",

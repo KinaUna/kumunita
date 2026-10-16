@@ -11,8 +11,11 @@ namespace Kumunita.Web.Controllers;
 
 /// <summary>
 /// The <c>/bookmarks</c> surface (M17 — ADR 0118: the personal pin surface
-/// for the five closed <see cref="Bookmark.TargetKind"/>s — <c>post</c> /
-/// <c>event</c> / <c>todo</c> / <c>announcement</c> / <c>page</c>). A *thin*
+/// for the seven closed <see cref="Bookmark.TargetKind"/>s — <c>post</c> /
+/// <c>event</c> / <c>todo</c> / <c>announcement</c> / <c>page</c> /
+/// <c>project</c> / <c>board</c> — the project / board kinds joined by the
+/// ADR 0118 amendment, 2026-10-16, the M37 PersonalNotes closed-set
+/// vocabulary already carried them). A *thin*
 /// HTTP layer (ADR 0006-D: routes + authz + shape): every access decision
 /// comes from the frozen <see cref="IBookmarkService"/> seam (the single
 /// decision path — C-M17·1: the seam composes only frozen seams, no new

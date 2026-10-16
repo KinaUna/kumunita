@@ -49,12 +49,16 @@ namespace Kumunita.Web.Tests;
 /// calls the seam's <c>RemoveAsync</c> (the D5 pin — the unbookmark needs no
 /// target read at all, the row is keyed on the owner's own
 /// <see cref="Bookmark"/> row).</item>
-/// <item><b>BmKeys_AreTheClosedFourteenKeySet</b> — the §kw-l pin: the
+/// <item><b>BmKeys_AreTheClosedTwentyOneKeySet</b> — the §kw-l pin: the
 /// <see cref="Kumunita.Core.Localization.KnownTranslationKeys.EnValues"/>
-/// registry contains **exactly** the 14 <c>bm.*</c> keys (the closed set,
+/// registry contains **exactly** the 21 <c>bm.*</c> keys (the closed set,
 /// the parity-test shape the U04 / U05 units depend on; the two
 /// <c>bm.toggle.*</c> flash keys were added by the obs-2 ADR 0118
-/// amendment, 2026-09-30).</item>
+/// amendment, 2026-09-30; the ADR 0168 folder-tree block joined 2026-10-14;
+/// the two <c>bm.list.kind.project</c> / <c>bm.list.kind.board</c> labels
+/// joined by the ADR 0118 amendment, 2026-10-16 — the M37 PersonalNotes
+/// closed-set vocabulary already carried them; the M17 surface now
+/// matches).</item>
 /// </list>
 /// <para>
 /// **No database, no Testcontainers** — a pure NSubstitute seam test (the
@@ -66,10 +70,14 @@ namespace Kumunita.Web.Tests;
 public sealed class BookmarksControllerTests
 {
     /// <summary>
-    /// The closed 14-key <c>bm.*</c> set (design doc §kw-l, the exact names
+    /// The closed 21-key <c>bm.*</c> set (design doc §kw-l, the exact names
     /// the parity tests pin — the U04 / U05 units consume this set, never
     /// re-register a subset; the two <c>bm.toggle.*</c> flash keys are the
-    /// obs-2 ADR 0118 amendment, 2026-09-30).
+    /// obs-2 ADR 0118 amendment, 2026-09-30; the ADR 0168 folder-tree block
+    /// joined 2026-10-14; the two <c>bm.list.kind.project</c> /
+    /// <c>bm.list.kind.board</c> labels joined by the ADR 0118 amendment,
+    /// 2026-10-16 — the M37 PersonalNotes closed-set vocabulary already
+    /// carried them; the M17 surface now matches).
     /// </summary>
     private static readonly string[] BmKeys =
     [
@@ -82,6 +90,14 @@ public sealed class BookmarksControllerTests
         "bm.list.kind.todo",
         "bm.list.kind.announcement",
         "bm.list.kind.page",
+        // ADR 0118 amendment (2026-10-16) — the project / board kinds join the
+        // closed set (the M37 PersonalNotes closed-set vocabulary already
+        // carried them; the M17 surface now matches). The two new kind labels
+        // use the same terminology as the M37 pn.list.kind.project /
+        // pn.list.kind.board labels (one label, one word, across all four
+        // language registries).
+        "bm.list.kind.project",
+        "bm.list.kind.board",
         "bm.list.unbookmark",
         "bm.button.bookmark",
         "bm.button.bookmarked",
@@ -326,20 +342,20 @@ public sealed class BookmarksControllerTests
         await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
-    // ── 5 — BmKeys_AreTheClosedTwelveKeySet ───────────────────────────────
+    // ── 5 — BmKeys_AreTheClosedTwentyOneKeySet ──────────────────────────
 
     /// <summary>
-    /// The §kw-l pin (the design doc §kw-l, the closed 12-key set): the
+    /// The §kw-l pin (the design doc §kw-l, the closed set): the
     /// <see cref="Kumunita.Core.Localization.KnownTranslationKeys.EnValues"/>
-    /// registry contains **exactly** the 12 <c>bm.*</c> keys (no more, no
-    /// less — the parity-test shape the U04 / U05 units depend on; the U04
-    /// <c>_BookmarkButton</c> partial + the U05 gate tests consume
-    /// <c>bm.button.bookmark</c> / <c>bm.button.bookmarked</c>, so the
-    /// closed set is registered in U03, never a per-unit subset). All four
-    /// registries (en / de / fr / da) carry the same closed set.
+    /// registry contains **exactly** the 21 <c>bm.*</c> keys (the original
+    /// 12 + the obs-2 flash pair (2026-09-30) + the ADR 0168 folder-tree
+    /// block (2026-10-14) + the ADR 0118 amendment's two kind labels (2026-10-16)
+    /// — the M37 PersonalNotes closed-set vocabulary already carried them;
+    /// the M17 surface now matches). All four registries (en / de / fr / da)
+    /// carry the same closed set.
     /// </summary>
     [Fact]
-    public void BmKeys_AreTheClosedFourteenKeySet()
+    public void BmKeys_AreTheClosedTwentyOneKeySet()
     {
         var en = Kumunita.Core.Localization.KnownTranslationKeys.EnValues;
 
@@ -351,14 +367,17 @@ public sealed class BookmarksControllerTests
             Assert.False(string.IsNullOrWhiteSpace(en[key]), $"The '{key}' value must be non-empty.");
         }
 
-        // (2) The closed set is EXACTLY the fourteen keys — no more (a
-        // fifteenth bm.* key is a drift event the U04 / U05 units depend
-        // on), no less (missing one breaks the parity tests).
+        // (2) The closed set is EXACTLY the 21 keys (the original 19 + the
+        // two bm.list.kind.project / bm.list.kind.board labels added by the
+        // ADR 0118 amendment, 2026-10-16 — the M37 PersonalNotes closed-set
+        // vocabulary already carried them; the M17 surface now matches) — no
+        // more (a twenty-second bm.* key is a drift event the U04 / U05
+        // units depend on), no less (missing one breaks the parity tests).
         var actualBmKeys = en.Keys
             .Where(k => k.StartsWith("bm.", StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
         Assert.Equal(BmKeys.ToHashSet(StringComparer.Ordinal), actualBmKeys);
-        Assert.Equal(19, actualBmKeys.Count);
+        Assert.Equal(21, actualBmKeys.Count);
 
         // (3) All four registries (en / de / fr / da) carry the same closed
         // set (the §kw-l parity pin — the U04 / U05 units consume the full

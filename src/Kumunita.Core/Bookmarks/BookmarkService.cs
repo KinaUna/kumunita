@@ -45,16 +45,27 @@ public sealed class BookmarkService : IBookmarkService
     /// string-not-enum shape), the exact vocabulary the existing
     /// <c>*ToAuditableResource</c> adapters and <c>AccessAudit</c> rows
     /// already emit. A kind outside this set is a drift event (§2.7).
+    /// <para>
+    /// The <c>project</c> / <c>board</c> kinds joined by the ADR 0118
+    /// amendment (2026-10-16) — the M37 PersonalNotes closed-set
+    /// vocabulary already carried them; the M17 surface now matches
+    /// (the project / board detail surfaces gain the bookmark
+    /// affordance; the D3 write-lane check re-runs the owning
+    /// surface's own frozen <c>IProjectService.GetProjectAsync</c> /
+    /// <c>GetBoardAsync</c> read — the same call the detail page uses,
+    /// committing the target's own audit row, exactly the category
+    /// the existing <c>todo</c> branch already establishes).
+    /// </para>
     /// </summary>
     public static readonly IReadOnlySet<string> ClosedTargetKinds =
         new HashSet<string>(StringComparer.Ordinal)
         {
-            "post", "event", "todo", "announcement", "page",
+            "post", "event", "todo", "announcement", "page", "project", "board",
         };
 
     // The closed set's canonical order (for group ordering in the list).
     private static readonly string[] ClosedTargetKindsOrdered =
-        ["post", "event", "todo", "announcement", "page"];
+        ["post", "event", "todo", "announcement", "page", "project", "board"];
 
     private readonly IUserInfoService _userInfo;
     private readonly IAuthorizationService _authz;
@@ -607,6 +618,31 @@ public sealed class BookmarkService : IBookmarkService
                 return (todo.Title, $"/projects/todos/{targetId}");
             }
 
+            case "project":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
+                // "project" shape re-applied (a pure doc load, no CanAsync,
+                // no audit row — C-M17·2). The Project has no IsDraft (D8a —
+                // a project is live on creation), so only the IsDeleted
+                // gate applies (the ADR 0024 soft-delete flag).
+                var project = await s.LoadAsync<Project>(targetId).ConfigureAwait(false);
+                if (project is null || project.IsDeleted)
+                    return (null, null);
+                return (project.Title, $"/projects/projects/{targetId}");
+            }
+
+            case "board":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
+                // "board" shape re-applied (a pure doc load, no CanAsync,
+                // no audit row — C-M17·2). The KanbanBoard has no IsDraft
+                // (D8a), so only the IsDeleted gate applies.
+                var board = await s.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
+                if (board is null || board.IsDeleted)
+                    return (null, null);
+                return (board.Title, $"/projects/boards/{targetId}");
+            }
+
             case "announcement":
             {
                 var a = await s.LoadAsync<Announcement>(targetId).ConfigureAwait(false);
@@ -690,6 +726,58 @@ public sealed class BookmarkService : IBookmarkService
                 {
                     var detail = await _projects.GetTodoAsync(targetId, actorId).ConfigureAwait(false);
                     return (true, detail.Todo.Title, $"/projects/todos/{targetId}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    return (false, null, null);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (false, null, null);
+                }
+            }
+
+            case "project":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
+                // "project" D3 shape re-applied: re-runs the owning surface's
+                // own frozen IProjectService.GetProjectAsync read (the same
+                // call the /projects/{id} detail page uses — the C-M17·3
+                // pin: the target's own audit row commits, M17 commits none
+                // of its own). KeyNotFoundException (404 on absent /
+                // soft-deleted) + UnauthorizedAccessException (403 on
+                // denied) both degrade to Refused — the M17 404-not-403
+                // Web mapping collapses the split to a non-leaky 404 (the
+                // D3 table: a denied / absent / soft-deleted target is
+                // Refused, the M16 create-gate posture).
+                try
+                {
+                    var project = await _projects.GetProjectAsync(targetId, actorId).ConfigureAwait(false);
+                    return (true, project.Title, $"/projects/projects/{targetId}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    return (false, null, null);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (false, null, null);
+                }
+            }
+
+            case "board":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
+                // "board" D3 shape re-applied: re-runs the owning surface's
+                // own frozen IProjectService.GetBoardAsync read (the same
+                // call the /projects/boards/{id} detail page uses — the
+                // C-M17·3 pin: the target's own audit row commits, M17
+                // commits none of its own). KeyNotFoundException +
+                // UnauthorizedAccessException both degrade to Refused.
+                try
+                {
+                    var detail = await _projects.GetBoardAsync(targetId, actorId).ConfigureAwait(false);
+                    return (true, detail.Board.Title, $"/projects/boards/{targetId}");
                 }
                 catch (KeyNotFoundException)
                 {

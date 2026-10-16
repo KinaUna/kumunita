@@ -31,7 +31,11 @@
     // The closed TargetKind set (D1 — the exact vocabulary the existing
     // *ToAuditableResource adapters already emit). Rendered in this canonical
     // order; a kind with no bookmarks is skipped (the M37 Notes/Index shape).
-    string[] _kinds = { "post", "event", "todo", "announcement", "page" };
+    // The project / board kinds joined by the ADR 0118 amendment (2026-10-16)
+    // — the M37 PersonalNotes closed-set vocabulary already carried them;
+    // the M17 surface now matches (the project / board detail surfaces
+    // gained the bookmark affordance).
+    string[] _kinds = { "post", "event", "todo", "announcement", "page", "project", "board" };
 
     // Builds the bookmark "buckets" for one kind (ADR 0168 D2 — the M37
     // Buckets shape re-applied). The owner's folder tree (D2 — depth ≤ 2:
