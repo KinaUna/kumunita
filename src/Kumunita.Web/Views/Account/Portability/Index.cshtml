@@ -75,3 +75,57 @@
    strings, outside the kw-l TagHelper's reach). *@
 @* No inline markup here — the _FlashToast partial is the one, uniform
    flash surface (the house convention). *@
+
+@* ── Delete account (ADR 0142) — folded into the "My data" tab 2026-10-17 ──
+   Previously a standalone settings tab (nav.delete_account → /account/delete).
+   Now rendered here as a danger-zone card at the bottom of the My data page.
+   The POST still targets /account/delete (the AccountController.Delete action
+   is unchanged). The ADR 0142 D5 gate (self-serve lane is GlobalAdmin-only)
+   is computed server-side via KumunitaPrincipal.IsGlobalAdmin — no DB read. *@
+@{
+    var canDelete = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
+}
+<div class="card border-danger mb-4">
+    <div class="card-header fw-semibold text-danger">
+        <kw-l key="account.delete_title">Delete account</kw-l>
+    </div>
+    <div class="card-body">
+        @if (!canDelete)
+        {
+            @* ADR 0142 D5 gate — the resident is not a GlobalAdmin. The form
+               is not rendered (the self-serve lane is unavailable); the
+               notice tells them to contact an administrator. A crafted POST
+               to /account/delete is still refused server-side by the Core
+               seam (defense in depth). *@
+            <div class="alert alert-warning mb-0">
+                <kw-l key="account.delete_refused">The self-serve delete-account lane is only available to a GlobalAdmin. A non-GlobalAdmin resident cannot delete their own account — contact an administrator to remove the account.</kw-l>
+            </div>
+        }
+        else
+        {
+            <p class="text-muted mb-3">
+                <kw-l key="account.delete_lede">Deleting your account removes your sign-in, your profile, and your group and community memberships. Your past actions in the platform's audit trail are preserved with your identity replaced by a placeholder (the platform's privacy policy, OPS.md §9). This cannot be undone.</kw-l>
+            </p>
+            <form method="post" action="/account/delete"
+                  data-confirm="Delete your account permanently? This cannot be undone.">
+                @Html.AntiForgeryToken()
+                <div class="mb-3">
+                    <label for="delete-password" class="form-label">
+                        <kw-l key="account.delete_password">Password</kw-l>
+                    </label>
+                    <input type="password" name="Password" id="delete-password"
+                           class="form-control" autocomplete="current-password" required />
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" name="Confirmed" id="delete-confirmed" class="form-check-input" />
+                    <label for="delete-confirmed" class="form-check-label">
+                        <kw-l key="account.delete_confirm_checkbox">I understand my account will be permanently deleted and this cannot be undone.</kw-l>
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-danger">
+                    <kw-l key="account.delete_submit">Delete account</kw-l>
+                </button>
+            </form>
+        }
+    </div>
+</div>

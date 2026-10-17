@@ -1931,8 +1931,9 @@ public static class FirstBootSeeder
              "different person:\n" +
              "- **Your own account.** Only a **global admin** can delete their " +
              "own account — a resident who isn't an admin can't. Open " +
-             "**Account → Delete account**, type your password, tick the box " +
-             "that you understand it's permanent, and click **Delete account**. " +
+             "**Settings → My data**, scroll to **Delete account** at the " +
+             "bottom, type your password, tick the box that you understand " +
+             "it's permanent, and click **Delete account**. " +
              "If you're not a global admin and you need your account removed, " +
              "ask an administrator.\n" +
              "- **Another resident's account.** A **global admin** removes it: " +
@@ -1990,7 +1991,7 @@ public static class FirstBootSeeder
              "archive. See [My data](my-data).\n" +
              "- **Kiosk** — configure your own full-screen display at /kiosk. " +
              "See [Kiosk](kiosk).\n" +
-             "- **Delete account** — the permanent end. See " +
+             "- **Delete account** — at the bottom of the My data page. See " +
              "[Deleting an account](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
              "## To-dos\n\n" +
@@ -3173,7 +3174,7 @@ public static class FirstBootSeeder
              "[Meine Daten](/pages/system/help/settings/my-data).\n" +
              "- **Kiosk** — deine eigene Vollbild-Anzeige auf /kiosk einrichten. " +
              "Siehe [Kiosk](kiosk).\n" +
-             "- **Konto löschen** — der dauerhafte Schluss. Siehe " +
+             "- **Konto löschen** — am Ende der Meine-Daten-Seite. Siehe " +
              "[Konto löschen](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
              "## To-dos\n\n" +
@@ -4326,7 +4327,7 @@ public static class FirstBootSeeder
              "[Mes données](/pages/system/help/settings/my-data).\n" +
              "- **Kiosque** — configure ton propre affichage plein écran sur /kiosk. " +
              "Voir [Kiosque](kiosk).\n" +
-             "- **Supprimer le compte** — la fin permanente. Voir " +
+             "- **Supprimer le compte** — en bas de la page Mes données. Voir " +
              "[Supprimer un compte](/pages/system/help/deleting-an-account).\n"),
             ("todos", "Tâches",
              "## Tâches\n\n" +
@@ -5495,7 +5496,7 @@ public static class FirstBootSeeder
              "[Mine data](/pages/system/help/settings/my-data).\n" +
              "- **Kiosk** — indstil din egen fuldskærms-visning på /kiosk. " +
              "Se [Kiosk](kiosk).\n" +
-             "- **Slet konto** — den varige afslutning. Se " +
+             "- **Slet konto** — nederst på siden Mine data. Se " +
              "[Slet en konto](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
              "## To-dos\n\n" +
