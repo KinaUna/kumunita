@@ -258,9 +258,39 @@
     {
         // Non-HTTP render / missing context — not embedded (the floor).
     }
+
+    // M35 (ADR 0164) kiosk display — this page is being iframed by the /kiosk
+    // display (the kiosk "frame the surface's own route" idiom, M35·6). The
+    // kmb-embed class above is SHARED with the onboarding walk-through modal,
+    // which frames INTERACTIVE settings pages where the buttons ARE the point
+    // — the kiosk is the opposite: a read-only wall display that wants ONLY
+    // the title / subtitle / content. The differentiator is the referrer: a
+    // kiosk iframe navigates from the /kiosk document, while the onboarding
+    // modal iframes from whatever page hosts the walk. Same-origin, so the
+    // Referer arrives intact; we match on the /kiosk path (the leading slash
+    // keeps it from over-matching e.g. /kiosk-admin). A header read failure
+    // degrades to "not kiosk" (the floor — the full page renders, exactly the
+    // kmb-embed "the safe floor is the full page" doctrine). The kmb-kiosk
+    // body class then drives the site.css kiosk rules (hide buttons / tabs /
+    // nav, stretch the content to fill the frame, tight margins).
+    bool kmbKiosk = kmbEmbed;
+    if (kmbKiosk)
+    {
+        try
+        {
+            var referrer = Context.Request.Headers["Referer"].ToString();
+            var qIndex = referrer.IndexOf('?');
+            var refPath = (qIndex >= 0 ? referrer.Substring(0, qIndex) : referrer);
+            kmbKiosk = refPath.Contains("/kiosk");
+        }
+        catch
+        {
+            kmbKiosk = false; // missing context — not kiosk (the floor).
+        }
+    }
 }
 
-<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null)">
+<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null) @(kmbKiosk ? "kmb-kiosk" : null)">
     @* Flash toast — the one, uniform flash-message surface (TempData["info"]
        / ["error"]). Renders a fixed top-right Bootstrap toast when the
        controller left a flash value on the last redirect. Replaces the

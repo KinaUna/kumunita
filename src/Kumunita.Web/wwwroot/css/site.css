@@ -1053,6 +1053,193 @@ body.kmb-embed .kmb-tab-under-navbar {
   border: 0;
 }
 
+/* ── Kiosk display (M35, ADR 0164) — the wall-display read-only mode ──────
+   When a kiosk slide iframes a surface's own route (board / calendar /
+   to-dos), _Layout.cshtml adds the kmb-kiosk body class (detected from the
+   /kiosk referrer — see the kmbEmbed block there; the kmb-embed class alone
+   is shared with the onboarding walk-through modal, which frames INTERACTIVE
+   settings pages and must keep its controls, so the kiosk gets its own
+   class). A wall display is read-only: it shows the title + subtitle +
+   content and nothing that does something. Hide every interactive control —
+   the buttons, the tab / section strips, the filter / add / assign forms,
+   the pickers, and the nav — and let the content fill the frame with a
+   minimal margin. The kmb-embed rules above already hide the top-level page
+   chrome (navbar / footer / banners / toasts); these rules strip the
+   in-content controls on top. display:none is safe on a control that is
+   absent (the same doctrine as the kmb-embed rules above), and each control
+   is purely a control (no content is wrapped inside a button / form /
+   select / input on these three surfaces), so hiding them never hides
+   content. A direct navigation (never a kiosk iframe) never sets the class,
+   so the page is unchanged when visited normally. */
+body.kmb-kiosk {
+  margin: 0;
+  padding: 0;
+}
+/* The flex-fill chain (the body.kmb-page-expanded idiom, tightened): main →
+   .container → .row → .col hand their height down to the surface, each with
+   min-height:0 so the last link may scroll internally instead of overflowing
+   the frame. The frame IS the viewport here (the kiosk iframe is full-height),
+   so 100vh fills it edge to edge. The Bootstrap gutter padding/margins on
+   .row / .col are zeroed for the 100% width. */
+/* !important on the margins/padding: the rail-mode content shift
+   (body.kmb-nav-rail-mode main { margin-left: var(--kmb-rail-w) }) and the
+   Bootstrap gutter paddings on .row / .col sit at the same-or-higher
+   specificity and later in the file, so they win a plain tie — the kiosk
+   rules must override both to fill the frame edge to edge. */
+body.kmb-kiosk main {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+body.kmb-kiosk .container {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: none !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+body.kmb-kiosk .container > .row {
+  display: flex !important;
+  width: 100% !important;
+  margin: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+body.kmb-kiosk .container [class*="col-"] {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+/* The one small breathing margin — so the content fills the frame but does
+   not paint flush into the very edges (the "very small" margin the display
+   wants). Applied to the .container so it wraps the whole framed surface. */
+body.kmb-kiosk .container {
+  padding: 0.5rem !important;
+}
+/* Title / subtitle (the .airy-head h1 / lede) keep their margin rhythm —
+   the small top padding above is the only spacing the frame adds. */
+body.kmb-kiosk .airy-head {
+  margin: 0 0 0.5rem !important;
+}
+/* The board surface (the title/actions head stays; the lane strip fills the
+   remaining height and the lanes stretch — their card stacks scroll
+   internally, as on a normal page). */
+body.kmb-kiosk .kanban-board {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The calendar surface fills the remaining height and — on a wall display —
+   must be WHOLLY VISIBLE: no internal scroll. Month's 5–6 week-rows and the
+   Day/Week 24-hour grid both compress to the frame's height, so the entire
+   month, or the entire 24-hour day/week, is always on screen. */
+body.kmb-kiosk #events-calendar {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;               /* a wall display carries no scrollbar */
+}
+/* ── Month: the 7-column lattice fills the height; the 5–6 week-rows share
+   it evenly, and the day-cell min-height goes to 0 so even a short frame
+   shows every row (not a clipped/stubbed grid). */
+body.kmb-kiosk #events-calendar .events-calendar-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-auto-rows: minmax(0, 1fr);
+}
+body.kmb-kiosk #events-calendar .events-calendar-day {
+  min-height: 0;
+}
+/* ── Day/Week: the 24-hour time grid compresses to the frame's height. The
+   top-level grid hands its full height to its single row; the hour-ruler and
+   the day-area each fill that height and distribute the 24 hour-rows with
+   1fr (replacing the fixed 3rem/hr the normal page uses). The event blocks
+   are positioned by % of the day-body, so they stay correctly placed as the
+   body shrinks; the hour hairlines scale to 1/24 of the body's height. */
+body.kmb-kiosk #events-calendar .events-time-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+/* Ruler: the 2.5rem head band stays fixed; the 24 hour-labels share the rest
+   (1fr each) so the ruler's rows keep lining up with the day-body's. */
+body.kmb-kiosk #events-calendar .events-time-ruler {
+  grid-template-rows: 2.5rem repeat(24, minmax(0, 1fr));
+  min-height: 0;
+}
+/* Day-area: its single row fills the height (1fr), each day-column becomes a
+   flex column so its 2.5rem label stays fixed and the body fills the rest. */
+body.kmb-kiosk #events-calendar .events-time-day-area {
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+body.kmb-kiosk #events-calendar .events-time-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+body.kmb-kiosk #events-calendar .events-time-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;                              /* drop the fixed calc(24*3rem) */
+  background-size: 100% calc(100% / 24);     /* hour lines track the body    */
+}
+/* ── The interactive controls go (the read-only wall display) ────────────
+   Buttons (incl. .btn links), form-based controls, and the nav all
+   disappear; the content (board lanes + cards, calendar grid + events,
+   to-do rows) remains. */
+body.kmb-kiosk button,
+body.kmb-kiosk .btn,
+body.kmb-kiosk form,
+body.kmb-kiosk select,
+body.kmb-kiosk input,
+body.kmb-kiosk .nav,
+body.kmb-kiosk .dropdown,
+/* BOTH nav variants: the .navbar row (variant B) AND the .kmb-rail +
+   .kmb-topbar pair (variant C). The nav's wrapping <header> is a DIRECT
+   child of <body>, so scope to `> header` — a bare `header` rule would also
+   hit the content's <header class="airy-head"> (nested deep inside main),
+   which carries the title + subtitle the kiosk must KEEP. The fixed .kmb-rail
+   is hidden explicitly (a fixed element survives an empty parent), and so are
+   the .kmb-topbar / .navbar rows. */
+body.kmb-kiosk > header,
+body.kmb-kiosk .navbar,
+body.kmb-kiosk .kmb-rail,
+body.kmb-kiosk .kmb-topbar,
+body.kmb-kiosk .kmb-footer,
+body.kmb-kiosk .kumunita-pinned-announcement,
+body.kmb-kiosk .kumunita-onboarding-banner,
+body.kmb-kiosk .kmb-flash-toast,
+body.kmb-kiosk .kmb-whatsnew-toast,
+body.kmb-kiosk .page-expand-toggle,
+body.kmb-kiosk .page-expand-close,
+body.kmb-kiosk .kanban-fullscreen-toggle,
+body.kmb-kiosk .calendar-fullscreen-toggle,
+body.kmb-kiosk .calendar-fullscreen-close,
+body.kmb-kiosk .kanban-fullscreen-close,
+body.kmb-kiosk .kanban-lane-menu,
+body.kmb-kiosk .kanban-lane-add,
+body.kmb-kiosk .kanban-lane-new,
+body.kmb-kiosk .kanban-lane-autosubmit,
+body.kmb-kiosk .kanban-arrow-submit,
+body.kmb-kiosk .kanban-divided-menu {
+  display: none !important;
+}
+/* The to-do surface's action cluster (the iCal-feed + New to-do buttons
+   live in a .d-flex row that has no dedicated class) — hide any control
+   row that ends up holding only controls. */
+body.kmb-kiosk .head-row > .d-flex {
+  display: none !important;
+}
+
 .lead {
   font-weight: 400;
   line-height: 1.6;
