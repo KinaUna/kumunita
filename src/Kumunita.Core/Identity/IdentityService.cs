@@ -973,6 +973,94 @@ public sealed class IdentityService(
             session.Delete(profile);
         }
 
+        // 8c. F1 (DB-13 GDPR) — delete the target's resident-authored content
+        //     docs in this SAME session / SAME commit (C3 single-write-lane,
+        //     ADR 0006; the §2A closed list in
+        //     docs/design/prod-hardening-f1-gdpr-deletion.md). Only the
+        //     resident's own rows are removed (the listed owner field ==
+        //     targetSubjectId); platform announcements (AuthorId == "") and
+        //     every other resident's content are untouched.
+        //
+        //     Owner-field-less sub-entities travel with their parent and have
+        //     no resident field to query by: KanbanLane / BoardItemPlacement
+        //     are cascade-deleted off the KanbanBoard rows below (the exact
+        //     ProjectService.DeleteBoardAsync cascade shape). GroupTranslation
+        //     / CommunityTranslation / TranslationResource are NOT removed here
+        //     — they sit under Group / Component parents this fix does not
+        //     delete (§2C — those parents are out of scope), and
+        //     TranslationResource is a global UI-string resource with no
+        //     principal field at all. MediaObject rows + their bytes are U4's
+        //     set — not touched here (only IdentityService.cs, this one commit).
+        int contentDocs = 0;
+        async Task<int> DeleteResidentRows<T>(
+            System.Linq.Expressions.Expression<System.Func<T, bool>> predicate)
+        {
+            var rows = await session.Query<T>().Where(predicate)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var row in rows)
+                session.Delete(row);
+            return rows.Count;
+        }
+
+        // §2A primary set — one query per doc type, owner field == resident.
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.Post>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.PostReply>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.PostTranslation>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.ReplyTranslation>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.Announcement>(a => a.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.AnnouncementTranslation>(a => a.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.AnnouncementComment>(a => a.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.Event>(e => e.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.EventTranslation>(e => e.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.EventRsvp>(r => r.UserId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.Project>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.ProjectGoal>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoItem>(t => t.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoComment>(t => t.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoTranslation>(t => t.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.BoardTranslation>(b => b.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.ProjectTranslation>(p => p.AuthorId == targetSubjectId);
+        // KanbanBoard + its owner-field-less sub-entities (cascade — the
+        // DeleteBoardAsync shape: the board's placements + lanes go first,
+        // then the board itself). The to-dos themselves are deleted above by
+        // their own AuthorId (a to-do is a standalone row, not a board child).
+        {
+            var boardIds = await session.Query<Kumunita.Core.Projects.KanbanBoard>()
+                .Where(b => b.AuthorId == targetSubjectId)
+                .Select(b => b.Id)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var boardId in boardIds)
+            {
+                var placements = await session.Query<Kumunita.Core.Projects.BoardItemPlacement>()
+                    .Where(p => p.BoardId == boardId)
+                    .ToListAsync(ct).ConfigureAwait(false);
+                foreach (var placement in placements)
+                    session.Delete(placement);
+
+                var lanes = await session.Query<Kumunita.Core.Projects.KanbanLane>()
+                    .Where(l => l.BoardId == boardId)
+                    .ToListAsync(ct).ConfigureAwait(false);
+                foreach (var lane in lanes)
+                    session.Delete(lane);
+            }
+            contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.KanbanBoard>(b => b.AuthorId == targetSubjectId);
+        }
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Pages.Page>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Pages.PageTranslation>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Inventory.InventoryItem>(i => i.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Documents.Document>(d => d.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Documents.DocumentFolder>(d => d.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Bookmarks.Bookmark>(b => b.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Bookmarks.BookmarkFolder>(b => b.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Tags.Tag>(t => t.CreatedBy == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Tags.TagTranslation>(t => t.AuthorId == targetSubjectId);
+        // Conversation — the two-principal union (the resident holds a seat).
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Messaging.Conversation>(
+            c => c.ParticipantA == targetSubjectId || c.ParticipantB == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Messaging.Message>(m => m.SenderId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.PersonalNote>(n => n.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.NoteFolder>(n => n.OwnerId == targetSubjectId);
+
         // 8b. ADR 0143 — dissolve every GuardianLink row for the deleted
         //     child (any status) in this same session (C·5 — no dangling
         //     standing; C4 strong-consistency). The ADR 0142 self/admin
@@ -1018,10 +1106,10 @@ public sealed class IdentityService(
         }
 
         logger.LogInformation(
-            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed.",
+            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed, {ContentDocs} resident content docs removed.",
             actorId, via, targetSubjectId,
             auditRows.Count, groupMemberships.Count,
-            compMemberships.Count, modAssignments.Count);
+            compMemberships.Count, modAssignments.Count, contentDocs);
     }
 
     // ── ADR 0077 — the account-lane GlobalAdmin emitters ──────────────────
