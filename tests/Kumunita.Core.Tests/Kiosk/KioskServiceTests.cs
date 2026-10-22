@@ -129,11 +129,12 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
     }
 
     // ── Pin 5 ─────────────────────────────────────────────────────────────
-    // M35·2 (the design doc §2.2 "upsert vs. no-op" divergence — the register
-    // wins): SavePlaylistAsync over a NO-ROW store CREATES the singleton — a
+    // M35·2: SavePlaylistAsync over a NO-ROW store CREATES the singleton — a
     // GlobalAdmin can configure the playlist on a fresh instance without a
-    // seeder (the one intentional departure from the SiteContentService
-    // no-op-on-missing template).
+    // seeder. ADR 0170 moved the SiteContentService.SaveAsync template to
+    // the same upsert shape, so the two services are now on parity (a save
+    // is never a silent no-op in either service) — the original "upsert
+    // vs. no-op" divergence was closed.
 
     [Fact]
     public async Task M35_2_SavePlaylist_NoRow_CreatesSingleton()

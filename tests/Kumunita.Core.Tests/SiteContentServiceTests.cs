@@ -60,6 +60,74 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.True(result.AboutShowContactCta);
     }
 
+    // ── 1b — a save on a missing row creates the singleton (ADR 0170) ────
+    // ADR 0170 (the ADR 0164 KioskService "upsert vs. no-op" shape applied
+    // to the SiteContent template): SaveAsync on a store with no row is
+    // not a silent no-op — it creates the singleton row with the caller's
+    // field set, writes exactly one AccessAudit row, and the very next
+    // GetAsync reflects the change (strong consistency). A second save is
+    // still an upsert (exactly one row — SITE·6).
+
+    [Fact(DisplayName = "U08 SaveAsync on a missing row creates the singleton (ADR 0170 upsert-on-missing)")]
+    public async Task SaveAsync_MissingRow_CreatesSingleton()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new SiteContent.SiteContentService(store);
+
+        // No row seeded — a fresh boot before the seeder ran (the ADR 0170
+        // scenario: the save must be live, not a silent no-op).
+        const string actor = "admin-u08-upsert-missing";
+        await svc.SaveAsync(new SiteContent.SiteContent
+        {
+            HomeHeroEyebrow   = "Created by save, not seeder",
+            HomeHeroLead      = "The save is the writer.",
+            HomeHeroSub1      = "Sub one",
+            HomeHeroSub2      = "Sub two",
+            HomeShowAboutButton = false,
+            HomeShowFeatures  = true,
+            HomeShowRoadmap   = false,
+            AboutHeroEyebrow  = "Created by save, not seeder (about)",
+            AboutHeroLead     = "The save is the writer (about).",
+            AboutShowFeatures = true,
+            AboutShowScope    = false,
+            AboutShowPhilosophy = true,
+            AboutShowProject  = true,
+            AboutShowWhatsNew = true,
+            AboutShowContactCta = true,
+        }, actor, ct);
+
+        // The singleton row now exists, with the caller's field set.
+        await using var q = store.QuerySession();
+        var rows = await q.Query<SiteContent.SiteContent>().ToListAsync(ct);
+        Assert.Single(rows);
+        Assert.Equal(SiteContent.SiteContent.SingletonId, rows[0].Id);
+        Assert.Equal("Created by save, not seeder", rows[0].HomeHeroEyebrow);
+        Assert.False(rows[0].HomeShowAboutButton); // a posted false is honored, not lost
+        Assert.False(rows[0].HomeShowRoadmap);
+
+        // Strong consistency: the very next GetAsync reflects the save.
+        var result = await svc.GetAsync(ct);
+        Assert.Equal("Created by save, not seeder", result.HomeHeroEyebrow);
+
+        // Exactly one AccessAudit row (site.save, site, Admin).
+        var audits = await q.Query<AccessAudit>()
+            .Where(a => a.Action == "site.save" && a.TargetKind == "site")
+            .ToListAsync(ct);
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Admin, audits[0].Via);
+        Assert.Equal(actor, audits[0].ActorId);
+
+        // A second save is still an upsert — exactly one row (SITE·6).
+        await svc.SaveAsync(new SiteContent.SiteContent
+        {
+            HomeHeroEyebrow = "Second save",
+        }, actor, ct);
+        var rowsAfter = await q.Query<SiteContent.SiteContent>().ToListAsync(ct);
+        Assert.Single(rowsAfter);
+        Assert.Equal("Second save", rowsAfter[0].HomeHeroEyebrow);
+    }
+
     // ── 2 — a save writes exactly one AccessAudit row (SITE·2) ────────────
     // The audit row: Via = Admin, action "site.save", TargetKind "site",
     // TargetId "singleton" — the signup.set-open / timezone.set-default shape.
@@ -71,7 +139,9 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var ct = TestContext.Current.CancellationToken;
         var svc = new SiteContent.SiteContentService(store);
 
-        // Seed a row so the save is not a no-op.
+        // Seed a row to exercise the existing-row save path (the ADR 0170
+        // upsert-on-missing case — a save on a missing row creates the
+        // singleton — is pinned by SaveAsync_MissingRow_CreatesSingleton).
         await SeedRowAsync(store, ct);
 
         const string actor = "admin-u08-audit";
@@ -110,7 +180,8 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var ct = TestContext.Current.CancellationToken;
         var svc = new SiteContent.SiteContentService(store);
 
-        // Seed a row so the save is not a no-op.
+        // Seed a row to exercise the existing-row save path (the ADR 0170
+        // upsert-on-missing case is pinned by SaveAsync_MissingRow_CreatesSingleton).
         await SeedRowAsync(store, ct);
 
         const string actor = "admin-u08-consistency";
@@ -141,7 +212,8 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var ct = TestContext.Current.CancellationToken;
         var svc = new SiteContent.SiteContentService(store);
 
-        // Seed a row so the save is not a no-op.
+        // Seed a row to exercise the existing-row save path (the ADR 0170
+        // upsert-on-missing case is pinned by SaveAsync_MissingRow_CreatesSingleton).
         await SeedRowAsync(store, ct);
 
         const string actor = "admin-u08-upsert";
@@ -363,8 +435,10 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
     }
 
     /// <summary>
-    /// Store a SiteContent singleton row so the save is not a no-op (the
-    /// service's SaveAsync is a no-op when the row is absent — SITE·6).
+    /// Store a SiteContent singleton row so the tests under it exercise the
+    /// existing-row save path (the ADR 0170 upsert-on-missing case — a save
+    /// on a missing row creates the singleton — is pinned separately by
+    /// <see cref="SaveAsync_MissingRow_CreatesSingleton"/>).
     /// </summary>
     private static async Task SeedRowAsync(IDocumentStore store, CancellationToken ct)
     {

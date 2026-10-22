@@ -15,15 +15,10 @@ namespace Kumunita.Core.Kiosk;
 /// sign-in authorization is produced (the ADR 0164 amendment — the gate is
 /// now [Authorize], any signed-in user, not GlobalAdmin).
 /// <para>
-/// **Three intentional departures from the <c>SiteContentService</c>
+/// **Two intentional departures from the <c>SiteContentService</c>
 /// template** (the register is the source of truth, pinned in the design
 /// doc §2.2 divergence notes):
 /// <list type="bullet">
-/// <item><b>Upsert vs. no-op.</b> <see cref="SavePlaylistAsync"/> is an
-/// **upsert** — a missing <see cref="KioskPlaylist"/> row is **created**
-/// (a resident can configure their playlist on a fresh instance without a
-/// seeder — the ADR 0164 amendment). The <c>SiteContentService.SaveAsync</c>
-/// template is a no-op on a missing row (SITE·6).</item>
 /// <item><b>Caller's session vs. own session.</b>
 /// <see cref="SavePlaylistAsync"/> takes the **caller's**
 /// <c>IDocumentSession</c> (in-transaction with surrounding work). The
@@ -34,6 +29,12 @@ namespace Kumunita.Core.Kiosk;
 /// <c>SiteContentService.GetAsync</c> template returns a never-null in-code
 /// fallback.</item>
 /// </list>
+/// <para>
+/// <b>Upsert parity (ADR 0170).</b> Both <see cref="SavePlaylistAsync"/>
+/// and <c>SiteContentService.SaveAsync</c> upsert — a missing row is
+/// created. The original M35·2 "upsert vs. no-op" divergence was closed
+/// when the <c>SiteContentService</c> template moved to upsert-on-missing;
+/// a save is never a silent no-op in either service.
 /// </para>
 /// <para>
 /// The <c>IAuthorizationService</c> is carried for composition-root symmetry
@@ -97,11 +98,11 @@ public sealed class KioskService : IKioskService
         // TargetKind = "kiosk", Via = Owner. Within the caller's session
         // (in-transaction with any surrounding work — the M3 CreatePostAsync
         // same-transaction precedent). Upsert: a missing row is created
-        // (the register's M35·2 pin — the one intentional departure from the
-        // SiteContentService.SaveAsync no-op-on-missing template; a resident
-        // can configure their playlist on a fresh instance without a seeder).
-        // The row is **per-resident** — keyed on the actor's subject id, so
-        // the acting resident's own playlist is upserted (the ADR 0164
+        // (the register's M35·2 pin; ADR 0170 moved the
+        // SiteContentService.SaveAsync template to the same upsert shape,
+        // so the two services are now on parity — a save is never a silent
+        // no-op). The row is **per-resident** — keyed on the actor's subject
+        // id, so the acting resident's own playlist is upserted (the ADR 0164
         // amendment: per-resident, not a shared GlobalAdmin singleton).
         var row = await session
             .LoadAsync<KioskPlaylist>(actorId, ct)
