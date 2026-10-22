@@ -47,7 +47,16 @@ public sealed class IdentityService(
     // breaks: a null reader resolves as "not a sample-data instance" (the
     // <c>false</c> floor — the lock is unreachable by construction, the
     // ADR 0056 shape). DI always supplies the live value.
-    IOptions<SampleDataOptions>? sampleDataOptions = null) : IIdentityService
+    IOptions<SampleDataOptions>? sampleDataOptions = null,
+    // F1 (DB-13 GDPR, U4) — the byte-store delete seam (F1.U2's
+    // <c>IMediaFileStore.DeleteIfExistsAsync</c>). Optional (default null) for
+    // the same reason the other trailing seams are: the two direct-construction
+    // Core test harnesses build <see cref="IdentityService"/> positionally and
+    // omit it (a null store skips the post-commit byte-delete; the catalog-row
+    // delete in the Marten session is unaffected). DI always supplies the live
+    // <c>IMediaFileStore</c> (registered in DependencyInjection.cs), so the
+    // delete lane runs the byte-delete in production.
+    Kumunita.Core.Media.IMediaFileStore? mediaStore = null) : IIdentityService
 {
     private const string ComponentKind = "component";
     private const string AccountKind = "account";
@@ -1061,6 +1070,27 @@ public sealed class IdentityService(
         contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.PersonalNote>(n => n.OwnerId == targetSubjectId);
         contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.NoteFolder>(n => n.OwnerId == targetSubjectId);
 
+        // F1.U4 (DB-13 GDPR) — the resident's MediaObject catalog rows, in this
+        // SAME session / SAME commit as the content-doc deletes above (C3
+        // single-write-lane, ADR 0006; the §4 catalog pin in
+        // docs/design/prod-hardening-f1-gdpr-deletion.md). The owner field is
+        // <c>CreatedById</c> (the resident who first stored the unique file).
+        // We collect each row's <c>Id</c> (the lowercase-hex SHA-256 content id
+        // — the exact byte-store key for F1.U2's DeleteIfExistsAsync) into
+        // <c>mediaIds</c> so the post-commit byte-delete loop below can run;
+        // the catalog rows themselves are session-deleted here and committed by
+        // the single SaveChangesAsync (step 9). Orphan policy (pinned §4,
+        // owner-accepted): a dedup'd byte referenced by another resident's doc
+        // is deleted anyway — the dangling ref degrades to a 404 (C-MED·7),
+        // not a crash — so NO reference check is performed.
+        var mediaRows = await session.Query<Kumunita.Core.Media.MediaObject>()
+            .Where(o => o.CreatedById == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        var mediaIds = mediaRows.Select(o => o.Id).ToList();
+        foreach (var mediaRow in mediaRows)
+            session.Delete(mediaRow);
+        contentDocs += mediaRows.Count;
+
         // 8b. ADR 0143 — dissolve every GuardianLink row for the deleted
         //     child (any status) in this same session (C·5 — no dangling
         //     standing; C4 strong-consistency). The ADR 0142 self/admin
@@ -1087,6 +1117,39 @@ public sealed class IdentityService(
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
+        // 9b. F1.U4 (DB-13 GDPR) — delete the resident's media BYTES on the
+        //     local volume, AFTER the Marten commit and BEFORE the EF Identity
+        //     delete (the §5 ordering pin: Marten commit → byte deletes → EF
+        //     Identity delete). These are filesystem ops, NOT in the Marten
+        //     session — the catalog rows were committed in step 9's single
+        //     SaveChangesAsync; only the bytes are removed here. Each
+        //     <c>DeleteIfExistsAsync</c> (F1.U2) is idempotent and never throws
+        //     for a missing file; we additionally swallow + log any unexpected
+        //     failure (a byte-delete failure after the commit leaves a
+        //     reclaimable orphan — orphan-safe per C-MED·7 — the §5 "accepted
+        //     cross-store window" for this store) so the account deletion
+        //     ALWAYS completes. Skipped entirely when the store seam was not
+        //     supplied (the two direct-construction test harnesses), which
+        //     leaves only the already-committed catalog-row deletes in place.
+        var mediaDeleted = 0;
+        if (mediaStore is not null)
+        {
+            foreach (var mediaId in mediaIds)
+            {
+                try
+                {
+                    if (await mediaStore.DeleteIfExistsAsync(mediaId, ct).ConfigureAwait(false))
+                        mediaDeleted++;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex,
+                        "F1.U4 — byte-delete failed for media id {MediaId} during account {Target} deletion; leaving a reclaimable orphan (orphan-safe per C-MED·7) and continuing.",
+                        mediaId, targetSubjectId);
+                }
+            }
+        }
+
         // 10. Delete the Identity account (EF Core, the identity schema).
         //     This removes the password hash, the role assignments, and the
         //     user row itself. Done AFTER the Marten commit (the
@@ -1106,10 +1169,11 @@ public sealed class IdentityService(
         }
 
         logger.LogInformation(
-            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed, {ContentDocs} resident content docs removed.",
+            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed, {ContentDocs} resident content docs removed (incl. {MediaRows} MediaObject catalog rows), {MediaBytes} media bytes deleted.",
             actorId, via, targetSubjectId,
             auditRows.Count, groupMemberships.Count,
-            compMemberships.Count, modAssignments.Count, contentDocs);
+            compMemberships.Count, modAssignments.Count, contentDocs,
+            mediaRows.Count, mediaDeleted);
     }
 
     // ── ADR 0077 — the account-lane GlobalAdmin emitters ──────────────────
