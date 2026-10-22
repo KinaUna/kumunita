@@ -85,3 +85,17 @@ No units executed yet. First wave (per the plan): F1, F2, F6, F7, F8, F13.
   - `Kumunita.Web.Tests` — **Total: 1062, Errors: 0, Failed: 0, Skipped: 1** (pre-existing `pwsh` skip) — exit 0.
   - `Kumunita.Core.Tests` — **Total: 1551, Errors: 0, Failed: 0, Skipped: 2** — exit 0 (134s; Testcontainers; `docker container prune -f` reported "Total reclaimed space: 0B", i.e. already cleaned).
 - **Open items:** none (U5 owns the pinned tests — `DeleteAccount_RemovesResidentMediaBytes` / `DeleteAccount_RemovesMediaObjectCatalogRows` / `DeleteAccount_KeepsOthersContentIntact` are the next clean-slate agent). Next unit = **F1.U5** (tests) — a fresh clean-slate agent.
+
+## F1.U5 — tests
+- **Landed (1 file):** `tests/Kumunita.Core.Tests/IdentityServiceDeleteLaneGdprTests.cs` (new, ~270 LOC) — the four §6 pinned tests + the `PostgresFixture`/`BootAsync` harness (mirrors `IdentityServiceDeleteAccountTests.cs`) + small plant helpers. **No `src/` edits, no other file, no doc type reshaped.**
+- **The four pinned test names (all `[Fact]`, all green):** `DeleteAccount_RemovesResidentAuthoredDocs`, `DeleteAccount_RemovesResidentMediaBytes`, `DeleteAccount_RemovesMediaObjectCatalogRows`, `DeleteAccount_KeepsOthersContentIntact`.
+- **GOTCHA 1 worked around (load-bearing):** `MediaObject` is on the **`MediaDocTypes`** surface, not `CoreDocTypes`/`PostDocTypes` — added `MediaDocTypes.Configure(opts);` to the boot store setup (the reference `BootAsync` omits it). Without it the two media tests hit an unmanaged-table error.
+- **GOTCHA 2 worked around (load-bearing, false-green guard):** the F1.U4 `mediaStore` ctor param is optional/null-defaulting, so the byte test would pass vacuously if omitted. `BootAsync` supplies a **real `LocalVolumeFileStore`** against a unique temp dir (`new LocalVolumeFileStore(Options.Create(new MediaOptions { RootPath = <unique temp dir> }))`); the byte test plants via `PutAsync` + asserts `store.ExistsAsync(id) == false` — genuinely exercising the post-commit byte-delete, not a null-skip.
+- **Role setup (per pin):** actor = a **GlobalAdmin** (GlobalAdmin role seeded + `AddToRoleAsync` on the actor only), target = a plain resident → clears the ADR 0142 gate and avoids the last-GlobalAdmin guard. Each media/content plant uses a valid 64-char lowercase-hex content id (the byte-store key) for `MediaObject.Id`.
+- **One build fix (not drift):** the private generic helper `LoadAsync<T>` cannot infer `T` from a return-only position — called with explicit type args (`LoadAsync<Post>`, `LoadAsync<PostReply>`, `LoadAsync<Page>`, `LoadAsync<TodoItem>`).
+- **Test result:**
+  - `dotnet build Kumunita.slnx -c Debug` — **Build succeeded, 0 Errors** (warnings are pre-existing in other files; my file adds none).
+  - `Kumunita.Web.Tests` — **Total: 1062, Errors: 0, Failed: 0, Skipped: 1** — exit 0.
+  - `Kumunita.Core.Tests` — **Total: 1555, Errors: 0, Failed: 0, Skipped: 2** (1551 prior + the 4 new GDPR tests, all green) — exit 0 (~153s; Testcontainers; `docker container prune -f` reported "Total reclaimed space: 0B", i.e. already cleaned).
+- **Drift pause:** none — the F1.U3/U4 seams (`DeleteCoreAsync` step 8d catalog delete + step 9b byte-delete loop, the `mediaStore` param, `MediaObject.CreatedById`/`Id`) all matched the pin exactly.
+- **Open items:** none. **F1 fix is complete (U1–U5).** Next fix = **F2** (AUTH-02: hash tokens at rest) — a fresh clean-slate agent.
