@@ -1851,6 +1851,155 @@ public class EventControllerTests
         Assert.Contains("2026", monthVm.Label);
     }
 
+    /// <summary>
+    /// ADR 0020 — when the viewer has a **date-only custom format** (e.g.
+    /// <c>dd/MM/yyyy</c>), the calendar subtitle's day-month-year portion is
+    /// rendered in **that** format (the user-defined date-time display format),
+    /// not the UI culture's short date. This is the exact case the user
+    /// defined (a date-only format is directly applicable to a date value).
+    /// </summary>
+    [Fact]
+    public async Task Calendar_Label_Uses_UserDefinedDateFormat()
+    {
+        const string subject = "subj-dwm-label-userfmt";
+        var zone = EffectiveTimezoneResolver.TryConvert("Europe/Berlin")!;
+
+        var events = Substitute.For<IEventService>();
+        events.ListInRangeAsync(
+                Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(),
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Event>());
+
+        // The viewer's Profile has a **date-only** custom format (the user's
+        // defined date display format — directly applicable to a date value).
+        var userInfoImpl = Substitute.For<IUserInfoService>();
+        userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+        userInfoImpl.GetProfileAsync(subject)
+            .Returns(new Profile { DateFormat = "dd/MM/yyyy" });
+
+        var localization = DefaultLocalization();
+        localization.GetDefaultTimezoneAsync().Returns(zone.Id);
+        localization.GetDefaultDateFormatAsync().Returns("MMMM d, yyyy HH:mm");
+
+        // A single HttpContextAccessor wired to the controller's HttpContext
+        // (the resolver reads the principal through this accessor — the
+        // same seam DI uses in the live app).
+        var httpContextAccessor = new HttpContextAccessor();
+        var sharedHttpContext = new DefaultHttpContext();
+        httpContextAccessor.HttpContext = sharedHttpContext;
+        var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, httpContextAccessor);
+        var dateFormat = new EffectiveDateFormatResolver(userInfoImpl, localization, httpContextAccessor);
+
+        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>(), timezone,
+            translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
+        controller.ControllerContext = new ControllerContext { HttpContext = sharedHttpContext };
+        sharedHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subject) },
+            authenticationType: "test"));
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+
+        // Day view: the label is "<DayName> <date>". The date portion must be
+        // the user's format (15/09/2026), not the culture's short date (15/09/
+        // 2026 in en-GB, but 09/15/2026 in en-US — the two are distinguishable
+        // here by the day/month order).
+        var dayVm = Assert.IsType<EventCalendarViewModel>(
+            Assert.IsType<ViewResult>(await controller.Calendar("2026-09-15", null, "day")).ViewData.Model);
+        Assert.Equal(
+            $"{invariant.DateTimeFormat.GetDayName(System.DayOfWeek.Tuesday)} 15/09/2026",
+            dayVm.Label);
+
+        // Week view: both endpoints must be the user's format (14/09/2026 –
+        // 20/09/2026), not the culture's short date (en-US would be 09/14/
+        // 2026 – 09/20/2026).
+        var weekVm = Assert.IsType<EventCalendarViewModel>(
+            Assert.IsType<ViewResult>(await controller.Calendar("2026-09-17", null, "week")).ViewData.Model);
+        Assert.Equal(
+            $"{invariant.DateTimeFormat.GetAbbreviatedDayName(System.DayOfWeek.Monday)} 14/09/2026 – " +
+            $"{invariant.DateTimeFormat.GetAbbreviatedDayName(System.DayOfWeek.Sunday)} 20/09/2026",
+            weekVm.Label);
+    }
+
+    /// <summary>
+    /// ADR 0020 — when the viewer's effective format is a **date-time** format
+    /// (e.g. the floor <c>MMMM d, yyyy HH:mm</c>, which carries an
+    /// <c>HH:mm</c>), the calendar subtitle's day-month-year portion is a
+    /// <b>date-only</b> value, so the format's time component is stripped and
+    /// its date portion is applied (the subtitle never emits a spurious
+    /// <c>00:00</c> tail). The floor's date portion (<c>MMMM d, yyyy</c>)
+    /// renders the full month name — so the label's shape is the same as the
+    /// pre-fix pin, but now derived from the user's own format rather than the
+    /// UI culture.
+    /// </summary>
+    [Fact]
+    public async Task Calendar_Label_DateTimeFormatStripsTimePortion()
+    {
+        const string subject = "subj-dwm-label-dtfmt";
+        var zone = EffectiveTimezoneResolver.TryConvert("Europe/Berlin")!;
+
+        var events = Substitute.For<IEventService>();
+        events.ListInRangeAsync(
+                Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(),
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Event>());
+
+        // The viewer has no personal override; the platform default is the
+        // ADR 0020 floor (a date-time format with HH:mm).
+        var userInfoImpl = Substitute.For<IUserInfoService>();
+        userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+        userInfoImpl.GetProfileAsync(subject).Returns(new Profile { DateFormat = null });
+
+        var localization = DefaultLocalization();
+        localization.GetDefaultTimezoneAsync().Returns(zone.Id);
+        localization.GetDefaultDateFormatAsync().Returns("MMMM d, yyyy HH:mm");
+
+        // A single HttpContextAccessor wired to the controller's HttpContext
+        // (the resolver reads the principal through this accessor — the
+        // same seam DI uses in the live app).
+        var httpContextAccessor = new HttpContextAccessor();
+        var sharedHttpContext = new DefaultHttpContext();
+        httpContextAccessor.HttpContext = sharedHttpContext;
+        var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, httpContextAccessor);
+        var dateFormat = new EffectiveDateFormatResolver(userInfoImpl, localization, httpContextAccessor);
+
+        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>(), timezone,
+            translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
+        controller.ControllerContext = new ControllerContext { HttpContext = sharedHttpContext };
+        sharedHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+            new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subject) },
+            authenticationType: "test"));
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+        var d = new DateTime(2026, 9, 15);
+
+        // Day view: the date portion is the floor's date-only format
+        // ("MMMM d, yyyy" → "September 15, 2026"), **not** a date-time format
+        // (no "00:00" tail). The full month name is present.
+        var dayVm = Assert.IsType<EventCalendarViewModel>(
+            Assert.IsType<ViewResult>(await controller.Calendar("2026-09-15", null, "day")).ViewData.Model);
+        Assert.Equal(
+            $"{invariant.DateTimeFormat.GetDayName(System.DayOfWeek.Tuesday)} " +
+            $"{d.ToString("MMMM d, yyyy", invariant)}",
+            dayVm.Label);
+        Assert.Contains(invariant.DateTimeFormat.GetMonthName(9), dayVm.Label, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("00:00", dayVm.Label);
+
+        // Week view (anchor 2026-09-17): the week's endpoints are Mon
+        // 2026-09-14 and Sun 2026-09-20; both are rendered in the floor's
+        // date-only format (full month name + day + year), no time tail.
+        var weekVm = Assert.IsType<EventCalendarViewModel>(
+            Assert.IsType<ViewResult>(await controller.Calendar("2026-09-17", null, "week")).ViewData.Model);
+        Assert.Equal(
+            $"{invariant.DateTimeFormat.GetAbbreviatedDayName(System.DayOfWeek.Monday)} " +
+            $"{new DateTime(2026, 9, 14).ToString("MMMM d, yyyy", invariant)} – " +
+            $"{invariant.DateTimeFormat.GetAbbreviatedDayName(System.DayOfWeek.Sunday)} " +
+            $"{new DateTime(2026, 9, 20).ToString("MMMM d, yyyy", invariant)}",
+            weekVm.Label);
+        Assert.DoesNotContain("00:00", weekVm.Label);
+    }
+
     // ── M12 (ADR 0112) — the iCal lane-1 Web pins (design doc §pinned tests) ──
 
     /// <summary>
