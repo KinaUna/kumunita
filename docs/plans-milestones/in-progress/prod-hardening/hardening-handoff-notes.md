@@ -29,3 +29,26 @@ No units executed yet. First wave (per the plan): F1, F2, F6, F7, F8, F13.
   2. Plan assumed U2 *adds* the byte-delete — the interface **already has** `DeleteFileAsync` but it's fail-closed (throws). Pinned a new idempotent method instead; existing one untouched.
   3. Grounded the closed list in the repo's own authoritative inventory `Portability/UserScopeInventory.cs` (M27 "closed in-scope inventory") cross-checked vs `*DocTypes.cs`, not the 3-field grep alone.
 - **Open items / decisions for the owner (NOT assumed done):** (a) whether `Report`(ReporterId), `Notification*`(RecipientId), `GroupInvitation`/`GroupJoinRequest`(UserId), `DelegationGrant`, `GuestAccess`, `IdentityToken`, `ErrorReport`(SubjectId) should also be purged — currently EXCLUDED from F1 (design §2C, each a decision); (b) §4 orphan policy: delete dedup'd bytes even if another resident's doc `ImageIds` still refs them (orphan-safe 404), vs. skip-if-still-referenced — **chose orphan-safe delete-by-default**; flip if owner prefers.
+
+## F1.U2 — byte-store delete seam
+- **Landed (6 files):**
+  - `src/Kumunita.Core/Media/IMediaFileStore.cs` — added the **one** new member (see signature below).
+  - `src/Kumunita.Core/Media/LocalVolumeFileStore.cs` — implemented it via the existing `PathFor`.
+  - `tests/Kumunita.Core.Tests/Usage/StorageLimitsAcceptanceTests.cs` — `FakeVolume` stub.
+  - `tests/Kumunita.Core.Tests/Usage/StorageLimitsTests.cs` — `FakeVolume` stub.
+  - `tests/Kumunita.Core.Tests/Usage/StorageMetricsHistoryTests.cs` — `FakeVolume` stub.
+  - `tests/Kumunita.Core.Tests/Usage/StorageMetricsTests.cs` — `FakeVolume` stub.
+- **Exact member signature added to `IMediaFileStore`:**
+  ```csharp
+  Task<bool> DeleteIfExistsAsync(string contentId, CancellationToken ct = default);
+  ```
+  (XML doc: "Idempotently delete the payload for this content id. A missing file is a **no-op, never an error** (unlike `DeleteFileAsync`). Returns `true` if a file was deleted, `false` if it was already absent.")
+- **`true`/`false` return contract (impl, `LocalVolumeFileStore`):** `var p = PathFor(contentId); if (File.Exists(p)) { File.Delete(p); return true; } return false;` — reuses `PathFor` (`{RootPath}/{id[0..2]}/{id}`), never hardcoded. **Idempotency holds:** a missing file returns `false`, never throws.
+- **`DeleteFileAsync` confirmation:** **untouched** — still fail-closed (throws `FileNotFoundException` on a missing file). C-MED·7 orphan self-cleaning (`LocalVolumeMediaStore.cs:75`) and `LocalVolumeFileStoreTests.cs:106` are unaffected.
+- **4 `FakeVolume` stubs:** each got a minimal read-only `=> Task.FromResult(false)` stub beside its existing `DeleteFileAsync` (build-breaker only — these fakes are read-only; no test here calls the new member).
+- **Drift pause:** none — `PathFor` and `DeleteFileAsync` matched the pin exactly; no guessing needed.
+- **Test result:**
+  - `dotnet build Kumunita.slnx -c Debug` — **Build succeeded**, 33 pre-existing warnings, 0 errors.
+  - `Kumunita.Web.Tests` — **Total: 1062, Errors: 0, Failed: 0, Skipped: 1**.
+  - `Kumunita.Core.Tests` — **Total: 1551, Errors: 0, Failed: 0, Skipped: 2** (Testcontainers; containers pruned after).
+- **Open items:** none. Next unit = **F1.U3** (content-doc deletion in `DeleteCoreAsync`, `IdentityService.cs` only) — a fresh clean-slate agent.

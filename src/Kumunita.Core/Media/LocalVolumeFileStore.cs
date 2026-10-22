@@ -47,6 +47,13 @@ public sealed class LocalVolumeFileStore : IMediaFileStore
         return Task.CompletedTask;
     }
 
+    public Task<bool> DeleteIfExistsAsync(string contentId, CancellationToken ct = default)
+    {
+        var p = PathFor(contentId);
+        if (File.Exists(p)) { File.Delete(p); return Task.FromResult(true); }
+        return Task.FromResult(false);
+    }
+
     public Task PutAsync(string contentId, byte[] content, CancellationToken ct = default)
     {
         var final = PathFor(contentId);

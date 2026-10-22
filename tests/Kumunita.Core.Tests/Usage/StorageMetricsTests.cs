@@ -380,5 +380,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
             => throw new NotSupportedException("FakeVolume is read-only (C-SM·2).");
         public Task DeleteFileAsync(string contentId, CancellationToken ct = default)
             => throw new NotSupportedException("FakeVolume is read-only (C-SM·2).");
+        public Task<bool> DeleteIfExistsAsync(string contentId, CancellationToken ct = default)
+            => Task.FromResult(false);
     }
 }
