@@ -1339,7 +1339,11 @@ public class EventControllerTests
             $"Window start {capturedStart} is neither the zone's midnight of the anchor's week Monday ({startBefore}) nor one week rollover away ({startAfter}).");
 
         // The window is exactly one week (Monday → the next Monday).
-        Assert.Equal(capturedStart!.Value.AddDays(7), capturedEnd);
+        // Zone-local date arithmetic (7 calendar days), not a fixed 168-hour
+        // UTC span — a DST transition in the zone shifts the instant delta
+        // by ±1 hour, so use zone-local dates to compute the expected end.
+        var startLocal = System.TimeZoneInfo.ConvertTimeFromUtc(capturedStart!.Value.UtcDateTime, zone);
+        Assert.Equal(ExpectZoneMidnightUtc(zone, startLocal.Date.AddDays(7)), capturedEnd);
 
         var view = Assert.IsType<ViewResult>(result);
         var vm = Assert.IsType<EventCalendarViewModel>(view.ViewData.Model);
@@ -1509,8 +1513,15 @@ public class EventControllerTests
         // `!` — capturedEnd is set by the NSubstitute capture callback (the
         // window end the controller passed in), so it is guaranteed
         // non-null here (CS8629).
-        Assert.Equal(capturedStart!.Value.AddDays(7), capturedEnd);
-        Assert.Equal(TimeSpan.FromDays(7), capturedEnd!.Value - capturedStart.Value);
+        // Zone-local date arithmetic (7 calendar days), not a fixed 168-hour
+        // UTC span — a DST transition in the zone shifts the instant delta
+        // by ±1 hour, so use zone-local dates to compute the expected end.
+        var startLocal = System.TimeZoneInfo.ConvertTimeFromUtc(capturedStart!.Value.UtcDateTime, zone);
+        Assert.Equal(ExpectZoneMidnightUtc(zone, startLocal.Date.AddDays(7)), capturedEnd);
+        Assert.True(
+            (capturedEnd!.Value - capturedStart.Value) >= TimeSpan.FromHours(167)
+                && (capturedEnd.Value - capturedStart.Value) <= TimeSpan.FromHours(169),
+            $"Week span {capturedEnd - capturedStart} is outside [167h, 169h] — expected ~7 zone-local days");
 
         var view = Assert.IsType<ViewResult>(result);
         var vm = Assert.IsType<EventCalendarViewModel>(view.ViewData.Model);

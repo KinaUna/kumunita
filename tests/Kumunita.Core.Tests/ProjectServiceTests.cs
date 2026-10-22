@@ -52,7 +52,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F1_TodoVisibleToAudienceMember()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f1-author";
         const string grantee = "u-u12-f1-grantee";
@@ -79,7 +79,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F1_TodoHiddenFromNonMember()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f1b-author";
         const string grantee = "u-u12-f1b-grantee";
@@ -110,7 +110,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F2_TodoPlacedOnMultipleBoards_AppearsOnEach()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f2-author";
 
@@ -173,7 +173,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F3_BoardGate_TodoOnBoard_BoardDenies_HidesCard()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f3-author";
         const string other = "u-u12-f3-other";
@@ -217,7 +217,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F3_BoardGate_TodoOnBoard_BoardAllows_ShowsCard()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f3b-author";
         const string other = "u-u12-f3b-grantee";
@@ -261,7 +261,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F4_MoveToStatusLane_SetsTodoStatus_Audited()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f4-author";
 
@@ -319,7 +319,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F5_MoveToNullStatusLane_TodoStatusUnchanged()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f5-author";
 
@@ -376,7 +376,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F6_LaneAtMaxRefusesMoveIn()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f6-author";
 
@@ -441,7 +441,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F6_LaneBelowMaxAllowsMoveIn()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f6b-author";
 
@@ -502,7 +502,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F7_AssigneeHasStanding_UpdatesTodo()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f7-author";
         const string assignee = "u-u12-f7-assignee";
@@ -536,7 +536,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F8_NonStandaloneActorRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f8-author";
         const string stranger = "u-u12-f8-stranger";
@@ -573,7 +573,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F9_SubtaskIsFullTodo_OwnStatusAssignee()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f9-author";
         const string assignee = "u-u12-f9-assignee";
@@ -617,7 +617,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F9_DeleteCascadesToSubtree()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f9c-author";
 
@@ -662,7 +662,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F9_ReparentToDescendant_Refused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f9d-author";
 
@@ -705,7 +705,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F10_CopyToBoard_Duplicates_OriginalUntouched()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f10-author";
         const string actor = "u-u12-f10-actor";
@@ -786,7 +786,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F10_MoveToBoard_RelocatesPlacement()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f10b-author";
 
@@ -864,7 +864,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F11_MoveLane_SwapsOrderWithAdjacent()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f11-author";
 
@@ -929,7 +929,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F11_MoveLane_AtEdge_NoOp()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f11b-author";
 
@@ -972,7 +972,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F11_MoveLane_NonCreatorRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f11c-author";
         const string stranger = "u-u12-f11c-stranger";
@@ -1016,7 +1016,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F12_AddTodoToLane_PlacesAtEnd_AndImpartsStatus()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f12-author";
 
@@ -1079,7 +1079,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F12_AddTodoToLane_InheritsBoardAudience()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f12d-author";
         const string grantee = "u-u12-f12d-grantee";
@@ -1124,7 +1124,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F12_AddTodoToLane_PublicBoardYieldsPublicCard()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f12e-author";
         const string stranger = "u-u12-f12e-stranger";
@@ -1158,7 +1158,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F12_AddTodoToLane_AtMax_Refused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f12b-author";
 
@@ -1209,7 +1209,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F12_AddTodoToLane_NonCreatorRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f12c-author";
         const string stranger = "u-u12-f12c-stranger";
@@ -1250,7 +1250,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F13_CreateLane_AppendsAtEnd_Audited()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f13-author";
 
@@ -1293,7 +1293,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F13_CreateLane_NonCreatorRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f13b-author";
         const string stranger = "u-u12-f13b-stranger";
@@ -1328,7 +1328,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F14_MoveLaneToPosition_Renumerates_CardsUntouched()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f14-author";
 
@@ -1373,7 +1373,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F14_MoveLaneToPosition_IndexBeyondEnd_ClampsToLast()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f14b-author";
 
@@ -1406,7 +1406,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F14_MoveLaneToPosition_AlreadyAtIndex_NoOp()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f14c-author";
 
@@ -1438,7 +1438,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F14_MoveLaneToPosition_NonCreatorRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f14d-author";
         const string stranger = "u-u12-f14d-stranger";
@@ -1477,7 +1477,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F17_DeleteLane_DeletesLaneAndPlacements_TodosKept_Renumerated_Audited()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f17-author";
 
@@ -1538,7 +1538,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F17_DeleteLane_LastLane_BoardLeftWithZeroLanes_TodoKept()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f17b-author";
 
@@ -1576,7 +1576,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F17_DeleteLane_NonCreatorRefused_NothingWritten()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f17c-author";
         const string stranger = "u-u12-f17c-stranger";
@@ -1615,7 +1615,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F17_DeleteLane_MissingLane_404_OnSoftDeletedBoard_404()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f17d-author";
 
@@ -1652,7 +1652,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F15_MoveCardToLanePosition_Moves_ImpartsStatus_Audited()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f15-author";
 
@@ -1700,7 +1700,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F15_MoveCardToLanePosition_CrossLaneAtLimit_Refused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f15b-author";
 
@@ -1746,7 +1746,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F16_UpdateBoard_AuthorUpdates_TitleDescriptionStampedAudited()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f16-author";
 
@@ -1787,7 +1787,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F16_UpdateBoard_GlobalAdminMayUpdate()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f16b-author";
         const string admin = "u-u12-f16b-admin";
@@ -1815,7 +1815,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F16_UpdateBoard_StrangerRefused_NothingWritten()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f16c-author";
         const string stranger = "u-u12-f16c-stranger";
@@ -1846,7 +1846,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F16_UpdateBoard_BlankTitle_Refused_NothingWritten()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f16d-author";
 
@@ -1878,7 +1878,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F16_UpdateBoard_NoChange_ModifiedUntouched()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f16e-author";
 
@@ -1909,7 +1909,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F16_UpdateBoard_AudienceApplied_ModifiedStamped()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f16f-author";
 
@@ -1959,7 +1959,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F16_UpdateBoard_NullAudience_LeavesStoredAudienceUntouched()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f16g-author";
 
@@ -2003,7 +2003,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F1_GoalVisibleToAudienceMember_HiddenFromNonMember()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f1-author";
         const string grantee = "u-pl-f1-grantee";
@@ -2036,7 +2036,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F2_GoalDetail_404OnAbsent_403OnDenied()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f2-author";
         const string grantee = "u-pl-f2-grantee";
@@ -2071,7 +2071,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F3_CreateGoal_AuthorIsStandingOwner_Audited()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f3-author";
 
@@ -2107,7 +2107,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F3_UpdateGoal_CreatorGlobalAdmin_StandingRechecked()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-pl-f3b-creator";
         const string admin = "u-pl-f3b-admin";
@@ -2173,7 +2173,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F5_ProjectFeed_GoalIdFilter_StandaloneVsUnderGoal()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f5-author";
 
@@ -2226,7 +2226,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F2_ProjectDetail_404OnAbsent_403OnDenied()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f2-author";
         const string grantee = "u-pl-f2-grantee";
@@ -2262,7 +2262,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F5_CreateProject_GoalIdGuard_RefusesDeletedOrUnreadableGoal()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f5-author";
         const string grantee = "u-pl-f5-grantee";
@@ -2344,7 +2344,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F4_UpdateProject_ClearGoal_NullsGoalId()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-pl-f4-creator";
 
@@ -2414,7 +2414,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F8_DeleteGoal_SoftDeletes_ProjectsKept_GoalLinkDangles()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-pl-f8-goal-creator";
         const string admin = "u-pl-f8-goal-admin";
@@ -2495,7 +2495,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F8_DeleteProject_SoftDeletes_TodosAndBoardsKept_ProjectLinkDangles()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-pl-f8-proj-creator";
         const string stranger = "u-pl-f8-proj-stranger";
@@ -2587,7 +2587,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F7_SetTodoProject_StandingRechecked_RefusesDeletedProject()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-pl-f7-creator";
         const string stranger = "u-pl-f7-stranger";
@@ -2674,7 +2674,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F7_SetBoardProject_StandingRechecked_RefusesDeletedProject()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-pl-f7b-creator";
         const string stranger = "u-pl-f7b-stranger";
@@ -2758,7 +2758,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task SetTodoProject_Null_Unassociates()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-pl-f7c-creator";
 
@@ -2800,7 +2800,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task SetTodoProject_ProjectDenied_Refused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-pl-f7d-creator";
 
@@ -2848,7 +2848,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task Todo_Feed_ProjectIdFilter_Narrows()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f7e-author";
         const string grantee = "u-pl-f7e-grantee";
@@ -2913,7 +2913,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task Board_Feed_ProjectIdFilter_Narrows()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f7f-author";
 
@@ -2951,7 +2951,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task Todo_Feed_ProjectIdNull_DefaultUnchanged()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-pl-f7g-author";
 
@@ -2996,7 +2996,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task C1_ClaimUnassigned_ByGroupMember_Succeeds_AuditedGroupVia()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-c1-author";
         const string claimer = "u-u12-c1-claimer";
@@ -3045,7 +3045,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task C2_ClaimAlreadyAssigned_Refused_NothingWritten()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-c2-author";
         const string assignee = "u-u12-c2-assignee";
@@ -3086,7 +3086,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task C3_Claim_ByMemberOfUnaddressedGroup_Refused_NothingWritten()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-c3-author";
         const string stranger = "u-u12-c3-stranger";
@@ -3130,7 +3130,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task C4_ClaimUnassigned_ByCommunityMember_Succeeds_AuditedCommunityVia()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-c4-author";
         const string claimer = "u-u12-c4-claimer";
@@ -3174,7 +3174,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task C5_ListTodos_UnassignedOnly_FiltersOutAssigned()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-c5-author";
         const string reader = "u-u12-c5-reader";
@@ -3221,7 +3221,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F11_CreateTodo_SetsOptionalStartAndDueDates()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f11-author";
 
@@ -3266,7 +3266,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task F11_UpdateTodo_SetsThenClearsOptionalDates()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u12-f11-author";
 
@@ -3312,7 +3312,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task ListTodosForEventAsync_ReturnsEmptyPage_WhenNoTodosLinkedToTheEvent()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-m14-u01-p1-author";
 
@@ -3355,7 +3355,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task ListTodosForEventAsync_DropsTodosTheActorCannotRead()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-m14-u01-p2-author";
         const string grantee = "u-m14-u01-p2-grantee";
@@ -3392,7 +3392,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task ListTodosForEventAsync_ExcludesTodosLinkedToADifferentEvent()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-m14-u01-p3-author";
 
@@ -3428,7 +3428,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task ListTodosForEventAsync_HasMoreIsTrue_WhenThePageFills()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-m14-u01-p4-author";
         const string eventId = "m14-eve-p4";
@@ -3463,7 +3463,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task SetTodoEventAsync_AllowsCreatorAssigneeAndGlobalAdmin_RefusesOutsider()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-m14-u02-p1-creator";
         const string assignee = "u-m14-u02-p1-assignee";
@@ -3547,7 +3547,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task SetTodoEventAsync_RefusesInvisibleEventId_NullClearsTheLink()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-m14-u02-p2-creator";
         const string eventId = "m14-u02-p2-event";
@@ -3612,7 +3612,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task SetTodoEventAsync_CommitsOneAccessAuditRowWithTheWrite()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-m14-u02-p3-creator";
         const string eventId = "m14-u02-p3-event";
@@ -3661,7 +3661,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task SetTodoStatusAsync_AllowsCreatorAssigneeAndGlobalAdmin_RefusesOutsider()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-sts-p1-creator";
         const string assignee = "u-sts-p1-assignee";
@@ -3730,7 +3730,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task SetTodoStatusAsync_NullClearsTheStatus_ValueIsStoredVerbatim()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-sts-p2-creator";
         var at = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
@@ -3771,7 +3771,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task SetTodoStatusAsync_CommitsOneAccessAuditRowWithTheWrite()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string creator = "u-sts-p3-creator";
         var at = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
@@ -3844,7 +3844,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task ListTodos_BlockedOnly_ReturnsOnlyToDosWithBlockedByTodoId()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f4-author";
 
@@ -3875,7 +3875,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task GetTodo_WithReadableBlocker_ResolvesBlockerChip()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f1-author";
 
@@ -3911,7 +3911,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task GetTodo_WithUnreadableBlocker_ReturnsGenericChip()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f2-author";
         const string stranger = "u-tbd-f2-stranger";
@@ -3949,7 +3949,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task GetTodo_WithSoftDeletedBlocker_ReturnsGenericChip()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f2c-author";
 
@@ -3984,7 +3984,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task UpdateTodo_SetBlockedBy_SelfRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f3-author";
 
@@ -4017,7 +4017,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task UpdateTodo_SetBlockedBy_TransitiveRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f3c-author";
 
@@ -4064,7 +4064,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task UpdateTodo_ClearBlockedBy_Allowed()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f5-author";
 
@@ -4100,7 +4100,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task UpdateTodo_DeniedActor_Refused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f6-author";
         const string stranger = "u-tbd-f6-stranger";
@@ -4134,7 +4134,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task UpdateTodo_NonNullTargetAtSoftDeletedRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f6c-author";
 
@@ -4166,7 +4166,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task MoveTodoToDoneLane_NeverClearsBlockedByTodoId()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f7-author";
 
@@ -4239,7 +4239,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task DeleteTodo_WithBlockedBy_SoftDeleteUnchanged()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-f7c-author";
 
@@ -4281,7 +4281,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task GetBoard_WithReadableBlocker_ResolvesCardChip()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-b1-author";
 
@@ -4337,7 +4337,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task GetBoard_WithUnreadableBlocker_ResolvesGenericCardChip()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-tbd-b2-author";
         const string stranger = "u-tbd-b2-stranger";
@@ -4399,7 +4399,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task CreateTodoComment_TopLevel_StoresRowAndAuditRow()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-1-author";
         const string commenter = "u-cmt-1-commenter";
@@ -4442,7 +4442,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task CreateTodoComment_Reply_SetsParentId()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-2-author";
         const string commenter = "u-cmt-2-commenter";
@@ -4481,7 +4481,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task CreateTodoComment_InvalidParentRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-3-author";
 
@@ -4536,7 +4536,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task CreateTodoComment_MissingOrDeletedTodoRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-4-author";
 
@@ -4569,7 +4569,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task CreateTodoComment_UnreadableTodoRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-5-author";
         const string stranger = "u-cmt-5-stranger";
@@ -4604,7 +4604,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task DeleteTodoComment_NonAuthorRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-6-author";
         const string commenter = "u-cmt-6-commenter";
@@ -4638,7 +4638,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task DeleteTodoComment_Author_SoftDeletesAndKeepsRow()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-7-author";
 
@@ -4674,7 +4674,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task GetTodo_ReturnsCommentsInCreatedOrder()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-8-author";
 
@@ -4701,7 +4701,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task CreateTodoComment_BlankBodyRefused()
     {
-        var store = await BootStoreAsync();
+        await using var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-cmt-9-author";
 
