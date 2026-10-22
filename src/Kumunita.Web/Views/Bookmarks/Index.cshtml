@@ -142,7 +142,7 @@
                                        not new POST actions). *@
                                     <span class="bm-folder-controls d-inline-flex gap-1">
                                         <a class="btn btn-sm btn-outline-secondary" href="/bookmarks/folders/@folder.Id/rename"><kw-l key="bm.folder.rename">Rename</kw-l></a>
-                                        <form method="post" action="@($"/bookmarks/folders/@folder.Id/delete")" style="margin:0;" onsubmit="return confirm('Delete this folder? Its bookmarks will be moved to the unfiled area.');">
+                                        <form method="post" action="@($"/bookmarks/folders/{folder.Id}/delete")" style="margin:0;" onsubmit="return confirm('Delete this folder? Its bookmarks will be moved to the unfiled area.');">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="bm.folder.delete">Delete</kw-l></button>
                                     </form>

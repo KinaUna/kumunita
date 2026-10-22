@@ -25,7 +25,7 @@
                 </div>
             </div>
         </header>
-        <form method="post" action="@($"/notes/folders/@Model.Id/rename")">
+        <form method="post" action="@($"/notes/folders/{Model.Id}/rename")">
             @Html.AntiForgeryToken()
             <div class="mb-3">
                 <label class="form-label" for="folder-name">

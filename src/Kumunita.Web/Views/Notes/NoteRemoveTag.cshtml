@@ -25,7 +25,7 @@
         </header>
         @if (Model.Tags.Count > 0)
         {
-            <form method="post" action="@($"/notes/@Model.Id/tags/remove")">
+            <form method="post" action="@($"/notes/{Model.Id}/tags/remove")">
                 @Html.AntiForgeryToken()
                 <div class="mb-3">
                     <label class="form-label" for="note-tag">

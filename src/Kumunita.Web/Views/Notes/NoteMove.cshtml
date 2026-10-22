@@ -30,7 +30,7 @@
                 </div>
             </div>
         </header>
-        <form method="post" action="@($"/notes/@Model.Note.Id/move")">
+        <form method="post" action="@($"/notes/{Model.Note.Id}/move")">
             @Html.AntiForgeryToken()
             <div class="mb-3">
                 <label class="form-label" for="note-folder">

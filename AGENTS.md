@@ -153,6 +153,17 @@ the source file** — and the user's report outranks your source reading.
     with `@checked(...)` on all nine toggles (bug reported 2026-10-22; every
     other checkbox in the repo uses the conditional form) — fix markup with
     `@(Model.X ? "checked" : null)`, never `@checked(...)`.
+  - **`@($"...")` in an attribute is a C# interpolated string, not Razor** — the
+    only interpolation holes are `{var}`; a bare `@var` inside is a **literal**
+    character. So `action="@($"/notes/@row.Id/delete")"` renders the literal URL
+    `/notes/@row.Id/delete`, while the working form is
+    `action="@($"/notes/{row.Id}/delete")"`. Plain `href="/notes/@row.Id/edit"`
+    (no `@$`) is a real Razor expression and is fine. This bit the Notes +
+    Bookmarks per-row/folder write controls in 9 places (bug reported
+    2026-10-22; commit `b481499a` introduced it by converting the delete
+    `<a href>` links into POST forms and dropping the `{…}` braces). Grep the
+    whole codebase with `grep -rnoE '@\(\$"[^"]*@[A-Za-z_]' src/Kumunita.Web/Views/`
+    — any hit is this bug.
 - A URL or link that shows a **literal `@Model.X`** (404s, `/groups/@Model.GroupId/posts`)
 is the same class of bug — an uninterpolated Razor attribute value, not a
   routing problem. Fix the markup; don't debug the route.
