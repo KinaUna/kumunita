@@ -1029,19 +1029,63 @@ body.kmb-page-expanded .page-expand-close {
 body.kmb-embed {
   margin-bottom: 0;
 }
+/* The chrome-hide list. The variant-B navbar (`.navbar`) and the variant-C
+   icon rail (`.kmb-rail`, which does NOT carry the `.navbar` class — the
+   ADR 0111 rail is its own element) are both part of the page chrome the
+   modal frames out; hide them together. The topbar (variant C) and the
+   variant-B navbar share the `.navbar` class, so they are covered by the
+   `.navbar` rule above; the rail is its own element and needs its own line. */
 body.kmb-embed .navbar,
+body.kmb-embed .kmb-rail,
 body.kmb-embed .kmb-footer,
 body.kmb-embed .kumunita-pinned-announcement,
 body.kmb-embed .kumunita-onboarding-banner,
 body.kmb-embed .kmb-whatsnew-toast {
   display: none;
 }
-/* Neutralize the settings sub-nav's negative margin (it hangs under the
-   navbar, which is hidden here) so the first heading isn't clipped. */
+/* In the embed the rail is gone, so the variant-C content-shift (the
+   `body.kmb-nav-rail-mode main { margin-left: var(--kmb-rail-w) }` rule)
+   would leave a 68px dead band on the left of the framed page. The two body
+   classes are both present (kmb-nav-rail-mode + kmb-embed), so this equal-
+   specificity later rule wins and the content fills the frame edge to edge —
+   the same doctrine as the kiosk's `body.kmb-kiosk main { margin: 0 }`
+   override. */
+body.kmb-nav-rail-mode.kmb-embed main,
+body.kmb-nav-rail-mode.kmb-embed .kmb-footer {
+  margin-left: 0;
+}
+/* Hide the settings sub-nav tab strip (.kmb-tab-under-navbar). These strips
+   link between sibling settings (the admin Overview/Accounts/Communities/
+   Platform/Security/Analytics tabs, the locale language/timezone/dateformat/
+   pagesize tabs, the events / projects / groups section tabs). In the modal
+   the user is on the specific setting the step points at; the tab strip is
+   links out to siblings they didn't choose, which breaks the linear walk —
+   the ADR 0166 "the walk-through should be a clean linear process" pin.
+   The same doctrine as the kiosk hiding its "tab / section strips" (the
+   M35·6 "frame the surface's own route" + chrome-hide idiom). The strip's
+   negative margin-top (it hangs under the now-hidden navbar) also vanishes
+   with display:none, so the first heading is no longer clipped.
+   display:none on a strip that is absent (a settings page without a
+   sub-nav) is a no-op — the same doctrine as the kmb-embed rules above. */
 body.kmb-embed .kmb-tab-under-navbar {
-  margin-top: 0;
-  border-top: 0;
-  border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+  display: none;
+}
+/* Hide the "← Admin" back-to-section link the sub-section admin pages
+   (moderation, notification cadence, site content, date format, timezone,
+   guests, messaging, sample data, signup, surface labels, portability)
+   render at the top of the content, linking back to the /admin dashboard.
+   In the modal the user is on the specific setting the step points at; the
+   back link breaks the linear walk the same way the tab strip does —
+   the ADR 0166 "clean linear process" pin, the same doctrine as the
+   kiosk hiding its "tab / section strips". The selector is deliberately
+   narrow: the `href="/admin"` attribute is what pins these to the back-to-
+   dashboard link (the admin sub-nav tab uses `href="/admin"` too, but
+   that's already hidden by the .kmb-tab-under-navbar rule above, and the
+   nav-bar Admin dropdown uses `href="/Admin"` capitalized, so it is not
+   matched). Display:none is safe on a page without the link (a no-op —
+   the same doctrine as the kmb-embed rules above). */
+body.kmb-embed a[href="/admin"] {
+  display: none;
 }
 /* The framed page's iframe inside the modal needs an explicit size — an
    <iframe> defaults to a ~150px tall, full-width box; give it a tall, full-
