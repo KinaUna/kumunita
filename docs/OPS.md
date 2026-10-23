@@ -216,6 +216,55 @@ So:
   (file with no doc) is **inert** — nothing references a bare hash. The
   failure mode is a missing picture, never cross-contamination.
 
+**PITR — WAL archiving + point-in-time recovery (BKP-02 fix):** a logical
+`pg_dump` is a point-in-time *snapshot*, so the recovery point of the procedure
+above is the **dump interval** (up to 24 h). PITR closes that gap: the recovery
+point is no longer the dump cadence, it is the WAL stream.
+
+- **Tool:** **pgBackRest** (full + differential backups, WAL archiving, PITR,
+  built-in retention, offsite to S3/B2 in one config). **WAL-G is the recorded
+  fallback** (single static binary; every step maps over: `archive-push` →
+  `wal-g wal-push`, `backup` → `backup-full|backup-incremental`, `restore
+  --type=time` → `restore` to a timestamp, retention → `wal-g delete retain 4`)
+  — either may be chosen at exec time, provided the RPO/retention contract below
+  and the alert-on-failure contract still hold.
+- **RPO: ≤ 5 minutes** (bounded only by WAL-archiving latency — effectively
+  continuous once `archive_command` is live). RTO: minutes for a same-instance
+  PITR restore; disaster recovery is the existing §5 DR path.
+- **Cadence:** one **full** per week + an **incremental** daily (a cheap
+  known-good restorable anchor) + **continuous** WAL archiving (via
+  `archive_command`, not a cron).
+- **Retention (defaults; tune to need):** **4 fulls retained**; **WAL segments
+  retained to bridge the gap to the oldest retained full** (14-day floor) — so
+  PITR coverage always spans the full-retention window. Offsite to the **same
+  object storage** the `pg_dump` ships to — not only on the VPS.
+- **Self-test (automated, at least quarterly):**
+  `pgbackrest --stanza=<instance> check` — validates the full → WAL chain is
+  restorable; this is the concrete form of the "a backup you can't restore is
+  not a backup" rule above. Update the **"Last tested"** date below on every run.
+- **Alert on failure:** wrap the cadence + `check` commands so a **non-zero exit
+  is escalated to a human**, not just logged — the failure handler routes to the
+  **F12 human alert channel** (F12 is the lane that *builds* that channel; this
+  step **reuses** it and does not build it).
+- **Scope boundary — Postgres surface only:** PITR/WAL archiving covers the
+  **Postgres surface only**. The **media volume** (`Media__RootPath`, ADR 0011)
+  is a **separate** restore surface — pgBackRest does not snapshot it, and
+  PITR-ing Postgres to a point in time does **not** rewind it. The media-volume
+  snapshot/restore procedure above is **preserved unchanged**; a half-restore
+  (Postgres at `T`, media volume at `T'`) degrades safely per the rule above
+  (a missing `MediaObject` byte is a re-hydratable avatar `404`).
+- **Owner ops (open items — recorded, not assumed done):** install the tool on
+  the VPS; configure the backup repo (offsite); enable `archive_mode=on` +
+  `archive_command='pgbackrest --stanza=<instance> archive-push %p'` on the
+  Postgres (the single most important step — until it is live the RPO is still
+  the dump interval); `stanza-create` + first full; set the cadence (cron or
+  the existing Coolify backup task); run the `check` self-test; wire the
+  alert-on-failure handler to the F12 channel. The PITR restore path below is
+  the procedure these steps make available.
+
+**Last tested (PITR):** _open item — owner stamps the date when a PITR restore
+or `pgbackrest check` is run on a live instance; never assumed._
+
 ### 5. Restore
 
 **Same instance (corruption / bad data):**
@@ -225,6 +274,20 @@ So:
    itself connected *as* (the first live restore — both roles `kumunita` — failed on
    exactly this).
 3. Start the app; verify `/health`, login, and a representative page.
+
+**Point-in-time (PITR, §4 — recover to a point in time, same instance):** the
+one-step path, available once §4's `archive_command` is live — restores the
+**Postgres surface only** (the media volume is a separate surface and is not
+rewound — restore it from its own snapshot per the rule below):
+1. Stop the app (Coolify).
+2. Pick the target instant (e.g. 10 minutes before the bad write):
+   `pgbackrest --stanza=<instance> restore --type=time --target="2026-10-23 14:50:00+00"`
+   (or `--latest` for the newest restorable point).
+3. Restart Postgres, then the app; verify `/health`, login, and a representative
+   page (step 3 above).
+
+   **Last tested (PITR restore):** _open item — owner stamps the date when run;
+   never assumed._
 
 **Disaster recovery (new VPS):**
 1. Provision a fresh instance (Procedure 1) with the **same** `Community__Name` and config.
