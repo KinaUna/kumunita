@@ -400,6 +400,7 @@ builder.Services.AddIdentity<User, IdentityRole>(opts =>
         opts.User.RequireUniqueEmail = true;
     })
     .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders()
     .AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory>();
 
 // Rate limiting (SECURITY.md §5 control "Rate limiting (register / login /
