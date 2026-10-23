@@ -4,6 +4,7 @@ using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.Controllers;
@@ -67,6 +68,8 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class SecuritySettingsController(
     UserManager<User> userManager,
+    SignInManager<User> signInManager,
+    IIdentityService identity,
     IOptions<TokenOptions> tokenOptions) : Controller
 {
     private static readonly string AuthenticatorProvider = "Authenticator";
@@ -340,5 +343,98 @@ public sealed class SecuritySettingsController(
         await userManager.ResetAuthenticatorKeyAsync(user);
         TempData["info"] = "Two-factor authentication has been disabled.";
         return RedirectToAction(nameof(Mfa));
+    }
+
+    // ── F5 (AUTH-04) — session management (kill-all + invalidation) ──────────
+    //
+    // F5.U3 — the /settings/security/sessions surface (the pin §3 shape):
+    // a sibling action set on this controller (same [Authorize], same
+    // ResolveUserAsync, same anti-forgery + rate-limit discipline as the
+    // F3 MFA actions above). The kill-all calls the Core seam
+    // (IIdentityService.KillAllSessionsAsync — F5.U2, Core stays HTTP-free,
+    // ADR 0006) then signs out the LOCAL browser (the AccountController.
+    // Logout shape — SignOutAsync clears both the kumunita.auth and the
+    // auxiliary .AspNetCore.Identity.Application schemes) for the instant
+    // local effect. The "everywhere" effect is F5.U2's server-side stamp
+    // (UpdateSecurityStampAsync rotation) + the per-request gate
+    // (RevocationStampMiddleware) + the F3 leg-2 gate — this surface does
+    // NOT re-implement any of that (F5.U2 owns it). The list is
+    // server-side state (the revocation stamp), NOT a per-browser cookie
+    // read (a server cannot enumerate another browser's cookies — pin §3).
+
+    /// <summary>
+    /// <c>GET /settings/security/sessions</c> — the session-management list.
+    /// Minimum viable (pin §3): "this session" + "other active sessions
+    /// (revoked if a kill-all has run)." This is **server-side state** (the
+    /// <c>User.SecurityStamp</c>, rotated by
+    /// <see cref="IIdentityService.KillAllSessionsAsync"/> / 
+    /// <see cref="IIdentityService.ChangePasswordAsync"/>), **not** a
+    /// per-browser cookie read. The <c>POST …/kill-all</c> action is the
+    /// only write; there is no form to bind (no <c>ModelState</c> check).
+    /// </summary>
+    [HttpGet("/settings/security/sessions")]
+    public IActionResult Sessions()
+    {
+        // Fail-closed: the [Authorize] attribute makes a null subject
+        // impossible for a real request, but the pin §3 discipline is to
+        // handle it anyway (redirect to login rather than render a list
+        // for an unauthenticated principal).
+        if (string.IsNullOrEmpty(KumunitaPrincipal.SubjectId(User)))
+        {
+            return RedirectToAction("Login", "Account");
+        }
+
+        return View(new SessionSettingsViewModel());
+    }
+
+    /// <summary>
+    /// <c>POST /settings/security/sessions/kill-all</c> — the kill-all.
+    /// <para>
+    /// Calls the **Core** seam
+    /// (<see cref="IIdentityService.KillAllSessionsAsync"/>) to rotate the
+    /// account's security stamp (the F5.U2 seam — reuses the existing
+    /// <c>UpdateSecurityStampAsync</c> rotation at the password-change lane,
+    /// one <c>AccessAudit</c> row in the same Marten session; Core stays
+    /// HTTP-free, ADR 0006). The "everywhere" effect is then produced by
+    /// F5.U2's per-request gate (<c>RevocationStampMiddleware</c>) + the
+    /// F3 leg-2 gate — every session whose cookie's <c>kumunita.stamp</c>
+    /// carrier predates the rotation is signed out on its next request, and
+    /// a pending F3 leg-1 <c>TwoFactorUserIdScheme</c> cookie is rejected at
+    /// leg-2 completion (the §1d half-signed-in window is closed).
+    /// </para>
+    /// <para>
+    /// The **local** effect is the <c>SignOutAsync</c> below (the
+    /// <c>AccountController.Logout</c> shape — clears BOTH the
+    /// <c>kumunita.auth</c> and the auxiliary
+    /// <c>.AspNetCore.Identity.Application</c> schemes) for the instant
+    /// local half, then a redirect to the login page.
+    /// </para>
+    /// </summary>
+    [HttpPost("/settings/security/sessions/kill-all")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting("write")]
+    public async Task<IActionResult> SessionsKillAll()
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+        {
+            // Fail-closed: no subject → no kill-all; redirect to login.
+            return RedirectToAction("Login", "Account");
+        }
+
+        // The Core seam (F5.U2) — rotates the User.SecurityStamp + appends
+        // one AccessAudit row in the same Marten session. Core stays
+        // HTTP-free (ADR 0006); this surface does NOT re-implement the
+        // rotation or the gate (F5.U2 owns both).
+        await identity.KillAllSessionsAsync(subject);
+
+        // The local effect — SignOutAsync (not a bare SignOutAsync on the
+        // auth scheme) clears BOTH of the app's cookies: AddIdentity
+        // registers an auxiliary .AspNetCore.Identity.Application cookie
+        // alongside the kumunita.auth cookie, and only this path signs out
+        // the ApplicationScheme too (the AccountController.Logout shape).
+        await signInManager.SignOutAsync();
+
+        return RedirectToAction("Login", "Account");
     }
 }
