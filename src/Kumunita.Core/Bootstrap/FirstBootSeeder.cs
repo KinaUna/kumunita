@@ -270,7 +270,10 @@ public static class FirstBootSeeder
             Id = Guid.NewGuid().ToString("N"),
             Kind = IdentityToken.KindSetup,
             UserId = user.Id,
-            Token = token,
+            // F2 — AUTH-02 (pin §8.2): store the SHA-256 hex digest, never the raw env
+            // token at rest. Shares IdentityService.Sha256Hex (pin §2) — the operator
+            // holds the raw in env/email; only its hash is persisted.
+            Token = IdentityService.Sha256Hex(token),
             Attempt = 1,
             CreatedAt = now,
             ExpiresAt = now.AddDays(setupTokenTtlDays)

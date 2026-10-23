@@ -1502,10 +1502,23 @@ public sealed class IdentityService(
     {
         await using var session = documentStore.OpenSession(new SessionOptions());
         var now = DateTimeOffset.UtcNow;
+
+        // F2 — DUAL match (pin §5). The verify lanes present the STORED column value
+        // (Web loads the row by Id and passes token.Token); the setup lane presents the
+        // RAW env secret the operator typed. Match either so both work against a hashed
+        // column, and legacy cleartext rows (presented as-is) still verify (pin §6).
+        // CRITICAL: `Sha256Hex` is a .NET call — compute it as a LOCAL constant BEFORE
+        // the query. Marten cannot translate SHA256.HashData into SQL. Do NOT put
+        // Sha256Hex(...) inside the .Where(...) expression.
+        var presented = tokenValue;
+        var presentedHash = Sha256Hex(presented);   // local, precomputed — translatable as a constant
+
         var query = session
             .Query<IdentityToken>()
-            .Where(t => t.Token == tokenValue && t.Kind == kind)
-            .Where(t => t.ConsumedAt == null && t.ExpiresAt > now);
+            .Where(t => t.Kind == kind
+                && (t.Token == presented || t.Token == presentedHash)   // stored-value OR raw-secret
+                && t.ConsumedAt == null
+                && t.ExpiresAt > now);
         if (subjectId is not null)
             query = query.Where(t => t.UserId == subjectId);
         return await query.FirstOrDefaultAsync().ConfigureAwait(false);
@@ -1516,7 +1529,10 @@ public sealed class IdentityService(
         Id = Guid.NewGuid().ToString("N"),
         Kind = IdentityToken.KindVerify,
         UserId = userId,
-        Token = NewSecret(),   // high-entropy; never in a URL (the URL carries the row Id)
+        // F2 — AUTH-02: store the SHA-256 hex digest, never the raw secret at rest.
+        // The raw NewSecret() is a throwaway: generated, hashed, discarded. The
+        // high-entropy secret is never in a URL (the URL carries the row Id).
+        Token = Sha256Hex(NewSecret()),
         Attempt = attempt,
         CreatedAt = now,
         // The bound option (Verification__TtlDays in appsettings, default 14) — see the
@@ -1546,6 +1562,21 @@ public sealed class IdentityService(
         var bytes = new byte[32];
         System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
         return Convert.ToBase64String(bytes);
+    }
+
+    /// <summary>
+    /// F2 — AUTH-02: one-way hash of a high-entropy secret (pin §2). SHA-256 over the
+    /// UTF-8 bytes, returned as exactly 64 lowercase hex chars. <c>internal</c> so the
+    /// <see cref="Bootstrap.FirstBootSeeder"/> setup mint (pin §8.2) shares the SAME
+    /// implementation rather than duplicating the hashing in a second file. Not a
+    /// KDF (no salt/iterations): these tokens are 32 random bytes, so we need
+    /// one-way-ness (a DB leak must not yield the token), not key-stretching.
+    /// </summary>
+    internal static string Sha256Hex(string value)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(bytes).ToLowerInvariant();   // exactly 64 lowercase hex chars
     }
 
     // The link target is the Web host's AccountController.Verify action, reached

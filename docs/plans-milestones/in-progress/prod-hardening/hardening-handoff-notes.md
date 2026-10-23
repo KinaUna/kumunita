@@ -114,3 +114,39 @@ No units executed yet. First wave (per the plan): F1, F2, F6, F7, F8, F13.
 - **Open items (owner, NOT assumed done):** (a) zero-residual re-mint follow-up (§6); (b) U2's extra `FirstBootSeeder.cs` file / setup-mint scope (§8.2).
 - **Drift pause:** none — but §8.1/§8.2 are **divergences from the plan's stated scope/read assumption**, recorded for the owner before U2 proceeds (not a codebase-drift stop, a design decision + scope flag).
 - **Next unit = F2.U2** (hash on write + compare on read; `IdentityService.cs` + the one flagged `FirstBootSeeder.cs` line) — a fresh clean-slate agent. Do NOT start F3.
+
+## F2.U2 — hash on write + compare on read
+- **Landed (2 files, the pinned deliverables):**
+  - `src/Kumunita.Core/Identity/IdentityService.cs` — added the `Sha256Hex` helper (pin §2); **write** `NewVerifyToken` (`:1519` region) now stores `Token = Sha256Hex(NewSecret())`; **read** `FindTokenAsync` rewritten to the pin §5 **dual comparison** with `presentedHash` **precomputed as a local before the query** (the Marten `SHA256.HashData` translation gotcha).
+  - `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` — **one line only** (pin §8.2): the `KindSetup` mint changed from `Token = token` to `Token = IdentityService.Sha256Hex(token)`. No other seeder reshuffling.
+- **`Sha256Hex` confirmed `internal static` + shared (pin §2):** `internal static string Sha256Hex(string value)` on `IdentityService` (ns `Kumunita.Core.Identity`) — SHA-256 over UTF-8 bytes → `Convert.ToHexString(...).ToLowerInvariant()` = **exactly 64 lowercase hex**. It is `internal` (not `private`) so `FirstBootSeeder` (ns `Kumunita.Core.Bootstrap`) calls the **same** implementation via `IdentityService.Sha256Hex(token)` — the hashing is **not duplicated** across the two files.
+- **Exact `FindTokenAsync` diff (pin §5, the load-bearing part):**
+  ```diff
+  -        var now = DateTimeOffset.UtcNow;
+  -        var query = session
+  -            .Query<IdentityToken>()
+  -            .Where(t => t.Token == tokenValue && t.Kind == kind)
+  -            .Where(t => t.ConsumedAt == null && t.ExpiresAt > now);
+  +        var now = DateTimeOffset.UtcNow;
+  +
+  +        // F2 — DUAL match (pin §5). … CRITICAL: compute Sha256Hex as a LOCAL constant
+  +        // BEFORE the query (Marten cannot translate SHA256.HashData into SQL).
+  +        var presented = tokenValue;
+  +        var presentedHash = Sha256Hex(presented);   // local, precomputed — translatable as a constant
+  +
+  +        var query = session
+  +            .Query<IdentityToken>()
+  +            .Where(t => t.Kind == kind
+  +                && (t.Token == presented || t.Token == presentedHash)   // stored-value OR raw-secret
+  +                && t.ConsumedAt == null
+  +                && t.ExpiresAt > now);
+           if (subjectId is not null)
+               query = query.Where(t => t.UserId == subjectId);
+           return await query.FirstOrDefaultAsync().ConfigureAwait(false);
+  ```
+  All four original filters are **intact**: `Kind == kind`, `ConsumedAt == null`, `ExpiresAt > now`, and the `subjectId` (`UserId`) guard. The **backward-compat rule (pin §6, accept-legacy-via-dual-compare)** falls out directly of clause 1 (`t.Token == presented`) — a pre-upgrade cleartext row still verifies in the lane that presents it as-is. **No new column, no schema change, no `IsFirstBootSetupCompleteAsync` change** (existence-only, pin §1).
+- **Invariants held:** Core stays HTTP-free (no Web types; the shared helper is a Core `internal static`, not a Web surface); the existing `IdentityToken.Token` column is **reused** (no new field, pin §3); the `NewVerifyToken` raw secret is a discarded throwaway (raw generated → hashed → discarded; the verify URL still carries the row `Id`); the two `NewVerifyToken` call sites (`:152`, `:216`) are unchanged.
+- **Drift pause:** none — `NewVerifyToken` (`:1519` `Token = NewSecret()`), the `FindTokenAsync` body, and the `FirstBootSeeder.cs` `KindSetup` mint all matched the pin §4/§5 exactly; no guessing needed.
+- **Test result:** **`dotnet build Kumunita.slnx -c Debug` — Build succeeded, 0 Warnings, 0 Errors** (exit 0). **No new test** — the three §7 pinned tests (`VerifyToken_StoredHashedNotCleartext`, `VerifyToken_ConsumedOrExpiredStillRejected`, `VerifyToken_ExistingCleartextRowHandled`) are the **next unit's** deliverables, not this unit's.
+- **Open items (owner, NOT assumed done):** zero-residual re-mint follow-up (pin §6) — carried over from F2.U1, unchanged by U2.
+- **Next unit = F2.U3** (tests, `Kumunita.Core.Tests`) — a fresh clean-slate agent. Do NOT start F3.
