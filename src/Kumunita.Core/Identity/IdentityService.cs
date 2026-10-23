@@ -1486,6 +1486,39 @@ public sealed class IdentityService(
         logger.LogInformation("Password changed for {UserId} ({ByAdmin}).", subjectId, byAdmin ? "admin" : "self");
     }
 
+    // ── Session kill-all (F5, AUTH-04) ──────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task KillAllSessionsAsync(string subjectId)
+    {
+        var user = await userManager.FindByIdAsync(subjectId)
+            ?? throw new InvalidOperationException($"No account '{subjectId}'.");
+
+        // Rotate the security stamp — the SAME seam ChangePasswordAsync uses at the
+        // password-change lane (IdentityService.cs:1477). No migration: User already
+        // carries the SecurityStamp column (inherited from IdentityUser, the InitialIdentity
+        // migration). The gate that makes this rotation operative (RevocationStampMiddleware
+        // in the Web) is the repo's actual invalidation idiom (ADR 0006-B "fat authorization,
+        // per request"; the SecurityStampValidator is intentionally neutered by the 14-day
+        // ValidationInterval — see Program.cs + PrivilegedStampMiddleware). The stamp
+        // rotation is the server-side revocation mark; the Web gate reads it per-request
+        // and signs out any session whose AuthenticationProperties.IssuedUtc (the
+        // session's birth time, set by the cookie handler at sign-in and NOT refreshed by
+        // sliding expiration) predates the stamp.
+        await userManager.UpdateSecurityStampAsync(user);
+
+        // Audit (C3 single-commit, same Marten session as the EF write — the same
+        // shape ChangePasswordAsync uses for its audit row; ADR 0006 "audit-by-default").
+        await using var session = documentStore.OpenSession(new SessionOptions());
+        session.Store(AuditRow(DateTimeOffset.UtcNow, subjectId, subjectId,
+            "session.kill_all", AccountKind, subjectId,
+            Authorization.AccessVia.Owner,
+            Authorization.AccessOutcome.Allow));
+        await session.SaveChangesAsync();
+
+        logger.LogInformation("Kill-all: security stamp rotated for {UserId}.", subjectId);
+    }
+
     // ── Guards + helpers ───────────────────────────────────────────────────
 
     private async Task<User> RequireGlobalAdminAsync(string adminSubjectId)

@@ -607,6 +607,65 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
+// F5 (AUTH-04, Option B) — session kill-all + invalidation. The `SecurityStamp`
+// (a per-user GUID, rotated by `UpdateSecurityStampAsync` on password change /
+// kill-all) is the server-side revocation mark. At sign-in, the cookie's
+// `AuthenticationProperties.Items["kumunita.stamp"]` is stamped with the user's
+// current `SecurityStamp` (via the `OnSigningIn` event below — the only reliable
+// place to set `Items`, since `CreateUserPrincipalAsync` returns a bare
+// `ClaimsPrincipal` and `SignInWithClaimsAsync` passes `AuthenticationProperties`
+// separately to `Context.SignInAsync`). The `Items` dictionary is preserved across
+// sliding renewal (`CookieAuthenticationHandler.CloneTicket` copies every `Items`
+// entry — confirmed in the .NET 10.0.13 source), so the stamp is stable for the
+// session's life. The per-request gate (`RevocationStampMiddleware`) reads the
+// cookie's stamp and compares it to the DB's current stamp: a mismatch means a
+// rotation happened after sign-in → sign out. This is the repo's actual
+// invalidation idiom (ADR 0006-B "fat authorization, per request"; the
+// `SecurityStampValidator` is intentionally neutered by the 14-day
+// `ValidationInterval`, see the comment block above).
+//
+// Two schemes are stamped:
+//   1. `Identity.Application` (the app cookie, `kumunita.auth`) — covers all
+//      live sessions (the `PasswordChange_InvalidatesOtherSessions` test).
+//   2. `Identity.TwoFactorUserId` (the pending leg-1 cookie) — closes the F3
+//      half-signed-in window (§1d of the F5 pin): a kill-all between leg-1 and
+//      leg-2 rotates the DB stamp; the pending cookie's stamp (set at leg-1)
+//      no longer matches → the leg-2 gate (in `AccountController.LoginMfa`)
+//      rejects completion before the app cookie is minted.
+//
+// The stamp is NOT a claim type (invariant-set-B preserved: `ClaimShaping.Build`
+// still mints exactly `ClaimTypes.All`). It is a non-claim property on the
+// cookie's `AuthenticationProperties`.
+{
+    var identityServices = builder.Services;
+    identityServices.Configure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, o =>
+    {
+        o.Events.OnSigningIn = async ctx =>
+        {
+            var subject = KumunitaPrincipal.SubjectId(ctx.Principal!);
+            if (string.IsNullOrEmpty(subject)) return;
+            var um = ctx.HttpContext!.RequestServices.GetRequiredService<UserManager<User>>();
+            var user = await um.FindByIdAsync(subject);
+            if (user is not null && !string.IsNullOrEmpty(user.SecurityStamp))
+                ctx.Properties.Items["kumunita.stamp"] = user.SecurityStamp;
+        };
+    });
+    identityServices.Configure<CookieAuthenticationOptions>(IdentityConstants.TwoFactorUserIdScheme, o =>
+    {
+        o.Events.OnSigningIn = async ctx =>
+        {
+            // The pending TwoFactorUserId cookie carries the user ID as the
+            // identity's Name (set by `StoreTwoFactorInfo` in the 10.0.13 source).
+            var subject = ctx.Principal!.Identity?.Name;
+            if (string.IsNullOrEmpty(subject)) return;
+            var um = ctx.HttpContext!.RequestServices.GetRequiredService<UserManager<User>>();
+            var user = await um.FindByIdAsync(subject);
+            if (user is not null && !string.IsNullOrEmpty(user.SecurityStamp))
+                ctx.Properties.Items["kumunita.stamp"] = user.SecurityStamp;
+        };
+    });
+}
+
 // Authorization: policies the /admin surfaces (step 8) will opt into; the claim-set
 // shape (invariant set B) is what lets [Authorize(Roles = "...")] work without any
 // DB read at decision time. The AuthorizationModule's fat-decision methods (CanAsync /
@@ -755,6 +814,18 @@ app.UseRateLimiter();
 app.UseAuthentication();
 
 app.UseMiddleware<BlockedAccountMiddleware>();
+
+// F5 (AUTH-04, Option B) — session-revocation enforcement: re-reads the DB
+// security stamp on every request for authenticated principals and signs them
+// out if a rotation (UpdateSecurityStampAsync — password change or kill-all)
+// happened after this session was minted. Registered after block enforcement
+// (a blocked user is signed out unconditionally, the higher-priority gate)
+// and before time-limit / privilege-revocation (the session-level gate is
+// broader — any resident — and must fire before the narrower role-specific
+// gates so a revoked GlobalAdmin session is killed as a session, not just
+// re-read as a role change). See RevocationStampMiddleware for the full
+// mechanism and the .NET 10.0.13 source grounding.
+app.UseMiddleware<RevocationStampMiddleware>();
 
 // M28 — guardian time-limit enforcement (ADR 0151, D5): a child whose
 // guardian-set schedule window says "not now" (evaluated in the child's ADR

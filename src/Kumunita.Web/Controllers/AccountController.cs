@@ -886,6 +886,69 @@ public sealed class AccountController(
     [EnableRateLimiting("login")]
     public async Task<IActionResult> LoginMfa(LoginViewModel model)
     {
+        // F5 (AUTH-04, Option B) — the leg-2 revocation gate (pin §1d / §2
+        // "leg-2 gating"). A kill-all (or password change) that rotated the
+        // security stamp AFTER leg-1 minted the pending
+        // `Identity.TwoFactorUserId` cookie leaves that cookie's stamp
+        // (stamped at leg-1 by the `OnSigningIn` handler in `Program.cs`)
+        // no longer matching the DB's current stamp. Without this gate the
+        // resident would complete leg-2 with a valid TOTP / recovery code and
+        // mint a FRESH app cookie after the kill — the half-signed-in state
+        // the F5 pin explicitly forbids (§1d: "the half-signed-in window F5
+        // must not let a kill-all leave dangling").
+        //
+        // The check reads the pending cookie's `Properties.Items["kumunita.stamp"]`
+        // (the per-session carrier, NOT a claim type — invariant-set-B intact)
+        // and compares it to the DB's current `SecurityStamp` (via
+        // `UserManager.GetSecurityStampAsync` — the framework's own
+        // `ValidateSecurityStampAsync` comparison, inlined here so the gate
+        // can sign out and re-render the challenge rather than returning a
+        // bare `SignInResult.Failed`). A mismatch → sign out (clears BOTH the
+        // pending `Identity.TwoFactorUserId` cookie AND the app scheme, the
+        // same `SignInManager.SignOutAsync` shape the `!result.Succeeded`
+        // branch below uses) + re-render the challenge with a revocation
+        // message. The resident must re-do leg-1 (password) to get a fresh
+        // pending cookie with the current stamp.
+        //
+        // If the pending cookie carries no stamp (e.g. leg-1 was minted
+        // before F5 shipped) the gate is a no-op — the resident's legitimate
+        // leg-2 completion is not blocked (backward compat, the same rule as
+        // `RevocationStampMiddleware`).
+        // Resolve IAuthenticationService explicitly (not via the AuthenticateAsync
+        // extension, which calls GetRequiredService and throws in test harnesses
+        // that use a DefaultHttpContext without authentication services registered).
+        // In production this is always available (AddAuthentication registers it).
+        // If it's absent (unit-test harness), the gate is a no-op — the test does
+        // not exercise the authentication pipeline.
+        if (HttpContext.RequestServices is not null
+            && HttpContext.RequestServices.GetService<IAuthenticationService>() is not null)
+        {
+            var pendingAuth = await HttpContext.AuthenticateAsync(IdentityConstants.TwoFactorUserIdScheme);
+            if (pendingAuth.Succeeded
+                && pendingAuth.Principal?.Identity?.Name is string pendingUserId
+                && pendingAuth.Properties?.Items.TryGetValue("kumunita.stamp", out var pendingStampObj) == true
+                && pendingStampObj is string pendingStamp)
+            {
+                var pendingUser = await userManager.FindByIdAsync(pendingUserId);
+                if (pendingUser is not null)
+                {
+                    var currentStamp = await userManager.GetSecurityStampAsync(pendingUser);
+                    if (pendingStamp != currentStamp)
+                    {
+                        // A kill-all / password change rotated the stamp after leg-1.
+                        // Reject the pending cookie and force the resident back to
+                        // leg-1 (password) so a fresh pending cookie is minted with
+                        // the current stamp.
+                        await signInManager.SignOutAsync();
+                        ModelState.AddModelError(string.Empty,
+                            "This sign-in was revoked. Please enter your password again.");
+                        model.MfaPending = true;
+                        return View("Login", model);
+                    }
+                }
+            }
+        }
+
         // The pin §5 leg 2: at least one of `MfaCode` (TOTP) or
         // `MfaRecoveryCode` (the pin §6 escape) must be present.
         if (string.IsNullOrWhiteSpace(model.MfaCode)
