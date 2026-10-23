@@ -358,3 +358,14 @@ No units executed yet. First wave (per the plan): F1, F2, F6, F7, F8, F13.
 - **Open items (owner, NOT assumed done):** all of §6 (install, config, `archive_command`, stanza, cadence, `check`, alert-wiring, PITR restore); §6.7 specifically depends on **F12**'s channel existing.
 - **Drift pause:** none — OPS §4/§5, `docker-compose.yml` (the `postgres:18` dev container + `kumunita_pgdata` volume + the `Media__RootPath` second-surface comment), and the F3.U5 section all matched the read plan; no guessing needed.
 - **F4 stays open — next unit = F4.U2** (expected "no code needed" recorded per pin §7, then F4.U3 lands the OPS.md update) — a fresh clean-slate agent.
+
+## F4.U2 — code support (none)
+- **Status: DONE — no code needed (per pin §7).** Read-only unit: **no `src`/`tests`/`design` edit, no `<PackageReference>`, no migration, no `.slnx` change, no build run.** I did **not** invent an app-side config knob to "make it code" (pin §7 forbids it).
+- **Pin §7 rationale (one sentence):** F4 is a **pure-ops tool** for this codebase — the app **neither reads nor writes the WAL stream**, so there is **no app-side knob, health-probe field, or DI seam** that WAL archiving / PITR requires; Postgres + pgBackRest (host-side `archive_command` + backup repo) own it entirely.
+- **Two-seam scan (read-only — confirms pin §7):** a precise token sweep (`archive_mode`, `pg_wal`, `pgbackrest`, `wal-g`, `standby`, `archive_timeout`, `restore_command`, `recovery_target`, `hot_standby`, `walreceiver`, `pg_switch_wal`, `XLogArchiver`) across the two most likely seams:
+  1. **`src/Kumunita.Web/Program.cs` (the `app.Use*` middleware pipeline)** → **0 hits**. No WAL/PITR participation.
+  2. **`Kumunita.Core` DI registrations** (`src/Kumunita.Core/**`) → **0 hits**. The only earlier broad "archive" matches were **false positives** — the Portability `*.kumunita` **zip** archive (`KumunitaArchive`/`Portability*`), the ADR 0019 **"wall clock"** timezone prose, and "walk/walk-through" copy — **none** of which is a WAL/PITR seam.
+- **Test result:** **no code** (the unit's expected outcome; no build run, per the exit contract).
+- **Drift pause:** none — the sweep surfaced nothing that participates in WAL/PITR, so there is no divergence to stop on.
+- **Open item (owner, NOT assumed done):** all of pin §6 (install, repo config, `archive_mode=on` + `archive_command`, stanza, cadence, `pgbackrest check`, alert-wiring, PITR restore) — the `ops` half of F4; §6.7 alert specifically depends on **F12**'s channel existing.
+- **F4 stays open — next unit = F4.U3** (the `docs/OPS.md` §4/§5 update — the only code-visible artifact of F4) — a fresh clean-slate agent.
