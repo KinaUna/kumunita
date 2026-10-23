@@ -16,8 +16,8 @@ self-contained: F3.U2–U5 must not need to re-derive any of these decisions.
 > pattern from memory." That applies to **ASP.NET Identity's two-factor API** as much as to
 > Marten/Wolverine. **Round-2 (this re-pin):** the 10.0.13 two-factor surface is the
 > **classic `UserManager` TOTP + recovery-code API** (`Get/SetTwoFactorEnabledAsync`,
-> `Generate/ValidateTwoFactorTokenAsync`, `GenerateNewAuthenticatorKey`,
-> `GenerateNewTwoFactorRecoveryCodesAsync` / `RedeemTwoFactorRecoveryCodeAsync` /
+> `GenerateTwoFactorTokenAsync` / `VerifyTwoFactorTokenAsync`, `GenerateNewAuthenticatorKey`,
+> `GenerateNewTwoFactorRecoveryCodesAsync(user, number)` / `RedeemTwoFactorRecoveryCodeAsync` /
 > `CountRecoveryCodesAsync`) plus the **TOTP `AuthenticatorTokenProvider<T>`** (RFC 6238) and
 > the **`SignInManager` two-leg sign-in** (`PasswordSignInAsync` → `TwoFactorAuthenticatorSignInAsync`
 > / `TwoFactorRecoveryCodeSignInAsync`). The `IdentityUser` *properties*
@@ -69,6 +69,8 @@ There is **no second factor** anywhere in the sign-in path. A compromised
 
 ## 2. Storage — **EF-owned Identity row + the token store; ADR 0004 preserved; NO new Marten doc; NO new migration**
 
+> **ROUND-3 RE-PIN (commit `db4ce95b` — the F3.U2 round-2 build drift-pause that recorded the 4 exact compiler errors):** four members corrected to the **build-verified** 10.0.13 surface — `ValidateTwoFactorTokenAsync` → **`VerifyTwoFactorTokenAsync(user, provider, token)`** (the `Validate…` name is ABSENT — CS1061, 0 byte-level hits in the Core + Identity DLLs); `GenerateNewTwoFactorRecoveryCodesAsync(user)` → **`(user, number)`** (pass 10); `TwoFactorAuthenticatorSignInAsync(user, code)` → **`(code, isPersistent, rememberClient)`** (code-first, no user); `TwoFactorRecoveryCodeSignInAsync(user, code)` → **`(recoveryCode)`** (1-arg, no user). The round-2 tier (①) for these four is now **③ U2-build-verifies against the round-3 shape**. The rest of the round-2 model (the members that DID compile) is unchanged.
+
 > **RE-PINNED AGAINST THE REAL `Microsoft.AspNetCore.Identity 10.0.13` — round 2.**
 > This unit re-derived §2 from **direct reflection of the actual 10.0.13 PE files**
 > (`System.Reflection.Metadata` over `Microsoft.Extensions.Identity.Core.dll`,
@@ -117,11 +119,11 @@ There is **no second factor** anywhere in the sign-in path. A compromised
 | Two-factor gate (login result) | `SignInResult.RequiresTwoFactor` (`bool`) + `TwoFactorRequired` | `SignInResult` (Core) | ① |
 | Valid 2FA providers | `UserManager.GetValidTwoFactorProvidersAsync` | `UserManager<T>` (Core) | ① |
 | TOTP — generate | `UserManager.GenerateTwoFactorTokenAsync` | `UserManager<T>` (Core) | ① |
-| TOTP — validate | `UserManager.ValidateTwoFactorTokenAsync` | `UserManager<T>` (Core) | ① |
+| TOTP — validate | `UserManager.VerifyTwoFactorTokenAsync(user, provider, token)` | `UserManager<T>` (Core) | ③ U2-build-verifies (round-3) |
 | **TOTP provider (real)** | `AuthenticatorTokenProvider<T>` + `Rfc6238AuthenticationService.ComputeTotp` | Identity / Core | ① |
 | TOTP — "can generate?" | `IUserTwoFactorTokenProvider<T>.CanGenerateTwoFactorTokenAsync` (+ on `AuthenticatorTokenProvider<T>`, `DataProtectorTokenProvider<T>`) | provider iface + impls | ① |
 | **TOTP secret (authenticator key)** | `UserManager.GenerateNewAuthenticatorKey` / `GetAuthenticatorKeyAsync` / `ResetAuthenticatorKeyAsync`; store `IUserAuthenticatorKeyStore<T>` (`Get/SetAuthenticatorKeyAsync`) | Core | ① |
-| **Recovery codes — (re)issue** | `UserManager.GenerateNewTwoFactorRecoveryCodesAsync` | `UserManager<T>` (Core) | ① |
+| **Recovery codes — (re)issue** | `UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, number)` | `UserManager<T>` (Core) | ③ U2-build-verifies (round-3) |
 | **Recovery codes — redeem** | `UserManager.RedeemTwoFactorRecoveryCodeAsync` | `UserManager<T>` (Core) | ① |
 | **Recovery codes — count** | `UserManager.CountRecoveryCodesAsync` | `UserManager<T>` (Core) | ① |
 | Recovery-code store iface | `IUserTwoFactorRecoveryCodeStore<T>`: `ReplaceCodesAsync` / `RedeemCodeAsync` / `CountCodesAsync` | Core | ① |
@@ -129,8 +131,8 @@ There is **no second factor** anywhere in the sign-in path. A compromised
 | Token store (key+codes backing) | `UserManager.GetAuthenticationTokenAsync` / `SetAuthenticationTokenAsync` / `RemoveAuthenticationTokenAsync` (raw token access); EF backing `UserStore<10>.UserTokens` + `AddUserTokenAsync` / `FindTokenAsync` / `RemoveUserTokenAsync` | Core / EFCore | ① |
 | Pending user (2FA) | `SignInManager.GetTwoFactorAuthenticationUserAsync` | `SignInManager<T>` | ① |
 | Pending user + metadata DTO | `TwoFactorAuthenticationInfo` (`User`, `LoginProvider`) | Identity | ① |
-| Leg-2 sign-in (TOTP) | `SignInManager.TwoFactorAuthenticatorSignInAsync` | `SignInManager<T>` | ① |
-| Leg-2 sign-in (recovery) | `SignInManager.TwoFactorRecoveryCodeSignInAsync` | `SignInManager<T>` | ① |
+| Leg-2 sign-in (TOTP) | `SignInManager.TwoFactorAuthenticatorSignInAsync(code, isPersistent, rememberClient)` | `SignInManager<T>` | ③ U2-build-verifies (round-3) |
+| Leg-2 sign-in (recovery) | `SignInManager.TwoFactorRecoveryCodeSignInAsync(recoveryCode)` | `SignInManager<T>` | ③ U2-build-verifies (round-3) |
 | Leg-2 combined / entry | `SignInManager.TwoFactorSignInAsync`, `SignInOrTwoFactorAsync` | `SignInManager<T>` | ① |
 | Security-stamp re-check | `SignInManager.ValidateTwoFactorSecurityStampAsync` | `SignInManager<T>` | ① |
 | Leg-1 (password) | `SignInManager.PasswordSignInAsync` | `SignInManager<T>` | ①' (`AccountController`) |
@@ -156,7 +158,8 @@ There is **no second factor** anywhere in the sign-in path. A compromised
 > - `CanGenerateTwoFactorTokenAsync`, `IUserTwoFactorTokenProvider<T>`, `DataProtectorTokenProvider<T>`,
 >   `TwoFactorAuthenticationInfo` — all **PRESENT** (round-2 reflection) despite F3.U2's
 >   false-negative "absent/UNKNOWN" verdicts.
-> - The `UserManager` TOTP + recovery-code method set (`Generate/ValidateTwoFactorTokenAsync`,
+> - The `UserManager` TOTP + recovery-code method set (`GenerateTwoFactorTokenAsync` /
+>   `VerifyTwoFactorTokenAsync`,
 >   `GetValidTwoFactorProvidersAsync`, `Get/SetTwoFactorEnabledAsync`,
 >   `GenerateNewTwoFactorRecoveryCodesAsync`, `RedeemTwoFactorRecoveryCodeAsync`,
 >   `CountRecoveryCodesAsync`, `Get/SetAuthenticatorKeyAsync`) — all **PRESENT** (round-2
@@ -176,11 +179,11 @@ There is **no second factor** anywhere in the sign-in path. A compromised
   the app builds the `otpauth://` URL from it + `TokenOptions.AuthenticatorIssuer`). Stored via
   the **token store** as `AspNetUserTokens(LoginProvider="Authenticator", Name="Key",
   Value=<base32 key>)`. Validated at the challenge leg via
-  `UserManager.ValidateTwoFactorTokenAsync(user, "Authenticator", code)` →
+  `UserManager.VerifyTwoFactorTokenAsync(user, "Authenticator", code)` →
   `AuthenticatorTokenProvider<T>.ValidateAsync` (`Rfc6238AuthenticationService.ComputeTotp`).
   **Reuses `AspNetUserTokens`; no new column.**
 - **Recovery codes:** 10 codes, generated once at enrollment via
-  `UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user)` (returns the set; shown **once**),
+  `UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10)` (returns the set; shown **once**),
   stored as rows in **`AspNetUserTokens`** (via `IUserTwoFactorRecoveryCodeStore<T>.
   ReplaceCodesAsync`, backed by the token store). **Redeemed** (one-time) via
   `UserManager.RedeemTwoFactorRecoveryCodeAsync(user, code)` (or leg-2
@@ -215,7 +218,7 @@ authenticator key, the recovery codes). U2's real deliverables: (a) the provider
 (§3 — `AddDefaultTokenProviders()` is **already present** at `Program.cs:403` per F3.U2 — do not
 re-add it), (b) confirming at build that `UserManager`'s `GenerateNewTwoFactorRecoveryCodesAsync` /
 `RedeemTwoFactorRecoveryCodeAsync` / `CountRecoveryCodesAsync` / `GenerateNewAuthenticatorKey`
-resolve (they do — ①) and that `ValidateTwoFactorTokenAsync` accepts a generated code, (c) the
+resolve (they do — ①) and that `VerifyTwoFactorTokenAsync` accepts a generated code, (c) the
 `AuthenticatorTokenProvider<T>` TOTP round-trip (generate → validate). **No new migration, no new
 `<PackageReference>`, no Marten doc.**
 
@@ -228,7 +231,7 @@ resolve (they do — ①) and that `ValidateTwoFactorTokenAsync` accepts a gener
 > landed it, build green). **U2 does NOT re-add it.** It registers the default token providers,
 > including **`DataProtectorTokenProvider<T>`** (verified ① present) and the TOTP
 > **`AuthenticatorTokenProvider<T>`** (verified ① present) — the provider
-> `UserManager.GenerateTwoFactorTokenAsync` / `ValidateTwoFactorTokenAsync` and the
+> `UserManager.GenerateTwoFactorTokenAsync` / `VerifyTwoFactorTokenAsync` and the
 > `SignInManager` leg-2 sign-in resolve for the `"Authenticator"` login provider.
 
 **Pin (state):** `.AddDefaultTokenProviders()` is already on the `AddIdentity<User,
@@ -237,7 +240,7 @@ IdentityRole>(…)` chain (`src/Kumunita.Web/Program.cs:396-403`):
 .AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory>()`. **Do not re-add it.**
 
 - **Why it is load-bearing (corrected):** `UserManager.GenerateTwoFactorTokenAsync` /
-  `ValidateTwoFactorTokenAsync` and `SignInManager.TwoFactorAuthenticatorSignInAsync` resolve a
+  `VerifyTwoFactorTokenAsync` and `SignInManager.TwoFactorAuthenticatorSignInAsync(code, isPersistent, rememberClient)` resolve a
   registered `IUserTwoFactorTokenProvider<User>` for the `"Authenticator"` login provider.
   `AddDefaultTokenProviders()` supplies it. Without it the first two-factor call throws
   ("no token provider registered" — the `Resources.NoTokenProvider` string, verified ① present).
@@ -279,12 +282,12 @@ two-factor API, §2.1); the challenge leg calls `SignInManager` (leg-2, §5).
 
 | URL | HTTP | Action | Purpose (round-2, real API) |
 |---|---|---|---|
-| `/settings/security/mfa` | GET | `Mfa()` | Enrollment state. **If not enabled:** show the one-time **setup key** (`userManager.GenerateNewAuthenticatorKey()` → base32) + **otpauth:// URI** (QR, built from that key + `TokenOptions.AuthenticatorIssuer`) + the **10 recovery codes** (`userManager.GenerateNewTwoFactorRecoveryCodesAsync`, shown **once**). **If already enabled:** status + **count only** (`userManager.CountRecoveryCodesAsync`, never the values). |
-| `/settings/security/mfa` | POST | `MfaEnable(MfaEnableViewModel)` | **Verify** the first TOTP code the resident typed (`userManager.ValidateTwoFactorTokenAsync(user, "Authenticator", code)`), **then** flip the flag `userManager.SetTwoFactorEnabledAsync(user, true)` (the .NET ≤8 `EnsureTwoFactorAsync` does not exist — this is the real call). The 10 recovery codes were already minted by the GET and shown **once**; this POST does not re-serve them. |
+| `/settings/security/mfa` | GET | `Mfa()` | Enrollment state. **If not enabled:** show the one-time **setup key** (`userManager.GenerateNewAuthenticatorKey()` → base32) + **otpauth:// URI** (QR, built from that key + `TokenOptions.AuthenticatorIssuer`) + the **10 recovery codes** (`userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10)`, shown **once**). **If already enabled:** status + **count only** (`userManager.CountRecoveryCodesAsync`, never the values). |
+| `/settings/security/mfa` | POST | `MfaEnable(MfaEnableViewModel)` | **Verify** the first TOTP code the resident typed (`userManager.VerifyTwoFactorTokenAsync(user, "Authenticator", code)`), **then** flip the flag `userManager.SetTwoFactorEnabledAsync(user, true)` (the .NET ≤8 `EnsureTwoFactorAsync` does not exist — this is the real call). The 10 recovery codes were already minted by the GET and shown **once**; this POST does not re-serve them. |
 | `/settings/security/mfa/recovery` | GET | `MfaRecovery()` | Show **count only** (`userManager.CountRecoveryCodesAsync`, never the values — they were shown once at enable/rotate). |
-| `/settings/security/mfa/recovery` | POST | `MfaRotateRecovery()` | **Rotate**: `userManager.GenerateNewTwoFactorRecoveryCodesAsync(user)` again → the new 10 are shown **once**; the old 10 are dead. |
+| `/settings/security/mfa/recovery` | POST | `MfaRotateRecovery()` | **Rotate**: `userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10)` again → the new 10 are shown **once**; the old 10 are dead. |
 | `/settings/security/mfa` | POST | `MfaDisable(MfaDisableViewModel)` | (Optional, recommended) Re-verify a TOTP code, then `userManager.SetTwoFactorEnabledAsync(user, false)` + clear the key (`userManager.ResetAuthenticatorKeyAsync(user)` / `RemoveAuthenticationTokenAsync`). **For a `GlobalAdmin`, this is the one action that must carry the enforcement caution** (§8.6): a lone GlobalAdmin disabling MFA removes their own second factor — gate it behind a TOTP or recovery proof, and record an audit row. |
-| `/account/login/mfa` | POST | (U4) `LoginMfa(MfaChallengeViewModel)` | The **challenge leg** of sign-in (§5): accept a TOTP **or** a recovery code for the pending (temporarily signed-in) user, then complete the **persistent** sign-in via `SignInManager.TwoFactorAuthenticatorSignInAsync` / `TwoFactorRecoveryCodeSignInAsync`. |
+| `/account/login/mfa` | POST | (U4) `LoginMfa(MfaChallengeViewModel)` | The **challenge leg** of sign-in (§5): accept a TOTP **or** a recovery code for the pending (temporarily signed-in) user, then complete the **persistent** sign-in via `SignInManager.TwoFactorAuthenticatorSignInAsync(code, isPersistent, rememberClient)` / `TwoFactorRecoveryCodeSignInAsync(recoveryCode)`. |
 
 > **URL-shape pin:** the plan names `/settings/security/mfa` (GET/POST) and
 > `/settings/security/mfa/recovery`. This table adds two additive actions
@@ -319,14 +322,14 @@ emits the values.
 > **RE-PINNED against the actual `Microsoft.AspNetCore.Identity 10.0.13` sign-in surface.**
 > The original §5 relied on the .NET ≤8 `UserManager` TOTP API + the `TwoFactorEnabled` property.
 > **Round-2 correction:** the .NET 10.0.13 `UserManager` two-factor API **IS present** (see §2.1) —
-> `ValidateTwoFactorTokenAsync` / `RedeemTwoFactorRecoveryCodeAsync` / `SetTwoFactorEnabledAsync` all
+> `VerifyTwoFactorTokenAsync` / `RedeemTwoFactorRecoveryCodeAsync` / `SetTwoFactorEnabledAsync` all
 > exist. The `IdentityUser` *properties* `IsTwoFactorEnabled` / `RecoveryCodesLeft` /
 > `ResetRecoveryCodes` are **ABSENT** (CS1061) — round-1's model was invented. The .NET 10 two-leg sign-in flow is instead:
 > **leg 1** `PasswordSignInAsync(user, password, isPersistent:false, lockoutOnFailure:true)`
 > (**① compiler-verified** — the current `AccountController.cs:716` calls it and the repo builds
 > green) → **gate** on `result.RequiresTwoFactor` (**① round-2 reflection-verified** — the property
-> on `SignInResult` is present in 10.0.13) → **leg 2** `TwoFactorAuthenticatorSignInAsync(user, code)` /
-> `TwoFactorRecoveryCodeSignInAsync(user, code)` (**① round-2 reflection-verified** — both present
+> on `SignInResult` is present in 10.0.13) → **leg 2** `TwoFactorAuthenticatorSignInAsync(code, isPersistent, rememberClient)` /
+> `TwoFactorRecoveryCodeSignInAsync(recoveryCode)` (**③ U2-build-verifies against the round-3 shape** — both present
 > on `SignInManager<T>` in 10.0.13). **Correction to the F3.U2 note's implication:** `PasswordSignInAsync` is
 > **NOT absent** in 10.0.13 (the F3.U2 agent only tested `AddTokenProvider` +
 > `TotpAuthenticatorTokenProvider`, both of which ARE absent; it did not test the sign-in leg).
@@ -361,10 +364,10 @@ complete sign-in without a valid TOTP or recovery code. **Other roles are unaffe
      for the challenge view — **no separate pending-user store is required**.
    - On a correct code at the challenge leg, **Leg 2 — complete sign-in** (both methods are
      **① round-2 reflection-verified**):
-     - **TOTP code:** `await signInManager.TwoFactorAuthenticatorSignInAsync(user,
-       code, model.RememberMe);`
-     - **Recovery code:** `await signInManager.TwoFactorRecoveryCodeSignInAsync(user,
-       code, model.RememberMe);` (this method also enforces one-time-use via
+     - **TOTP code:** `await signInManager.TwoFactorAuthenticatorSignInAsync(
+       code, isPersistent: model.RememberMe, rememberClient: model.RememberMe);` (code-first, **no user** — the user comes from the pending temp sign-in)
+     - **Recovery code:** `await signInManager.TwoFactorRecoveryCodeSignInAsync(
+       code);` (1-arg, **no user**; this method also enforces one-time-use via
        `UserManager.RedeemTwoFactorRecoveryCodeAsync` under the hood, §6).
      - These two methods **complete the sign-in and mint the auth cookie** on success (the
        .NET 10 two-factor sign-in overloads issue the cookie — **③ U4-build-verifies** this;
@@ -379,7 +382,7 @@ complete sign-in without a valid TOTP or recovery code. **Other roles are unaffe
    admin surface with password-only. (This is the "enforce" half of AUTH-03; the *challenge*
    half is Leg 1.5.) **U4 must complete the sign-in for this user only after they enroll**
    (the enrollment POST flips `SetTwoFactorEnabledAsync(user, true)` and issues recovery codes
-   via `GenerateNewTwoFactorRecoveryCodesAsync`, §4/§6).
+   via `GenerateNewTwoFactorRecoveryCodesAsync(user, 10)`, §4/§6).
 4. **Leg 1.5c — the existing path for non-MFA users is UNCHANGED from today:** the
    `profile.Blocked` check (kept verbatim), then the persistent sign-in
    (`await signInManager.PasswordSignInAsync(user, model.Password, isPersistent: true,
@@ -426,7 +429,7 @@ complete sign-in without a valid TOTP or recovery code. **Other roles are unaffe
 ## 6. Recovery path (pin the full shape)
 
 ### 6.1 Generation
-- **Count: 10** — the 10 codes are minted by `UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user)`
+- **Count: 10** — the 10 codes are minted by `UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10)`
   (① round-2 reflection-verified) and persisted as rows in the existing `AspNetUserTokens` table
   (via `IUserTwoFactorRecoveryCodeStore<T>.ReplaceCodesAsync`). **No new column, no new migration.**
   The count a steady GET shows is `UserManager.CountRecoveryCodesAsync(user)` (①). Pin 10; do not
@@ -437,8 +440,7 @@ complete sign-in without a valid TOTP or recovery code. **Other roles are unaffe
 
 ### 6.2 One-time use
 - A recovery code presented at the challenge leg is consumed by the **sign-in leg**
-  `signInManager.TwoFactorRecoveryCodeSignInAsync(user, code, rememberMe)` (① round-2
-  reflection-verified), which internally calls `UserManager.RedeemTwoFactorRecoveryCodeAsync`
+  `signInManager.TwoFactorRecoveryCodeSignInAsync(code)` (③ U2-build-verifies against the round-3 shape — 1-arg, **no user**), which internally calls `UserManager.RedeemTwoFactorRecoveryCodeAsync`
   (①) to consume the code from `AspNetUserTokens`. A second presentation of the same code is
   rejected (the code row is gone). This is the `GlobalAdminRecoveryCode_WorksOnce` guarantee.
   The remaining count is `UserManager.CountRecoveryCodesAsync(user)` (①). **U2 must verify at
@@ -447,7 +449,7 @@ complete sign-in without a valid TOTP or recovery code. **Other roles are unaffe
   the handoff note — do not guess).
 
 ### 6.3 Rotate
-- `UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user)` (① round-2 reflection-verified)
+- `UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10)` (③ U2-build-verifies against the round-3 shape)
   **atomically swaps** the whole set (via `IUserTwoFactorRecoveryCodeStore<T>.ReplaceCodesAsync`).
   The new 10 are shown **once**; the old 10 are dead. The steady-state GET (§4 `MfaRecovery()`)
   shows only the **count** (`UserManager.CountRecoveryCodesAsync(user)`, ①).
@@ -504,7 +506,7 @@ setup the F1 `IdentityServiceDeleteLaneGdprTests` harness uses for a GlobalAdmin
 **Seeding the two-factor state (round-2, real API):** enable via
 `userManager.SetTwoFactorEnabledAsync(user, true)` (①) + mint the TOTP key via
 `userManager.GenerateNewAuthenticatorKey()` (①, stored as `AspNetUserTokens` row) + generate the
-10 recovery codes via `userManager.GenerateNewTwoFactorRecoveryCodesAsync(user)` (①, stored as
+10 recovery codes via `userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10)` (③, stored as
 `AspNetUserTokens` rows). **Do NOT use the round-1 `user.IsTwoFactorEnabled` /
 `user.ResetRecoveryCodes` / `user.RecoveryCodesLeft` properties — they do not exist on
 `IdentityUser` in 10.0.13 (CS1061).**
@@ -583,7 +585,7 @@ setup the F1 `IdentityServiceDeleteLaneGdprTests` harness uses for a GlobalAdmin
      `AuthenticatorTokenProvider<T>` / `DataProtectorTokenProvider<T>`).
    - **PRESENT** (round-2 reflection, ①) despite round-1/F3.U2 "absent" claims: the full
      `UserManager` two-factor set (`Get/SetTwoFactorEnabledAsync`, `GetValidTwoFactorProvidersAsync`,
-     `Generate/ValidateTwoFactorTokenAsync`, `Get/SetAuthenticationTokenAsync`,
+     `VerifyTwoFactorTokenAsync`, `Get/SetAuthenticationTokenAsync`,
      `GetAuthenticatorKeyAsync` / `ResetAuthenticatorKeyAsync` / `GenerateNewAuthenticatorKey`,
      `GenerateNewTwoFactorRecoveryCodesAsync` / `RedeemTwoFactorRecoveryCodeAsync` /
      `CountRecoveryCodesAsync`), the `IUserTwoFactorRecoveryCodeStore<T>` / `IUserTwoFactorStore<T>` /
@@ -596,7 +598,7 @@ setup the F1 `IdentityServiceDeleteLaneGdprTests` harness uses for a GlobalAdmin
      authoritative present/absent basis.
    - **U2's build-verify is now narrow:** confirm at build that `UserManager`'s two-factor API
      resolves for the repo's `User` (it should — the repo already `AddIdentity`s against `User`)
-     and that `ValidateTwoFactorTokenAsync` accepts a `GenerateTwoFactorTokenAsync` output. No
+     and that `VerifyTwoFactorTokenAsync` accepts a `GenerateTwoFactorTokenAsync` output. No
      "confirm the ③ names" step is needed — §2.1 is reflection-verified.
 8. **Old→new API mapping (for the owner's diff — the re-derivation):**
 
@@ -607,14 +609,14 @@ setup the F1 `IdentityServiceDeleteLaneGdprTests` harness uses for a GlobalAdmin
 | Disable (write) | `user.IsTwoFactorEnabled = false` + `SaveChangesAsync` | `userManager.SetTwoFactorEnabledAsync(user, false)` (①) |
 | Enable-check | `signInManager.IsTwoFactorEnabledAsync(user)` | **same** — `IsTwoFactorEnabledAsync` IS on `SignInManager` (①); or `userManager.GetTwoFactorEnabledAsync(user)` (①) |
 | TOTP — generate | `signInManager.CanGenerateTwoFactorTokenAsync(user)` (**wrong home**) | `userManager.GenerateTwoFactorTokenAsync(user, "Authenticator")` (①) or the provider's `GenerateAsync` (①) |
-| TOTP — validate | `signInManager.TwoFactorAuthenticatorSignInAsync(user, code)` | **enrollment:** `userManager.ValidateTwoFactorTokenAsync(user, "Authenticator", code)` (①); **sign-in:** `signInManager.TwoFactorAuthenticatorSignInAsync(user, code)` (①) |
+| TOTP — validate | `signInManager.TwoFactorAuthenticatorSignInAsync(user, code)` | **enrollment:** `userManager.VerifyTwoFactorTokenAsync(user, "Authenticator", code)` (③); **sign-in:** `signInManager.TwoFactorAuthenticatorSignInAsync(code, isPersistent, rememberClient)` (③) |
 | TOTP secret | (invented) | `userManager.GenerateNewAuthenticatorKey()` (①) + `otpauth://` from `TokenOptions.AuthenticatorIssuer` (①); stored in `AspNetUserTokens` |
 | **Sign-in leg 1** | (n/a) | `signInManager.PasswordSignInAsync(user, pw, isPersistent:false, lockout)` — ①' compiler-verified; only `isPersistent` flips `true`→`false` |
 | **Two-factor gate** | `signInManager.IsTwoFactorEnabledAsync(user)` | **same — `IsTwoFactorEnabledAsync` IS present** (①) OR `result.RequiresTwoFactor` (①) |
-| **Sign-in leg 2** | (n/a) | `signInManager.TwoFactorAuthenticatorSignInAsync(user, code)` / `TwoFactorRecoveryCodeSignInAsync(user, code)` (both ①) |
+| **Sign-in leg 2** | (n/a) | `signInManager.TwoFactorAuthenticatorSignInAsync(code, isPersistent, rememberClient)` / `TwoFactorRecoveryCodeSignInAsync(recoveryCode)` (both ③) |
 | Recovery — read | `user.RecoveryCodesLeft` (**absent**) | `userManager.CountRecoveryCodesAsync(user)` (①) |
-| Recovery — issue/rotate | `user.ResetRecoveryCodes = <set>` (**absent**) | `userManager.GenerateNewTwoFactorRecoveryCodesAsync(user)` (①) → `AspNetUserTokens` |
-| Recovery — consume | `signInManager.TwoFactorRecoveryCodeSignInAsync(user, code)` | **same** (①) + `userManager.RedeemTwoFactorRecoveryCodeAsync(user, code)` (①) under the hood |
+| Recovery — issue/rotate | `user.ResetRecoveryCodes = <set>` (**absent**) | `userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10)` (③) → `AspNetUserTokens` |
+| Recovery — consume | `signInManager.TwoFactorRecoveryCodeSignInAsync(user, code)` | **same — `TwoFactorRecoveryCodeSignInAsync(recoveryCode)`** (③) + `userManager.RedeemTwoFactorRecoveryCodeAsync(user, code)` (①) under the hood |
 | Provider type | `IUserTwoFactorTokenProvider<T>` (②) | **same** (①) + `AuthenticatorTokenProvider<T>` TOTP (①) + `DataProtectorTokenProvider<T>` (①) |
 | Registration | `.AddDefaultTokenProviders()` (②) | **same** — already at `Program.cs:403` (①') — do not re-add |
 | Secret + codes storage | (invented `IdentityUser` properties) | **`AspNetUserTokens` table** (already in schema) via the token store (①); **NO new migration** |
