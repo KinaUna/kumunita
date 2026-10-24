@@ -1,0 +1,68 @@
+# F14.U2 — DEP-03: CI test gate on `release`.
+#
+# This workflow makes a red test a HARD STOP for the `release` branch:
+#   - the job is green IF AND ONLY IF build == 0 AND Web.Tests == 0 AND Core.Tests == 0;
+#   - a non-zero exit from the build OR either test dll fails the job (pin §4);
+#   - a green Web.Tests does NOT offset a red Core.Tests (no partial credit).
+#
+# The three `dotnet` gate commands below are transcribed VERBATIM from the
+# F14.U1 Part-0 design pin (§2 of docs/design/prod-hardening-f14-ci.md):
+#   - the reliable in-process `dotnet exec` path (NOT the broken xunit.v3
+#     discovery runner — see AGENTS.md § "Running the tests");
+#   - each `dotnet exec` is its OWN step with its OWN exit code.
+#
+# `runs-on: ubuntu-latest` — Docker is pre-installed on GitHub-hosted runners,
+# which `Kumunita.Core.Tests` needs (Testcontainers starts `postgres:18`).
+# NO container-prune cleanup step here (pin §5): the "prune orphan containers"
+# advice is a LOCAL concern (a killed local runner); a CI runner is ephemeral
+# and recycled after each run, so a prune would be a no-op — noise, not a step.
+#
+# The `checkout` + `setup-dotnet` steps are CI plumbing (action setup), NOT
+# one of the three pinned gate commands and NOT a <PackageReference> — they
+# do not change the gate (pin §2 "CI runner pre-requisite").
+#
+# F14.U3 (owner-ops, recorded — NOT assumed done): wire the Coolify deploy to
+# REQUIRE the green CI check on `release` (required status check / branch
+# protection) so this green/red signal actually blocks a deploy. Until U3
+# runs, the check EXISTS (a push shows green/red) but does NOT block a deploy.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - release
+  pull_request:
+    branches:
+      - release
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK
+      # matching global.json (sdk.version = 10.0.400, rollForward = latestFeature).
+      - name: Set up .NET SDK
+        uses: dotnet/setup-dotnet@v4
+        with:
+          version: '10.0.400'
+          roll-forward: latestfeature
+
+      # --- The three pinned gate commands (pin §2, VERBATIM, in order) ---
+      # Each is a separate step with its own exit code. A non-zero exit from
+      # ANY of them (build, Web.Tests, or Core.Tests) fails the job (pin §4).
+
+      # 1. Build the .slnx solution in Debug — emits the two test dlls.
+      - name: Build
+        run: dotnet build Kumunita.slnx -c Debug
+
+      # 2. Run the Web test assembly in-process (xunit.v3 runner).
+      - name: Test Web
+        run: dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll
+
+      # 3. Run the Core test assembly in-process (xunit.v3 runner, Docker/Testcontainers).
+      - name: Test Core
+        run: dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
