@@ -407,7 +407,27 @@ public sealed class AccountController(
         if (!await identity.IsSignupOpenAsync())
             return View("SignupClosed", new SignupClosedViewModel());
 
-        return View(new SignupViewModel());
+        var model = new SignupViewModel();
+
+        // F9 (AUTH-15, U3) — surface the flag + site key to the view (pin §4b): the
+        // challenge widget + the hidden BotChallengeToken input render ONLY when the
+        // owner's KUMUNITA__SIGNUP__BOT_CHECK flag is on (the registered verifier is
+        // NOT the Noop default). Resolved from the request scope (the
+        // LocalizeValidationAsync idiom — the constructor is unchanged). Off (the
+        // NoopBotChallengeVerifier, the default) → BotChallengeEnabled stays false and
+        // the signup form is byte-identical to before this seam (the standing owner
+        // deferral, OPS.md §10; the frozen CSP invariant — no new origin exposed).
+        var botChallengeVerifier = HttpContext?.RequestServices
+            ?.GetService<Kumunita.Core.Identity.IBotChallengeVerifier>();
+        if (botChallengeVerifier is not Kumunita.Core.Identity.NoopBotChallengeVerifier)
+        {
+            model.BotChallengeEnabled = true;
+            model.BotChallengeSiteKey = HttpContext?.RequestServices
+                ?.GetService<Microsoft.Extensions.Options.IOptions<Kumunita.Core.Identity.SignupBotChallengeOptions>>()
+                ?.Value.SiteKey;
+        }
+
+        return View(model);
     }
 
     [AllowAnonymous]
@@ -426,6 +446,30 @@ public sealed class AccountController(
         if (!ModelState.IsValid)
         {
             await LocalizeValidationAsync(model);
+            return View(model);
+        }
+
+        // F9 (AUTH-15, U3) — the bot-challenge gate (pin §4b): when the owner's
+        // KUMUNITA__SIGNUP__BOT_CHECK flag is on, the signup POST must carry a
+        // valid challenge token (the widget wrote it into BotChallengeToken).
+        // Resolved from the request scope (the LocalizeValidationAsync idiom — the
+        // constructor is unchanged for the existing direct-construction harnesses)
+        // so a harness with no HTTP host / no registered IBotChallengeVerifier is a
+        // no-op (null → skipped), exactly like the F3 leg-2 gate. The Core lane
+        // (RegisterCoreAsync / IIdentityService) does NOT call the verifier — the
+        // verification is a Web-enforced I/O gate (the IMailerStage "designed
+        // handoff" precedent, pin §4b). On false: re-render with the
+        // BotChallengeFailed flag (the EmailDomainDisallowed precedent, §3b) — a
+        // bot is not proven human, and the reason is NOT leaked (the
+        // uniform-rejection shape, the F3 leg-2 precedent).
+        var botChallengeVerifier = HttpContext?.RequestServices
+            ?.GetService<Kumunita.Core.Identity.IBotChallengeVerifier>();
+        if (botChallengeVerifier is not null &&
+            !await botChallengeVerifier.IsVerifiedAsync(model.BotChallengeToken))
+        {
+            model.BotChallengeFailed = true;
+            ModelState.AddModelError(string.Empty,
+                "The security check did not pass. Please try again.");
             return View(model);
         }
 

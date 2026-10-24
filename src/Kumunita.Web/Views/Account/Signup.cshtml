@@ -34,8 +34,30 @@
                 <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
             </div>
 
+            @* F9 (AUTH-15, U3) — the bot-challenge widget (pin §4b/§4c). Rendered ONLY
+               when the owner's KUMUNITA__SIGNUP__BOT_CHECK flag is on (Model.BotChallengeEnabled,
+               set by the Signup GET from the flag) — when off (the default, the Noop
+               verifier) this block is absent and the form is byte-identical to before
+               this seam (the standing owner deferral, OPS.md §10; the frozen CSP
+               invariant). The host div's data-sitekey drives the bot-challenge.ts module
+               (a self-wiring client/lib module — no inline JS, the CSP script-src 'self'
+               rule); it writes the solved token into the hidden BotChallengeToken input,
+               which AccountController.Signup verifies (IBotChallengeVerifier gate). *@
+            @if (Model is { BotChallengeEnabled: true })
+            {
+                <div class="kumunita-bot-challenge mb-3" data-sitekey="@(Model.BotChallengeSiteKey ?? string.Empty)"></div>
+                <input type="hidden" asp-for="BotChallengeToken" />
+            }
+
             <button type="submit" class="btn btn-primary"><kw-l key="account.signup_submit">Sign up</kw-l></button>
         </form>
+
+        @if (Model is { BotChallengeFailed: true })
+        {
+            <p class="mt-3 text-danger">
+                The security check did not pass. Please try again.
+            </p>
+        }
 
         @if (Model is { EmailDomainDisallowed: true })
         {
@@ -61,4 +83,12 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    @* F9 (AUTH-15, U3) — the bot-challenge widget's self-wiring module (CSP
+       script-src 'self' compliant). Loaded only when the widget rendered
+       (Model.BotChallengeEnabled) — when off (the default) no script, no
+       third-party load, the form is byte-identical to before this seam. *@
+    @if (Model is { BotChallengeEnabled: true })
+    {
+        <script type="module" src="~/js/lib/bot-challenge.js"></script>
+    }
 }

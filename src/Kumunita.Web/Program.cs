@@ -320,6 +320,29 @@ if (builder.Environment.IsDevelopment())
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
 
+// F9 (AUTH-15, U3) — the signup bot-challenge seam (pin §4b): an owner-controlled,
+// OFF-BY-DEFAULT Turnstile-style gate on the signup POST. The standing owner deferral
+// (OPS.md §10, "no CAPTCHA is needed today") is honored by construction: the flag is
+// off unless the owner sets KUMUNITA__SIGNUP__BOT_CHECK=true, so an unconfigured
+// instance is byte-identical to before this seam (the NoopBotChallengeVerifier is
+// registered and the signup form has no widget / hidden input / challenge). Core owns
+// the interface + both impls (IBotChallengeVerifier / NoopBotChallengeVerifier /
+// TurnstileBotChallengeVerifier — the Turnstile impl is a plain BCL HttpClient
+// siteverify call, no SDK / no new PackageReference, pin §7); the Web is the
+// registration root (ADR 0006-D). The site key
+// (KUMUNITA__SIGNUP__BOT_CHECK__SITE_KEY) is an owner-ops open item (pin §4b); when
+// unset the Turnstile impl fails closed (returns false), so a misconfigured "on" flag
+// never silently accepts a bot.
+var kumunitaSignupBotCheckEnabled = string.Equals(
+    builder.Configuration["KUMUNITA:SIGNUP:BOT_CHECK"], "true",
+    StringComparison.OrdinalIgnoreCase);
+builder.Services.Configure<Kumunita.Core.Identity.SignupBotChallengeOptions>(o =>
+    o.SiteKey = builder.Configuration["KUMUNITA:SIGNUP:BOT_CHECK:SITE_KEY"]);
+builder.Services.AddSingleton<Kumunita.Core.Identity.IBotChallengeVerifier>(sp =>
+    kumunitaSignupBotCheckEnabled
+        ? new Kumunita.Core.Identity.TurnstileBotChallengeVerifier(sp.GetRequiredService<IOptions<Kumunita.Core.Identity.SignupBotChallengeOptions>>())
+        : new Kumunita.Core.Identity.NoopBotChallengeVerifier());
+
 // M25 (U8) — the Web-only upload gate (C-UP·3): the single 413-producing
 // call-site the four upload lanes + the document edit-lane re-upload adopt
 // before IMediaStore.PutAsync. Web-layer (it returns an IActionResult — the
@@ -785,13 +808,21 @@ if (!app.Environment.IsDevelopment())
 //
 // img-src adds blob: (the WYSIWYG local-preview pane renders a blob: image,
 // rich-editor.ts) and data: (inline data-URI thumbnails) on top of 'self'.
+//
+// F9 (AUTH-15, U3, pin §4c) — the bot-challenge CSP amendment is ADDITIVE and
+// FLAG-GATED on the owner's KUMUNITA__SIGNUP__BOT_CHECK flag (the kumunitaSignupBotCheckEnabled
+// var bound above, the F7 additive-in-the-same-block precedent). When the flag is ON the
+// Turnstile widget (script + iframe + fetch to challenges.cloudflare.com) needs those
+// three origins; when the flag is OFF (the default) the CSP is byte-identical to before
+// this seam (frozen invariant — no new external origin exposed, OPS §10's deferral stands).
 var csp =
     "default-src 'self'; " +
-    "script-src 'self'; " +
+    (kumunitaSignupBotCheckEnabled ? "script-src 'self' https://challenges.cloudflare.com; " : "script-src 'self'; ") +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: blob:; " +
     "font-src 'self' data:; " +
-    "connect-src 'self'; " +
+    (kumunitaSignupBotCheckEnabled ? "connect-src 'self' https://challenges.cloudflare.com; " : "connect-src 'self'; ") +
+    (kumunitaSignupBotCheckEnabled ? "frame-src https://challenges.cloudflare.com; " : "") +
     "form-action 'self'; " +
     "base-uri 'self'; " +
     "frame-ancestors 'self'; " +

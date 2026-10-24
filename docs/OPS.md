@@ -451,7 +451,11 @@ run-anywhere checklists (including deployment checks D-1…D-8) — lives in
   key) on **signup** and **failed login** (after N failures) if either: (a) abuse is
   observed, or (b) several instances share a VPS/public IP — a bot probing one
   neighborhood can burn the shared IP's reputation, and a per-instance key also avoids
-  one third party seeing all instances' traffic.
+  one third party seeing all instances' traffic. **The seam is in place** (F9, AUTH-15,
+  `docs/design/prod-hardening-f9-signup.md` §4): set `KUMUNITA__SIGNUP__BOT_CHECK=true`
+  + `KUMUNITA__SIGNUP__BOT_CHECK__SITE_KEY=<key>` and rebuild. The deferral
+  conditions (a) abuse observed / (b) shared VPS still apply — the seam does not force
+  the challenge on.
 - **Supply chain:** pin the base image + package versions; rebuild on base-image updates.
 
 ### 11. Incident response (basic)
