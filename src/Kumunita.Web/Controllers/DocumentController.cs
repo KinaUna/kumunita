@@ -38,6 +38,13 @@ public sealed class DocumentController(
     IMediaStore media,
     IOptions<MediaOptions> mediaOpts,
     IDocumentStore store,
+    // F16 / UPL-02 — the serve-lane virus-scan seam (the "widen the ctor as
+    // the lane needs it" shape). The download serve action runs the gate
+    // (short-circuit / scan / quarantine + 404); the upload lane is untouched.
+    // Optional (default null) so the existing test-construction sites keep
+    // compiling; a null scanner is the fail-open floor (pin §2.1) — the serve
+    // proceeds unchanged (DI always supplies the live ClamAvScanner in the app).
+    IVirusScanner? scanner = null,
     // The per-request translation read seam (the flash-message resolution —
     // the LocaleController.FlashAsync / AdminPortabilityController.T /
     // BookmarksController.T idiom). Optional (default null) so a
@@ -495,6 +502,15 @@ public sealed class DocumentController(
         var stored = await media.GetAsync(result.Document.MediaId);
         if (stored is null) return NotFound();
 
+        // ── F16 / UPL-02: the quarantine gate (serve lane is the
+        // enforcement point, pin §4/§5). After the blob-miss 404, before the
+        // OpenReadAsync serve — a malware byte is refused, 404, zero audit
+        // rows (the no-leak posture; the Read decision already ran in
+        // GetAsync above, so this refusal is a store-level refusal, not an
+        // audience one). ──
+        if (await IsQuarantinedOrInfectedAsync(result.Document.MediaId, stored, CancellationToken.None))
+            return NotFound();
+
         // Step 5: serve (D6 — Content-Disposition: attachment; the stored
         // Content-Type, already validated at write — no second allowlist check).
         var stream = await media.OpenReadAsync(result.Document.MediaId);
@@ -503,6 +519,46 @@ public sealed class DocumentController(
         Response.Headers["Content-Disposition"] =
             "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + Uri.EscapeDataString(filename);
         return File(stream, stored.ContentType);
+    }
+
+    /// <summary>
+    /// F16 / UPL-02 — the serve-lane quarantine gate (pin §4/§5). Returns
+    /// <c>true</c> when the byte must be <b>refused with 404</b>: either it is
+    /// already quarantined (idempotent short-circuit — no re-scan, no re-write,
+    /// zero audit rows), or the scanner flags the payload <see
+    /// cref="VirusScanStatus.Infected"/> (set <see cref="MediaObject.Quarantined"/>
+    /// + one <c>SaveChangesAsync</c>, C3 single-write-lane). A
+    /// <see cref="VirusScanStatus.Clean"/> verdict (incl. the fail-open
+    /// unavailable-daemon default, pin §2.1) returns <c>false</c> — the serve
+    /// proceeds unchanged. The scanner re-uses the serve lane's own
+    /// <see cref="IMediaStore.OpenReadAsync"/> read seam (no new byte-read seam).
+    /// </summary>
+    private async Task<bool> IsQuarantinedOrInfectedAsync(string id, MediaObject stored, CancellationToken ct)
+    {
+        if (stored.Quarantined) return true;               // idempotent short-circuit (no re-scan, §3)
+
+        // Fail-open floor (pin §2.1): a box / test-construction site without a
+        // scanner degrades to Clean — the serve proceeds unchanged (never a
+        // crash, never a false-positive quarantine).
+        if (scanner is null) return false;
+
+        VirusScanStatus verdict = VirusScanStatus.Clean;
+        try
+        {
+            await using var scanStream = await media.OpenReadAsync(id, ct);
+            verdict = await scanner!.ScanAsync(scanStream, ct);
+        }
+        catch { /* fail-open: a scanner fault degrades to Clean (§2.1), never a crash */ }
+
+        if (verdict is VirusScanStatus.Infected)
+        {
+            stored.Quarantined = true;                     // quarantine (persist, §3)
+            await using var s = store.LightweightSession();
+            s.Store(stored);
+            await s.SaveChangesAsync(ct);                  // one commit (C3 single-write-lane, ADR 0006)
+            return true;                                   // refuse with 404 (no-leak, §4)
+        }
+        return false;                                       // Clean → serve proceeds unchanged
     }
 
     // ── helpers (mirror AttachmentController) ──────────────────────────────

@@ -397,6 +397,18 @@ public static class ServiceCollectionExtensions
         // lane (U6); never touched by the raw volume directly (C-MED·6).
         services.AddTransient<IMediaStore, LocalVolumeMediaStore>();
 
+        // F16 / UPL-02 — the byte-level antivirus seam (IVirusScanner) + its
+        // fail-open local-ClamAV default impl (ClamAvScanner). Core stays
+        // HTTP-free (ADR 0006-D): the seam is a pure "bytes in → verdict out"
+        // contract; the default impl drives a local daemon over a loopback
+        // socket (no HttpClient, no package — the ISmtpSender BCL-I/O
+        // precedent). Fail-open by construction (a missing daemon → Clean), so
+        // a box without ClamAV still serves until the owner runs the F16 ops
+        // step. The serve lane (the three serve controllers) is the
+        // enforcement point, not this scanner.
+        services.AddOptions<VirusScanOptions>();
+        services.AddTransient<IVirusScanner, ClamAvScanner>();
+
         // Multilingual (ML, ADR 0005; plan U4): the two Core seams U2/U3 shipped —
         // the per-request read path (ITranslationProvider, U2) and the admin
         // management seam (ILocalizationService, U3). Both take the host-registered
