@@ -321,6 +321,21 @@ if (builder.Environment.IsDevelopment())
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
 
+// F12 (OBS-06, U2) — the human alert channel (pin §2c): the SupportEmail SMTP
+// sink, gated on CommunityOptions.SupportEmail being set (the off-by-default
+// floor: gate unmet → NoopAlertSink default fires → a no-op). Registered
+// AFTER AddKumunitaCore (which binds the NoopAlertSink default,
+// DependencyInjection.cs:380) so it wins DI resolution (the F10.U2 / F11
+// registration-ordering precedent). Core stays HTTP-free (ADR 0006) — the
+// SupportEmailAlertSink is a Web channel that reuses the existing Core
+// ISmtpSender; no new seam, no new PackageReference. NoopAlertSink default
+// is KEPT (the off-by-default floor; gate-unmet dev/scratch binding).
+var f12SupportEmail = builder.Configuration["Community:SupportEmail"];
+if (!string.IsNullOrWhiteSpace(f12SupportEmail))
+{
+    builder.Services.AddTransient<IAlertSink, SupportEmailAlertSink>();
+}
+
 // F9 (AUTH-15, U3) — the signup bot-challenge seam (pin §4b): an owner-controlled,
 // OFF-BY-DEFAULT Turnstile-style gate on the signup POST. The standing owner deferral
 // (OPS.md §10, "no CAPTCHA is needed today") is honored by construction: the flag is
