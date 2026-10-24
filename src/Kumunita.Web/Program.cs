@@ -23,6 +23,7 @@ using Microsoft.Extensions.Options;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Marten;
+using Sentry.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -342,6 +343,57 @@ builder.Services.AddSingleton<Kumunita.Core.Identity.IBotChallengeVerifier>(sp =
     kumunitaSignupBotCheckEnabled
         ? new Kumunita.Core.Identity.TurnstileBotChallengeVerifier(sp.GetRequiredService<IOptions<Kumunita.Core.Identity.SignupBotChallengeOptions>>())
         : new Kumunita.Core.Identity.NoopBotChallengeVerifier());
+
+// F10 (OBS-02, U2) — the error-tracker seam (pin §2): an owner-controlled,
+// OFF-BY-DEFAULT Sentry capture. The standing owner deferral (no external
+// telemetry by default) is honored by construction: the DSN is unset unless
+// the owner sets SENTRY_DSN, so an unconfigured instance is byte-identical to
+// before this seam (the UseSentry call is not executed, the pipeline is
+// unchanged). Core is untouched (ADR 0006 — the registration + the PII
+// scrubber are Web concerns; the scrubber is a SetBeforeSend callback on the
+// Sentry options, not a Core interface). The DSN is owner-ops (pin §5);
+// when unset the instance is unchanged.
+//
+// DRIFT NOTE (F10.U2, 2026-10-24): the pin §2a block references three Sentry
+// members that do not exist in Sentry.AspNetCore 6.12.1 (verified against the
+// 6.12.1 SentryOptions.cs + SentryAspNetCoreOptions.cs source):
+//   · o.SendCallback          → SetBeforeSend(Func<SentryEvent, SentryHint, SentryEvent?>)
+//   · o.AddNetworkLogBreadcrumbs → does not exist; the real lever is
+//     DisableSentryHttpMessageHandler = true (prevents the SDK from capturing
+//     outbound HTTP requests as breadcrumbs/events — the PII-scrubbing intent
+//     of the pin's §3a line is preserved)
+//   · pin §3c target 4 (breadcrumb data redaction) → structurally infeasible
+//     in the callback (Breadcrumb.Data is immutable, SentryEvent.Breadcrumbs
+//     has no setter) AND vacuous (DisableSentryHttpMessageHandler prevents
+//     http-category breadcrumbs; the app adds zero manual breadcrumbs).
+// See the ## F10.U2 handoff section for the full drift table.
+var kumunitaSentryDsn = builder.Configuration["SENTRY_DSN"];
+if (!string.IsNullOrWhiteSpace(kumunitaSentryDsn))
+{
+    // Pin §2a: builder.WebHost.UseSentry(o => …) — in 6.12.1 the config-action
+    // overload is on IWebHostBuilder (verified against the 6.12.1 NUGET assembly
+    // XML docs: UseSentry(IWebHostBuilder, Action<SentryAspNetCoreOptions>)).
+    // builder.WebHost (IWebHostBuilder) is the receiver, NOT builder
+    // (WebApplicationBuilder) — the WebApplicationBuilder overload is only in the
+    // 7.x/main line, not the pinned 6.12.1.
+    builder.WebHost.UseSentry(o =>
+    {
+        o.Dsn = kumunitaSentryDsn;
+        // PII-scrubbing contract (pin §3a): default PII off.
+        o.SendDefaultPii = false;
+        // Pin §3a "AddNetworkLogBreadcrumbs = false" — no such member in 6.12.1;
+        // DisableSentryHttpMessageHandler is the real lever (prevents outbound
+        // HTTP capture as breadcrumbs/events, preserving the pin's intent of
+        // "no URL, no headers, no body" for the SDK's own network logging).
+        o.DisableSentryHttpMessageHandler = true;
+        // Pin §3b/§3c: the SendCallback (→ SetBeforeSend in 6.12.1) redacts the
+        // known PII-bearing request surfaces; fail-closed on throw.
+        o.SetBeforeSend((e, _) => SentryPiiScrubber.Scrub(e));
+        // Pin §2d: the Sentry stack-trace in-app filter (Kumunita.Web frames are
+        // not actionable; Kumunita.Core frames are the domain).
+        o.AddInAppExclude("Kumunita.Web");
+    });
+}
 
 // M25 (U8) — the Web-only upload gate (C-UP·3): the single 413-producing
 // call-site the four upload lanes + the document edit-lane re-upload adopt
@@ -1043,4 +1095,105 @@ try
 finally
 {
     await app.StopAsync();
+}
+
+// F10 (OBS-02, U2) — the PII scrubber (pin §3b/§3c). Pure, stateless,
+// fail-closed: a redaction that throws drops the entire event (pin §3b — the
+// TurnstileBotChallengeVerifier fail-closed precedent). The three implementable
+// pin §3c targets are redacted (request headers, cookies, query-string params);
+// the fourth (breadcrumb data) is structurally infeasible in the callback
+// (Breadcrumb.Data is IReadOnlyDictionary with private init; SentryEvent.
+// Breadcrumbs is IReadOnlyCollection with no setter) AND vacuous
+// (DisableSentryHttpMessageHandler prevents http-category breadcrumbs; the
+// app adds zero manual breadcrumbs — a codebase-wide grep for
+// Sentry.AddBreadcrumb returns zero hits). Public so F10.U3's
+// Error_TrackerRegisteredWhenDsnSet test (pin §4a leg-3) can invoke it on a
+// synthetic SentryEvent without an InternalsVisibleTo (none exists in this
+// repo).
+public static class SentryPiiScrubber
+{
+    private static readonly string[] RedactedHeaderNames =
+        ["authorization", "set-cookie", "cookie"];
+
+    private static readonly string[] RedactedQueryParamNames =
+        ["token", "id", "sessionid", "csrf", "__requestverificationtoken"];
+
+    private const string RedactedValue = "REDACTED";
+
+    public static Sentry.SentryEvent? Scrub(Sentry.SentryEvent e)
+    {
+        try
+        {
+            var req = e.Request;
+            if (req is not null)
+            {
+                // Pin §3c target 1: redact the value of any header whose name
+                // matches authorization / set-cookie / cookie (case-insensitive).
+                // Headers is IDictionary<string, string> (mutable, getter-only
+                // property — mutate the returned dictionary in place).
+                foreach (var key in req.Headers.Keys.ToList())
+                {
+                    if (RedactedHeaderNames.Any(n =>
+                        key.Equals(n, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        req.Headers[key] = RedactedValue;
+                    }
+                }
+
+                // Pin §3c target 2: redact ALL cookie values (the cookie names
+                // are well-known — Kumunita.Auth, .AspNetCore.Identity.Cookie —
+                // but the values are the session + anti-forgery tokens).
+                // SentryRequest.Cookies is string? (the wire format is
+                // "name=value; name2=value2"); the entire value is PII.
+                if (!string.IsNullOrWhiteSpace(req.Cookies))
+                {
+                    req.Cookies = RedactedValue;
+                }
+
+                // Pin §3c target 3: redact the value of any query param whose
+                // name matches token / id / sessionId / sessionid / csrf /
+                // __RequestVerificationToken (case-insensitive). Other params
+                // (page, sort, etc.) are not PII and are left intact.
+                if (!string.IsNullOrWhiteSpace(req.QueryString))
+                {
+                    // ParseQuery yields IDictionary<string, StringValues> (a
+                    // non-nullable struct wrapping IEnumerable<string> — no ??).
+                    var pairs = Microsoft.AspNetCore.WebUtilities.QueryHelpers
+                        .ParseQuery(req.QueryString);
+                    if (pairs is not null && pairs.Any())
+                    {
+                        var redacted = pairs
+                            .Select(kv =>
+                            {
+                                var name = kv.Key.ToLowerInvariant();
+                                var shouldRedact = RedactedQueryParamNames.Contains(name);
+                                var value = shouldRedact
+                                    ? RedactedValue
+                                    : string.Join(",", kv.Value);
+                                return $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(value)}";
+                            })
+                            .ToList();
+                        req.QueryString = string.Join("&", redacted);
+                    }
+                }
+            }
+
+            // Pin §3c target 4 (breadcrumbs): structurally infeasible here
+            // (Breadcrumb.Data is immutable; SentryEvent.Breadcrumbs has no
+            // setter) and vacuous (DisableSentryHttpMessageHandler + zero
+            // manual breadcrumbs). See the DRIFT NOTE above and the handoff
+            // section.
+
+            return e;
+        }
+        catch
+        {
+            // Fail-closed (pin §3b): a redaction that throws drops the entire
+            // event — the PII is not sent, the owner's instance is unchanged,
+            // the owner sees a "dropped event" in Sentry's dashboard rather
+            // than a leaked PII. The TurnstileBotChallengeVerifier fail-closed
+            // precedent (Kumunita.Core/Identity/TurnstileBotChallengeVerifier.cs).
+            return null;
+        }
+    }
 }

@@ -28,6 +28,14 @@
          handlers (OutboxEmail, Fault<>, AuditPurge) compile at startup — see
          wolverinefx.net/guide/codegen.html. -->
     <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.50.2" />
+    <!-- F10 (OBS-02, U2) — the ONE <PackageReference> ADD the plan explicitly allows
+         (pin §7). Error-tracker seam (pin §2): OFF-by-DEFAULT Sentry capture, gated
+         on the owner's SENTRY_DSN (the builder-phase guard in Program.cs is the no-op
+         path — the UseSentry call is not executed until the DSN is set). The version
+         is F10.U2's judgment call (pin §7 / F10.U1 open item (c)): 6.12.1 is the
+         latest-stable Sentry.AspNetCore and ships a net10.0 TFM (verified against
+         the 6.12.1 nuspec). -->
+    <PackageReference Include="Sentry.AspNetCore" Version="6.12.1" />
   </ItemGroup>
 
   <ItemGroup>
