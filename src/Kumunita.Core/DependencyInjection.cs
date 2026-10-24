@@ -590,6 +590,21 @@ public static class ServiceCollectionExtensions
             // composition (the M1/M5/M9 services above rely on the same seam).
             sp.GetRequiredService<Localization.ILocalizationService>()));
 
+        // F17 (MAIL-03, plan U3): the bounce/complaint suppression write + lookup
+        // seam — the SuppressedAddress doc's single write lane (pin
+        // docs/design/prod-hardening-f17-bounce.md §3.2). The same
+        // "AddTransient with the store injected" shape as ISiteContentService /
+        // ISurfaceLabelsService above: composes the host-registered Marten
+        // IDocumentStore (reads open a QuerySession, the write opens a write
+        // session — invariant C3, one SaveChangesAsync). Core stays HTTP-free
+        // (ADR 0006-D, pin §5·1): the Web ingest route (U3,
+        // MailSuppressionController) is the only place an IActionResult /
+        // HttpContext appear. Fully qualified Notifications.ISuppressionService
+        // for the type/namespace-collision idiom (like Notifications.
+        // NotificationService above).
+        services.AddTransient<Notifications.ISuppressionService>(sp => new Notifications.SuppressionService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // M8 (ADR 0091, U01): the Search bounded context's service seam (bounded
         // context Kumunita.Core.Search — the "find content by text" read lane over
         // the four resident content surfaces: posts, events, pages, announcements).
