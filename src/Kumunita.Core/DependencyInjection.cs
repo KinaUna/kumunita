@@ -368,6 +368,17 @@ public static class ServiceCollectionExtensions
         // to drive failure/retry/dead-letter assertions without a live relay.
         services.AddTransient<ISmtpSender, SmtpSender>();
 
+        // F11 (JOB-02, prod-hardening): the alert seam's DEFAULT binding. The
+        // IAlertSink seam + the AlertEvent payload are Core (ADR 0006 — Core
+        // stays HTTP-free: the domain "an alert-worthy event happened" + its
+        // payload are Core; the channel is Web + owner-ops). NoopAlertSink is
+        // off-by-default (the F10 DSN-gated no-op idiom): an unconfigured
+        // instance sends nothing anywhere — the /health degraded gate (OPS §8)
+        // is the always-on signal, the alert is the additive push (pin §3.0).
+        // A channel binding (the Sentry-backed SentryAlertSink, the F12 human
+        // sink) is registered LATER in Program.cs so it wins DI resolution.
+        services.AddTransient<IAlertSink, NoopAlertSink>();
+
         // Step-7 (M1 plan §6.4): the AuditPurge tiering is per-instance config,
         // not improvised (§5: "the purge decision ... is set in the job's config").
         services.AddOptions<Authorization.AuditPurgeOptions>();
