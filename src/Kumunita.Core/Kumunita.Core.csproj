@@ -81,4 +81,15 @@
     <EmbeddedResource Include="Data\sample-data.json" LogicalName="Kumunita.Core.sample-data.json" />
   </ItemGroup>
 
+  <!-- F9 (AUTH-15) — the instance's disposable-email blocklist: a committed,
+       versioned, owner-editable text file (one domain per line) read by
+       `DisallowedEmailDomains`. Embedded (the `sample-data.json` precedent), NOT
+       a NuGet package (pin §2a: a self-hosted T1 platform keeps a pinned,
+       self-contained image — no new supply-chain surface for a slow-moving list).
+       `DisallowedEmailDomains` resolves the stream by name (with a suffix
+       fallback), so no explicit `LogicalName` is required. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Identity\disposable-emails.txt" />
+  </ItemGroup>
+
 </Project>

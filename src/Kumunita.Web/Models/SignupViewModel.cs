@@ -25,6 +25,13 @@ public sealed class SignupViewModel
     /// (unactivated) — the view shows the "resend confirmation email" affordance.
     /// </summary>
     public bool EmailAlreadyExists { get; set; }
+
+    /// <summary>
+    /// True when signup failed because the email's domain is in the instance's
+    /// disposable-email blocklist (F9, AUTH-15) — the view shows the "please use a
+    /// permanent email" notice (the <c>EmailAlreadyExists</c> precedent, :28).
+    /// </summary>
+    public bool EmailDomainDisallowed { get; set; }
 }
 
 public sealed class ResendVerificationViewModel

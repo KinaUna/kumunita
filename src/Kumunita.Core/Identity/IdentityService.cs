@@ -127,6 +127,22 @@ public sealed class IdentityService(
     private async Task<ThinPrincipal> RegisterCoreAsync(
         string displayName, string email, string? password, bool requiresPassword)
     {
+        // F9 (AUTH-15) — disposable-email blocklist (the instance's committed list,
+        // `disposable-emails.txt`). Pre-write: no EF, no Marten, no audit row — the
+        // actor does not yet exist (no `subjectId` to audit). Throws
+        // `DisallowedEmailDomainException` (a dedicated type — the existing
+        // `InvalidOperationException` catch in `AccountController.Signup` must NOT
+        // swallow it). The structured log line is the audit lane for this rejection
+        // (the `:184` "Registered unverified resident …" mirror, pin §3d).
+        if (DisallowedEmailDomains.IsDisposable(email))
+        {
+            var blockedDomain = email[(email.LastIndexOf('@') + 1)..];
+            logger.LogInformation(
+                "Signup rejected: disposable-email domain {Domain} (email {Email}).",
+                blockedDomain, email);
+            throw new DisallowedEmailDomainException(email, blockedDomain);
+        }
+
         if (await userManager.FindByEmailAsync(email) is not null)
             throw new InvalidOperationException($"An account with email '{email}' already exists.");
 

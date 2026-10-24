@@ -1088,6 +1088,17 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             //     same request (G·4, one commit; C3).
             await userInfo.CreateGuardianLinkAsync(child.SubjectId, subject);
         }
+        catch (DisallowedEmailDomainException ex)
+        {
+            // F9 (AUTH-15) — the child lane shares `RegisterCoreAsync`, so the
+            // disposable-email blocklist rejection surfaces here too. Caught BEFORE
+            // the `InvalidOperationException` catch (the dedicated type must not be
+            // swallowed by it) and shown to the guardian on the add-a-child form
+            // (pin §3b — mirrors this lane's existing error shape).
+            ModelState.AddModelError(string.Empty,
+                $"The email domain '{ex.Domain}' is not accepted for new accounts. Please use a permanent email address.");
+            return View(form);
+        }
         catch (InvalidOperationException ex)
         {
             // A signup-lane failure (e.g. the email is already taken) or a formation

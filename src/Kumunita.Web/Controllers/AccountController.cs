@@ -413,6 +413,7 @@ public sealed class AccountController(
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("signup")]
     public async Task<IActionResult> Signup(SignupViewModel model)
     {
         // ADR 0050 — the gate is authoritative on the write path too (the GET hides
@@ -434,6 +435,17 @@ public sealed class AccountController(
             // (visibility self-only, Core-defaulted), mints the verify token, stages the
             // verification email into the durable outbox — all in one Core transaction.
             await identity.RegisterAsync(model.DisplayName, model.Email, model.Password);
+        }
+        catch (DisallowedEmailDomainException ex)
+        {
+            // F9 (AUTH-15) — the disposable-email blocklist rejection. Caught BEFORE the
+            // `InvalidOperationException` catch (the dedicated type must not be swallowed
+            // by it) and re-rendered with the `EmailDomainDisallowed` flag (the
+            // `EmailAlreadyExists` precedent) — pin §3b.
+            model.EmailDomainDisallowed = true;
+            ModelState.AddModelError(string.Empty,
+                $"The email domain '{ex.Domain}' is not accepted for new accounts.");
+            return View(model);
         }
         catch (InvalidOperationException ex)
         {
