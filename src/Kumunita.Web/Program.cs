@@ -1092,6 +1092,12 @@ await bus.PublishAsync(new UsagePurgeTick());
 // /admin/storage Trend section is permanently empty — the M13
 // UsagePurgeTick seed precedent, M33·3).
 await bus.PublishAsync(new StorageMetricsCaptureTick());
+// F15 (UPL-04) — the MediaObject catalog + byte-store 365-day retention tick
+// (the MediaLifecycleHandler self-reschedules after each run; this seed is the
+// first-boot scheduling. Without this line the handler never fires and the
+// LocalVolumeFileStore bytes accumulate forever — the M13 UsagePurgeTick seed
+// precedent, re-using F1's idempotent DeleteIfExistsAsync byte-delete seam).
+await bus.PublishAsync(new MediaLifecycleTick());
 // M20 (ADR 0121) — the deferred-notification email flush tick (the
 // NotificationFlushHandler self-reschedules at the resolved admin cadence
 // QuietCheckMinutes after each run; this seed is the first-boot scheduling).
