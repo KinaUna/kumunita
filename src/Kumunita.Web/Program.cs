@@ -4,6 +4,7 @@ using Kumunita.Core.Bootstrap;
 using Kumunita.Core.Logging;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Usage;
 using Kumunita.Web;
 using Kumunita.Web.Middleware;
@@ -1098,6 +1099,12 @@ await bus.PublishAsync(new StorageMetricsCaptureTick());
 // LocalVolumeFileStore bytes accumulate forever — the M13 UsagePurgeTick seed
 // precedent, re-using F1's idempotent DeleteIfExistsAsync byte-delete seam).
 await bus.PublishAsync(new MediaLifecycleTick());
+// F18 (MAIL-06, T4 code leg) — the in-repo bounce/complaint ingest-rate alarm
+// (the MailAlarmsHandler self-reschedules hourly after each run; this seed is
+// the first-boot scheduling. Without this line the handler never fires and the
+// T4 cross-check never runs — the F15 UsagePurgeTick/MediaLifecycleTick seed
+// precedent, re-using F12's IAlertSink seam + F17's SuppressedAddress list).
+await bus.PublishAsync(new MailAlarmsTick());
 // M20 (ADR 0121) — the deferred-notification email flush tick (the
 // NotificationFlushHandler self-reschedules at the resolved admin cadence
 // QuietCheckMinutes after each run; this seed is the first-boot scheduling).
