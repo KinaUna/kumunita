@@ -1,0 +1,14 @@
+{
+  "name": "kumunita-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "F19 (TEST-03) E2E suite — Playwright against the docker-compose stack (:5080 app, :8025 Mailpit). A separate fourth test tier, NOT in Kumunita.slnx, NOT invoked by `dotnet test` (pin §1/§4).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1",
+    "playwright": "1.49.1",
+    "typescript": "5.6.3"
+  }
+}
