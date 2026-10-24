@@ -358,6 +358,23 @@ public sealed class NotificationService
             emailBody += "\n\n" + declineLabel + ": " + AbsoluteLink(_baseUrl, notification.DeclinePath);
         }
 
+        // (5c) F17 — bounce/complaint suppression gate (pin §2.1; additive,
+        //      after the ADR 0078 sample-suppression gate, before the
+        //      StageAsync call). Read-only lookup: is this recipient's
+        //      e-mail on the SuppressedAddress list? If yes, skip the email
+        //      — the inbox row is already stored (D7 — the inbox is the
+        //      durable record; the email is the best-effort nudge). No new
+        //      audit row (pin §2.3 — the gate is a pure read + return);
+        //      no SaveChangesAsync here (the caller's own SaveChangesAsync
+        //      commits the inbox row + its domain write).
+        if (profile is not null && !string.IsNullOrWhiteSpace(profile.Email))
+        {
+            var suppressed = await session.LoadAsync<SuppressedAddress>(
+                profile.Email.Trim().ToLowerInvariant(), ct).ConfigureAwait(false);
+            if (suppressed is not null)
+                return notification;   // F17 — suppressed recipient: inbox row stored, email skipped
+        }
+
         await _mailer.StageAsync(session, idempotencyKey, profile.Email!, subject, emailBody, ct).ConfigureAwait(false);
         return notification;
     }
