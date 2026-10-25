@@ -46,6 +46,13 @@ All per-instance identity and integration is env. The *image* is identical every
 | `AuditPurge__RoutineDays` | Optional | No | §6.4 scheduled-job config: routine access-audit rows are purged once older than this many days (default `90`). Omit to keep the default |
 | `AuditPurge__UnresolvedReportDays` | Optional | No | §6.4 scheduled-job config: report-attached + standing audit rows are kept until the report resolves, then a further this many days (default `365`). Omit to keep the default |
 | `EventReminder__WindowHours` | Optional | No | §6.4 scheduled-job config: the "remind the day before" window for event reminders, in hours (default `24`). Omit to keep the default |
+| `ConnectionStrings__KumunitaMigrate` | F22 (ADR 0171) | Yes | The **migrate role** connection string — the role that owns the DB + `mt` / `identity` schemas and runs DDL at boot (EF migrations + Marten schema-apply + the grant step). When **unset**, the boot path degrades to the single-role baseline (a not-yet-migrated instance is unchanged). See §10 "DB user" | 
+| `DbTls__SslMode` | F21 (SRV-04) | No | Postgres TLS posture for the app↔DB connection (`Prefer` default → byte-identical to baseline; `Require` / `Verify CA`). **`Verify CA` against a non-TLS server is a hard connection failure** — enable server-side TLS before flipping to it. (This is app↔DB TLS, distinct from the §6 edge/domain TLS; see `docs/design/prod-hardening-f21-db-tls.md`) | 
+| `DbTls__CaPath` | F21 (SRV-04) | No | Path to the CA bundle for `DbTls__SslMode=Verify CA`. Must be re-provisioned on CA rotation or the handshake fails | 
+| `SENTRY_DSN` | F10 (OBS-02) | Yes | Sentry error-tracker DSN (F10). **OFF by default** — unset = a no-op, the pipeline is byte-identical to before the seam (no PII leaves the box, the PII-scrubbing filter applies only once set). Set it to enable capture on an instance | 
+| `VirusScan__Host` / `VirusScan__Port` | F16 (UPL-02) | No | Point the serve-lane scan at a local `clamd` daemon (`127.0.0.1` / `3310` defaults). **Fail-open by default** — a missing/errored daemon degrades to `Clean`, so until ClamAV is live on the volume the active control stays the `nosniff` + `attachment` serve mitigation. `VirusScan__MaxScanBytes` caps the bytes scanned per file (default 100 MiB) | 
+| `MailSuppression__IngestToken` | F17 (MAIL-03) | Yes | Shared secret for `POST /api/mail/suppress` — the provider's bounce/complaint webhook sends it as the `X-Suppression-Token` header. A missing/mismatched token → 403. Until the webhook is pointed at this route the suppression list stays empty and the mail-out gate is a no-op | 
+| `KUMUNITA__SIGNUP__BOT_CHECK` / `...__SITE_KEY` | F9 (AUTH-15) | No / Yes | The Turnstile bot-challenge seam (see §10). **OFF by default** — the `SITE_KEY` is the owner's key; until it is set a flag-on instance **fails closed** (a bot is not proven human) | 
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
@@ -307,10 +314,12 @@ drilled"** stamp is the **only state** the drill writes — making it a
 - **Format:** `pg_dump -Fc` (custom format — fast restore, compression).
 - **Schedule:** the `postgres` addon on the VPS is backed up **hourly via the Coolify
   backup task** (examplium instance; daily is the documented floor for a new instance).
-  The dump target is the app database `kumunita` — owned by the `kumunita` role, so it
-  can be taken by `kumunita` or `postgres`. (Example host cron, if operating without
-  Coolify's task: `0 3 * * * pg_dump -Fc -h 127.0.0.1 -U kumunita kumunita | rclone rcat
-  backup:kumunita/<instance>/$(date +\%F).dump`.)
+  The dump target is the app database `kumunita` — owned by the **`kumunita_migrate`**
+  role (the two-role split, **ADR 0171** / F22: `kumunita_migrate` owns the DB + the
+  `mt` / `identity` schemas and carries DDL; the demoted `kumunita` app role is DML),
+  so it can be taken by `kumunita_migrate` or `postgres`. (Example host cron, if operating
+  without Coolify's task: `0 3 * * * pg_dump -Fc -h 127.0.0.1 -U kumunita_migrate kumunita
+  | rclone rcat backup:kumunita/<instance>/$(date +%F).dump`.)
 - **Offsite:** to object storage (S3 / Backblaze B2 / rclone) — **not** only on the same VPS.
 - **Retention:** e.g. 7 daily, 4 weekly, 6 monthly (tune to need).
 - **Config:** include the instance's env set (encrypted) in the same backup set.
@@ -524,11 +533,19 @@ run-anywhere checklists (including deployment checks D-1…D-8) — lives in
 - **SSH:** key-based only; consider fail2ban; disable password login.
 - **Secrets:** never baked into the image. Env / secrets manager only. Rotate SMTP, DB, and
   admin credentials on a schedule and after any suspected exposure.
-- **DB user:** dedicated **database owner**, non-superuser — `CREATE DATABASE kumunita
-  OWNER kumunita`. Ownership grants schema creation and `CREATE EXTENSION` inside that
-  database, so **no elevated/rights dance is ever needed** (and none was required on the
-  live instance). The `postgres` superuser is admin/restore-only and is **never** the app
-  connection.
+- **DB user (two-role split, ADR 0171 / F22):** the database is owned by a dedicated
+  **non-superuser migration role `kumunita_migrate`** (`CREATE DATABASE kumunita OWNER
+  kumunita_migrate`); `kumunita_migrate` owns the `mt` + `identity` schemas and is the
+  only role that may run DDL (schema/table creation, `CREATE EXTENSION`). The runtime **
+  app role `kumunita` is demoted to DML** (CONNECT / USAGE / SELECT / INSERT / UPDATE /
+  DELETE) plus one **forced exception** — schema-level `CREATE` on `mt` only, because
+  Wolverine + Marten create their `mt.wolverine_*` / `mt.mt_*` tables **as the app role**
+  during `app.StartAsync()`; it is refused `CREATE SCHEMA` / `DROP SCHEMA` /
+  `DROP DATABASE` (SQLSTATE `42501`, the `AppRole_CannotDropSchema` witness). The boot
+  path reads `ConnectionStrings:KumunitaMigrate` (the migrate role) and falls back to
+  the single-role baseline when it is unset (a not-yet-migrated instance is unchanged).
+  The `postgres` superuser is admin/restore-only and is **never** the app connection.
+  (Supersedes the old single-owner bullet `CREATE DATABASE kumunita OWNER kumunita`.)
 - **App:** HTTPS-only + HSTS, secure cookies, anti-forgery tokens, rate limiting (all
   planned in the app):
   - **Cookies:** `Secure`, `HttpOnly`, `SameSite=Lax`; sliding expiry with an absolute
@@ -539,9 +556,14 @@ run-anywhere checklists (including deployment checks D-1…D-8) — lives in
     delegated person never keeps stale access after the grant is revoked.
   - **Rate limiting (decided):** ASP.NET Core built-in middleware (`AddRateLimiter`),
     per-endpoint policies, in-memory partitioning by client IP (+ authenticated user
-    where relevant). Covered endpoints: register, login (failed attempts), **and
-    report-filing** — report filing is an authorization-escalation surface (it grants
-    the assigned moderator access), so it is not just a spam concern.
+    where relevant). Covered endpoints (each a named policy in `Program.cs`):
+    **signup, resend, login (failed attempts), report-filing, setup (first-boot
+    token), message, write (post/reply), and the four upload lanes** (`upload`
+    policy, F8 / WEB-10 — `/attachment`, `/content-image`, `/documents`,
+    `/profile/avatar`; `IUploadGate` is the size/quota guard, this is the *rate*
+    guard). Report filing is an authorization-escalation surface (it grants the
+    assigned moderator access), so it is not just a spam concern; the upload lanes
+    write a volume byte each and are the byte-flood surface.
     **Proxy requirement:** the reverse proxy must forward `X-Forwarded-For` and the app
     must honor it (trusted-proxy config); otherwise every request shares one bucket.
     Verify in the M0/M1 smoke test. Rationale & revisit triggers: SECURITY.md §6.
@@ -568,7 +590,11 @@ run-anywhere checklists (including deployment checks D-1…D-8) — lives in
     inline `style=` attributes are Bootstrap utility patterns, not a script
     vector). `img-src` adds `data:`/`blob:` (the WYSIWYG local-preview pane).
     Any future third-party script: scoped `script-src` entry + SRI, decided per
-    case (SECURITY.md §6).
+    case (SECURITY.md §6). **Two more global headers ride the same block (F7 /
+    WEB-07):** `X-Content-Type-Options: nosniff` (every response — the global
+    floor under the per-controller `nosniff` on the serve/download lanes) and
+    `Referrer-Policy: no-referrer` (no cross-origin referrer leakage). Set in
+    code, so every environment carries them; verify with `curl -sI <domain>`.
 - **CAPTCHA — deferred by default (decision):** signup is email-verification-gated and
   rate-limited, so a bot that can't verify the email can't join — no CAPTCHA is needed
   today. Revisit and add one (e.g. Turnstile, self-hosted or cloud, per-instance site
