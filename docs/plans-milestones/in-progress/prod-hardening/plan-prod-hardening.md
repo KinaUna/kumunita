@@ -423,6 +423,9 @@ of old uploads.
   the compose stack).
 
 ### F20 — DEP-04: one-step rollback + drilled (availability) — `code+ops` (dep: F4)
+**Status: DONE (U1–U3).** U1 pin, U2 `docs/OPS.md` runbook, U3 owner-ops drill
+recorded as an open item (F20 complete; the drill itself is owner-executed, never
+assumed done).
 **Context (from audit):** rollback is a DB restore (OPS §5); forward-only schema;
 no dated rollback record.
 - **U1 — Part-0 design pin.** Author `docs/design/prod-hardening-f20-rollback.md`:
@@ -431,6 +434,9 @@ no dated rollback record.
 - **U2 — runbook update.** Add the one-step rollback + drill procedure to
   `docs/OPS.md` (≤1 file). **Open item (owner):** run the drill once on the prod
   box and stamp the date (recorded, not assumed).
+- **U3 — owner-ops drill close-out.** Record the A → B1 → B2 → C → verify → stamp
+  drill as an **open item** (owner-executed on a throwaway prod-style instance;
+  **recorded, not assumed done**) + close F20. No C#, no build, no test run.
 
 ### F21 — SRV-04: app↔DB TLS (everything else) — `code+ops`
 **Context (from audit):** Npgsql connection string has no `SslMode`.
