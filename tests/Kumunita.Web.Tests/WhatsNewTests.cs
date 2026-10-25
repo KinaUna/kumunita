@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.69.0 entry (Page-level notes — ADR 0167 amendment) — 0.68.0 (Prod-hardening) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.70.0 entry (Kiosk conditional refresh — ADR 0164 amendment) — 0.69.0 (Page-level notes) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,48 +69,58 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The Page-level notes lane (ADR 0167 amendment,
-        // 2026-10-25 — the ten `page-*` kinds join the M37 closed set, the
-        // D3 write-lane check re-runs the owning surface's own frozen read
-        // for the group / project page kinds) is now the newest shipped (the
-        // 0.69.0 entry), so it is the head; the Prod-hardening lane
-        // (F1–F22, 2026-10-25 — the 2026-10-22 production-readiness audit's
-        // FAIL rows, closed as a *named lane* reusing no milestone letter;
-        // ADR 0171 Accepted — the two-role split reconciling ADR 0004 §B's
-        // boot-ownership invariant with DB-18's least-privilege requirement)
-        // 0.68.0 entry slides one row back; the
+        // slides down. The Kiosk conditional-refresh lane (ADR 0164 amendment,
+        // 2026-10-25 — the /kiosk display now skips a slide's iframe reload on
+        // a refresh tick whose content fingerprint is unchanged, the "kiosk
+        // reload is too disruptive" fix) is now the newest shipped (the
+        // 0.70.0 entry), so it is the head; the Page-level notes lane (ADR
+        // 0167 amendment, 2026-10-25 — the ten `page-*` kinds join the M37
+        // closed set, the D3 write-lane check re-runs the owning surface's
+        // own frozen read for the group / project page kinds) 0.69.0 entry
+        // slides one row back; the Prod-hardening lane (F1–F22, 2026-10-25 —
+        // the 2026-10-22 production-readiness audit's FAIL rows, closed as a
+        // *named lane* reusing no milestone letter; ADR 0171 Accepted — the
+        // two-role split reconciling ADR 0004 §B's boot-ownership invariant
+        // with DB-18's least-privilege requirement) 0.68.0 entry slides two
+        // rows back; the
         // Bookmark-and-note-inventory-and-directory lane (ADR 0118 amendment
-        // + ADR 0167 extension, 2026-10-16) 0.67.0 entry slides two rows
+        // + ADR 0167 extension, 2026-10-16) 0.67.0 entry slides three rows
         // back; the Bookmark-projects-boards lane (ADR 0118 amendment,
-        // 2026-10-16) 0.66.0 entry slides three rows back; the first-day-of-week
-        // lane (ADR 0169) 0.65.0 entry slides four rows back; the Kiosk
-        // display-mode lane (ADR 0164 amendment) 0.64.0 entry; the Kiosk
-        // per-resident move (ADR 0164 amendment) 0.63.0 entry; the
-        // Bookmark-folders lane (ADR 0168) 0.62.0 entry; the M37
-        // Personal-notes milestone (ADR 0167) 0.61.0 entry; the Events↔boards
-        // lane 0.60.0 entry; the ONB onboarding walk-through lane 0.59.0
-        // entry; the M36 @mentions milestone (ADR 0165) 0.58.0 entry; the M35
-        // kiosk-mode milestone (ADR 0164) 0.57.0 entry; the home upcoming
-        // events & to-dos lane (ADR 0163) 0.56.0 entry; the M34 (analytics
-        // history) milestone (ADR 0162) 0.55.0 entry; the ADR 0161
-        // page-translation-standing lane 0.54.0 entry; the NESTED
-        // nested-help-guides lane (ADR 0160) 0.53.0 entry; the ESC
-        // escalation-authorization lane (ADR 0159) 0.52.0 entry; the LBL-2
-        // surface-label-translation lane (ADR 0158) 0.51.0 entry; the SITE-2
-        // hero-translation lane (ADR 0157) 0.50.0 entry; the M33 (storage
-        // metrics history) 0.49.0 entry; the M32 (issue submission &
-        // escalation) 0.48.0 entry.
+        // 2026-10-16) 0.66.0 entry slides four rows back; the first-day-of-week
+        // lane (ADR 0169) 0.65.0 entry; the Kiosk display-mode lane
+        // (ADR 0164 amendment) 0.64.0 entry; the Kiosk per-resident move
+        // (ADR 0164 amendment) 0.63.0 entry; the Bookmark-folders lane
+        // (ADR 0168) 0.62.0 entry; the M37 Personal-notes milestone
+        // (ADR 0167) 0.61.0 entry; the Events↔boards lane 0.60.0 entry; the
+        // ONB onboarding walk-through lane 0.59.0 entry; the M36 @mentions
+        // milestone (ADR 0165) 0.58.0 entry; the M35 kiosk-mode milestone
+        // (ADR 0164) 0.57.0 entry; the home upcoming events & to-dos lane
+        // (ADR 0163) 0.56.0 entry; the M34 (analytics history) milestone
+        // (ADR 0162) 0.55.0 entry; the ADR 0161 page-translation-standing
+        // lane 0.54.0 entry; the NESTED nested-help-guides lane (ADR 0160)
+        // 0.53.0 entry; the ESC escalation-authorization lane (ADR 0159)
+        // 0.52.0 entry; the LBL-2 surface-label-translation lane (ADR 0158)
+        // 0.51.0 entry; the SITE-2 hero-translation lane (ADR 0157) 0.50.0
+        // entry; the M33 (storage metrics history) 0.49.0 entry; the M32
+        // (issue submission & escalation) 0.48.0 entry.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.69.0" && head.Date == "2026-10-25",
-            "The Page-level notes 0.69.0 (2026-10-25) entry must be the head of the registry; got "
+            head.Version == "0.70.0" && head.Date == "2026-10-25",
+            "The Kiosk conditional-refresh 0.70.0 (2026-10-25) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("page-level notes", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("ADR 0167 amendment", StringComparison.OrdinalIgnoreCase)),
-            "The 0.69.0 head entry must name the Page-level notes lane + the ADR 0167 amendment.");
+            head.Changes.Any(c => c.Contains("kiosk auto-refresh", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0164 amendment", StringComparison.OrdinalIgnoreCase)),
+            "The 0.70.0 head entry must name the Kiosk conditional-refresh lane + the ADR 0164 amendment.");
 
-        // The Prod-hardening entry (0.68.0) slides one row back.
+        // The Page-level notes entry (0.69.0) slides one row back.
+        var pageNotes = WhatsNew.All.Single(v => v.Version == "0.69.0");
+        Assert.True(
+            pageNotes.Changes.Any(c => c.Contains("page-level notes", StringComparison.OrdinalIgnoreCase)
+                                      && c.Contains("ADR 0167 amendment", StringComparison.OrdinalIgnoreCase)),
+            "The 0.69.0 entry must name the Page-level notes lane + the ADR 0167 amendment.");
+
+        // The Prod-hardening entry (0.68.0) slides two rows back.
         var prodHardening = WhatsNew.All.Single(v => v.Version == "0.68.0");
         Assert.True(
             prodHardening.Changes.Any(c => c.Contains("prod-hardening", StringComparison.OrdinalIgnoreCase)

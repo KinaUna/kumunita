@@ -327,3 +327,84 @@ delta**, the per-resident shape preserved.
   close-flip member). The `Milestones.cs` / `MilestonesTests.cs` roadmap
   order + shape are unchanged (M35 is still `Done` — the display-mode is a
   refinement of the already-shipped M35 surface, not a new milestone).
+
+## Amendment (2026-10-25) — conditional refresh: only reload a slide when its content changed
+
+The original M35 `REFRESH` timer in `client/lib/kiosk.ts` re-rendered the
+current slide **unconditionally** on every `data-refresh-interval` tick — the
+iframe was re-pointed at its `src` (re-navigating, re-loading) even when the
+underlying board / calendar / to-do had **not changed**. On a wall display that
+is visibly disruptive: the slide flickers and re-loads on every tick regardless
+of whether anything happened. This amendment makes the refresh **conditional**:
+the slide is reloaded **only when its content fingerprint actually changed**.
+
+The mechanism reuses the **`GET /kiosk/slide`** endpoint the M35 design already
+reserved for the "check the current slide" fetch — it was declared but the
+`kiosk.ts` state machine shipped against the unconditional re-render instead.
+This amendment wires it up: the endpoint now returns a **content fingerprint**
+alongside the classification, and the state machine compares it to the last
+rendered fingerprint and **skips the iframe reload when they match**.
+
+The bounded context, the `KioskPlaylist` / `KioskView` doc shapes, the
+2-method `IKioskService` seam, the `GET /kiosk` display, the `kiosk.ts`
+state machine's shape (ADVANCE / REFRESH / denied-shape), and the one
+`kiosk.save` audit row are **unchanged in shape** — this is an **additive
+delta**, the per-resident shape preserved, and **no new** `AccessAction` /
+`AccessVia` / `Decide()` branch / `IAuditableResource` adapter (M35·1 /
+M35·3), **no** second `kiosk.*` `AccessAudit` row (M35·5), **no** new
+bounded context / doc / service (M35·9), **no** new dependency / build step
+(M35·7). The fingerprint is **display-only, never an access input** (M35·4):
+it is a change-detection signal computed from content the controller has
+already read through the frozen seams.
+
+- **Content fingerprint (display-only).** A new `KioskFingerprint.Of(string?)`
+  helper (`Models/KioskFingerprint.cs`) — a tiny, dependency-free **FNV-1a 32**
+  digest rendered as 8 lowercase hex characters — computes a stable digest of
+  the slide's display-relevant content (deterministic, no salt / randomness /
+  environment dependence — change detection only, **not** integrity or
+  signatures). The `KioskSlideViewModel` record gains a `Fingerprint` member;
+  the `KioskSlideRefreshViewModel` (the `/kiosk/slide` response) gains the same.
+- **Fingerprint builders (in the controller, over the already-read content).**
+  `KioskController` gains three private static builders, each producing a
+  canonical string from content the `Classify*` methods **already** loaded
+  through the frozen seams (so no new seam, no new read, no new audit row):
+  `BuildBoardFingerprint` (lane order + each card's id / title / status),
+  `BuildTodosFingerprint` (each row's id / title / status / `Modified` stamp),
+  and `BuildCalendarFingerprint` (the view unit + each in-range event's
+  id / title / start — the view unit is folded in so a day / week / month
+  rollover that keeps the same event set still re-renders). A **denied** slide
+  carries a fixed `"denied"` digest (distinct from any content digest by the
+  kind prefix), so a **visible↔denied flip is always detected** by the client's
+  equality check.
+- **`GET /kiosk/slide` returns the fingerprint.** The existing
+  `KioskSlideRefreshViewModel` response now carries the slide's `Fingerprint`
+  (the out-of-range branch returns the denied digest; the classified branch
+  returns the classified slide's digest). The CSRF-free GET + the `t` cache-bust
+  + the cookie-is-authorization shape are unchanged (the M12 iCal precedent).
+- **`kiosk.ts` REFRESH becomes conditional.** The `renderSlide` shape-paint is
+  split into a reusable `paintShape`; the state machine keeps a per-slide
+  `fingerprints` array (seeded from the slide meta's new `data-fingerprint`
+  attribute, index 0 pre-seeded from the server-rendered first slide). On each
+  `REFRESH` tick it **fetches** `GET /kiosk/slide?slide=N&t=…` and, when the
+  returned fingerprint equals the last rendered one, **skips the iframe reload
+  entirely** (no flicker, no re-navigation); when it differs (or the first
+  check), it re-renders (which also covers a visible↔denied flip) and stores the
+  new fingerprint. A `refreshing` guard prevents overlapping fetches, and a fetch
+  failure keeps the current slide and the next tick retries (a transient network
+  blip never drops the display). The ADVANCE cycle, the denied-shape, the
+  chrome-hidden stage, the display-mode, and the self-guard no-op are unchanged.
+- **The view emits the seed fingerprint.** `Views/Kiosk/Index.cshtml`'s
+  per-slide `.kmb-kiosk-slide-meta` divs gain a `data-fingerprint` attribute (the
+  slide's `Fingerprint`), so the state machine's initial slide (0) is stamped
+  with the server's first-render digest and the first `REFRESH` tick only
+  reloads if it genuinely changed.
+- **Tests.** The existing `KioskControllerTests` (the `GET /kiosk` /
+  `GET /kiosk/slide` surface pins) exercise the now-fingerprinted response and
+  continue to pass unchanged (the added members are additive; the response
+  `Single(...)` / `Json` shape pins are unaffected). The `WhatsNewTests` head
+  pin moves to the new `0.70.0` entry (the required sixth close-flip member).
+- **Docs sync.** The `WhatsNew` registry gains a `0.70.0` row (the
+  conditional-refresh lane); this ADR records the amendment. The
+  `Milestones.cs` / `MilestonesTests.cs` roadmap order + shape are unchanged
+  (M35 is still `Done` — the conditional refresh is a refinement of the
+  already-shipped M35 surface, not a new milestone).
