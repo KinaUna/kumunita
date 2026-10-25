@@ -4810,7 +4810,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         const string todoId = "m36-todo-1";
         await Plant(boot.Store, new TodoItem { Id = todoId, Title = "Water the plants", AuthorId = author });
 
-        var comment = await svc.CreateTodoCommentAsync(todoId, author, new HashSet<string> { Roles.Member }, "@Ada can you water them?", null);
+        var comment = await svc.CreateTodoCommentAsync(todoId, author, new HashSet<string> { Roles.Member }, "@Ada can you water them?", null, null, TestContext.Current.CancellationToken);
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
         var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.TodoMention);
@@ -4830,9 +4830,9 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         const string todoId = "m36-todo-inert";
         await Plant(boot.Store, new TodoItem { Id = todoId, Title = "T", AuthorId = author });
 
-        await svc.CreateTodoCommentAsync(todoId, author, new HashSet<string> { Roles.Member }, "@Ghost ping", null);
+        await svc.CreateTodoCommentAsync(todoId, author, new HashSet<string> { Roles.Member }, "@Ghost ping", null, null, TestContext.Current.CancellationToken);
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.TodoMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.TodoMention);
     }
 }

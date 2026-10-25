@@ -643,6 +643,6 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
         await svc.SendAsync(convo.Id, "alice", "@Ghost hi");
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.MessageMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.MessageMention);
     }
 }

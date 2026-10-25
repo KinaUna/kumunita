@@ -2731,7 +2731,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Start = new DateTimeOffset(2099, 6, 1, 10, 0, 0, TimeSpan.Zero),
             End = new DateTimeOffset(2099, 6, 1, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false,
-        });
+        }, TestContext.Current.CancellationToken);
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
         var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.EventMention);
@@ -2755,9 +2755,9 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Start = new DateTimeOffset(2099, 6, 1, 10, 0, 0, TimeSpan.Zero),
             End = new DateTimeOffset(2099, 6, 1, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false,
-        });
+        }, TestContext.Current.CancellationToken);
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.EventMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.EventMention);
     }
 }

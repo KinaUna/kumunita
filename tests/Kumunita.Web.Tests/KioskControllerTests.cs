@@ -455,16 +455,16 @@ public class KioskControllerTests
 
     private sealed class StubUrlHelper : IUrlHelper
     {
-        public StubUrlHelper(ActionContext? actionContext)
+        public StubUrlHelper(ActionContext actionContext)
         {
             ActionContext = actionContext;
         }
 
-        public ActionContext? ActionContext { get; }
+        public ActionContext ActionContext { get; }
         public string Action(UrlActionContext actionContext) => "stub-action";
-        public string Content(string content) => content ?? string.Empty;
-        public bool IsLocalUrl(string url) => false;
+        public string Content(string? content) => content ?? string.Empty;
+        public bool IsLocalUrl(string? url) => false;
         public string RouteUrl(UrlRouteContext routeContext) => "stub-route";
-        public string Link(string linkName, object values) => "stub-link";
+        public string Link(string? linkName, object? values) => "stub-link";
     }
 }

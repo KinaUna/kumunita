@@ -85,7 +85,7 @@ public class PersonalNoteServiceTests(PostgresFixture fixture) : IClassFixture<P
 
         // Delete.
         await RunInSession(store, s => svc.DeleteNoteAsync(owner, first.Id, s));
-        Assert.Empty((await Notes(store, owner)).Where(n => n.TargetId == postId));
+        Assert.DoesNotContain(await Notes(store, owner), n => n.TargetId == postId);
 
         // Re-attach after removal is a fresh Created (D4 / F1).
         var reAttached = await RunInSession(store, s => svc.CreateNoteAsync(owner, "post", postId, "body again", s));

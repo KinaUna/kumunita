@@ -2463,6 +2463,6 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await using (var s = newSession(boot.Store)) { await svc.CreateAsync(new Page { Slug = "m36-page-inert", Body = "@Ghost ping", Kind = PageKind.User }, author, RolesSet(Roles.Member), s); }
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PageMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.PageMention);
     }
 }

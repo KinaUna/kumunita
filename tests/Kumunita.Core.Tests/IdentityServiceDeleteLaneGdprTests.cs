@@ -91,7 +91,7 @@ public sealed class IdentityServiceDeleteLaneGdprTests(PostgresFixture fixture) 
 
         var id = NewContentId(); // 64 lowercase-hex chars — the byte-store key
         await boot.MediaStore.PutAsync(id, new byte[] { 1, 2, 3, 4 }, TestContext.Current.CancellationToken);
-        Assert.True(await boot.MediaStore.ExistsAsync(id), "precondition: the byte was planted");
+        Assert.True(await boot.MediaStore.ExistsAsync(id, TestContext.Current.CancellationToken), "precondition: the byte was planted");
 
         await using (var session = boot.Store.LightweightSession())
         {
@@ -102,7 +102,7 @@ public sealed class IdentityServiceDeleteLaneGdprTests(PostgresFixture fixture) 
         await boot.Identity.DeleteAccountAsync(target, adminSubjectId: actor);
 
         // The byte was genuinely deleted from the temp dir the store wrote to.
-        Assert.False(await boot.MediaStore.ExistsAsync(id));
+        Assert.False(await boot.MediaStore.ExistsAsync(id, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public sealed class IdentityServiceDeleteLaneGdprTests(PostgresFixture fixture) 
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
-    private static async Task<T?> LoadAsync<T>(IDocumentStore store, string id) where T : new()
+    private static async Task<T?> LoadAsync<T>(IDocumentStore store, string id) where T : notnull, new()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var session = store.QuerySession();

@@ -2398,7 +2398,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         await using (var s = newSession(boot.Store)) { await svc.CreateAsync(ann, author, new HashSet<string> { Roles.GlobalAdmin }, s); }
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.AnnouncementMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.AnnouncementMention);
     }
 
     [Fact]
@@ -2414,6 +2414,6 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         await using (var s2 = newSession(boot.Store)) { await svc.PublishAsync(created.Id, author, s2); }
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.AnnouncementMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.AnnouncementMention);
     }
 }
