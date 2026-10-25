@@ -59,7 +59,11 @@ test('a signed-in resident publishes one post and it appears', async ({ page }) 
   await page.fill('input[name="Password"]', RESIDENT_PASSWORD);
 
   const loginResponse = await Promise.resolve(
-    page.click('button[type="submit"]'),
+    // Scope to the login form: the nav language-picker carries its own
+    // button[type="submit"] dropdown items, and an unscoped selector grabs
+    // the first (invisible) one and times out. The login form is the one
+    // with asp-action="Login" (Views/Account/Login.cshtml).
+    page.click('form[asp-action="Login"] button[type="submit"]'),
   );
   // A 503 (ASP.NET Identity lockout) is a PRECONDITION/ENVIRONMENT failure —
   // record it, do NOT retry (pin §5 invariant #6 + the repo memory
