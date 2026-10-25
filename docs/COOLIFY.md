@@ -88,24 +88,21 @@ hardening violation (OPS §10).
 4. **Bootstrap superuser `postgres`**: set a **strong unique** password on
 first creation (`POSTGRES_PASSWORD`). `postgres` is **admin/restore-only**
 (OPS §5) and **never** the app connection.
-5. **Create the app role + database so the app role is the database *owner***
-(Open console on the addon). The app's boot block creates the `mt` and
-`identity` schemas itself (ADR 0004) — schema creation needs ownership, so
-   exactly this shape, mirroring `dev-db-init/01-app-role.sql`:
+5. **Create the migration role + app role + database so the migration role is the database *owner*** (Open console on the addon). The two-role split (**ADR 0171** / F22) separates DDL from DML: `kumunita_migrate` owns the DB + the `mt` / `identity` schemas and is the only role that runs DDL; the app role `kumunita` is DML, with one **forced exception** — `CREATE` on the `mt` schema only (so Wolverine + Marten can create their `mt.wolverine_*` / `mt.mt_*` tables **as the app role** during `app.StartAsync()`). Exactly this shape, mirroring `dev-db-init/01-app-role.sql` + `dev-db-init/02-app-schemas.sh`:
 ```
-CREATE ROLE kumunita LOGIN PASSWORD '<strong-password>';
-CREATE DATABASE kumunita OWNER kumunita;
+CREATE ROLE kumunita_migrate LOGIN PASSWORD '<strong-migrate-password>';
+CREATE ROLE kumunita LOGIN PASSWORD '<strong-app-password>';
+CREATE DATABASE kumunita OWNER kumunita_migrate;
+GRANT CONNECT ON DATABASE kumunita TO kumunita;
+-- then, in the `kumunita` database:
+CREATE SCHEMA mt AUTHORIZATION kumunita_migrate;
+GRANT USAGE, CREATE ON SCHEMA mt TO kumunita;   -- the forced exception (no `identity` grant)
 ```
 
-(Coolify's "username/password" fields provision the non-superuser role;
-verify the database is **owned** by it — this is the one step the addon
-doesn't do out of the box. Ownership means schema creation at boot needs no
-elevated/rights dance, and none was required on the live instance — OPS §10.)
+(Coolify's "username/password" fields provision the non-superuser app role; create the **migrate** role + make it the **database owner** in the console — this is the one step the addon doesn't do out of the box. Ownership-by-migrate-role means DDL at boot needs no elevated/rights dance, and the app role is refused `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE` (SQLSTATE `42501`). See OPS §10 "DB user".)
 
-6. Store `<strong-password>` in the secrets manager (OPS Procedures 1–2).
-7. Verify both paths: `postgres` → `kumunita` connection, and
-`kumunita` → `kumunita` (pings the console / an admin login, then the app
-smoke below).
+6. Store **both** `<strong-migrate-password>` and `<strong-app-password>` in the secrets manager (OPS Procedures 1–2).
+7. Verify both paths: `kumunita_migrate` → `kumunita` (owns the DB; `mt` / `identity` owned by it), and `kumunita` → `kumunita` (can `CREATE TABLE` in `mt` + `INSERT`/`SELECT`, but is **refused** `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE`).
 
 8. Backing up the database is **procedure 4** (OPS) — the addon's backup task
 writes to object storage, not only this VPS.
@@ -140,6 +137,7 @@ port (OPS §10).
 | `Community__Name` | **required** — the neighborhood's display name |
 | `Community__SupportEmail` | **required** — support contact from the inventory |
 | `ConnectionStrings__Kumunita` | **required, secret** — `Host=<addon-service-name>;Port=5432;Database=kumunita;Username=kumunita;Password=<from §4>;Include Error Detail=true`. The `Host` value is the addon's internal service name (from the addon's page / psql connection block), not `localhost`. |
+| `ConnectionStrings__KumunitaMigrate` | **required, secret (F22 / ADR 0171)** — the **migration role** connection string, same shape as `Kumunita` but `Username=kumunita_migrate` + `Password=<migrate-password from §4>`. The boot path (`SchemaBootstrap`) runs EF migrations + the Marten schema-apply + the `identity` DML grants as this role; when **unset** the app degrades to the single-role baseline (a not-yet-migrated instance). See OPS *Configuration reference* |
 | `SMTP__Host` | **required for real mail** — the relay for verification + seed-admin mail — see **§5.1** (and OPS §7) |
 | `SMTP__Port` | optional — the relay's STARTTLS port, conventionally **587** (default `587`); see **§5.1** |
 | `SMTP__Secure` | optional — `Tls` (STARTTLS, default) or `None` (plain, local-only) — **see BCL constraint in §5.1** |
@@ -167,6 +165,12 @@ port (OPS §10).
 | `Logging__File__RetentionDays` | optional — log-file retention before the at-boot delete pass (default `14`) |
 | `KUMUNITA_SMTP_HEALTH_TIMEOUT_MS` | optional — a timeout (ms) override for the `/health` SMTP relay probe (diagnostic tuning; read directly from the environment) |
 | `SOURCE_COMMIT` | optional — the commit SHA surfaced as `/health`'s `build` field (usually injected by the build/CI; defaults to `local`) |
+| `DbTls__SslMode` | optional (F21 / SRV-04) — Postgres TLS posture for the app↔DB connection (`Prefer` default → byte-identical to baseline; `Require` / `Verify CA`). **`Verify CA` against a non-TLS server is a hard connection failure** — enable server-side TLS before flipping to it. Distinct from the §5.3 domain TLS — OPS *Configuration reference* |
+| `DbTls__CaPath` | optional (F21) — path to the CA bundle for `DbTls__SslMode=Verify CA`; re-provision on CA rotation |
+| `SENTRY_DSN` | optional, **secret** (F10 / OBS-02) — the Sentry error-tracker DSN. **OFF by default** — unset = a no-op (no PII leaves the box); set it to enable capture on an instance. OPS *Configuration reference* |
+| `VirusScan__Host` / `VirusScan__Port` | optional (F16 / UPL-02) — point the serve-lane scan at a local `clamd` daemon (`127.0.0.1` / `3310`). **Fail-open by default** — a missing/errored daemon degrades to `Clean`, so until ClamAV is live on the volume the active control stays the `nosniff` + `attachment` serve mitigation. `VirusScan__MaxScanBytes` caps the bytes scanned per file (default 100 MiB) |
+| `MailSuppression__IngestToken` | optional, **secret** (F17 / MAIL-03) — shared secret for `POST /api/mail/suppress`; the provider's bounce/complaint webhook sends it as the `X-Suppression-Token` header (mismatch → 403). Until the webhook is pointed at this route the suppression list stays empty and the mail-out gate is a no-op |
+| `KUMUNITA__SIGNUP__BOT_CHECK` / `...__SITE_KEY` | optional (F9 / AUTH-15) — the Turnstile bot-challenge seam; **OFF by default** (the `SITE_KEY` is the owner's key; until set, a flag-on instance **fails closed**). OPS §10 |
 
 ### 5.1 SMTP — concrete env values
 
@@ -446,6 +450,6 @@ SHA, admin contact, dates).
 | Avatars 404 for everyone after a redeploy (initial-circle monograms shown), or an upload vanished | the media volume is being lost between boots. Two things must both be true (see §5.2A): a **Coolify-managed named volume** attached to the **app container** at `/data/media` (the Postgres addon's `/data` volume is a different surface, same trap as §5.2) **and** the `Media__RootPath` env var pointing at that same path, every deploy. Verify with `docker inspect <app-container>` (`Mounts`) and the Coolify env settings. Note the catalog row may still exist (Postgres) while the *bytes* are gone (volume) — restore the media tarball from the same backup set (OPS §4/§5) |
 | Logged out / bounced to login after a redeploy,
 | Health check `database` failed on boot | `Host` in the connection string (should be the internal addon name, not `localhost`) |
-| Boot loops, "permission denied: schema" | the `kumunita` role isn't the **owner** of the `kumunita` database — re-run §4 step 5 |
+| Boot loops, "permission denied: schema" | the `kumunita_migrate` role isn't the **owner** of the `kumunita` database (or the `mt` schema isn't owned by it / the app role lacks `CREATE` on `mt`) — re-run §4 step 5 (two-role split, ADR 0171) |
 | TLS not issued | DNS not pointing at the VPS yet (§2), or port 80/443 closed |
 | Nothing renders, port 8080 open | you are (a) not on the `release` branch (OPS §3) or (b) hitting the exposed internal port directly instead of the domain |
