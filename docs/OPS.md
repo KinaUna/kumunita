@@ -77,9 +77,9 @@ for it — a sorted read emits **no `AccessAudit` row** (C-SORT·4).
 
 Keep one row per neighborhood. This is your map.
 
-| Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created (Y/M/D) | Last backup verified (Y/M/D) | Notes |
-|--------------|--------|-----|---------|---------------|---------------|---------|----------------------|-------|
-|Examplium Residents|example.kumunita.com|Hetzner|kumunita|f8b8432ce7b5b2a6c4eaca26fd363029dde104f0|admin@examplium.com|2026-09-01|2026-09-01 15:20|First instance|
+| Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created (Y/M/D) | Last backup verified (Y/M/D) | Last drilled (rollback) | Notes |
+|--------------|--------|-----|---------|---------------|---------------|---------|----------------------|------------------------|-------|
+|Examplium Residents|example.kumunita.com|Hetzner|kumunita|f8b8432ce7b5b2a6c4eaca26fd363029dde104f0|admin@examplium.com|2026-09-01|2026-09-01 15:20|_not yet drilled (open item — F20.U3)_|First instance|
 
 ---
 
@@ -175,6 +175,130 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
    Coolify and deploy it. App rollback is easy; **DB
    rollback requires a restore** (Procedure 5) because schema changes are forward-only.
 7. Record the new **commit SHA** + date in the inventory.
+
+**One-step rollback (DEP-04 — this block is the procedure):**
+the app reselect (step 6 above) and the DB restore (§5) are **two halves of
+one procedure**, not two separate ones. Read this block top-to-bottom when you
+need to roll back — it is the "one-step" the 2026-10-22 audit found missing:
+*one runbook the owner reads and executes*, not one command. The mechanism
+(Coolify reselect + PITR restore) already exists; what was absent is this
+ordered, guarded, drilled, dated shape around it.
+
+**R1 — the schema-compat guard (run BEFORE reselecting the SHA):**
+the forward-only rule (ADR 0004 §B, step 4 above) constrains the *forward*
+direction (the new image must be a superset). This guard constrains the
+*rollback* direction — does the **old** image tolerate the **current**
+schema?
+
+1. Enumerate the commits in the rolled-back window:
+   `git --no-pager log --oneline <rollback-target-sha>..HEAD`.
+2. For each, check the **Marten surface** (`Kumunita.Core`
+   `FeatureSchemaBase` / doc-type registration — `CoreDocTypes` /
+   `PostDocTypes`, `DependencyInjection.cs`) **and** the **EF surface**
+   (`Kumunita.Web/Migrations/*`) for a schema change.
+3. **Classify** each change: **additive** (new column with a default, new
+   table, new doc type, additive-only EF migration) vs **breaking**
+   (dropped/renamed column, column type change, reshaped doc the old image
+   reads).
+4. **Decision gate:** *all* additive → **R2** (app-only rollback).
+   *Any* breaking → **R3 first** (DB-restore leg), **then** R2.
+
+> **Recorded risk (if the guard is skipped):** rolling an old image over a
+> breaking schema = a boot failure (the old image can't read the reshaped
+> `mt`/`identity` surface) — the app is **down**, not merely degraded. This
+> guard converts that surprise outage into a deliberate "app + DB" rollback
+> with a known restore target.
+
+**R2 — the app-only rollback (the one-step app leg):**
+1. **Name the rollback target SHA** — the "Version (Commit)" from step 2
+   (the pre-upgrade SHA, from `/health` → `build` / the `SOURCE_COMMIT`
+   env) and/or the Instance inventory row.
+2. **Prod (Coolify, primary — the only prod path, §3 intro: no registry):**
+   reselect that commit SHA in Coolify and deploy. Coolify rebuilds the image
+   from that commit (the commit *is* the version). On boot, the old image's
+   Marten delta-detection runs against the current `mt` catalog; because the
+   schema is forward-only and the old image's feature set is a subset, it is
+   a **no-op** — provided the R1 guard held (all additive).
+3. **Local / compose (equivalent):**
+   ```bash
+   git checkout <rollback-target-sha> && docker compose build app && docker compose up -d app
+   ```
+   (the AGENTS.md rebuild idiom applied to the previous commit; wait ~8 s for
+   the Marten schema + Wolverine leadership boot.)
+4. **Verify:** `/health` OK, `build` SHA == the target SHA, login works, and
+   one representative page renders (step 5 smoke set — home / one post / one
+   component, the M1/M3 smoke set).
+
+**R3 — the DB-restore leg (when R1 found a breaking change):**
+this leg **reuses F4's PITR** (§4 PITR block / §5 PITR restore) — it is not a
+new procedure, it *calls* the existing one. The exact sequence:
+1. Stop the app (Coolify).
+2. Restore the Postgres surface — one of two targets, chosen by F4's state:
+   - **PITR point (preferred; F4's `archive_command` live):**
+     `pgbackrest --stanza=<instance> restore --type=time --target="<T>"`
+     where `<T>` is the instant **before** the bad deploy/write (e.g.
+     `--target="2026-10-23 14:50:00+00"`), **or** `--latest` for the newest
+     restorable point. **WAL-G fallback** (F4 §2): the `wal-g`
+     restore-to-timestamp equivalent.
+   - **Last `pg_dump` (fallback; F4's WAL archiving not yet live):** the §5
+     same-instance path — `pg_restore … < dump.dump` **as `postgres`**
+     (superuser; the `kumunita` role cannot drop/recreate the DB it is
+     connected *as*). F4 only narrows the RPO; this leg works **with or
+     without** F4.
+   **The restore connects as the `postgres` superuser** — the ADR 0004
+   "app role owns the DB" consequence (the `kumunita` role cannot
+   drop/recreate the DB it is connected *as*).
+3. **Restore the media volume too, if bracketed** (ADR 0011, §4 "Second
+   restore surface"): the DB restore does **not** rewind the media volume
+   (`Media__RootPath`). If the media snapshot brackets the dump, restore it
+   as **step 2.5** — between the DB restore and app start. A half-restore
+   (Postgres at `T`, media volume at `T'`) degrades safely (a missing
+   `MediaObject` byte is a **re-hydratable avatar `404`**; the content hash
+   is the integrity key). This leg **reuses the existing** media-volume
+   procedure; the one-step rollback does not change it.
+4. Restart Postgres, then the app (now at the old SHA from R2). **Verify**
+   (the R2 verify set).
+
+**The drill procedure (dated, repeatable, owner-run — the "Last drilled" record
+the audit found absent):**
+the owner runs this on a **throwaway prod-style instance** (the "No shared
+staging cluster" idiom — a throwaway prod-style instance is enough to verify
+an upgrade), *not* the live instance:
+
+- **Precondition:** the throwaway instance is at a **known current** SHA with
+  a representative schema; a **previous** SHA's image is available (Coolify
+  deploy history / a `git checkout` target); and a **fresh backup / PITR
+  anchor** is present (F4 §4 stanza + first full, or a `pg_dump`).
+- **A — app-only rollback (R2):** reselect the previous SHA, deploy, boot.
+  **Verify:** `/health` OK, `build` SHA == the previous SHA, **login**
+  works, and **one representative page** renders (the step 5 smoke set).
+- **B1 (additive):** apply a **deliberate additive** schema change (a new
+  column / doc type), confirm the old image **tolerates** the superset and
+  boots clean (proves the additive path).
+- **B2 (breaking):** in a fresh pass, a **deliberate breaking** change (a
+  dropped/reshaped column the old image reads), confirm the R1 guard
+  **fires** and routes to the R3 DB-restore leg (proves the gate is not a
+  no-op).
+- **C — the full "app + DB" rollback (R3):** introduce a **known-bad write
+  past the restore point**, then run the R3 DB-restore command (PITR point or
+  last-`pg_dump`) **as `postgres`**, restart, and re-run the A verify set.
+- **Verify leg (all steps):** `/health`, login, a representative page (the
+  step 5 smoke set) — **the rendered page is the evidence** (step 5; the
+  AGENTS.md "rendered HTML is the evidence" doctrine).
+- **Stamp (the dated record):** record the **date + the target SHA + the
+  passes (A/B1/B2/C) + the operator** in the Instance inventory "Last drilled
+  (rollback)" column. This **dated record** is the concrete close of the
+  FAIL.
+
+> **Last drilled (rollback):** _open item — the owner stamps the date + SHA +
+> passes when the drill is run on a throwaway prod-style instance;
+> **never assumed**._ (Mirrors the §4 "Last tested (PITR)" idiom and "Rules
+> of the road": *update the date when you run a step*.)
+
+**Repeatable:** the sequence is a **fixed order** (A → B1 → B2 → C → verify
+→ stamp); each pass is **independently re-runnable**, and the **"Last
+drilled"** stamp is the **only state** the drill writes — making it a
+**dated, repeatable, auditable** record rather than a one-off.
 
 ### 4. Backups
 
