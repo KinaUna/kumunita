@@ -1235,7 +1235,7 @@ public static class SentryPiiScrubber
                                 var shouldRedact = RedactedQueryParamNames.Contains(name);
                                 var value = shouldRedact
                                     ? RedactedValue
-                                    : string.Join(",", kv.Value);
+                                    : string.Join(",", (IEnumerable<string?>)kv.Value);
                                 return $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(value)}";
                             })
                             .ToList();

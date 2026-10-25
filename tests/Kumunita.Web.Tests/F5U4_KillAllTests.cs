@@ -344,12 +344,12 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
     /// </summary>
     private sealed class StubUrlHelper : Microsoft.AspNetCore.Mvc.IUrlHelper
     {
-        public StubUrlHelper(ActionContext? actionContext)
+        public StubUrlHelper(ActionContext actionContext)
         {
             ActionContext = actionContext;
         }
 
-        public ActionContext? ActionContext { get; }
+        public ActionContext ActionContext { get; }
         public string Action(string? actionName, string? controllerName, object? values)
             => $"/{controllerName}/{actionName}";
         public string Action(Microsoft.AspNetCore.Mvc.Routing.UrlActionContext actionContext)

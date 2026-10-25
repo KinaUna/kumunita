@@ -2445,6 +2445,20 @@ public static class KnownTranslationKeys
             // the M37 closed set (the detail page's affordance surface now
             // matches the M17 bookmark surface).
             ["pn.list.kind.inventory"]      = "Inventory",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page). A page-level note
+            // is a note about the page itself (e.g. "the /announcements page
+            // needs a search box"), distinct from a note about an item on it.
+            ["pn.list.kind.page-announcements"] = "Announcements (page)",
+            ["pn.list.kind.page-community"]     = "Community (page)",
+            ["pn.list.kind.page-group"]         = "Groups (page)",
+            ["pn.list.kind.page-events"]        = "Events (page)",
+            ["pn.list.kind.page-projects"]      = "Projects (page)",
+            ["pn.list.kind.page-project"]       = "Project (page)",
+            ["pn.list.kind.page-todos"]         = "To-dos (page)",
+            ["pn.list.kind.page-boards"]        = "Boards (page)",
+            ["pn.list.kind.page-inventory"]     = "Inventory (page)",
+            ["pn.list.kind.page-documents"]     = "Documents (page)",
             ["pn.note.body_label"]          = "Your note",
             ["pn.note.delete_confirm"]      = "Delete this note? This cannot be undone.",
             ["pn.note.add"]                 = "Add note",
@@ -5214,6 +5228,18 @@ public static class KnownTranslationKeys
             // the M37 closed set (the detail page's affordance surface now
             // matches the M17 bookmark surface).
             ["pn.list.kind.inventory"]      = "Inventar",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page).
+            ["pn.list.kind.page-announcements"] = "Ankündigungen (Seite)",
+            ["pn.list.kind.page-community"]     = "Gemeinschaft (Seite)",
+            ["pn.list.kind.page-group"]         = "Gruppen (Seite)",
+            ["pn.list.kind.page-events"]        = "Veranstaltungen (Seite)",
+            ["pn.list.kind.page-projects"]      = "Projekte (Seite)",
+            ["pn.list.kind.page-project"]       = "Projekt (Seite)",
+            ["pn.list.kind.page-todos"]         = "Aufgaben (Seite)",
+            ["pn.list.kind.page-boards"]        = "Boards (Seite)",
+            ["pn.list.kind.page-inventory"]     = "Inventar (Seite)",
+            ["pn.list.kind.page-documents"]     = "Dokumente (Seite)",
             ["pn.note.body_label"]          = "Deine Notiz",
             ["pn.note.delete_confirm"]      = "Diese Notiz löschen? Dies kann nicht rückgängig gemacht werden.",
             ["pn.note.add"]                 = "Notiz hinzufügen",
@@ -7877,6 +7903,18 @@ public static class KnownTranslationKeys
             // the M37 closed set (the detail page's affordance surface now
             // matches the M17 bookmark surface).
             ["pn.list.kind.inventory"]      = "Inventaire",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page).
+            ["pn.list.kind.page-announcements"] = "Annonces (page)",
+            ["pn.list.kind.page-community"]     = "Communauté (page)",
+            ["pn.list.kind.page-group"]         = "Groupes (page)",
+            ["pn.list.kind.page-events"]        = "Événements (page)",
+            ["pn.list.kind.page-projects"]      = "Projets (page)",
+            ["pn.list.kind.page-project"]       = "Projet (page)",
+            ["pn.list.kind.page-todos"]         = "Tâches (page)",
+            ["pn.list.kind.page-boards"]        = "Tableaux (page)",
+            ["pn.list.kind.page-inventory"]     = "Inventaire (page)",
+            ["pn.list.kind.page-documents"]     = "Documents (page)",
             ["pn.note.body_label"]          = "Votre note",
             ["pn.note.delete_confirm"]      = "Supprimer cette note ? Cette action est irréversible.",
             ["pn.note.add"]                 = "Ajouter une note",
@@ -10525,6 +10563,18 @@ public static class KnownTranslationKeys
             // the M37 closed set (the detail page's affordance surface now
             // matches the M17 bookmark surface).
             ["pn.list.kind.inventory"]      = "Inventar",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page).
+            ["pn.list.kind.page-announcements"] = "Meddelelser (side)",
+            ["pn.list.kind.page-community"]     = "Fællesskab (side)",
+            ["pn.list.kind.page-group"]         = "Grupper (side)",
+            ["pn.list.kind.page-events"]        = "Arrangementer (side)",
+            ["pn.list.kind.page-projects"]      = "Projekter (side)",
+            ["pn.list.kind.page-project"]       = "Projekt (side)",
+            ["pn.list.kind.page-todos"]         = "Opgaver (side)",
+            ["pn.list.kind.page-boards"]        = "Brætter (side)",
+            ["pn.list.kind.page-inventory"]     = "Inventar (side)",
+            ["pn.list.kind.page-documents"]     = "Dokumenter (side)",
             ["pn.note.body_label"]          = "Din note",
             ["pn.note.delete_confirm"]      = "Slet denne note? Dette kan ikke fortrydes.",
             ["pn.note.add"]                 = "Tilføj note",

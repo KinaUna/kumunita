@@ -31,6 +31,10 @@
 -- kumunita_migrate/kumunita_migrate); the prod passwords live in the secrets
 -- manager, not here.
 --
+-- Prod (Coolify) equivalent of this layout: `docs/COOLIFY-INIT-TEMPLATE.sql`
+-- — the same shape as a one-shot init script for the Coolify Postgres addon
+-- (see docs/COOLIFY.md §4 step 5).
+--
 -- Runs exactly once, against an empty data directory (docker-entrypoint-initdb.d).
 -- After switching the db service to this layout you must `docker compose down -v`
 -- so the container re-bootstraps. The per-schema grants + the pre-created schemas

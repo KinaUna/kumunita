@@ -74,8 +74,8 @@ public sealed class MediaLifecycleTests(PostgresFixture fixture) : IClassFixture
         }
 
         // Precondition: both bytes are present before the sweep.
-        Assert.True(await boot.Media.ExistsAsync(expiredId));
-        Assert.True(await boot.Media.ExistsAsync(liveId));
+        Assert.True(await boot.Media.ExistsAsync(expiredId, TestContext.Current.CancellationToken));
+        Assert.True(await boot.Media.ExistsAsync(liveId, TestContext.Current.CancellationToken));
 
         // Run the sweep once — it should delete exactly the expired row + byte.
         var deleted = await MediaLifecycleService.SweepAsync(boot.Store, boot.Media, now, ct);
@@ -84,14 +84,14 @@ public sealed class MediaLifecycleTests(PostgresFixture fixture) : IClassFixture
         // (1) the expired MediaObject row is gone (catalog delete).
         Assert.Null(await LoadAsync(boot.Store, expiredId));
         // (2) the expired byte is gone (byte delete via DeleteIfExistsAsync).
-        Assert.False(await boot.Media.ExistsAsync(expiredId));
+        Assert.False(await boot.Media.ExistsAsync(expiredId, TestContext.Current.CancellationToken));
 
         // (3) no double-run: a second sweep is a no-op (returns 0, no exception)
         //     and the not-expired row + byte are still present (keeps-others-intact).
         var second = await MediaLifecycleService.SweepAsync(boot.Store, boot.Media, now, ct);
         Assert.Equal(0, second);
         Assert.NotNull(await LoadAsync(boot.Store, liveId));
-        Assert.True(await boot.Media.ExistsAsync(liveId));
+        Assert.True(await boot.Media.ExistsAsync(liveId, TestContext.Current.CancellationToken));
     }
 
     // ── Harness ─────────────────────────────────────────────────────────────

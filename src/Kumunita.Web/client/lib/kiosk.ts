@@ -121,16 +121,10 @@
     return el;
   }
 
-  // ── Render the slide at `i` into the stage's content slot ─────────────────
+  // ── Render one slide shape (iframe or denied) into the stage slot ─────────
   // Exactly one slide element (iframe or denied shape) is visible at a time;
   // the hidden meta divs, the exit link, and the title are left in place.
-  function renderSlide(i: number): void {
-    const meta = slides[i];
-    if (!meta) return;
-    const href = meta.getAttribute('data-href') || '';
-    const denied = meta.getAttribute('data-denied') === 'true';
-    const label = meta.getAttribute('data-label') || '';
-
+  function paintShape(denied: boolean, href: string, label: string): void {
     stageEl.querySelector<HTMLElement>(':scope > .kmb-kiosk-iframe')?.remove();
     stageEl.querySelector<HTMLElement>(':scope > .kmb-kiosk-denied')?.remove();
 
@@ -144,6 +138,30 @@
     el.classList.remove('kmb-kiosk-fading');
   }
 
+  // ── Render the slide at `i` from its meta (the initial / ADVANCE path) ────
+  // The meta div is the seed source for href / denied / label / fingerprint.
+  function renderSlide(i: number): void {
+    const meta = slides[i];
+    if (!meta) return;
+    paintShape(
+      meta.getAttribute('data-denied') === 'true',
+      meta.getAttribute('data-href') || '',
+      meta.getAttribute('data-label') || '');
+    fingerprints[i] = meta.getAttribute('data-fingerprint') || null;
+  }
+
+  // The last rendered content fingerprint per slide (ADR 0164 amendment — the
+  // "only reload when something changed" guard). The server-rendered initial
+  // slide is always slide 0 (the view's FirstSlide), so seed index 0 from its
+  // meta — the first REFRESH tick then only reloads slide 0 if its content
+  // genuinely changed. The other slides are seeded from their meta on first
+  // render (ADVANCE) and from the /kiosk/slide response after each REFRESH
+  // check. A null entry means "not yet rendered" (ADVANCE renders it, so a
+  // null can only be hit for the current slide if its check pre-dates a
+  // fresh load — the next ADVANCE re-stamps it).
+  const fingerprints: (string | null)[] = new Array(slideCount).fill(null);
+  fingerprints[0] = slides[0].getAttribute('data-fingerprint') || null;
+
   let current = 0;
 
   // (1) ADVANCE — next slide, wrapping to the first (every view-interval).
@@ -152,15 +170,42 @@
     renderSlide(current);
   }
 
-  // (2) REFRESH — re-render the current slide (every refresh-interval).
-  function refresh(): void {
-    renderSlide(current);
+  // (2) REFRESH — check the current slide for changes (every refresh-interval).
+  // ADR 0164 amendment — "only reload when something changed": fetch
+  // GET /kiosk/slide?slide=N (the CSRF-free GET the M35 design reserved for
+  // this purpose; the cookie is the authorization, the t param busts cache)
+  // and compare its Fingerprint to the last rendered one. Same → skip the
+  // iframe reload entirely (no flicker / re-navigation). Different → re-render
+  // (which also covers a visible↔denied flip) and store the new fingerprint.
+  // A refresh-in-flight guard prevents overlapping fetches when a check is
+  // slower than the interval; a fetch failure keeps the current slide and the
+  // next tick simply retries.
+  let refreshing = false;
+  async function refresh(): Promise<void> {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      const res = await fetch(`/kiosk/slide?slide=${current}&t=${Date.now()}`, { credentials: 'same-origin' });
+      if (!res.ok) return; // a transient failure → keep the current slide, retry next tick
+      const data: { denied?: boolean; href?: string | null; fingerprint?: string | null } = await res.json();
+      const fp = data.fingerprint ?? null;
+      if (fp !== null && fp === fingerprints[current]) return; // unchanged → no reload
+      // The label is display-only and rides the meta (the server response
+      // carries href / denied / fingerprint, not the per-slide label).
+      const label = slides[current] ? (slides[current].getAttribute('data-label') || '') : '';
+      paintShape(!!data.denied, data.href ?? '', label);
+      fingerprints[current] = fp;
+    } catch {
+      // Network error → keep the current slide; the next tick retries.
+    } finally {
+      refreshing = false;
+    }
   }
 
   if (Number.isFinite(viewIntervalSec) && viewIntervalSec > 0) {
     window.setInterval(advance, viewIntervalSec * 1000);
   }
   if (Number.isFinite(refreshIntervalSec) && refreshIntervalSec > 0) {
-    window.setInterval(refresh, refreshIntervalSec * 1000);
+    window.setInterval(() => { void refresh(); }, refreshIntervalSec * 1000);
   }
 })();

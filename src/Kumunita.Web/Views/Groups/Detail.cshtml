@@ -125,6 +125,16 @@
 
         <p><a class="text-muted" href="@Url.Action("Index", "Groups")"><kw-l key="groups.back_all">← All groups</kw-l></a></p>
 
+        @* 2026-10-25 page-level notes lane (ADR 0167 amendment) — a note about
+           this group's page itself (the /groups/{id} detail) — distinct from
+           a note about a specific group post. The _NoteButton partial renders
+           its own d-flex wrapper (the M37 bookmark/note convention), so it
+           sits right-aligned below the back link. Signed-in residents only. *>
+        <div class="mb-2">
+            @{ var _pn = ("page-group", Model.GroupId, $"/groups/{Model.GroupId}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
+
         @* ADR 0082 — the group's action surface: one ⋮ dropdown (the
            ADR 0069 / 0071 todo/board idiom). The Groups context has no
            group-level Edit / Delete lane (the ADR 0007 / 0010 / 0026

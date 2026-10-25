@@ -38,18 +38,43 @@ public sealed class PersonalNoteService : IPersonalNoteService
     /// string-not-enum shape), the exact vocabulary the existing
     /// <c>*ToAuditableResource</c> adapters and <c>AccessAudit</c> rows
     /// already emit. A kind outside this set is a drift event (§2.7).
+    /// <para>
+    /// The 2026-10-25 page-level notes lane (the ADR 0167 amendment) adds
+    /// 11 <c>page-*</c> kinds — one per named platform page — so a resident
+    /// can attach a private note to the page itself (e.g. "the /announcements
+    /// page needs a search box"), not just to the items on it. The static
+    /// kinds (<c>page-announcements</c>, <c>page-community</c>,
+    /// <c>page-events</c>, <c>page-projects</c>, <c>page-todos</c>,
+    /// <c>page-boards</c>, <c>page-inventory</c>, <c>page-documents</c>) are
+    /// always visible (the page itself is the surface — no item-level
+    /// visibility to re-check; the write-lane check is a closed-set
+    /// membership + a fixed title + a fixed link). The dynamic kinds
+    /// (<c>page-group</c>, <c>page-project</c>) re-run the owning surface's
+    /// own frozen read (the same call the detail page uses) so a group /
+    /// project the actor cannot see cannot be page-noted (the M16
+    /// create-gate posture — the D3 write-lane check re-applied to the
+    /// page-level lane).
+    /// </para>
     /// </summary>
     public static readonly IReadOnlySet<string> ClosedTargetKinds =
         new HashSet<string>(StringComparer.Ordinal)
         {
             "post", "grouppost", "event", "page", "project",
             "todo", "board", "document", "directory", "announcement", "inventory",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment):
+            "page-announcements", "page-community", "page-group",
+            "page-events", "page-projects", "page-project",
+            "page-todos", "page-boards", "page-inventory", "page-documents",
         };
 
     // The closed set's canonical order (for group ordering in the list).
     private static readonly string[] ClosedTargetKindsOrdered =
         ["post", "grouppost", "event", "page", "project",
-         "todo", "board", "document", "directory", "announcement", "inventory"];
+         "todo", "board", "document", "directory", "announcement", "inventory",
+         // 2026-10-25 page-level notes lane (ADR 0167 amendment):
+         "page-announcements", "page-community", "page-group",
+         "page-events", "page-projects", "page-project",
+         "page-todos", "page-boards", "page-inventory", "page-documents"];
 
     private readonly IUserInfoService _userInfo;
     private readonly IAuthorizationService _authz;
@@ -811,6 +836,67 @@ public sealed class PersonalNoteService : IPersonalNoteService
                 return (item.Name, $"/inventory/{targetId}");
             }
 
+            // ── 2026-10-25 page-level notes lane (ADR 0167 amendment) ──
+            // The static page kinds are always visible (the page itself is the
+            // surface — no item-level visibility to re-check); the dynamic
+            // page-group / page-project kinds re-run the owning surface's own
+            // frozen read (the same call the detail page uses) so a group /
+            // project the owner can no longer see degrades to the generic
+            // "no longer available" label (the D7 pin — the body remains
+            // visible, the pointer does not).
+
+            case "page-announcements":
+                return ("Announcements", "/announcements");
+
+            case "page-community":
+                return ("Community", "/community");
+
+            case "page-events":
+                return ("Events", "/events");
+
+            case "page-projects":
+                return ("Projects", "/projects");
+
+            case "page-todos":
+                return ("To-dos", "/projects/todos");
+
+            case "page-boards":
+                return ("Boards", "/projects/boards");
+
+            case "page-inventory":
+                return ("Inventory", "/inventory");
+
+            case "page-documents":
+                return ("Documents", "/documents");
+
+            case "page-group":
+            {
+                // The groups surface. Two shapes, distinguished by the
+                // target id:
+                //   - "static" — the /groups index page (always visible,
+                //     fixed title + link).
+                //   - a real group id — the /groups/{id} detail page (re-run
+                //     the owning surface's own frozen read; the group the
+                //     owner can no longer see degrades to the generic
+                //     "no longer available" label — the D7 pin, the body
+                //     remains visible, the pointer does not).
+                if (targetId == "static")
+                    return ("Groups", "/groups");
+                var groups = await _userInfo.GetGroupsForUserAsync(ownerId).ConfigureAwait(false);
+                var g = groups.FirstOrDefault(gr => gr.Id == targetId);
+                if (g is null)
+                    return (null, null);
+                return (g.Name, $"/groups/{targetId}");
+            }
+
+            case "page-project":
+            {
+                var project = await s.LoadAsync<Project>(targetId).ConfigureAwait(false);
+                if (project is null || project.IsDeleted)
+                    return (null, null);
+                return (project.Title, $"/projects/projects/{targetId}");
+            }
+
             default:
                 return (null, null);
         }
@@ -1017,6 +1103,82 @@ public sealed class PersonalNoteService : IPersonalNoteService
                 {
                     var item = await _inventory.GetItemAsync(targetId, actorId).ConfigureAwait(false);
                     return (true, item.Name, $"/inventory/{targetId}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    return (false, null, null);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (false, null, null);
+                }
+            }
+
+            // ── 2026-10-25 page-level notes lane (ADR 0167 amendment) ──
+            // The static page kinds (page-announcements, page-community,
+            // page-events, page-projects, page-todos, page-boards,
+            // page-inventory, page-documents) are always visible — the page
+            // itself is the surface (no item-level visibility to re-check);
+            // the write-lane check is a closed-set membership + a fixed
+            // title + a fixed link. The targetId is the fixed page id
+            // ("static" for static pages, the group/project id for the
+            // dynamic page-group / page-project kinds).
+
+            case "page-announcements":
+                return (true, "Announcements", "/announcements");
+
+            case "page-community":
+                return (true, "Community", "/community");
+
+            case "page-events":
+                return (true, "Events", "/events");
+
+            case "page-projects":
+                return (true, "Projects", "/projects");
+
+            case "page-todos":
+                return (true, "To-dos", "/projects/todos");
+
+            case "page-boards":
+                return (true, "Boards", "/projects/boards");
+
+            case "page-inventory":
+                return (true, "Inventory", "/inventory");
+
+            case "page-documents":
+                return (true, "Documents", "/documents");
+
+            case "page-group":
+            {
+                // The groups surface. Two shapes, distinguished by the
+                // target id:
+                //   - "static" — the /groups index page (one page; the note
+                //     is about the index itself). Always visible, fixed
+                //     title + link (no group to look up).
+                //   - a real group id — the /groups/{id} detail page. Re-run
+                //     the owning surface's own frozen read (the same
+                //     GetGroupsForUserAsync the /groups/{id} controller uses
+                //     — the owner ∪ member gate). A group the actor cannot
+                //     see cannot be page-noted (the M16 create-gate posture
+                //     — the D3 write-lane check re-applied).
+                if (targetId == "static")
+                    return (true, "Groups", "/groups");
+                var groups = await _userInfo.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
+                var g = groups.FirstOrDefault(gr => gr.Id == targetId);
+                if (g is null)
+                    return (false, null, null);
+                return (true, g.Name, $"/groups/{targetId}");
+            }
+
+            case "page-project":
+            {
+                // The project's own page (the /projects/projects/{id} detail) —
+                // re-run the owning surface's own frozen read (the same
+                // IProjectService.GetProjectAsync the detail page uses).
+                try
+                {
+                    var p = await _projects.GetProjectAsync(targetId, actorId).ConfigureAwait(false);
+                    return (true, p.Title, $"/projects/projects/{targetId}");
                 }
                 catch (KeyNotFoundException)
                 {

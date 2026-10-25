@@ -213,7 +213,7 @@
        (POST /content-image) is CSRF-aware. (GetAndStoreTokens is the canonical way to get the
        bare token string in a model-less layout; the avatar lane never needed this because it
        form-POSTs, but the content-image upload is the first fetch-based consumer.) *@
-    <meta name="anti-forgery-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
+    <meta name="anti-forgery-token" content="@Antiforgery.GetAndStoreTokens(Context!).RequestToken" />
     <title>@ViewData["Title"] - Kumunita</title>
     <link rel="icon" type="image/png" href="~/images/logo/kumunita_k_logo_64x64.png" />
     <link rel="apple-touch-icon" href="~/images/logo/kumunita_k_logo_64x64.png" />
@@ -235,7 +235,7 @@
     // ADR 0111 — the nav-variant preference (the kumunita.nav cookie, ADR
     // 0001-B: a preference, never a claim). Default B (compact top row);
     // variant C (icon rail) is the explicit opt-in.
-    var navVariant = NavLayoutCookie.Read(Context.Request);
+    var navVariant = NavLayoutCookie.Read(Context!.Request);
 
     // Onboarding walk-through modal (M22/M30 rework) — this page is being
     // iframed by the shared _OnboardingModal (the M35 kiosk "frame the

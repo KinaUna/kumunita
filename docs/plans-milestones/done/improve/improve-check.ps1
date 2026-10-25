@@ -111,8 +111,12 @@ $aBaseline = @(
 # crossing the ceiling outright (the recurring-events lane's surface). The
 # ceiling now starts from the 2026-10-25 baseline; the next reduction lane
 # measures against it (the M29 precedent, applied once more).
+# Re-baselined again 2026-10-25 (987086ea, the ADR 0167 amendment): the ten
+# new page-* note kinds added 10 pn.list.kind.page-* keys x en/de/fr/da to
+# KnownTranslationKeys.cs (10970 -> 11020) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 11020 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 10970
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11020
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5257
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926

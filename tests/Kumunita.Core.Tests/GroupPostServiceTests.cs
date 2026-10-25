@@ -1475,7 +1475,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
             new GroupPostDraft(group.Id, null, "@Ghost ping"), owner, s));
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.GroupPostMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.GroupPostMention);
         Assert.Empty(boot.Staged);
     }
 
@@ -1497,7 +1497,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
             new GroupPostDraft(group.Id, null, "@Ada help", IsDraft: true), owner, s));
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.GroupPostMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.GroupPostMention);
     }
 
     /// <summary>Lane 4 (M36·4) — a **group post reply** (Part 2.3 lane 4) whose

@@ -55,6 +55,15 @@
             </div>
         </header>
 
+        @* 2026-10-25 page-level notes lane (ADR 0167 amendment) — a note about
+           the /events page itself. The _NoteButton partial renders its own
+           d-flex wrapper (the M37 bookmark/note convention), so it sits
+           right-aligned below the header. Signed-in residents only. *@
+        <div class="mb-2">
+            @{ var _pn = ("page-events", "static", "/events"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
+
         @* ADR 0109 (EV-PAST) — Upcoming / Past toggle + the community filter
            form, placed below the feed list. *@
         @{

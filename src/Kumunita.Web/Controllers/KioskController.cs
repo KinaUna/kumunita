@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Kumunita.Core.Events;
 using Kumunita.Core.Kiosk;
 using Kumunita.Core.Projects;
@@ -137,6 +138,7 @@ public sealed class KioskController : Controller
             // (no slide is named).
             refresh.Denied = true;
             refresh.DeniedKey = "kiosk.slide_denied";
+            refresh.Fingerprint = KioskFingerprint.Of("denied");
             return Json(refresh);
         }
 
@@ -144,6 +146,7 @@ public sealed class KioskController : Controller
         refresh.Denied = klass.Denied;
         refresh.Href = klass.Href;
         refresh.DeniedKey = klass.Denied ? "kiosk.slide_denied" : null;
+        refresh.Fingerprint = klass.Fingerprint;
         return Json(refresh);
     }
 
@@ -393,17 +396,23 @@ public sealed class KioskController : Controller
             // (the BoardDetail action's exact catch shape).
             var board = await projects.GetBoardAsync(view.BoardId ?? string.Empty, actorId, ct).ConfigureAwait(false);
             var id = board.Board?.Id ?? view.BoardId;
-            return new KioskSlideViewModel(index, view.Kind, view.Label, $"/projects/boards/{id}", Denied: false);
+            // ADR 0164 amendment — the board's content fingerprint (lane order
+            // + each card's id/title/status, in lane order): any card added /
+            // removed / moved between lanes, or edited in place, changes the
+            // digest, so the kiosk's REFRESH tick reloads the iframe then and
+            // only then (the "kiosk reload is too disruptive" fix).
+            var fp = KioskFingerprint.Of(BuildBoardFingerprint(board));
+            return new KioskSlideViewModel(index, view.Kind, view.Label, $"/projects/boards/{id}", Denied: false, Fingerprint: fp);
         }
         catch (KeyNotFoundException)
         {
             // A missing board — the denied shape (M35-5 FACE: no 404 crash).
-            return new KioskSlideViewModel(index, view.Kind, view.Label, Href: null, Denied: true);
+            return DeniedSlide(index, view.Kind, view.Label);
         }
         catch (UnauthorizedAccessException)
         {
             // A board the viewer may not read — the denied shape (M35-5 FACE).
-            return new KioskSlideViewModel(index, view.Kind, view.Label, Href: null, Denied: true);
+            return DeniedSlide(index, view.Kind, view.Label);
         }
     }
 
@@ -415,17 +424,23 @@ public sealed class KioskController : Controller
             // runs here; a denied read throws (the TodosIndex action's exact
             // catch shape). A visible empty feed is a legitimate state, not a
             // deny (the seam returns an empty page, not an exception).
-            await projects.ListTodosAsync(view.ComponentId, assigneeId: null, actorId, page: 1, ct: ct).ConfigureAwait(false);
+            var page = await projects.ListTodosAsync(view.ComponentId, assigneeId: null, actorId, page: 1, ct: ct).ConfigureAwait(false);
             // The page's contents are never rendered here (M35·6) — the iframe
             // loads /projects/todos and re-runs the same seam for the viewer.
+            // ADR 0164 amendment — the todos content fingerprint (each row's
+            // id / title / status + its Modified stamp, in feed order): a row
+            // added, removed, or edited in place (the Modified stamp moves) all
+            // change the digest, so the REFRESH tick reloads only when the feed
+            // actually changed.
+            var fp = KioskFingerprint.Of(BuildTodosFingerprint(page.Items));
             var href = view.ComponentId is not null
                 ? $"/projects/todos?componentId={Uri.EscapeDataString(view.ComponentId)}"
                 : "/projects/todos";
-            return new KioskSlideViewModel(index, view.Kind, view.Label, href, Denied: false);
+            return new KioskSlideViewModel(index, view.Kind, view.Label, href, Denied: false, Fingerprint: fp);
         }
         catch (UnauthorizedAccessException)
         {
-            return new KioskSlideViewModel(index, view.Kind, view.Label, Href: null, Denied: true);
+            return DeniedSlide(index, view.Kind, view.Label);
         }
     }
 
@@ -441,13 +456,85 @@ public sealed class KioskController : Controller
             var viewName = NormalizeCalendarView(view.CalendarView);
             var zone = timezone is not null ? await timezone.GetAsync().ConfigureAwait(false) : null;
             var (start, end) = CalendarWindow(viewName, zone);
-            await events.ListInRangeAsync(start, end, componentId: view.ComponentId, actorId, ct).ConfigureAwait(false);
-            return new KioskSlideViewModel(index, view.Kind, view.Label, $"/events/calendar?view={viewName}", Denied: false);
+            var eventsInWindow = await events.ListInRangeAsync(start, end, componentId: view.ComponentId, actorId, ct).ConfigureAwait(false);
+            // ADR 0164 amendment — the calendar content fingerprint (the view
+            // unit + each in-range event's id / title / start, in window order):
+            // the view unit is folded in so a day/week/month rollover that keeps
+            // the same event set still re-renders; an event added, removed, or
+            // rescheduled changes the digest. The REFRESH tick reloads only
+            // when the window's events actually changed.
+            var fp = KioskFingerprint.Of(BuildCalendarFingerprint(viewName, eventsInWindow));
+            return new KioskSlideViewModel(index, view.Kind, view.Label, $"/events/calendar?view={viewName}", Denied: false, Fingerprint: fp);
         }
         catch (UnauthorizedAccessException)
         {
-            return new KioskSlideViewModel(index, view.Kind, view.Label, Href: null, Denied: true);
+            return DeniedSlide(index, view.Kind, view.Label);
         }
+    }
+
+    // ── ADR 0164 amendment — the content-fingerprint builders (M35·4
+    //    display-only: a change-detection digest, never an access input; no
+    //    new audit row, M35·5; no new authorization branch, M35·1 / M35·3) ──
+
+    /// <summary>
+    /// A denied slide's stable shape: a <see cref="KioskSlideViewModel"/> with
+    /// <see cref="KioskSlideViewModel.Denied"/> = true and a fixed denied
+    /// fingerprint (distinct from any content digest, so a visible→denied or
+    /// denied→visible flip is always detected by the client's equality check).
+    /// </summary>
+    private static KioskSlideViewModel DeniedSlide(int index, KioskViewKind kind, string? label)
+    {
+        return new KioskSlideViewModel(
+            index, kind, label, Href: null, Denied: true,
+            Fingerprint: KioskFingerprint.Of("denied"));
+    }
+
+    /// <summary>The board's display-relevant content as a canonical string
+    /// (lane order + each card's id / title / status) for the
+    /// <see cref="KioskFingerprint"/> digest.</summary>
+    private static string BuildBoardFingerprint(BoardDetailResult board)
+    {
+        var sb = new StringBuilder(64);
+        sb.Append('B');
+        foreach (var lane in board.Lanes)
+        {
+            sb.Append('|').Append(lane.Lane.Id).Append('/').Append(lane.Lane.Title);
+            foreach (var card in lane.Cards)
+            {
+                sb.Append(';').Append(card.Id).Append('/').Append(card.Title).Append('/').Append(card.Status ?? string.Empty);
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The todos feed's display-relevant content as a canonical
+    /// string (each row's id / title / status + Modified stamp, in feed order)
+    /// for the <see cref="KioskFingerprint"/> digest.</summary>
+    private static string BuildTodosFingerprint(IReadOnlyList<TodoItem> items)
+    {
+        var sb = new StringBuilder(64);
+        sb.Append('T');
+        foreach (var todo in items)
+        {
+            sb.Append('|').Append(todo.Id).Append('/').Append(todo.Title)
+              .Append('/').Append(todo.Status ?? string.Empty)
+              .Append('/').Append(todo.Modified?.ToString("O") ?? string.Empty);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The calendar window's display-relevant content as a canonical
+    /// string (the view unit + each in-range event's id / title / start, in
+    /// window order) for the <see cref="KioskFingerprint"/> digest.</summary>
+    private static string BuildCalendarFingerprint(string viewName, IReadOnlyList<Event> events)
+    {
+        var sb = new StringBuilder(64);
+        sb.Append('E').Append('/').Append(viewName);
+        foreach (var e in events)
+        {
+            sb.Append('|').Append(e.Id).Append('/').Append(e.Title).Append('/').Append(e.Start.ToString("O"));
+        }
+        return sb.ToString();
     }
 
     private static string NormalizeCalendarView(string? view) =>

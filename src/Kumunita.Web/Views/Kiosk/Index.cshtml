@@ -137,7 +137,8 @@
                  data-index="@slide.Index"
                  data-href="@(slide.Href ?? string.Empty)"
                  data-denied="@slide.Denied.ToString().ToLowerInvariant()"
-                 data-label="@(slide.Label ?? string.Empty)"></div>
+                 data-label="@(slide.Label ?? string.Empty)"
+                 data-fingerprint="@(slide.Fingerprint ?? string.Empty)"></div>
         }
 
         @* The initial (first) slide: the iframe (the surface's own route), or

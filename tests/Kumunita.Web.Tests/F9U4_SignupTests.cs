@@ -135,7 +135,7 @@ public sealed class F9U4_SignupTests
                     new InvalidOperationException("SENTINEL: the bot-challenge gate did not fire.")));
 
             var stub = Substitute.For<IBotChallengeVerifier>();
-            stub.IsVerifiedAsync(Arg.Any<string?>()).Returns(false); // reject
+            stub.IsVerifiedAsync(Arg.Any<string?>(), TestContext.Current.CancellationToken).Returns(false); // reject
 
             var controller = BuildController(identity, verifier: stub);
 

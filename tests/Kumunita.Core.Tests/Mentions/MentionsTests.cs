@@ -85,7 +85,7 @@ public sealed class MentionsTests(PostgresFixture fixture) : IClassFixture<Postg
             ("bob", "Bob"),
             ("author-1", "Author One"));
 
-        var resolved = await svc.ResolveAsync(["Ada"], "author-1");
+        var resolved = await svc.ResolveAsync(["Ada"], "author-1", TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { "ada" }, resolved);
         await store.DisposeAsync();
@@ -101,7 +101,7 @@ public sealed class MentionsTests(PostgresFixture fixture) : IClassFixture<Postg
         var (store, svc) = await BootAsync();
         await PlantResidents(store, ("ada", "Ada"));
 
-        var resolved = await svc.ResolveAsync(["Ghost"], "author-1");
+        var resolved = await svc.ResolveAsync(["Ghost"], "author-1", TestContext.Current.CancellationToken);
 
         Assert.Empty(resolved);
         await store.DisposeAsync();
@@ -120,7 +120,7 @@ public sealed class MentionsTests(PostgresFixture fixture) : IClassFixture<Postg
             ("twin-a", "Twin"),
             ("twin-b", "Twin"));
 
-        var resolved = await svc.ResolveAsync(["Twin"], "author-1");
+        var resolved = await svc.ResolveAsync(["Twin"], "author-1", TestContext.Current.CancellationToken);
 
         Assert.Empty(resolved);
         await store.DisposeAsync();
@@ -138,7 +138,7 @@ public sealed class MentionsTests(PostgresFixture fixture) : IClassFixture<Postg
         var (store, svc) = await BootAsync();
         await PlantResidents(store, ("carol", "Carol"));
 
-        var resolved = await svc.ResolveAsync(["Carol"], "carol");
+        var resolved = await svc.ResolveAsync(["Carol"], "carol", TestContext.Current.CancellationToken);
 
         Assert.Empty(resolved);
         await store.DisposeAsync();
@@ -155,7 +155,7 @@ public sealed class MentionsTests(PostgresFixture fixture) : IClassFixture<Postg
         var (store, svc) = await BootAsync();
         await PlantResidents(store, ("ada", "Ada"));
 
-        await svc.ResolveAsync(["Ada"], "author-1");
+        await svc.ResolveAsync(["Ada"], "author-1", TestContext.Current.CancellationToken);
 
         await using var q = store.QuerySession();
         Assert.Equal(0, await q.Query<AccessAudit>().CountAsync(TestContext.Current.CancellationToken));
