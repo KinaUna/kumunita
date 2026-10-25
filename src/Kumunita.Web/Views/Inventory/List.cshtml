@@ -55,6 +55,16 @@
             </div>
         </header>
 
+        @* 2026-10-25 page-level notes lane (ADR 0167 amendment) — a note about
+           the /inventory page itself (not about a specific item). The
+           _NoteButton partial renders its own d-flex wrapper (the M37
+           bookmark/note convention), so it sits right-aligned below the
+           header. Signed-in residents only. *@
+        <div class="mb-2">
+            @{ var _pn = ("page-inventory", "static", "/inventory"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
+
         <form method="get" action="/inventory" class="mb-4">
             <div class="d-flex gap-2 align-items-end flex-wrap">
                 <div>

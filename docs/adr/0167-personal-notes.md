@@ -375,3 +375,85 @@ surface gains the existing `_NoteButton` partial; the list view's
 design doc is amended to count the closed set as **eleven kinds** (was
 ten) and to name `inventory` among the closed vocabulary. The §kw-l key
 list is amended to count **30 keys** (was 29).
+
+## Amendment — the page-level notes lane (2026-10-25)
+
+A resident can attach a note to **the page itself**, not just to the
+items on it — e.g. a note about the /announcements page ("needs a
+search box"), the /community feed, a group's page, an event listing, the
+projects / to-dos / boards pages, the inventory page, or the documents
+page. The amendment adds **ten new kinds** to the closed set (eight
+static page kinds + the two dynamic group / project page kinds), reuses
+the existing `PersonalNote` doc + `IPersonalNoteService` seam + the
+`_NoteButton` partial + the `note-modal.ts` module + the `/notes` list
+— **zero new bounded context, doc, or authorization surface**
+(C-M37·1 holds), **zero migrations** (the ten new kinds are rows in the
+existing `PersonalNote` table — the `(OwnerId, TargetKind, TargetId)`
+unique index already covers them).
+
+- **`PersonalNoteService.ClosedTargetKinds`** — the closed set grows
+  from eleven to **twenty-one** kinds: `page-announcements`,
+  `page-community`, `page-group`, `page-events`, `page-projects`,
+  `page-project`, `page-todos`, `page-boards`, `page-inventory`,
+  `page-documents`. The eight **static** kinds (announcements /
+  community / events / projects / to-dos / boards / inventory /
+  documents) are always visible — a page itself has no item-level
+  visibility to re-check; the D3 write-lane check is a closed-set
+  membership + a fixed title + a fixed link. The two **dynamic** kinds
+  (`page-group`, `page-project`) re-run the owning surface's own frozen
+  read (the same `IUserInfoService.GetGroupsForUserAsync` /
+  `IProjectService.GetProjectAsync` the detail pages use) — a group /
+  project the actor cannot see cannot be page-noted (the M16
+  create-gate posture — the D3 write-lane check re-applied).
+- **`PersonalNoteService.ResolveTargetAsync`** (the D3 write-lane) and
+  **`ResolveForListAsync`** (the D5 list resolution) each gain ten
+  branches — the same shape as the existing `board` / `document` /
+  `directory` branches. The `page-group` branch resolves to the fixed
+  title/link when the target id is `static` (the /groups index) and
+  looks up the group when it is a real group id (the group detail page);
+  `page-project` always looks up the project (the project detail page).
+- **`KnownTranslationKeys`** — ten new `pn.list.kind.page-*` keys × four
+  languages (en / de / fr / da), one label per page. The closed `pn.*`
+  key set grows from **30 to 40 keys** (the
+  `KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages` pin
+  re-targets the count + the ten new keys).
+- **`Views/Shared/_NoteButton.cshtml`** — the partial gains a
+  per-instance id (`data-note-instance`, an 8-hex random suffix) that
+  suffixes every modal element id (`note-modal-{inst}`,
+  `note-modal-textarea-{inst}`, etc.) so a page may render **multiple**
+  `_NoteButton` instances without id collisions (the project detail
+  page renders two: the item note + the page note).
+- **`client/lib/note-modal.ts`** — the module iterates over **every**
+  `[data-note-button]` anchor on the page (previously it assumed exactly
+  one) and wires each to its own modal via the `data-note-instance`
+  suffix; each instance carries its own closure state (the current
+  `noteId`), so saving one note does not affect the other.
+- **The ten list/detail views** — each gains the `_NoteButton` partial
+  (kind `page-*`, target id `static`, the page's own URL) right-aligned
+  below its header: `Announcement/Index.cshtml` (page-announcements),
+  `Posts/Index.cshtml` (page-community), `Groups/Index.cshtml`
+  (page-group, target id `static`), `Groups/Detail.cshtml` (page-group,
+  target id the group's id), `Event/Index.cshtml` (page-events),
+  `Projects/ProjectsIndex.cshtml` (page-projects),
+  `Projects/TodosIndex.cshtml` (page-todos),
+  `Projects/BoardIndex.cshtml` (page-boards), `Inventory/List.cshtml`
+  (page-inventory), `Document/Index.cshtml` (page-documents), and
+  `Projects/ProjectDetail.cshtml` (page-project, alongside the existing
+  item note). The `Groups/Index.cshtml` static `page-group` and the
+  `Groups/Detail.cshtml` dynamic `page-group` share one kind but carry
+  different target ids (a stable per-page identity for the note row).
+- **`Views/Notes/Index.cshtml`** — the `_kinds` closed-set array gains
+  the ten `page-*` kinds (the list view now renders the new groups when
+  the owner has page-noted them).
+
+**The frozen surfaces are untouched** (C-M37·1 holds): the
+`IPersonalNoteService` public signature is unchanged; **no** new
+`AccessAction` / `AccessVia` / `Decide()` branch; **no** new method on
+`IAuthorizationService`. The only changes are in the **Core composition**
+(the two resolver switches gain ten branches each — the same shape as
+the existing `board` / `document` / `directory` branches), the **key
+registry** (ten new `pn.list.kind.*` keys × 4 languages), the **shared
+partial + client module** (the multi-instance refactor), the **views**
+(ten list/detail surfaces gain the existing `_NoteButton` partial; the
+list view's `_kinds` array gains ten entries), and the **test pin**
+(the `pn.*` closed-set count re-targets to 40).

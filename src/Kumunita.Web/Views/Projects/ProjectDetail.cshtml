@@ -51,12 +51,23 @@
            /bookmarks/toggle with the kind "project" (the D3 write-lane
            check re-runs the owning surface's frozen IProjectService.
            GetProjectAsync read — the same call the detail page uses, the
-           M37 PersonalNotes "project" D3 shape re-applied). *@
+           M37 PersonalNotes "project" D3 shape re-applied).
+
+           2026-10-25 page-level notes lane (ADR 0167 amendment) — the
+           project detail page renders TWO _NoteButton partials (the multi-
+           instance support, ADR 0167 amendment): one for the project itself
+           (kind "project", the M37 per-item note) and one for the page
+           itself (kind "page-project", the 2026-10-25 page-level note). The
+           _NoteButton partial's per-instance id (data-note-instance) + the
+           note-modal.ts module's multi-anchor iteration keep the two
+           modals independent. *@
         <div class="d-flex justify-content-end gap-2 mb-2">
             @{ var _bm = ("project", Model.Id, $"/projects/projects/{Model.Id}"); }
             <partial name="_BookmarkButton" model="@_bm" />
             @{ var _pn = ("project", Model.Id, $"/projects/{Model.Id}"); }
             <partial name="_NoteButton" model="@_pn" />
+            @{ var _pnPage = ("page-project", Model.Id, $"/projects/projects/{Model.Id}"); }
+            <partial name="_NoteButton" model="@_pnPage" />
         </div>
         @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
            idiom) — the project detail is part of the /projects section; placed

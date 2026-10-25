@@ -9,10 +9,15 @@
  *   DELETE /notes/api/{noteId}                   — delete the note
  *
  * The module self-wires at load (the client/lib idiom — the expand-page.js /
- * notifications-bell.ts precedent): it finds the [data-note-button] element
- * and the #note-modal element on the page, and no-ops if either is absent.
- * One _NoteButton is rendered per detail page, so the modal id "note-modal"
- * is unique per page.
+ * notifications-bell.ts precedent): it finds every [data-note-button] anchor
+ * on the page and no-ops if there are none. Each anchor carries a unique
+ * data-note-instance id that suffixes the modal + textarea + save + delete
+ * element ids (note-modal-{inst}, note-modal-textarea-{inst}, etc.), so a
+ * page may render multiple _NoteButton instances (the 2026-10-25 page-level
+ * notes lane, ADR 0167 amendment — e.g. the project detail's item-note +
+ * page-note) without id collisions. Each instance is wired independently
+ * with its own closure state (the current noteId), so saving one note does
+ * not affect the other.
  *
  * CSRF-aware (the api.ts / ADR 0015 shape): mutating requests carry the
  * RequestVerificationToken header from <meta name="anti-forgery-token">.
@@ -25,27 +30,6 @@
  */
 (() => {
   'use strict';
-
-  const anchorEl = document.querySelector<HTMLElement>('[data-note-button]');
-  if (!anchorEl) return; // no _NoteButton on this page — no-op
-
-  const kind = anchorEl.dataset.targetKind ?? '';
-  const targetId = anchorEl.dataset.targetId ?? '';
-  if (!kind || !targetId) return;
-
-  const modalEl = document.getElementById('note-modal');
-  const textareaEl = document.getElementById('note-modal-textarea') as HTMLTextAreaElement | null;
-  const saveBtnEl = document.getElementById('note-modal-save') as HTMLButtonElement | null;
-  const deleteBtnEl = document.getElementById('note-modal-delete') as HTMLButtonElement | null;
-  if (!modalEl || !textareaEl || !saveBtnEl || !deleteBtnEl) return;
-
-  // Bind definite consts after the guard (the TS18047 guard-narrowing issue:
-  // TS does not propagate narrowing into function-expression closures).
-  const anchor: HTMLElement = anchorEl;
-  const textarea: HTMLTextAreaElement = textareaEl;
-  const saveBtn: HTMLButtonElement = saveBtnEl;
-  const deleteBtn: HTMLButtonElement = deleteBtnEl;
-  const modal: HTMLElement = modalEl;
 
   // Localized strings (the P0-6 #kumunita-strings bundle, en floor fallback).
   function L(key: string, fallback: string): string {
@@ -65,8 +49,46 @@
     return meta?.content ?? '';
   }
 
-  // State: the current note's id (null = create mode; non-null = edit mode).
-  let noteId: string | null = null;
+  const anchors = Array.from(document.querySelectorAll<HTMLElement>('[data-note-button]'));
+  for (const anchorEl of anchors) {
+    wireNoteButton(anchorEl, L, csrfToken);
+  }
+
+  // Wire a single _NoteButton anchor to its modal (per-instance closure state).
+  function wireNoteButton(
+    anchorEl: HTMLElement,
+    L: (key: string, fallback: string) => string,
+    csrfToken: () => string,
+  ): void {
+    const kind = anchorEl.dataset.targetKind ?? '';
+    const targetId = anchorEl.dataset.targetId ?? '';
+    if (!kind || !targetId) return;
+
+    // The per-instance id (the _NoteButton partial's data-note-instance —
+    // suffixes the modal + textarea + save + delete element ids). Fall back
+    // to the legacy bare "note-modal" id only when the attribute is absent
+    // (a pre-2026-10-25 rendered page — defensive, not expected).
+    const inst = anchorEl.dataset.noteInstance ?? '';
+    const suffix = inst ? `-${inst}` : '';
+
+    const modalEl = document.getElementById(`note-modal${suffix}`);
+    const textareaEl = document.getElementById(`note-modal-textarea${suffix}`) as HTMLTextAreaElement | null;
+    const saveBtnEl = document.getElementById(`note-modal-save${suffix}`) as HTMLButtonElement | null;
+    const deleteBtnEl = document.getElementById(`note-modal-delete${suffix}`) as HTMLButtonElement | null;
+    if (!modalEl || !textareaEl || !saveBtnEl || !deleteBtnEl) return;
+
+    // Bind definite consts after the guard (the TS18047 guard-narrowing issue:
+    // TS does not propagate narrowing into function-expression closures).
+    const anchor: HTMLElement = anchorEl;
+    const textarea: HTMLTextAreaElement = textareaEl;
+    const saveBtn: HTMLButtonElement = saveBtnEl;
+    const deleteBtn: HTMLButtonElement = deleteBtnEl;
+    const modal: HTMLElement = modalEl;
+
+    // State: the current note's id (null = create mode; non-null = edit mode).
+    // Per-instance closure state — one note per anchor, independent of any
+    // other _NoteButton on the same page (the 2026-10-25 page-level lane).
+    let noteId: string | null = null;
 
   // Fetch the existing note when the modal opens (if the button said
   // data-has-note="true"). A 404 is a valid "no note" state — the modal
@@ -190,4 +212,5 @@
       deleteBtn.disabled = false;
     }
   });
+  }
 })();

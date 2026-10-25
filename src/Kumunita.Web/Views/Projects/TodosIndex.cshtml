@@ -75,6 +75,15 @@
            a to-do or from a board — both entry points are first-class. *@
         <partial name="_ProjectsTabs" />
 
+        @* 2026-10-25 page-level notes lane (ADR 0167 amendment) — a note about
+           the /projects/todos page itself. The _NoteButton partial renders its
+           own d-flex wrapper (the M37 bookmark/note convention), so it sits
+           right-aligned below the tab strip. Signed-in residents only. *@
+        <div class="mb-2">
+            @{ var _pn = ("page-todos", "static", "/projects/todos"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
+
         <header class="airy-head">
             <div class="head-row">
                 <div>

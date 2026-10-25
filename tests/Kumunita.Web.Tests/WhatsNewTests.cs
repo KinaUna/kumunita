@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.68.0 entry (Prod-hardening lane close — F1–F22, ADR 0171) — 0.67.0 (Bookmark + note inventory and directory) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.69.0 entry (Page-level notes — ADR 0167 amendment) — 0.68.0 (Prod-hardening) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,17 +69,21 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The Prod-hardening lane (F1–F22, 2026-10-25 — the
-        // 2026-10-22 production-readiness audit's FAIL rows, closed as a
-        // *named lane* reusing no milestone letter; ADR 0171 Accepted — the
-        // two-role split reconciling ADR 0004 §B's boot-ownership invariant
-        // with DB-18's least-privilege requirement) is now the newest shipped
-        // (the 0.68.0 entry), so it is the head; the
+        // slides down. The Page-level notes lane (ADR 0167 amendment,
+        // 2026-10-25 — the ten `page-*` kinds join the M37 closed set, the
+        // D3 write-lane check re-runs the owning surface's own frozen read
+        // for the group / project page kinds) is now the newest shipped (the
+        // 0.69.0 entry), so it is the head; the Prod-hardening lane
+        // (F1–F22, 2026-10-25 — the 2026-10-22 production-readiness audit's
+        // FAIL rows, closed as a *named lane* reusing no milestone letter;
+        // ADR 0171 Accepted — the two-role split reconciling ADR 0004 §B's
+        // boot-ownership invariant with DB-18's least-privilege requirement)
+        // 0.68.0 entry slides one row back; the
         // Bookmark-and-note-inventory-and-directory lane (ADR 0118 amendment
-        // + ADR 0167 extension, 2026-10-16) 0.67.0 entry slides one row
+        // + ADR 0167 extension, 2026-10-16) 0.67.0 entry slides two rows
         // back; the Bookmark-projects-boards lane (ADR 0118 amendment,
-        // 2026-10-16) 0.66.0 entry slides two rows back; the first-day-of-week
-        // lane (ADR 0169) 0.65.0 entry slides three rows back; the Kiosk
+        // 2026-10-16) 0.66.0 entry slides three rows back; the first-day-of-week
+        // lane (ADR 0169) 0.65.0 entry slides four rows back; the Kiosk
         // display-mode lane (ADR 0164 amendment) 0.64.0 entry; the Kiosk
         // per-resident move (ADR 0164 amendment) 0.63.0 entry; the
         // Bookmark-folders lane (ADR 0168) 0.62.0 entry; the M37
@@ -98,13 +102,20 @@ public sealed class WhatsNewTests
         // escalation) 0.48.0 entry.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.68.0" && head.Date == "2026-10-25",
-            "The Prod-hardening 0.68.0 (2026-10-25) entry must be the head of the registry; got "
+            head.Version == "0.69.0" && head.Date == "2026-10-25",
+            "The Page-level notes 0.69.0 (2026-10-25) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("prod-hardening", StringComparison.OrdinalIgnoreCase)
+            head.Changes.Any(c => c.Contains("page-level notes", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0167 amendment", StringComparison.OrdinalIgnoreCase)),
+            "The 0.69.0 head entry must name the Page-level notes lane + the ADR 0167 amendment.");
+
+        // The Prod-hardening entry (0.68.0) slides one row back.
+        var prodHardening = WhatsNew.All.Single(v => v.Version == "0.68.0");
+        Assert.True(
+            prodHardening.Changes.Any(c => c.Contains("prod-hardening", StringComparison.OrdinalIgnoreCase)
                                  && c.Contains("least-privilege db role", StringComparison.OrdinalIgnoreCase)),
-            "The 0.68.0 head entry must name the Prod-hardening lane close + the F22 two-role split (ADR 0171).");
+            "The 0.68.0 entry must name the Prod-hardening lane close + the F22 two-role split (ADR 0171).");
 
         // The Bookmark-and-note-inventory-and-directory entry (0.67.0) slides one row back.
         var inventoryDirectory = WhatsNew.All.Single(v => v.Version == "0.67.0");
