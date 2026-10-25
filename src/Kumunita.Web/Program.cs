@@ -86,6 +86,18 @@ var kumunitaConnection = builder.Configuration.GetConnectionString("Kumunita")
                              "ConnectionStrings:Kumunita is required. Set it in appsettings.Development.json " +
                              "(dev) or the ConnectionStrings__Kumunita env var (OPS.md).");
 
+// F21 (SRV-04): app↔DB TLS knob (pin §4, sibling-key shape). Reads DbTls:SslMode
+// + DbTls:CaPath; if either is non-empty, appends ;SslMode=<v> and (when a CA path
+// is set) ;Root Certificate=<path> to the shared string ONCE, before either consumer
+// registers. Unset ⇒ byte-for-byte the baseline (dev compose stack boots unchanged).
+var dbTlsSslMode = builder.Configuration["DbTls:SslMode"];
+var dbTlsCaPath  = builder.Configuration["DbTls:CaPath"];
+if (!string.IsNullOrWhiteSpace(dbTlsSslMode) || !string.IsNullOrWhiteSpace(dbTlsCaPath))
+{
+    if (!string.IsNullOrWhiteSpace(dbTlsSslMode)) kumunitaConnection += $";SslMode={dbTlsSslMode}";
+    if (!string.IsNullOrWhiteSpace(dbTlsCaPath))  kumunitaConnection += $";Root Certificate={dbTlsCaPath}";
+}
+
 // Dev-only document-shape loop (ADR 0004 / 0001): document-shape auto-creation applies
 // the current `mt` schema derived from code on startup in Development only; the versioned
 // boot block below (after `app.Build`) applies the reviewed storage-feature steps in all
