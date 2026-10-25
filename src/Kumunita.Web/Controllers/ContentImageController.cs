@@ -4,6 +4,7 @@ using Kumunita.Core.Media;
 using Kumunita.Core.Posts;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -162,6 +163,7 @@ public sealed class ContentImageController(
     /// </summary>
     [HttpPost("/content-image")]
     [Microsoft.AspNetCore.Authorization.Authorize]
+    [EnableRateLimiting("upload")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Upload([FromForm] IFormFile? file)
     {

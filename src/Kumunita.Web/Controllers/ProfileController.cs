@@ -7,6 +7,7 @@ using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -404,6 +405,7 @@ public sealed class ProfileController(
     /// third parameter).
     /// </summary>
     [HttpPost("/profile/avatar")]
+    [EnableRateLimiting("upload")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AvatarUpload([FromForm] IFormFile? file)
     {

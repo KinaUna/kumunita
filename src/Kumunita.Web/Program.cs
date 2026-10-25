@@ -556,6 +556,15 @@ builder.Services.AddRateLimiter(opts =>
     // more than 30 times in 15 minutes is an anomaly at this platform's
     // scale; the limit is generous for normal use and tight for spam).
     AddWindow(opts, "write", limit: 30, window: TimeSpan.FromMinutes(15));
+
+    // F8 (WEB-10, prod-hardening) — the four upload lanes (avatar,
+    // content-image, attachment, document) each write a volume byte via
+    // PutAsync; the IUploadGate size/quota guard (C-UP·3) bounds the size
+    // per request, this bounds the request *rate* per IP. 10 per 15 minutes
+    // per IP — a resident uploading a handful of files in a burst is fine,
+    // an automated uploader is not (the audit row names this exact gap:
+    // "the four upload lanes have no [EnableRateLimiting]").
+    AddWindow(opts, "upload", limit: 10, window: TimeSpan.FromMinutes(15));
 });
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the
@@ -910,6 +919,15 @@ var csp =
 app.Use(async (context, next) =>
 {
     context.Response.Headers["Content-Security-Policy"] = csp;
+    // F7 (WEB-07, prod-hardening) — the two remaining global headers the
+    // 2026-10-22 audit flagged: X-Content-Type-Options: nosniff (every
+    // response, not just the per-controller serve/download lanes that already
+    // set it — the per-controller headers stay, this is the global floor) and
+    // Referrer-Policy: no-referrer (no referrer leakage cross-origin by
+    // default — the strictest sane value for a self-hosted platform whose
+    // privacy model is SECURITY.md's "the audience choice is authoritative").
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
     await next();
 });
 

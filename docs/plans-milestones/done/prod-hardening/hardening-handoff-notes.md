@@ -1179,9 +1179,9 @@ The lane's close table (fix → units landed → tests → owner-ops open items 
 | **F3** (AUTH-03 — MFA for `GlobalAdmin`) | U1 pin (3 re-pin rounds against the real 10.0.13 API), U2 registration + token store, U3 enroll/verify surface, U4 enforcement, U5 tests | `GlobalAdminLogin_RequiresMfaChallenge`, `GlobalAdminRecoveryCode_WorksOnce`, `NonAdmin_MfaOptional` | — (the §6.4 break-glass / second-GlobalAdmin runbook is already recorded as owner-attested in the F3.U1 pin §8) |
 | **F4** (BKP-02 — PITR / WAL archiving) | U1 pin, U2 "no code needed", U3 `OPS.md` §4/§5 update | no code unit | (a) install pgBackRest (or WAL-G) + offsite repo + `archive_mode=on` + `archive_command` + stanza + cadence + `pgbackrest check` + wire the alert to the F12 channel + perform the PITR restore drill; (b) stamp the two **"Last tested (PITR)"** lines in OPS §4/§5 when the check / restore actually runs on a live instance |
 | **F5** (AUTH-04 — session kill-all + invalidation) | U1 pin, U2 kill-all service + per-request gate + F3 leg-2 gate, U3 `/settings/security/sessions` surface, U4 tests | `PasswordChange_InvalidatesOtherSessions`, `KillAllSessions_SignsOutAll` | a **live end-to-end verification** (compose stack, a second browser session, a password-change or kill-all, then assert the other session is signed out on its next request) — the unit tests assert the seams, but the rendered sign-out behavior is best confirmed against the served app |
-| **F6** (AUTH-09 — argon2id/bcrypt password hash) | **not unitized** — superseded by the ASP.NET Identity 10.x built-in hashing posture; the F2 SHA-256 token-hash lane carries the "secret-at-rest" control instead | — | — (recorded as out-of-lane at the F5→F9 transition; the lane's first-wave list named it but no `F6.U*` entry was ever written) |
-| **F7** (WEB-07 — global `nosniff` + `Referrer-Policy`) | **not unitized** — the CSP middleware already ships the two headers in `Program.cs` (the F9/F10/F12 units cite it as "the F7 frozen-invariant test" — the headers are present and asserted by the F9 U3 / F13 U1 build gates) | the F9/F13 build-green gates over the same middleware | — |
-| **F8** (WEB-10 — rate-limit upload lanes) | **not unitized** — the upload lanes already ride the existing per-IP rate-limit policies (the `UploadGate`-guarding POST actions); the F15 lifecycle lane's `MediaLifecycleTick` is the retention half, not the rate-limit half | — | — |
+| **F6** (AUTH-09 — argon2id/bcrypt password hash) | **closed by policy — ADR 0172** (accepted 2026-10-25): the posture is **PBKDF2 (HMAC-SHA256) at the ASP.NET Identity default work factor, no custom `PasswordHasher`** — a *confirmation* of the already-decided `SECURITY.md` §6 "Password storage" control (2026-08-27), **no code change**. The first-pass claim ("superseded by the F2 SHA-256 token-hash lane") was **unsound** — F2 hashes one-time tokens, not passwords; this ADR is the honest disposition. Revisit trigger = the `SECURITY.md` §1 shared-VPS assumption / an offline-DB-exposure event, not a defect today | — | — (the revisit decision is the owner's, recorded in ADR 0172; not a blocker to re-verifying AUTH-09 as satisfied-by-policy) |
+| **F7** (WEB-07 — global `nosniff` + `Referrer-Policy`) | **CLOSED (2026-10-25 fix pass)** — the first pass did **not** actually ship the two headers (verified: the CSP block was the only global-header middleware; `nosniff` was per-controller only, `Referrer-Policy` nowhere). Now set **globally** in the same `app.Use(…)` CSP block in `Program.cs` (the per-controller `nosniff` headers stay — this is the global floor) | `F7_GlobalNosniffAndReferrerPolicy_In_CspMiddlewareBlock` (in `tests/Kumunita.Web.Tests/F7F8_HardeningGateTests.cs`) + a `curl -sI` / integrated-browser header snapshot (owner-ops, Razor-verification doctrine) | — (header presence is pure code; the live-served snapshot is the rendered evidence) |
+| **F8** (WEB-10 — rate-limit upload lanes) | **CLOSED (2026-10-25 fix pass)** — the first pass did **not** actually rate-limit the upload lanes (verified: none of the four upload POSTs carried `[EnableRateLimiting]`; the `IUploadGate` is a *size/quota* guard, not a *rate* guard). Now a new `upload` policy (10 / 15 min per IP) is defined in the `AddRateLimiter` block and attached via `[EnableRateLimiting("upload")]` to all four lanes — `AttachmentController.Upload` (`/attachment`), `ContentImageController.Upload` (`/content-image`), `DocumentController.Upload` (`/documents`), `ProfileController.AvatarUpload` (`/profile/avatar`) — the same one-line-per-action pattern F9.U2 established for signup | `F8_UploadLane_IsRateLimited` (in `tests/Kumunita.Web.Tests/F7F8_HardeningGateTests.cs`) + a `curl` 429-after-N check (owner-ops, optional) | — (pure code; the 429-after-N leg is the rendered evidence) |
 | **F9** (AUTH-15 — signup bot challenge + disposable-email blocklist) | U1 pin, U2 blocklist + dead-policy fix, U3 bot-challenge seam (OFF by default), U4 tests | `Signup_DisposableEmail_Rejected`, `Signup_BotChallengeEnforced` | (a) the initial `disposable-emails.txt` content (the owner's community is the ground truth — a false positive is a one-line deletion + rebuild); (b) `KUMUNITA__SIGNUP__BOT_CHECK__SITE_KEY` (the owner's Turnstile site key — the seam is in place; the key is owner-ops) |
 | **F10** (OBS-02 — error tracker / Sentry) | U1 pin, U2 `UseSentry` + PII-scrubbing filter (DSN-gated, `Sentry.AspNetCore` 6.12.1), U3 test | `Error_TrackerRegisteredWhenDsnSet` | (a) `SENTRY_DSN` — the owner's Sentry DSN registered to the instance's domain (unset ⇒ a no-op, the pipeline is byte-identical); (b) confirm the DSN is **unset on prod before the rebuild** (or knowingly accept that setting it enables Sentry immediately, including the live PII-scrubbing contract) |
 | **F11** (JOB-02 — alert on dead-letter exhaustion) | U1 pin, U2 `IAlertSink` seam + `NoopAlertSink` default + the Wolverine fault-path trigger, U3 test | `DeadLetter_FiresAlert` | (a) point the sink at the F12 human channel (until then the `NoopAlertSink` default fires — a structured log, not a human); (b) the F10 `SENTRY_DSN` deferral still stands (a `SentryAlertSink` binding, if added, must be DSN-gated) |
@@ -1196,3 +1196,61 @@ The lane's close table (fix → units landed → tests → owner-ops open items 
 | **F20** (DEP-04 — one-step rollback + drilled) | U1 pin, U2 `docs/OPS.md` runbook update (the one-step app rollback + the schema-compat guard + the "last drilled" line), U3 owner-ops drill close-out recorded | no code unit — the runbook + the drill are the deliverables | (a) **run the drill once** on a throwaway prod-style instance (the A → B1 → B2 → C → verify sequence in OPS §5) and **stamp the "last drilled" date**; (b) F4 precondition — the PITR / WAL archiving (F4's open item) must be live before the rollback drill is meaningful (a rollback without a PITR target is just an image swap, not a data-safe restore) |
 | **F21** (SRV-04 — app↔DB TLS) | U1 pin, U2 the `DbTls__SslMode` + `DbTls__CaPath` env-knob pair in `Program.cs` (the F21 `DbTls` shape), U3 owner-ops close-out recorded | the knob is byte-identical to the baseline when unset (the `kumunitaConnection` string is unchanged) — the F21 U3 entry records the pristine-boot evidence | (1) **Enable Postgres TLS on the prod Postgres addon** so the server actually *serves* TLS — a client-side `SslMode=Verify CA` against a non-TLS server is a **hard connection failure**, so this must be true **before** the prod value flips from `Prefer` to `Verify CA`; (2) **provision + distribute the CA bundle** (pin §3 Option A) into the prod app container and set `DbTls__SslMode=Verify CA` + `DbTls__CaPath=<path>` (if the owner cannot distribute a bundle, record the justification for the `Require` fallback or the `Trust Server Certificate` escape — **do not leave prod at `Prefer`**); (3) **re-provision on CA rotation** — the distributed bundle + `DbTls__CaPath` value must be updated or the `Verify CA` handshake fails |
 | **F22** (DB-18 — demote app role, least-privilege) | U1 pin + ADR 0171 proposal, U2 the two-role split (Option A; ADR 0171 Accepted; `01-app-role.sql` + `02-app-schemas.sh` + `SchemaBootstrap.cs` + `Program.cs` + `docker-compose.yml` + the witness) + the ADR Implementation addendum, U3 this owner-ops close-out | `AppRole_CannotDropSchema` (Testcontainers — the app role is refused `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE` with SQLSTATE `42501` while `CREATE TABLE mt.f22_probe` + `INSERT` + `SELECT count` succeed, and `kumunita_migrate` (DB owner) can `CREATE SCHEMA`) | (1) **provision `kumunita_migrate`** on the prod Postgres + make it the owner of the DB + the `mt` / `identity` schemas **before** demoting the app role (existing-DB: `ALTER DATABASE kumunita OWNER kumunita_migrate` + `ALTER SCHEMA mt / identity OWNER TO kumunita_migrate`); (2) **demote the prod app role to DML** — it keeps `mt` schema-level `CREATE` (the forced exception) but loses DB/`identity` ownership + `CREATE/DROP SCHEMA` + `DROP DATABASE` (verify `42501` + DML green first); (3) **set `ConnectionStrings:KumunitaMigrate`** on the prod app (the **REAL key** — not the pin's `DbMigrate` placeholder). If the owner cannot provision a second role on the managed addon, **record the justification — do not leave the app role as the database owner** while claiming least-privilege |
+
+---
+
+## 2026-10-25 verification + fix pass (F6 / F7 / F8)
+
+A code-vs-docs pass over the closed lane (per the plan's "next audit run can
+diff against this one" contract) found **19 of 22** rows genuinely closed
+(code + test + docs all present and green) but **three rows the `## Summary`
+had marked as handled were not actually closed**, and the close-flip docs
+repeated the over-claim. The three, and their disposition now:
+
+- **F7 (WEB-07)** — the first pass claimed "the CSP middleware already ships
+  the two headers" — **false**. `Program.cs`'s only global-header middleware
+  was the CSP block; `nosniff` was set per-controller on serve/download lanes
+  only, and `Referrer-Policy` was **nowhere** in `src/`. **Fixed:** the two
+  headers are now set **globally** in the same `app.Use(…)` CSP block (the
+  per-controller `nosniff` stays — this is the global floor).
+- **F8 (WEB-10)** — the first pass claimed "the upload lanes already ride the
+  existing per-IP rate-limit policies" — **false**. None of the four upload
+  POSTs carried `[EnableRateLimiting]`; the `IUploadGate` is a *size/quota*
+  guard, not a *rate* guard. (Notably F9.U2 had already fixed this exact bug
+  class for signup.) **Fixed:** a new `upload` policy (10 / 15 min per IP) in
+  the `AddRateLimiter` block, attached via `[EnableRateLimiting("upload")]` to
+  all four lanes (`/attachment`, `/content-image`, `/documents`,
+  `/profile/avatar`) — the same one-line-per-action pattern F9.U2 established.
+- **F6 (AUTH-09)** — the first pass claimed F6 was "superseded by the F2 SHA-256
+  token-hash lane" — **unsound**: F2 hashes one-time verify/setup tokens, not
+  passwords; no `AddPasswordHasher` / BCrypt / Argon2 exists in `src/`. The
+  correct disposition is that the platform's own `SECURITY.md` §6 (2026-08-27)
+  already **deliberately decided** PBKDF2-at-Identity-default + "no custom
+  password scheme." **Recorded as ADR 0172** (Accepted, no code change) so the
+  audit row and that decision now agree, instead of the row dangling as a
+  false "done."
+
+**Landed (this fix pass — code + test + doc, nothing else touched):**
+- `src/Kumunita.Web/Program.cs` — the two global headers (F7) in the CSP
+  `app.Use(…)` block; the `upload` fixed-window policy (F8) in the
+  `AddRateLimiter` block.
+- `src/Kumunita.Web/Controllers/{Attachment,ContentImage,Document,Profile}Controller.cs`
+  — `using Microsoft.AspNetCore.RateLimiting;` + `[EnableRateLimiting("upload")]`
+  on the four upload POSTs (F8).
+- `tests/Kumunita.Web.Tests/F7F8_HardeningGateTests.cs` (new) — the two pinned
+  tests `F7_GlobalNosniffAndReferrerPolicy_In_CspMiddlewareBlock` +
+  `F8_UploadLane_IsRateLimited` (the house "string pin, no TestServer" idiom —
+  these are pipeline/attribute seams a direct-construction harness cannot drive
+  end-to-end; the rendered-header / 429 evidence is the live-server snapshot per
+  the Razor-verification doctrine, recorded as owner-ops).
+- `docs/adr/0172-password-hash-posture-pbkdf2-identity-default.md` (new) +
+  `docs/adr/README.md` index row 0172 (F6).
+- This section + the three `## Summary` rows above (F6 / F7 / F8) corrected to
+  match the code.
+
+**Open items (owner, recorded — NOT assumed done):** F7's live-served header
+snapshot (`curl -sI` / integrated browser) and F8's optional 429-after-N
+leg — the code + the pinned source tests are the in-repo evidence; the rendered
+evidence is the owner's per the doctrine. F6's revisit (a stronger KDF) is the
+owner's decision on the ADR 0172 trigger (shared VPS / offline-DB exposure),
+not a blocker. **No owner step was executed; no prod value was flipped.**

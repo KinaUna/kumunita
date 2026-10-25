@@ -7,6 +7,7 @@ using Kumunita.Web.Security;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -399,6 +400,7 @@ public sealed class DocumentController(
     // ── POST /documents — the upload write lane (D5, A2, D3) ───────────────
     [HttpPost("/documents")]
     [Authorize]
+    [EnableRateLimiting("upload")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Upload([FromForm] DocumentUploadViewModel form)
     {
