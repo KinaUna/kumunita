@@ -1,8 +1,9 @@
 # ADR 0171 — Least-privilege DB role: the two-role split (migrations under a separate owner role; app role demoted to DML)
 
-Status: **Proposed** (gated on owner acceptance — **F22.U2 must not proceed**
-until this ADR is accepted)
+Status: **Accepted** (owner accepted 2026-10-25 — the **F22.U2** gate is now
+**clear**; the high-risk split may proceed)
 Date: 2026-10-25
+Accepted: 2026-10-25
 Amends **ADR 0004** (§A — "Two schemas, one Postgres" + §B — the
 boot-ownership invariant "the app role owns the DB so it can create the `mt`
 and `identity` schemas at boot"). This ADR reconciles that invariant with the
@@ -10,13 +11,14 @@ and `identity` schemas at boot"). This ADR reconciles that invariant with the
 **splitting the DDL-creation capability across two roles** rather than by
 dropping the invariant.
 
-> **Why Proposed, not Accepted:** F22 is `code+ops` and its **U2 (the migration
-> + role split) is high risk** — it changes *which role* owns the database and
-> the schemas on a running system, and a wrong ordering revokes the app's ability
-> to apply further schema changes. Per the prod-hardening protocol, a high-risk
-> unit is **gated on owner acceptance of the proposal first**. U1 (this ADR + the
-> design pin) records the tension and the proposal; the owner accepts it; only
-> then does U2 land the code. This ADR's **index row is added as *Proposed***.
+> **History (was Proposed, now Accepted):** F22 is `code+ops` and its **U2
+> (the migration + role split) is high risk** — it changes *which role* owns the
+> database and the schemas on a running system, and a wrong ordering revokes the
+> app's ability to apply further schema changes. Per the prod-hardening protocol,
+> a high-risk unit is **gated on owner acceptance of the proposal first**. U1
+> (this ADR + the design pin) recorded the tension and the proposal; the owner
+> accepted it on 2026-10-25; only then does U2 land the code. This ADR's
+> **index row is added as *Accepted***.
 
 ## Context
 
