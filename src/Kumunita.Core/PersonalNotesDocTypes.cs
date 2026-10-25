@@ -63,7 +63,7 @@ public static class PersonalNotesDocTypes
         // index matches the "list a parent's children" read's order (D6).
         opts.Schema.For<NoteFolder>()
                .UniqueIndex("nf_uidx_owner_parent_name",
-                           f => f.OwnerId, f => f.ParentId, f => f.Name)
+                           f => f.OwnerId, f => f.ParentId!, f => f.Name)
                .Index(f => new { f.OwnerId, f.ParentId });
     }
 }

@@ -1019,6 +1019,7 @@ public sealed class IdentityService(
         int contentDocs = 0;
         async Task<int> DeleteResidentRows<T>(
             System.Linq.Expressions.Expression<System.Func<T, bool>> predicate)
+            where T : notnull
         {
             var rows = await session.Query<T>().Where(predicate)
                 .ToListAsync(ct).ConfigureAwait(false);

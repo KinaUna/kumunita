@@ -41,15 +41,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK
-      # matching global.json (sdk.version = 10.0.400, rollForward = latestFeature).
+      # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK.
+      # @v5 runs on Node 24 (the v4 major targets deprecated Node 20).
+      # dotnet-version is the correct input name (the old 'version' +
+      # 'roll-forward' inputs are not valid inputs for setup-dotnet and were
+      # being ignored). 10.0.400 matches global.json's sdk.version.
       - name: Set up .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
-          version: '10.0.400'
-          roll-forward: latestfeature
+          dotnet-version: '10.0.400'
 
       # --- The three pinned gate commands (pin §2, VERBATIM, in order) ---
       # Each is a separate step with its own exit code. A non-zero exit from
@@ -105,14 +107,14 @@ jobs:
       KUMUNITA_MAILPIT_URL: http://localhost:8025
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # CI plumbing (NOT a pinned gate command): install Node for the E2E
       # project. The e2e project does NOT use a <PackageReference>; it is a
       # standalone npm project with its own package.json + package-lock.json
       # (F19.U2).
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
 

@@ -375,7 +375,11 @@ public sealed class NotificationService
                 return notification;   // F17 — suppressed recipient: inbox row stored, email skipped
         }
 
-        await _mailer.StageAsync(session, idempotencyKey, profile.Email!, subject, emailBody, ct).ConfigureAwait(false);
+        // profile is non-null here by construction (a notification always has a
+        // recipient profile); the `!` suppresses the compiler's nullable analysis
+        // which cannot see the guard above (it was a scoped if, not a method-level
+        // contract).
+        await _mailer.StageAsync(session, idempotencyKey, profile!.Email!, subject, emailBody, ct).ConfigureAwait(false);
         return notification;
     }
 

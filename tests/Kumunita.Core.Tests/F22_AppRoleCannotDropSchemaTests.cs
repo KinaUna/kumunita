@@ -126,7 +126,8 @@ public sealed class AppRoleCannotDropSchemaTests(PostgresFixture fixture) : ICla
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
-        return (long)(await cmd.ExecuteScalarAsync()!);
+        var result = await cmd.ExecuteScalarAsync();
+        return (long)result!;
     }
 
     private static async Task<bool> ScalarBoolAsync(string cs, string sql)
@@ -135,7 +136,8 @@ public sealed class AppRoleCannotDropSchemaTests(PostgresFixture fixture) : ICla
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
-        return (bool)(await cmd.ExecuteScalarAsync()!);
+        var result = await cmd.ExecuteScalarAsync();
+        return (bool)result!;
     }
 
     private static async Task<string> ScalarStringAsync(string cs, string sql)
@@ -144,7 +146,8 @@ public sealed class AppRoleCannotDropSchemaTests(PostgresFixture fixture) : ICla
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
-        return (string)(await cmd.ExecuteScalarAsync()!);
+        var result = await cmd.ExecuteScalarAsync();
+        return (string)result!;
     }
 
     /// <summary>Assert a statement fails with SQLSTATE <paramref name="expected"/> (insufficient_privilege).</summary>

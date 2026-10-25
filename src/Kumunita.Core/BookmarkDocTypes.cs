@@ -69,7 +69,7 @@ public static class BookmarkDocTypes
         // re-applied).
         opts.Schema.For<BookmarkFolder>()
                .UniqueIndex("bmf_uidx_owner_parent_name",
-                           f => f.OwnerId, f => f.ParentId, f => f.Name)
+                           f => f.OwnerId, f => f.ParentId!, f => f.Name)
                .Index(f => new { f.OwnerId, f.ParentId });
     }
 }
