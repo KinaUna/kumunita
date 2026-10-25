@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Kumunita.Core.Bootstrap;
 
@@ -27,7 +28,21 @@ public static class SchemaBootstrap
     /// scope: <see cref="AppDbContext"/> is scoped, so it cannot be resolved from the
     /// root provider.
     /// </summary>
-    public static async Task ApplyAsync(IServiceProvider services, CancellationToken ct = default)
+    /// <param name="services">the root DI provider.</param>
+    /// <param name="migrateConnection">
+    /// F22 two-role split (ADR 0171): when set, the EF Core Identity migrations
+    /// (<c>identity</c> schema + <c>AspNet*</c> tables) are applied as the migration
+    /// role (<c>kumunita_migrate</c>, the database owner) on this connection, and the
+    /// app role is granted DML on the resulting tables. This is required because EF's
+    /// <c>EnsureSchema("identity")</c> emits <c>CREATE SCHEMA IF NOT EXISTS</c> — a
+    /// database-level <c>CREATE</c> the demoted app role does not hold. When <c>null</c>
+    /// / empty, the single-role baseline applies (the DI <see cref="AppDbContext"/>,
+    /// byte-for-byte the pre-split behavior).
+    /// </param>
+    public static async Task ApplyAsync(
+        IServiceProvider services,
+        string? migrateConnection = null,
+        CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
         var sp = scope.ServiceProvider;
@@ -45,8 +60,50 @@ public static class SchemaBootstrap
 
         var firstBoot = await DbBootstrap.IsPristineAsync(identity, ct);
 
+        // Marten versioned boot (mt schema + mt_doc_* tables): runs as the DI app-role
+        // store. In the two-role split the app role holds schema-level CREATE on `mt`
+        // (dev-db-init/02-app-schemas.sh), so it creates + owns the mt tables (the
+        // wolverine_* / mt_doc_* / domain-doc tables). Weasel 9.45.1 checks
+        // information_schema.schemata and only creates MISSING schemas, so a pre-created
+        // `mt` is a no-op for it — the app role never emits `CREATE SCHEMA mt` (which
+        // would need the database-level CREATE it no longer holds).
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync();
-        await identity.Database.MigrateAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(migrateConnection))
+        {
+            // Single-role baseline: the app role is the database owner and runs the EF
+            // migrations itself (byte-for-byte the pre-split behavior).
+            await identity.Database.MigrateAsync(ct);
+        }
+        else
+        {
+            // Two-role split (ADR 0171): the EF Core Identity migrations run as the
+            // database owner (kumunita_migrate) — EF's EnsureSchema("identity") emits
+            // CREATE SCHEMA IF NOT EXISTS, a database-level CREATE the demoted app role
+            // does not hold. The identity schema + AspNet* tables are created owned by
+            // kumunita_migrate; the app role is then granted DML on them (it needs no
+            // CREATE on `identity` — it only does DML there). A single standalone
+            // connection (migrate credentials) does both, so no shared-context
+            // disposal subtleties.
+            var migrateOpts = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(migrateConnection).Options;
+            await using var migrateCtx = new AppDbContext(migrateOpts);
+            await migrateCtx.Database.MigrateAsync(ct);
+
+            // Grant the app role DML on the identity tables (owned by kumunita_migrate):
+            // USAGE on the schema + DML on all existing tables + ALTER DEFAULT PRIVILEGES
+            // so every future identity table the migration role creates is DML-able.
+            // (Idempotent on every re-run — re-granting is a no-op.)
+            await using var grantConn = new NpgsqlConnection(migrateConnection);
+            await grantConn.OpenAsync(ct);
+            await using var grantCmd = grantConn.CreateCommand();
+            grantCmd.CommandText =
+                "GRANT USAGE ON SCHEMA identity TO kumunita; " +
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA identity TO kumunita; " +
+                "ALTER DEFAULT PRIVILEGES FOR ROLE kumunita_migrate IN SCHEMA identity " +
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO kumunita;";
+            await grantCmd.ExecuteNonQueryAsync(ct);
+        }
 
         if (firstBoot)
         {

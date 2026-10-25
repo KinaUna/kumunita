@@ -995,7 +995,15 @@ await using (var probeScope = app.Services.CreateAsyncScope())
     firstBoot = await DbBootstrap.IsPristineAsync(
         probeScope.ServiceProvider.GetRequiredService<AppDbContext>());
 }
-await SchemaBootstrap.ApplyAsync(app.Services);
+
+// F22 two-role split (ADR 0171): the migration-role connection string (sibling of
+// ConnectionStrings:Kumunita). When set, the EF Core Identity migrations run as the
+// database owner (kumunita_migrate) and the demoted app role is granted DML on the
+// identity tables. When absent (a not-yet-migrated instance, or a single-role dev
+// setup), SchemaBootstrap falls back to the single-role baseline (byte-for-byte the
+// pre-split behavior). See SchemaBootstrap.ApplyAsync for the full rationale.
+var kumunitaMigrateConnection = builder.Configuration.GetConnectionString("KumunitaMigrate");
+await SchemaBootstrap.ApplyAsync(app.Services, kumunitaMigrateConnection);
 
 // Sample data (a mock neighborhood): a fresh `docker compose down -v &&
 // docker compose up --build` (dev) or a fresh deployed demo instance (ADR 0056)

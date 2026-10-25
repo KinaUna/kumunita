@@ -50,6 +50,11 @@ services:
       SampleData__Enabled: "true"
       # kumunita role (created by dev-db-init/01-app-role.sql), not the bootstrap superuser
       ConnectionStrings__Kumunita: "Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=kumunita;Include Error Detail=true"
+      # F22 two-role split (ADR 0171): the migration role (database owner). The EF Core
+      # Identity migrations run as kumunita_migrate (EnsureSchema needs DB-level CREATE
+      # the demoted app role lacks). Absent ⇒ SchemaBootstrap falls back to the single-role
+      # baseline. Created by dev-db-init/01-app-role.sql (weak-by-design dev password).
+      ConnectionStrings__KumunitaMigrate: "Host=db;Port=5432;Database=kumunita;Username=kumunita_migrate;Password=kumunita_migrate;Include Error Detail=true"
       # First-boot seed-admin lane (OPS §2). One-time, weak-by-design dev values (like the
       # DB password) — presented at /admin/setup on first boot to set the admin password;
       # the token is consumed and invalidated on that first use. Regenerate with

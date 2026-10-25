@@ -125,3 +125,51 @@ boot-ownership contract.**
   migration.** The change is at the Postgres role/privilege layer + the boot
   connection shape. Core stays HTTP-free; ADR 0006 module boundaries are
   untouched.
+
+## Implementation (F22.U2, 2026-10-25)
+
+Decisions the empirical boot-DDL resolution settled, recorded here so the ADR
+matches what actually ships (the pin `docs/design/prod-hardening-f22-role.md`
+is the F22.U1 source; this addendum is the F22.U2 implementation record):
+
+- **The one forced exception.** The app role is **not the owner** of `mt`
+  (`kumunita_migrate` owns it) and owns no schema and not the database — but it
+  keeps **schema-level `CREATE` on `mt`**, because Wolverine's
+  `IntegrateWithWolverine()` and Marten create their runtime tables
+  (`mt.wolverine_*`, `mt.mt_*`) **as the app role** during `app.StartAsync()`.
+  Schema-level CREATE is table-DDL *within* a pre-created schema, not schema/DB
+  DDL: the app is still refused `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE`
+  (all SQLSTATE `42501`). This is "owns no schema" held precisely — no
+  *ownership*, a bounded *table-creation* grant on `mt` only.
+- **`mt` is pre-created; `identity` is not.** `mt` is created in init owned by
+  `kumunita_migrate` with `GRANT USAGE, CREATE … TO kumunita`; `identity` is
+  **deliberately absent** after init — (a) its absence is the pristine signal in
+  `DbBootstrap.IsPristineAsync` (ADR 0004 §B), and (b) the EF initial migration
+  `EnsureSchema("identity")` emits `CREATE SCHEMA IF NOT EXISTS identity`, which
+  needs **database-level** CREATE — so it must run as `kumunita_migrate`. The
+  app then gets `identity` USAGE + table DML **at boot** (below), not in init.
+- **EF migrations run as the migrate role.** `SchemaBootstrap.ApplyAsync`
+  applies the Marten/Weasel store as the app role (the app already has `mt`),
+  then runs `identity.Database.MigrateAsync` **as `kumunita_migrate`** and
+  grants the app identity DML. The migrate connection is read from
+  **`ConnectionStrings:KumunitaMigrate`** (the actual env key — the pin's
+  "DbMigrate" placeholder became this). When the key is **unset**, the path
+  degrades to the single-role baseline (`identity` on the app role) — the
+  backward-compat knob.
+- **`02-app-schemas.sh`.** The `mt` pre-create + grant lives in a **`.sh`**
+  init script (not `.sql`) because Postgres' entrypoint runs `.sql` files
+  against the `postgres` database, not `kumunita` — the script `psql`s the app
+  DB explicitly.
+- **No live-DB migration path.** Per the owner (2026-10-25), current production
+  deployments are install-from-scratch demos, so the split is simply what
+  provisioning (`01-app-role.sql` + `02-app-schemas.sh`) produces — there is no
+  `ALTER … OWNER` demotion of a running DB to author. The reorder-ops risk above
+  applies only to a hypothetical existing-DB demotion and remains recorded, not
+  executed.
+- **Verified at a pristine boot** (`docker compose down -v && up`): `mt` /
+  `identity` owner = `kumunita_migrate`, DB owner = `kumunita_migrate`; the app
+  role's `CREATE TABLE mt.x` / `INSERT` succeed while `DROP SCHEMA mt` ("must be
+  owner of schema") and `CREATE SCHEMA` ("permission denied for database") are
+  refused; `identity."AspNetUsers"` is DML-able by the app role and the
+  GlobalAdmin is seeded. The witness test `AppRole_CannotDropSchema` encodes the
+  same invariants against a Testcontainers DB.
