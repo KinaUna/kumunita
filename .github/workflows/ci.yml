@@ -46,7 +46,7 @@ jobs:
       # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK
       # matching global.json (sdk.version = 10.0.400, rollForward = latestFeature).
       - name: Set up .NET SDK
-        uses: dotnet/setup-dotnet@v4
+        uses: actions/setup-dotnet@v4
         with:
           version: '10.0.400'
           roll-forward: latestfeature
@@ -161,6 +161,14 @@ jobs:
       # Resolve the E2E project's deps (its own package-lock.json — F19.U2).
       - name: Install E2E deps
         run: npm --prefix e2e ci
+
+      # Playwright's npm package does NOT ship the browser binaries: on a
+      # fresh runner `browserType.launch` fails with "Executable doesn't
+      # exist at ~/.cache/ms-playwright/...". Download the chromium the
+      # suite uses (pin §1: one chromium project) + its system deps
+      # (`--with-deps`, ubuntu-latest).
+      - name: Install Playwright browser
+        run: npm --prefix e2e exec playwright install --with-deps chromium
 
       # Run the suite: both pinned specs (F19.U2 `signup_verify_login.e2e.ts`
       # Flow A + F19.U3 `post_write.e2e.ts` Flow B).
