@@ -1,0 +1,92 @@
+@* ADR 0173 — the shared "Report this …" **modal** (the per-target intake
+   form on the new report-target surfaces: events, projects, Kanban
+   boards, to-dos, group posts). The surface's ⋮ action dropdown adds
+   its own dropdown item (the house idiom — the button markup is
+   surface-local, the ADR 0082 "one ⋮ dropdown" shape), targeting this
+   modal's id with data-bs-toggle/data-bs-target.
+   • **Usage** —
+     <partial name="_ReportModal" model="new (ActionUrl: ..., ModalId: ..., TitleKey: ...)" />
+     placed **outside** the dropdown (a modal is a document-level div;
+     it must not live inside a <ul>). The surface may host several
+     report targets (e.g. a to-do detail + its subtask rows); the
+     ModalId keeps them unique per surface.
+   • **Model** — (string ActionUrl, string ModalId, string TitleKey).
+     ActionUrl is the form's POST target (the ReportTargetsController
+     endpoint for this surface); TitleKey is the kw-l key for the
+     modal title + the dropdown item's label (en floor in
+     KnownTranslationKeys).
+   • **Gating** — the partial makes no service call (reporting is a
+     write, not a state read). The surface already ran the target's
+     Read decision (the "can see it" precondition); any signed-in
+     resident who can see the target may file a report (C-M3b·1, the
+     post-report lane's standing — the "any resident who can currently
+     see it" pin).
+   • **Flash** — on success the controller sets TempData["info"] and
+     redirects back to the surface (the _BookmarkButton obs-2 shape);
+     the flash is rendered by the shared layout (the house idiom).
+   • **Shape** — the ADR 0082 modal idiom, the same Bootstrap 5
+     .modal.fade container the translation modals use; the form's
+     id is <ModalId>-form (an e2e helper's stable seam). *@
+@model (string ActionUrl, string ModalId, string TitleKey)
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+
+@* The reason placeholder is resolved server-side (a <kw-l> TagHelper
+   can't sit inside an attribute — the Posts/Detail.cshtml pattern).
+   The modal title + the button's label go through <kw-l> with an en
+   fallback (the house idiom). *@
+@{
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(
+        ViewContext.HttpContext?.Request, Localization, Translation);
+    string titleFloor = Kumunita.Core.Localization.KnownTranslationKeys.EnValues[Model.TitleKey];
+    string reasonPlaceholder = Kumunita.Core.Localization.KnownTranslationKeys.EnValues["posts.report_reason_placeholder"];
+    if (Translation is not null)
+        reasonPlaceholder = await Translation.GetAsync("posts.report_reason_placeholder", _kwL);
+    string modalLabelId = Model.ModalId + "-label";
+    string formId       = Model.ModalId + "-form";
+    string reasonId     = Model.ModalId + "-reason";
+}
+
+<div class="modal fade" id="@Model.ModalId" tabindex="-1"
+     aria-labelledby="@modalLabelId" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="@Model.ActionUrl"
+                  id="@formId" class="mb-0">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="@modalLabelId">
+                        <kw-l key="@Model.TitleKey">@titleFloor</kw-l>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label" for="@reasonId">
+                        <kw-l key="posts.report_reason_label">What's wrong?</kw-l>
+                        <span class="text-muted small">
+                            (<kw-l key="posts.report_optional">optional</kw-l>)
+                        </span>
+                    </label>
+                    <textarea class="form-control mb-2"
+                              name="reason"
+                              id="@reasonId"
+                              rows="3"
+                              placeholder="@reasonPlaceholder"></textarea>
+                    <p class="small text-muted mb-0">
+                        <kw-l key="posts.report_note">Filing a report is an intake action — it doesn't change what you can see, and a moderator may follow up.</kw-l>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <kw-l key="common.cancel">Cancel</kw-l>
+                    </button>
+                    <button type="submit" class="btn btn-outline-danger">
+                        <kw-l key="posts.report_submit">Report</kw-l>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

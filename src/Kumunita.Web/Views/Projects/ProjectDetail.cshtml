@@ -68,6 +68,7 @@
             <partial name="_NoteButton" model="@_pn" />
             @{ var _pnPage = ("page-project", Model.Id, $"/projects/projects/{Model.Id}"); }
             <partial name="_NoteButton" model="@_pnPage" />
+            @{ var _repPr = (ActionUrl: "/projects/projects/" + Model.Id + "/report", ModalId: "project-report-modal", TitleKey: "posts.project_report_button"); }
         </div>
         @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
            idiom) — the project detail is part of the /projects section; placed
@@ -277,6 +278,18 @@
                                     }
                                 }
 
+                                @* ADR 0173 — the "Report this project" lane: any
+                                   resident who can see the project may file a
+                                   report (the C-M3b·1 standing). The dropdown
+                                   item opens the shared _ReportModal below. *@
+                                <li>
+                                    <button type="button" class="dropdown-item text-dark"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#project-report-modal">
+                                        <kw-l key="posts.project_report_button">Report this project</kw-l>
+                                    </button>
+                                </li>
+
                                 @if (Model.CanEdit)
                                 {
                                     <li><hr class="dropdown-divider" /></li>
@@ -293,6 +306,15 @@
                                 }
                             </ul>
                         </div>
+
+                        @* ADR 0173 — the "Report this project" modal (the
+                           shared _ReportModal partial — the ADR 0082 modal
+                           idiom). The _repPr tuple is hoisted into the top-level
+                           @{ } block (the _BookmarkButton idiom). Rendered
+                           unconditionally: any resident who can see the project
+                           (the detail's own Read decision already ran) may file
+                           a report (C-M3b·1). *@
+                        <partial name="_ReportModal" model="@_repPr" />
 
                         @* ADR 0071 modal shape — one modal per language the
                            standing-holder may edit or add. The rich editor is

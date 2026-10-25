@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.70.0 entry (Kiosk conditional refresh — ADR 0164 amendment) — 0.69.0 (Page-level notes) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.71.0 entry (Report targets — ADR 0173) — 0.70.0 (Kiosk conditional refresh) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,15 +69,19 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The Kiosk conditional-refresh lane (ADR 0164 amendment,
-        // 2026-10-25 — the /kiosk display now skips a slide's iframe reload on
-        // a refresh tick whose content fingerprint is unchanged, the "kiosk
-        // reload is too disruptive" fix) is now the newest shipped (the
-        // 0.70.0 entry), so it is the head; the Page-level notes lane (ADR
-        // 0167 amendment, 2026-10-25 — the ten `page-*` kinds join the M37
-        // closed set, the D3 write-lane check re-runs the owning surface's
-        // own frozen read for the group / project page kinds) 0.69.0 entry
-        // slides one row back; the Prod-hardening lane (F1–F22, 2026-10-25 —
+        // slides down. The Report-targets lane (ADR 0173, 2026-10-27 — the
+        // "Report this …" lane now reaches events, projects, boards, to-dos,
+        // and group posts, the same standing the post/reply lanes have) is
+        // now the newest shipped (the 0.71.0 entry), so it is the head; the
+        // Kiosk conditional-refresh lane (ADR 0164 amendment, 2026-10-25 —
+        // the /kiosk display now skips a slide's iframe reload on a refresh
+        // tick whose content fingerprint is unchanged, the "kiosk reload is
+        // too disruptive" fix) 0.70.0 entry slides one row back; the
+        // Page-level notes lane (ADR 0167 amendment, 2026-10-25 — the ten
+        // `page-*` kinds join the M37 closed set, the D3 write-lane check
+        // re-runs the owning surface's own frozen read for the group /
+        // project page kinds) 0.69.0 entry slides two rows back; the
+        // Prod-hardening lane (F1–F22, 2026-10-25 —
         // the 2026-10-22 production-readiness audit's FAIL rows, closed as a
         // *named lane* reusing no milestone letter; ADR 0171 Accepted — the
         // two-role split reconciling ADR 0004 §B's boot-ownership invariant
@@ -105,15 +109,22 @@ public sealed class WhatsNewTests
         // (issue submission & escalation) 0.48.0 entry.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.70.0" && head.Date == "2026-10-25",
-            "The Kiosk conditional-refresh 0.70.0 (2026-10-25) entry must be the head of the registry; got "
+            head.Version == "0.71.0" && head.Date == "2026-10-27",
+            "The Report-targets 0.71.0 (2026-10-27) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("kiosk auto-refresh", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("ADR 0164 amendment", StringComparison.OrdinalIgnoreCase)),
-            "The 0.70.0 head entry must name the Kiosk conditional-refresh lane + the ADR 0164 amendment.");
+            head.Changes.Any(c => c.Contains("report", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0173", StringComparison.OrdinalIgnoreCase)),
+            "The 0.71.0 head entry must name the Report-targets lane + the ADR 0173.");
 
-        // The Page-level notes entry (0.69.0) slides one row back.
+        // The Kiosk conditional-refresh entry (0.70.0) slides one row back.
+        var kioskRefresh = WhatsNew.All.Single(v => v.Version == "0.70.0");
+        Assert.True(
+            kioskRefresh.Changes.Any(c => c.Contains("kiosk auto-refresh", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0164 amendment", StringComparison.OrdinalIgnoreCase)),
+            "The 0.70.0 entry must name the Kiosk conditional-refresh lane + the ADR 0164 amendment.");
+
+        // The Page-level notes entry (0.69.0) slides two rows back.
         var pageNotes = WhatsNew.All.Single(v => v.Version == "0.69.0");
         Assert.True(
             pageNotes.Changes.Any(c => c.Contains("page-level notes", StringComparison.OrdinalIgnoreCase)

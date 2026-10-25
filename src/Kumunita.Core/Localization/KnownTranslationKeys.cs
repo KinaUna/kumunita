@@ -1281,6 +1281,17 @@ public static class KnownTranslationKeys
             ["posts.detail_why_label"] = "Why can I see this?",
             ["posts.report_button"] = "Report this post",
             ["posts.reply_report_button"] = "Report this reply",
+            // ADR 0173 — the new report-target surfaces (event / project /
+            // board / to-do / group-post). Same shape as the two existing
+            // report buttons above (a kw-l key whose en floor is the label
+            // text; the _ReportModal partial + the per-surface ⋮ item both
+            // consume the same key, so one string serves both the dropdown
+            // item and the modal title).
+            ["posts.event_report_button"] = "Report this event",
+            ["posts.project_report_button"] = "Report this project",
+            ["posts.board_report_button"] = "Report this board",
+            ["posts.todo_report_button"] = "Report this to-do",
+            ["posts.grouppost_report_button"] = "Report this post",
             ["posts.report_reason_label"] = "What's wrong?",
             ["posts.report_optional"] = "optional",
             ["posts.report_note"] =
@@ -5684,6 +5695,14 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Vollseite (Browserfenster füllen)",
             ["kiosk.settings.display_mode.full_screen"] = "Vollbild (der ganze Monitor)",
             ["kiosk.settings.display_mode.hint"] = "Vollseite füllt dein Browserfenster; Vollbild blendet zusätzlich die Browser-Tabs und die Adressleiste aus (zum Betreten ist eine Benutzeraktion erforderlich).",
+
+            // ADR 0173 — the new report-target surfaces (the en-parity
+            // extension, the posts.*-set shape above).
+            ["posts.event_report_button"] = "Diese Veranstaltung melden",
+            ["posts.project_report_button"] = "Dieses Projekt melden",
+            ["posts.board_report_button"] = "Dieses Board melden",
+            ["posts.todo_report_button"] = "Diese Aufgabe melden",
+            ["posts.grouppost_report_button"] = "Diesen Beitrag melden",
         };
 
     /// <summary>
@@ -8361,6 +8380,14 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Page entière (remplir la fenêtre du navigateur)",
             ["kiosk.settings.display_mode.full_screen"] = "Plein écran (tout le moniteur)",
             ["kiosk.settings.display_mode.hint"] = "Page entière remplit votre fenêtre de navigateur ; plein écran masque aussi les onglets et la barre d'adresse du navigateur (une action de l'utilisateur est nécessaire pour l'activer).",
+
+            // ADR 0173 — the new report-target surfaces (the en-parity
+            // extension, the posts.*-set shape above).
+            ["posts.event_report_button"] = "Signaler cet événement",
+            ["posts.project_report_button"] = "Signaler ce projet",
+            ["posts.board_report_button"] = "Signaler ce tableau",
+            ["posts.todo_report_button"] = "Signaler cette tâche",
+            ["posts.grouppost_report_button"] = "Signaler ce message",
         };
 
     /// <summary>
@@ -11012,6 +11039,14 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Hele siden (fyld browservinduet)",
             ["kiosk.settings.display_mode.full_screen"] = "Fuldskærm (hele monitoren)",
             ["kiosk.settings.display_mode.hint"] = "Hele siden fylder dit browservindue; fuldskærm skjuler også browserens faner og adressefelt (det kræver en brugerhandling at aktivere).",
+
+            // ADR 0173 — the new report-target surfaces (the en-parity
+            // extension, the posts.*-set shape above).
+            ["posts.event_report_button"] = "Anmelde denne begivenhed",
+            ["posts.project_report_button"] = "Anmelde dette projekt",
+            ["posts.board_report_button"] = "Anmelde dette bræt",
+            ["posts.todo_report_button"] = "Anmelde denne todo",
+            ["posts.grouppost_report_button"] = "Anmelde dette indlæg",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

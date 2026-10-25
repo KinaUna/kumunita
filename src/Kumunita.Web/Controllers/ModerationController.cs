@@ -1,6 +1,8 @@
+using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Moderation;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -241,7 +243,6 @@ public sealed class ModerationController(
 
         foreach (var r in reports)
         {
-            var post     = await session.LoadAsync<Post>(r.PostId).ConfigureAwait(false);
             var reporter = await userInfo.GetProfileAsync(r.ReporterId).ConfigureAwait(false);
 
             // ADR 0023 — the reply-report-target lane: when the report's
@@ -259,6 +260,39 @@ public sealed class ModerationController(
                         (await userInfo.GetProfileAsync(reply.AuthorId).ConfigureAwait(false))?.DisplayName;
             }
 
+            // ADR 0173 — the report-targets lane: the new surfaces
+            // (event / project / board / todo / grouppost) carry their
+            // identity on TargetKind / TargetId (PostId is empty);
+            // resolve the target's title + author for the queue row.
+            string? targetKind = r.TargetKind, targetId = r.TargetId;
+            string? targetTitle = null, targetAuthorName = null;
+            if (targetKind is not null && targetId is not null)
+            {
+                (string? title, string? authorId) = (null, null);
+                switch (targetKind)
+                {
+                    case "event":
+                        var ev = await session.LoadAsync<Kumunita.Core.Events.Event>(targetId).ConfigureAwait(false);
+                        title = ev?.Title; authorId = ev?.AuthorId; break;
+                    case "project":
+                        var pr = await session.LoadAsync<Kumunita.Core.Projects.Project>(targetId).ConfigureAwait(false);
+                        title = pr?.Title; authorId = pr?.AuthorId; break;
+                    case "board":
+                        var bd = await session.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
+                        title = bd?.Title; authorId = bd?.AuthorId; break;
+                    case "todo":
+                        var td = await session.LoadAsync<TodoItem>(targetId).ConfigureAwait(false);
+                        title = td?.Title; authorId = td?.AuthorId; break;
+                    case "grouppost":
+                        var gp = await session.LoadAsync<Post>(targetId).ConfigureAwait(false);
+                        title = gp?.Title; authorId = gp?.AuthorId; break;
+                }
+                targetTitle = title;
+                targetAuthorName = authorId is null
+                    ? null
+                    : (await userInfo.GetProfileAsync(authorId).ConfigureAwait(false))?.DisplayName;
+            }
+
             var statusKey = r.Status ?? "filed";   // "filed" as the M3-registered POCO default
             if (!byStatus.ContainsKey(statusKey))
                 byStatus[statusKey] = 0;
@@ -267,14 +301,18 @@ public sealed class ModerationController(
             rows.Add(new ReportRow(
                 r.Id,
                 r.PostId,
-                post?.Title,
+                r.PostId.Length > 0 ? (await session.LoadAsync<Post>(r.PostId).ConfigureAwait(false))?.Title : null,
                 r.ComponentId is not null ? componentNames.GetValueOrDefault(r.ComponentId) : null,
                 reporter?.DisplayName,
                 r.Reason,
                 statusKey,
                 r.At,
                 r.ReplyId,
-                replyAuthorName));
+                replyAuthorName,
+                TargetKind: targetKind,
+                TargetId: targetId,
+                TargetTitle: targetTitle,
+                TargetAuthorName: targetAuthorName));
         }
 
         return View(new ModerationQueueViewModel
@@ -335,11 +373,67 @@ public sealed class ModerationController(
                 return NotFound();
         }
 
-        var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
-        if (post is null) return NotFound();
+        // ADR 0173 — the report-targets lane: the report's target is
+        // EITHER a post (PostId set — the original M3b / ADR 0023 shape)
+        // OR one of the new surfaces (TargetKind / TargetId set — the
+        // PostId is empty). Both branches share the queue's scoped-read
+        // gate above (the component-scope filter); only the title /
+        // author resolution differs.
+        string? postTitle = null, postBody = null, postAuthorId = null;
+        string? targetKind = report.TargetKind, targetId = report.TargetId;
+        string? targetTitle = null, targetAuthorId = null;
+
+        if (targetKind is not null && targetId is not null)
+        {
+            switch (targetKind)
+            {
+                case "event":
+                {
+                    var ev = await session.LoadAsync<Kumunita.Core.Events.Event>(targetId).ConfigureAwait(false);
+                    if (ev is null) return NotFound();
+                    targetTitle = ev.Title; postBody = ev.Body; targetAuthorId = ev.AuthorId;
+                    break;
+                }
+                case "project":
+                {
+                    var pr = await session.LoadAsync<Kumunita.Core.Projects.Project>(targetId).ConfigureAwait(false);
+                    if (pr is null) return NotFound();
+                    targetTitle = pr.Title; postBody = pr.Description; targetAuthorId = pr.AuthorId;
+                    break;
+                }
+                case "board":
+                {
+                    var bd = await session.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
+                    if (bd is null) return NotFound();
+                    targetTitle = bd.Title; postBody = bd.Description; targetAuthorId = bd.AuthorId;
+                    break;
+                }
+                case "todo":
+                {
+                    var td = await session.LoadAsync<TodoItem>(targetId).ConfigureAwait(false);
+                    if (td is null) return NotFound();
+                    targetTitle = td.Title; targetAuthorId = td.AuthorId;
+                    break;
+                }
+                case "grouppost":
+                {
+                    var gp = await session.LoadAsync<Post>(targetId).ConfigureAwait(false);
+                    if (gp is null) return NotFound();
+                    targetTitle = gp.Title; postBody = gp.Body; targetAuthorId = gp.AuthorId;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
+            if (post is null) return NotFound();
+            postTitle = post.Title; postBody = post.Body; postAuthorId = post.AuthorId;
+        }
 
         var reporter  = await userInfo.GetProfileAsync(report.ReporterId).ConfigureAwait(false);
-        var postAuthor = await userInfo.GetProfileAsync(post.AuthorId).ConfigureAwait(false);
+        var postAuthor = await userInfo.GetProfileAsync(
+            (postAuthorId ?? targetAuthorId) ?? string.Empty).ConfigureAwait(false);
         var componentNames = await BuildComponentNameLookupAsync(session).ConfigureAwait(false);
 
         // ADR 0023 — the reply-report-target lane: when the report's target
@@ -394,13 +488,19 @@ public sealed class ModerationController(
             Status          = statusKey,
             At              = report.At,
             ReporterName    = reporter?.DisplayName,
-            PostTitle       = post.Title,
-            PostBody        = post.Body,
+            PostTitle       = postTitle,
+            PostBody        = postBody,
             ComponentName   = report.ComponentId is not null ? componentNames.GetValueOrDefault(report.ComponentId) : null,
             PostAuthorName  = postAuthor?.DisplayName,
             ReplyId         = replyId,
             ReplyBody       = replyBody,
             ReplyAuthorName = replyAuthorName,
+            TargetKind      = targetKind,
+            TargetId        = targetId,
+            TargetTitle     = targetTitle,
+            TargetAuthorName = targetAuthorId is null
+                ? null
+                : (await userInfo.GetProfileAsync(targetAuthorId).ConfigureAwait(false))?.DisplayName,
             Moderators      = moderators,
 
             // Display-level predicates (the §2.3 item-2 four

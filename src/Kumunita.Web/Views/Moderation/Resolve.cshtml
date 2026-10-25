@@ -13,8 +13,24 @@
     </div>
     <div class="card-body">
         <dl class="row mb-0">
+            @* ADR 0173 — the report-targets lane: when the report's target
+               is one of the new surfaces (Model.TargetKind non-null), show
+               the target's kind + title + author in place of the original
+               post / post-author shape (the PostTitle / PostAuthorName
+               fields are still populated by the controller for the new
+               shapes — the Target* fields carry the identity). *@
             <dt class="col-sm-3"><kw-l key="moderation.th_post_label">Post</kw-l></dt>
-            <dd class="col-sm-9">@(Model.PostTitle ?? Model.PostId)</dd>
+            <dd class="col-sm-9">
+                @if (Model.TargetKind is not null)
+                {
+                    <span class="badge text-bg-light border me-2">@Model.TargetKind</span>
+                    @(Model.TargetTitle ?? Model.TargetId)
+                }
+                else
+                {
+                    @(Model.PostTitle ?? Model.PostId)
+                }
+            </dd>
 
             <dt class="col-sm-3"><kw-l key="moderation.th_component_label">Component</kw-l></dt>
             <dd class="col-sm-9">@(Model.ComponentName ?? "—")</dd>
@@ -23,7 +39,9 @@
             <dd class="col-sm-9">@(Model.ReporterName ?? "—")</dd>
 
             <dt class="col-sm-3"><kw-l key="moderation.th_author_label">Post author</kw-l></dt>
-            <dd class="col-sm-9">@(Model.PostAuthorName ?? "—")</dd>
+            <dd class="col-sm-9">
+                @(Model.TargetKind is not null ? (Model.TargetAuthorName ?? "—") : (Model.PostAuthorName ?? "—"))
+            </dd>
 
             <dt class="col-sm-3"><kw-l key="moderation.th_filed_label">Filed</kw-l></dt>
             <dd class="col-sm-9"><kw-dt dt="@Model.At" format="g"></kw-dt></dd>
@@ -40,13 +58,25 @@
                 }
             </dd>
 
+            @* The body preview — for the original post / grouppost shapes
+               it is the post body; for the new surfaces (event / project /
+               board) it is the target's description (the controller's
+               PostBody field carries the same value, the ADR 0173 lane's
+               shared shape). The todo surface has no body field — the
+               block is omitted (Model.PostBody is null). *@
             @if (!string.IsNullOrEmpty(Model.PostBody))
             {
-                <dt class="col-sm-3"><kw-l key="moderation.th_body_label">Post body</kw-l></dt>
+                string bodyLabel = Model.TargetKind is not null
+                    ? (Model.TargetKind + " body")
+                    : "Post body";
+                string bodyPreview = Model.TargetKind is not null
+                    ? (Model.TargetKind + " preview")
+                    : "post preview";
+                <dt class="col-sm-3">@bodyLabel</dt>
                 <dd class="col-sm-9">
                     <blockquote class="blockquote mb-0">
                         <div>@Model.PostBody</div>
-                        <footer class="blockquote-footer"><kw-l key="moderation.body_preview">post preview</kw-l></footer>
+                        <footer class="blockquote-footer">@bodyPreview</footer>
                     </blockquote>
                 </dd>
             }
