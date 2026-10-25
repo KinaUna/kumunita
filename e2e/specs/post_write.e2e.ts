@@ -61,9 +61,15 @@ test('a signed-in resident publishes one post and it appears', async ({ page }) 
   const loginResponse = await Promise.resolve(
     // Scope to the login form: the nav language-picker carries its own
     // button[type="submit"] dropdown items, and an unscoped selector grabs
-    // the first (invisible) one and times out. The login form is the one
-    // with asp-action="Login" (Views/Account/Login.cshtml).
-    page.click('form[asp-action="Login"] button[type="submit"]'),
+    // the first (invisible) one and times out.
+    //
+    // The view is written as <form asp-action="Login"> (Views/Account/Login.cshtml),
+    // but the Razor tag helper CONSUMES asp-action and emits the routed
+    // action="/Account/Login" — asp-action is NOT present in the served HTML,
+    // so a form[asp-action=...] selector matches nothing in a real browser.
+    // Scope by the rendered action value instead (exact match also keeps
+    // this off the sibling LoginMfa form, which posts to /Account/LoginMfa).
+    page.click('form[action="/Account/Login"] button[type="submit"]'),
   );
   // A 503 (ASP.NET Identity lockout) is a PRECONDITION/ENVIRONMENT failure —
   // record it, do NOT retry (pin §5 invariant #6 + the repo memory

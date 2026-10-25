@@ -97,10 +97,12 @@ test('resident signs up, verifies via the Mailpit link, logs in, and publishes o
   // your inbox for the verification link." (the controller's L502
   // TempData["info"] — verified in AccountController.cs).
   const signupResponse = await Promise.resolve(
-    // Scope to the signup form (asp-action="Signup") — the same
-    // language-picker-dropdown collision that breaks the unscoped form on
-    // the login page (Views/Account/Signup.cshtml).
-    page.click('form[asp-action="Signup"] button[type="submit"]'),
+    // Scope to the signup form. The view is written as <form asp-action="Signup">
+    // (Views/Account/Signup.cshtml), but the Razor tag helper CONSUMES asp-action
+    // and emits action="/Account/Signup" — asp-action is NOT in the served HTML,
+    // so scope by the rendered action value (not form[asp-action=...], which
+    // matches nothing in a real browser).
+    page.click('form[action="/Account/Signup"] button[type="submit"]'),
   );
   expect(
     signupResponse,
@@ -167,9 +169,11 @@ test('resident signs up, verifies via the Mailpit link, logs in, and publishes o
   await page.fill('input[name="Password"]', RUN_PASSWORD);
 
   const loginSubmitResponse = await Promise.resolve(
-    // Scope to the login form (asp-action="Login") — the unscoped form
-    // grabs the nav language-picker's first (invisible) submit item.
-    page.click('form[asp-action="Login"] button[type="submit"]'),
+    // Scope to the login form. The view is written as <form asp-action="Login">,
+    // but the Razor tag helper CONSUMES asp-action and emits action="/Account/Login" —
+    // asp-action is NOT in the served HTML, so scope by the rendered action value.
+    // (Exact match also keeps this off the sibling LoginMfa form at /Account/LoginMfa.)
+    page.click('form[action="/Account/Login"] button[type="submit"]'),
   );
   // A 503 (ASP.NET Identity lockout) is a precondition/environment failure —
   // record it, do NOT retry (pin §5 invariant #6 + the repo memory
