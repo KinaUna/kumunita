@@ -66,3 +66,103 @@ jobs:
       # 3. Run the Core test assembly in-process (xunit.v3 runner, Docker/Testcontainers).
       - name: Test Core
         run: dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
+
+  # ---------------------------------------------------------------------------
+  # F19.U4 — the E2E job (TEST-03, `code`).
+  #
+  # This job is ADDED by F19.U4 on top of F14.U2's landed "test" job; the two
+  # `dotnet exec` dll steps above are UNCHANGED (the F14 "two dlls" gate shape
+  # is preserved — the E2E job is a SEPARATE concern, never folded into the
+  # xunit path, per pin §1 + §5 invariant #2).
+  #
+  # The E2E suite is the FOURTH test tier (pin §1): Playwright driving a real
+  # browser against the docker-compose stack (`:5080` app, `:8025` Mailpit),
+  # outside `Kumunita.slnx` / `dotnet test` (no `src/**`, no `<PackageReference>`,
+  # no `.slnx` change — pin §5 #1/#2).
+  #
+  # SIGNUP-GATE PRECONDITION (recorded, NOT assumed done — pin §6 #1, ADR 0050):
+  #   Flow A (`signup_verify_login.e2e.ts`) requires the ADR 0050 signup gate to
+  #   be OPEN. The suite ASSERTS the gate state and fails fast with a named
+  #   message if it is closed — it does NOT mutate platform config (pin §5 #5,
+  #   the invariant held by U2/U3). Opening the gate is a write-lane action
+  #   through the admin surface (`SetSignupOpenAsync`); no deterministic CI-only
+  #   seam exists in this repo to flip it without a C# client + GlobalAdmin
+  #   credential, and the pin §5 #5 invariant forbids the suite from doing that
+  #   itself. So CI records the precondition here (a documented setup step, not
+  #   a silent assumption) and the operator opens the gate on the live box
+  #   before the job can run Flow A green. A 503 lockout in the suite is a
+  #   precondition/environment failure, never retried in a loop (pin §5 #6).
+  #
+  # Runs only on the same triggers as F14's `test` job (`release` push / PR).
+  # ---------------------------------------------------------------------------
+  e2e:
+    runs-on: ubuntu-latest
+    # The two env vars the E2E suite reads (pin §1). Defaults are already the
+    # compose stack's published ports; set them explicitly so the job is
+    # self-documenting and does not depend on the helper's in-code defaults.
+    env:
+      KUMUNITA_APP_URL: http://localhost:5080
+      KUMUNITA_MAILPIT_URL: http://localhost:8025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # CI plumbing (NOT a pinned gate command): install Node for the E2E
+      # project. The e2e project does NOT use a <PackageReference>; it is a
+      # standalone npm project with its own package.json + package-lock.json
+      # (F19.U2).
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Bring up the compose stack (the app + Mailpit + Postgres). `build`
+      # ensures the app image is current with the checked-out source. The
+      # volumes persist across runs on the same runner image — but CI runners
+      # are ephemeral, so the stack is freshly started each run.
+      - name: Bring up the compose stack
+        run: docker compose build app && docker compose up -d
+
+      # The F19.U1 §1 readiness gate (re-implemented in `e2e/global-setup.ts`
+      # by the suite itself, but we wait here too so a wedged boot fails
+      # FAST with a clear message rather than surfacing as a confusing spec
+      # failure). The app needs ~8 s after container start (Marten schema +
+      # Wolverine leadership, the AGENTS.md boot doctrine); Mailpit is up
+      # almost immediately.
+      - name: Wait for app + Mailpit readiness
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 90 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            if curl -fsS "http://localhost:5080/health" >/dev/null 2>&1 \
+              && curl -fsS "http://localhost:8025/api/v1/info" >/dev/null 2>&1; then
+              echo "Readiness gate: app + Mailpit both 200"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Readiness gate: app or Mailpit did not answer within 90 s — wedged boot (precondition failure, not a test failure)" >&2
+          exit 1
+
+      # SIGNUP-GATE PRECONDITION (see the job-level comment above; ADR 0050,
+      # pin §6 #1): the suite's Flow A spec asserts the gate state and fails
+      # fast with a named message if it is closed. The operator must open the
+      # gate on the live box (the admin settings surface — `SetSignupOpenAsync`
+      # write lane) before this job can drive Flow A green. This step is a
+      # DOCUMENTED setup note — not a silent assumption — and does NOT
+      # mutate the platform config (the suite's invariant, pin §5 #5).
+      - name: Signup-gate precondition (documented)
+        run: |
+          echo "::notice::F19.E2E Flow A requires the ADR 0050 signup gate to be OPEN."
+          echo "::notice::If the gate is closed, the suite fails fast with a named precondition message (it does not open the gate itself — pin §5 #5)."
+          echo "::notice::Open the gate via the admin settings surface (SetSignupOpenAsync write lane) before this job can run Flow A green."
+          echo "::notice::A 503 lockout in the suite is a precondition failure, never retried in a loop (pin §5 #6)."
+
+      # Resolve the E2E project's deps (its own package-lock.json — F19.U2).
+      - name: Install E2E deps
+        run: npm --prefix e2e ci
+
+      # Run the suite: both pinned specs (F19.U2 `signup_verify_login.e2e.ts`
+      # Flow A + F19.U3 `post_write.e2e.ts` Flow B).
+      - name: Run E2E suite
+        run: npm --prefix e2e run test
