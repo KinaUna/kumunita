@@ -56,9 +56,23 @@ export async function writePostViaBrowser(
   await form.waitFor({ state: 'visible', timeout: 15_000 });
 
   // Fill the required `Title` (optional in the model but the spec fills it
-  // for the rendered-evidence assertion) and the required `Body`.
+  // for the rendered-evidence assertion).
   await page.fill('input[name="Title"]', input.title);
-  await page.fill('textarea[name="Body"]', input.body);
+
+  // The `Body` is a WYSIWYG rich editor (ADR 0031–0033): the source
+  // `<textarea name="Body">` is the data carrier the server binds, but the
+  // binder hides it (`rc-editor-source-hidden`) and makes the contenteditable
+  // pane (`[data-rich-editor-preview]`) the editing surface. A real user types
+  // into the pane; the pane's `input` listener syncs it to the textarea
+  // (`textarea.value = toMarkdown(previewPane.innerHTML)`). `page.fill()` on
+  // the hidden textarea fails the visibility check, so drive the pane the way
+  // a user does: focus it, then type (plain text — the editor's `beforeinput`
+  // inline-formatting path is only armed after a toolbar click, so plain
+  // typing lands verbatim and fires the `input` sync).
+  const bodyPane = page.locator('[data-rich-editor-preview]');
+  await bodyPane.waitFor({ state: 'visible', timeout: 15_000 });
+  await bodyPane.click();
+  await page.keyboard.type(input.body);
 
   // The `ComponentId` select is `required` (the view). The seeded
   // neighborhood has components — the first option is a valid choice (the
