@@ -96,21 +96,28 @@ test('resident signs up, verifies via the Mailpit link, logs in, and publishes o
   // RedirectToAction(nameof(Login))) with the flash "Account created. Check
   // your inbox for the verification link." (the controller's L502
   // TempData["info"] — verified in AccountController.cs).
-  const signupResponse = await Promise.resolve(
-    // Scope to the signup form. The view is written as <form asp-action="Signup">
-    // (Views/Account/Signup.cshtml), but the Razor tag helper CONSUMES asp-action
-    // and emits action="/Account/Signup" — asp-action is NOT in the served HTML,
-    // so scope by the rendered action value (not form[asp-action=...], which
-    // matches nothing in a real browser).
-    page.click('form[action="/Account/Signup"] button[type="submit"]'),
+  // `page.click()` resolves to `void`, NOT the navigation Response — capture
+  // it with an armed `waitForResponse` (the correct Playwright idiom), not the
+  // click's return value (always `undefined`).
+  const signupResponsePromise = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().includes('/Account/Signup'),
+    { timeout: 15_000 },
   );
+  // Scope to the signup form. The view is written as <form asp-action="Signup">
+  // (Views/Account/Signup.cshtml), but the Razor tag helper CONSUMES asp-action
+  // and emits action="/Account/Signup" — so scope by the rendered action value
+  // (not form[asp-action=...], which matches nothing in a real browser).
+  await page.click('form[action="/Account/Signup"] button[type="submit"]');
+  const signupResponse = await signupResponsePromise;
   expect(
-    signupResponse,
-    'signup POST should produce a navigation response (a redirect to /account/login; a missing response is a real failure)',
-  ).toBeTruthy();
+    signupResponse.status(),
+    'signup POST should produce a response (a redirect to /account/login)',
+  ).toBeLessThan(500);
+  // waitForResponse resolves on the 302, before the browser finishes navigating
+  // — wait for the final URL so the assertion is deterministic.
+  await page.waitForURL(/\/account\/login/, { timeout: 10_000 });
   // The redirect target is /account/login (the controller's
   // RedirectToAction(nameof(Login)) — verified at AccountController.cs L232).
-  const loginUrl = signupResponse!.url ?? page.url();
   expect(
     page.url(),
     'after signup, the browser should be on /account/login (the controller\'s RedirectToAction(nameof(Login)))',
@@ -168,17 +175,20 @@ test('resident signs up, verifies via the Mailpit link, logs in, and publishes o
   await page.fill('input[name="Email"]', RUN_EMAIL);
   await page.fill('input[name="Password"]', RUN_PASSWORD);
 
-  const loginSubmitResponse = await Promise.resolve(
-    // Scope to the login form. The view is written as <form asp-action="Login">,
-    // but the Razor tag helper CONSUMES asp-action and emits action="/Account/Login" —
-    // asp-action is NOT in the served HTML, so scope by the rendered action value.
-    // (Exact match also keeps this off the sibling LoginMfa form at /Account/LoginMfa.)
-    page.click('form[action="/Account/Login"] button[type="submit"]'),
+  const loginSubmitResponsePromise = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().includes('/Account/Login'),
+    { timeout: 15_000 },
   );
+  // Scope to the login form. The view is written as <form asp-action="Login">,
+  // but the Razor tag helper CONSUMES asp-action and emits action="/Account/Login"
+  // — so scope by the rendered action value (exact match also keeps this off the
+  // sibling LoginMfa form at /Account/LoginMfa).
+  await page.click('form[action="/Account/Login"] button[type="submit"]');
+  const loginSubmitResponse = await loginSubmitResponsePromise;
   // A 503 (ASP.NET Identity lockout) is a precondition/environment failure —
   // record it, do NOT retry (pin §5 invariant #6 + the repo memory
   // env-docker-ts7-and-portbind "rapid login POSTs trip the lockout").
-  if (loginSubmitResponse && loginSubmitResponse.status() === 503) {
+  if (loginSubmitResponse.status() === 503) {
     throw new Error(
       'login POST returned 503 (ASP.NET Identity lockout). This is a ' +
       'PRECONDITION/ENVIRONMENT failure (a prior run left the account in ' +
@@ -186,6 +196,9 @@ test('resident signs up, verifies via the Mailpit link, logs in, and publishes o
       'Reset the lockout on the compose volume and re-run.',
     );
   }
+  // waitForResponse resolves on the 302, before the browser finishes navigating
+  // — wait for the final URL so the assertion is deterministic.
+  await page.waitForURL(/\/profile\/edit/, { timeout: 10_000 });
   expect(
     page.url(),
     'after login, the browser should be on /profile/edit (the controller\'s Redirect("/profile/edit"))',

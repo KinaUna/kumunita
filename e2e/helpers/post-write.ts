@@ -66,25 +66,27 @@ export async function writePostViaBrowser(
   // sufficient, pin §2.1 step 5).
   await page.selectOption('select[name="ComponentId"]', { index: 0 });
 
-  // Submit and capture the response. The success path is a redirect
-  // (the controller's `Redirect(...)`); a validation re-render is a 200
-  // with the form still present — a real failure (the `Body` was empty, or
-  // a community was missing), not retried.
-  const response = await Promise.resolve(
-    page.click('#new-post-form button[type="submit"]'),
+  // Submit and capture the response. `page.click()` resolves to `void`,
+  // NOT the navigation Response — so the response is captured with an armed
+  // `waitForResponse` (the correct Playwright idiom), not the click's return
+  // value (always `undefined`). The success path is a redirect (3xx);
+  // a validation re-render is a 200 with the form still present — a real
+  // failure (the `Body` was empty, or a community the actor cannot post to),
+  // not retried (pin §5 #6).
+  const responsePromise = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().includes('/posts/new'),
+    { timeout: 15_000 },
   );
-  const redirectUrl = response?.redirectedFrom?.url ?? response?.url ?? '';
-
-  // Assert the response is a redirect (not a validation re-render). The
-  // Playwright `click` resolves to the navigation response; a 3xx
-  // redirectedFrom is the success signal.
-  if (!response) {
+  await page.click('#new-post-form button[type="submit"]');
+  const response = await responsePromise;
+  const status = response.status();
+  if (status < 300 || status >= 400) {
     throw new Error(
-      `writePostViaBrowser: no response captured on submit. The form ` +
-        `submission did not navigate — a real failure (the controller ` +
-        `returned a validation re-render, or the form was not in a ` +
-        `submittable state), NOT retried (pin §5 invariant #6).`,
+      `writePostViaBrowser: the write POST returned ${status}, not a ` +
+        `redirect. A 200 is a validation re-render (an empty Body, or a ` +
+        `community the actor cannot post to) — a real failure, NOT retried ` +
+        `(pin §5 invariant #6).`,
     );
   }
-  return redirectUrl;
+  return response.url();
 }

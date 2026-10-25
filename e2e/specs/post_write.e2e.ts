@@ -58,23 +58,27 @@ test('a signed-in resident publishes one post and it appears', async ({ page }) 
   await page.fill('input[name="Email"]', RESIDENT_EMAIL);
   await page.fill('input[name="Password"]', RESIDENT_PASSWORD);
 
-  const loginResponse = await Promise.resolve(
-    // Scope to the login form: the nav language-picker carries its own
-    // button[type="submit"] dropdown items, and an unscoped selector grabs
-    // the first (invisible) one and times out.
-    //
-    // The view is written as <form asp-action="Login"> (Views/Account/Login.cshtml),
-    // but the Razor tag helper CONSUMES asp-action and emits the routed
-    // action="/Account/Login" — asp-action is NOT present in the served HTML,
-    // so a form[asp-action=...] selector matches nothing in a real browser.
-    // Scope by the rendered action value instead (exact match also keeps
-    // this off the sibling LoginMfa form, which posts to /Account/LoginMfa).
-    page.click('form[action="/Account/Login"] button[type="submit"]'),
+  // `page.click()` resolves to `void`, NOT the navigation Response — so the
+  // response must be captured with an armed `waitForResponse` (the correct
+  // Playwright idiom), not from the click's return value (which is always
+  // `undefined` and would fail the truthy assertion even on a successful submit).
+  const loginResponsePromise = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().includes('/Account/Login'),
+    { timeout: 15_000 },
   );
+  // Scope to the login form: the nav language-picker carries its own
+  // button[type="submit"] dropdown items, and an unscoped selector grabs the
+  // first (invisible) one. The view is written as <form asp-action="Login">
+  // (Views/Account/Login.cshtml), but the Razor tag helper CONSUMES asp-action
+  // and emits action="/Account/Login" — so scope by the rendered action value
+  // (exact match also keeps this off the sibling LoginMfa form, which posts to
+  // /Account/LoginMfa).
+  await page.click('form[action="/Account/Login"] button[type="submit"]');
+  const loginResponse = await loginResponsePromise;
   // A 503 (ASP.NET Identity lockout) is a PRECONDITION/ENVIRONMENT failure —
   // record it, do NOT retry (pin §5 invariant #6 + the repo memory
   // env-docker-ts7-and-portbind "rapid login POSTs trip the lockout").
-  if (loginResponse && loginResponse.status() === 503) {
+  if (loginResponse.status() === 503) {
     throw new Error(
       'login POST returned 503 (ASP.NET Identity lockout). This is a ' +
       'PRECONDITION/ENVIRONMENT failure (a prior run left the resident ' +
@@ -83,9 +87,12 @@ test('a signed-in resident publishes one post and it appears', async ({ page }) 
     );
   }
   expect(
-    loginResponse,
-    'the login submit should produce a navigation response (a redirect to /profile/edit; a missing response is a real failure)',
-  ).toBeTruthy();
+    loginResponse.status(),
+    'the login POST should produce a response (a redirect to /profile/edit)',
+  ).toBeLessThan(500);
+  // waitForResponse resolves on the 302, before the browser finishes navigating
+  // — wait for the final URL so the assertion is deterministic.
+  await page.waitForURL(/\/profile\/edit/, { timeout: 10_000 });
   expect(
     page.url(),
     'after login, the browser should be on /profile/edit (the controller\'s Redirect("/profile/edit"))',
