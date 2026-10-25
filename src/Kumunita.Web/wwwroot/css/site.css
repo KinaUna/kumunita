@@ -2790,7 +2790,7 @@ html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
 /* A: page header (h1 + optional lede, action row on the right). */
 .airy-head { margin-bottom: 2.5rem; }
 .airy-head h1 {
-  font-size: 2.5rem;
+  font-size: 2.25rem;
   letter-spacing: -0.015em;
   line-height: var(--bs-heading-line-height);
   margin-bottom: 0;
@@ -3100,7 +3100,7 @@ html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
 
 /* Responsive collapse (mobile-first: single column until md+). */
 @media (max-width: 767.98px) {
-  .airy-head h1 { font-size: 2rem; }
+  .airy-head h1 { font-size: 1.75rem; }
   .airy-ann-row { grid-template-columns: 1fr; padding: 1.25rem 1.25rem; }
   .airy-ann-side { align-items: flex-start; }
   /* Edit left, Delete right on small screens (the base rule above stacks them
