@@ -140,6 +140,11 @@ public sealed class AccountController(
     /// </summary>
     [Authorize]
     [HttpGet]
+    // This controller uses conventional routing ({controller}/{action}), which
+    // would map the `ChangePassword` action to /account/changepassword. The
+    // documented URL (ADR 0138, the settings-tab nav link, the form's
+    // asp-action) is /account/password, so pin it explicitly.
+    [Route("account/password")]
     public async Task<IActionResult> ChangePassword()
     {
         var subject = SubjectId(User);
@@ -170,6 +175,9 @@ public sealed class AccountController(
     /// </summary>
     [Authorize]
     [HttpPost]
+    // Explicit route so the POST targets /account/password (matching the GET
+    // and the form's action) rather than the conventional /account/changepassword.
+    [Route("account/password")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
     {
