@@ -1,9 +1,19 @@
 {
-  "servers": {
-    "critter-stack-docs": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/home/agent/projects/Critter_Tools/mcp-server/src/index.js"]
-    }
-  }
+	"servers": {
+		"critter-stack-docs": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"/home/agent/projects/Critter_Tools/mcp-server/src/index.js"
+			]
+		},
+		"serena": {
+        "type": "stdio",
+        "command": "serena",
+        "args": [
+          "start-mcp-server",
+          "--context=vscode"
+        ]
+      }
+	}
 }
