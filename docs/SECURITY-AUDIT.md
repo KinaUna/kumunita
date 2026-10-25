@@ -102,8 +102,10 @@ served.
 - **D-1** Public surface is 80/443 + SSH (key-only) only. Postgres is
   unreachable from outside (OPS.md §10).
 - **D-2** HTTPS-only + HSTS present; `Content-Security-Policy: default-src
-  'self'` present; session cookie is `Secure`/`HttpOnly`/`SameSite=Lax`
-  (browser devtools → response headers + cookie attributes).
+  'self'` present; `X-Content-Type-Options: nosniff` + `Referrer-Policy`
+  present (the F7 global floor — every response carries them); session
+  cookie is `Secure`/`HttpOnly`/`SameSite=Lax` (browser devtools → response
+  headers + cookie attributes).
 - **D-3** Rate limiting is active **and** partitioning by real client IP —
   the reverse proxy forwards `X-Forwarded-For` and the app trusts it; a burst
   test from one IP is throttled without another client feeling it (OPS.md §10
