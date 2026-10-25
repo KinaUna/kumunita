@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 # F22 two-role split (ADR 0171) — step 2 + step 3 (schema pre-creation + grants).
 #
+# Prod (Coolify) equivalent of this whole 01+02 layout: `00-coolify-init-template.sql`
+# (the same shape as a one-shot init script for the Coolify Postgres addon —
+# docs/COOLIFY.md §4 step 5).
+#
 # Runs in /docker-entrypoint-initdb.d on a fresh data directory, AFTER 01-app-role.sql
 # (which created the roles + the `kumunita` database owned by `kumunita_migrate`).
 # This is a .sh (not .sql) because it must target the *app* database (`kumunita`),

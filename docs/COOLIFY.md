@@ -88,21 +88,24 @@ hardening violation (OPS §10).
 4. **Bootstrap superuser `postgres`**: set a **strong unique** password on
 first creation (`POSTGRES_PASSWORD`). `postgres` is **admin/restore-only**
 (OPS §5) and **never** the app connection.
-5. **Create the migration role + app role + database so the migration role is the database *owner*** (Open console on the addon). The two-role split (**ADR 0171** / F22) separates DDL from DML: `kumunita_migrate` owns the DB + the `mt` / `identity` schemas and is the only role that runs DDL; the app role `kumunita` is DML, with one **forced exception** — `CREATE` on the `mt` schema only (so Wolverine + Marten can create their `mt.wolverine_*` / `mt.mt_*` tables **as the app role** during `app.StartAsync()`). Exactly this shape, mirroring `dev-db-init/01-app-role.sql` + `dev-db-init/02-app-schemas.sh`:
-```
+5. **Create the migration role + app role + database ownership with one init script.** First, set the addon's **Initial database** field to `kumunita` (instead of the default `postgres`) — this makes the postgres image auto-create the `kumunita` database *and* run your init script inside it, which is where `CREATE SCHEMA` is valid (it's a per-database operation). Then paste the template below into the addon's **Initialization scripts** field (General → Initialization scripts), replacing only the two `<strong-…-password>` placeholders:
+```sql
 CREATE ROLE kumunita_migrate LOGIN PASSWORD '<strong-migrate-password>';
-CREATE ROLE kumunita LOGIN PASSWORD '<strong-app-password>';
-CREATE DATABASE kumunita OWNER kumunita_migrate;
+CREATE ROLE kumunita        LOGIN PASSWORD '<strong-app-password>';
+-- Transfer ownership of the auto-created `kumunita` database to the migration role:
+ALTER DATABASE kumunita OWNER TO kumunita_migrate;
 GRANT CONNECT ON DATABASE kumunita TO kumunita;
--- then, in the `kumunita` database:
+-- Pre-create the `mt` schema, owned by the migration role (the forced exception —
+-- the app role gets CREATE on it so Wolverine + Marten can create their tables at boot):
 CREATE SCHEMA mt AUTHORIZATION kumunita_migrate;
-GRANT USAGE, CREATE ON SCHEMA mt TO kumunita;   -- the forced exception (no `identity` grant)
+GRANT USAGE, CREATE ON SCHEMA mt TO kumunita;
 ```
+This is the two-role split (**ADR 0171** / F22) in its entirety: `kumunita_migrate` owns the DB + the `mt` schema and is the only role that runs DDL; the app role `kumunita` is DML, with one **forced exception** — `CREATE` on the `mt` schema only (so Wolverine + Marten can create their `mt.wolverine_*` / `mt.mt_*` tables **as the app role** during `app.StartAsync()`). The `identity` schema is deliberately **not** pre-created here — the app's fresh-boot signal ("identity schema absent") must stay true; EF creates it at first boot as `kumunita_migrate` (the DB owner). The shape mirrors `dev-db-init/01-app-role.sql` + `dev-db-init/02-app-schemas.sh` (the dev-compose equivalent).
 
-(Coolify's "username/password" fields provision the non-superuser app role; create the **migrate** role + make it the **database owner** in the console — this is the one step the addon doesn't do out of the box. Ownership-by-migrate-role means DDL at boot needs no elevated/rights dance, and the app role is refused `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE` (SQLSTATE `42501`). See OPS §10 "DB user".)
+(The init script runs **once, on first boot only** — the postgres image executes its `/docker-entrypoint-initdb.d/` files only against a fresh, empty data directory. Ownership-by-migrate-role means DDL at boot needs no elevated/rights dance, and the app role is refused `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE` (SQLSTATE `42501`). See OPS §10 "DB user".)
 
 6. Store **both** `<strong-migrate-password>` and `<strong-app-password>` in the secrets manager (OPS Procedures 1–2).
-7. Verify both paths: `kumunita_migrate` → `kumunita` (owns the DB; `mt` / `identity` owned by it), and `kumunita` → `kumunita` (can `CREATE TABLE` in `mt` + `INSERT`/`SELECT`, but is **refused** `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE`).
+7. Verify both paths: `kumunita_migrate` → `kumunita` (owns the DB; `mt` owned by it — and, after the app's first boot, `identity` too, which EF creates as this role), and `kumunita` → `kumunita` (can `CREATE TABLE` in `mt` + `INSERT`/`SELECT`, but is **refused** `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE`).
 
 8. Backing up the database is **procedure 4** (OPS) — the addon's backup task
 writes to object storage, not only this VPS.
