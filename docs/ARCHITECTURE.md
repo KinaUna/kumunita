@@ -136,7 +136,22 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
         ├── Kumunita.Core.Tests/    # XUnit; PostgresFixture = one shared postgres:18 per class,
         │                           #   fresh scratch DB per test (matches prod db image)
         └── Kumunita.Web.Tests/     # XUnit; controller + view-model + config-binding tests, plus
-                                      # Playwright e2e (e2e-m2.spec.ts, e2e-m3.spec.ts, §7)
+                                      # in-process Playwright specs
+                                      # (e2e-m2.spec.ts, e2e-m3.spec.ts,
+                                      # e2e-m4.spec.ts — the per-milestone
+                                      # happy-path specs)
+
+  e2e/                              # F19 (E2E) — the standalone Playwright harness
+                                    # (its own package.json + playwright.config.ts
+                                    # + global-setup.ts readiness gate + specs/
+                                    #  signup_verify_login.e2e.ts +
+                                    #  post_write.e2e.ts), driving the compose app
+                                    # on :5080 + Mailpit on :8025; NOT in
+                                    # Kumunita.slnx, NOT invoked by `dotnet test`,
+                                    # NOT a dependency of the .NET build; the
+                                    # F14 CI gate's `dotnet exec` shape is
+                                    # untouched — the e2e job is a separate step
+                                    # in `.github/workflows/ci.yml`.
 
 Two projects. `Core` holds all business logic behind interfaces and never references
 ASP.NET HTTP types — keeping it testable and leaving the door open for a future API/MCP
@@ -536,6 +551,10 @@ Localization (ADR 0005 — languages and translations are data, not env)
   LocaleSettings      { defaultLanguageCode }                                  # singleton document
   TranslationResource { key, languageCode, text }                              # UI strings
   LocalizedPage       { slug, languageCode, title, body: Markdown, updated }   # terms, about, help
+                                         # (retired — ADR 0043 SP moved the four
+                                         # canonical system pages to `Page` rows
+                                         # with `PageKind.System`; `LocalizedPage`
+                                         # is kept only for the historical record
 
 Moderation / audit
   Report           { id, targetKind, targetId, reporterId, reason, assignedModeratorId?,
@@ -689,6 +708,26 @@ Env contract:
                              # login ("set your password" doubles as first login); env
                              # never holds a reusable admin credential. See OPS.md §2
   ConnectionStrings__Kumunita
+  # Prod-hardening lane (F1–F22) — optional; each degrades to the pre-lane
+  # baseline (byte-identical) when unset. See the F22 blockquote above (the
+  # ADR 0171 two-role split) and OPS.md §10 for the full knob set.
+  ConnectionStrings__KumunitaMigrate   # F22 (DB-18) — the kumunita_migrate
+                                        # role's DSN; read by SchemaBootstrap
+                                        # .ApplyAsync + the Program.cs boot
+                                        # path; unset ⇒ single-role baseline.
+  SENTRY_DSN                           # F10 — the Sentry.AspNetCore error-
+                                        # tracker DSN; unset ⇒ no registration.
+  VirusScan__Host / VirusScan__Port    # F16 — the ClamAV daemon endpoint;
+                                        # unset ⇒ the IVirusScanner seam is
+                                        # absent, the serve-lane gate is
+                                        # fail-open.
+  MailSuppression__IngestToken         # F17 — the bearer token the
+                                        # POST /api/mail/suppress ingest
+                                        # route requires; unset ⇒ the route
+                                        # is not registered.
+  DbTls__SslMode / DbTls__CaPath       # F21 — app↔DB TLS; unset ⇒ the
+                                        # connection string is byte-identical
+                                        # to the pre-lane baseline.
 
 First run (versioned migrations + seeder): apply Marten migrations -> apply Identity
 migrations -> create GlobalAdmin for SeedAdmin__Email with the token as the one-time
