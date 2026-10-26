@@ -73,7 +73,7 @@
             <partial name="_NoteButton" model="@_pn" />
         </div>
 
-        <div class="airy-ann-list">
+        <div class="kmb-ann-list">
             @* The shared sort control (the _Sort partial) sits at the TOP of
                the feed — above the list — so the sort options are the first
                thing the viewer sees (it renders nothing when the VM field is
@@ -84,15 +84,12 @@
             }
             @if (Model.Announcements.Count == 0)
             {
-                <div class="p-4 text-muted">
-                    <kw-l key="announcements.empty">No announcements yet.</kw-l>
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="announcements.empty">No announcements yet.</kw-l></p>
                 </div>
             }
             @foreach (var a in Model.Announcements)
             {
-                var badgeClass = a.Scope == AnnouncementScope.Public
-                    ? "text-bg-secondary"
-                    : "text-bg-primary";
                 // Edit affordance — mirrors the controller's CanEditAnnouncement
                 // (and the service's EnsureEditPermissionAsync gate at POST):
                 // Public → GlobalAdmin; flat "all residents" (Community, no
@@ -109,29 +106,28 @@
                     ? char.ToUpperInvariant(a.AuthorDisplayName.TrimStart()[0]).ToString()
                     : string.Empty;
 
-                @* The body is long by design (a pinned announcement can
-                   run to pages) — the list shows only the first 250
-                   characters; the full text lives at the row's detail
-                   view (GET /announcements/{id}). *@
-                <div class="airy-ann-row">
-                    <div>
-                        <h3 class="airy-ann-title">
-                            <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })">@a.Title</a>
-                        </h3>
-                        <p class="airy-ann-preview mb-2">
-                            @MarkdownRenderer.PlainTextPreview(a.Body, 250)
-                            <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })"><kw-l key="announcements.read_more">Read more…</kw-l></a>
-                        </p>
-                        <div class="airy-ann-meta">
-                            <span class="d-inline-flex align-items-center">
-                                <kw-avatar subject="@a.AuthorSubjectId" mono="@authorAvatarInitial" />
-                            </span>
-                            <span>@a.AuthorDisplayName — <kw-dt dt="@a.Created" format="g"></kw-dt></span>
-                        </div>
-                    </div>
-                    <div class="airy-ann-side">
-                        <div class="d-flex gap-2 flex-wrap justify-content-end">
-                            <span class="badge @badgeClass">
+                @* ADR 0183 — the announcement card (the feed card pattern,
+                   ADR 0175): author header (44px avatar, name, date, scope and
+                   pinned chips) -> title -> preview -> quiet actions. The body
+                   is long by design (a pinned announcement can run to pages) —
+                   the list shows only the first 250 characters; the full text
+                   lives at the row's detail view (GET /announcements/{id}). *@
+                <article class="airy-post-card kmb-ann-card@(a.Pinned ? " is-pinned" : "")">
+                    <div class="airy-post-head">
+                        <kw-avatar subject="@a.AuthorSubjectId" mono="@authorAvatarInitial"
+                                  mono-hue="@AvatarHue.For(a.AuthorSubjectId)" />
+                        <span class="airy-post-author">
+                            <span class="name">@a.AuthorDisplayName</span>
+                            <span class="when"><kw-dt dt="@a.Created" format="g"></kw-dt></span>
+                        </span>
+                        <span class="kmb-ann-chips">
+                            @if (a.Pinned)
+                            {
+                                <span class="kmb-chip kmb-chip-pinned" title="Shown as a banner at the top of every page">
+                                    <kw-l key="announcements.pinned_badge">pinned</kw-l>
+                                </span>
+                            }
+                            <span class="kmb-chip">
                                 @if (a.Scope == AnnouncementScope.Public)
                                 {
                                     <kw-l key="announcements.scope_everyone">everyone</kw-l>
@@ -145,14 +141,22 @@
                                     <kw-l key="announcements.scope_residents">residents</kw-l>
                                 }
                             </span>
-                            @if (a.Pinned)
-                            {
-                                <span class="badge text-bg-warning" title="Shown as a banner at the top of every page">
-                                    <kw-l key="announcements.pinned_badge">pinned</kw-l>
-                                </span>
-                            }
-                        </div>
-                        <div class="airy-ann-actions">
+                        </span>
+                    </div>
+                    <h3 class="airy-post-title">
+                        <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })">@a.Title</a>
+                    </h3>
+                    <p class="airy-post-preview mb-0">
+                        @MarkdownRenderer.PlainTextPreview(a.Body, 250)
+                        <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })"><kw-l key="announcements.read_more">Read more…</kw-l></a>
+                    </p>
+                    @if (canEdit || isGlobalAdmin)
+                    {
+                        @* Edit / Delete stay in different places (ADR 0017 edit
+                           lane + the admin delete lane): Edit at the start of
+                           the row, Delete at the end, so a misclick on one
+                           can't hit the other. *@
+                        <div class="airy-post-foot kmb-ann-actions">
                             @if (canEdit)
                             {
                                 <a class="link-quiet small text-decoration-none" href="/announcements/@a.Id/edit">
@@ -163,7 +167,7 @@
                             {
                                 <form method="post" action="/announcements/@a.Id/delete"
                                       data-confirm="@confirmDelete"
-                                      style="margin:0; display:inline;">
+                                      class="ms-auto" style="margin:0; display:inline;">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="link-quiet small text-danger text-decoration-none border-0 bg-transparent p-0">
                                         <kw-l key="announcements.delete">Delete</kw-l>
@@ -171,8 +175,8 @@
                                 </form>
                             }
                         </div>
-                    </div>
-                </div>
+                    }
+                </article>
             }
 
             @* M7 (ADR 0090 D5/D6) — the paged list's pager (F2 one-page

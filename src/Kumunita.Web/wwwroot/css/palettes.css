@@ -579,3 +579,27 @@ html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link:hover { color: var(--kmb
 @media (max-width: 575.98px) {
   html[data-kmb-palette] form > .card > .card-body { padding: 1rem; }
 }
+
+/* Announcements (ADR 0183) — the feed card, plus a pinned accent. */
+.kmb-ann-list { display: flex; flex-direction: column; gap: var(--kmb-feed-gap); }
+html[data-kmb-palette] .kmb-ann-card.is-pinned {
+  border-inline-start: 4px solid var(--kmb-accent);
+}
+.kmb-ann-chips {
+  margin-inline-start: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+html[data-kmb-palette] .kmb-chip-pinned {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+}
+.kmb-ann-actions { padding-top: 0.5rem; }
+html[data-kmb-palette] .kmb-ann-actions .link-quiet:hover { color: var(--kmb-accent); }
+@media (max-width: 575.98px) {
+  /* Chips drop under the author line instead of squeezing the name. */
+  .kmb-ann-card .airy-post-head { flex-wrap: wrap; }
+  .kmb-ann-chips { margin-inline-start: 0; justify-content: flex-start; flex-basis: 100%; }
+}
