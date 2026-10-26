@@ -67,9 +67,7 @@
                                     @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
                                     {
                                         <span class="d-inline-flex align-items-center mt-1">
-                                            <img class="avatar avatar-sm" src="/profile/avatar/@card.AssigneeId" alt=""
-                                                 data-avatar-fallback>
-                                            <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
+                                            <kw-avatar subject="@card.AssigneeId" mono="@assigneeInitial" size="sm" />
                                         </span>
                                     }
                                     <div class="flex-grow-1">

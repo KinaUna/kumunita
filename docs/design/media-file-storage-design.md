@@ -495,6 +495,24 @@ Notes: `ClaimTypes` here is the repo's custom claim names (same as `Edit()`);
 `403`) is the repo's fail-closed idiom (matches `PreviewAsAsync` returning
 `null` → the caller's 404). **This** action is C-MED·1/2/3 in code.
 
+> **Rendered-slot rule (added 2026-10-26 — ADR 0011 Amendment, 2026-10-26).**
+> The action above is the *serving* contract — unchanged, and still the
+> fail-closed 404 for a direct URL with no profile / blocked profile / no
+> avatar set (FACES M3–M5). **How views render** an avatar slot is now a
+> separate, equally pinned rule: every resident-avatar slot renders through
+> the `<kw-avatar>` TagHelper
+> (`src/Kumunita.Web/TagHelpers/AvatarTagHelper.cs`), which asks the
+> `IAvatarPresenceChecker`
+> (`src/Kumunita.Web/Security/AvatarPresenceChecker.cs`) whether the avatar
+> resolves and only then writes the `<img>`. Present → the `<img>` at this
+> serving lane + the hidden `.avatar-mono` sibling; absent → the monogram
+> circle (or nothing) — **no `<img>`, no doomed 404 request**. A follow-on
+> lane that needs an avatar-style slot (the group-logo / badge-icon lanes
+> named under "Follow-on lanes" below) should copy the `<kw-avatar>` idiom
+> rather than shipping a raw `<img>` + a client-side `onerror` handler.
+> `client/lib/avatar.ts` is retained (SECURITY.md §6 — no inline `on*`) as
+> the secondary fallback for the present case.
+
 ### §2.4 Upload rule (U6)
 
 `ProfileController.AvatarUpload` (owner-scoped, self-only — C-MED·8):
@@ -645,6 +663,22 @@ volume) in §4 backups and §5 restore; `ARCHITECTURE.md` §2/§3/§5 (Media mod
 row, feature-module list, `MediaObject` POC, "one database + one volume");
 `README.md` status + features + ADR range (0001–0011). Per §2.7 rule 6 the
 ADR conformed to this doc — no drift guard fired against it.
+
+**Amendment note (2026-10-26 — see ADR 0011 Amendment, 2026-10-26).** The
+U8 "avatar form + `<img src="/profile/avatar/{subject}">` + monogram
+fallback" deliverable has been refined: the *rendering* of an avatar slot is
+now driven by a server-side presence check (the `<kw-avatar>` TagHelper +
+`IAvatarPresenceChecker`) so a resident without an avatar renders the
+monogram directly and the browser makes no request that 404s — fixing the
+flood of `GET /profile/avatar/… 404` lines in the dev-tools console. The
+*endpoint* contract in §2.3 (the `GET /profile/avatar/{subjectId}` action,
+its FACES M1–M6 outcomes, and its 404-for-no-avatar/blocked/unknown shape) is
+**unchanged**, and every other decision in this doc (storage primitive,
+HTTP-free seam, content-hash integrity, two-restore-surface backup, the
+`POST /profile/avatar` upload lane) is unchanged. The "reference-consumer"
+pin now covers both the serving lane (§2.3) and the rendering lane
+(`<kw-avatar>`); the "how views render" pointer is recorded at the end of
+§2.3.
 
 **Follow-on lanes — deliberately NOT shipped here** (Scope; each reuses
 §2.1–2.4, §2.7-7; each gets its own design doc + units before its first unit):

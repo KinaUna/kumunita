@@ -61,18 +61,12 @@
                 : string.Empty;
         }
         <div class="d-flex align-items-center gap-3">
-            @if (!string.IsNullOrEmpty(avatarSubject) && (bool?)ViewData["HasAvatar"] == true)
-            {
-                <span class="d-inline-flex align-items-center">
-                    <img class="avatar avatar-lg" src="/profile/avatar/@avatarSubject" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono avatar-lg" style="display:none;">@avatarInitial</span>
-                </span>
-            }
-            else
-            {
-                <span class="avatar-mono avatar-lg">@avatarInitial</span>
-            }
+            @* The <kw-avatar> TagHelper resolves the present/absent decision
+               server-side (the avatar PresenceChecker, ADR 0057) — present
+               renders the <img> (+ the hidden monogram fallback), absent
+               renders the monogram circle directly, so no doomed 404 request
+               is made. No separate ViewData["HasAvatar"] gate needed. *@
+            <kw-avatar subject="@avatarSubject" mono="@avatarInitial" size="lg" />
             <form method="post" action="/profile/avatar" enctype="multipart/form-data" data-avatar-upload>
                 @Html.AntiForgeryToken()
                 <div class="d-flex align-items-center gap-2 flex-wrap">

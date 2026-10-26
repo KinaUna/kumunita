@@ -42,7 +42,8 @@ namespace Kumunita.Web.Controllers;
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
 public sealed class AdminSiteController(
     ISiteContentService site,
-    ILocalizationService? localization = null) : Controller
+    ILocalizationService? localization = null,
+    Kumunita.Web.Services.PlatformPaletteProvider? palette = null) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -122,6 +123,10 @@ public sealed class AdminSiteController(
                 HomeShowFeatures    = current.HomeShowFeatures,
                 HomeShowRoadmap     = current.HomeShowRoadmap,
             },
+            Appearance = new AdminSiteViewModel.AppearanceSection
+            {
+                DefaultPalette = Kumunita.Web.Security.PaletteCookie.Normalize(current.DefaultPalette),
+            },
             About = new AdminSiteViewModel.AboutSection
             {
                 AboutHeroEyebrow    = current.AboutHeroEyebrow,
@@ -176,6 +181,7 @@ public sealed class AdminSiteController(
             AboutShowProject    = current.AboutShowProject,
             AboutShowWhatsNew   = current.AboutShowWhatsNew,
             AboutShowContactCta = current.AboutShowContactCta,
+            DefaultPalette      = current.DefaultPalette, // ADR 0175: unchanged (the save is partial)
         }, actor);
         TempData["info"] = "The home page's hero text and section toggles have been saved.";
         return RedirectToAction(nameof(Index));
@@ -214,8 +220,31 @@ public sealed class AdminSiteController(
             HomeShowAboutButton = current.HomeShowAboutButton,
             HomeShowFeatures    = current.HomeShowFeatures,
             HomeShowRoadmap     = current.HomeShowRoadmap,
+            DefaultPalette      = current.DefaultPalette, // ADR 0175: unchanged (the save is partial)
         }, actor);
         TempData["info"] = "The about page's hero text and section toggles have been saved.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// <c>POST /admin/site/save-palette</c> — saves the platform's default colour
+    /// palette (ADR 0175 D3). Same partial-save shape as <see cref="SaveHome"/> /
+    /// <see cref="SaveAbout"/>: every other field passes through unchanged, one
+    /// <c>AccessAudit</c> row (<c>site.save</c>). The value is normalized so a
+    /// tampered field can never store an unknown palette. The cached read in
+    /// <c>PlatformPaletteProvider</c> is invalidated so the change is live on the
+    /// very next render.
+    /// </summary>
+    [HttpPost("save-palette")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SavePalette(AdminSiteViewModel.AppearanceSection appearance)
+    {
+        var actor = ActorId(User) ?? string.Empty;
+        var current = await site.GetAsync();
+        current.DefaultPalette = Kumunita.Web.Security.PaletteCookie.Normalize(appearance.DefaultPalette);
+        await site.SaveAsync(current, actor); // SaveAsync copies the full field set, DefaultPalette included
+        palette?.Invalidate();
+        TempData["info"] = "The platform's default palette has been saved.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -385,6 +414,9 @@ public sealed class AdminSiteController(
 
         public AboutSection About { get; init; } = new();
 
+        /// <summary>The appearance form section (ADR 0175).</summary>
+        public AppearanceSection Appearance { get; init; } = new();
+
         // ── ADR 0157 — the SITE-2 hero-translation section ─────────────
         // [BindNever] — the translation write lanes are dedicated POST
         // actions (the add / update / remove shape, the ADR 0022 / ADR 0048
@@ -430,6 +462,13 @@ public sealed class AdminSiteController(
             public bool HomeShowFeatures { get; init; }
 
             public bool HomeShowRoadmap { get; init; }
+        }
+
+        /// <summary>The appearance form section (ADR 0175): the platform's
+        /// default palette (<c>forest</c> | <c>ember</c>).</summary>
+        public sealed class AppearanceSection
+        {
+            public string DefaultPalette { get; init; } = "forest";
         }
 
         /// <summary>The <c>/about</c> form section — the About text fields

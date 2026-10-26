@@ -214,36 +214,41 @@
                     string authorAvatarInitial = !string.IsNullOrWhiteSpace(p.AuthorDisplayName)
                         ? char.ToUpperInvariant(p.AuthorDisplayName.TrimStart()[0]).ToString()
                         : string.Empty;
+                    @* ADR 0175 — the feed card: author header (44px avatar, name,
+                       date, community chip) -> title -> preview -> footer. The
+                       avatar slot keeps the <kw-avatar> presence idiom; the
+                       stable per-resident monogram colour (Security/AvatarHue)
+                       rides on its data-hue attribute. *@
                     <div class="airy-post-card">
-                        <div class="airy-post-title">
-                            <a href="@Url.Action("Detail","Posts", new { id = p.Id })">
-                                @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
-                            </a>
+                        <div class="airy-post-head">
+                            <kw-avatar subject="@p.AuthorSubjectId" mono="@authorAvatarInitial"
+                                      mono-hue="@AvatarHue.For(p.AuthorSubjectId)" />
+                            <span class="airy-post-author">
+                                <span class="name">@p.AuthorDisplayName</span>
+                                <span class="when"><kw-dt dt="@p.Created" format="g"></kw-dt></span>
+                            </span>
                             @if (!string.IsNullOrEmpty(p.ComponentName))
                             {
                                 @if (!string.IsNullOrEmpty(p.ComponentId))
                                 {
-                                    <a class="badge text-bg-light ms-2 text-decoration-none airy-post-chip"
+                                    <a class="kmb-chip"
                                        href="@Url.Action("Index","Posts", new { componentId = p.ComponentId })"
                                        title="@p.ComponentName">@p.ComponentName</a>
                                 }
                                 else
                                 {
-                                    <span class="badge text-bg-light ms-2 airy-post-chip" title="@p.ComponentName">@p.ComponentName</span>
+                                    <span class="kmb-chip" title="@p.ComponentName">@p.ComponentName</span>
                                 }
                             }
                         </div>
-                        <p class="airy-post-preview mb-0">@p.BodyPreview</p>
-                        <div class="airy-post-meta">
-                            <span class="d-inline-flex align-items-center">
-                                <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
-                                     data-avatar-fallback>
-                                <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
-                            </span>
-                            <span>@p.AuthorDisplayName</span>
-                            <span>·</span>
-                            <span><kw-dt dt="@p.Created" format="g"></kw-dt></span>
+                        <div class="airy-post-title">
+                            <a href="@Url.Action("Detail","Posts", new { id = p.Id })">
+                                @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
+                            </a>
                         </div>
+                        <p class="airy-post-preview mb-0">@p.BodyPreview</p>
+                        @* TODO (ADR 0175): <div class="airy-post-foot"> with the reply count
+                           and the bookmark button once PostListItem carries the reply count. *@
                     </div>
                 }
             </div>

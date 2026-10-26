@@ -180,9 +180,7 @@
                                 : string.Empty;
                             <div class="mb-1">
                                 <span class="d-inline-flex align-items-center">
-                                    <img class="avatar avatar-sm" src="/profile/avatar/@row.AssigneeId" alt=""
-                                         data-avatar-fallback>
-                                    <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
+                                    <kw-avatar subject="@row.AssigneeId" mono="@assigneeInitial" size="sm" />
                                 </span>
                             </div>
                         }

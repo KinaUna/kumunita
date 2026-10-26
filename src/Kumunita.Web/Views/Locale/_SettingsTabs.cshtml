@@ -25,6 +25,12 @@
         ("settings.messaging.title", "Messaging",         "/settings/messaging"),
         ("nav.children",             "Children",          "/me/children"),
         ("nav.change_password",      "Change password",   "/account/password"),
+        // ADR 0174 — the per-resident Security tab (the MFA enrollment + session
+        // management surface at /settings/security/mfa, SecuritySettingsController).
+        // Previously reached only by deep-linking the /settings/security/mfa URL;
+        // now a first-class settings tab so the resident can set up or change MFA
+        // from the settings strip.
+        ("settings.security.title",  "Security",          "/settings/security/mfa"),
         // M27 (ADR 0148) — the resident's own backup/restore surface: export
         // their authored content to a *.kumunita archive, or import one back.
         ("nav.my_data",              "My data",           "/account/portability"),
@@ -36,6 +42,15 @@
     var activeLabel = (controller, action) switch
     {
         ("Guardian", _)                   => "Children",
+        // ADR 0174 — the Security tab owns the MFA enrollment + session
+        // management surface. The controller is SecuritySettings; the Mfa
+        // action family covers the /settings/security/mfa URL set (the
+        // Sessions surface re-uses the same tabs strip).
+        ("SecuritySettings", "Mfa")            => "Security",
+        ("SecuritySettings", "MfaRecovery")    => "Security",
+        ("SecuritySettings", "MfaRotateRecovery") => "Security",
+        ("SecuritySettings", "MfaDisable")     => "Security",
+        ("SecuritySettings", "Sessions")       => "Security",
         ("Kiosk",    "SettingsGet")       => "Kiosk",
         ("Kiosk",    "SettingsPost")      => "Kiosk",
         ("Account",  "ChangePassword")    => "Change password",

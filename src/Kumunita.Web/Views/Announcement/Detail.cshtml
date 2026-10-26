@@ -446,9 +446,7 @@
             }
             <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                    <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial" />
                 </span>
                 <span>
                     <kw-l key="announcements.by">by</kw-l> @Model.AuthorDisplayName — <kw-dt dt="@Model.Created" format="g"></kw-dt>
@@ -494,7 +492,7 @@
                             <div class="list-group-item">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="d-inline-flex align-items-center me-2">
-                                        <img class="avatar avatar-sm" src="/profile/avatar/@c.AuthorId" alt="" data-avatar-fallback>
+                                        <kw-avatar subject="@c.AuthorId" size="sm" />
                                     </div>
                                     <div>
                                         <div class="d-flex align-items-center gap-1">

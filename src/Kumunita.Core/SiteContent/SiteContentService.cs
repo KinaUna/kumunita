@@ -72,6 +72,7 @@ public sealed class SiteContentService : ISiteContentService
         stored.AboutShowProject    = content.AboutShowProject;
         stored.AboutShowWhatsNew   = content.AboutShowWhatsNew;
         stored.AboutShowContactCta = content.AboutShowContactCta;
+        stored.DefaultPalette      = content.DefaultPalette; // ADR 0175
 
         session.Store(stored);
 

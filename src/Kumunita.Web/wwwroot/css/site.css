@@ -199,9 +199,18 @@
   --kmb-tint-b: #f6f1e7;     /* warm cream section band          */
   --kmb-border: #dde3dd;
   --kmb-border-soft: #e6e4dd;  /* hairline separators (row borders inside cards) */
-  --kmb-radius: 12px;          /* cards, panels */
+  /* ADR 0175 — the rounder scale: 16px cards, pill buttons/chips, 12px inputs.
+     TODO: --kmb-radius moves 12px -> 16px for EVERY card; screenshot the
+     directory, groups, events and kanban surfaces before merging. */
+  --kmb-radius: 16px;          /* cards, panels */
   --kmb-radius-lg: 16px;       /* large ledger containers */
-  --kmb-radius-chip: 8px;      /* pills, list-item targets, small panels */
+  --kmb-radius-chip: 8px;      /* list-item targets, small panels (NOT chips: see pill) */
+  --kmb-radius-pill: 999px;    /* buttons, chips, filter pills */
+  --kmb-radius-input: 12px;    /* form fields */
+  --kmb-surface: #ffffff;      /* card fill (light); dark scopes + palettes override */
+  --kmb-card-pad-y: 1.5rem;    /* ADR 0175: 24px card padding, 16px gap */
+  --kmb-card-pad-x: 1.5rem;
+  --kmb-feed-gap: 1rem;
   --kmb-hover-border: #c9d3ca; /* border on card/row hover */
   --kmb-hover-row: #fdfdfb;    /* row hover fill (announcements ledger)   */
   --kmb-space-section: clamp(4.5rem, 8vw, 7rem);
@@ -1320,6 +1329,7 @@ body.kmb-kiosk .head-row > .d-flex {
   font-weight: 600;
   letter-spacing: 0.01em;
   padding: 0.625rem 1.5rem;
+  border-radius: var(--kmb-radius-pill); /* ADR 0175: pill buttons */
 }
 
 /* Fully pill-shaped primary CTA (hero + CTA bands). */
@@ -2415,16 +2425,21 @@ html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
   box-shadow: 0 0 0 calc(var(--bs-focus-ring-width) * 0.75) var(--bs-focus-ring-color);
 }
 
-/* --- Avatar (media feature, U8) -------------------------------------------------------
-   Every avatar <img> carries the app endpoint /profile/avatar/{subjectId}
-   as its src (C-MED·3 — served only through the audited serving lane, never
-   When that endpoint fails closed to a 404 (no avatar set,
-   a blocked profile, or a denied audience — FACES M3–M5), the
-   client/lib/avatar.ts module (loaded in the _Layout as ~/js/lib/avatar.js;
-   SECURITY.md §6 — no inline on*) hides the <img> marked
-   data-avatar-fallback and .avatar-mono, a sibling rendered server-side
-   (the resident's initial, or an empty circle when the surface has no
-   display-name channel), takes its place — no broken-image icon. */
+/* --- Avatar (media feature, U8; the kw-avatar presence lane) ------------------------
+   Every avatar slot renders through the <kw-avatar> TagHelper, which checks
+   server-side (the IAvatarPresenceChecker, ADR 0057) whether the resident
+   actually has an avatar before writing any markup:
+   - avatar present → the <img> at the audited serving lane
+     /profile/avatar/{subjectId} (C-MED·3 — served only through that lane,
+     never a static path), plus a hidden .avatar-mono sibling that
+     client/lib/avatar.ts swaps in on the rare render-then-delete race;
+   - avatar absent → just .avatar-mono (the resident's initial, or an empty
+     circle when the surface has no display-name channel), or nothing at all
+     for a slot with no monogram channel — NO <img>, so the browser makes no
+     request that would fail closed to a 404.
+   The client/lib/avatar.ts module (loaded in the _Layout as ~/js/lib/
+   avatar.js; SECURITY.md §6 — no inline on*) is kept as a belt-and-suspenders
+   fallback for the present case. */
 .avatar {
   width: 42px;
   height: 42px;
@@ -2917,24 +2932,93 @@ html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
   font-size: 0.8125rem;
   color: var(--kmb-ink-soft);
 }
-.airy-feed { display: flex; flex-direction: column; gap: 1rem; }
+.airy-feed { display: flex; flex-direction: column; gap: var(--kmb-feed-gap); }
 .airy-post-card {
-  background: #fff;
+  background: var(--kmb-surface);
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius);
-  padding: 1.375rem 1.625rem;
+  padding: var(--kmb-card-pad-y) var(--kmb-card-pad-x);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.airy-post-card:hover { border-color: var(--kmb-hover-border); }
-.airy-post-title { font-size: 1.0625rem; font-weight: 600; line-height: 1.35; }
-.airy-post-title a { color: inherit; }
-.airy-post-title a:hover { color: var(--bs-primary); }
-.airy-post-chip { margin-left: 0.5rem; }
+.airy-post-card:hover {
+  border-color: var(--kmb-hover-border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); /* TODO: token (--kmb-shadow-hover) */
+}
+.airy-post-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--bs-heading-font-family);
+}
+.airy-post-head .avatar,
+.airy-post-head .avatar-mono { width: 44px; height: 44px; }
+.airy-post-author { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.airy-post-author .name { font-weight: 600; font-size: 0.9375rem; color: var(--kmb-ink); }
+.airy-post-author .when { font-size: 0.8125rem; color: var(--kmb-muted); }
+.airy-post-head .kmb-chip { margin-inline-start: auto; }
+.airy-post-title { font-size: 1.375rem; font-weight: 600; line-height: 1.3; }
+.airy-post-title a { color: inherit; text-decoration: none; }  /* ADR 0175: no underline on titles */
+.airy-post-title a:hover { color: var(--kmb-accent, var(--bs-primary)); }
 .airy-post-preview {
   font-family: var(--bs-body-font-family);
-  font-size: 0.9375rem;
+  font-size: 1rem;
+  line-height: 1.65;
   color: var(--kmb-ink-soft);
-  margin-top: 0.5rem;
 }
+.airy-post-foot {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--kmb-border-soft);
+  font-size: 0.8125rem;
+  color: var(--kmb-muted);
+}
+/* TODO: footer content (reply count, bookmark button) once PostListItem carries
+   the reply count; until then the footer is not rendered. */
+
+/* One chip style for community tags, filters and statuses (ADR 0175). */
+.kmb-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3125rem 0.75rem;
+  border-radius: var(--kmb-radius-pill);
+  background: var(--kmb-tint-a);
+  color: var(--kmb-ink-soft);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration: none; }
+/* TODO: per-community chip colour (map community -> one of 4 tint pairs). */
+
+/* Monogram colours, stable per resident (Security/AvatarHue.cs, 0..5).
+   Fixed mid-tone fills with white initials; AA on all six checked in the
+   palette contrast pass. */
+.avatar-mono[data-hue='0'] { background-color: #3f6f82; border-color: transparent; color: #fff; }
+.avatar-mono[data-hue='1'] { background-color: #94562f; border-color: transparent; color: #fff; }
+.avatar-mono[data-hue='2'] { background-color: #6a4a7c; border-color: transparent; color: #fff; }
+.avatar-mono[data-hue='3'] { background-color: #3f7a5a; border-color: transparent; color: #fff; }
+.avatar-mono[data-hue='4'] { background-color: #8a5a12; border-color: transparent; color: #fff; }
+.avatar-mono[data-hue='5'] { background-color: #8a3f4f; border-color: transparent; color: #fff; }
+
+@media (max-width: 575.98px) {
+  /* Phones: 16px padding, 12px gap so more of the feed fits. */
+  .airy-feed { --kmb-feed-gap: 0.75rem; }
+  .airy-post-card { --kmb-card-pad-y: 1rem; --kmb-card-pad-x: 1rem; }
+  .airy-post-title { font-size: 1.1875rem; }
+}
+
+/* Legacy feed-card parts still used by the group-posts list (Groups/Detail)
+   and the Home teaser (Home/Index) — the Community feed card itself moved to
+   the ADR 0175 .airy-post-head/-author shape above. */
+.airy-post-chip { margin-left: 0.5rem; }
 .airy-post-meta {
   margin-top: 1rem;
   padding-top: 0.75rem;

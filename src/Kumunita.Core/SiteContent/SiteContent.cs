@@ -99,4 +99,14 @@ public sealed class SiteContent
 
     /// <summary>The about's contact CTA band is shown.</summary>
     public bool AboutShowContactCta { get; set; } = true;
+
+    // ── Appearance (ADR 0175 — an additive field, ADR 0004 §B.1) ──
+
+    /// <summary>The platform's default colour palette (<c>forest</c> | <c>ember</c>).
+    /// A resident may override it from the account menu (the <c>kumunita.palette</c>
+    /// cookie); this is what a resident sees until they do, and what lets
+    /// members of several platforms tell them apart. Default <c>forest</c> (the
+    /// shipped look); an unknown stored value is normalized to <c>forest</c> by
+    /// the Web layer (<c>PaletteCookie.Normalize</c>), never an error.</summary>
+    public string DefaultPalette { get; set; } = "forest";
 }
