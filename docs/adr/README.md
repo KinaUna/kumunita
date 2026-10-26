@@ -187,3 +187,4 @@ Decision / Consequences. New decisions take the next number.
 | 0177 | Groups tile (rounded-square monogram + name + members, whole-card link) and a friendly `.kmb-empty` empty state; "Request to join" becomes a quiet outline button. |
 | 0178 | Home restyle, no structural change — Ember warm hero/bands, surface-token feature cards, `.kmb-home-card` columns for Coming up / What's new; visibility switches and section order untouched. |
 | 0179 | Event card — date tile (month/day via new `kw-dt` sentinels `month`/`day`/`weekday`), title, weekday + time range, location, chip, preview, organizer; whole-card link; shared `_EventCard` partial for the feed and "Your upcoming events". |
+| 0180 | Event detail rich header — date tile + title, chip, icon rows for when/where, quiet Add-to-calendar; shared `.kmb-detail-card` card language; RSVP choices as accent pill chips. Structure and handlers unchanged. |

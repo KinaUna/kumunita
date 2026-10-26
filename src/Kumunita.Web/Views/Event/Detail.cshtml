@@ -84,7 +84,7 @@
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
             @if (Model.ComponentDisplayName is not null)
             {
-                <span class="badge text-bg-light border">@Model.ComponentDisplayName</span>
+                <span class="kmb-chip">@Model.ComponentDisplayName</span>
             }
             @* ADR 0037 — the draft surface: GetAsync returns a draft to the
                author only, so IsDraft ⇔ IsAuthor here. The badge is visible to
@@ -172,7 +172,7 @@
                stay here in the metadata row. *@
         </div>
 
-        <div class="card mb-4">
+        <div class="kmb-detail-card card mb-4">
             <div class="card-body">
                 @* ADR 0027 chip-swap scope — the whole variant surface (title row,
                    body, chip row) lives inside this one group wrapper; the
@@ -184,7 +184,12 @@
                    on the left; the ⋮ actions dropdown (ADR 0082) and the bookmark
                    toggle (M17 / ADR 0118) on the right, on the same line. *@
                 <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-                    <div class="min-w-0">
+                    <div class="min-w-0 d-flex align-items-start gap-3">
+                        <div class="kmb-event-date" aria-hidden="true">
+                            <span class="kmb-event-month"><kw-dt dt="@Model.Event.Start" format="month"></kw-dt></span>
+                            <span class="kmb-event-day"><kw-dt dt="@Model.Event.Start" format="day"></kw-dt></span>
+                        </div>
+                        <div class="min-w-0 flex-grow-1">
                         @* Authored-in title — the SHARED FALLBACK heading
                            (td-variant-shared). Default-visible unless ADR 0049
                            auto-selects a translation of it into the viewer's
@@ -221,6 +226,7 @@
                                 </div>
                             }
                         }
+                    </div>
                     </div>
 
                     <div class="d-flex align-items-center gap-2 flex-shrink-0">
@@ -331,16 +337,23 @@
                    caller passed GetAsync's Read decision (the C-M12·6 "quiet" pin).
                    The d-inline-flex wrapper keeps it on the metadata's line and
                    lets it wrap below at 360 px (M10 phone-width re-check). *@
-                <div class="text-muted mb-3 d-inline-flex gap-2 align-items-center flex-wrap">
-                    <span>
-                        <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to
-                        <kw-dt dt="@Model.Event.End" format="g"></kw-dt>
-                    </span>
+                <div class="kmb-event-detail-meta mb-3">
+                    <div class="kmb-event-detail-row">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        <span>
+                            <strong><kw-dt dt="@Model.Event.Start" format="weekday"></kw-dt></strong>
+                            <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to
+                            <kw-dt dt="@Model.Event.End" format="g"></kw-dt>
+                        </span>
+                    </div>
                     @if (!string.IsNullOrWhiteSpace(Model.Event.Location))
                     {
-                        <span class="ms-2">· @Model.Event.Location</span>
+                        <div class="kmb-event-detail-row">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                            <span>@Model.Event.Location</span>
+                        </div>
                     }
-                    <a class="btn btn-outline-secondary btn-sm" href="@($"/events/{Model.Event.Id}.ics")">
+                    <a class="btn btn-outline-secondary btn-sm align-self-start" href="@($"/events/{Model.Event.Id}.ics")">
                         <kw-l key="events.ics.download">Add to calendar</kw-l>
                     </a>
                 </div>
@@ -413,7 +426,7 @@
                the author's subject id is the Event's AuthorId (the domain's
                owner branch — the same field the service checks against in
                CheckEditStanding / CanAddTranslation). *@
-            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
+            <div class="d-flex align-items-center gap-2 kmb-detail-author text-muted small px-3 py-2">
                 <span class="d-inline-flex align-items-center">
                     <kw-avatar subject="@Model.Event.AuthorId" mono="@authorAvatarInitial" />
                 </span>
@@ -548,11 +561,11 @@
         @* The RSVP surface (ADR 0054 §3.2): the owner-only list (the author
            sees their own event's RSVPs; a non-author sees only their own
            RSVP) + the last-write-wins RSVP form (Going / Maybe / No). *@
-        <div class="card">
+        <div class="kmb-detail-card card">
             <div class="card-body">
                 <h2 class="h5 mb-3"><kw-l key="events.rsvp">RSVP</kw-l></h2>
 
-                <form method="post" action="/events/@Model.Event.Id/rsvp" class="d-flex gap-2 align-items-center">
+                <form method="post" action="/events/@Model.Event.Id/rsvp" class="kmb-rsvp d-flex flex-wrap gap-2 align-items-center">
                     @Html.AntiForgeryToken()
                     @if (Model.MyRsvp is not null)
                     {
@@ -611,7 +624,7 @@
            optional status label + optional due date. *@
         @if (Model.LinkedTodos is { Count: > 0 })
         {
-            <div class="card">
+            <div class="kmb-detail-card card">
                 <div class="card-body">
                     <h2 class="h5 mb-3"><kw-l key="events.linked_todos">Linked to-dos</kw-l></h2>
                     <ul class="list-unstyled mb-0">
@@ -648,7 +661,7 @@
            checklist / plan surface the event's prep to-dos live on). *@
         @if (Model.LinkedBoards is { Count: > 0 })
         {
-            <div class="card">
+            <div class="kmb-detail-card card">
                 <div class="card-body">
                     <h2 class="h5 mb-3"><kw-l key="events.linked_boards">Linked boards</kw-l></h2>
                     <ul class="list-unstyled mb-0">
@@ -683,7 +696,7 @@
             if (Translation is not null)
                 addTodoLabel = await Translation.GetAsync("events.add_todo.title", defaultVariant);
         }
-        <div class="card">
+        <div class="kmb-detail-card card">
             <div class="card-body">
                 <h2 class="h5 mb-2"><kw-l key="events.add_todo.title">Add a to-do to this event</kw-l></h2>
                 <p class="text-muted small mb-3">

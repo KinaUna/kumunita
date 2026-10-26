@@ -3155,6 +3155,36 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
   .kmb-event-head { flex-wrap: wrap; }
 }
 
+/* ADR 0180 — event detail: rich header (date tile + when/where rows), card
+   language shared with the feed, RSVP choices as accent chips. */
+.kmb-detail-card {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  overflow: hidden;
+}
+.kmb-detail-card + .kmb-detail-card { margin-top: 1rem; }
+.kmb-detail-author { background: var(--kmb-surface-2, var(--kmb-tint-a)); }
+.kmb-event-detail-meta { display: flex; flex-direction: column; gap: 0.375rem; color: var(--kmb-ink-soft); }
+.kmb-event-detail-row { display: flex; align-items: flex-start; gap: 0.5rem; }
+.kmb-event-detail-row svg { flex: none; margin-top: 0.3125rem; color: var(--kmb-muted); }
+.kmb-rsvp .btn-check + .btn {
+  --bs-btn-color: var(--kmb-ink-soft);
+  --bs-btn-border-color: var(--kmb-hover-border);
+  --bs-btn-hover-color: var(--kmb-accent);
+  --bs-btn-hover-bg: var(--kmb-tint-a);
+  --bs-btn-hover-border-color: var(--kmb-hover-border);
+  border-radius: var(--kmb-radius-pill);
+}
+.kmb-rsvp .btn-check:checked + .btn {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+  border-color: var(--kmb-accent);
+}
+@media (max-width: 575.98px) {
+  .kmb-detail-card .kmb-event-date { width: 48px; height: 56px; }
+}
+
 /* A: pages — the tree becomes a bordered ledger (indentation kept;
    each row links full-width via the inner <a>). */
 .airy-page-list {

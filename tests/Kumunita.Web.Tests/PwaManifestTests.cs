@@ -300,16 +300,17 @@ public class PwaManifestTests
     /// <summary>
     /// U06 / D6 — the <c>site.css</c> media-block boundary is pinned:
     /// exactly <b>four</b> <c>@media (max-width: 767.98px)</c> blocks +
-    /// <b>two</b> <c>@media (max-width: 575.98px)</c> blocks (the ADR 0111
-    /// collapsed-mobile-navbar block + the ADR 0175 D4 feed-card phone block —
-    /// both at Bootstrap's navbar-expand-sm breakpoint, narrower than the
-    /// app's 767.98px block) + <b>one</b>
+    /// <b>four</b> <c>@media (max-width: 575.98px)</c> blocks (the ADR 0111
+    /// collapsed-mobile-navbar block + the ADR 0175 D4 feed-card phone block
+    /// + the ADR 0179 event-card phone block + the ADR 0180 event-detail
+    /// phone tile block — all at Bootstrap's narrower-than-767.98px
+    /// sm-collapsed breakpoint) + <b>one</b>
     /// <c>@media (prefers-reduced-motion: reduce)</c> block, for a total of
-    /// <b>seven</b> <c>@media</c> occurrences (nine counting the two ADR 0133
-    /// dark blocks below). Both 575.98px blocks are recorded drift-guard
-    /// entries (ADR 0111, ADR 0175), so they are expected here. Any OTHER
-    /// count change without a recorded entry is a breach (the design doc
-    /// §drift-guard frozen pin #7).
+    /// <b>eleven</b> <c>@media</c> occurrences (thirteen counting the two ADR
+    /// 0133 dark blocks below). Every 575.98px block is a recorded
+    /// drift-guard entry (ADR 0111, ADR 0175, ADR 0179, ADR 0180), so it is
+    /// expected here. Any OTHER count change without a recorded entry is a
+    /// breach (the design doc §drift-guard frozen pin #7).
     /// </summary>
     [Fact(DisplayName = "M10 U06: site.css media-block boundary pinned (D6)")]
     public void Site_Css_Media_Block_Boundary_Pinned()
@@ -324,13 +325,14 @@ public class PwaManifestTests
         Assert.True(widthBlocks.Count == 4,
             $"Expected exactly 4 '@media (max-width: 767.98px)' blocks (the U00–U05 baseline); found {widthBlocks.Count}.");
 
-        // The two 575.98px blocks (both recorded drift entries): the ADR 0111
+        // The four 575.98px blocks (all recorded drift entries): the ADR 0111
         // collapsed-mobile navbar (the breakpoint where navbar-expand-sm
         // collapses) + the ADR 0175 D4 feed-card phone rule (16px padding /
-        // 12px gap on phones).
+        // 12px gap on phones) + the ADR 0179 event-card phone rule + the ADR
+        // 0180 event-detail phone tile rule.
         var collapsedBlocks = Regex.Matches(css, @"@media\s*\(max-width:\s*575\.98px\)");
-        Assert.True(collapsedBlocks.Count == 3,
-            $"Expected exactly 3 '@media (max-width: 575.98px)' blocks (the ADR 0111 collapsed navbar + the ADR 0175 D4 feed-card phone rule + the ADR 0179 event-card phone rule); found {collapsedBlocks.Count}.");
+        Assert.True(collapsedBlocks.Count == 4,
+            $"Expected exactly 4 '@media (max-width: 575.98px)' blocks (the ADR 0111 collapsed navbar + the ADR 0175 D4 feed-card phone rule + the ADR 0179 event-card phone rule + the ADR 0180 event-detail phone rule); found {collapsedBlocks.Count}.");
 
         // The one reduced-motion block.
         var motionBlocks = Regex.Matches(css, @"@media\s*\(prefers-reduced-motion:\s*reduce\)");
@@ -345,14 +347,14 @@ public class PwaManifestTests
         Assert.True(darkBlocks.Count == 2,
             $"Expected exactly 2 '@media (prefers-color-scheme: dark)' blocks (ADR 0133 Forest theme); found {darkBlocks.Count}.");
 
-        // The total @media count is ten (4 width + 3 collapsed + 1 motion +
-        // 2 dark) — the "no new boundary without a record" witness (the design
-        // doc §drift-guard frozen pin #7: "a count change without a recorded
-        // entry is a breach"). The third collapsed block is the ADR 0179
-        // event-card phone rule.
+        // The total @media count is eleven (4 width + 4 collapsed + 1 motion
+        // + 2 dark) — the "no new boundary without a record" witness (the
+        // design doc §drift-guard frozen pin #7: "a count change without a
+        // recorded entry is a breach"). The fourth collapsed block is the ADR
+        // 0180 event-detail phone rule.
         var allMedia = Regex.Matches(css, @"@media");
-        Assert.True(allMedia.Count == 10,
-            $"Expected exactly 10 '@media' occurrences total (4 width + 3 collapsed (ADR 0111 + ADR 0175 D4 + ADR 0179) + 1 reduced-motion + 2 dark / ADR 0133); found {allMedia.Count}.");
+        Assert.True(allMedia.Count == 11,
+            $"Expected exactly 11 '@media' occurrences total (4 width + 4 collapsed (ADR 0111 + ADR 0175 D4 + ADR 0179 + ADR 0180) + 1 reduced-motion + 2 dark / ADR 0133); found {allMedia.Count}.");
     }
 
     // ── shared helper ───────────────────────────────────────────────────────
