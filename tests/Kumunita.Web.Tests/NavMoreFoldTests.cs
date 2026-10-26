@@ -131,13 +131,14 @@ public class NavMoreFoldTests
         // The state-class rule lives OUTSIDE any @media block. A naive
         // "@media…{…}" could in principle swallow a nested rule, so check the
         // .kmb-nav-folded occurrences all sit in the top-level (non-media)
-        // region: i.e. the media-block count is still exactly eight (the
-        // pinned boundary — 4 width + 1 collapsed + 1 reduced-motion + 2
-        // ADR 0133 dark blocks). A change would mean a new block was added
-        // without a record, which is the breach this pin guards against.
+        // region: i.e. the media-block count is still exactly nine (the
+        // pinned boundary — 4 width + 2 collapsed (ADR 0111 + ADR 0175 D4)
+        // + 1 reduced-motion + 2 ADR 0133 dark blocks). A change would mean a
+        // new block was added without a record, which is the breach this pin
+        // guards against.
         var allMedia = Regex.Matches(css, @"@media");
-        Assert.True(allMedia.Count == 8,
-            $"Expected exactly 8 '@media' occurrences (the M10 pinned boundary — the ADR 0113 fold state class is intentionally not a media block; the 2 dark blocks are ADR 0133); found {allMedia.Count}.");
+        Assert.True(allMedia.Count == 9,
+            $"Expected exactly 9 '@media' occurrences (the M10 pinned boundary — the ADR 0113 fold state class is intentionally not a media block; the 2 dark blocks are ADR 0133, the second 575.98px block is ADR 0175 D4); found {allMedia.Count}.");
     }
 
     // ── (4) the decision is recorded ────────────────────────────────────────
