@@ -479,6 +479,9 @@
          Bootstrap Modal (the ADR 0071 convention). Falls back to a plain
          navigation when no Bootstrap bundle is present. -->
     <script type="module" src="~/js/lib/events-calendar-detail.js"></script>
+    <!-- Today highlight (ADR 0181): adds .is-today to the day cell / week column
+         whose data-date is today in the resident's zone. -->
+    <script type="module" src="~/js/lib/calendar-today.js"></script>
     <!-- The calendar's browser full-screen channel (client/lib/
          calendar-fullscreen.ts, the board's ⛶ sibling): #events-calendar
          becomes the Fullscreen API element; the :fullscreen rules in

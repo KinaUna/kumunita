@@ -416,3 +416,89 @@ html[data-kmb-palette] .kmb-feat-icon.kmb-feat-icon-warm { color: var(--kmb-acce
 html[data-kmb-palette='ember'] .kumunita-pinned-announcement .btn-link {
   color: var(--kmb-accent) !important;
 }
+
+/* ==========================================================================
+   Calendar (ADR 0181) — toolbar, grid lines, today, event chips
+   --------------------------------------------------------------------------
+   CSS only plus calendar-today.ts. Specificity-tie trick (html[data-kmb-palette]
+   loads after site.css) so these win over site.css's dark-scope patches.
+   ========================================================================== */
+
+/* View toggle: one segmented pill; the active segment uses the selected-chip
+   colours (the old active state was dark green on dark, unreadable). */
+html[data-kmb-palette] .events-view-toggle.btn-group {
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--kmb-hover-border);
+  border-radius: var(--kmb-radius-pill);
+}
+html[data-kmb-palette] .events-view-toggle.btn-group > .btn {
+  border: 0;
+  border-radius: var(--kmb-radius-pill);
+  background: transparent;
+  color: var(--kmb-ink-soft);
+  padding-inline: 0.875rem;
+}
+html[data-kmb-palette] .events-view-toggle.btn-group > .btn:hover {
+  background: var(--kmb-tint-a);
+  color: var(--kmb-accent);
+}
+html[data-kmb-palette] .events-view-toggle.btn-group > .btn.active {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+  font-weight: 600;
+}
+
+/* Community filter label: quiet, small. */
+html[data-kmb-palette] label[for='calendar-component-filter'] {
+  font-size: 0.75rem;
+  font-weight: 600 !important;
+  color: var(--kmb-muted);
+  margin-bottom: 0.25rem;
+}
+
+/* Grid lines: the "soft" border was ~1.1:1 on the card surface in dark. */
+html[data-kmb-palette] .events-calendar-grid { border-color: var(--kmb-border); }
+html[data-kmb-palette] .events-calendar-day {
+  background: var(--kmb-surface);
+  border-top-color: var(--kmb-border);
+  border-right-color: var(--kmb-border);
+}
+html[data-kmb-palette] .events-time-column { border-left-color: var(--kmb-border); }
+html[data-kmb-palette] .events-time-body {
+  background-image: linear-gradient(to bottom, var(--kmb-border) 1px, transparent 1px);
+}
+html[data-kmb-palette] .events-time-ruler-label { border-bottom-color: var(--kmb-border); }
+
+/* Today (class added by calendar-today.ts). */
+html[data-kmb-palette] .events-calendar-day.is-today { background: var(--kmb-chip-selected-bg); }
+html[data-kmb-palette] .events-calendar-day.is-today .events-calendar-day-label {
+  color: var(--kmb-chip-selected-ink) !important;
+  font-weight: 700;
+}
+html[data-kmb-palette] .events-time-column.is-today .events-time-column-label {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+}
+
+/* Event chips (Month) and blocks (Day/Week): soft tint, a coloured leading
+   bar instead of an outline, no underline. The overlap flag is a thin accent
+   ring (was a 2px gold ring that made every clash look selected). */
+html[data-kmb-palette] .event-chip,
+html[data-kmb-palette] .event-block {
+  border: 0;
+  border-inline-start: 3px solid var(--event-color, var(--kmb-accent));
+  border-radius: 8px;
+}
+html[data-kmb-palette] .event-chip a,
+html[data-kmb-palette] .event-block a {
+  color: var(--kmb-ink);
+  text-decoration: none;
+}
+html[data-kmb-palette] .event-chip a:hover,
+html[data-kmb-palette] .event-block a:hover { color: var(--kmb-accent); }
+html[data-kmb-palette] .event-chip-overlap,
+html[data-kmb-palette] .event-block.event-chip-overlap {
+  box-shadow: 0 0 0 1px var(--kmb-accent);
+  border-color: var(--kmb-accent);
+}
