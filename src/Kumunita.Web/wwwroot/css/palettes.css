@@ -356,3 +356,56 @@ html[data-kmb-palette] :is(.form-control, .form-select):focus {
   outline: 2px solid var(--kmb-accent);
   outline-offset: 1px;
 }
+
+/* ==========================================================================
+   Home (ADR 0178) — restyle only; section order and visibility settings
+   (HomeShowFeatures, HideIntro, ...) are unchanged.
+   --------------------------------------------------------------------------
+   - Ember gets a warm hero, feature band and CTA band instead of the green
+     ones (Forest keeps its green; it already matches).
+   - Feature cards and the Coming up / What's new columns use the same card
+     language as the feed: --kmb-surface, 16px radius, border, soft shadow
+     on hover only.
+   ========================================================================== */
+html[data-kmb-palette='ember'] .kmb-hero {
+  background-color: #3a2819;
+  background-image: var(--kmb-hero-bg, linear-gradient(165deg, #4d3621 0%, #3a2819 55%, #2a1c10 100%));
+}
+html[data-kmb-palette='ember'] .kmb-hero::before {
+  background: linear-gradient(180deg, rgba(26, 18, 10, 0.4), rgba(26, 18, 10, 0.25));
+}
+html[data-kmb-palette='ember'] .kmb-features-band { background-color: #2a1c10; }
+html[data-kmb-palette='ember'] .kmb-cta-band {
+  background-color: #3a2819;
+  background-image: linear-gradient(120deg, #4d3621 0%, #2a1c10 100%);
+}
+
+html[data-kmb-palette] .kmb-feat-card {
+  background-color: var(--kmb-surface);
+  border-radius: var(--kmb-radius);
+}
+html[data-kmb-palette] .kmb-feat-icon { color: var(--kmb-accent); }
+html[data-kmb-palette] .kmb-feat-icon.kmb-feat-icon-warm { color: var(--kmb-accent); }
+
+.kmb-home-card {
+  height: 100%;
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.25rem 1.5rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.kmb-home-card:hover {
+  border-color: var(--kmb-hover-border);
+  box-shadow: var(--bs-box-shadow-sm);
+}
+.kmb-home-card .list-group-item {
+  background: transparent;
+  border-color: var(--kmb-border-soft, var(--kmb-border));
+  color: var(--kmb-ink);
+}
+.kmb-home-card .list-group-item > a { color: var(--kmb-ink); }
+.kmb-home-card .list-group-item > a:hover { color: var(--kmb-accent); }
+@media (max-width: 575.98px) {
+  .kmb-home-card { padding: 1rem; }
+}
