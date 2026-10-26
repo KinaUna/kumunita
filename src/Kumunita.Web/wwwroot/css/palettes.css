@@ -142,8 +142,8 @@ html[data-kmb-palette='ember'] {
     --bs-tertiary-bg: #262019;    --bs-tertiary-bg-rgb: 38, 32, 25;
     --bs-border-color: #352d26;   --bs-border-color-rgb: 53, 45, 38;
     --bs-light-border-subtle: #352d26;
-    --bs-link-color: #8fcaa6;     --bs-link-color-rgb: 143, 202, 166;
-    --bs-link-hover-color: #b0dcc1; --bs-link-hover-color-rgb: 176, 220, 193;
+    --bs-link-color: #f0b45c;     --bs-link-color-rgb: 240, 180, 92;
+    --bs-link-hover-color: #f5c378; --bs-link-hover-color-rgb: 245, 195, 120;
 
     --kmb-ink: #f1e9dc;
     --kmb-ink-soft: #dccfbc;
@@ -173,8 +173,8 @@ html[data-kmb-theme='dark'][data-kmb-palette='ember'] {
   --bs-tertiary-bg: #262019;    --bs-tertiary-bg-rgb: 38, 32, 25;
   --bs-border-color: #352d26;   --bs-border-color-rgb: 53, 45, 38;
   --bs-light-border-subtle: #352d26;
-  --bs-link-color: #8fcaa6;     --bs-link-color-rgb: 143, 202, 166;
-  --bs-link-hover-color: #b0dcc1; --bs-link-hover-color-rgb: 176, 220, 193;
+  --bs-link-color: #f0b45c;     --bs-link-color-rgb: 240, 180, 92;
+  --bs-link-hover-color: #f5c378; --bs-link-hover-color-rgb: 245, 195, 120;
 
   --kmb-ink: #f1e9dc;
   --kmb-ink-soft: #dccfbc;
@@ -408,4 +408,11 @@ html[data-kmb-palette] .kmb-feat-icon.kmb-feat-icon-warm { color: var(--kmb-acce
 .kmb-home-card .list-group-item > a:hover { color: var(--kmb-accent); }
 @media (max-width: 575.98px) {
   .kmb-home-card { padding: 1rem; }
+}
+
+/* Ember: ordinary links follow the amber accent in dark mode too (they were the
+   Forest green #8fcaa6), and so does the pinned-announcement link, which
+   site.css pins to a light green with !important in both dark scopes. */
+html[data-kmb-palette='ember'] .kumunita-pinned-announcement .btn-link {
+  color: var(--kmb-accent) !important;
 }
