@@ -329,8 +329,8 @@ public class PwaManifestTests
         // collapses) + the ADR 0175 D4 feed-card phone rule (16px padding /
         // 12px gap on phones).
         var collapsedBlocks = Regex.Matches(css, @"@media\s*\(max-width:\s*575\.98px\)");
-        Assert.True(collapsedBlocks.Count == 2,
-            $"Expected exactly 2 '@media (max-width: 575.98px)' blocks (the ADR 0111 collapsed navbar + the ADR 0175 D4 feed-card phone rule); found {collapsedBlocks.Count}.");
+        Assert.True(collapsedBlocks.Count == 3,
+            $"Expected exactly 3 '@media (max-width: 575.98px)' blocks (the ADR 0111 collapsed navbar + the ADR 0175 D4 feed-card phone rule + the ADR 0179 event-card phone rule); found {collapsedBlocks.Count}.");
 
         // The one reduced-motion block.
         var motionBlocks = Regex.Matches(css, @"@media\s*\(prefers-reduced-motion:\s*reduce\)");
@@ -345,13 +345,14 @@ public class PwaManifestTests
         Assert.True(darkBlocks.Count == 2,
             $"Expected exactly 2 '@media (prefers-color-scheme: dark)' blocks (ADR 0133 Forest theme); found {darkBlocks.Count}.");
 
-        // The total @media count is nine (4 width + 2 collapsed + 1 motion +
+        // The total @media count is ten (4 width + 3 collapsed + 1 motion +
         // 2 dark) — the "no new boundary without a record" witness (the design
         // doc §drift-guard frozen pin #7: "a count change without a recorded
-        // entry is a breach").
+        // entry is a breach"). The third collapsed block is the ADR 0179
+        // event-card phone rule.
         var allMedia = Regex.Matches(css, @"@media");
-        Assert.True(allMedia.Count == 9,
-            $"Expected exactly 9 '@media' occurrences total (4 width + 2 collapsed + 1 reduced-motion + 2 dark / ADR 0133); found {allMedia.Count}.");
+        Assert.True(allMedia.Count == 10,
+            $"Expected exactly 10 '@media' occurrences total (4 width + 3 collapsed (ADR 0111 + ADR 0175 D4 + ADR 0179) + 1 reduced-motion + 2 dark / ADR 0133); found {allMedia.Count}.");
     }
 
     // ── shared helper ───────────────────────────────────────────────────────

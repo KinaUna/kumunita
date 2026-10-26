@@ -3093,6 +3093,68 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
 .kmb-empty-title { font-family: var(--bs-heading-font-family); font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
 .kmb-empty-body { color: var(--kmb-muted); margin-bottom: 1rem; }
 
+/* ADR 0179 — event card: date tile + title + when/where + chip + preview. */
+.kmb-event-list,
+.kmb-event-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kmb-feed-gap, 1rem);
+  margin-bottom: 1.5rem;
+}
+.kmb-event-card {
+  position: relative;            /* anchors the stretched-link */
+  display: flex;
+  gap: 1rem;
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: var(--kmb-card-pad-y, 1.25rem) var(--kmb-card-pad-x, 1.5rem);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.kmb-event-card[hidden] { display: none; }
+.kmb-event-card:hover {
+  border-color: var(--kmb-hover-border);
+  box-shadow: var(--bs-box-shadow-sm);
+}
+.kmb-event-date {
+  flex: none;
+  width: 56px;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--kmb-tint-a);
+  color: var(--kmb-ink);
+  font-family: var(--bs-heading-font-family);
+  line-height: 1.1;
+}
+.kmb-event-month { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--kmb-accent, var(--bs-primary)); }
+.kmb-event-day { font-size: 1.5rem; font-weight: 700; }
+.kmb-event-body { min-width: 0; flex: 1 1 auto; }
+.kmb-event-head { display: flex; align-items: flex-start; gap: 0.75rem; }
+.kmb-event-title { margin: 0; font-size: 1.125rem; line-height: 1.3; flex: 1 1 auto; overflow-wrap: anywhere; }
+.kmb-event-title a { color: var(--kmb-ink); text-decoration: none; }
+.kmb-event-title a:hover { color: var(--kmb-accent, var(--bs-primary)); }
+.kmb-event-head .kmb-chip { flex: none; }
+.kmb-event-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.25rem; font-size: 0.875rem; color: var(--kmb-ink-soft); }
+.kmb-event-meta svg { vertical-align: -2px; margin-inline-end: 0.25rem; color: var(--kmb-muted); }
+.kmb-event-preview {
+  margin: 0.5rem 0 0;
+  color: var(--kmb-ink-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.kmb-event-org { margin-top: 0.5rem; font-size: 0.8125rem; color: var(--kmb-muted); }
+@media (max-width: 575.98px) {
+  .kmb-event-card { --kmb-card-pad-y: 1rem; --kmb-card-pad-x: 1rem; gap: 0.75rem; }
+  .kmb-event-date { width: 48px; height: 56px; }
+  .kmb-event-head { flex-wrap: wrap; }
+}
+
 /* A: pages — the tree becomes a bordered ledger (indentation kept;
    each row links full-width via the inner <a>). */
 .airy-page-list {
