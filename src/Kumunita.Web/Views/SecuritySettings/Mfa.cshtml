@@ -1,0 +1,190 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Models.MfaSettingsViewModel
+@{
+    ViewData["Title"] = "Settings — Security";
+}
+
+@* F3 (AUTH-03) — the per-resident MFA enrollment surface (F3.U3). The
+   /settings/security/mfa section, the ADR 0080 settings-tab shape (the
+   same sub-nav strip + page heading + section + forms as
+   /settings/messaging).
+   <para>
+   <b>Plain-English strings, deliberately not <c>kw-l</c> keys:</b> the
+   KwLRegistryConsistencyTests view-scan fails the build if a <c>kw-l</c>
+   key is used but not in KnownTranslationKeys, and registering new keys
+   would require a 4th file (KnownTranslationKeys + De/Fr/Da parity), which
+   exceeds this unit's ≤3-file budget. The enforcement leg (F3.U4) and the
+   multilingual close-flip may register the keys then; the surface works
+   en-only today.
+   </para>
+   <para>
+   <b>Recovery-codes-shown-once rule:</b> the setup key, the otpauth URI,
+   and the 10 codes are rendered only when present on the model (the
+   enabling/rotating response); a steady GET sets them to null and renders
+   the count-only floor.
+   </para>
+*@
+@await Html.PartialAsync("../Locale/_SettingsTabs.cshtml")
+
+<h1>Your settings</h1>
+
+<h2 class="mt-1">Security</h2>
+<p class="text-muted">
+    Add two-factor authentication (an authenticator app) to your account. A
+    GlobalAdmin must have this on before signing in; for everyone else it is
+    optional.
+</p>
+
+@* ---- Enabled + count-only steady state -------------------------------- * @*
+   When MFA is on and no one-time secrets are present (Model.RecoveryCodes is
+   null), render the status + the remaining-code count. This is the floor
+   that a steady GET /settings/security/mfa and
+   /settings/security/mfa/recovery land on. *@
+@if (Model.Enabled && Model.RecoveryCodes is null)
+{
+    <div class="alert alert-info">
+        Two-factor authentication is <b>enabled</b> on this account. You have
+        <b>@Model.RemainingRecoveryCodes</b> unused recovery code
+        @(Model.RemainingRecoveryCodes == 1 ? "" : "s") remaining.
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h3 class="h5">Recovery codes</h3>
+            <p class="text-muted mb-2">
+                If you lose your authenticator app, a recovery code lets you
+                sign in once and reset your second factor. You have
+                @Model.RemainingRecoveryCodes unused code
+                @(Model.RemainingRecoveryCodes == 1 ? "" : "s").
+            </p>
+            <form method="post" action="/settings/security/mfa/recovery"
+                  data-confirm="Replace your 10 recovery codes with a fresh set? The current codes stop working immediately.">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-secondary">
+                    Rotate recovery codes
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <hr />
+
+    <div class="card border-danger-subtle">
+        <div class="card-body">
+            <h3 class="h5 text-danger">Turn off two-factor authentication</h3>
+            <p class="text-muted mb-2">
+                Disabling removes your second factor. If you are the only
+                GlobalAdmin on this instance, doing so removes your last
+                defense against a stolen password.
+            </p>
+            <form method="post" action="/settings/security/mfa/disable"
+                  data-confirm="Turn off two-factor authentication? If you are the only GlobalAdmin on this instance, you will lose your last defense against a stolen password.">
+                @Html.AntiForgeryToken()
+                <div class="row g-2 align-items-end">
+                    <div class="col-sm-8">
+                        <label for="disableCode" class="form-label">
+                            Enter the current code from your authenticator app to confirm
+                        </label>
+                        <input type="text" class="form-control" id="disableCode"
+                               name="Code" inputmode="numeric" autocomplete="one-time-code"
+                               pattern="[0-9]{6}" />
+                    </div>
+                    <div class="col-sm-4">
+                        <button type="submit" class="btn btn-outline-danger">
+                            Disable two-factor authentication
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@* ---- Enrollment (not enabled) or rotate result (codes present) ------- * @*
+   When the one-time secrets are present (Model.SetupKey /
+   Model.RecoveryCodes not null), this is either the first enrollment (the
+   setup key + otpauth URI + 10 codes, shown once) or a rotate result (the
+   10 codes, shown once). Render them together with the enable form so the
+   resident can pair the app, then submit the first code. *@
+else
+{
+    @* The one-time secrets (enrollment / rotate leg — shown once). *@
+    @if (Model.RecoveryCodes is not null)
+    {
+        <div class="card border-warning-subtle">
+            <div class="card-body">
+                <h3 class="h5">Your recovery codes — copy them now</h3>
+                <p class="text-muted">
+                    These 10 codes let you sign in if you lose your
+                    authenticator app. They are shown <b>once</b> and cannot
+                    be recovered later.
+                </p>
+                <ol class="recovery-codes" aria-label="Recovery codes">
+                    @foreach (var code in Model.RecoveryCodes)
+                    {
+                        <li><code>@code</code></li>
+                    }
+                </ol>
+            </div>
+        </div>
+    }
+
+    @* The setup key + otpauth URI (enrollment leg only — absent on a
+       rotate, which has no new key). *@
+    @if (Model.SetupKey is not null && Model.OtpAuthUrl is not null)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h3 class="h5">Pair your authenticator app</h3>
+                <p class="text-muted">
+                    Add this account to your authenticator app (Google
+                    Authenticator, 1Password, Authy, or any TOTP app). Scan
+                    the QR-equivalent setup key below, or enter the key
+                    manually.
+                </p>
+                <div class="mb-2">
+                    <label for="otpAuthUrl" class="form-label d-block">otpauth URI</label>
+                    <input type="text" class="form-control font-monospace" id="otpAuthUrl"
+                           value="@Model.OtpAuthUrl" readonly />
+                </div>
+                <div class="mb-2">
+                    <label for="setupKey" class="form-label d-block">Setup key</label>
+                    <input type="text" class="form-control font-monospace" id="setupKey"
+                           value="@Model.SetupKey" readonly />
+                </div>
+            </div>
+        </div>
+    }
+
+    @* The enable form (the pin's POST /settings/security/mfa — MfaEnable).
+       Visible on the enrollment leg (not enabled). On a rotate result the
+       flag is already on, so the form is suppressed. *@
+    @if (!Model.Enabled)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h3 class="h5">Enable two-factor authentication</h3>
+                <p class="text-muted">
+                    Enter the 6-digit code your authenticator app is showing
+                    to confirm and turn on your second factor.
+                </p>
+                <form method="post" action="/settings/security/mfa">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-2 align-items-end">
+                        <div class="col-sm-8">
+                            <label for="enableCode" class="form-label">Current code from your authenticator app</label>
+                            <input type="text" class="form-control" id="enableCode"
+                                   name="Code" inputmode="numeric" autocomplete="one-time-code"
+                                   pattern="[0-9]{6}" required />
+                        </div>
+                        <div class="col-sm-4">
+                            <button type="submit" class="btn btn-primary">
+                                Enable two-factor authentication
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+}

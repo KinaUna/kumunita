@@ -2,6 +2,7 @@ using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -45,16 +46,27 @@ public sealed class BookmarkService : IBookmarkService
     /// string-not-enum shape), the exact vocabulary the existing
     /// <c>*ToAuditableResource</c> adapters and <c>AccessAudit</c> rows
     /// already emit. A kind outside this set is a drift event (§2.7).
+    /// <para>
+    /// The <c>project</c> / <c>board</c> kinds joined by the ADR 0118
+    /// amendment (2026-10-16) — the M37 PersonalNotes closed-set
+    /// vocabulary already carried them; the M17 surface now matches
+    /// (the project / board detail surfaces gain the bookmark
+    /// affordance; the D3 write-lane check re-runs the owning
+    /// surface's own frozen <c>IProjectService.GetProjectAsync</c> /
+    /// <c>GetBoardAsync</c> read — the same call the detail page uses,
+    /// committing the target's own audit row, exactly the category
+    /// the existing <c>todo</c> branch already establishes).
+    /// </para>
     /// </summary>
     public static readonly IReadOnlySet<string> ClosedTargetKinds =
         new HashSet<string>(StringComparer.Ordinal)
         {
-            "post", "event", "todo", "announcement", "page",
+            "post", "event", "todo", "announcement", "page", "project", "board", "inventory", "directory",
         };
 
     // The closed set's canonical order (for group ordering in the list).
     private static readonly string[] ClosedTargetKindsOrdered =
-        ["post", "event", "todo", "announcement", "page"];
+        ["post", "event", "todo", "announcement", "page", "project", "board", "inventory", "directory"];
 
     private readonly IUserInfoService _userInfo;
     private readonly IAuthorizationService _authz;
@@ -63,6 +75,7 @@ public sealed class BookmarkService : IBookmarkService
     private readonly IPageService _pages;
     private readonly IEventService _events;
     private readonly IProjectService _projects;
+    private readonly IInventoryService _inventory;
     private readonly IIdentityService _identity;
 
     /// <summary>
@@ -86,6 +99,7 @@ public sealed class BookmarkService : IBookmarkService
         IPageService pages,
         IEventService events,
         IProjectService projects,
+        IInventoryService inventory,
         IIdentityService identity)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
@@ -95,6 +109,7 @@ public sealed class BookmarkService : IBookmarkService
         _pages = pages ?? throw new ArgumentNullException(nameof(pages));
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _projects = projects ?? throw new ArgumentNullException(nameof(projects));
+        _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
         _identity = identity ?? throw new ArgumentNullException(nameof(identity));
     }
 
@@ -131,26 +146,77 @@ public sealed class BookmarkService : IBookmarkService
             resolved.Add((row, title, link));
         }
 
-        // Group by TargetKind in the closed set's canonical order (D1), only
-        // including kinds the owner actually pinned.
+        // Group by (TargetKind, FolderId) in the closed set's canonical order
+        // (D1), only including kinds the owner actually pinned (ADR 0168 D2 —
+        // the M37 ListNotesAsync shape re-applied: one group per folder, then
+        // the unfiled bucket, within each kind).
         var groups = new List<BookmarkGroup>();
         foreach (var kind in ClosedTargetKindsOrdered)
         {
-            var items = resolved
+            var kindRows = resolved
                 .Where(r => string.Equals(r.Row.TargetKind, kind, StringComparison.Ordinal))
-                .Select(r => new BookmarkRow(
-                    kind,
-                    r.Row.TargetId,
-                    r.Title,
-                    r.Link,
-                    r.Title is null && r.Link is null,
-                    r.Row.Created))
                 .ToList();
-            if (items.Count > 0)
-                groups.Add(new BookmarkGroup(kind, items));
+            if (kindRows.Count == 0) continue;
+
+            // Root bucket (FolderId = null — the unfiled rows).
+            var rootItems = kindRows
+                .Where(r => r.Row.FolderId is null)
+                .Select(r => ToBookmarkRow(kind, r))
+                .ToList();
+            if (rootItems.Count > 0)
+                groups.Add(new BookmarkGroup(kind, rootItems, null));
+
+            // Folder sub-buckets (ADR 0168 D2 — the owner's tree).
+            var folderIds = kindRows
+                .Select(r => r.Row.FolderId)
+                .Where(f => f is not null)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            foreach (var folderId in folderIds)
+            {
+                var items = kindRows
+                    .Where(r => r.Row.FolderId == folderId)
+                    .Select(r => ToBookmarkRow(kind, r))
+                    .ToList();
+                groups.Add(new BookmarkGroup(kind, items, folderId));
+            }
         }
 
-        return new BookmarkListResult(groups);
+        // Load the owner's folders (ADR 0168 D2 — the personal tree).
+        var folders = await q.Query<BookmarkFolder>()
+            .Where(f => f.OwnerId == ownerId)
+            .OrderBy(f => f.Created)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var folderRows = folders
+            .Select(f => new FolderRow(f.Id, f.Name, f.ParentId,
+                rows.Count(b => b.FolderId == f.Id)))
+            .ToList();
+
+        return new BookmarkListResult(groups, folderRows);
+    }
+
+    /// <summary>
+    /// Builds a <see cref="BookmarkRow"/> from a resolved bookmark
+    /// (<c>title</c>, <c>link</c>) — carrying the row's own
+    /// <see cref="BookmarkRow.Id"/> and <see cref="BookmarkRow.FolderId"/>
+    /// (ADR 0168 D2) so the Web layer can render the per-row move control
+    /// and the folder nesting.
+    /// </summary>
+    private static BookmarkRow ToBookmarkRow(
+        string kind, (Bookmark Row, string? Title, string? Link) r)
+    {
+        bool degraded = r.Title is null && r.Link is null;
+        return new BookmarkRow(
+            kind,
+            r.Row.TargetId,
+            r.Title,
+            r.Link,
+            degraded,
+            r.Row.Created,
+            r.Row.Id,
+            r.Row.FolderId);
     }
 
     // ── Toggle (D3 write-lane visibility check; F1 idempotent) ────────────
@@ -256,6 +322,243 @@ public sealed class BookmarkService : IBookmarkService
             .ConfigureAwait(false);
     }
 
+    // ── Folder-tree methods (ADR 0168 D2 — the M37 folder-tree shape
+    //    re-applied to the bookmark surface) ─────────────────────────────
+    //
+    // D2 (ADR 0168): the folder tree is a personal tree, bounded in depth
+    // (≤ 2 — a new folder's parent must itself be a root), unique in name
+    // within the owner's tree (the (OwnerId, ParentId, Name) unique index
+    // is the witness), a bookmark's FolderId is the owner's folder id (a
+    // bookmark cannot live in another resident's folder), and a folder's
+    // deletion MOVES its bookmarks to the root (FolderId = null) — the
+    // bookmark is never lost. The M37 C-M37·6 pin, re-applied to the
+    // bookmark surface (the §deferred "bookmark folders" lane from
+    // m17-bookmarks-design.md, now settled).
+
+    /// <inheritdoc />
+    public async Task<FolderRow> CreateFolderAsync(
+        string ownerId, string name, string? parentId, IDocumentSession session)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(session);
+
+        // D2 — the depth ≤ 2 pin: if a parent is given, it must itself be a
+        // ROOT (ParentId == null). A folder whose parent is a non-root would
+        // open the tree past the bound (the ADR 0168 "arbitrary-depth folder
+        // tree" forbid). A foreign / absent parent is a non-leaky 404. The
+        // depth violation throws InvalidOperationException (the Web layer maps
+        // it to 400 — the depth is violated).
+        if (parentId is not null)
+        {
+            var parent = await session.LoadAsync<BookmarkFolder>(parentId).ConfigureAwait(false);
+            if (parent is null || !string.Equals(parent.OwnerId, ownerId, StringComparison.Ordinal))
+                throw new KeyNotFoundException($"Parent folder '{parentId}' not found for owner '{ownerId}'.");
+            if (parent.ParentId is not null)
+                throw new InvalidOperationException(
+                    "Folder depth exceeds the bound (≤ 2): a new folder's parent must be a root folder.");
+        }
+
+        // D2 — the (OwnerId, ParentId, Name) unique index is the witness: a
+        // sibling already holding the name under this parent is the no-op
+        // (return the existing row — the M17 Bookmark idempotent-create
+        // shape, adapted to the frozen <see cref="FolderRow"/> return). The
+        // same name under a *different* parent is allowed (the index is
+        // keyed on all three).
+        var existing = parentId is null
+            ? await session.Query<BookmarkFolder>()
+                .Where(f => f.OwnerId == ownerId && f.Name == name && f.ParentId == null)
+                .FirstOrDefaultAsync().ConfigureAwait(false)
+            : await session.Query<BookmarkFolder>()
+                .Where(f => f.OwnerId == ownerId && f.Name == name && f.ParentId == parentId)
+                .FirstOrDefaultAsync().ConfigureAwait(false);
+        if (existing is not null)
+            return ToFolderRow(existing, await FolderBookmarkCountAsync(session, ownerId, existing.Id).ConfigureAwait(false));
+
+        var folder = new BookmarkFolder
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            OwnerId = ownerId,
+            ParentId = parentId,
+            Name = name,
+            Created = DateTimeOffset.UtcNow,
+        };
+        session.Store(folder);
+        return new FolderRow(folder.Id, folder.Name, folder.ParentId, 0);
+    }
+
+    /// <inheritdoc />
+    public async Task<FolderRow> RenameFolderAsync(
+        string ownerId, string folderId, string newName, IDocumentSession session)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(newName);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var folder = await session.LoadAsync<BookmarkFolder>(folderId).ConfigureAwait(false);
+        // Owner pin (D2): a non-owner — a GlobalAdmin included — gets a
+        // non-leaky 404 (no leak that the folder exists).
+        if (folder is null || !string.Equals(folder.OwnerId, ownerId, StringComparison.Ordinal))
+            throw new KeyNotFoundException($"Folder '{folderId}' not found for owner '{ownerId}'.");
+
+        // No-op when the name is unchanged.
+        if (string.Equals(folder.Name, newName, StringComparison.Ordinal))
+            return ToFolderRow(folder, await FolderBookmarkCountAsync(session, ownerId, folderId).ConfigureAwait(false));
+
+        // D2 — the (OwnerId, ParentId, Name) unique index is the witness: a
+        // sibling already holding the new name under the same parent is a
+        // conflict the DB would reject on save; surfaced as
+        // InvalidOperationException (the Web layer maps to 400/409).
+        var conflict = folder.ParentId is null
+            ? await session.Query<BookmarkFolder>()
+                .Where(f => f.OwnerId == ownerId && f.Name == newName && f.ParentId == null && f.Id != folderId)
+                .AnyAsync().ConfigureAwait(false)
+            : await session.Query<BookmarkFolder>()
+                .Where(f => f.OwnerId == ownerId && f.Name == newName && f.ParentId == folder.ParentId && f.Id != folderId)
+                .AnyAsync().ConfigureAwait(false);
+        if (conflict)
+            throw new InvalidOperationException(
+                $"A folder named '{newName}' already exists in this part of the owner's tree.");
+
+        folder.Name = newName;
+        session.Store(folder);
+        return ToFolderRow(folder, await FolderBookmarkCountAsync(session, ownerId, folderId).ConfigureAwait(false));
+    }
+
+    /// <inheritdoc />
+    public async Task<BookmarkFolderDeleteResult> DeleteFolderAsync(
+        string ownerId, string folderId, IDocumentSession session)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderId);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var folder = await session.LoadAsync<BookmarkFolder>(folderId).ConfigureAwait(false);
+        // Owner pin (D2): a non-owner gets a non-leaky 404 (no row, no leak).
+        if (folder is null || !string.Equals(folder.OwnerId, ownerId, StringComparison.Ordinal))
+            throw new KeyNotFoundException($"Folder '{folderId}' not found for owner '{ownerId}'.");
+
+        // D2 — the folder's bookmarks are MOVED to the root (FolderId =
+        // null); the bookmark rows are never lost (the folder row is
+        // physically removed — the M17 Bookmark physical-removal shape — but
+        // the bookmark rows are re-parented, not deleted).
+        await MoveFolderBookmarksToRootAsync(session, ownerId, folderId).ConfigureAwait(false);
+
+        // D2 — child folders are recursively deleted (their bookmarks move
+        // to the root too). The tree is bounded (≤ 2), so there is at most
+        // one level of children; the loop is a belt-and-suspenders over that
+        // bound. Deleting a folder that has children is the FoldersDeleted
+        // outcome; a leaf folder (bookmarks only) is the BookmarksMoved
+        // outcome.
+        var result = BookmarkFolderDeleteResult.BookmarksMoved;
+        var children = await session.Query<BookmarkFolder>()
+            .Where(f => f.OwnerId == ownerId && f.ParentId == folderId)
+            .ToListAsync().ConfigureAwait(false);
+        foreach (var child in children)
+        {
+            await MoveFolderBookmarksToRootAsync(session, ownerId, child.Id).ConfigureAwait(false);
+            // Grandchildren — bounded, but recurse for safety (no unbounded
+            // surface per D2; the guard below is defensive only).
+            var grandchildren = await session.Query<BookmarkFolder>()
+                .Where(f => f.OwnerId == ownerId && f.ParentId == child.Id)
+                .ToListAsync().ConfigureAwait(false);
+            foreach (var grandchild in grandchildren)
+                await MoveFolderBookmarksToRootAsync(session, ownerId, grandchild.Id).ConfigureAwait(false);
+            session.Delete(child);
+            result = BookmarkFolderDeleteResult.FoldersDeleted;
+        }
+
+        session.Delete(folder);
+        return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<BookmarkRow> MoveBookmarkToFolderAsync(
+        string ownerId, string targetKind, string targetId, string? folderId,
+        IDocumentSession session)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetKind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetId);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var bookmark = await session.Query<Bookmark>()
+            .Where(b => b.OwnerId == ownerId && b.TargetKind == targetKind && b.TargetId == targetId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        // Owner pin: a non-owner gets a non-leaky 404.
+        if (bookmark is null)
+            throw new KeyNotFoundException($"Bookmark '{targetKind}/{targetId}' not found for owner '{ownerId}'.");
+
+        // D2 — the bookmark and the folder are in the SAME owner's tree: a
+        // bookmark cannot live in another resident's folder (C-M17·6, the
+        // M37 C-M37·6 pin re-applied). An absent or foreign folder is a
+        // non-leaky 404 (no leak that the folder exists).
+        if (folderId is not null)
+        {
+            var folder = await session.LoadAsync<BookmarkFolder>(folderId).ConfigureAwait(false);
+            if (folder is null || !string.Equals(folder.OwnerId, ownerId, StringComparison.Ordinal))
+                throw new KeyNotFoundException($"Folder '{folderId}' not found for owner '{ownerId}'.");
+        }
+
+        bookmark.FolderId = folderId; // null = move the bookmark to the root.
+        session.Store(bookmark);
+
+        // Resolve the (possibly dead) target for the row's Title / Link —
+        // the D5 degrade (a dangling bookmark still renders the
+        // bm.list.degraded label; the move control works regardless).
+        var (title, link) =
+            await ResolveForListAsync(bookmark.TargetKind, bookmark.TargetId, ownerId).ConfigureAwait(false);
+        return new BookmarkRow(
+            bookmark.TargetKind,
+            bookmark.TargetId,
+            title,
+            link,
+            title is null && link is null,
+            bookmark.Created,
+            bookmark.Id,
+            bookmark.FolderId);
+    }
+
+    // ── Folder-tree private helpers (ADR 0168) ───────────────────────────
+
+    /// <summary>Builds a <see cref="FolderRow"/> from a
+    /// <see cref="BookmarkFolder"/> + the folder's bookmark count.</summary>
+    private static FolderRow ToFolderRow(BookmarkFolder folder, int bookmarkCount)
+        => new FolderRow(folder.Id, folder.Name, folder.ParentId, bookmarkCount);
+
+    /// <summary>
+    /// The count of the owner's bookmarks sitting in the given folder (the
+    /// <see cref="FolderRow.BookmarkCount"/> shape; the M17 shape of
+    /// counting over the identity predicate).
+    /// </summary>
+    private static async Task<int> FolderBookmarkCountAsync(
+        IDocumentSession session, string ownerId, string folderId)
+        => await session.Query<Bookmark>()
+            .Where(b => b.OwnerId == ownerId && b.FolderId == folderId)
+            .CountAsync()
+            .ConfigureAwait(false);
+
+    /// <summary>
+    /// Moves every owner-bookmark in the given folder to the root
+    /// (<c>FolderId = null</c>) — the D2 pin: the bookmarks are never lost,
+    /// the folder deletion is a re-parent, not a bookmark removal.
+    /// </summary>
+    private static async Task MoveFolderBookmarksToRootAsync(
+        IDocumentSession session, string ownerId, string folderId)
+    {
+        var bookmarks = await session.Query<Bookmark>()
+            .Where(b => b.OwnerId == ownerId && b.FolderId == folderId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        foreach (var bookmark in bookmarks)
+        {
+            bookmark.FolderId = null; // D2 — moved to the root; never lost.
+            session.Store(bookmark);
+        }
+    }
+
     // ── The D5 list resolution — a pure, non-auditing doc load ────────────
 
     /// <summary>
@@ -319,6 +622,31 @@ public sealed class BookmarkService : IBookmarkService
                 return (todo.Title, $"/projects/todos/{targetId}");
             }
 
+            case "project":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
+                // "project" shape re-applied (a pure doc load, no CanAsync,
+                // no audit row — C-M17·2). The Project has no IsDraft (D8a —
+                // a project is live on creation), so only the IsDeleted
+                // gate applies (the ADR 0024 soft-delete flag).
+                var project = await s.LoadAsync<Project>(targetId).ConfigureAwait(false);
+                if (project is null || project.IsDeleted)
+                    return (null, null);
+                return (project.Title, $"/projects/projects/{targetId}");
+            }
+
+            case "board":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
+                // "board" shape re-applied (a pure doc load, no CanAsync,
+                // no audit row — C-M17·2). The KanbanBoard has no IsDraft
+                // (D8a), so only the IsDeleted gate applies.
+                var board = await s.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
+                if (board is null || board.IsDeleted)
+                    return (null, null);
+                return (board.Title, $"/projects/boards/{targetId}");
+            }
+
             case "announcement":
             {
                 var a = await s.LoadAsync<Announcement>(targetId).ConfigureAwait(false);
@@ -336,6 +664,22 @@ public sealed class BookmarkService : IBookmarkService
                     return (null, null);
                 var path = await BuildPagePathAsync(page.Id).ConfigureAwait(false);
                 return path is null ? (null, null) : (page.Title, path);
+            }
+
+            case "inventory":
+            {
+                var item = await s.LoadAsync<InventoryItem>(targetId).ConfigureAwait(false);
+                if (item is null || item.IsDeleted)
+                    return (null, null);
+                return (item.Name, $"/inventory/{targetId}");
+            }
+
+            case "directory":
+            {
+                var profile = await _userInfo.GetProfileAsync(targetId).ConfigureAwait(false);
+                if (profile is null || profile.Blocked)
+                    return (null, null);
+                return (profile.DisplayName, $"/directory/{targetId}");
             }
 
             default:
@@ -413,6 +757,58 @@ public sealed class BookmarkService : IBookmarkService
                 }
             }
 
+            case "project":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
+                // "project" D3 shape re-applied: re-runs the owning surface's
+                // own frozen IProjectService.GetProjectAsync read (the same
+                // call the /projects/{id} detail page uses — the C-M17·3
+                // pin: the target's own audit row commits, M17 commits none
+                // of its own). KeyNotFoundException (404 on absent /
+                // soft-deleted) + UnauthorizedAccessException (403 on
+                // denied) both degrade to Refused — the M17 404-not-403
+                // Web mapping collapses the split to a non-leaky 404 (the
+                // D3 table: a denied / absent / soft-deleted target is
+                // Refused, the M16 create-gate posture).
+                try
+                {
+                    var project = await _projects.GetProjectAsync(targetId, actorId).ConfigureAwait(false);
+                    return (true, project.Title, $"/projects/projects/{targetId}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    return (false, null, null);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (false, null, null);
+                }
+            }
+
+            case "board":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
+                // "board" D3 shape re-applied: re-runs the owning surface's
+                // own frozen IProjectService.GetBoardAsync read (the same
+                // call the /projects/boards/{id} detail page uses — the
+                // C-M17·3 pin: the target's own audit row commits, M17
+                // commits none of its own). KeyNotFoundException +
+                // UnauthorizedAccessException both degrade to Refused.
+                try
+                {
+                    var detail = await _projects.GetBoardAsync(targetId, actorId).ConfigureAwait(false);
+                    return (true, detail.Board.Title, $"/projects/boards/{targetId}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    return (false, null, null);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (false, null, null);
+                }
+            }
+
             case "announcement":
             {
                 // The announcement lane has no AccessAudit / CanAsync of its
@@ -462,6 +858,48 @@ public sealed class BookmarkService : IBookmarkService
 
                 var path = await BuildPagePathAsync(page.Id).ConfigureAwait(false);
                 return path is null ? (false, null, null) : (true, page.Title, path);
+            }
+
+            case "inventory":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M16 Inventory detail
+                // page's own read, re-run: IInventoryService.GetItemAsync
+                // (the same call the /inventory/{id} detail page uses — the
+                // C-M17·3 pin: the target's own audit row commits, M17
+                // commits none of its own). KeyNotFoundException (404 on
+                // absent / soft-deleted / denied — the C-M3·4 non-leaky shape)
+                // degrades to Refused.
+                try
+                {
+                    var item = await _inventory.GetItemAsync(targetId, actorId).ConfigureAwait(false);
+                    return (true, item.Name, $"/inventory/{targetId}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    return (false, null, null);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (false, null, null);
+                }
+            }
+
+            case "directory":
+            {
+                // The M37 PersonalNotes "directory" D3 shape re-applied:
+                // the profile read (GetProfileAsync — a pure read, the detail
+                // page's own projection) + the frozen CanAsync(Read) over the
+                // ProfileToAuditableResource (the C-M17·3 pin: the target's
+                // own audit row commits, M17 commits none of its own).
+                var profile = await _userInfo.GetProfileAsync(targetId).ConfigureAwait(false);
+                if (profile is null || profile.Blocked)
+                    return (false, null, null);
+                var decision = await _authz.CanAsync(
+                    actorId, AccessAction.Read, new ProfileToAuditableResource(profile))
+                    .ConfigureAwait(false);
+                if (!decision.Allowed)
+                    return (false, null, null);
+                return (true, profile.DisplayName, $"/directory/{targetId}");
             }
 
             default:

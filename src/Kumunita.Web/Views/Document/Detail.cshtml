@@ -20,6 +20,14 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* M37 (ADR 0167) — the note-attach affordance, on ONE right-aligned row
+           at the TOP of the parent column (just below the nav bar, to the
+           right). The M17 bookmark closed set does not include "document",
+           so there is no M17 sibling on this surface. *@
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            @{ var _pn = ("document", Model.Document.Id, $"/documents/{Model.Document.Id}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
         <p>
             <a href="/documents" class="btn btn-link p-0">
                 &larr; <kw-l key="documents.title">Documents</kw-l>

@@ -7,13 +7,20 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MailKit" Version="4.18.1" />
-    <PackageReference Include="Marten" Version="9.31.2" />
+    <!-- Security pin: MimeKit (pulled by MailKit 4.18.1) depends on
+         System.Security.Cryptography.Pkcs 10.0.0, which carries NU1902
+         (GHSA-2fmv-rv2c-59x7) and NU1903 (GHSA-846f-f764-76mx). Pinning the
+         patched 10.0.13 here forces the higher version across the whole
+         dependency graph and silences the advisory in every project that
+         transitively references Core (Web, Core.Tests, Web.Tests). -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="Marten" Version="9.50.2" />
     <!-- Raw parameterised SQL on the hand-rolled mt."AdminOverride" table
          (ConsumeBreakGlassAsync, the break-glass consume write). Matches the Npgsql
          10.0.x the rest of the tree (Web, Core.Tests) already pins; makes the
          direct ADO.NET surface explicit instead of relying on Marten's transitive pull. -->
     <PackageReference Include="Npgsql" Version="10.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.13" />
     <!-- EF Core's Npgsql provider. Needed in Core (not just Web): the Identity schema's
          EF Core migrations live next to AppDbContext in this assembly (ADR 0004 —
          "standard EF Core migrations, applied at startup"), and the generated migration
@@ -23,9 +30,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <!-- Explicit for AddKumunitaCore's public API (IServiceCollection); Bootstrap's DI
          usings previously flowed transitively. -->
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
     <!-- M1 step 7 (C3 fix, plan-m1-step-7-outbox-email-c3.md):
           Core now carries the *enqueue* half of the durable OutboxEmail
           pipeline. The prior convention — "Wolverine is a Web package" — is
@@ -54,10 +61,10 @@
           Kumunita.Web.csproj (R4 — do not let a transitive bump drift one
           of them; WolverineFx.Marten 6.33 pulls WolverineFx >= 6.33 so the
           two stay locked together as they already are in Web). -->
-    <PackageReference Include="WolverineFx" Version="6.33.0" />
+    <PackageReference Include="WolverineFx" Version="6.50.2" />
     <!-- EF Core design-time: lets `dotnet ef migrations add ...` discover AppDbContext
           without booting the Web host (the DesignTimeDbContextFactory seam). -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -72,6 +79,17 @@
        warm-boot backfill (ADR 0060) are sourced from the same file. -->
   <ItemGroup>
     <EmbeddedResource Include="Data\sample-data.json" LogicalName="Kumunita.Core.sample-data.json" />
+  </ItemGroup>
+
+  <!-- F9 (AUTH-15) — the instance's disposable-email blocklist: a committed,
+       versioned, owner-editable text file (one domain per line) read by
+       `DisallowedEmailDomains`. Embedded (the `sample-data.json` precedent), NOT
+       a NuGet package (pin §2a: a self-hosted T1 platform keeps a pinned,
+       self-contained image — no new supply-chain surface for a slow-moving list).
+       `DisallowedEmailDomains` resolves the stream by name (with a suffix
+       fallback), so no explicit `LogicalName` is required. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Identity\disposable-emails.txt" />
   </ItemGroup>
 
 </Project>

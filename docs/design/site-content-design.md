@@ -899,3 +899,20 @@ by a later unit is a `## U<m> — Drift pause` section in the handoff note
 
 *— Part 2 (seams & contracts) authored by U02 (2026-10-07). ADR 0150 is
 drafted (Status: Accepted) in the same unit.*
+
+## Amendments
+
+### 2026-10-22 — D3 save lane: upsert-on-missing (ADR 0170)
+
+The SITE·2 pin's "**The lane never load-or-creates a new row on a save** —
+it upserts the singleton" is **amended**: a save on a missing row now
+**creates** the singleton (the ADR 0164 `KioskService` "upsert vs. no-op"
+shape, the M35·2 pin). The upsert contract (exactly one row, never a
+second row — SITE·6) is unchanged; the strong-consistency contract
+(invariant C4) is now actually honored on the missing-row path (the new
+value is live on the very next `GetAsync`, exactly one `AccessAudit` row
+written). The `ISiteContentService.SaveAsync` seam signature and the
+audit-row shape are byte-identical. The sibling `SurfaceLabelsService`
+(ADR 0152, M29·6) carries the same no-op template and is **not** amended
+in this pass (ADR 0170 D5 — a separate follow-up if the latent-bug class
+is confirmed there). See **ADR 0170** for the full locked text.

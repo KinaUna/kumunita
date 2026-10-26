@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Security.Claims;
 using Kumunita.Core.Bookmarks;
 using Kumunita.Core.Localization;
@@ -10,8 +11,11 @@ namespace Kumunita.Web.Controllers;
 
 /// <summary>
 /// The <c>/bookmarks</c> surface (M17 — ADR 0118: the personal pin surface
-/// for the five closed <see cref="Bookmark.TargetKind"/>s — <c>post</c> /
-/// <c>event</c> / <c>todo</c> / <c>announcement</c> / <c>page</c>). A *thin*
+/// for the seven closed <see cref="Bookmark.TargetKind"/>s — <c>post</c> /
+/// <c>event</c> / <c>todo</c> / <c>announcement</c> / <c>page</c> /
+/// <c>project</c> / <c>board</c> — the project / board kinds joined by the
+/// ADR 0118 amendment, 2026-10-16, the M37 PersonalNotes closed-set
+/// vocabulary already carried them). A *thin*
 /// HTTP layer (ADR 0006-D: routes + authz + shape): every access decision
 /// comes from the frozen <see cref="IBookmarkService"/> seam (the single
 /// decision path — C-M17·1: the seam composes only frozen seams, no new
@@ -247,4 +251,204 @@ public sealed class BookmarksController(
         TempData["info"] = await T("bm.toggle.bookmarked");
         return Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/bookmarks" : returnUrl);
     }
+
+    // ── Folder-tree controls (the /bookmarks list's new / rename / delete /
+    //    move — ADR 0168 D2, the M37 NotesController folder-endpoint shape
+    //    re-applied to the bookmark surface). Each follows the same
+    //    C-M17·2 non-leaky-404 + zero-audit shape as the existing routes:
+    //    the controller never re-derives access, the frozen IBookmarkService
+    //    seam is the sole reader/writer, and a non-owner (a GlobalAdmin
+    //    included) gets a non-leaky 404 (the ADR 0105 "operator has no read
+    //    standing" precedent). The controller commits in its own fresh
+    //    IDocumentSession (the C3 same-transaction lane — BookmarkService
+    //    never commits internally; the caller owns the single write).
+
+    /// <summary>
+    /// <c>GET /bookmarks/folders/new</c> — the new-folder form (ADR 0168
+    /// D2: the folder tree is a personal tree, bounded in depth ≤ 2). 404
+    /// when the caller has no read standing.
+    /// </summary>
+    [HttpGet("/bookmarks/folders/new")]
+    public IActionResult FolderNew()
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        return View();
+    }
+
+    /// <summary>
+    /// <c>POST /bookmarks/folders/new</c> — create a folder (ADR 0168 D2).
+    /// 404 when the caller has no read standing. Redirects back to the
+    /// form when the name is empty.
+    /// </summary>
+    [HttpPost("/bookmarks/folders/new")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FolderNewSave(string? name)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        if (string.IsNullOrWhiteSpace(name))
+            return Redirect("/bookmarks/folders/new");
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await bookmarks.CreateFolderAsync(actorId, name.Trim(), null, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/bookmarks");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            // D2 depth violation or name conflict — 400.
+            return BadRequest();
+        }
+    }
+
+    /// <summary>
+    /// <c>GET /bookmarks/folders/{folderId}/rename</c> — the rename-folder
+    /// form (ADR 0168 D2). 404 when the folder does not exist or the caller
+    /// is not the owner.
+    /// </summary>
+    [HttpGet("/bookmarks/folders/{folderId}/rename")]
+    public async Task<IActionResult> FolderRename(string folderId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        try
+        {
+            var list = await bookmarks.ListAsync(actorId);
+            var folder = list.Folders.FirstOrDefault(f => f.Id == folderId);
+            if (folder is null) return NotFound();
+            return View(folder);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /bookmarks/folders/{folderId}/rename</c> — rename a folder
+    /// (ADR 0168 D2). 404 when the folder does not exist or the caller is
+    /// not the owner.
+    /// </summary>
+    [HttpPost("/bookmarks/folders/{folderId}/rename")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FolderRenameSave(string folderId, string? name)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        if (string.IsNullOrWhiteSpace(name))
+            return Redirect($"/bookmarks/folders/{folderId}/rename");
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await bookmarks.RenameFolderAsync(actorId, folderId, name.Trim(), session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/bookmarks");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            // D2 name conflict — 400.
+            return BadRequest();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /bookmarks/folders/{folderId}/delete</c> — delete a folder
+    /// (ADR 0168 D2: the folder's bookmarks are moved to the root; the
+    /// bookmarks are never lost). 404 when the folder does not exist or the
+    /// caller is not the owner.
+    /// </summary>
+    [HttpPost("/bookmarks/folders/{folderId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FolderDelete(string folderId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        await using var session = store.LightweightSession();
+        try
+        {
+            await bookmarks.DeleteFolderAsync(actorId, folderId, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/bookmarks");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>GET /bookmarks/{targetKind}/{targetId}/move</c> — the move-folder
+    /// form (ADR 0168 D2: the folder tree is a personal tree, bounded in
+    /// depth). 404 when the bookmark does not exist or the caller is not the
+    /// owner.
+    /// </summary>
+    [HttpGet("/bookmarks/{targetKind}/{targetId}/move")]
+    public async Task<IActionResult> BookmarkMove(string targetKind, string targetId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        try
+        {
+            var list = await bookmarks.ListAsync(actorId);
+            // Resolve the bookmark row (for the current-folder pre-select)
+            // from the list result (the D2 personal read, C-M17·2).
+            var row = list.Groups
+                .SelectMany(g => g.Items)
+                .FirstOrDefault(r => r.TargetKind == targetKind && r.TargetId == targetId);
+            if (row is null) return NotFound();
+            return View(new BookmarkMoveForm(row, list.Folders));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /bookmarks/{targetKind}/{targetId}/move</c> — move the
+    /// bookmark to (or from) a folder (ADR 0168 D2). 404 when the bookmark
+    /// or folder does not exist or the caller is not the owner.
+    /// </summary>
+    [HttpPost("/bookmarks/{targetKind}/{targetId}/move")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BookmarkMoveSave(string targetKind, string targetId, string? folderId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        await using var session = store.LightweightSession();
+        try
+        {
+            await bookmarks.MoveBookmarkToFolderAsync(actorId, targetKind, targetId, folderId, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/bookmarks");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
 }
+
+/// <summary>
+/// The form model for <c>GET /bookmarks/{targetKind}/{targetId}/move</c>
+/// (the folder picker — the M37 <c>NoteMoveForm</c> shape re-applied): the
+/// bookmark row (for the current-folder pre-select + the 404 witness) + the
+/// owner's folder tree (the ADR 0168 D2 personal tree, bounded in depth ≤ 2).
+/// </summary>
+public sealed record BookmarkMoveForm(BookmarkRow Bookmark, IReadOnlyList<FolderRow> Folders);

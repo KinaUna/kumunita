@@ -5,6 +5,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Bookmarks;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -391,12 +392,311 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     [Fact]
     public void TargetKind_IsTheClosedStringSet()
     {
+        // The ADR 0118 amendment (2026-10-16) added the project / board
+        // kinds — the M37 PersonalNotes closed-set vocabulary already
+        // carried them; the M17 surface now matches. The ADR 0118 amendment
+        // (2026-10-16) also added the M16 inventory + M2 directory kinds —
+        // the M37 PersonalNotes "directory" closed-set vocabulary re-applied
+        // to the M17 surface, and the M16 inventory surface's own read
+        // (GetItemAsync) re-applied. The set is now NINE kinds (was five at
+        // M17 ship, seven after the project / board amendment, the M5
+        // KanbanStatuses shape pin still holds: string, not enum, closed,
+        // drift-guarded).
         var expected = new HashSet<string>(StringComparer.Ordinal)
-            { "post", "event", "todo", "announcement", "page" };
+            { "post", "event", "todo", "announcement", "page", "project", "board", "inventory", "directory" };
 
-        // The closed set is exactly five kinds (D1, the M5 KanbanStatuses shape).
         Assert.Equal(expected, new HashSet<string>(BookmarkService.ClosedTargetKinds, StringComparer.Ordinal));
-        Assert.Equal(5, BookmarkService.ClosedTargetKinds.Count);
+        Assert.Equal(9, BookmarkService.ClosedTargetKinds.Count);
+    }
+
+    // ── ADR 0118 amendment (2026-10-16) — the project / board bookmark
+    //    lanes (the M37 PersonalNotes closed-set vocabulary re-applied to
+    //    the M17 surface) ───────────────────────────────────────────────
+    //
+    // The ADR 0118 amendment (2026-10-16) added the project / board kinds
+    // to the closed set. The D3 write-lane check re-runs the owning
+    // surface's own frozen IProjectService.GetProjectAsync / GetBoardAsync
+    // read — the same call the /projects/{id} / /projects/boards/{id}
+    // detail page uses (the M37 PersonalNotes "project" / "board" D3 shape
+    // re-applied). These tests pin that the new kinds behave identically
+    // to the existing five (F1 idempotency, D3 write-lane check, D4
+    // physical removal, D5 list resolution).
+
+    // ── 16 — F2_ProjectBookmark_WriteLanePositive (D3, positive) ───────
+
+    [Fact]
+    public async Task F2_ProjectBookmark_WriteLanePositive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-16-owner";
+        const string projectId = "p-16-project";
+
+        // Plant a visible project (author = owner — the author branch of
+        // the frozen Decide() passes CanAsync(Read)).
+        await Plant(store, new Project
+        {
+            Id = projectId,
+            AuthorId = owner,
+            Title = "16 test project",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        // The D3 check passes (the author branch): a visible target is
+        // bookmarkable, the row is created.
+        var result = await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, result.Status);
+
+        // The row is keyed on the (owner, "project", projectId) tuple.
+        var rows = await Bookmarks(store, owner);
+        Assert.Single(rows, b => b.TargetKind == "project" && b.TargetId == projectId);
+
+        // Idempotency (F1 — the unique index witness):
+        var second = await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        Assert.Equal(BookmarkToggleStatus.AlreadyBookmarked, second.Status);
+        Assert.Single(await Bookmarks(store, owner), b => b.TargetKind == "project");
+    }
+
+    // ── 17 — F2_ProjectBookmark_InvisibleRefused (D3, negative) ────────
+
+    [Fact]
+    public async Task F2_ProjectBookmark_InvisibleRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-17-owner";
+        const string author = "u-17-author";
+        const string projectId = "p-17-project";
+
+        // A project authored by a *different* resident, with an audience that
+        // grants only the author — the owner is neither the author nor in the
+        // audience, has no role standing: the frozen CanAsync(Read) denies →
+        // Refused (the M16 create-gate posture, the 404-not-403 Web mapping).
+        // (Audience = null would be community-visible, ADR 0036 — so the
+        // restricted audience is what makes the target invisible.)
+        await Plant(store, new Project
+        {
+            Id = projectId,
+            AuthorId = author,
+            Title = "17 invisible project",
+            Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var result = await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        Assert.Equal(BookmarkToggleStatus.Refused, result.Status);
+
+        // No Bookmark row survives (the D3 table: a denied / absent /
+        // soft-deleted target is Refused, no row is created).
+        var rows = await Bookmarks(store, owner);
+        Assert.DoesNotContain(rows, b => b.TargetKind == "project" && b.TargetId == projectId);
+    }
+
+    // ── 18 — F2_BoardBookmark_WriteLanePositive (D3, positive) ─────────
+
+    [Fact]
+    public async Task F2_BoardBookmark_WriteLanePositive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-18-owner";
+        const string boardId = "b-18-board";
+
+        // Plant a visible board (author = owner — the author branch of
+        // the frozen Decide() passes CanAsync(Read)).
+        await Plant(store, new KanbanBoard
+        {
+            Id = boardId,
+            AuthorId = owner,
+            Title = "18 test board",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var result = await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, result.Status);
+
+        var rows = await Bookmarks(store, owner);
+        Assert.Single(rows, b => b.TargetKind == "board" && b.TargetId == boardId);
+
+        // Idempotency (F1):
+        var second = await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+        Assert.Equal(BookmarkToggleStatus.AlreadyBookmarked, second.Status);
+        Assert.Single(await Bookmarks(store, owner), b => b.TargetKind == "board");
+    }
+
+    // ── 19 — F2_BoardBookmark_InvisibleRefused (D3, negative) ──────────
+
+    [Fact]
+    public async Task F2_BoardBookmark_InvisibleRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-19-owner";
+        const string author = "u-19-author";
+        const string boardId = "b-19-board";
+
+        // A board authored by a *different* resident, with an audience that
+        // grants only the author — the owner has no standing: the frozen
+        // CanAsync(Read) denies → Refused. (Audience = null would be
+        // community-visible, ADR 0036 — so the restricted audience is what
+        // makes the target invisible.)
+        await Plant(store, new KanbanBoard
+        {
+            Id = boardId,
+            AuthorId = author,
+            Title = "19 invisible board",
+            Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var result = await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+        Assert.Equal(BookmarkToggleStatus.Refused, result.Status);
+
+        var rows = await Bookmarks(store, owner);
+        Assert.DoesNotContain(rows, b => b.TargetKind == "board" && b.TargetId == boardId);
+    }
+
+    // ── 20 — F4_ProjectBoardRowsResolveTitleAndLink (D5, positive) ─────
+
+    [Fact]
+    public async Task F4_ProjectBoardRowsResolveTitleAndLink()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-20-owner";
+        const string projectId = "p-20-project";
+        const string boardId = "b-20-board";
+
+        await Plant(store, new Project
+        {
+            Id = projectId,
+            AuthorId = owner,
+            Title = "20 test project",
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = boardId,
+            AuthorId = owner,
+            Title = "20 test board",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+
+        var list = await bm.ListAsync(owner);
+
+        // The project group (the "project" kind, the canonical order puts
+        // it after "page" in the ClosedTargetKindsOrdered array).
+        var projectGroup = Assert.Single(list.Groups, g => g.Kind == "project");
+        var projectRow = Assert.Single(projectGroup.Items);
+        Assert.False(projectRow.Degraded);
+        Assert.Equal("20 test project", projectRow.Title);
+        Assert.Equal($"/projects/projects/{projectId}", projectRow.Link);
+
+        // The board group (the "board" kind, last in the canonical order).
+        var boardGroup = Assert.Single(list.Groups, g => g.Kind == "board");
+        var boardRow = Assert.Single(boardGroup.Items);
+        Assert.False(boardRow.Degraded);
+        Assert.Equal("20 test board", boardRow.Title);
+        Assert.Equal($"/projects/boards/{boardId}", boardRow.Link);
+    }
+
+    // ── 21 — F4_ProjectBoardDanglingRowsDegrade (D5, negative) ─────────
+
+    [Fact]
+    public async Task F4_ProjectBoardDanglingRowsDegrade()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-21-owner";
+        const string ghostProjectId = "p-21-ghost-project";
+        const string ghostBoardId = "b-21-ghost-board";
+
+        // Plant the bookmark rows directly (no toggle — the targets are
+        // absent, so the D3 check would refuse).
+        await Plant(store, new Bookmark
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerId = owner,
+            TargetKind = "project",
+            TargetId = ghostProjectId,
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new Bookmark
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerId = owner,
+            TargetKind = "board",
+            TargetId = ghostBoardId,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var list = await bm.ListAsync(owner);
+
+        // The project group — the dangling row degrades to (null, null),
+        // Degraded = true (the D5 / C-M17·5 pin — exactly one static
+        // bm.list.degraded label, no <a> tag, no title, no TargetId).
+        var projectGroup = Assert.Single(list.Groups, g => g.Kind == "project");
+        var projectRow = Assert.Single(projectGroup.Items);
+        Assert.True(projectRow.Degraded);
+        Assert.Null(projectRow.Title);
+        Assert.Null(projectRow.Link);
+        Assert.Equal(ghostProjectId, projectRow.TargetId);
+
+        // The board group — same D5 degrade shape.
+        var boardGroup = Assert.Single(list.Groups, g => g.Kind == "board");
+        var boardRow = Assert.Single(boardGroup.Items);
+        Assert.True(boardRow.Degraded);
+        Assert.Null(boardRow.Title);
+        Assert.Null(boardRow.Link);
+        Assert.Equal(ghostBoardId, boardRow.TargetId);
+    }
+
+    // ── 22 — F4_SoftDeletedProjectBoardRefused (D3, soft-delete) ───────
+
+    [Fact]
+    public async Task F4_SoftDeletedProjectBoardRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-22-owner";
+        const string projectId = "p-22-project";
+        const string boardId = "b-22-board";
+
+        // A soft-deleted project (IsDeleted = true, the ADR 0024 flag) —
+        // the owning surface's frozen GetProjectAsync throws
+        // KeyNotFoundException on absent / soft-deleted (the C3 split),
+        // which the D3 table maps to Refused.
+        await Plant(store, new Project
+        {
+            Id = projectId,
+            AuthorId = owner,
+            Title = "22 soft-deleted project",
+            Created = DateTimeOffset.UtcNow,
+            IsDeleted = true,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = boardId,
+            AuthorId = owner,
+            Title = "22 soft-deleted board",
+            Created = DateTimeOffset.UtcNow,
+            IsDeleted = true,
+        });
+
+        var projectResult = await RunInSession(store, s => bm.ToggleAsync(owner, "project", projectId, s));
+        Assert.Equal(BookmarkToggleStatus.Refused, projectResult.Status);
+
+        var boardResult = await RunInSession(store, s => bm.ToggleAsync(owner, "board", boardId, s));
+        Assert.Equal(BookmarkToggleStatus.Refused, boardResult.Status);
+
+        // No rows survive (the D3 table: absent / soft-deleted → Refused,
+        // no row is created).
+        var rows = await Bookmarks(store, owner);
+        Assert.DoesNotContain(rows, b => b.TargetKind == "project" && b.TargetId == projectId);
+        Assert.DoesNotContain(rows, b => b.TargetKind == "board" && b.TargetId == boardId);
     }
 
     // ── Shared helpers ──────────────────────────────────────────────────
@@ -412,6 +712,7 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.Storage.Add<AuthorizationFeature>();
             CoreDocTypes.Configure(opts);
             PostDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
             BookmarkDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
@@ -470,7 +771,8 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         var pages = new PageService(store);
         var events = new EventService(store, authz, userInfo);
         var projects = new ProjectService(store, authz, userInfo);
-        var bm = new BookmarkService(userInfo, authz, store, announcements, pages, events, projects, identity);
+        var inventory = new InventoryService(store, authz, userInfo);
+        var bm = new BookmarkService(userInfo, authz, store, announcements, pages, events, projects, inventory, identity);
         return (userInfo, authz, bm);
     }
 
@@ -520,6 +822,16 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         return await Marten.QueryableExtensions.ToListAsync(
             s.Query<Bookmark>()
                 .Where(b => b.OwnerId == owner),
+            ct);
+    }
+
+    private static async Task<IReadOnlyList<BookmarkFolder>> Folders(IDocumentStore store, string owner)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await Marten.QueryableExtensions.ToListAsync(
+            s.Query<BookmarkFolder>()
+                .Where(f => f.OwnerId == owner),
             ct);
     }
 
@@ -630,5 +942,190 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         // Verify the row was created.
         var rows = await Bookmarks(store, adminId);
         Assert.Single(rows, b => b.TargetKind == "announcement" && b.TargetId == annId);
+    }
+
+    // ── Folder-tree tests (ADR 0168 D2 — the M37 C_M37_6_* pin re-applied to
+    //    the bookmark surface) ─────────────────────────────────────────────
+
+    /// <summary>
+    /// C_M17_6_FolderTree_DepthBounded_UniqueName (ADR 0168 D2 — the M37
+    /// C_M37_6_FolderTree_DepthBounded_UniqueName pin re-applied): a folder
+    /// tree is a personal tree, bounded in depth (≤ 2: a new folder's parent
+    /// must be a root), unique in name within the owner's tree (the
+    /// (OwnerId, ParentId, Name) unique index is the witness), and a foreign
+    /// parent / a non-root parent is a non-leaky 404 / depth violation.
+    /// </summary>
+    [Fact]
+    public async Task C_M17_6_FolderTree_DepthBounded_UniqueName()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-cm176-owner";
+
+        // Root folder, then a child under it (depth ≤ 2 — both allowed).
+        var root = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Work", null, s));
+        var child = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Deep", root.Id, s));
+        Assert.NotNull(root.Id);
+        Assert.NotNull(child.Id);
+
+        // A depth violation: a new folder whose parent is a non-root (a child)
+        // would open the tree past the bound (the ADR 0168 "arbitrary-depth
+        // folder tree" forbid) — throws InvalidOperationException.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RunInSession(store, s => bm.CreateFolderAsync(owner, "TooDeep", child.Id, s)));
+
+        // A foreign parent is a non-leaky 404 (KeyNotFoundException).
+        const string other = "u-cm176-other";
+        var otherRoot = await RunInSession(store, s => bm.CreateFolderAsync(other, "Other", null, s));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s => bm.CreateFolderAsync(owner, "X", otherRoot.Id, s)));
+
+        // The (OwnerId, ParentId, Name) unique index is the witness: a
+        // same-name, same-parent folder is the no-op (returns the existing
+        // row — one row, not a new one).
+        var dupRoot = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Work", null, s));
+        Assert.Equal(root.Id, dupRoot.Id);
+
+        // A different parent with the same name is allowed (the index is
+        // keyed on all three).
+        var sameNameUnderChild = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Work", root.Id, s));
+        Assert.NotEqual(root.Id, sameNameUnderChild.Id);
+    }
+
+    /// <summary>
+    /// C_M17_6_FolderDeletion_MovesBookmarksToRoot_BookmarksSurvive (ADR
+    /// 0168 D2 — the M37 C_M37_6_FolderDeletion_MovesNotesToRoot_BodiesSurvive
+    /// pin re-applied): a folder's deletion MOVES its bookmarks to the root
+    /// (FolderId = null) — the bookmark rows are never lost (re-parented, not
+    /// deleted); child folders are recursively deleted (their bookmarks move
+    /// to the root too).
+    /// </summary>
+    [Fact]
+    public async Task C_M17_6_FolderDeletion_MovesBookmarksToRoot_BookmarksSurvive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-cm176b-owner";
+        const string postId = "cm176b-post";
+        const string otherPostId = "cm176b-post2";
+
+        await PlantVisiblePost(store, postId, owner);
+        await PlantVisiblePost(store, otherPostId, owner);
+
+        // Plant two root folders + one child.
+        var root = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Archive", null, s));
+        var child = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Old", root.Id, s));
+
+        // Plant a bookmark in the root folder and one in the child.
+        var rootBm = await RunInSession(store, s => bm.ToggleAsync(owner, "post", postId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, rootBm.Status);
+        var childBm = await RunInSession(store, s => bm.ToggleAsync(owner, "post", otherPostId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, childBm.Status);
+        await RunInSession(store, s => bm.MoveBookmarkToFolderAsync(owner, "post", postId, root.Id, s));
+        await RunInSession(store, s => bm.MoveBookmarkToFolderAsync(owner, "post", otherPostId, child.Id, s));
+
+        // Delete the root folder — it has a child, so the outcome is
+        // FoldersDeleted (child recursively deleted).
+        var result = await RunInSession(store, s => bm.DeleteFolderAsync(owner, root.Id, s));
+        Assert.Equal(BookmarkFolderDeleteResult.FoldersDeleted, result);
+
+        // Both folders (root + child) are physically removed.
+        var folders = await Folders(store, owner);
+        Assert.DoesNotContain(folders, f => f.Id == root.Id);
+        Assert.DoesNotContain(folders, f => f.Id == child.Id);
+
+        // Both bookmarks are moved to the root (FolderId = null) — the bookmark
+        // rows are never lost (the D2 pin: folder deletion is a re-parent, not
+        // a bookmark removal).
+        var bookmarks = await Bookmarks(store, owner);
+        Assert.Equal(2, bookmarks.Count);
+        foreach (var b in bookmarks)
+        {
+            Assert.Null(b.FolderId);   // moved to the root
+        }
+        Assert.Equal("post", bookmarks.First(x => x.TargetId == postId).TargetKind);
+        Assert.Equal("post", bookmarks.First(x => x.TargetId == otherPostId).TargetKind);
+    }
+
+    /// <summary>
+    /// C_M17_6_BookmarkCannotLiveInAnotherResidentFolder (ADR 0168 D2 — the
+    /// M37 C_M37_6_NoteCannotLiveInAnotherResidentFolder pin re-applied): a
+    /// bookmark cannot live in another resident's folder (a foreign folder is
+    /// a non-leaky 404 on the move).
+    /// </summary>
+    [Fact]
+    public async Task C_M17_6_BookmarkCannotLiveInAnotherResidentFolder()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string ownerA = "u-cm176c-ownerA";
+        const string ownerB = "u-cm176c-ownerB";
+        const string postId = "cm176c-post";
+
+        await PlantVisiblePost(store, postId, ownerA);
+        var bmRow = await RunInSession(store, s => bm.ToggleAsync(ownerA, "post", postId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, bmRow.Status);
+
+        // Owner B's folder.
+        var folderB = await RunInSession(store, s => bm.CreateFolderAsync(ownerB, "B's folder", null, s));
+        Assert.NotNull(folderB.Id);
+
+        // Owner A cannot move their bookmark into Owner B's folder (non-leaky 404).
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s => bm.MoveBookmarkToFolderAsync(ownerA, "post", postId, folderB.Id, s)));
+
+        // And a non-owner cannot move Owner A's bookmark at all (non-leaky 404).
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s => bm.MoveBookmarkToFolderAsync(ownerB, "post", postId, null, s)));
+    }
+
+    /// <summary>
+    /// F1_ListGroupsUnderFolderTree (ADR 0168 D2 — the M37 ListNotesAsync
+    /// shape re-applied): the owner's list groups bookmarks by (TargetKind,
+    /// FolderId), with the unfiled bucket (FolderId = null) and the owner's
+    /// folder tree carried in the result (the Folders list, with the
+    /// BookmarkCount per folder).
+    /// </summary>
+    [Fact]
+    public async Task F1_ListGroupsUnderFolderTree()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-cm17f1-owner";
+        const string post1 = "cm17f1-post1";
+        const string post2 = "cm17f1-post2";
+
+        await PlantVisiblePost(store, post1, owner);
+        await PlantVisiblePost(store, post2, owner);
+        await RunInSession(store, s => bm.ToggleAsync(owner, "post", post1, s));
+        await RunInSession(store, s => bm.ToggleAsync(owner, "post", post2, s));
+
+        var folder = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Read later", null, s));
+        await RunInSession(store, s => bm.MoveBookmarkToFolderAsync(owner, "post", post1, folder.Id, s));
+        // post2 stays unfiled (root).
+
+        var result = await bm.ListAsync(owner);
+
+        // The "post" kind has TWO groups: one for the folder, one unfiled.
+        var postGroups = result.Groups.Where(g => g.Kind == "post").ToList();
+        Assert.Equal(2, postGroups.Count);
+
+        // The folder group carries one item (post1) + the folder id.
+        var folderGroup = postGroups.First(g => g.FolderId == folder.Id);
+        Assert.Single(folderGroup.Items);
+        Assert.Equal(post1, folderGroup.Items[0].TargetId);
+        Assert.Equal(folder.Id, folderGroup.Items[0].FolderId);
+
+        // The unfiled group carries one item (post2), FolderId = null.
+        var unfiledGroup = postGroups.First(g => g.FolderId is null);
+        Assert.Single(unfiledGroup.Items);
+        Assert.Equal(post2, unfiledGroup.Items[0].TargetId);
+        Assert.Null(unfiledGroup.Items[0].FolderId);
+
+        // The owner's folder tree is carried in the result, with the correct
+        // BookmarkCount (1 — post1).
+        var folderRow = result.Folders.First(f => f.Id == folder.Id);
+        Assert.Equal("Read later", folderRow.Name);
+        Assert.Equal(1, folderRow.BookmarkCount);
     }
 }

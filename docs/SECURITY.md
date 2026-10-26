@@ -108,7 +108,7 @@ Ranked by realism at this scale. Each maps to the controls that answer it.
 | # | Adversary | Can do | Mitigated by |
 |---|-----------|--------|--------------|
 | A1 | **Curious outsider** (no account) | scrape public pages, probe endpoints, attempt signup | nothing sensitive is public; opt-in contact details; rate limiting (OPS.md §10) |
-| A2 | **Credential-stuffing / signup bots** | brute login, flood register & report endpoints | rate limiting on register/login/report (§6, OPS.md §10), Identity lockout (OPS.md §10); CAPTCHA deferred by decision (OPS.md §10) |
+| A2 | **Credential-stuffing / signup bots** | brute login, flood register & report endpoints | rate limiting on the eight covered lanes (§6, OPS.md §10), Identity lockout (OPS.md §10); CAPTCHA deferred by decision (OPS.md §10) — a **bot-challenge seam** (F9, AUTH-15) is in place: a `KUMUNITA__SIGNUP__BOT_CHECK` flag, **off by default** (the owner's site key is an owner-ops step). The deferral stands until the owner turns the flag on |
 | A3 | **Compromised or malicious resident** (has an account) | try to read beyond their audience, abuse delegation, spam reports | deny-by-default audiences (ADR 0001-B); action-scoped delegation (ARCHITECTURE.md §4.4); report-filing rate-limited; security-stamp invalidation on privilege change (OPS.md §10); audit trail for after-the-fact |
 | A4 | **Malicious / hostile GlobalAdmin** | read everything, suppress others, extend their power | two-admin standing practice; no in-app `AdminOverride` creation; operator-only break-glass; `BreakGlass`-tagged audit (ADR 0003, ARCHITECTURE.md §4.5) |
 | A5 | **Third parties & operator path** (SMTP provider, object store, VPS host, operator mistake) | leak data at B4/B5, misconfigure | encryption at rest + at source, scoped keys, SPF/DKIM/DMARC, least-privilege DB user, backups-verified (OPS.md §4, §7, §10) |
@@ -129,11 +129,11 @@ privilege surface? If so, add a row here and in the relevant checklist.
 | Thin token, fat authorization (no privilege in cookie) | A3 | ADR 0001-B, ARCHITECTURE.md §4.1 |
 | Security-stamp rotation on privilege change | A3 (revoked grants) | OPS.md §10 |
 | Optimistic concurrency + atomic audit commit | A3 (lost-update abuse) | ARCHITECTURE.md §5 |
-| Rate limiting (register / login / report), per-IP | A2 | §6 (mechanism decided); OPS.md §10 (endpoints + XFF) |
+| Rate limiting (the eight fixed-window policies: `login` / `signup` / `resend` / `report` / `setup` / `message` / `write` / `upload`), per-IP | A2 | §6 (mechanism decided); OPS.md §10 (endpoints + XFF); the `upload` leg is F8 (the 2026-10-25 fix pass) |
 | Identity account lockout, per-account (defaults) | A2 | OPS.md §10 — pairs with rate limiting; see division of labor there |
 | **2FA (TOTP): required for GlobalAdmin**, recommended for Moderator | A3, A4 | §6 (decided); OPS.md §10; break-glass step OPS.md §9 |
 | Content-Security-Policy `script-src 'self'` (strict, no inline script) + origin pinning (shipped) | A3 (XSS) | §6 (decided); OPS.md §10 (shipped in `Program.cs`) |
-| PBKDF2 password hashing (Identity default; iteration count documented) | A2, A3 | §6 (decided) |
+| PBKDF2 password hashing (Identity default; iteration count documented) | A2, A3 | §6 (decided 2026-08-27; ADR 0172 records the posture) |
 | CAPTCHA (deferred, documented decision) | A2 | OPS.md §10 |
 | Report-gated, audited moderator access | A4 (and protects A3's privacy from mods) | ADR 0003 |
 | Two-admin rule + operator-only break-glass | A4 | ADR 0003, ARCHITECTURE.md §4.5, OPS.md §9 |
@@ -147,6 +147,8 @@ privilege surface? If so, add a row here and in the relevant checklist.
 | Media served only through an auth + audit endpoint (never static; one frozen `CanAsync(Read)` call commits the Allow **and** Deny rows) | A1 (scraping), A3 | ADR 0011 (C-MED·1/2/3); design doc §2.3 |
 | Upload type/size allowlist at the edge — raster only (SVG = excluded script vector), 10 MiB cap, self-only write lane | A3 (payload-as-XSS, self-impersonation of others) | ADR 0011 (C-MED·5/8); `Media__*` keys (OPS.md) |
 | **Attachment lane (ADR 0034):** served only through `GET /attachment/{id}` (never static); the owning post / reply (parent post) / announcement's **single** `Read` decision; **every miss a 404** (store-miss, orphan, Deny) — existence never leaks; **one `Deny` row** on a UGC (post/reply) Deny, **zero rows** on every other 404 (announcement ⇒ zero rows); `Content-Disposition: attachment` + `nosniff` + stored `Content-Type` (a download, not an inline render); a **separate** file allowlist (SVG excluded); the `AttachmentIds` id is derived **server-side** from the body (never client-sent); a removed link ⇒ inert bytes (orphan-safe, never hard-deleted) | A1 (scraping), A3 (payload-as-XSS, self-impersonation) | ADR 0034 (C-ATT·1–10); design doc `file-attachments-design.md`; `Media__AttachmentAllowedContentTypes` (OPS.md) |
+| Upload virus scan (F16): the `IVirusScanner` seam + a quarantine flag on the `MediaObject` doc + a serve-lane gate, **fail-open by default** (`VirusScan__Host` / `VirusScan__Port` unset ⇒ the seam is absent), `InfectedUpload_NotServed` | A3 (malicious payload) | F16; OPS.md §10 (the ClamAV daemon is an owner-ops step) |
+| Global security-header floor (F7): every response carries `X-Content-Type-Options: nosniff` + `Referrer-Policy`, set in the same `app.Use(…)` block as the CSP (the 2026-10-25 fix pass added them; pinned by `F7F8_HardeningGateTests`) | A3 (MIME sniffing, referrer leakage) | F7; OPS.md §10 |
 
 ## 6. Decisions & open items
 
@@ -159,9 +161,7 @@ privilege surface? If so, add a row here and in the relevant checklist.
   client IP** (plus user identity where the actor is authenticated). At one instance
   per neighborhood with dozens of users, a process-local counter is the correct weight
   — no Postgres-backed or distributed rate limiter, no queue.
-- **Covered endpoints (minimum):** `register`, `login` (failed attempts), and
-  `report-filing` (an authorization-escalation surface — OPS.md §10). Add policies for
-  other mutating surfaces as they ship (M1+).
+- **Covered endpoints (shipped):** `login` (5/15 min), `signup` (5/1 hr), `resend` (5/1 hr), `report-filing` (10/1 hr — an authorization-escalation surface), `setup` (5/15 min), `message` (20/15 min), `write` (30/15 min), and `upload` (10/15 min — F8, the 2026-10-25 fix pass, attached to the four upload POSTs: `/attachment`, `/content-image`, `/documents`, `/profile/avatar`). OPS.md §10 is the canonical runbook list; the `upload` leg is pinned by `F7F8_HardeningGateTests`.
 - **Real client IP is a hard requirement.** Behind the reverse proxy the app sees the
   proxy's address unless the proxy forwards `X-Forwarded-For` *and* the app honors it
   (trust the proxy, e.g. `ForwardedHeaders` / `UseForwardedHeaders` configured for the

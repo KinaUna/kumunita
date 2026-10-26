@@ -35,10 +35,20 @@
             <div class="head-row">
                 <div>
                     <h1>@_surfaceTitle</h1>
-                    <p class="lede"><kw-l key="groups.lead">The communities you own or belong to.</kw-l></p>
+                    <p class="lede"><kw-l key="groups.lead">The groups you own or belong to.</kw-l></p>
                 </div>
             </div>
         </header>
+
+        @* 2026-10-25 page-level notes lane (ADR 0167 amendment) — a note about
+           the /groups page itself (not about a specific group). The
+           _NoteButton partial renders its own d-flex wrapper (the M37
+           bookmark/note convention), so it sits right-aligned below the
+           header. Signed-in residents only. *@
+        <div class="mb-2">
+            @{ var _pn = ("page-group", "static", "/groups"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
 
         @*
             m2b — "Your invitations" card: the actor's OWN pending group

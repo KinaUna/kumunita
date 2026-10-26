@@ -44,7 +44,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
         var store = await BootStoreAsync();
         var svc = BuildService(store);
 
-        var result = await svc.GetPlaylistAsync(TestContext.Current.CancellationToken);
+        var result = await svc.GetPlaylistAsync(Admin, TestContext.Current.CancellationToken);
 
         Assert.Null(result);
         await store.DisposeAsync();
@@ -53,8 +53,9 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
     // ── Pin 2 ─────────────────────────────────────────────────────────────
     // M35·2 (FACES M35-1): GetPlaylistAsync over a CONFIGURED singleton
     // returns the row — the ordered Views + the two intervals project through
-    // (the M35·2 4-member ceiling: Id sentinel + Views + ViewIntervalSeconds
-    // + RefreshIntervalSeconds).
+    // (the M35·2 5-member ceiling: Id sentinel + Views + ViewIntervalSeconds
+    // + RefreshIntervalSeconds + DisplayMode, the last the ADR 0164
+    // amendment's full-page / full-screen preference).
 
     [Fact]
     public async Task M35_2_GetPlaylist_Configured_ReturnsRow()
@@ -65,10 +66,10 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
 
         await PlantPlaylist(store, views: 2, viewInterval: 45, refreshInterval: 15);
 
-        var row = await svc.GetPlaylistAsync(ct);
+        var row = await svc.GetPlaylistAsync(Admin, ct);
 
         Assert.NotNull(row);
-        Assert.Equal(KioskPlaylist.SingletonId, row!.Id);
+        Assert.Equal(Admin, row!.Id);
         Assert.Equal(2, row.Views.Count);
         Assert.Equal(45, row.ViewIntervalSeconds);
         Assert.Equal(15, row.RefreshIntervalSeconds);
@@ -88,7 +89,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
         var svc = BuildService(store);
         var ct = TestContext.Current.CancellationToken;
 
-        await svc.GetPlaylistAsync(ct);
+        await svc.GetPlaylistAsync(Admin, ct);
 
         Assert.Equal(0, await AuditCount(store));
         await store.DisposeAsync();
@@ -112,6 +113,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
             views: [new KioskView { Kind = KioskViewKind.Board, BoardId = "board-1" }],
             viewIntervalSeconds: 40,
             refreshIntervalSeconds: 12,
+            displayMode: KioskDisplayMode.FullPage,
             actorId: Admin,
             session,
             ct);
@@ -120,18 +122,19 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Single(rows);
         Assert.Equal("kiosk.save", rows[0].Action);
         Assert.Equal("kiosk", rows[0].TargetKind);
-        Assert.Equal(KioskPlaylist.SingletonId, rows[0].TargetId);
-        Assert.Equal(AccessVia.Admin, rows[0].Via);
+        Assert.Equal(Admin, rows[0].TargetId);
+        Assert.Equal(AccessVia.Owner, rows[0].Via);
         Assert.Equal(AccessOutcome.Allow, rows[0].Outcome);
         await store.DisposeAsync();
     }
 
     // ── Pin 5 ─────────────────────────────────────────────────────────────
-    // M35·2 (the design doc §2.2 "upsert vs. no-op" divergence — the register
-    // wins): SavePlaylistAsync over a NO-ROW store CREATES the singleton — a
+    // M35·2: SavePlaylistAsync over a NO-ROW store CREATES the singleton — a
     // GlobalAdmin can configure the playlist on a fresh instance without a
-    // seeder (the one intentional departure from the SiteContentService
-    // no-op-on-missing template).
+    // seeder. ADR 0170 moved the SiteContentService.SaveAsync template to
+    // the same upsert shape, so the two services are now on parity (a save
+    // is never a silent no-op in either service) — the original "upsert
+    // vs. no-op" divergence was closed.
 
     [Fact]
     public async Task M35_2_SavePlaylist_NoRow_CreatesSingleton()
@@ -141,25 +144,31 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
         var ct = TestContext.Current.CancellationToken;
 
         // Sanity: no row before the write (the M35-8 floor).
-        Assert.Null(await svc.GetPlaylistAsync(ct));
+        Assert.Null(await svc.GetPlaylistAsync(Admin, ct));
 
         await using var session = store.LightweightSession();
+        // The ADR 0164 amendment "full page vs. full screen" pin: save a
+        // non-default DisplayMode and pin that it persists + round-trips.
         var saved = await svc.SavePlaylistAsync(
             views: [new KioskView { Kind = KioskViewKind.Todos, ComponentId = "comp-1" }],
             viewIntervalSeconds: 50,
             refreshIntervalSeconds: 20,
+            displayMode: KioskDisplayMode.FullScreen,
             actorId: Admin,
             session,
             ct);
 
-        // The upsert created the singleton (the M35·2 pin):
-        Assert.Equal(KioskPlaylist.SingletonId, saved.Id);
+        // The upsert created the per-resident row (the M35·2 pin):
+        Assert.Equal(Admin, saved.Id);
+        Assert.Equal(KioskDisplayMode.FullScreen, saved.DisplayMode);
 
-        // And a subsequent read (the M35·2 read pin) now returns the row:
-        var reloaded = await svc.GetPlaylistAsync(ct);
+        // And a subsequent read (the M35·2 read pin) now returns the row, with
+        // the DisplayMode preserved (the amendment's display-mode round-trip):
+        var reloaded = await svc.GetPlaylistAsync(Admin, ct);
         Assert.NotNull(reloaded);
         Assert.Equal(50, reloaded!.ViewIntervalSeconds);
         Assert.Equal(20, reloaded.RefreshIntervalSeconds);
+        Assert.Equal(KioskDisplayMode.FullScreen, reloaded.DisplayMode);
         Assert.Single(reloaded.Views);
         Assert.Equal(KioskViewKind.Todos, reloaded.Views[0].Kind);
         await store.DisposeAsync();
@@ -185,15 +194,16 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
             views: [new KioskView { Kind = KioskViewKind.Calendar, CalendarView = "week" }],
             viewIntervalSeconds: 60,
             refreshIntervalSeconds: 30,
+            displayMode: KioskDisplayMode.FullPage,
             actorId: Admin,
             session,
             ct);
-        Assert.Equal(KioskPlaylist.SingletonId, saved.Id);
+        Assert.Equal(Admin, saved.Id);
 
         // In the CALLER's session, both the playlist row and exactly one
         // kiosk.save audit row are committed together (the M3 same-transaction
         // pin — a single SaveChanges in the caller's transaction):
-        var inSessionRow = await session.LoadAsync<KioskPlaylist>(KioskPlaylist.SingletonId, ct);
+        var inSessionRow = await session.LoadAsync<KioskPlaylist>(Admin, ct);
         Assert.NotNull(inSessionRow);
         Assert.Equal(60, inSessionRow!.ViewIntervalSeconds);
 
@@ -254,7 +264,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
         }
         w.Store(new KioskPlaylist
         {
-            Id = KioskPlaylist.SingletonId,
+            Id = Admin,
             Views = list,
             ViewIntervalSeconds = viewInterval,
             RefreshIntervalSeconds = refreshInterval,

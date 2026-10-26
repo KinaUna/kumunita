@@ -272,4 +272,102 @@ public class KnownTranslationKeys_ParityTests
         Assert.Equal(d4Keys.OrderBy(k => k).ToList(),
             registryPlatformKeys.OrderBy(k => k).ToList());
     }
+
+    // ── M37 U05 — the personal-note pn.* closed set (ADR 0167 §kw-l) ────────
+    // The M37 design doc §kw-l locks the exact 24-key pn.* closed set
+    // (U00's source of truth). U04 registered the two _NoteButton keys
+    // (pn.note.attach + pn.note.attached); U05 registered the remaining 22 to
+    // complete the closed set. This test pins the count (24) + the exact
+    // names, each present in all four language registries (en/de/fr/da) with
+    // a non-empty value. The M17 parity-test precedent (the about.* /
+    // footer.platform.* closed-set shape re-used).
+
+    [Fact(DisplayName = "M37: the 40 pn.* keys (ADR 0167 §kw-l) are registered in all four languages with non-empty values")]
+    public void KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages()
+    {
+        // The ADR 0167 §kw-l closed contract — exactly 40 keys (the original
+        // 24 + 5 announcement/modal extension + 1 page-level inventory + 10
+        // page-level kinds — the 2026-10-25 page-level notes lane, ADR 0167
+        // amendment: one note per named platform page).
+        var pnKeys = new[]
+        {
+            "pn.nav",
+            "pn.list.title",
+            "pn.list.empty",
+            "pn.list.degraded",
+            "pn.list.kind.post",
+            "pn.list.kind.grouppost",
+            "pn.list.kind.event",
+            "pn.list.kind.page",
+            "pn.list.kind.project",
+            "pn.list.kind.todo",
+            "pn.list.kind.board",
+            "pn.list.kind.document",
+            "pn.list.kind.directory",
+            "pn.list.kind.announcement",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            "pn.list.kind.inventory",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page).
+            "pn.list.kind.page-announcements",
+            "pn.list.kind.page-community",
+            "pn.list.kind.page-group",
+            "pn.list.kind.page-events",
+            "pn.list.kind.page-projects",
+            "pn.list.kind.page-project",
+            "pn.list.kind.page-todos",
+            "pn.list.kind.page-boards",
+            "pn.list.kind.page-inventory",
+            "pn.list.kind.page-documents",
+            "pn.note.edit",
+            "pn.note.delete",
+            "pn.note.move",
+            "pn.note.tag.add",
+            "pn.note.tag.remove",
+            "pn.note.attach",
+            "pn.note.attached",
+            "pn.note.body_label",
+            "pn.note.delete_confirm",
+            "pn.note.add",
+            "pn.note.view",
+            "pn.folder.new",
+            "pn.folder.rename",
+            "pn.folder.delete",
+            "pn.folder.empty",
+        };
+
+        Assert.True(pnKeys.Length == 40,
+            "the pn.* closed set must be exactly 40 keys");
+        Assert.True(new HashSet<string>(pnKeys).Count == pnKeys.Length,
+            "the pn.* closed set must have no duplicate names");
+
+        foreach (var key in pnKeys)
+        {
+            foreach (var (label, dict) in new[]
+            {
+                ("en", KnownTranslationKeys.EnValues),
+                ("de", KnownTranslationKeys.DeValues),
+                ("fr", KnownTranslationKeys.FrValues),
+                ("da", KnownTranslationKeys.DaValues),
+            })
+            {
+                Assert.True(dict.ContainsKey(key),
+                    $"M37 §kw-l key '{key}' is not registered in the {label} dictionary");
+                Assert.False(string.IsNullOrWhiteSpace(dict[key]),
+                    $"M37 §kw-l key '{key}' has an empty {label} value");
+                Assert.Contains(key, KnownTranslationKeys.AllKeys);
+            }
+        }
+
+        // The list is closed: every pn.* key in the registry is one of the 40
+        // contract keys (no drift in either direction — the parity pin).
+        var registryPnKeys =
+            KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("pn.")).ToList();
+        Assert.True(registryPnKeys.Count == 40,
+            "the registry's pn.* key set is not the closed 40-key §kw-l set");
+        Assert.Equal(pnKeys.OrderBy(k => k).ToList(),
+            registryPnKeys.OrderBy(k => k).ToList());
+    }
 }

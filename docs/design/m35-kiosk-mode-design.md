@@ -984,3 +984,17 @@ them) · the 12-test run green together.
   No red pin remains — all 12 §2.5 tests green.
 - No other `## U<m> — Drift pause` section is recorded (U00 / U01 / U02 / U03
   / U05 / U06 / U07 / U08 shipped without a drift pause).
+
+## Amendments
+
+### 2026-10-22 — §2.2 "Upsert vs. no-op" divergence closed (ADR 0170)
+
+The §2.2 "Upsert vs. no-op" divergence note (the `SiteContentService`
+template being a "no-op on a missing row" while `SavePlaylistAsync`
+upserts — the M35·2 register pin) is **closed**: ADR 0170 moved the
+`SiteContentService.SaveAsync` template to the same upsert shape, so the
+two services are now on parity — a save is never a silent no-op in either
+service. The `KioskService.SavePlaylistAsync` code is **unchanged** (it
+was already the upsert shape); the M35·2 pin is preserved. The two other
+§2.2 divergences (caller's session vs. own session; nullable read vs.
+never-null read) remain. See **ADR 0170** for the full locked text.

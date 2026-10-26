@@ -82,7 +82,15 @@
     const anchor = dropdownMenu!.firstChild;
     foldItems.forEach((li) => {
       const a = li.querySelector<HTMLElement>('a');
-      if (a) a.className = 'dropdown-item text-dark';
+      if (a) {
+        // Preserve the active highlight (the server sets .active when the
+        // current page is one of the two folded sections — e.g. Community on
+        // /community, Groups on /groups): the className swap below would
+        // otherwise drop it.
+        const wasActive = a.classList.contains('active');
+        a.className = 'dropdown-item text-dark';
+        if (wasActive) a.classList.add('active');
+      }
       dropdownMenu!.insertBefore(li, anchor);
     });
     nav.classList.add('kmb-nav-folded');
@@ -93,7 +101,15 @@
     if (!folded) return;
     foldItems.forEach((li) => {
       const a = li.querySelector<HTMLElement>('a');
-      if (a) a.className = originalClasses.get(li) ?? 'nav-link text-dark';
+      if (a) {
+        // originalClasses captured the server-set .active at init and the
+        // className assignment below restores it; the explicit re-add is the
+        // belt-and-suspenders path (a fold-state drift would otherwise
+        // strand the highlight in the dropdown only).
+        const wasActive = a.classList.contains('active');
+        a.className = originalClasses.get(li) ?? 'nav-link text-dark';
+        if (wasActive) a.classList.add('active');
+      }
       // Back to the flat row, immediately before the More item, in order.
       moreLi!.parentNode!.insertBefore(li, moreLi);
     });

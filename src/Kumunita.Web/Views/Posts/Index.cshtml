@@ -121,6 +121,19 @@
             </div>
         </header>
 
+        @* 2026-10-25 page-level notes lane (ADR 0167 amendment) — a note about
+           the /community page itself (not about a specific post). The
+           _NoteButton partial renders its own d-flex wrapper (the M37
+           bookmark/note convention), so it sits right-aligned below the
+           header. Signed-in residents only. The target id is "static" (a
+           stable per-page identity — the /community feed is one page; the
+           ?componentId= filter is a view of that page, not a different
+           page). *@
+        <div class="mb-2">
+            @{ var _pn = ("page-community", "static", "/community"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
+
         <div class="airy-comm-layout">
         <aside>
             @* Individual-community links — the viewer's own community directory:

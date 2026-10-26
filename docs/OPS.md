@@ -46,6 +46,13 @@ All per-instance identity and integration is env. The *image* is identical every
 | `AuditPurge__RoutineDays` | Optional | No | §6.4 scheduled-job config: routine access-audit rows are purged once older than this many days (default `90`). Omit to keep the default |
 | `AuditPurge__UnresolvedReportDays` | Optional | No | §6.4 scheduled-job config: report-attached + standing audit rows are kept until the report resolves, then a further this many days (default `365`). Omit to keep the default |
 | `EventReminder__WindowHours` | Optional | No | §6.4 scheduled-job config: the "remind the day before" window for event reminders, in hours (default `24`). Omit to keep the default |
+| `ConnectionStrings__KumunitaMigrate` | F22 (ADR 0171) | Yes | The **migrate role** connection string — the role that owns the DB + `mt` / `identity` schemas and runs DDL at boot (EF migrations + Marten schema-apply + the grant step). When **unset**, the boot path degrades to the single-role baseline (a not-yet-migrated instance is unchanged). See §10 "DB user" | 
+| `DbTls__SslMode` | F21 (SRV-04) | No | Postgres TLS posture for the app↔DB connection (`Prefer` default → byte-identical to baseline; `Require` / `Verify CA`). **`Verify CA` against a non-TLS server is a hard connection failure** — enable server-side TLS before flipping to it. (This is app↔DB TLS, distinct from the §6 edge/domain TLS; see `docs/design/prod-hardening-f21-db-tls.md`) | 
+| `DbTls__CaPath` | F21 (SRV-04) | No | Path to the CA bundle for `DbTls__SslMode=Verify CA`. Must be re-provisioned on CA rotation or the handshake fails | 
+| `SENTRY_DSN` | F10 (OBS-02) | Yes | Sentry error-tracker DSN (F10). **OFF by default** — unset = a no-op, the pipeline is byte-identical to before the seam (no PII leaves the box, the PII-scrubbing filter applies only once set). Set it to enable capture on an instance | 
+| `VirusScan__Host` / `VirusScan__Port` | F16 (UPL-02) | No | Point the serve-lane scan at a local `clamd` daemon (`127.0.0.1` / `3310` defaults). **Fail-open by default** — a missing/errored daemon degrades to `Clean`, so until ClamAV is live on the volume the active control stays the `nosniff` + `attachment` serve mitigation. `VirusScan__MaxScanBytes` caps the bytes scanned per file (default 100 MiB) | 
+| `MailSuppression__IngestToken` | F17 (MAIL-03) | Yes | Shared secret for `POST /api/mail/suppress` — the provider's bounce/complaint webhook sends it as the `X-Suppression-Token` header. A missing/mismatched token → 403. Until the webhook is pointed at this route the suppression list stays empty and the mail-out gate is a no-op | 
+| `KUMUNITA__SIGNUP__BOT_CHECK` / `...__SITE_KEY` | F9 (AUTH-15) | No / Yes | The Turnstile bot-challenge seam (see §10). **OFF by default** — the `SITE_KEY` is the owner's key; until it is set a flag-on instance **fails closed** (a bot is not proven human) | 
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
@@ -77,9 +84,9 @@ for it — a sorted read emits **no `AccessAudit` row** (C-SORT·4).
 
 Keep one row per neighborhood. This is your map.
 
-| Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created (Y/M/D) | Last backup verified (Y/M/D) | Notes |
-|--------------|--------|-----|---------|---------------|---------------|---------|----------------------|-------|
-|Examplium Residents|example.kumunita.com|Hetzner|kumunita|f8b8432ce7b5b2a6c4eaca26fd363029dde104f0|admin@examplium.com|2026-09-01|2026-09-01 15:20|First instance|
+| Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created (Y/M/D) | Last backup verified (Y/M/D) | Last drilled (rollback) | Notes |
+|--------------|--------|-----|---------|---------------|---------------|---------|----------------------|------------------------|-------|
+|Examplium Residents|example.kumunita.com|Hetzner|kumunita|f8b8432ce7b5b2a6c4eaca26fd363029dde104f0|admin@examplium.com|2026-09-01|2026-09-01 15:20|_not yet drilled (open item — F20.U3)_|First instance|
 
 ---
 
@@ -176,6 +183,130 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
    rollback requires a restore** (Procedure 5) because schema changes are forward-only.
 7. Record the new **commit SHA** + date in the inventory.
 
+**One-step rollback (DEP-04 — this block is the procedure):**
+the app reselect (step 6 above) and the DB restore (§5) are **two halves of
+one procedure**, not two separate ones. Read this block top-to-bottom when you
+need to roll back — it is the "one-step" the 2026-10-22 audit found missing:
+*one runbook the owner reads and executes*, not one command. The mechanism
+(Coolify reselect + PITR restore) already exists; what was absent is this
+ordered, guarded, drilled, dated shape around it.
+
+**R1 — the schema-compat guard (run BEFORE reselecting the SHA):**
+the forward-only rule (ADR 0004 §B, step 4 above) constrains the *forward*
+direction (the new image must be a superset). This guard constrains the
+*rollback* direction — does the **old** image tolerate the **current**
+schema?
+
+1. Enumerate the commits in the rolled-back window:
+   `git --no-pager log --oneline <rollback-target-sha>..HEAD`.
+2. For each, check the **Marten surface** (`Kumunita.Core`
+   `FeatureSchemaBase` / doc-type registration — `CoreDocTypes` /
+   `PostDocTypes`, `DependencyInjection.cs`) **and** the **EF surface**
+   (`Kumunita.Web/Migrations/*`) for a schema change.
+3. **Classify** each change: **additive** (new column with a default, new
+   table, new doc type, additive-only EF migration) vs **breaking**
+   (dropped/renamed column, column type change, reshaped doc the old image
+   reads).
+4. **Decision gate:** *all* additive → **R2** (app-only rollback).
+   *Any* breaking → **R3 first** (DB-restore leg), **then** R2.
+
+> **Recorded risk (if the guard is skipped):** rolling an old image over a
+> breaking schema = a boot failure (the old image can't read the reshaped
+> `mt`/`identity` surface) — the app is **down**, not merely degraded. This
+> guard converts that surprise outage into a deliberate "app + DB" rollback
+> with a known restore target.
+
+**R2 — the app-only rollback (the one-step app leg):**
+1. **Name the rollback target SHA** — the "Version (Commit)" from step 2
+   (the pre-upgrade SHA, from `/health` → `build` / the `SOURCE_COMMIT`
+   env) and/or the Instance inventory row.
+2. **Prod (Coolify, primary — the only prod path, §3 intro: no registry):**
+   reselect that commit SHA in Coolify and deploy. Coolify rebuilds the image
+   from that commit (the commit *is* the version). On boot, the old image's
+   Marten delta-detection runs against the current `mt` catalog; because the
+   schema is forward-only and the old image's feature set is a subset, it is
+   a **no-op** — provided the R1 guard held (all additive).
+3. **Local / compose (equivalent):**
+   ```bash
+   git checkout <rollback-target-sha> && docker compose build app && docker compose up -d app
+   ```
+   (the AGENTS.md rebuild idiom applied to the previous commit; wait ~8 s for
+   the Marten schema + Wolverine leadership boot.)
+4. **Verify:** `/health` OK, `build` SHA == the target SHA, login works, and
+   one representative page renders (step 5 smoke set — home / one post / one
+   component, the M1/M3 smoke set).
+
+**R3 — the DB-restore leg (when R1 found a breaking change):**
+this leg **reuses F4's PITR** (§4 PITR block / §5 PITR restore) — it is not a
+new procedure, it *calls* the existing one. The exact sequence:
+1. Stop the app (Coolify).
+2. Restore the Postgres surface — one of two targets, chosen by F4's state:
+   - **PITR point (preferred; F4's `archive_command` live):**
+     `pgbackrest --stanza=<instance> restore --type=time --target="<T>"`
+     where `<T>` is the instant **before** the bad deploy/write (e.g.
+     `--target="2026-10-23 14:50:00+00"`), **or** `--latest` for the newest
+     restorable point. **WAL-G fallback** (F4 §2): the `wal-g`
+     restore-to-timestamp equivalent.
+   - **Last `pg_dump` (fallback; F4's WAL archiving not yet live):** the §5
+     same-instance path — `pg_restore … < dump.dump` **as `postgres`**
+     (superuser; the `kumunita` role cannot drop/recreate the DB it is
+     connected *as*). F4 only narrows the RPO; this leg works **with or
+     without** F4.
+   **The restore connects as the `postgres` superuser** — the ADR 0004
+   "app role owns the DB" consequence (the `kumunita` role cannot
+   drop/recreate the DB it is connected *as*).
+3. **Restore the media volume too, if bracketed** (ADR 0011, §4 "Second
+   restore surface"): the DB restore does **not** rewind the media volume
+   (`Media__RootPath`). If the media snapshot brackets the dump, restore it
+   as **step 2.5** — between the DB restore and app start. A half-restore
+   (Postgres at `T`, media volume at `T'`) degrades safely (a missing
+   `MediaObject` byte is a **re-hydratable avatar `404`**; the content hash
+   is the integrity key). This leg **reuses the existing** media-volume
+   procedure; the one-step rollback does not change it.
+4. Restart Postgres, then the app (now at the old SHA from R2). **Verify**
+   (the R2 verify set).
+
+**The drill procedure (dated, repeatable, owner-run — the "Last drilled" record
+the audit found absent):**
+the owner runs this on a **throwaway prod-style instance** (the "No shared
+staging cluster" idiom — a throwaway prod-style instance is enough to verify
+an upgrade), *not* the live instance:
+
+- **Precondition:** the throwaway instance is at a **known current** SHA with
+  a representative schema; a **previous** SHA's image is available (Coolify
+  deploy history / a `git checkout` target); and a **fresh backup / PITR
+  anchor** is present (F4 §4 stanza + first full, or a `pg_dump`).
+- **A — app-only rollback (R2):** reselect the previous SHA, deploy, boot.
+  **Verify:** `/health` OK, `build` SHA == the previous SHA, **login**
+  works, and **one representative page** renders (the step 5 smoke set).
+- **B1 (additive):** apply a **deliberate additive** schema change (a new
+  column / doc type), confirm the old image **tolerates** the superset and
+  boots clean (proves the additive path).
+- **B2 (breaking):** in a fresh pass, a **deliberate breaking** change (a
+  dropped/reshaped column the old image reads), confirm the R1 guard
+  **fires** and routes to the R3 DB-restore leg (proves the gate is not a
+  no-op).
+- **C — the full "app + DB" rollback (R3):** introduce a **known-bad write
+  past the restore point**, then run the R3 DB-restore command (PITR point or
+  last-`pg_dump`) **as `postgres`**, restart, and re-run the A verify set.
+- **Verify leg (all steps):** `/health`, login, a representative page (the
+  step 5 smoke set) — **the rendered page is the evidence** (step 5; the
+  AGENTS.md "rendered HTML is the evidence" doctrine).
+- **Stamp (the dated record):** record the **date + the target SHA + the
+  passes (A/B1/B2/C) + the operator** in the Instance inventory "Last drilled
+  (rollback)" column. This **dated record** is the concrete close of the
+  FAIL.
+
+> **Last drilled (rollback):** _open item — the owner stamps the date + SHA +
+> passes when the drill is run on a throwaway prod-style instance;
+> **never assumed**._ (Mirrors the §4 "Last tested (PITR)" idiom and "Rules
+> of the road": *update the date when you run a step*.)
+
+**Repeatable:** the sequence is a **fixed order** (A → B1 → B2 → C → verify
+→ stamp); each pass is **independently re-runnable**, and the **"Last
+drilled"** stamp is the **only state** the drill writes — making it a
+**dated, repeatable, auditable** record rather than a one-off.
+
 ### 4. Backups
 
 **What:** the Postgres DB is the crown jewels (all Marten documents + Identity). Back it up.
@@ -183,10 +314,12 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
 - **Format:** `pg_dump -Fc` (custom format — fast restore, compression).
 - **Schedule:** the `postgres` addon on the VPS is backed up **hourly via the Coolify
   backup task** (examplium instance; daily is the documented floor for a new instance).
-  The dump target is the app database `kumunita` — owned by the `kumunita` role, so it
-  can be taken by `kumunita` or `postgres`. (Example host cron, if operating without
-  Coolify's task: `0 3 * * * pg_dump -Fc -h 127.0.0.1 -U kumunita kumunita | rclone rcat
-  backup:kumunita/<instance>/$(date +\%F).dump`.)
+  The dump target is the app database `kumunita` — owned by the **`kumunita_migrate`**
+  role (the two-role split, **ADR 0171** / F22: `kumunita_migrate` owns the DB + the
+  `mt` / `identity` schemas and carries DDL; the demoted `kumunita` app role is DML),
+  so it can be taken by `kumunita_migrate` or `postgres`. (Example host cron, if operating
+  without Coolify's task: `0 3 * * * pg_dump -Fc -h 127.0.0.1 -U kumunita_migrate kumunita
+  | rclone rcat backup:kumunita/<instance>/$(date +%F).dump`.)
 - **Offsite:** to object storage (S3 / Backblaze B2 / rclone) — **not** only on the same VPS.
 - **Retention:** e.g. 7 daily, 4 weekly, 6 monthly (tune to need).
 - **Config:** include the instance's env set (encrypted) in the same backup set.
@@ -216,6 +349,55 @@ So:
   (file with no doc) is **inert** — nothing references a bare hash. The
   failure mode is a missing picture, never cross-contamination.
 
+**PITR — WAL archiving + point-in-time recovery (BKP-02 fix):** a logical
+`pg_dump` is a point-in-time *snapshot*, so the recovery point of the procedure
+above is the **dump interval** (up to 24 h). PITR closes that gap: the recovery
+point is no longer the dump cadence, it is the WAL stream.
+
+- **Tool:** **pgBackRest** (full + differential backups, WAL archiving, PITR,
+  built-in retention, offsite to S3/B2 in one config). **WAL-G is the recorded
+  fallback** (single static binary; every step maps over: `archive-push` →
+  `wal-g wal-push`, `backup` → `backup-full|backup-incremental`, `restore
+  --type=time` → `restore` to a timestamp, retention → `wal-g delete retain 4`)
+  — either may be chosen at exec time, provided the RPO/retention contract below
+  and the alert-on-failure contract still hold.
+- **RPO: ≤ 5 minutes** (bounded only by WAL-archiving latency — effectively
+  continuous once `archive_command` is live). RTO: minutes for a same-instance
+  PITR restore; disaster recovery is the existing §5 DR path.
+- **Cadence:** one **full** per week + an **incremental** daily (a cheap
+  known-good restorable anchor) + **continuous** WAL archiving (via
+  `archive_command`, not a cron).
+- **Retention (defaults; tune to need):** **4 fulls retained**; **WAL segments
+  retained to bridge the gap to the oldest retained full** (14-day floor) — so
+  PITR coverage always spans the full-retention window. Offsite to the **same
+  object storage** the `pg_dump` ships to — not only on the VPS.
+- **Self-test (automated, at least quarterly):**
+  `pgbackrest --stanza=<instance> check` — validates the full → WAL chain is
+  restorable; this is the concrete form of the "a backup you can't restore is
+  not a backup" rule above. Update the **"Last tested"** date below on every run.
+- **Alert on failure:** wrap the cadence + `check` commands so a **non-zero exit
+  is escalated to a human**, not just logged — the failure handler routes to the
+  **F12 human alert channel** (F12 is the lane that *builds* that channel; this
+  step **reuses** it and does not build it).
+- **Scope boundary — Postgres surface only:** PITR/WAL archiving covers the
+  **Postgres surface only**. The **media volume** (`Media__RootPath`, ADR 0011)
+  is a **separate** restore surface — pgBackRest does not snapshot it, and
+  PITR-ing Postgres to a point in time does **not** rewind it. The media-volume
+  snapshot/restore procedure above is **preserved unchanged**; a half-restore
+  (Postgres at `T`, media volume at `T'`) degrades safely per the rule above
+  (a missing `MediaObject` byte is a re-hydratable avatar `404`).
+- **Owner ops (open items — recorded, not assumed done):** install the tool on
+  the VPS; configure the backup repo (offsite); enable `archive_mode=on` +
+  `archive_command='pgbackrest --stanza=<instance> archive-push %p'` on the
+  Postgres (the single most important step — until it is live the RPO is still
+  the dump interval); `stanza-create` + first full; set the cadence (cron or
+  the existing Coolify backup task); run the `check` self-test; wire the
+  alert-on-failure handler to the F12 channel. The PITR restore path below is
+  the procedure these steps make available.
+
+**Last tested (PITR):** _open item — owner stamps the date when a PITR restore
+or `pgbackrest check` is run on a live instance; never assumed._
+
 ### 5. Restore
 
 **Same instance (corruption / bad data):**
@@ -225,6 +407,20 @@ So:
    itself connected *as* (the first live restore — both roles `kumunita` — failed on
    exactly this).
 3. Start the app; verify `/health`, login, and a representative page.
+
+**Point-in-time (PITR, §4 — recover to a point in time, same instance):** the
+one-step path, available once §4's `archive_command` is live — restores the
+**Postgres surface only** (the media volume is a separate surface and is not
+rewound — restore it from its own snapshot per the rule below):
+1. Stop the app (Coolify).
+2. Pick the target instant (e.g. 10 minutes before the bad write):
+   `pgbackrest --stanza=<instance> restore --type=time --target="2026-10-23 14:50:00+00"`
+   (or `--latest` for the newest restorable point).
+3. Restart Postgres, then the app; verify `/health`, login, and a representative
+   page (step 3 above).
+
+   **Last tested (PITR restore):** _open item — owner stamps the date when run;
+   never assumed._
 
 **Disaster recovery (new VPS):**
 1. Provision a fresh instance (Procedure 1) with the **same** `Community__Name` and config.
@@ -337,11 +533,19 @@ run-anywhere checklists (including deployment checks D-1…D-8) — lives in
 - **SSH:** key-based only; consider fail2ban; disable password login.
 - **Secrets:** never baked into the image. Env / secrets manager only. Rotate SMTP, DB, and
   admin credentials on a schedule and after any suspected exposure.
-- **DB user:** dedicated **database owner**, non-superuser — `CREATE DATABASE kumunita
-  OWNER kumunita`. Ownership grants schema creation and `CREATE EXTENSION` inside that
-  database, so **no elevated/rights dance is ever needed** (and none was required on the
-  live instance). The `postgres` superuser is admin/restore-only and is **never** the app
-  connection.
+- **DB user (two-role split, ADR 0171 / F22):** the database is owned by a dedicated
+  **non-superuser migration role `kumunita_migrate`** (`CREATE DATABASE kumunita OWNER
+  kumunita_migrate`); `kumunita_migrate` owns the `mt` + `identity` schemas and is the
+  only role that may run DDL (schema/table creation, `CREATE EXTENSION`). The runtime **
+  app role `kumunita` is demoted to DML** (CONNECT / USAGE / SELECT / INSERT / UPDATE /
+  DELETE) plus one **forced exception** — schema-level `CREATE` on `mt` only, because
+  Wolverine + Marten create their `mt.wolverine_*` / `mt.mt_*` tables **as the app role**
+  during `app.StartAsync()`; it is refused `CREATE SCHEMA` / `DROP SCHEMA` /
+  `DROP DATABASE` (SQLSTATE `42501`, the `AppRole_CannotDropSchema` witness). The boot
+  path reads `ConnectionStrings:KumunitaMigrate` (the migrate role) and falls back to
+  the single-role baseline when it is unset (a not-yet-migrated instance is unchanged).
+  The `postgres` superuser is admin/restore-only and is **never** the app connection.
+  (Supersedes the old single-owner bullet `CREATE DATABASE kumunita OWNER kumunita`.)
 - **App:** HTTPS-only + HSTS, secure cookies, anti-forgery tokens, rate limiting (all
   planned in the app):
   - **Cookies:** `Secure`, `HttpOnly`, `SameSite=Lax`; sliding expiry with an absolute
@@ -352,9 +556,14 @@ run-anywhere checklists (including deployment checks D-1…D-8) — lives in
     delegated person never keeps stale access after the grant is revoked.
   - **Rate limiting (decided):** ASP.NET Core built-in middleware (`AddRateLimiter`),
     per-endpoint policies, in-memory partitioning by client IP (+ authenticated user
-    where relevant). Covered endpoints: register, login (failed attempts), **and
-    report-filing** — report filing is an authorization-escalation surface (it grants
-    the assigned moderator access), so it is not just a spam concern.
+    where relevant). Covered endpoints (each a named policy in `Program.cs`):
+    **signup, resend, login (failed attempts), report-filing, setup (first-boot
+    token), message, write (post/reply), and the four upload lanes** (`upload`
+    policy, F8 / WEB-10 — `/attachment`, `/content-image`, `/documents`,
+    `/profile/avatar`; `IUploadGate` is the size/quota guard, this is the *rate*
+    guard). Report filing is an authorization-escalation surface (it grants the
+    assigned moderator access), so it is not just a spam concern; the upload lanes
+    write a volume byte each and are the byte-flood surface.
     **Proxy requirement:** the reverse proxy must forward `X-Forwarded-For` and the app
     must honor it (trusted-proxy config); otherwise every request shares one bucket.
     Verify in the M0/M1 smoke test. Rationale & revisit triggers: SECURITY.md §6.
@@ -381,14 +590,22 @@ run-anywhere checklists (including deployment checks D-1…D-8) — lives in
     inline `style=` attributes are Bootstrap utility patterns, not a script
     vector). `img-src` adds `data:`/`blob:` (the WYSIWYG local-preview pane).
     Any future third-party script: scoped `script-src` entry + SRI, decided per
-    case (SECURITY.md §6).
+    case (SECURITY.md §6). **Two more global headers ride the same block (F7 /
+    WEB-07):** `X-Content-Type-Options: nosniff` (every response — the global
+    floor under the per-controller `nosniff` on the serve/download lanes) and
+    `Referrer-Policy: no-referrer` (no cross-origin referrer leakage). Set in
+    code, so every environment carries them; verify with `curl -sI <domain>`.
 - **CAPTCHA — deferred by default (decision):** signup is email-verification-gated and
   rate-limited, so a bot that can't verify the email can't join — no CAPTCHA is needed
   today. Revisit and add one (e.g. Turnstile, self-hosted or cloud, per-instance site
   key) on **signup** and **failed login** (after N failures) if either: (a) abuse is
   observed, or (b) several instances share a VPS/public IP — a bot probing one
   neighborhood can burn the shared IP's reputation, and a per-instance key also avoids
-  one third party seeing all instances' traffic.
+  one third party seeing all instances' traffic. **The seam is in place** (F9, AUTH-15,
+  `docs/design/prod-hardening-f9-signup.md` §4): set `KUMUNITA__SIGNUP__BOT_CHECK=true`
+  + `KUMUNITA__SIGNUP__BOT_CHECK__SITE_KEY=<key>` and rebuild. The deferral
+  conditions (a) abuse observed / (b) shared VPS still apply — the seam does not force
+  the challenge on.
 - **Supply chain:** pin the base image + package versions; rebuild on base-image updates.
 
 ### 11. Incident response (basic)

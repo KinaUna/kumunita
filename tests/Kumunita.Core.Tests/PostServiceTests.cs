@@ -1962,7 +1962,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             svc.CreatePostAsync(draft, "u-m36-inert-author", new HashSet<string> { Roles.GlobalAdmin }, s));
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PostMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
         Assert.Empty(boot.Staged);
     }
 
@@ -1984,7 +1984,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             svc.CreatePostAsync(draft, "u-m36-draft-author", new HashSet<string> { Roles.GlobalAdmin }, s));
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PostMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
     }
 
     /// <summary>Lane 2 (M36·4) — a community reply (a parent post with an empty
@@ -2042,6 +2042,6 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             svc.CreateReplyAsync(parent, "u-m36-self-replier", "@Replier oops", s));
 
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
-        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PostMention));
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
     }
 }

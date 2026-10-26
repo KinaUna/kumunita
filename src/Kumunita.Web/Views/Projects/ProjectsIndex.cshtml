@@ -25,6 +25,15 @@
             </div>
         </header>
 
+        @* 2026-10-25 page-level notes lane (ADR 0167 amendment) — a note about
+           the /projects page itself. The _NoteButton partial renders its own
+           d-flex wrapper (the M37 bookmark/note convention), so it sits
+           right-aligned below the header. Signed-in residents only. *@
+        <div class="mb-2">
+            @{ var _pn = ("page-projects", "static", "/projects"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
+
         @if (Model.ComponentPickerOptions.Count > 0)
         {
             <form method="get" action="/projects" class="mb-4">

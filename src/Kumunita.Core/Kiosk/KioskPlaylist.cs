@@ -1,12 +1,14 @@
 namespace Kumunita.Core.Kiosk;
 
 /// <summary>
-/// The kiosk playlist singleton (M35·2 — the **4-member ceiling**, no field
-/// outside this set, ADR 0164 D1). A **singleton** (the
-/// <c>SiteContent</c> / <c>LocaleSettings</c> shape, ADR 0005 B / ADR 0004
-/// §B.1): one row per instance, <see cref="Id"/> fixed to the sentinel
-/// <c>"kiosk"</c> (the <see cref="SingletonId"/> constant), so re-resolving
-/// it is a plain identity-keyed load.
+/// The kiosk playlist (M35·2 — the **5-member ceiling**, no field
+/// outside this set, ADR 0164 D1 + the amendment's <see cref="DisplayMode"/>).
+/// A **per-resident** row (the
+/// <c>LocaleSettings</c> / per-user preference shape, ADR 0004
+/// §B.1): one row per signed-in user, <see cref="Id"/> set to the
+/// user's <b>subject id</b> (the actor id that configured it), so each
+/// resident's kiosk playlist is independent — the <c>/kiosk</c> display
+/// resolves the *viewer's* playlist, not a shared GlobalAdmin singleton.
 /// <para>
 /// The <see cref="Views"/> is the **ordered** slide list (list position =
 /// the slide order, not a stored field — the <see cref="KioskView"/> entries
@@ -16,27 +18,23 @@ namespace Kumunita.Core.Kiosk;
 /// never a DB access column and never an authorization input.
 /// </para>
 /// <para>
-/// The <see cref="KioskPlaylist"/> is a **GlobalAdmin-set** config (the
-/// admin-surface write-lane convention — the <c>SiteContentService</c> /
-/// <c>LocaleSettingsService</c> precedent): the standing to write it is
-/// GlobalAdmin, enforced by the Web gate (<c>[Authorize(Roles =
-/// GlobalAdmin)]</c>), not re-checked in the Core service (M35·1 — the
-/// <c>KioskService</c> adds **no** new <c>AccessAction</c> /
-/// <c>AccessVia</c> / <c>Decide()</c> branch / <c>IAuditableResource</c>
-/// adapter). The <see cref="KioskPlaylist"/> read emits **zero**
-/// <c>AccessAudit</c> rows (M35·5, ADR 0164 D5); the write commits exactly
-/// **one** <c>kiosk.save</c> <c>AccessAudit</c> row (M35·5).
+/// The <see cref="KioskPlaylist"/> is a **resident-set** config (the
+/// <c>LocaleSettingsService</c> / per-user preference write-lane
+/// convention): the standing to write it is any signed-in user, enforced by
+/// the Web gate (<c>[Authorize]</c>), not re-checked in the Core service
+/// (M35·1 — the <c>KioskService</c> adds **no** new <c>AccessAction</c> /
+/// <c>Decide()</c> branch / <c>IAuditableResource</c> adapter). The
+/// <see cref="KioskPlaylist"/> read emits **zero** <c>AccessAudit</c> rows
+/// (M35·5, ADR 0164 D5); the write commits exactly **one**
+/// <c>kiosk.save</c> <c>AccessAudit</c> row (<c>Via = Owner</c>, M35·5).
 /// </para>
 /// </summary>
 public sealed class KioskPlaylist
 {
-    /// <summary>The singleton sentinel id (the <c>SiteContent.SingletonId</c>
-    /// / <c>LocaleSettings.SingletonId</c> idiom — one row per instance,
-    /// keyed on this id).</summary>
-    public const string SingletonId = "kiosk";
-
-    /// <summary>The singleton's identity key (fixed to <see cref="SingletonId"/>).</summary>
-    public string Id { get; set; } = SingletonId;
+    /// <summary>The per-resident identity key (the <b>subject id</b> of the
+    /// user who configured this playlist — one row per user, keyed on this
+    /// id).</summary>
+    public string Id { get; set; } = string.Empty;
 
     /// <summary>The **ordered** slide list (list position = the slide order,
     /// not a stored field — the <see cref="KioskView"/> entries are a value
@@ -57,4 +55,16 @@ public sealed class KioskPlaylist
     /// D3). <c>&gt;= 2</c> and <c>&lt; ViewIntervalSeconds</c>; default
     /// <c>10</c>.</summary>
     public int RefreshIntervalSeconds { get; set; } = 10;
+
+    /// <summary>The display mode (the ADR 0164 amendment "full page vs. full
+    /// screen" pin — a per-resident <em>display</em> preference, **display-only,
+    /// never an access input**, M35·4): <see cref="KioskDisplayMode.FullPage"/>
+    /// (the browser viewport, the ADR 0104 chrome-hide idiom) or
+    /// <see cref="KioskDisplayMode.FullScreen"/> (the browser's Fullscreen API
+    /// — the stage owns the whole monitor, the "shared physical display"
+    /// question M35 settles). Default <see cref="KioskDisplayMode.FullPage"/>
+    /// (a fresh row is the in-browser full-page shape; entering true
+    /// full-screen needs a user gesture, so the display degrades to full-page
+    /// where the gesture is unavailable).</summary>
+    public KioskDisplayMode DisplayMode { get; set; } = KioskDisplayMode.FullPage;
 }

@@ -10,11 +10,24 @@
     // wrap an attribute). The en floor is the server fallback (a null provider
     // — a non-HTTP render — degrades to en).
     string confirmClear = "Clear your quiet hours? All notification emails will be sent immediately again.";
+    // The days-of-week <option> labels — localized day names ("Monday", …),
+    // not numerals (ADR 0049: rendered in the request's effective language,
+    // the same path the EventController's day-label uses via
+    // CultureInfo.GetCultureInfo(effLang).DateTimeFormat.GetDayName). A null
+    // provider (a non-HTTP render) degrades to the ambient current culture.
+    System.Globalization.DateTimeFormatInfo dayFmt;
     if (Translation is not null)
     {
         var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
         confirmClear = await Translation.GetAsync("settings.quiet.clear_confirm", effLang);
+        dayFmt = System.Globalization.CultureInfo.GetCultureInfo(effLang).DateTimeFormat;
     }
+    else
+    {
+        dayFmt = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat;
+    }
+    // 0=Sunday…6=Saturday maps 1:1 onto the System.DayOfWeek ordinal.
+    string DayName(int d) => dayFmt.GetDayName((System.DayOfWeek)d);
 }
 
 @* M20 (ADR 0121, D7) — the resident's quiet-hours section (the 5th /settings
@@ -98,10 +111,17 @@
             <select class="form-select" name="daysOfWeek" id="quietDays" multiple size="7">
                 @{
                     var days = Model.QuietDaysOfWeek ?? Array.Empty<int>();
+                    // ADR 0169 — order the days to lead with the resident's
+                    // first day of the week (WeekAnchor.OrderDays — Monday-first
+                    // by default, Sunday-first if the resident chose Sunday), so
+                    // the picker reads from their week's start. The posted value
+                    // is still the 0…6 ordinal (value unchanged), only the order
+                    // moves.
+                    var orderedDays = Kumunita.Core.Query.WeekAnchor.OrderDays(Model.FirstDayOfWeek);
                 }
-                @for (var d = 0; d < 7; d++)
+                @foreach (var d in orderedDays)
                 {
-                    <option value="@d" selected="@(days.Contains(d) ? "selected" : null)">@d</option>
+                    <option value="@d" selected="@(days.Contains(d) ? "selected" : null)">@DayName(d)</option>
                 }
             </select>
         </div>

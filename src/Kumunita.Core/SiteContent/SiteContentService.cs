@@ -44,20 +44,17 @@ public sealed class SiteContentService : ISiteContentService
         // one write session, the doc + exactly one AccessAudit row (Via = Admin,
         // action "site.save", TargetKind "site") commit together (invariant C3,
         // strong consistency C4 — live on the very next GetAsync / render). The
-        // lane upserts the singleton — it never creates a second row (SITE·6); a
-        // missing row is a no-op (the seeder is the only writer that creates the
-        // row on a fresh boot, so a fresh instance is already at the in-code
-        // fallback).
+        // lane upserts the singleton — it never creates a second row (SITE·6).
+        // ADR 0170 — a missing row is **created** (the ADR 0164 KioskService
+        // "upsert vs. no-op" shape): the save is live and idempotent even if
+        // the seeder has not run (a fresh boot, or a test construction with no
+        // seeder), so a save is never a silent no-op.
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
 
         var stored = await session
             .LoadAsync<SiteContent>(SiteContent.SingletonId, ct)
-            .ConfigureAwait(false);
-
-        if (stored is null)
-        {
-            return; // a missing row is a no-op — the lane never load-or-creates (SITE·6)
-        }
+            .ConfigureAwait(false)
+            ?? new SiteContent { Id = SiteContent.SingletonId };
 
         // The full field set, verbatim from the caller's SiteContent.
         stored.HomeHeroEyebrow     = content.HomeHeroEyebrow;

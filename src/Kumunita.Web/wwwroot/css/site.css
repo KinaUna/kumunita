@@ -449,6 +449,19 @@ html[data-kmb-theme='dark'] {
   html:not([data-kmb-theme='light']) .navbar-light .nav-link:focus {
     color: var(--bs-primary-text-emphasis) !important;
   }
+  /* Nav active highlight: the base rule's deep-pine text (#1c4532) and
+     translucent wash are near-invisible on the dark bar — re-point the text
+     to the light pine and the fill to the dark tint (the dropdown-item
+     hover fill, the house read for a selected menu row). */
+  html:not([data-kmb-theme='light']) .navbar .navbar-nav .nav-link.active,
+  html:not([data-kmb-theme='light']) .navbar .dropdown-menu .dropdown-item.active {
+    color: var(--bs-primary-text-emphasis) !important;
+    background-color: var(--kmb-tint-a) !important;
+  }
+  html:not([data-kmb-theme='light']) .kmb-rail-btn.active {
+    background: var(--kmb-tint-a) !important;
+    color: var(--bs-primary-text-emphasis) !important;
+  }
   /* Two-tier tab strip: the active tab's white merge into the navbar */
   html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-link.active,
   html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-item.show .nav-link {
@@ -635,6 +648,12 @@ html[data-kmb-theme='dark'] {
     border-color: #3d4a42;
     --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
   }
+  /* Unchecked checkboxes on the dark canvas: the light-mode mid green would
+     read as a washed-out outline against #0f1a14. Re-pin to a brighter
+     dark-green edge (~3:1) so the "off" box is clearly present. */
+  html:not([data-kmb-theme='light']) .form-check-input:not(:checked):not(:focus) {
+    border-color: #4e6357 !important;
+  }
 }
 
 /* ---- Forest dark patches (explicit-dark scope) ----------------------------
@@ -678,6 +697,17 @@ html[data-kmb-theme='dark'] .navbar {
 }
 html[data-kmb-theme='dark'] .navbar-light .nav-link:hover,
 html[data-kmb-theme='dark'] .navbar-light .nav-link:focus {
+  color: var(--bs-primary-text-emphasis) !important;
+}
+/* Nav active highlight (explicit-dark scope): the light-pine text + the
+   dark tint fill (the auto-scope twin above). */
+html[data-kmb-theme='dark'] .navbar .navbar-nav .nav-link.active,
+html[data-kmb-theme='dark'] .navbar .dropdown-menu .dropdown-item.active {
+  color: var(--bs-primary-text-emphasis) !important;
+  background-color: var(--kmb-tint-a) !important;
+}
+html[data-kmb-theme='dark'] .kmb-rail-btn.active {
+  background: var(--kmb-tint-a) !important;
   color: var(--bs-primary-text-emphasis) !important;
 }
 html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-link.active,
@@ -846,6 +876,12 @@ html[data-kmb-theme='dark'] .form-switch .form-check-input:not(:checked):not(:fo
   border-color: #3d4a42;
   --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
 }
+/* Unchecked checkboxes on the dark canvas: re-pin the light-mode mid green
+   to a brighter dark-green edge (~3:1) so the "off" box reads clearly.
+   !important because the light rule below it in the file wins the tie. */
+html[data-kmb-theme='dark'] .form-check-input:not(:checked):not(:focus) {
+  border-color: #4e6357 !important;
+}
 
 /* --- Base ----------------------------------------------------------------- */
 html {
@@ -993,19 +1029,63 @@ body.kmb-page-expanded .page-expand-close {
 body.kmb-embed {
   margin-bottom: 0;
 }
+/* The chrome-hide list. The variant-B navbar (`.navbar`) and the variant-C
+   icon rail (`.kmb-rail`, which does NOT carry the `.navbar` class — the
+   ADR 0111 rail is its own element) are both part of the page chrome the
+   modal frames out; hide them together. The topbar (variant C) and the
+   variant-B navbar share the `.navbar` class, so they are covered by the
+   `.navbar` rule above; the rail is its own element and needs its own line. */
 body.kmb-embed .navbar,
+body.kmb-embed .kmb-rail,
 body.kmb-embed .kmb-footer,
 body.kmb-embed .kumunita-pinned-announcement,
 body.kmb-embed .kumunita-onboarding-banner,
 body.kmb-embed .kmb-whatsnew-toast {
   display: none;
 }
-/* Neutralize the settings sub-nav's negative margin (it hangs under the
-   navbar, which is hidden here) so the first heading isn't clipped. */
+/* In the embed the rail is gone, so the variant-C content-shift (the
+   `body.kmb-nav-rail-mode main { margin-left: var(--kmb-rail-w) }` rule)
+   would leave a 68px dead band on the left of the framed page. The two body
+   classes are both present (kmb-nav-rail-mode + kmb-embed), so this equal-
+   specificity later rule wins and the content fills the frame edge to edge —
+   the same doctrine as the kiosk's `body.kmb-kiosk main { margin: 0 }`
+   override. */
+body.kmb-nav-rail-mode.kmb-embed main,
+body.kmb-nav-rail-mode.kmb-embed .kmb-footer {
+  margin-left: 0;
+}
+/* Hide the settings sub-nav tab strip (.kmb-tab-under-navbar). These strips
+   link between sibling settings (the admin Overview/Accounts/Communities/
+   Platform/Security/Analytics tabs, the locale language/timezone/dateformat/
+   pagesize tabs, the events / projects / groups section tabs). In the modal
+   the user is on the specific setting the step points at; the tab strip is
+   links out to siblings they didn't choose, which breaks the linear walk —
+   the ADR 0166 "the walk-through should be a clean linear process" pin.
+   The same doctrine as the kiosk hiding its "tab / section strips" (the
+   M35·6 "frame the surface's own route" + chrome-hide idiom). The strip's
+   negative margin-top (it hangs under the now-hidden navbar) also vanishes
+   with display:none, so the first heading is no longer clipped.
+   display:none on a strip that is absent (a settings page without a
+   sub-nav) is a no-op — the same doctrine as the kmb-embed rules above. */
 body.kmb-embed .kmb-tab-under-navbar {
-  margin-top: 0;
-  border-top: 0;
-  border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+  display: none;
+}
+/* Hide the "← Admin" back-to-section link the sub-section admin pages
+   (moderation, notification cadence, site content, date format, timezone,
+   guests, messaging, sample data, signup, surface labels, portability)
+   render at the top of the content, linking back to the /admin dashboard.
+   In the modal the user is on the specific setting the step points at; the
+   back link breaks the linear walk the same way the tab strip does —
+   the ADR 0166 "clean linear process" pin, the same doctrine as the
+   kiosk hiding its "tab / section strips". The selector is deliberately
+   narrow: the `href="/admin"` attribute is what pins these to the back-to-
+   dashboard link (the admin sub-nav tab uses `href="/admin"` too, but
+   that's already hidden by the .kmb-tab-under-navbar rule above, and the
+   nav-bar Admin dropdown uses `href="/Admin"` capitalized, so it is not
+   matched). Display:none is safe on a page without the link (a no-op —
+   the same doctrine as the kmb-embed rules above). */
+body.kmb-embed a[href="/admin"] {
+  display: none;
 }
 /* The framed page's iframe inside the modal needs an explicit size — an
    <iframe> defaults to a ~150px tall, full-width box; give it a tall, full-
@@ -1015,6 +1095,193 @@ body.kmb-embed .kmb-tab-under-navbar {
   width: 100%;
   height: 70vh;
   border: 0;
+}
+
+/* ── Kiosk display (M35, ADR 0164) — the wall-display read-only mode ──────
+   When a kiosk slide iframes a surface's own route (board / calendar /
+   to-dos), _Layout.cshtml adds the kmb-kiosk body class (detected from the
+   /kiosk referrer — see the kmbEmbed block there; the kmb-embed class alone
+   is shared with the onboarding walk-through modal, which frames INTERACTIVE
+   settings pages and must keep its controls, so the kiosk gets its own
+   class). A wall display is read-only: it shows the title + subtitle +
+   content and nothing that does something. Hide every interactive control —
+   the buttons, the tab / section strips, the filter / add / assign forms,
+   the pickers, and the nav — and let the content fill the frame with a
+   minimal margin. The kmb-embed rules above already hide the top-level page
+   chrome (navbar / footer / banners / toasts); these rules strip the
+   in-content controls on top. display:none is safe on a control that is
+   absent (the same doctrine as the kmb-embed rules above), and each control
+   is purely a control (no content is wrapped inside a button / form /
+   select / input on these three surfaces), so hiding them never hides
+   content. A direct navigation (never a kiosk iframe) never sets the class,
+   so the page is unchanged when visited normally. */
+body.kmb-kiosk {
+  margin: 0;
+  padding: 0;
+}
+/* The flex-fill chain (the body.kmb-page-expanded idiom, tightened): main →
+   .container → .row → .col hand their height down to the surface, each with
+   min-height:0 so the last link may scroll internally instead of overflowing
+   the frame. The frame IS the viewport here (the kiosk iframe is full-height),
+   so 100vh fills it edge to edge. The Bootstrap gutter padding/margins on
+   .row / .col are zeroed for the 100% width. */
+/* !important on the margins/padding: the rail-mode content shift
+   (body.kmb-nav-rail-mode main { margin-left: var(--kmb-rail-w) }) and the
+   Bootstrap gutter paddings on .row / .col sit at the same-or-higher
+   specificity and later in the file, so they win a plain tie — the kiosk
+   rules must override both to fill the frame edge to edge. */
+body.kmb-kiosk main {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+body.kmb-kiosk .container {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: none !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+body.kmb-kiosk .container > .row {
+  display: flex !important;
+  width: 100% !important;
+  margin: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+body.kmb-kiosk .container [class*="col-"] {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+/* The one small breathing margin — so the content fills the frame but does
+   not paint flush into the very edges (the "very small" margin the display
+   wants). Applied to the .container so it wraps the whole framed surface. */
+body.kmb-kiosk .container {
+  padding: 0.5rem !important;
+}
+/* Title / subtitle (the .airy-head h1 / lede) keep their margin rhythm —
+   the small top padding above is the only spacing the frame adds. */
+body.kmb-kiosk .airy-head {
+  margin: 0 0 0.5rem !important;
+}
+/* The board surface (the title/actions head stays; the lane strip fills the
+   remaining height and the lanes stretch — their card stacks scroll
+   internally, as on a normal page). */
+body.kmb-kiosk .kanban-board {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The calendar surface fills the remaining height and — on a wall display —
+   must be WHOLLY VISIBLE: no internal scroll. Month's 5–6 week-rows and the
+   Day/Week 24-hour grid both compress to the frame's height, so the entire
+   month, or the entire 24-hour day/week, is always on screen. */
+body.kmb-kiosk #events-calendar {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;               /* a wall display carries no scrollbar */
+}
+/* ── Month: the 7-column lattice fills the height; the 5–6 week-rows share
+   it evenly, and the day-cell min-height goes to 0 so even a short frame
+   shows every row (not a clipped/stubbed grid). */
+body.kmb-kiosk #events-calendar .events-calendar-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-auto-rows: minmax(0, 1fr);
+}
+body.kmb-kiosk #events-calendar .events-calendar-day {
+  min-height: 0;
+}
+/* ── Day/Week: the 24-hour time grid compresses to the frame's height. The
+   top-level grid hands its full height to its single row; the hour-ruler and
+   the day-area each fill that height and distribute the 24 hour-rows with
+   1fr (replacing the fixed 3rem/hr the normal page uses). The event blocks
+   are positioned by % of the day-body, so they stay correctly placed as the
+   body shrinks; the hour hairlines scale to 1/24 of the body's height. */
+body.kmb-kiosk #events-calendar .events-time-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+/* Ruler: the 2.5rem head band stays fixed; the 24 hour-labels share the rest
+   (1fr each) so the ruler's rows keep lining up with the day-body's. */
+body.kmb-kiosk #events-calendar .events-time-ruler {
+  grid-template-rows: 2.5rem repeat(24, minmax(0, 1fr));
+  min-height: 0;
+}
+/* Day-area: its single row fills the height (1fr), each day-column becomes a
+   flex column so its 2.5rem label stays fixed and the body fills the rest. */
+body.kmb-kiosk #events-calendar .events-time-day-area {
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+body.kmb-kiosk #events-calendar .events-time-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+body.kmb-kiosk #events-calendar .events-time-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;                              /* drop the fixed calc(24*3rem) */
+  background-size: 100% calc(100% / 24);     /* hour lines track the body    */
+}
+/* ── The interactive controls go (the read-only wall display) ────────────
+   Buttons (incl. .btn links), form-based controls, and the nav all
+   disappear; the content (board lanes + cards, calendar grid + events,
+   to-do rows) remains. */
+body.kmb-kiosk button,
+body.kmb-kiosk .btn,
+body.kmb-kiosk form,
+body.kmb-kiosk select,
+body.kmb-kiosk input,
+body.kmb-kiosk .nav,
+body.kmb-kiosk .dropdown,
+/* BOTH nav variants: the .navbar row (variant B) AND the .kmb-rail +
+   .kmb-topbar pair (variant C). The nav's wrapping <header> is a DIRECT
+   child of <body>, so scope to `> header` — a bare `header` rule would also
+   hit the content's <header class="airy-head"> (nested deep inside main),
+   which carries the title + subtitle the kiosk must KEEP. The fixed .kmb-rail
+   is hidden explicitly (a fixed element survives an empty parent), and so are
+   the .kmb-topbar / .navbar rows. */
+body.kmb-kiosk > header,
+body.kmb-kiosk .navbar,
+body.kmb-kiosk .kmb-rail,
+body.kmb-kiosk .kmb-topbar,
+body.kmb-kiosk .kmb-footer,
+body.kmb-kiosk .kumunita-pinned-announcement,
+body.kmb-kiosk .kumunita-onboarding-banner,
+body.kmb-kiosk .kmb-flash-toast,
+body.kmb-kiosk .kmb-whatsnew-toast,
+body.kmb-kiosk .page-expand-toggle,
+body.kmb-kiosk .page-expand-close,
+body.kmb-kiosk .kanban-fullscreen-toggle,
+body.kmb-kiosk .calendar-fullscreen-toggle,
+body.kmb-kiosk .calendar-fullscreen-close,
+body.kmb-kiosk .kanban-fullscreen-close,
+body.kmb-kiosk .kanban-lane-menu,
+body.kmb-kiosk .kanban-lane-add,
+body.kmb-kiosk .kanban-lane-new,
+body.kmb-kiosk .kanban-lane-autosubmit,
+body.kmb-kiosk .kanban-arrow-submit,
+body.kmb-kiosk .kanban-divided-menu {
+  display: none !important;
+}
+/* The to-do surface's action cluster (the iCal-feed + New to-do buttons
+   live in a .d-flex row that has no dedicated class) — hide any control
+   row that ends up holding only controls. */
+body.kmb-kiosk .head-row > .d-flex {
+  display: none !important;
 }
 
 .lead {
@@ -1214,9 +1481,19 @@ body.kmb-embed .kmb-tab-under-navbar {
 .navbar-light .nav-link:focus {
   color: #1c4532;
 }
-.navbar-light .navbar-nav .nav-link.active {
+.navbar-light .navbar-nav .nav-link.active,
+.navbar .navbar-nav .nav-link.active,
+.navbar .dropdown-menu .dropdown-item.active {
   color: #1c4532;
   font-weight: 600;
+  /* The active-section wash (the navbar's current-page highlight): a subtle
+     pine tint so the section the page belongs to — e.g. Community on
+     /community and /posts/{id}, Projects on /projects/todos — reads at a
+     glance. Transparent-mix keeps it correct on the white bar AND the dark
+     dropdown alike; the higher specificity also wins the tie with the
+     hover rule above, so the active item never reverts on hover. */
+  background: color-mix(in srgb, #1c4532 8%, transparent);
+  border-radius: 8px;
 }
 /* Vertically center each nav item in the bar so an icon-only item (the
    notification bell — its anchor is ~4.5px shorter than a text nav-link
@@ -1480,6 +1757,110 @@ body.kmb-nav-rail-mode {
   --kmb-rail-w: 68px;
   overflow-x: hidden;
 }
+
+/* --- Rail label expander (variant C) ------------------------------------
+   The .kmb-rail-expander button toggles body.kmb-rail-expanded (rail-expander.ts).
+   Expanded: the rail widens (the --kmb-rail-w variable the content-shift
+   margin reads), each section's .kmb-rail-label appears beside its icon, the
+   hover-tip is hidden (redundant), and the buttons switch from a centered
+   46×46 icon box to a full-width icon+label row. The base 46×46 .kmb-rail-btn
+   and the 56px/68px --kmb-rail-w values are untouched — the expanded state is
+   a higher-specificity override (two body classes), so it wins the cascade at
+   every width. */
+body.kmb-nav-rail-mode.kmb-rail-expanded {
+  --kmb-rail-w: 212px;
+}
+.kmb-rail-expander {
+  flex: none;
+  width: 40px;
+  height: 30px;
+  margin-bottom: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--kmb-border);
+  border-radius: 8px;
+  color: var(--kmb-ink-soft);
+  cursor: pointer;
+  padding: 0;
+}
+.kmb-rail-expander:hover,
+.kmb-rail-expander:focus {
+  background: var(--kmb-tint-a);
+  color: #1c4532;
+}
+/* The expander chevron (the inline SVG) is the animated affordance: on
+   expand it rotates 180° (pointing left = "collapse") and slides toward the
+   rail's right edge; on contract it reverses back to the original (right)
+   position and rotates 180° the other way. transform-origin sits at the icon
+   centre so the rotation reads as a spin, and the 0.35s cubic-bezier gives a
+   smooth ease. The base (collapsed) state is the identity (no transform). */
+.kmb-rail-expander svg {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-expander svg {
+  transform: translateX(4px) rotate(180deg);
+}
+.kmb-rail-label {
+  display: none;
+  min-width: 0;
+}
+/* Expanded: left-align the whole rail (logo + expander + items) to one edge
+   so they share a left margin instead of the rail's default centre column.
+   The item buttons already carry their own 0.75rem left padding (the icon
+   column); the logo (centred by the rail's align-items:center) is offset the
+   same 0.75rem so the 52px logo starts at the same left edge as the item
+   icons, and the expander chip's chevron is left-aligned + padded to the same
+   edge (so its animated rest position sits in the icon column). No rail-level
+   padding is added — that would double up on the buttons' own padding. The
+   collapsed rail is untouched (it keeps the centred column). */
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail {
+  align-items: flex-start;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-brand {
+  margin-left: 0.75rem;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-expander {
+  justify-content: flex-start;
+  padding-left: 0.75rem;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-btn {
+  width: 100%;
+  height: auto;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  align-items: center;
+  gap: 0.55rem;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-label {
+  display: inline;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
+  display: none !important;
+}
+
+/* --- Navbar variant B: inline section icons ------------------------------
+   The top-row nav links (and the "More ▾" dropdown items) carry a small
+   inline SVG (the .kmb-nav-icon) beside their text, mirroring the icon rail.
+   The icon is an inline replaced element, so vertical-align: -0.15em centres
+   it against the surrounding text baseline (no display change on the link —
+   keeping .nav-link / .dropdown-item as Bootstrap renders them, which also
+   keeps the collapsed ≤575.98px full-width rows intact). These are
+   display-only — they never change the link target or the e2e-frozen
+   selectors. */
+.nav-link .kmb-nav-icon,
+.dropdown-item .kmb-nav-icon {
+  margin-right: 0.4rem;
+  vertical-align: -0.15em;
+}
+
 .kmb-rail {
   position: fixed;
   top: 0; left: 0; bottom: 0;
@@ -1529,6 +1910,14 @@ body.kmb-nav-rail-mode {
   background: var(--kmb-tint-a);
   color: #1c4532;
   text-decoration: none;
+}
+/* The active section's rail button (variant C): the same pine read as the
+   variant-B .nav-link.active (tint fill + pine ink). Declared after the
+   hover state with equal specificity, so it wins the tie and the current
+   page's icon keeps its highlight on hover. */
+.kmb-rail-btn.active {
+  background: var(--kmb-tint-a);
+  color: #1c4532;
 }
 .kmb-rail-tip {
   display: none;
@@ -2014,6 +2403,13 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   background-color: #1c4532;
   border-color: #1c4532;
 }
+/* Unchecked checkboxes: Bootstrap leaves the border at --bs-border-color
+   (#dde3dd — ~1.2:1 against the #fbfaf7 canvas), which reads as almost
+   invisible. Pin a mid green (the light .kmb-hover-border) so the "off"
+   box has a visible edge in light mode (the dark theme re-pins it below). */
+html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
+  border-color: #a3b2a8;
+}
 .form-check-input:focus {
   border-color: #1c4532;
   box-shadow: 0 0 0 calc(var(--bs-focus-ring-width) * 0.75) var(--bs-focus-ring-color);
@@ -2317,6 +2713,9 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 }
 @media (prefers-reduced-motion: reduce) {
   .reply-highlight { animation: none; background-color: rgba(13, 110, 253, 0.10); box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.20); }
+  /* Rail expander affordance: drop the chevron rotate/slide transition (the
+     state still changes on click — only the motion is removed). */
+  .kmb-rail-expander svg { transition: none; }
 }
 /* --- Inline editor (IE U1) — the source is hidden by default (IE·1) ---
    Hiding is a CSS class (display: none), never `disabled` (which would
@@ -2391,7 +2790,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 /* A: page header (h1 + optional lede, action row on the right). */
 .airy-head { margin-bottom: 2.5rem; }
 .airy-head h1 {
-  font-size: 2.5rem;
+  font-size: 2.25rem;
   letter-spacing: -0.015em;
   line-height: var(--bs-heading-line-height);
   margin-bottom: 0;
@@ -2701,7 +3100,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 
 /* Responsive collapse (mobile-first: single column until md+). */
 @media (max-width: 767.98px) {
-  .airy-head h1 { font-size: 2rem; }
+  .airy-head h1 { font-size: 1.75rem; }
   .airy-ann-row { grid-template-columns: 1fr; padding: 1.25rem 1.25rem; }
   .airy-ann-side { align-items: flex-start; }
   /* Edit left, Delete right on small screens (the base rule above stacks them

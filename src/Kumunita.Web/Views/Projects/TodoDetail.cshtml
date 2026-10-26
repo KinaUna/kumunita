@@ -45,10 +45,28 @@
     // code). Used by the ⋮ dropdown's translation add / edit / remove items.
     var langNames = (Model.Languages ?? []).ToDictionary(l => l.Code, l => l.NativeName);
     string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+    // Author monogram for the author footer band at the bottom of the card
+    // (the fail-closed avatar sibling — the Directory pattern's initial).
+    string todoAuthorInitial = !string.IsNullOrWhiteSpace(Model.Todo.AuthorDisplayName)
+        ? char.ToUpperInvariant(Model.Todo.AuthorDisplayName.TrimStart()[0]).ToString()
+        : string.Empty;
 }
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* M17 (ADR 0118) + M37 (ADR 0167) — the bookmark toggle and the
+           personal-note button, on ONE right-aligned row at the TOP of the
+           parent column (just below the nav bar, to the right), OUTSIDE the
+           main card. Each partial still carries its own d-flex wrapper + the
+           bootstrap modal, so they only need to be side-by-side here. D2 /
+           C-M17·2 pin holds: the label is static per render — this view does
+           not load the owner's bookmark list to decide it. *@
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            @{ var _bm = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
+            <partial name="_BookmarkButton" model="@_bm" />
+            @{ var _pn = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
         <p>
             <a href="/projects/todos" class="btn btn-link p-0"><kw-l key="projects.todo.back">← Back to to-dos</kw-l></a>
         </p>
@@ -76,115 +94,17 @@
                     <kw-l key="projects.todo.addressed_to">Addressed to</kw-l>: @string.Join(", ", Model.Todo.GroupNames)
                 </span>
             }
-            <div class="dropdown ms-auto">
-                <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
-                        data-bs-toggle="dropdown" aria-expanded="false"
-                        aria-label="@(ariaActionsFor.Replace("{0}", Model.Todo.Title))">⋮</button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    @if (Model.Todo.CanClaim)
-                    {
-                        <li>
-                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/claim")" style="margin:0;">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.claim">Claim</kw-l></button>
-                            </form>
-                        </li>
-                    }
-                    @* ADR 0106 — "Assign to me" (the self-assign pick-up
-                       lane, the claim generalized): visible only when the
-                       to-do is **unassigned** and the actor is authenticated.
-                       Posts the assign route with the actor's own subject id.
-                       The service's self-assign allowance (Read-allowed +
-                       unassigned) is the server-side gate. *@
-                    @if (string.IsNullOrWhiteSpace(Model.Todo.AssigneeId) && User?.Identity?.IsAuthenticated == true)
-                    {
-                        <li>
-                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")" style="margin:0;">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="assigneeId" value="@KumunitaPrincipal.SubjectId(User)" />
-                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.assign_to_me">Assign to me</kw-l></button>
-                            </form>
-                        </li>
-                    }
-                    <li>
-                        <a class="dropdown-item text-dark" href="@($"/projects/todos/{Model.Todo.Id}/edit")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
-                    </li>
-                    <li>
-                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")"
-                              data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
-                        </form>
-                    </li>
-                    <li>
-                        <button type="button" class="dropdown-item text-dark"
-                                data-bs-toggle="modal"
-                                data-bs-target="#subtask-modal">
-                            <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
-                        </button>
-                    </li>
-                    @* ADR 0082 — the translation add / edit / remove as
-                       dropdown items opening the modals below (replacing the
-                       prior inline <details> blocks): one "Edit" per existing
-                       translation + one "Add" per enabled-but-missing language
-                       (both open modals), then a "Remove" per existing.
-                       Server-side gate on CanTranslate (the ADR 0088
-                       translator lane); the items are localized (the ADR 0015
-                       kw-l tags — the same posts.translation_* keys the
-                       Community-post and Project surfaces use). *@
-                    @if (Model.CanTranslate)
-                    {
-                        @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
-                        {
-                            <li>
-                                <button type="button" class="dropdown-item text-dark"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="@($"#todo-trans-edit-{existing.LanguageCode}")">
-                                    <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                </button>
-                            </li>
-                        }
-                        @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
-                        {
-                            <li>
-                                <button type="button" class="dropdown-item text-dark"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="@($"#todo-trans-add-{lang.Code}")">
-                                    <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
-                                </button>
-                            </li>
-                        }
-                        @if (Model.Translations is { Count: > 0 })
-                        {
-                            <li><hr class="dropdown-divider" /></li>
-                            @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
-                            {
-                                <li>
-                                    <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/remove")"
-                                          data-confirm="@confirmRemoveTrans" style="margin:0;">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                        <button type="submit" class="dropdown-item text-danger">
-                                            <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                        </button>
-                                    </form>
-                                </li>
-                            }
-                        }
-                    }
-                    <li>
-                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/delete")"
-                              data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
-                        </form>
-                    </li>
-                </ul>
-            </div>
+        </div>
 
-            @* ADR 0071 — the Add-subtask modal (same convention as the Kanban
-               board card; the inline Title input is replaced). *@
-            <div class="modal fade" id="subtask-modal" tabindex="-1"
+        @* The to-do's ⋮ action surface now sits inside the card's title row
+           (below) — the community-posts idiom. The Add-subtask modal + the
+           translation add / edit modals (opened from that dropdown) are the
+           siblings rendered below; their ids are the data-bs-target references
+           its items use. *@
+
+        @* ADR 0071 — the Add-subtask modal (same convention as the Kanban
+           board card; the inline Title input is replaced). *@
+        <div class="modal fade" id="subtask-modal" tabindex="-1"
                  aria-labelledby="subtask-modal-label" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
@@ -366,16 +286,125 @@
                     </div>
                 }
             }
-        </div>
 
         <div class="card mb-4">
             <div class="card-body">
-                @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
-                   set: "todo"). D2 / C-M17·2 pin: the label is static per render —
-                   this view does not load the owner's bookmark list to decide it.
-                   Placed at the top-right of the main card. *@
-                @{ var _bm = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
-                <partial name="_BookmarkButton" model="@_bm" />
+                @* The to-do's ⋮ action surface (ADR 0082), now INSIDE the card
+                   (the community-posts idiom): a right-aligned row at the top of
+                   the card body. Assign / add-subtask / delete are plain POST
+                   forms; translation add / edit open the modals above; remove is
+                   a confirm form in the menu. The service's write-lane re-check
+                   at POST is the real gate (CanClaim / CanTranslate /
+                   CanUpdate / the self-assign allowance) — the same standing
+                   rules as before, only the presentation moved into the card. *@
+                <div class="d-flex justify-content-end">
+                    <div class="dropdown">
+                        <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="@(ariaActionsFor.Replace("{0}", Model.Todo.Title))">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            @if (Model.Todo.CanClaim)
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/claim")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.claim">Claim</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                            @* ADR 0106 — "Assign to me" (the self-assign pick-up
+                               lane, the claim generalized): visible only when the
+                               to-do is **unassigned** and the actor is authenticated.
+                               Posts the assign route with the actor's own subject id.
+                               The service's self-assign allowance (Read-allowed +
+                               unassigned) is the server-side gate. *@
+                            @if (string.IsNullOrWhiteSpace(Model.Todo.AssigneeId) && User?.Identity?.IsAuthenticated == true)
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="assigneeId" value="@KumunitaPrincipal.SubjectId(User)" />
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.assign_to_me">Assign to me</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                            <li>
+                                <a class="dropdown-item text-dark" href="@($"/projects/todos/{Model.Todo.Id}/edit")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                            </li>
+                            <li>
+                                <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")"
+                                      data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
+                                </form>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#subtask-modal">
+                                    <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                </button>
+                            </li>
+                            @* ADR 0082 — the translation add / edit / remove as
+                               dropdown items opening the modals above (replacing the
+                               prior inline <details> blocks): one "Edit" per existing
+                               translation + one "Add" per enabled-but-missing language
+                               (both open modals), then a "Remove" per existing.
+                               Server-side gate on CanTranslate (the ADR 0088
+                               translator lane); the items are localized (the ADR 0015
+                               kw-l tags — the same posts.translation_* keys the
+                               Community-post and Project surfaces use). *@
+                            @if (Model.CanTranslate)
+                            {
+                                @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#todo-trans-edit-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#todo-trans-add-{lang.Code}")">
+                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @if (Model.Translations is { Count: > 0 })
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                                    {
+                                        <li>
+                                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/remove")"
+                                                  data-confirm="@confirmRemoveTrans" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                </button>
+                                            </form>
+                                        </li>
+                                    }
+                                }
+                            }
+                            <li>
+                                <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/delete")"
+                                      data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
                 @* ADR 0088 — user-added translations of the to-do (the ADR 0059
                    chip-swap: the original + one variant per translation, the
                    td-swap JS shows the viewer's current-language variant
@@ -444,42 +473,10 @@
                    lanes (routes / form fields / server-side CanTranslate gate)
                    are unchanged — only the presentation moved. *@
 
-                @* The assignee avatar (the BoardDetail card pattern, the same
-                   fail-closed contract every other avatar <img> uses: the
-                   <img> links the audited serving lane (GET
-                   /profile/avatar/{subjectId}) and avatar.ts hides it on
-                   the 404 it fails closed to, showing the monogram sibling). *@
-                @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeId))
-                {
-                    string assigneeInitial = !string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName)
-                        ? char.ToUpperInvariant(Model.Todo.AssigneeDisplayName.TrimStart()[0]).ToString()
-                        : string.Empty;
-                    <div class="mb-2">
-                        <span class="d-inline-flex align-items-center">
-                            <img class="avatar avatar-sm" src="/profile/avatar/@Model.Todo.AssigneeId" alt=""
-                                 data-avatar-fallback>
-                            <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
-                        </span>
-                    </div>
-                }
-                <div class="text-muted small mt-2 mb-3">
-                    @Model.Todo.AuthorDisplayName
-                    @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName))
-                    {
-                        <span> · <kw-l key="projects.todo.assignee">Assignee</kw-l>: @Model.Todo.AssigneeDisplayName</span>
-                    }
-                    else
-                    {
-                        <span> · <kw-l key="projects.todo.unassigned">Unassigned</kw-l></span>
-                    }
-                    <span> · <kw-l key="projects.todo.created">Created</kw-l>
-                    <kw-dt dt="@Model.Todo.Created" format="g"></kw-dt></span>
-                    @if (Model.Todo.Modified is not null)
-                    {
-                        <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
-                        <kw-dt dt="@Model.Todo.Modified" format="g"></kw-dt></span>
-                    }
-                </div>
+                @* The author + assignee line (previously above the title, with
+                   the assignee's avatar) moved to the author footer band at the
+                   BOTTOM of the card (the community Posts/Detail.cshtml
+                   pattern) — see the band below the body. *@
 
                 @* U08 (ADR 0086 §3.9) — the Project link (D9): the to-do's
                    project association (F3) rendered as a link to the project
@@ -512,141 +509,11 @@
                     </div>
                 }
 
-                @* ADR 0115 D4 (M14 interlock, U06) — the **VTODO** "Add to
-                   calendar" affordance (the ADR 0112 events.ics.download shape
-                   carried to the to-do surface): a plain link to the lane-1
-                   per-item file (GET /projects/todos/{id}.ics, U06). Quiet,
-                   beside the event-link chip / picker block — the detail page
-                   only renders for a to-do the caller already passed the
-                   Read decision on, so the file lane's own 404-not-403 split
-                   (C-M14·2) is the guard. No new JS (the ADR 0031 tsc-only
-                   discipline — a plain <a>). *@
-                <a class="btn btn-outline-secondary btn-sm d-inline-block mb-3" href="@($"/projects/todos/{Model.Todo.Id}.ics")">
-                    <kw-l key="projects.todos.ics.download">Add to calendar</kw-l>
-                </a>
-
-                @* ADR 0115 D3 (M14 interlock) — the **event picker** (the
-                   <c>set-event</c> lane's affordance, the U04
-                   <c>POST /projects/todos/{id}/set-event</c> form). A
-                   standalone POST (its own small form — **not** the main M5
-                   update form, whose frozen <c>UpdateTodoRequest</c> is
-                   untouched — C-M14·7). The picker is a **display surface,
-                   never a gate** (C-M14·4): the service's
-                   <c>SetTodoEventAsync</c> standing re-check + event guard
-                   on write is the enforcement (C-M14·3). The clear option
-                   (blank value) is always first — a blank / <c>null</c>
-                   choice posts <c>null</c> = **clear** the association.
-                   The **"create a new event"** affordance (the
-                   <c>todo.set_event.create_new</c> sentinel option → the
-                   modal below) is always available to an authenticated
-                   actor — the service's <c>CreateAsync</c> standing is
-                   **any signed-in resident**, so the card is rendered
-                   whenever the picker is non-null. The existing-event
-                   options are conditionally rendered from <see
-                   cref="TodoEventPicker.Options"/> (the ADR 0086 D9 hide
-                   rule still applies to the *existing-events* subset — a
-                   select with only the sentinel is still useful: "create
-                   new" is the affordance). No new JS module — a single
-                   inline <c>script</c> in the Scripts section intercepts
-                   the form's submit when the sentinel is selected and
-                   opens the Bootstrap modal (the ADR 0071 convention, the
-                   ADR 0081 quick-create idiom carried to the to-do
-                   surface). *@
-                @if (Model.EventPicker is not null)
-                {
-                    <div class="card mb-3">
-                        <div class="card-body">
-                            <label class="form-label fw-semibold" for="set-event-select">
-                                <kw-l key="todo.set_event.label">Link to event</kw-l>
-                            </label>
-                            <form id="set-event-form" method="post" action="@($"/projects/todos/{Model.Todo.Id}/set-event")" style="margin:0;">
-                                @Html.AntiForgeryToken()
-                                <select class="form-select" id="set-event-select" name="eventId">
-                                    <option value="">
-                                        <kw-l key="todo.set_event.pick">Choose an event</kw-l>
-                                    </option>
-                                    @foreach (var (id, name) in Model.EventPicker.Options)
-                                    {
-                                        <option value="@id" selected="@(id == Model.EventPicker.CurrentEventId ? "selected" : null)">@name</option>
-                                    }
-                                    <option value="__new__">
-                                        <kw-l key="todo.set_event.create_new">Create a new event…</kw-l>
-                                    </option>
-                                </select>
-                                <div class="d-flex gap-2 mt-2">
-                                    <button type="submit" class="btn btn-sm btn-outline-primary">
-                                        <kw-l key="todo.set_event.label">Link to event</kw-l>
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
-                    @* The **"create a new event" modal** (the ADR 0071
-                       Bootstrap modal convention; the ADR 0081 quick-create
-                       idiom carried to the to-do detail's set-event
-                       picker). Opens when the __new__ sentinel is selected
-                       and the form is submitted (the inline JS in the
-                       Scripts section intercepts the submit and opens the
-                       modal). The modal's form POSTs to the new
-                       <c>POST /projects/todos/{id}/create-event</c> lane,
-                       which composes the frozen
-                       <c>IEventService.CreateAsync</c> +
-                       <c>IProjectService.SetTodoEventAsync</c> (create
-                       first, then link — the correct failure mode for "I
-                       created an event but couldn't link it": the event
-                       stays as a draft the author can review + publish from
-                       /events/{id}, the link is just not set). Start / End
-                       are pre-filled from the picker's seeded defaults
-                       (the actor's current wall-clock time in their
-                       effective zone — the ADR 0019 wall-clock contract).
-                       The audience is the community-visible default (ADR
-                       0036 floor). The event is saved as a draft (ADR 0037
-                       floor). *@
-                    <div class="modal fade" id="create-event-modal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <form id="create-event-form" method="post" action="@($"/projects/todos/{Model.Todo.Id}/create-event")">
-                                    @Html.AntiForgeryToken()
-                                    <div class="modal-header">
-                                        <h5 class="modal-title"><kw-l key="events.new_event">New event</kw-l></h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="text-muted small mb-3">
-                                            <kw-l key="todo.set_event.create_hint">Create a new event to link to this to-do. It is saved as a draft — you can publish it from the event's detail page.</kw-l>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label" for="ce-title" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></label>
-                                            <input class="form-control" type="text" id="ce-title" name="Title" maxlength="120" required />
-                                            <div class="text-muted small mt-1"><kw-l key="events.title_hint">A short headline for the event.</kw-l></div>
-                                        </div>
-                                        <div class="row g-2 mb-3">
-                                            <div class="col">
-                                                <label class="form-label" for="ce-start" style="font-weight:600;"><kw-l key="events.start">Start</kw-l></label>
-                                                <input class="form-control" type="datetime-local" id="ce-start" name="Start" required
-                                                       value="@Model.EventPicker.Start.ToString("yyyy-MM-ddTHH:mm")" />
-                                            </div>
-                                            <div class="col">
-                                                <label class="form-label" for="ce-end" style="font-weight:600;"><kw-l key="events.end">End</kw-l></label>
-                                                <input class="form-control" type="datetime-local" id="ce-end" name="End" required
-                                                       value="@Model.EventPicker.End.ToString("yyyy-MM-ddTHH:mm")" />
-                                            </div>
-                                        </div>
-                                        <div class="mb-1">
-                                            <label class="form-label" for="ce-location" style="font-weight:600;"><kw-l key="events.location">Location</kw-l></label>
-                                            <input class="form-control" type="text" id="ce-location" name="Location" />
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><kw-l key="common.cancel">Cancel</kw-l></button>
-                                        <button type="submit" class="btn btn-primary"><kw-l key="todo.set_event.create_submit">Create and link</kw-l></button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                }
+                @* The **event picker** ("Link to event") + the **VTODO**
+                   "Add to calendar" affordance are **below the body** on
+                   this card (moved there so the read surface — title /
+                   project / event / dates / tags / body — stays uncluttered
+                   at the top). See the block below the body. *@
 
                 @* F9 — the parent link (a subtask is a full to-do shown under
                    its parent; the service's read surface, the view renders it). *@
@@ -740,6 +607,289 @@
                 {
                     <p class="text-body-tertiary mb-0"><kw-l key="projects.todo.no_body">No body — this to-do is title-only.</kw-l></p>
                 }
+
+                @* The **status / assign** controls (below the body — the
+                   detail page's mutation lane). Gated on
+                   <see cref="TodoDetailViewModel.CanUpdate"/> (the
+                   <see cref="TodoRow.CanClaim"/> convenience-mirror shape —
+                   the real gate is the service's server-side standing
+                   re-check in the <c>set-status</c> / <c>assign</c> lanes,
+                   C-M5·6): a read-allowed stranger sees the detail but not
+                   these controls (the Claim / Assign-to-me dropdown items
+                   above remain their own, separately-gated affordances).
+                   Both are standalone POSTs (their own small forms —
+                   **not** the main M5 update form, whose frozen
+                   <c>UpdateTodoRequest</c> is untouched — the
+                   <c>set-project</c> / <c>assign</c> lane shape): the
+                   status <select> posts the ADR 0069 fixed vocabulary
+                   (None = clear, the same closed set the Kanban lane's
+                   Set-status select offers) to
+                   <c>POST /projects/todos/{id}/status</c>; the assign
+                   picker posts the seeded <c>Assign_Users</c> options to
+                   the existing <c>POST /projects/todos/{id}/assign</c>
+                   lane (blank = unassign). *@
+                @if (Model.CanUpdate)
+                {
+                    <div class="card mt-4">
+                        <div class="card-body">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-sm-6">
+                                    <label class="form-label fw-semibold" for="detail-status-select">
+                                        <kw-l key="projects.todo.status">Status</kw-l>
+                                    </label>
+                                    <form id="detail-status-form" method="post"
+                                          action="@($"/projects/todos/{Model.Todo.Id}/status")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        @* The fixed status vocabulary
+                                           (ADR 0069) — None + the four known
+                                           codes, the same
+                                           <c>KanbanStatuses.Known</c> set the
+                                           Kanban lane's Set-status select
+                                           offers. A pre-ADR-0069 free-text
+                                           status is preserved as an extra
+                                           option so changing never loses it
+                                           (the Edit.cshtml idiom, C3). *@
+                                        <select class="form-select" id="detail-status-select" name="status">
+                                            <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Todo.Status))">
+                                                <kw-l key="projects.todo.clear_status">Clear status</kw-l>
+                                            </option>
+                                            @if (!string.IsNullOrWhiteSpace(Model.Todo.Status) && !KanbanStatuses.Known.Contains(Model.Todo.Status))
+                                            {
+                                                <option value="@Model.Todo.Status" selected>@Model.Todo.Status</option>
+                                            }
+                                            @foreach (var statusCode in KanbanStatuses.Known)
+                                            {
+                                                <option value="@statusCode" selected="@(Model.Todo.Status == statusCode)">
+                                                    <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
+                                                </option>
+                                            }
+                                        </select>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                <kw-l key="projects.todo.status_apply">Set status</kw-l>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label fw-semibold" for="detail-assignee-select">
+                                        <kw-l key="projects.todo.assign_picker">Assign to…</kw-l>
+                                    </label>
+                                    <form id="detail-assignee-form" method="post"
+                                          action="@($"/projects/todos/{Model.Todo.Id}/assign")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        @* The seeded <c>Assign_Users</c>
+                                           options (the ADR 0106 self-assign
+                                           list — verified / non-blocked,
+                                           actor included); the current
+                                           assignee, if not in the list, is
+                                           carried as a leading option so the
+                                           picker never renders blank over a
+                                           set assignee (the Edit.cshtml
+                                           prefill idiom). Blank = unassign. *@
+                                        <select class="form-select" id="detail-assignee-select" name="assigneeId">
+                                            <option value=""><kw-l key="projects.todo.unassigned">Unassigned</kw-l></option>
+                                            @{
+                                                var _assignOpts = (ViewData["Assign_Users"] as List<GrantOption>)
+                                                    ?? (ViewData["Audience_Users"] as List<GrantOption>)
+                                                    ?? new List<GrantOption>();
+                                                var _curAssignee = Model.Todo.AssigneeId;
+                                            }
+                                            @if (_curAssignee is { Length: > 0 } && _assignOpts.All(o => o.Id != _curAssignee))
+                                            {
+                                                <option value="@_curAssignee" selected>
+                                                    @(Model.Todo.AssigneeDisplayName ?? _curAssignee)
+                                                </option>
+                                            }
+                                            @foreach (var o in _assignOpts)
+                                            {
+                                                <option value="@o.Id" selected="@(o.Id == _curAssignee ? "selected" : null)">@o.Label</option>
+                                            }
+                                        </select>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                <kw-l key="projects.todo.assign_apply">Apply</kw-l>
+                                            </button>
+                                        </div>
+                                    </form>
+                                    <div class="text-muted small mt-2">
+                                        <kw-l key="projects.todo.mutation_hint">Status and assignee are settable by the creator, the assignee, or a GlobalAdmin.</kw-l>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* ADR 0115 D3 (M14 interlock) — the **event picker**
+                   (the <c>set-event</c> lane's affordance, the U04
+                   <c>POST /projects/todos/{id}/set-event</c> form). **Below
+                   the body** (moved here so the read surface stays
+                   uncluttered). A standalone POST (its own small form —
+                   **not** the main M5 update form, whose frozen
+                   <c>UpdateTodoRequest</c> is untouched — C-M14·7). The
+                   picker is a **display surface, never a gate** (C-M14·4):
+                   the service's <c>SetTodoEventAsync</c> standing re-check
+                   + event guard on write is the enforcement (C-M14·3). The
+                   clear option (blank value) is always first — a blank /
+                   <c>null</c> choice posts <c>null</c> = **clear** the
+                   association. The **"create a new event"** affordance (the
+                   <c>todo.set_event.create_new</c> sentinel option → the
+                   modal below) is always available to an authenticated
+                   actor — the service's <c>CreateAsync</c> standing is
+                   **any signed-in resident**, so the card is rendered
+                   whenever the picker is non-null. The existing-event
+                   options are conditionally rendered from <see
+                   cref="TodoEventPicker.Options"/> (the ADR 0086 D9 hide
+                   rule still applies to the *existing-events* subset — a
+                   select with only the sentinel is still useful: "create
+                   new" is the affordance). No new JS module — a single
+                   inline <c>script</c> in the Scripts section intercepts
+                   the form's submit when the sentinel is selected and
+                   opens the Bootstrap modal (the ADR 0071 convention, the
+                   ADR 0081 quick-create idiom carried to the to-do
+                   surface). *@
+                @if (Model.EventPicker is not null)
+                {
+                    <div class="card mt-4">
+                        <div class="card-body">
+                            <label class="form-label fw-semibold" for="set-event-select">
+                                <kw-l key="todo.set_event.label">Link to event</kw-l>
+                            </label>
+                            <form id="set-event-form" method="post" action="@($"/projects/todos/{Model.Todo.Id}/set-event")" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <select class="form-select" id="set-event-select" name="eventId">
+                                    <option value="">
+                                        <kw-l key="todo.set_event.pick">Choose an event</kw-l>
+                                    </option>
+                                    @foreach (var (id, name) in Model.EventPicker.Options)
+                                    {
+                                        <option value="@id" selected="@(id == Model.EventPicker.CurrentEventId ? "selected" : null)">@name</option>
+                                    }
+                                    <option value="__new__">
+                                        <kw-l key="todo.set_event.create_new">Create a new event…</kw-l>
+                                    </option>
+                                </select>
+                                <div class="d-flex gap-2 mt-2">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <kw-l key="todo.set_event.label">Link to event</kw-l>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    @* The **"create a new event" modal** (the ADR 0071
+                       Bootstrap modal convention; the ADR 0081 quick-create
+                       idiom carried to the to-do detail's set-event
+                       picker). Opens when the __new__ sentinel is selected
+                       and the form is submitted (the inline JS in the
+                       Scripts section intercepts the submit and opens the
+                       modal). The modal's form POSTs to the new
+                       <c>POST /projects/todos/{id}/create-event</c> lane,
+                       which composes the frozen
+                       <c>IEventService.CreateAsync</c> +
+                       <c>IProjectService.SetTodoEventAsync</c> (create
+                       first, then link — the correct failure mode for "I
+                       created an event but couldn't link it": the event
+                       stays as a draft the author can review + publish from
+                       /events/{id}, the link is just not set). Start / End
+                       are pre-filled from the picker's seeded defaults
+                       (the actor's current wall-clock time in their
+                       effective zone — the ADR 0019 wall-clock contract).
+                       The audience is the community-visible default (ADR
+                       0036 floor). The event is saved as a draft (ADR 0037
+                       floor). *@
+                    <div class="modal fade" id="create-event-modal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form id="create-event-form" method="post" action="@($"/projects/todos/{Model.Todo.Id}/create-event")">
+                                    @Html.AntiForgeryToken()
+                                    <div class="modal-header">
+                                        <h5 class="modal-title"><kw-l key="events.new_event">New event</kw-l></h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="text-muted small mb-3">
+                                            <kw-l key="todo.set_event.create_hint">Create a new event to link to this to-do. It is saved as a draft — you can publish it from the event's detail page.</kw-l>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="ce-title" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></label>
+                                            <input class="form-control" type="text" id="ce-title" name="Title" maxlength="120" required />
+                                            <div class="text-muted small mt-1"><kw-l key="events.title_hint">A short headline for the event.</kw-l></div>
+                                        </div>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col">
+                                                <label class="form-label" for="ce-start" style="font-weight:600;"><kw-l key="events.start">Start</kw-l></label>
+                                                <input class="form-control" type="datetime-local" id="ce-start" name="Start" required
+                                                       value="@Model.EventPicker.Start.ToString("yyyy-MM-ddTHH:mm")" />
+                                            </div>
+                                            <div class="col">
+                                                <label class="form-label" for="ce-end" style="font-weight:600;"><kw-l key="events.end">End</kw-l></label>
+                                                <input class="form-control" type="datetime-local" id="ce-end" name="End" required
+                                                       value="@Model.EventPicker.End.ToString("yyyy-MM-ddTHH:mm")" />
+                                            </div>
+                                        </div>
+                                        <div class="mb-1">
+                                            <label class="form-label" for="ce-location" style="font-weight:600;"><kw-l key="events.location">Location</kw-l></label>
+                                            <input class="form-control" type="text" id="ce-location" name="Location" />
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><kw-l key="common.cancel">Cancel</kw-l></button>
+                                        <button type="submit" class="btn btn-primary"><kw-l key="todo.set_event.create_submit">Create and link</kw-l></button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* ADR 0115 D4 (M14 interlock, U06) — the **VTODO** "Add to
+                   calendar" affordance (the ADR 0112 events.ics.download
+                   shape carried to the to-do surface): a plain link to the
+                   lane-1 per-item file (GET /projects/todos/{id}.ics, U06).
+                   **Below the body** (moved here beside the event picker —
+                   the read surface above stays uncluttered). The detail
+                   page only renders for a to-do the caller already passed
+                   the Read decision on, so the file lane's own 404-not-403
+                   split (C-M14·2) is the guard. No new JS (the ADR 0031
+                   tsc-only discipline — a plain <a>). *@
+                <a class="btn btn-outline-secondary btn-sm d-inline-block mt-4 mb-1" href="@($"/projects/todos/{Model.Todo.Id}.ics")">
+                    <kw-l key="projects.todos.ics.download">Add to calendar</kw-l>
+                </a>
+            </div>
+
+            @* Author footer band (the community Posts/Detail.cshtml pattern):
+               the author sits at the BOTTOM of the card, below the body, as
+               its own band — the <img> links the audited serving lane (GET
+               /profile/avatar/{subjectId}), the monogram sibling on its
+               fail-closed 404. The assignee line (previously above the
+               title) moves here with the author. *@
+            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@Model.Todo.AuthorId" alt=""
+                         data-avatar-fallback>
+                    <span class="avatar-mono" style="display:none;">@todoAuthorInitial</span>
+                </span>
+                <span>
+                    @Model.Todo.AuthorDisplayName
+                    @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName))
+                    {
+                        <span> · <kw-l key="projects.todo.assignee">Assignee</kw-l>: @Model.Todo.AssigneeDisplayName</span>
+                    }
+                    else
+                    {
+                        <span> · <kw-l key="projects.todo.unassigned">Unassigned</kw-l></span>
+                    }
+                    <span> · <kw-l key="projects.todo.created">Created</kw-l>
+                    <kw-dt dt="@Model.Todo.Created" format="g"></kw-dt></span>
+                    @if (Model.Todo.Modified is not null)
+                    {
+                        <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                        <kw-dt dt="@Model.Todo.Modified" format="g"></kw-dt></span>
+                    }
+                </span>
             </div>
         </div>
 

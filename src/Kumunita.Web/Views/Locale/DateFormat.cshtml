@@ -10,11 +10,23 @@
     // wrap an attribute). The en floor is the server fallback (a null provider
     // — a non-HTTP render — degrades to en).
     string confirmReset = "Reset your date & time format to the platform default?";
+    // ADR 0169 — the "First day of week" radio labels: localized day names
+    // (the Quiet.cshtml DayName idiom; the settings.quiet.days_label
+    // precedent), resolved in the request's effective language. A null
+    // provider (a non-HTTP render) degrades to the ambient current culture.
+    System.Globalization.DateTimeFormatInfo dayFmt;
     if (Translation is not null)
     {
         var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
         confirmReset = await Translation.GetAsync("settings.dateformat_reset_confirm", effLang);
+        dayFmt = System.Globalization.CultureInfo.GetCultureInfo(effLang).DateTimeFormat;
     }
+    else
+    {
+        dayFmt = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat;
+    }
+    // 0=Sunday…6=Saturday maps 1:1 onto the System.DayOfWeek ordinal.
+    string DayName(int d) => dayFmt.GetDayName((System.DayOfWeek)d);
 }
 
 @* The settings sub-nav (the _EventsTabs.cshtml idiom): top of the page —
@@ -33,6 +45,36 @@
 
     <form method="post" action="/settings/dateformat">
         @Html.AntiForgeryToken()
+
+        @* ADR 0169 — the resident's first-day-of-week preference (this page's
+           second control, the DateFormatSettings' sibling). The radio group is
+           ordered to lead with the resident's chosen first day (WeekAnchor
+           .OrderDays), the selected day is pre-checked (Model.FirstDayOfWeek,
+           resolved to a concrete ordinal in the controller). A display
+           preference only — it reorders the day-of-week selectors and the
+           events calendar's week/month columns; it never touches data or
+           authorization. The radio group always posts `firstDayOfWeek`, so the
+           save always writes a concrete preference (the "preference if present"
+           shape — there is no separate reset for this control). *@
+        <div class="row g-2 align-items-end mb-3">
+            <div class="col-sm-8">
+                <span class="form-label"><kw-l key="settings.dateformat_firstday_label">First day of week</kw-l></span>
+                <div class="d-flex flex-wrap gap-3" role="radiogroup" aria-label="First day of week">
+                    @foreach (var d in Kumunita.Core.Query.WeekAnchor.OrderDays(Model.FirstDayOfWeek))
+                    {
+                        <div class="form-check m-0">
+                            <input class="form-check-input" type="radio" name="firstDayOfWeek" value="@d"
+                                   id="firstDay@d" @(Model.FirstDayOfWeek == d ? "checked" : null) />
+                            <label class="form-check-label" for="firstDay@d">@DayName(d)</label>
+                        </div>
+                    }
+                </div>
+                <div class="form-text small">
+                    <kw-l key="settings.dateformat_firstday_note">The day your calendar week starts on, and the day shown at the top of your day-of-week lists. Defaults to Monday.</kw-l>
+                </div>
+            </div>
+        </div>
+
         <div class="row g-2 align-items-end">
             <div class="col-sm-8">
                 <label for="dateFormat" class="form-label"><kw-l key="settings.dateformat_label">Your date &amp; time format</kw-l></label>

@@ -140,6 +140,11 @@ public sealed class AccountController(
     /// </summary>
     [Authorize]
     [HttpGet]
+    // This controller uses conventional routing ({controller}/{action}), which
+    // would map the `ChangePassword` action to /account/changepassword. The
+    // documented URL (ADR 0138, the settings-tab nav link, the form's
+    // asp-action) is /account/password, so pin it explicitly.
+    [Route("account/password")]
     public async Task<IActionResult> ChangePassword()
     {
         var subject = SubjectId(User);
@@ -170,6 +175,9 @@ public sealed class AccountController(
     /// </summary>
     [Authorize]
     [HttpPost]
+    // Explicit route so the POST targets /account/password (matching the GET
+    // and the form's action) rather than the conventional /account/changepassword.
+    [Route("account/password")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
     {
@@ -407,12 +415,33 @@ public sealed class AccountController(
         if (!await identity.IsSignupOpenAsync())
             return View("SignupClosed", new SignupClosedViewModel());
 
-        return View(new SignupViewModel());
+        var model = new SignupViewModel();
+
+        // F9 (AUTH-15, U3) — surface the flag + site key to the view (pin §4b): the
+        // challenge widget + the hidden BotChallengeToken input render ONLY when the
+        // owner's KUMUNITA__SIGNUP__BOT_CHECK flag is on (the registered verifier is
+        // NOT the Noop default). Resolved from the request scope (the
+        // LocalizeValidationAsync idiom — the constructor is unchanged). Off (the
+        // NoopBotChallengeVerifier, the default) → BotChallengeEnabled stays false and
+        // the signup form is byte-identical to before this seam (the standing owner
+        // deferral, OPS.md §10; the frozen CSP invariant — no new origin exposed).
+        var botChallengeVerifier = HttpContext?.RequestServices
+            ?.GetService<Kumunita.Core.Identity.IBotChallengeVerifier>();
+        if (botChallengeVerifier is not Kumunita.Core.Identity.NoopBotChallengeVerifier)
+        {
+            model.BotChallengeEnabled = true;
+            model.BotChallengeSiteKey = HttpContext?.RequestServices
+                ?.GetService<Microsoft.Extensions.Options.IOptions<Kumunita.Core.Identity.SignupBotChallengeOptions>>()
+                ?.Value.SiteKey;
+        }
+
+        return View(model);
     }
 
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("signup")]
     public async Task<IActionResult> Signup(SignupViewModel model)
     {
         // ADR 0050 — the gate is authoritative on the write path too (the GET hides
@@ -428,12 +457,47 @@ public sealed class AccountController(
             return View(model);
         }
 
+        // F9 (AUTH-15, U3) — the bot-challenge gate (pin §4b): when the owner's
+        // KUMUNITA__SIGNUP__BOT_CHECK flag is on, the signup POST must carry a
+        // valid challenge token (the widget wrote it into BotChallengeToken).
+        // Resolved from the request scope (the LocalizeValidationAsync idiom — the
+        // constructor is unchanged for the existing direct-construction harnesses)
+        // so a harness with no HTTP host / no registered IBotChallengeVerifier is a
+        // no-op (null → skipped), exactly like the F3 leg-2 gate. The Core lane
+        // (RegisterCoreAsync / IIdentityService) does NOT call the verifier — the
+        // verification is a Web-enforced I/O gate (the IMailerStage "designed
+        // handoff" precedent, pin §4b). On false: re-render with the
+        // BotChallengeFailed flag (the EmailDomainDisallowed precedent, §3b) — a
+        // bot is not proven human, and the reason is NOT leaked (the
+        // uniform-rejection shape, the F3 leg-2 precedent).
+        var botChallengeVerifier = HttpContext?.RequestServices
+            ?.GetService<Kumunita.Core.Identity.IBotChallengeVerifier>();
+        if (botChallengeVerifier is not null &&
+            !await botChallengeVerifier.IsVerifiedAsync(model.BotChallengeToken))
+        {
+            model.BotChallengeFailed = true;
+            ModelState.AddModelError(string.Empty,
+                "The security check did not pass. Please try again.");
+            return View(model);
+        }
+
         try
         {
             // RegisterAsync: creates the unverified account, bootstraps the Profile
             // (visibility self-only, Core-defaulted), mints the verify token, stages the
             // verification email into the durable outbox — all in one Core transaction.
             await identity.RegisterAsync(model.DisplayName, model.Email, model.Password);
+        }
+        catch (DisallowedEmailDomainException ex)
+        {
+            // F9 (AUTH-15) — the disposable-email blocklist rejection. Caught BEFORE the
+            // `InvalidOperationException` catch (the dedicated type must not be swallowed
+            // by it) and re-rendered with the `EmailDomainDisallowed` flag (the
+            // `EmailAlreadyExists` precedent) — pin §3b.
+            model.EmailDomainDisallowed = true;
+            ModelState.AddModelError(string.Empty,
+                $"The email domain '{ex.Domain}' is not accepted for new accounts.");
+            return View(model);
         }
         catch (InvalidOperationException ex)
         {
@@ -705,47 +769,331 @@ public sealed class AccountController(
             return View(model);
         }
 
-        // Always mint a persistent, long-lived cookie. PasswordSignInAsync's
-        // `isPersistent` flag sets AuthenticationProperties.IsPersistent — the
-        // app wants long-lived logins (not a browser-session cookie that dies
-        // when the tab closes), so pass true unconditionally: the RememberMe
-        // checkbox stays for the form but the cookie is persistent either way.
-        // The ticket (and hence the cookie's) lifetime is set by the cookie
-        // handler's ExpireTimeSpan (14 days, Program.cs) and its sliding
-        // expiration refreshes it while the resident keeps the tab active.
+        // Leg 1 — password check (the pin §5 leg 1). `isPersistent: false` so a
+        // not-yet-MFA'd sign-in does not mint the long-lived cookie (the pin §5
+        // leg 1: "the only change from today is `isPersistent: true` →
+        // `isPersistent: false`"). The .NET 10.0.13 `PasswordSignInAsync` calls
+        // `SignInOrTwoFactorAsync` after a successful password check, which
+        // returns `SignInResult.TwoFactorRequired` (Succeeded == false,
+        // RequiresTwoFactor == true) when MFA is required — so we must check
+        // `RequiresTwoFactor` BEFORE `Succeeded` (a `TwoFactorRequired` result
+        // is NOT a failure). For the non-MFA path (leg 1.5c, the
+        // NonAdmin_MfaOptional guarantee), the sign-in still completes — the
+        // cookie just won't be long-lived, which is functionally equivalent
+        // (the cookie's lifetime is set by the handler's ExpireTimeSpan, not
+        // by the IsPersistent flag, for the non-MFA case).
         var result = await signInManager.PasswordSignInAsync(
-            user, model.Password, isPersistent: true, lockoutOnFailure: true);
+            user, model.Password, isPersistent: false, lockoutOnFailure: true);
 
-        if (result.Succeeded)
+        // Leg 1.5 — MFA gate (the pin §5 leg 1.5). `result.RequiresTwoFactor`
+        // is the .NET 10 two-factor gate (① round-2 reflection-verified — the
+        // property on `SignInResult` is present in 10.0.13). The .NET 10.0.13
+        // `SignInResult` states are:
+        //   · wrong password (any MFA state)        → Succeeded=false, RequiresTwoFactor=false
+        //   · correct password + MFA enabled        → Succeeded=false, RequiresTwoFactor=true  (TwoFactorRequired)
+        //   · correct password + MFA disabled       → Succeeded=true,  RequiresTwoFactor=false  (Success)
+        // so `RequiresTwoFactor` is the authoritative challenge gate and is
+        // ONLY set when the password was correct AND MFA is enabled
+        // (`CheckPasswordSignInCoreAsync` returns `SignInResult.Failed` for a
+        // wrong password before `SignInOrTwoFactorAsync` runs, so a wrong
+        // password on an MFA account has `RequiresTwoFactor == false` and
+        // falls through to the `Succeeded` check below — it does NOT get the
+        // challenge). The pin §5's "fallback" (`IsTwoFactorEnabledAsync`) is a
+        // compile-time alternative for if `RequiresTwoFactor` did not resolve;
+        // it resolves (F3U2's `nameof(SignInResult.RequiresTwoFactor)` is
+        // green), so it is not OR'd in here — OR-ing it would wrongly show the
+        // challenge for a wrong password on an MFA account.
+        if (result.RequiresTwoFactor)
         {
-            // Block enforcement at the login seam: a GlobalAdmin's suspension (Profile.Blocked)
-            // must not end in a signed-in resident, even if the cookie minted below somehow
-            // carried standing (it does not — the ClaimsPrincipalFactory strips it at mint,
-            // but the explicit sign-out + message here is what the feature promises the
-            // resident: a login attempt that ends in rejection, not a silent bounce to a
-            // page they then cannot open). Kept here (not in the factory) because the
-            // factory cannot fail sign-in; the controller is the one place that can
-            // inspect the account after credentials are verified.
-            var profile = await userInfo.GetProfileAsync(user.Id ?? string.Empty);
-            if (profile is not null && profile.Blocked)
-            {
-                await signInManager.SignOutAsync();
-                // The GET-Login action maps the "blocked" code to the resident-facing
-                // message (see Login GET) — keep it as a code here too, consistent with
-                // the BlockedAccountMiddleware path and non-informative in URLs.
-                return RedirectToAction(nameof(Login), new { error = "blocked" });
-            }
-
-            return Url.IsLocalUrl(model.ReturnUrl)
-                ? Redirect(model.ReturnUrl)
-                : Redirect("/profile/edit");
+            // The account is MFA-protected and the password was correct.
+            // Return the MFA challenge (a TOTP/recovery-code field on the
+            // login view) — do NOT yet redirect to `ReturnUrl` (the pin §5
+            // leg 1.5). The user is already in a temporary (non-persistent)
+            // sign-in from leg 1 (the `TwoFactorUserIdScheme` cookie, which
+            // `SignInOrTwoFactorAsync` mints), so the leg-2 methods can read
+            // the pending user back (the pin §5 leg 1.5: "no separate
+            // pending-user store is required"). Complete the sign-in at the
+            // challenge leg (leg 2, `LoginMfa`).
+            // Preserve the resident's email + RememberMe flag in the model so
+            // the view can render the challenge form (the `MfaPending` flag
+            // drives the view's branch; the `MfaCode` / `MfaRecoveryCode`
+            // fields are the challenge inputs, empty here — the resident
+            // fills them in).
+            model.MfaPending = true;
+            model.Email = user.Email ?? user.UserName ?? model.Email;
+            model.MfaCode = null;
+            model.MfaRecoveryCode = null;
+            return View(model);
         }
 
-        ModelState.AddModelError(string.Empty,
-            result.IsLockedOut
-                ? "Account is temporarily locked. Try again in a few minutes."
-                : "Email or password is incorrect.");
-        return View(model);
+        // A real sign-in failure (wrong password, lockout, not-allowed). The
+        // `TwoFactorRequired` case was handled above; if `Succeeded` is
+        // `false` here, it is a genuine failure — fail as today (the existing
+        // `AccountController` error path, the pin §5 leg 1 "If Succeeded is
+        // false → fail as today").
+        if (!result.Succeeded)
+        {
+            ModelState.AddModelError(string.Empty,
+                result.IsLockedOut
+                    ? "Account is temporarily locked. Try again in a few minutes."
+                    : "Email or password is incorrect.");
+            return View(model);
+        }
+
+        // Leg 1.5b — the "Enforce for GlobalAdmin" requirement (the pin §5
+        // leg 1.5b). Reached only on a successful password check (
+        // `Succeeded == true`) for a non-MFA account. A `GlobalAdmin` who has
+        // NOT enrolled yet (i.e. `TwoFactorEnabled == false`) is redirected to
+        // the MFA enrollment surface instead of proceeding — they cannot reach
+        // the admin surface with password-only (the pin §5 leg 1.5b: "a
+        // GlobalAdmin with TwoFactorEnabled == false is redirected to
+        // /settings/security/mfa (enroll) instead of proceeding"). "U4 must
+        // complete the sign-in for this user only after they enroll" — after
+        // enrolling (the enrollment POST flips `SetTwoFactorEnabledAsync
+        // (user, true)` + issues recovery codes via F3.U3's `MfaEnable`
+        // action) the resident re-signs-in and leg 1.5 now returns
+        // `TwoFactorRequired`, completing via the leg-2 challenge.
+        // Use `UserManager.GetRolesAsync` (the repo's verified pattern —
+        // `AccountController.cs:281`) + `Kumunita.Core.Identity.Roles.GlobalAdmin`
+        // (NOT `ClaimsPrincipal.IsInRole`, which does not see the custom
+        // `Kumunita.Role` claim type).
+        var userRoles = await userManager.GetRolesAsync(user);
+        if (userRoles.Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)
+            && !await signInManager.IsTwoFactorEnabledAsync(user))
+        {
+            // **Do NOT sign out here.** The `SecuritySettingsController`
+            // (F3.U3) is `[Authorize]`, so the resident must be signed in to
+            // reach the enrollment page. This branch is only reached when the
+            // password was correct (`Succeeded == true`, above), and an
+            // unenrolled account's leg-1 `PasswordSignInAsync` mints the app
+            // cookie (MFA is off, so `SignInOrTwoFactorAsync` takes the
+            // non-MFA branch → `SignInWithClaimsAsync`), so the resident IS
+            // signed in — the redirect to enrollment works. Signing out would
+            // break the `[Authorize]` (auth challenge → redirect back to
+            // /Account/Login → loop).
+            return RedirectToAction("Mfa", "SecuritySettings");
+        }
+
+        // Leg 1.5c — the existing path for non-MFA users, UNCHANGED from today
+        // (the pin §5 leg 1.5c, the NonAdmin_MfaOptional guarantee). The
+        // **persistent** sign-in — `PasswordSignInAsync(user, model.Password,
+        // isPersistent: true, lockoutOnFailure: true)` (the pin §5 leg 1.5c:
+        // "the persistent sign-in … the current code's exact shape"; the app
+        // "Always mint[s] a persistent, long-lived cookie") — is called here
+        // (NOT in leg 1, which used `isPersistent: false` so the not-yet-MFA'd
+        // sign-in does not mint the long-lived cookie). This re-verifies the
+        // password (already verified at leg 1, so this succeeds) and re-mints
+        // the app cookie as **persistent** (overwriting the non-persistent
+        // cookie leg 1 minted), preserving the pre-F3.U4 behavior for
+        // non-MFA users exactly. Then the `profile.Blocked` check + the
+        // `ReturnUrl` redirect stay exactly as today.
+        await signInManager.PasswordSignInAsync(
+            user, model.Password, isPersistent: true, lockoutOnFailure: true);
+
+        var profile = await userInfo.GetProfileAsync(user.Id ?? string.Empty);
+        if (profile is not null && profile.Blocked)
+        {
+            await signInManager.SignOutAsync();
+            // The GET-Login action maps the "blocked" code to the resident-facing
+            // message (see Login GET) — keep it as a code here too, consistent with
+            // the BlockedAccountMiddleware path and non-informative in URLs.
+            return RedirectToAction(nameof(Login), new { error = "blocked" });
+        }
+
+        return Url.IsLocalUrl(model.ReturnUrl)
+            ? Redirect(model.ReturnUrl)
+            : Redirect("/profile/edit");
+    }
+
+    // ── MFA challenge leg (F3.U4, the pin §5 leg 2) ──────────────────────────────────
+    //
+    // The pin §4 routes table: `POST /account/login/mfa` → `LoginMfa
+    // (MfaChallengeViewModel)`. The action accepts a TOTP **or** a recovery
+    // code for the pending (temporarily signed-in) user, then completes the
+    // **persistent** sign-in via `SignInManager.TwoFactorAuthenticatorSignIn
+    // Async(code, isPersistent, rememberClient)` / `TwoFactorRecoveryCode
+    // SignInAsync(recoveryCode)` (both ③ U2-build-verifies against the
+    // round-3 shape — F3U2_TokenStoreApiCompileCheckTests.cs proved these
+    // names compile against `Microsoft.AspNetCore.Identity 10.0.13`).
+    //
+    // **Leg-2 return types (the pin §5 leg 2: "if a build shows they do NOT
+    // auto-mint, U4 adds a `HandleSignInAsync` follow-up and records it"):**
+    // the compiler resolves both methods to `Task<SignInResult>` (the
+    // `result.Succeeded` branch below compiles green — `SignInResult` is the
+    // return type, NOT `bool` or `IdentityResult`). The .NET 10.0.13 source
+    // confirms both call `DoTwoFactorSignInAsync` → `SignInWithClaimsAsync`
+    // (which mints the app cookie) on success; no `HandleSignInAsync`
+    // follow-up is needed (recorded in the handoff note).
+    //
+    // **Model note:** the action binds to `LoginViewModel` (the same model the
+    // `Login` action uses, the pin §5 leg 1.5 "a code/recovery-code field on
+    // the login view") — NOT a separate `MfaChallengeViewModel`. The
+    // `MfaCode` / `MfaRecoveryCode` fields (added to `LoginViewModel` by this
+    // unit) carry the TOTP / recovery-code inputs; `MfaPending` + `Email` +
+    // `ReturnUrl` + `RememberMe` are carried through for the error re-render.
+    //
+    // **URL note (F3.U4 refinement of the pin §4 table):** the pin's §4 table
+    // names `POST /account/login/mfa`, but `AccountController` is routed by
+    // the conventional `{controller=Home}/{action=Index}/{id?}` route
+    // (Program.cs:789) — under that route this action is reachable at
+    // `POST /Account/LoginMfa` (NOT `/account/login/mfa`). This is consistent
+    // with the repo's other `AccountController` actions (`/Account/Login`,
+    // `/Account/Signup`, `/Account/Logout`) and the pin §5's "the enforcement
+    // seam is `AccountController.Login` POST" — the challenge leg lives in
+    // the same controller and is reachable by the same convention. The view
+    // form posts to `asp-action="LoginMfa"` (the conventional URL), not the
+    // pin's literal `/account/login/mfa` path. The pin's URL is the
+    // *semantic* name for the leg; the actual URL is the conventional one.
+    [AllowAnonymous]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> LoginMfa(LoginViewModel model)
+    {
+        // F5 (AUTH-04, Option B) — the leg-2 revocation gate (pin §1d / §2
+        // "leg-2 gating"). A kill-all (or password change) that rotated the
+        // security stamp AFTER leg-1 minted the pending
+        // `Identity.TwoFactorUserId` cookie leaves that cookie's stamp
+        // (stamped at leg-1 by the `OnSigningIn` handler in `Program.cs`)
+        // no longer matching the DB's current stamp. Without this gate the
+        // resident would complete leg-2 with a valid TOTP / recovery code and
+        // mint a FRESH app cookie after the kill — the half-signed-in state
+        // the F5 pin explicitly forbids (§1d: "the half-signed-in window F5
+        // must not let a kill-all leave dangling").
+        //
+        // The check reads the pending cookie's `Properties.Items["kumunita.stamp"]`
+        // (the per-session carrier, NOT a claim type — invariant-set-B intact)
+        // and compares it to the DB's current `SecurityStamp` (via
+        // `UserManager.GetSecurityStampAsync` — the framework's own
+        // `ValidateSecurityStampAsync` comparison, inlined here so the gate
+        // can sign out and re-render the challenge rather than returning a
+        // bare `SignInResult.Failed`). A mismatch → sign out (clears BOTH the
+        // pending `Identity.TwoFactorUserId` cookie AND the app scheme, the
+        // same `SignInManager.SignOutAsync` shape the `!result.Succeeded`
+        // branch below uses) + re-render the challenge with a revocation
+        // message. The resident must re-do leg-1 (password) to get a fresh
+        // pending cookie with the current stamp.
+        //
+        // If the pending cookie carries no stamp (e.g. leg-1 was minted
+        // before F5 shipped) the gate is a no-op — the resident's legitimate
+        // leg-2 completion is not blocked (backward compat, the same rule as
+        // `RevocationStampMiddleware`).
+        // Resolve IAuthenticationService explicitly (not via the AuthenticateAsync
+        // extension, which calls GetRequiredService and throws in test harnesses
+        // that use a DefaultHttpContext without authentication services registered).
+        // In production this is always available (AddAuthentication registers it).
+        // If it's absent (unit-test harness), the gate is a no-op — the test does
+        // not exercise the authentication pipeline.
+        if (HttpContext.RequestServices is not null
+            && HttpContext.RequestServices.GetService<IAuthenticationService>() is not null)
+        {
+            var pendingAuth = await HttpContext.AuthenticateAsync(IdentityConstants.TwoFactorUserIdScheme);
+            if (pendingAuth.Succeeded
+                && pendingAuth.Principal?.Identity?.Name is string pendingUserId
+                && pendingAuth.Properties?.Items.TryGetValue("kumunita.stamp", out var pendingStampObj) == true
+                && pendingStampObj is string pendingStamp)
+            {
+                var pendingUser = await userManager.FindByIdAsync(pendingUserId);
+                if (pendingUser is not null)
+                {
+                    var currentStamp = await userManager.GetSecurityStampAsync(pendingUser);
+                    if (pendingStamp != currentStamp)
+                    {
+                        // A kill-all / password change rotated the stamp after leg-1.
+                        // Reject the pending cookie and force the resident back to
+                        // leg-1 (password) so a fresh pending cookie is minted with
+                        // the current stamp.
+                        await signInManager.SignOutAsync();
+                        ModelState.AddModelError(string.Empty,
+                            "This sign-in was revoked. Please enter your password again.");
+                        model.MfaPending = true;
+                        return View("Login", model);
+                    }
+                }
+            }
+        }
+
+        // The pin §5 leg 2: at least one of `MfaCode` (TOTP) or
+        // `MfaRecoveryCode` (the pin §6 escape) must be present.
+        if (string.IsNullOrWhiteSpace(model.MfaCode)
+            && string.IsNullOrWhiteSpace(model.MfaRecoveryCode))
+        {
+            ModelState.AddModelError(string.Empty,
+                "Enter a code from your authenticator app, or a recovery code.");
+            model.MfaPending = true;
+            return View("Login", model);
+        }
+
+        // Leg 2 — complete the sign-in. The user comes from the pending temp
+        // sign-in (leg 1, `isPersistent: false`), stored in the
+        // `TwoFactorUserIdScheme` cookie by `SignInOrTwoFactorAsync` (the
+        // .NET 10.0.13 source at `SignInOrTwoFactorAsync` — `
+        // Context.SignInAsync(IdentityConstants.TwoFactorUserIdScheme,
+        // StoreTwoFactorInfo(userId, loginProvider))`), so the leg-2 methods
+        // take NO `user` arg (they call `RetrieveTwoFactorInfoAsync` to read
+        // it back — the pin §5 leg 2, both ③ round-3 verified).
+        // `TwoFactorAuthenticatorSignInAsync` (TOTP) and
+        // `TwoFactorRecoveryCodeSignInAsync` (recovery code) each return
+        // `Microsoft.AspNetCore.Identity.SignInResult` (the
+        // compiler-verified shape — the `result.Succeeded` branch below is the
+        // proof; fully-qualified to disambiguate from
+        // `Microsoft.AspNetCore.Mvc.SignInResult`, which is also in scope in
+        // the Web project). The .NET 10.0.13 source confirms both call
+        // `DoTwoFactorSignInAsync` → `SignInWithClaimsAsync` (which mints the
+        // app cookie) on success; no `HandleSignInAsync` follow-up is needed
+        // (recorded in the handoff note — the pin §5 leg 2 "do not pre-commit
+        // to `HandleSignInAsync`").
+        Microsoft.AspNetCore.Identity.SignInResult result;
+        if (!string.IsNullOrWhiteSpace(model.MfaRecoveryCode))
+        {
+            // Recovery code (the pin §6 escape — presented **once**;
+            // `TwoFactorRecoveryCodeSignInAsync` redeems it under the hood via
+            // `UserManager.RedeemTwoFactorRecoveryCodeAsync`, dropping the
+            // count by 1 — the F3.U5 test `GlobalAdminRecoveryCode_WorksOnce`
+            // asserts this). 1-arg, NO user (③ round-3 verified).
+            // Note: the .NET 10.0.13 source at
+            // `TwoFactorRecoveryCodeSignInCoreAsync` calls
+            // `DoTwoFactorSignInAsync(user, info, isPersistent: false,
+            // rememberClient: false)` — the recovery path is
+            // always non-persistent + no remember-client (the `RememberMe`
+            // flag does not apply to the recovery-code path).
+            result = await signInManager.TwoFactorRecoveryCodeSignInAsync(
+                model.MfaRecoveryCode.Trim());
+        }
+        else
+        {
+            // TOTP code (RFC 6238). Code-first, NO user (③ round-3 verified).
+            // `isPersistent` + `rememberClient` take the `RememberMe` flag the
+            // resident chose on the password form (the pin §5 leg 2:
+            // `TwoFactorAuthenticatorSignInAsync(code, isPersistent,
+            // rememberClient)`).
+            result = await signInManager.TwoFactorAuthenticatorSignInAsync(
+                model.MfaCode!.Trim(),
+                isPersistent: model.RememberMe,
+                rememberClient: model.RememberMe);
+        }
+
+        if (!result.Succeeded)
+        {
+            // On a wrong code → fail (no persistent cookie minted); the temp
+            // sign-in is discarded by the next request / sign-out (the pin §5
+            // leg 2). Sign out the temp cookie (clears the
+            // `TwoFactorUserIdScheme` + the app scheme) and re-render the
+            // challenge form with the resident's prior input preserved.
+            await signInManager.SignOutAsync();
+            ModelState.AddModelError(string.Empty,
+                "The code was not valid. Try again, or use a recovery code.");
+            model.MfaPending = true;
+            return View("Login", model);
+        }
+
+        // Complete the sign-in and redirect to `ReturnUrl` (the pin §5 leg 2:
+        // "complete the sign-in and mint the auth cookie on success"). The
+        // cookie was minted by the leg-2 sign-in method above (via
+        // `DoTwoFactorSignInAsync` → `SignInWithClaimsAsync`).
+        return Url.IsLocalUrl(model.ReturnUrl)
+            ? Redirect(model.ReturnUrl)
+            : Redirect("/profile/edit");
     }
 
     // ── Sign-out ────────────────────────────────────────────────────────────────────────

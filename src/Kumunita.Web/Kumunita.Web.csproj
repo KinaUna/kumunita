@@ -21,13 +21,21 @@
          WolverineFx 6.33.0 directly for the transactional-outbox `IMessageContext`
          enqueue. Both projects pin the same version (R4: no skew). See
          docs/plans-milestones/done/plan-m1-step-7-outbox-email-c3.md. -->
-    <PackageReference Include="WolverineFx" Version="6.33.0" />
-    <PackageReference Include="WolverineFx.Marten" Version="6.33.0" />
+    <PackageReference Include="WolverineFx" Version="6.50.2" />
+    <PackageReference Include="WolverineFx.Marten" Version="6.50.2" />
     <!-- Wolverine 6.33 no longer ships the runtime compiler (IAssemblyGenerator/Roslyn)
          in the core package. This reference auto-registers it so TypeLoadMode.Dynamic
          handlers (OutboxEmail, Fault<>, AuditPurge) compile at startup — see
          wolverinefx.net/guide/codegen.html. -->
-    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.33.0" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.50.2" />
+    <!-- F10 (OBS-02, U2) — the ONE <PackageReference> ADD the plan explicitly allows
+         (pin §7). Error-tracker seam (pin §2): OFF-by-DEFAULT Sentry capture, gated
+         on the owner's SENTRY_DSN (the builder-phase guard in Program.cs is the no-op
+         path — the UseSentry call is not executed until the DSN is set). The version
+         is F10.U2's judgment call (pin §7 / F10.U1 open item (c)): 6.12.1 is the
+         latest-stable Sentry.AspNetCore and ships a net10.0 TFM (verified against
+         the 6.12.1 nuspec). -->
+    <PackageReference Include="Sentry.AspNetCore" Version="6.12.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -45,9 +53,7 @@
        defines/generates the static-web-assets manifest. (BeforeTargets must name
        real MSBuild *targets* — DefineStaticWebAssets is only a task, so hooking
        it directly matches nothing.) -->
-  <Target Name="EmitTypeScriptBeforeStaticWebAssets"
-          BeforeTargets="ResolveProjectStaticWebAssets;GenerateStaticWebAssetsManifest;GenerateComputedBuildStaticWebAssets;StaticWebAssetsPrepareForRun"
-          DependsOnTargets="RunTscCompile" />
+  <Target Name="EmitTypeScriptBeforeStaticWebAssets" BeforeTargets="ResolveProjectStaticWebAssets;GenerateStaticWebAssetsManifest;GenerateComputedBuildStaticWebAssets;StaticWebAssetsPrepareForRun" DependsOnTargets="RunTscCompile" />
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

@@ -100,6 +100,20 @@ public sealed class EventController : Controller
     // omits.
     private readonly IProjectService? projects;
 
+    // ADR 0020 — the per-request **effective date-time format** resolver,
+    // injected (like the <c>EffectiveTimezoneResolver</c> above) so the
+    // calendar's start–end subtitle (the view-appropriate <c>Label</c>)
+    // renders the day-month-year in the resident's own date format (override
+    // → platform default → the <c>DateFormat.FloorFormat</c> floor) instead of
+    // the UI culture's <c>DateTimeFormat</c>. **Optional** (default null) so
+    // the existing test-construction sites that build this controller without
+    // a format resolver keep compiling (the <c>ITagService</c> /
+    // <c>IProjectService</c> idiom); absent, the label falls back to the
+    // language's culture (the pre-fix shape — the <c>
+    // Calendar_Label_IsViewAppropriate</c> pin, invariant/en). DI always
+    // supplies the live resolver in the app.
+    private readonly EffectiveDateFormatResolver? dateFormat;
+
     public EventController(
         IEventService events,
         IUserInfoService userInfo,
@@ -108,7 +122,8 @@ public sealed class EventController : Controller
         EffectiveTimezoneResolver timezone,
         ITranslationProvider? translationProvider = null,
         ITagService? tags = null,
-        IProjectService? projects = null)
+        IProjectService? projects = null,
+        EffectiveDateFormatResolver? dateFormat = null)
     {
         this.events = events;
         this.userInfo = userInfo;
@@ -118,6 +133,7 @@ public sealed class EventController : Controller
         this.translationProvider = translationProvider;
         this.tags = tags;
         this.projects = projects;
+        this.dateFormat = dateFormat;
     }
     private static string? SubjectId(ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -509,6 +525,15 @@ public sealed class EventController : Controller
             ? parsed.Date
             : nowInZone.Date;
 
+        // ADR 0169 — the viewer's first-day-of-week preference (a *display* input
+        // only, never an access input — C-DWM·3): the day the week + month grids
+        // anchor on. Resolved to the Monday default (WeekAnchor.Default = 1) when
+        // the viewer has not set one, so the default view is byte-identical to the
+        // pre-preference ISO Monday-start shape (C-DWM·5 / the pinned calendar
+        // tests). A read, not a decision — the CanSeeAsync gate already ran.
+        var viewerProfile = await userInfo.GetProfileAsync(actorId);
+        var firstDay = Kumunita.Core.Query.WeekAnchor.Resolve(viewerProfile?.FirstDayOfWeek);
+
         // Per-view window (ADR 0064 §6.2 step 3): each bound = the window's
         // first/last day's zone-local midnight → UTC instant (the anchor's
         // local midnight is a display anchor, not a stored value — a
@@ -535,31 +560,58 @@ public sealed class EventController : Controller
             }
             case "week":
             {
-                // Week (F2, C-DWM·5): the anchor's ISO **Monday-start** week —
-                // Monday = anchor minus ((int)DayOfWeek + 6) % 7 days;
-                // [mondayLocalStartUtc, mondayLocalStartUtc + 7d); WindowDays
-                // = the 7 days monday .. monday+6 (Monday-first).
-                var monday = anchorDate.AddDays(-(((int)anchorDate.DayOfWeek + 6) % 7));
-                windowStartLocal = monday;
-                windowEndLocalExclusive = monday.AddDays(7);
-                windowDays = Enumerable.Range(0, 7).Select(n => monday.AddDays(n)).ToList();
+                // Week (F2, C-DWM·5): the anchor's week anchored on the viewer's
+                // first day (ADR 0169; the Monday-start ISO shape when unset — the
+                // offset below reduces to ((int)DayOfWeek + 6) % 7 for firstDay =
+                // Monday, so the default is byte-identical). WindowDays = the 7
+                // days from the anchor's week-start through +6.
+                int WeekOffset(DateTime d) => ((int)d.DayOfWeek - firstDay + 7) % 7;
+                var weekStart = anchorDate.AddDays(-WeekOffset(anchorDate));
+                windowStartLocal = weekStart;
+                windowEndLocalExclusive = weekStart.AddDays(7);
+                windowDays = Enumerable.Range(0, 7).Select(n => weekStart.AddDays(n)).ToList();
                 break;
             }
             default:
             {
                 // Month (F3): the anchor's calendar month —
                 // [1stLocalStartUtc, 1stLocalStartUtc + DaysInMonth);
-                // WindowDays = the 5–6 full weeks covering the month,
-                // starting on the Monday on or before the 1st (D4).
+                // WindowDays = the weeks covering the month, starting on the
+                // first day of the viewer's week on or before the 1st (D4).
+                //
+                // ADR 0169 — honor the viewer's first-day preference, but keep
+                // the **Monday default byte-identical** to the pre-preference
+                // shape (the pinned Calendar_ViewMonth_WindowIsAnchorCalendarMonth
+                // test asserts the original grid Monday + count, so the default
+                // path is the original formula verbatim — note the original's
+                // trailing pad is `1 + (6 − dow)` *without* a %7, a ragged
+                // trailing week). A non-Monday first day (the only opt-in value
+                // is Sunday) uses the same anchor-on-the-1st + trailing-next-
+                // first-day shape with the preference's offset.
+                int WeekOffset(DateTime d) => ((int)d.DayOfWeek - firstDay + 7) % 7;
                 var monthStart = new DateTime(anchorDate.Year, anchorDate.Month, 1);
                 var daysInMonth = DateTime.DaysInMonth(anchorDate.Year, anchorDate.Month);
-                var gridMonday = monthStart.AddDays(-(((int)monthStart.DayOfWeek + 6) % 7));
-                var monthEndInclusive = monthStart.AddDays(daysInMonth - 1);
-                var gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - (int)monthEndInclusive.DayOfWeek) % 7));
+                DateTime gridStart, gridEndExclusive;
+                if (firstDay == Kumunita.Core.Query.WeekAnchor.Default)
+                {
+                    // The original Monday-start month grid, verbatim (C-DWM·4).
+                    gridStart = monthStart.AddDays(-(((int)monthStart.DayOfWeek + 6) % 7));
+                    var monthEndInclusive = monthStart.AddDays(daysInMonth - 1);
+                    gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - (int)monthEndInclusive.DayOfWeek) % 7));
+                }
+                else
+                {
+                    // The opt-in (Sunday) week anchor: grid starts on the first
+                    // day of the viewer's week on/before the 1st, ends on the
+                    // first day of the week after the month's last day.
+                    gridStart = monthStart.AddDays(-WeekOffset(monthStart));
+                    var monthEndInclusive = monthStart.AddDays(daysInMonth - 1);
+                    gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - WeekOffset(monthEndInclusive)) % 7));
+                }
                 windowStartLocal = monthStart;
                 windowEndLocalExclusive = monthStart.AddDays(daysInMonth);
                 windowDays = new List<DateTime>();
-                for (var d = gridMonday; d < gridEndExclusive; d = d.AddDays(1))
+                for (var d = gridStart; d < gridEndExclusive; d = d.AddDays(1))
                     windowDays.Add(d);
                 break;
             }
@@ -668,20 +720,57 @@ public sealed class EventController : Controller
         // <c>effectiveLangCode</c> (no translation provider — test
         // construction) falls to the ambient current culture (the
         // <c>Calendar_Label_IsViewAppropriate</c> pin, invariant/en-GB).
+        //
+        // Label — the view-appropriate display string in the viewer's language
+        // (ADR 0064 §6.2 step 6; a computed display string, **not** a registry
+        // key — C-DWM·9): Day → full date; Week → "Mon d – Mon d" range;
+        // Month → month name + year (the EV-CAL shape). Rendered in the
+        // request's effective language (ADR 0049) so day/month names match the
+        // language the resident is reading the platform in; a null
+        // <c>effectiveLangCode</c> (no translation provider — test
+        // construction) falls to the ambient current culture.
+        //
+        // ADR 0020 — when the viewer has an **effective date-time format**
+        // (override → platform default → the <c>DateFormat.FloorFormat</c>
+        // floor, resolved by the injected
+        // <see cref="EffectiveDateFormatResolver"/>), the day-month-year
+        // portion of the Day / Week labels is rendered in **that** format's
+        // date-only portion — the stored format is a date-*time* format
+        // (every ADR 0020 preset carries an <c>HH:mm</c>), but the subtitle
+        // is a date surface (no time-of-day), so the time component is
+        // stripped (see <see cref="StripTimeComponent"/>) and the remaining
+        // date tokens are applied to the date value. This is the user-defined
+        // date-time display format the resident set in their settings — the
+        // exact surface this fix targets. When no format resolver was supplied
+        // (the <c>Calendar_Label_IsViewAppropriate</c> test harness, which
+        // builds the controller without one), the labels keep their original
+        // pre-fix shapes verbatim (Day → full month name; Week → the culture
+        // short date; Month → month name + year).
         CultureInfo labelCulture = effectiveLangCode is not null
             ? CultureInfo.GetCultureInfo(effectiveLangCode)
             : CultureInfo.CurrentCulture;
         var fmt = labelCulture.DateTimeFormat;
+        // ADR 0020 — resolve the viewer's effective date-time format once
+        // (the resolver caches per request); null when the optional resolver
+        // was not supplied (test construction) → the original shapes below.
+        string? effectiveDateFormat = dateFormat is not null ? await dateFormat.GetAsync() : null;
+        string? dateOnlyFormat = effectiveDateFormat is not null
+            ? StripTimeComponent(effectiveDateFormat)
+            : null;
         string label;
         if (resolvedView == "day")
         {
-            label = $"{fmt.GetDayName(anchorDate.DayOfWeek)} {anchorDate.Day} {fmt.GetMonthName(anchorDate.Month)} {anchorDate.Year}";
+            label = dateOnlyFormat is not null
+                ? $"{fmt.GetDayName(anchorDate.DayOfWeek)} {anchorDate.ToString(dateOnlyFormat, labelCulture)}"
+                : $"{fmt.GetDayName(anchorDate.DayOfWeek)} {anchorDate.Day} {fmt.GetMonthName(anchorDate.Month)} {anchorDate.Year}";
         }
         else if (resolvedView == "week")
         {
             var monday = windowDays[0];
             var sunday = windowDays[^1];
-            label = $"{fmt.GetAbbreviatedDayName(monday.DayOfWeek)} {monday:d} – {fmt.GetAbbreviatedDayName(sunday.DayOfWeek)} {sunday:d}";
+            label = dateOnlyFormat is not null
+                ? $"{fmt.GetAbbreviatedDayName(monday.DayOfWeek)} {monday.ToString(dateOnlyFormat, labelCulture)} – {fmt.GetAbbreviatedDayName(sunday.DayOfWeek)} {sunday.ToString(dateOnlyFormat, labelCulture)}"
+                : $"{fmt.GetAbbreviatedDayName(monday.DayOfWeek)} {monday:d} – {fmt.GetAbbreviatedDayName(sunday.DayOfWeek)} {sunday:d}";
         }
         else
         {
@@ -710,6 +799,83 @@ public sealed class EventController : Controller
             WindowDays: windowDays);
 
         return View(vm);
+    }
+
+    /// <summary>
+    /// Reduces a .NET custom datetime format string to its **date-only
+    /// portion** (ADR 0020) — strips the time-of-day component and the
+    /// separator immediately before it, so the result is applicable to a
+    /// <see cref="DateTime"/> date value without emitting a spurious
+    /// <c>00:00</c> tail.
+    /// <para>
+    /// In .NET's custom format tokens, <c>M</c> = month and <c>m</c> = minute
+    /// (case-sensitive), <c>d</c> = day and <c>D</c> = day-of-week, <c>y</c> =
+    /// year; the time-of-day tokens are <c>H</c>/<c>K</c> (hour), <c>m</c>
+    /// (minute), <c>s</c> (second), <c>f</c>/<c>F</c> (fractional second),
+    /// <c>t</c> (AM/PM designator), <c>z</c>/<c>o</c>/<c>O</c> (offset). This
+    /// helper finds the first unescaped time token (scanning left to right,
+    /// skipping single-quoted literal segments) and truncates the format just
+    /// before the non-alphanumeric separator that precedes it (e.g. the space
+    /// in <c>"MMMM d, yyyy HH:mm"</c> → <c>"MMMM d, yyyy"</c>; the
+    /// <c>"/"</c> in <c>"dd/MM/yyyy HH:mm"</c> → <c>"dd/MM/yyyy"</c>). A
+    /// format with no time token is returned as-is (already date-only).
+    /// </para>
+    /// <para>
+    /// <b>Examples:</b>
+    /// <list type="bullet">
+    ///   <item><c>"MMMM d, yyyy HH:mm"</c> → <c>"MMMM d, yyyy"</c></item>
+    ///   <item><c>"dd/MM/yyyy HH:mm"</c> → <c>"dd/MM/yyyy"</c></item>
+    ///   <item><c>"yyyy-MM-dd HH:mm"</c> → <c>"yyyy-MM-dd"</c></item>
+    ///   <item><c>"dd/MM/yyyy"</c> → <c>"dd/MM/yyyy"</c> (unchanged)</item>
+    ///   <item><c>"yyyy-MM-dd"</c> → <c>"yyyy-MM-dd"</c> (unchanged)</item>
+    /// </list>
+    /// </para>
+    /// </summary>
+    private static string StripTimeComponent(string format)
+    {
+        // Find the first unescaped time-of-day token.
+        bool inLiteral = false;
+        int timeTokenIndex = -1;
+        for (int i = 0; i < format.Length; i++)
+        {
+            var ch = format[i];
+            if (ch == '\'')
+            {
+                inLiteral = !inLiteral;
+                continue;
+            }
+            if (inLiteral)
+                continue;
+
+            if (ch is 'H' or 'h' or 'K' or 'k'
+                or 'm' or 's' or 'S'
+                or 't' or 'z' or 'Z'
+                or 'o' or 'O'
+                or 'f' or 'F')
+            {
+                timeTokenIndex = i;
+                break;
+            }
+        }
+
+        // No time component — the format is already date-only.
+        if (timeTokenIndex < 0)
+            return format;
+
+        // Walk back from the time token over the separator (space, comma,
+        // slash, colon, period, or any non-alphanumeric) to find where the
+        // date portion ends.
+        int dateEnd = timeTokenIndex;
+        while (dateEnd > 0 && !char.IsLetterOrDigit(format[dateEnd - 1]))
+            dateEnd--;
+
+        // If the separator walk consumed the entire string (a time-only
+        // format — degenerate but defensive), fall back to the invariant
+        // short-date format.
+        if (dateEnd == 0)
+            return "d";
+
+        return format[..dateEnd];
     }
 
     /// <summary>

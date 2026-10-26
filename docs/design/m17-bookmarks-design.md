@@ -139,7 +139,7 @@ scratch handoff note is
 **Out (deferred lanes, each its own ADR — §deferred):**
 
 - The "nudge the author on bookmark" notification lane (D7).
-- Bookmark folders / manual ordering.
+- ~~Bookmark folders / manual ordering~~ — folders are **settled by ADR 0168**; manual ordering remains deferred.
 - Bookmark sharing / per-surface "top bookmarked" stats.
 - Bookmarks on **groups** themselves (the ADR 0013 membership-lane
   surfaces have their own visibility world).
@@ -685,7 +685,9 @@ differently by design, and both pins hold together.
 ## §deferred — the deferred-lane list (each a named follow-on, own ADR)
 
 - The "nudge the author on bookmark" lane (D7).
-- Bookmark folders / manual ordering.
+- ~~Bookmark folders~~ — **settled by ADR 0168** (personal folder tree, depth
+  ≤ 2, owner-scoped, delete-moves-to-root). Manual **ordering** within a
+  folder remains deferred (own ADR).
 - Bookmark sharing / per-surface "top bookmarked" stats.
 - Bookmarks on **groups** themselves (the ADR 0013 membership-lane
   surfaces have their own visibility world).

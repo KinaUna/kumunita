@@ -42,6 +42,24 @@ public interface IIdentityService
     Task<ThinPrincipal> RegisterAsync(string displayName, string email, string password);
 
     /// <summary>
+    /// <b>Session kill-all</b> (F5, AUTH-04): rotate the account's security stamp so that
+    /// every live session (and any pending two-factor sign-in) that predates this
+    /// rotation is rejected by the per-request revocation gate on its next request.
+    /// This is the Core write seam the <c>/settings/security/sessions/kill-all</c>
+    /// surface (F5.U3, the F3 <c>SecuritySettingsController</c> shape) calls — Core stays
+    /// HTTP-free (ADR 0006). The rotation reuses the existing
+    /// <see cref="Microsoft.AspNetCore.Identity.UserManager{TUser}.UpdateSecurityStampAsync"/>
+    /// seam (the same one <c>ChangePasswordAsync</c> already calls at the
+    /// password-change lane) so there is exactly one stamp-rotation path in Core; the
+    /// gate that makes the rotation operative lives in the Web (F5.U2's
+    /// <c>RevocationStampMiddleware</c>), which is the repo's actual invalidation idiom
+    /// (ADR 0006-B "fat authorization, per request"; the <c>SecurityStampValidator</c>
+    /// is intentionally neutered by the 14-day <c>ValidationInterval</c>, see
+    /// <c>Program.cs</c> and <c>PrivilegedStampMiddleware</c>).
+    /// </summary>
+    Task KillAllSessionsAsync(string subjectId);
+
+    /// <summary>
     /// ADR 0146 — <b>child-account formation</b> (the GU add-a-child lane): create an
     /// *unverified* account **with no password**, bootstrap its <see cref="Profile"/>,
     /// create a fresh <see cref="IdentityToken"/> (kind <see cref="IdentityToken.KindVerify"/>,

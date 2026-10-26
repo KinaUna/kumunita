@@ -84,7 +84,8 @@ public static class OutboxEmailHandler
     /// </summary>
     public static async Task HandleFault(
         Wolverine.Fault<OutboxEmail> fault,
-        IDocumentSession session)
+        IDocumentSession session,
+        IAlertSink? alertSink = null)   // F11 (JOB-02) — method-injected (the ISmtpSender Handle() precedent); nullable so the existing harness-construction sites stay valid
     {
         var origin = fault.Message
             ?? throw new InvalidOperationException(
@@ -93,10 +94,38 @@ public static class OutboxEmailHandler
         var lastError = fault.Exception?.Message ?? "unknown";
         var attempts  = fault.Attempts;   // set by Wolverine's retry schedule; 6 per §6.2
 
-        await EmailDeadLetterWriter.WriteAndCommitAsync(
+        var row = await EmailDeadLetterWriter.WriteAndCommitAsync(
             session, origin, lastError, attempts);
 
         // /health (controllers/HealthController) reads the EmailDeadLetter count and
         // reports degraded while non-zero (OPS §8, ARCHITECTURE.md §6.2).
+
+        // F11 (JOB-02, U2) — the dead-letter alert (pin §3): fires AFTER the
+        // EmailDeadLetter row is committed (the /health degraded gate is the
+        // load-bearing signal, unchanged; the alert is an additive push). The
+        // IAlertSink is Core (ADR 0006 — the domain "an alert-worthy event
+        // happened" + its AlertEvent payload are Core; the channel — Sentry /
+        // human / log — is Web + owner-ops). Best-effort at the boundary: a
+        // sink failure never propagates (the row is already committed; the
+        // alert is a copy, not the signal). A null sink (a harness-construction
+        // site that did not supply one) is a no-op (the off-by-default idiom).
+        if (alertSink is not null)
+        {
+            try
+            {
+                await alertSink.ReportAsync(new AlertEvent(
+                    Kind:      "email.dead-letter",
+                    Subject:   row.Recipient,          // the operator re-queues this (OPS §7)
+                    Detail:    row.LastError,
+                    Attempts:  row.Attempts), ct: default);
+            }
+            catch
+            {
+                // A sink/channel failure is swallowed (pin §2a contract —
+                // best-effort at the boundary; the row is the load-bearing
+                // signal, the alert is a copy). The owner sees the row in
+                // /health regardless.
+            }
+        }
     }
 }

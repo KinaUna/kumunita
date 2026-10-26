@@ -1,0 +1,47 @@
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "New folder";
+}
+@* ADR 0168 D2 — the new-bookmark-folder form (the folder tree is a personal
+   tree, bounded in depth ≤ 2: root → child → grandchild — the M37
+   Notes/FolderNew shape re-applied to the bookmark surface). The new folder
+   is created at the root (ParentId = null) — the D2 "a new folder's parent
+   must itself be a root" pin: the depth ≤ 2 bound means a root's child is
+   the deepest level a user can create; nesting deeper would open the tree
+   past the bound. The (OwnerId, ParentId, Name) unique index is the witness
+   (a sibling already holding the name under this parent is a conflict the
+   DB would reject on save — the Web layer maps to 400). The owner's own
+   tree (C-M17·6 — a bookmark cannot live in another resident's folder; a
+   folder's OwnerId is the gate). A non-owner (a GlobalAdmin included) gets a
+   non-leaky 404 (the controller's gate). *@
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="bm.folder.new">New folder</kw-l></h1>
+                </div>
+            </div>
+        </header>
+        <form method="post" action="/bookmarks/folders/new">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <label class="form-label" for="folder-name">
+                    <kw-l key="common.name">Name</kw-l>
+                </label>
+                <input class="form-control" id="folder-name" name="name" type="text"
+                       maxlength="120" placeholder="…" required />
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <kw-l key="common.add">Add</kw-l>
+                </button>
+                <a class="btn btn-secondary" href="/bookmarks">
+                    <kw-l key="common.cancel">Cancel</kw-l>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>

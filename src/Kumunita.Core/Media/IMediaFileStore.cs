@@ -21,6 +21,11 @@ public interface IMediaFileStore
     /// <summary>Delete the payload file (not the document). Fails closed if the file is missing.</summary>
     Task DeleteFileAsync(string contentId, CancellationToken ct = default);
 
+    /// <summary>Idempotently delete the payload for this content id. A missing
+    /// file is a **no-op, never an error** (unlike <see cref="DeleteFileAsync"/>).
+    /// Returns <c>true</c> if a file was deleted, <c>false</c> if it was already absent.</summary>
+    Task<bool> DeleteIfExistsAsync(string contentId, CancellationToken ct = default);
+
     /// <summary>The disk-partition total bytes (a `DriveInfo` / `statvfs` read; not a `QuerySession`). M24, ADR 0134 C-SM·2.</summary>
     Task<long> GetTotalSpaceBytesAsync(CancellationToken ct = default);
 

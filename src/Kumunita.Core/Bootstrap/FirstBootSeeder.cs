@@ -270,7 +270,10 @@ public static class FirstBootSeeder
             Id = Guid.NewGuid().ToString("N"),
             Kind = IdentityToken.KindSetup,
             UserId = user.Id,
-            Token = token,
+            // F2 — AUTH-02 (pin §8.2): store the SHA-256 hex digest, never the raw env
+            // token at rest. Shares IdentityService.Sha256Hex (pin §2) — the operator
+            // holds the raw in env/email; only its hash is persisted.
+            Token = IdentityService.Sha256Hex(token),
             Attempt = 1,
             CreatedAt = now,
             ExpiresAt = now.AddDays(setupTokenTtlDays)
@@ -1515,10 +1518,12 @@ public static class FirstBootSeeder
              "**The reminder.** You can opt in to a reminder the day before the " +
              "event. It's sent once, to your account, and only if you asked for " +
              "it — there is no reminder you didn't sign up for.\n\n" +
-             "**Creating one.** A global admin (or, where granted, a moderator) " +
-             "can create an event for the neighborhood, set its audience, and " +
-             "choose whether it carries a reminder. You can post about an event in " +
-             "the feed the same way you post about anything else.\n"),
+             "**Creating one.** Any resident can create an event — open " +
+             "**Events**, pick **New event**, set the date, time, and place, " +
+             "choose who can see it (the audience), and decide whether it " +
+             "carries a reminder. A new event is a draft until you publish it. " +
+             "You can also post about an event in the feed the same way you " +
+             "post about anything else.\n"),
             ("translator", "Translators",
              "## Translators\n\n" +
              "A **Translator** is a resident granted the standing to add and edit " +
@@ -1929,8 +1934,9 @@ public static class FirstBootSeeder
              "different person:\n" +
              "- **Your own account.** Only a **global admin** can delete their " +
              "own account — a resident who isn't an admin can't. Open " +
-             "**Account → Delete account**, type your password, tick the box " +
-             "that you understand it's permanent, and click **Delete account**. " +
+             "**Settings → My data**, scroll to **Delete account** at the " +
+             "bottom, type your password, tick the box that you understand " +
+             "it's permanent, and click **Delete account**. " +
              "If you're not a global admin and you need your account removed, " +
              "ask an administrator.\n" +
              "- **Another resident's account.** A **global admin** removes it: " +
@@ -1984,7 +1990,11 @@ public static class FirstBootSeeder
              "[Child accounts](/pages/system/help/child-accounts).\n" +
              "- **Change password** — set a new password. See " +
              "[Change password](change-password).\n" +
-             "- **Delete account** — the permanent end. See " +
+             "- **My data** — export or import your own content as a portable " +
+             "archive. See [My data](my-data).\n" +
+             "- **Kiosk** — configure your own full-screen display at /kiosk. " +
+             "See [Kiosk](kiosk).\n" +
+             "- **Delete account** — at the bottom of the My data page. See " +
              "[Deleting an account](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
              "## To-dos\n\n" +
@@ -2169,6 +2179,54 @@ public static class FirstBootSeeder
              "Your password is yours. No one else on the platform — including an " +
              "admin — can read it; it is used only to check that it matches when " +
              "you sign in.\n"),
+            ("my-data", "My data",
+             "## My data\n\n" +
+             "Your data is the content *you* wrote on this platform — the posts, " +
+             "replies, events, to-dos, projects, documents, pages, messages, and " +
+             "images you created. The **My data** page (under **Settings**) is " +
+             "where you take that content with you, or bring it back.\n\n" +
+             "**To export it.** Open **Settings → My data** and click **Export**. " +
+             "You get one portable `*.kumunita` archive — your own rows and " +
+             "media. Your password is never in it, and no one else's content is: " +
+             "only your own work travels.\n\n" +
+             "**To import it back.** Open **Settings → My data**, pick " +
+             "**Import**, and choose one of your `*.kumunita` archives. The " +
+             "platform first checks what fits this community and what needs your " +
+             "call — a clean / duplicate / conflict report — and then you decide, " +
+             "item by item, where each piece goes: add it somewhere, or leave it " +
+             "out. Nothing is written until you resolve each piece.\n\n" +
+             "**What it is for.** Leaving a community, or moving to a new " +
+             "instance, without losing what you wrote. The archive is yours — a " +
+             "plain file you can keep, back up, or hand to the new instance. It " +
+             "is your own copy of your own work, separate from the platform's " +
+             "backups (the operator's job).\n"),
+            ("kiosk", "Kiosk",
+             "## Kiosk\n\n" +
+             "The **kiosk** is a full-page / full-screen display at " +
+             "**/kiosk** that automatically cycles through a list of your " +
+             "surfaces — a board, the calendar, the to-dos — on a set interval, " +
+             "and refreshes each view's content on a separate, faster interval. " +
+             "It is meant for a wall display, a TV, or a spare screen: sign in " +
+             "once, open **/kiosk**, and it runs on its own.\n\n" +
+             "**It is yours.** Each signed-in user has their **own** kiosk " +
+             "playlist (saved on your account, like your other settings), so " +
+             "what your **/kiosk** shows depends only on your choice — not on " +
+             "anyone else's. A view you could not see on its own page is simply " +
+             "skipped on the kiosk (the kiosk never shows you more than you " +
+             "could already see).\n\n" +
+             "**To set it up.** Open **Settings → Kiosk**. Choose the views to " +
+             "cycle through, top to bottom (pick a view in an empty slot to add " +
+             "one; set a slot to *—* to remove it; move a slide to a different " +
+             "slot to reorder). For a board slide, pick which board; for the " +
+             "calendar, pick day / week / month. Set the two cadences: how " +
+             "often the view *changes*, and how often the current view's " +
+             "content *refreshes*. Click **Save playlist**.\n\n" +
+             "**To see it run.** Open **/kiosk** (signed in as you) on the " +
+             "screen. It advances to the next slide on the view cadence and " +
+             "reloads each slide's content on the refresh cadence, forever — " +
+             "until you sign out.\n\n" +
+             "**Empty playlist.** A kiosk with no slides shows an empty " +
+             "message — configure one in **Settings → Kiosk** first.\n"),
             ("members", "Group members",
              "## Group members\n\n" +
              "The **Members** tab of a group is where the group's people live — " +
@@ -2371,6 +2429,11 @@ public static class FirstBootSeeder
             ["quiet-hours"]     = "settings",
             ["messaging"]       = "settings",
             ["change-password"] = "settings",
+            ["my-data"]         = "settings",
+            // M35 (ADR 0164 amendment) — the per-resident kiosk playlist
+            // editor (Settings → Kiosk, /settings/kiosk) + its /kiosk display
+            // guide; a sub-page of the settings guide.
+            ["kiosk"]           = "settings",
 
             // Group detail (the /groups/{id} tabs: Feed · Members · Settings).
             // The <c>groups</c> guide covers the Feed tab; the other two tabs
@@ -2556,10 +2619,12 @@ public static class FirstBootSeeder
              "anmelden. Sie wird einmalig an dein Konto gesendet, und nur wenn du " +
              "dich dafür angemeldet hast — es gibt keine Erinnerung, für die du " +
              "dich nicht angemeldet hast.\n\n" +
-             "**Einen anlegen.** Ein Global-Admin (und, wo zugewiesen, ein " +
-             "Moderator) kann einen Termin für das Viertel anlegen, seine " +
-             "Zielgruppe setzen und wählen, ob er eine Erinnerung trägt. Du " +
-             "kannst über einen Termin im Feed posten wie über alles andere.\n"),
+             "**Einen anlegen.** Jede:r Bewohner:in kann einen Termin anlegen — " +
+             "öffne **Termine**, wähle **Neuer Termin**, setze Datum, Uhrzeit " +
+             "und Ort, wähle die Zielgruppe und entscheide, ob er eine " +
+             "Erinnerung trägt. Ein neuer Termin ist ein Entwurf, bis du ihn " +
+             "veröffentlichst. Du kannst auch über einen Termin im Feed posten, " +
+             "wie über alles andere.\n"),
             ("translator", "Übersetzer",
              "## Übersetzer\n\n" +
              "Ein **Übersetzer** ist ein Bewohner, dem das Recht zugewiesen ist, " +
@@ -3107,7 +3172,12 @@ public static class FirstBootSeeder
              "hast. Siehe [Kinderkonten](/pages/system/help/child-accounts).\n" +
              "- **Passwort ändern** — setze ein neues Passwort. Siehe " +
              "[Passwort ändern](/pages/system/help/settings/change-password).\n" +
-             "- **Konto löschen** — der dauerhafte Schluss. Siehe " +
+             "- **Meine Daten** — exportiere oder importiere deinen eigenen " +
+             "Inhalt als portierbares Archiv. Siehe " +
+             "[Meine Daten](/pages/system/help/settings/my-data).\n" +
+             "- **Kiosk** — deine eigene Vollbild-Anzeige auf /kiosk einrichten. " +
+             "Siehe [Kiosk](kiosk).\n" +
+             "- **Konto löschen** — am Ende der Meine-Daten-Seite. Siehe " +
              "[Konto löschen](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
              "## To-dos\n\n" +
@@ -3311,6 +3381,69 @@ public static class FirstBootSeeder
              "Dein Passwort ist deins. Niemand anderes auf der Plattform — auch " +
              "keine Admin — kann es lesen; es wird nur dazu genutzt, beim " +
              "Anmelden zu prüfen, dass es passt.\n"),
+            ("my-data", "Meine Daten",
+             "## Meine Daten\n\n" +
+             "Deine Daten sind der Inhalt, *den* du auf dieser Plattform " +
+             "geschrieben hast — die Beiträge, Antworten, Veranstaltungen, " +
+             "Aufgaben, Projekte, Dokumente, Seiten, Nachrichten und Bilder, " +
+             "die du erstellt hast. Die **Meine Daten**-Seite (unter " +
+             "**Einstellungen**) ist der Ort, an dem du diesen Inhalt mitnimmst " +
+             "oder wieder zurückbringst.\n\n" +
+             "**Exportieren.** Öffne **Einstellungen → Meine Daten** und " +
+             "klicke auf **Exportieren**. Du erhältst ein portierbares " +
+             "`*.kumunita`-Archiv — deinen eigenen Inhalt und deine Medien. " +
+             "Dein Passwort ist nie darin, und auch der Inhalt anderer ist " +
+             "nicht enthalten — es ist nur, was du selbst angefertigt hast.\n\n" +
+             "**Wieder importieren.** Öffne **Einstellungen → Meine Daten**, " +
+             "wähle **Importieren** und wähle eines deiner " +
+             "`*.kumunita`-Archive. Die Plattform prüft zuerst, was zu dieser " +
+             "Gemeinschaft passt und was deine Entscheidung erfordert — als " +
+             "Bericht über sauber / doppelt / Konflikt — und dann entscheidest " +
+             "du ein einzelnes nach dem anderen, wo es hingehört: irgendwo " +
+             "hinzufügen oder weglassen. Nichts wird gespeichert, bis du dich " +
+             "zu jedem Element entschieden hast.\n\n" +
+             "**Wofür es ist.** Wenn du eine Gemeinschaft verlässt oder zu einer " +
+             "neuen Instanz umziehst, ohne das zu verlieren, was du geschrieben " +
+             "hast. Das Archiv ist deins — eine einfache Datei, die du " +
+             "sichern, archivieren oder an die neue Instanz übergeben kannst. " +
+             "Es ist eine eigene Kopie deiner Arbeit, getrennt von den " +
+             "Sicherungen der Plattform (die Verantwortung des Betreibers).\n"),
+            ("kiosk", "Kiosk",
+             "## Kiosk\n\n" +
+             "Der **Kiosk** ist eine Vollbild-Anzeige unter **/kiosk**, " +
+             "die automatisch im Wechsel deine Oberflächen zeigt — ein Board, " +
+             "den Kalender, die Aufgaben — im Abstand eines Zeitraums, und " +
+             "dabei den Inhalt jeder Ansicht in einem kürzeren, schnelleren " +
+             "Abstand aktualisiert. Er ist für eine Wandanzeige, einen " +
+             "Fernseher oder einen leeren Bildschirm gedacht: einmal " +
+             "anmelden, **/kiosk** öffnen, und er läuft von allein.\n\n" +
+             "**Er ist deiner.** Jede angemeldete Person hat ihre " +
+             "**eigene** Kiosk-Wiedergabeliste (auf deinem Konto " +
+             "gespeichert, wie deine anderen Einstellungen), also zeigt " +
+             "dein **/kiosk** nur das an, was *du* gewählt hast — nicht, " +
+             "was andere gewählt haben. Eine Ansicht, die du auf ihrer " +
+             "eigenen Seite nicht sehen könntest, wird im Kiosk einfach " +
+             "übersprungen (der Kiosk zeigt dir nie mehr als du ohnehin " +
+             "sehen könntest).\n\n" +
+             "**Einrichten.** Öffne **Einstellungen → Kiosk**. Wähle die " +
+             "Ansichten, die im Wechsel gezeigt werden, von oben nach unten " +
+             "(in einem leeren Platz eine Ansicht wählen, um sie " +
+             "hinzuzufügen; einen Platz auf *—* setzen, um sie zu " +
+             "entfernen; eine Folie in einen anderen Platz verschieben, um " +
+             "die Reihenfolge zu ändern). Bei einer Board-Ansicht wählst " +
+             "du, welches Board; beim Kalender wählst du Tag / Woche / " +
+             "Monat. Setze die beiden Abstände: wie oft die Ansicht " +
+             "*wechselt* und wie oft der Inhalt der aktuellen Ansicht " +
+             "*aktualisiert* wird. Klicke auf **Wiedergabeliste " +
+             "speichern**.\n\n" +
+             "**Ansehen, wie er läuft.** Öffne auf dem Bildschirm " +
+             "**/kiosk** (angemeldet als du). Er geht im Abstand des " +
+             "Ansichts-Wechsels zur nächsten Folie und lädt den Inhalt " +
+             "jeder Folie im Aktualisierungs-Abstand nach — immer " +
+             "weiter, bis du dich abmeldest.\n\n" +
+             "**Leere Wiedergabeliste.** Ein Kiosk ohne Folien zeigt eine " +
+             "Leer-Meldung — richte vorher unter **Einstellungen → Kiosk** " +
+             "eine ein.\n"),
             ("members", "Gruppenmitglieder",
              "## Gruppenmitglieder\n\n" +
              "Der **Mitglieder**-Tab einer Gruppe ist, wo die Leute der Gruppe " +
@@ -3650,10 +3783,12 @@ public static class FirstBootSeeder
              "l'événement. Il est envoyé une fois, à ton compte, et seulement si " +
              "tu t'es inscrit — il n'y a pas de rappel auquel tu ne t'es pas " +
              "inscrit.\n\n" +
-             "**En créer un.** Un administrateur global (et, si c'est concédé, un " +
-             "modérateur) peut créer un événement pour le quartier, définir son " +
-             "audience, et choisir s'il porte un rappel. Tu peux parler d'un " +
-             "événement dans le fil comme de n'importe quoi d'autre.\n"),
+             "**En créer un.** Tout résident peut créer un événement — ouvre " +
+             "**Événements**, choisis **Nouvel événement**, fixe la date, " +
+             "l'heure et le lieu, choisis qui peut le voir (l'audience) et " +
+             "décide s'il porte un rappel. Un nouvel événement est un brouillon " +
+             "jusqu'à ce que tu le publies. Tu peux aussi parler d'un " +
+             "événement dans le fil, comme de n'importe quoi d'autre.\n"),
             ("translator", "Traducteurs",
              "## Traducteurs\n\n" +
              "Un **traducteur** est un résident à qui est accordé le droit " +
@@ -4190,7 +4325,12 @@ public static class FirstBootSeeder
              "- **Changer le mot de passe** — définir un nouveau mot de passe. " +
              "Voir [Changer le mot de passe]" +
              "(/pages/system/help/settings/change-password).\n" +
-             "- **Supprimer le compte** — la fin permanente. Voir " +
+             "- **Mes données** — exporter ou importer ton propre contenu " +
+             "sous forme d'archive portable. Voir " +
+             "[Mes données](/pages/system/help/settings/my-data).\n" +
+             "- **Kiosque** — configure ton propre affichage plein écran sur /kiosk. " +
+             "Voir [Kiosque](kiosk).\n" +
+             "- **Supprimer le compte** — en bas de la page Mes données. Voir " +
              "[Supprimer un compte](/pages/system/help/deleting-an-account).\n"),
             ("todos", "Tâches",
              "## Tâches\n\n" +
@@ -4418,6 +4558,68 @@ public static class FirstBootSeeder
              "plateforme — y compris un administrateur — ne peut le lire ; " +
              "il est seulement utilisé pour vérifier qu'il correspond " +
              "quand tu te connectes.\n"),
+            ("my-data", "Mes données",
+             "## Mes données\n\n" +
+             "Tes données sont le contenu *que* tu as écrit sur cette " +
+             "plateforme — les messages, les réponses, les événements, " +
+             "les tâches, les projets, les documents, les pages, les " +
+             "messages directs et les images que tu as créés. La page " +
+             "**Mes données** (sous **Paramètres**) est l'endroit où tu " +
+             "prends ce contenu avec toi, ou où tu le ramènes.\n\n" +
+             "**Pour l'exporter.** Ouvre **Paramètres → Mes données** et " +
+             "clique sur **Exporter**. Tu reçois une archive " +
+             "`*.kumunita` portable — ton propre contenu et tes médias. Ton " +
+             "mot de passe n'y figure jamais, ni le contenu des autres : " +
+             "seul ce que tu as écrit part avec toi.\n\n" +
+             "**Pour le réimporter.** Ouvre **Paramètres → Mes données**, " +
+             "choisis **Importer** et sélectionne l'une de tes archives " +
+             "`*.kumunita`. La plateforme vérifie d'abord ce qui " +
+             "convient à cette communauté et ce qui nécessite ton " +
+             "jugement — un rapport propre / en double / en conflit — " +
+             "puis tu décides, un par un, où va chaque élément : " +
+             "l'ajouter quelque part ou le laisser de côté. Rien n'est " +
+             "enregistré avant que tu aies tranché pour chaque élément.\n\n" +
+             "**À quoi ça sert.** Quitter une communauté, ou migrer " +
+             "vers une nouvelle instance, sans perdre ce que tu as " +
+             "écrit. L'archive t'appartient — un simple fichier que tu " +
+             "peux conserver, sauvegarder ou transmettre à la nouvelle " +
+             "instance. C'est une copie que tu gardes de ton travail, " +
+             "séparée des sauvegardes de la plateforme (la " +
+             "responsabilité du porteur).\n"),
+            ("kiosk", "Kiosque",
+             "## Kiosque\n\n" +
+             "Le **kiosque** est un affichage plein écran sous **/kiosk** " +
+             "qui passe automatiquement d'une surface à l'autre — un " +
+             "tableau, le calendrier, les tâches — à un intervalle réglé, " +
+             "et qui actualise le contenu de chaque vue à un intervalle " +
+             "séparé, plus court. Il est pensé pour un écran mural, une " +
+             "télévision ou un écran libre : connecte-toi une fois, ouvre " +
+             "**/kiosk**, et il tourne tout seul.\n\n" +
+             "**C'est le tien.** Chaque personne connectée a sa **propre** " +
+             "playliste de kiosque (enregistrée sur ton compte, comme tes " +
+             "autres réglages), donc ton **/kiosk** ne montre que ce que " +
+             "*toi* tu as choisi — pas ce que les autres ont choisi. Une " +
+             "vue que tu ne pourrais pas voir sur sa propre page est " +
+             "simplement ignorée par le kiosque (il ne te montre jamais " +
+             "plus que ce que tu pourrais déjà voir).\n\n" +
+             "**Pour le régler.** Ouvre **Paramètres → Kiosque**. Choisis " +
+             "les vues qui défilent, de haut en bas (choisir une vue dans " +
+             "un emplacement vide pour l'ajouter ; mettre un emplacement " +
+             "à *—* pour l'enlever ; déplacer une diapositive vers un " +
+             "autre emplacement pour la réordonner). Pour une vue de " +
+             "tableau, choisis quel tableau ; pour le calendrier, choisis " +
+             "jour / semaine / mois. Réglé les deux cadences : la " +
+             "fréquence à laquelle la vue *change* et la fréquence à " +
+             "laquelle le contenu de la vue actuelle *se met à jour*. " +
+             "Clique sur **Enregistrer la playliste**.\n\n" +
+             "**Pour le voir en marche.** Ouvre **/kiosk** sur l'écran " +
+             "(connecté sous ton compte). Il passe à la diapositive " +
+             "suivante à la cadence de changement de vue et recharge le " +
+             "contenu de chaque diapositive à la cadence de mise à " +
+             "jour — indéfiniment, jusqu'à ce que tu te déconnectes.\n\n" +
+             "**Playliste vide.** Un kiosque sans diapositives affiche un " +
+             "message vide — règle-en une d'abord sous **Paramètres → " +
+             "Kiosque**.\n"),
             ("members", "Membres du groupe",
              "## Membres du groupe\n\n" +
              "L'onglet **Membres** d'un groupe est où vivent les gens du " +
@@ -4771,10 +4973,12 @@ public static class FirstBootSeeder
              "begivenheden. Den sendes én gang, til din konto, og kun hvis du " +
              "har bedt om den — der er ingen påmindelse, du ikke har tilmeldt " +
              "dig.\n\n" +
-             "**Sådan opretter du én.** En global admin (og, hvor tildelt, en " +
-             "moderator) kan oprette en begivenhed for nabolaget, sætte dens " +
-             "modtagerkreds og vælge, om den bærer en påmindelse. Du kan poste " +
-             "om en begivenhed i feeden, ligesom du poster om alt andet.\n"),
+             "**Sådan opretter du én.** Enhver beboer kan oprette en " +
+             "begivenhed — åbn **Begivenheder**, vælg **Ny begivenhed**, sæt " +
+             "dato, tid og sted, vælg modtagerkredsen og afgør, om den bærer " +
+             "en påmindelse. En ny begivenhed er et udkast, indtil du " +
+             "publicerer den. Du kan også poste om en begivenhed i feeden, " +
+             "lige som du poster om alt andet.\n"),
             ("translator", "Oversættere",
              "## Oversættere\n\n" +
              "En **oversætter** er en beboer, der er givet ret til at tilføje og " +
@@ -5290,7 +5494,12 @@ public static class FirstBootSeeder
              "- **Skift adgangskode** — sæt en ny adgangskode. Se " +
              "[Skift adgangskode]" +
              "(/pages/system/help/settings/change-password).\n" +
-             "- **Slet konto** — den varige afslutning. Se " +
+             "- **Mine data** — eksportér eller importer dit eget indhold som " +
+             "et portabelt arkiv. Se " +
+             "[Mine data](/pages/system/help/settings/my-data).\n" +
+             "- **Kiosk** — indstil din egen fuldskærms-visning på /kiosk. " +
+             "Se [Kiosk](kiosk).\n" +
+             "- **Slet konto** — nederst på siden Mine data. Se " +
              "[Slet en konto](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
              "## To-dos\n\n" +
@@ -5495,6 +5704,60 @@ public static class FirstBootSeeder
              "Din adgangskode er din. Ingen andre på platformen — heller " +
              "ikke en admin — kan læse den; den bruges kun til at tjekke, " +
              "at den matcher, når du logger ind.\n"),
+            ("my-data", "Mine data",
+             "## Mine data\n\n" +
+             "Dine data er det indhold, *du* har skrevet på denne platform — " +
+             "de indlæg, svar, begivenheder, opgaver, projekter, dokumenter, " +
+             "sider, beskeder og billeder, du har oprettet. **Mine data**-siden " +
+             "(under **Indstillinger**) er stedet, hvor du tager dit indhold " +
+             "med dig, eller bringer det tilbage.\n\n" +
+             "**Eksportér.** Åbn **Indstillinger → Mine data** og klik på " +
+             "**Eksportér**. Du får ét portabelt `*.kumunita`-arkiv — dit eget " +
+             "indhold og dine medier. Din adgangskode er aldrig i det, og " +
+             "heller ikke andres indhold: der følger kun det, du selv har skabt.\n\n" +
+             "**Importer tilbage.** Åbn **Indstillinger → Mine data**, vælg " +
+             "**Importer** og vælg ét af dine `*.kumunita`-arkiver. Platformen " +
+             "tjekker først, hvad der passer til dette fællesskab, og hvad der " +
+             "kræver dit valg — en rapport om rent / dobbelt / konflikt — " +
+             "og derefter afgør du, ét for ét, hvor hvert element skal " +
+             "være: tilføj det et sted, eller lad være. Intet gemmes, før du " +
+             "har bestemt, hvor hvert element skal være.\n\n" +
+             "**Hvad det er til.** At forlade et fællesskab, eller flytte til " +
+             "en ny instans, uden at miste det, du har skrevet. Arkivet er dit " +
+             "— en almindelig fil, du kan gemme, sikre eller overdrage til den " +
+             "nye instans. Det er din egen kopi af dit eget arbejde, adskilt fra " +
+             "platformens sikkerhedskopier (operatørens ansvar).\n"),
+            ("kiosk", "Kiosk",
+             "## Kiosk\n\n" +
+             "**Kiosken** er en fuldskærms-visning på **/kiosk**, der " +
+             "automatisk skifter imellem dine overflader — et board, " +
+             "kalendarium, opgaver — i et fast interval, og opdaterer " +
+             "hvert syns indhold i et kortere, hurtigere interval. Den er " +
+             "tænkt til et væggeskærm, en TV eller en ledig skærm: log " +
+             "ind én gang, åbn **/kiosk**, og den kører for sig selv.\n\n" +
+             "**Den er din.** Hver logget bruger har sin **egen** " +
+             "kiosk-liste (gemt på din konto, som dine andre " +
+             "indstillinger), så hvad din **/kiosk** viser afhænger kun af, " +
+             "hvad *du* har valgt — ikke hvad andre har valgt. En syn, du " +
+             "ikke kunne se på dens egen side, springes simpelthen over i " +
+             "kiosken (kiosken viser dig aldrig mere end du allerede kunne " +
+             "se).\n\n" +
+             "**Indstil den.** Åbn **Indstillinger → Kiosk**. Vælg de " +
+             "syns, der skiftes imellem, fra top til bund (vælg en syn i " +
+             "et tomt felt for at tilføje den; sæt et felt til *—* for at " +
+             "fjerne den; flyt et slide til et andet felt for at " +
+             "genordne). For et board-vælg, hvilket board; for " +
+             "kalendarium, vælg dag / uge / måned. Indstil de to " +
+             "intervaller: hvor ofte synet *skifter*, og hvor ofte det " +
+             "aktuelle syns indhold *opdateres*. Klik på **Gem " +
+             "liste**.\n\n" +
+             "**Se den køre.** Åbn **/kiosk** på skærmen (logget ind som " +
+             "dig). Den går til det næste slide i synskifte-intervallet " +
+             "og genindlæser hvert slides indhold i " +
+             "opdateringsintervallet — videre og videre, indtil du logger " +
+             "ud.\n\n" +
+             "**Tom liste.** En kiosk uden slides viser en tom-melding — " +
+             "indstil én først under **Indstillinger → Kiosk**.\n"),
             ("members", "Gruppemedlemmer",
              "## Gruppemedlemmer\n\n" +
              "**Medlemmer**-fanen i en gruppe er, hvor gruppens " +
@@ -5748,6 +6011,8 @@ public static class FirstBootSeeder
              "  - [Quiet hours](/pages/system/help/settings/quiet-hours) — when notifications wait\n" +
              "  - [Messaging](/pages/system/help/settings/messaging) — resident-to-resident messages\n" +
              "  - [Change password](/pages/system/help/settings/change-password) — set a new sign-in password\n" +
+             "  - [My data](/pages/system/help/settings/my-data) — export or import your own content\n" +
+             "  - [Kiosk](/pages/system/help/settings/kiosk) — configure your own full-screen /kiosk display\n" +
              "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n" +
              "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n" +
              "- [Being a child](/pages/system/help/being-a-child) — what a child's account is like, and what stays yours\n" +
@@ -5873,6 +6138,8 @@ public static class FirstBootSeeder
              "  - [Stillezeiten](/pages/system/help/settings/quiet-hours) — Wann Benachrichtigungen warten\n" +
              "  - [Nachrichten](/pages/system/help/settings/messaging) — Nachrichten zwischen Bewohner:innen\n" +
              "  - [Passwort ändern](/pages/system/help/settings/change-password) — Ein neues Anmeldepasswort setzen\n" +
+             "  - [Meine Daten](/pages/system/help/settings/my-data) — deinen eigenen Inhalt exportieren oder importieren\n" +
+             "  - [Kiosk](/pages/system/help/settings/kiosk) — deine eigene Vollbild-Anzeige auf /kiosk einrichten\n" +
              "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n" +
              "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n" +
              "- [Ein Kinderkonto nutzen](/pages/system/help/being-a-child) — Wie sich ein Kinderkonto anfühlt und was dir gehört\n" +
@@ -6003,6 +6270,8 @@ public static class FirstBootSeeder
              "  - [Heures de calme](/pages/system/help/settings/quiet-hours) — Quand les notifications attendent\n" +
              "  - [Messagerie](/pages/system/help/settings/messaging) — Les messages entre résidents\n" +
              "  - [Changer le mot de passe](/pages/system/help/settings/change-password) — Définir un nouveau mot de passe\n" +
+             "  - [Mes données](/pages/system/help/settings/my-data) — exporter ou importer ton propre contenu\n" +
+             "  - [Kiosque](/pages/system/help/settings/kiosk) — configure ton propre affichage plein écran sur /kiosk\n" +
              "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n" +
              "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n" +
              "- [Utiliser un compte enfant](/pages/system/help/being-a-child) — À quoi ressemble un compte enfant et ce qui te reste\n" +
@@ -6130,6 +6399,8 @@ public static class FirstBootSeeder
              "  - [Stille timer](/pages/system/help/settings/quiet-hours) — Hvornår beskeder venter\n" +
              "  - [Beskeder](/pages/system/help/settings/messaging) — Beskeder mellem beboere\n" +
              "  - [Skift adgangskode](/pages/system/help/settings/change-password) — Sæt en ny login-adgangskode\n" +
+             "  - [Mine data](/pages/system/help/settings/my-data) — eksportér eller importer dit eget indhold\n" +
+             "  - [Kiosk](/pages/system/help/settings/kiosk) — indstil din egen fuldskærms-visning på /kiosk\n" +
              "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n" +
              "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n" +
              "- [At bruge en barnkonto](/pages/system/help/being-a-child) — Hvordan en barnkonto er, og hvad der er dit\n" +

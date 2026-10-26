@@ -47,7 +47,16 @@ public sealed class IdentityService(
     // breaks: a null reader resolves as "not a sample-data instance" (the
     // <c>false</c> floor — the lock is unreachable by construction, the
     // ADR 0056 shape). DI always supplies the live value.
-    IOptions<SampleDataOptions>? sampleDataOptions = null) : IIdentityService
+    IOptions<SampleDataOptions>? sampleDataOptions = null,
+    // F1 (DB-13 GDPR, U4) — the byte-store delete seam (F1.U2's
+    // <c>IMediaFileStore.DeleteIfExistsAsync</c>). Optional (default null) for
+    // the same reason the other trailing seams are: the two direct-construction
+    // Core test harnesses build <see cref="IdentityService"/> positionally and
+    // omit it (a null store skips the post-commit byte-delete; the catalog-row
+    // delete in the Marten session is unaffected). DI always supplies the live
+    // <c>IMediaFileStore</c> (registered in DependencyInjection.cs), so the
+    // delete lane runs the byte-delete in production.
+    Kumunita.Core.Media.IMediaFileStore? mediaStore = null) : IIdentityService
 {
     private const string ComponentKind = "component";
     private const string AccountKind = "account";
@@ -118,6 +127,22 @@ public sealed class IdentityService(
     private async Task<ThinPrincipal> RegisterCoreAsync(
         string displayName, string email, string? password, bool requiresPassword)
     {
+        // F9 (AUTH-15) — disposable-email blocklist (the instance's committed list,
+        // `disposable-emails.txt`). Pre-write: no EF, no Marten, no audit row — the
+        // actor does not yet exist (no `subjectId` to audit). Throws
+        // `DisallowedEmailDomainException` (a dedicated type — the existing
+        // `InvalidOperationException` catch in `AccountController.Signup` must NOT
+        // swallow it). The structured log line is the audit lane for this rejection
+        // (the `:184` "Registered unverified resident …" mirror, pin §3d).
+        if (DisallowedEmailDomains.IsDisposable(email))
+        {
+            var blockedDomain = email[(email.LastIndexOf('@') + 1)..];
+            logger.LogInformation(
+                "Signup rejected: disposable-email domain {Domain} (email {Email}).",
+                blockedDomain, email);
+            throw new DisallowedEmailDomainException(email, blockedDomain);
+        }
+
         if (await userManager.FindByEmailAsync(email) is not null)
             throw new InvalidOperationException($"An account with email '{email}' already exists.");
 
@@ -973,6 +998,116 @@ public sealed class IdentityService(
             session.Delete(profile);
         }
 
+        // 8c. F1 (DB-13 GDPR) — delete the target's resident-authored content
+        //     docs in this SAME session / SAME commit (C3 single-write-lane,
+        //     ADR 0006; the §2A closed list in
+        //     docs/design/prod-hardening-f1-gdpr-deletion.md). Only the
+        //     resident's own rows are removed (the listed owner field ==
+        //     targetSubjectId); platform announcements (AuthorId == "") and
+        //     every other resident's content are untouched.
+        //
+        //     Owner-field-less sub-entities travel with their parent and have
+        //     no resident field to query by: KanbanLane / BoardItemPlacement
+        //     are cascade-deleted off the KanbanBoard rows below (the exact
+        //     ProjectService.DeleteBoardAsync cascade shape). GroupTranslation
+        //     / CommunityTranslation / TranslationResource are NOT removed here
+        //     — they sit under Group / Component parents this fix does not
+        //     delete (§2C — those parents are out of scope), and
+        //     TranslationResource is a global UI-string resource with no
+        //     principal field at all. MediaObject rows + their bytes are U4's
+        //     set — not touched here (only IdentityService.cs, this one commit).
+        int contentDocs = 0;
+        async Task<int> DeleteResidentRows<T>(
+            System.Linq.Expressions.Expression<System.Func<T, bool>> predicate)
+            where T : notnull
+        {
+            var rows = await session.Query<T>().Where(predicate)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var row in rows)
+                session.Delete(row);
+            return rows.Count;
+        }
+
+        // §2A primary set — one query per doc type, owner field == resident.
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.Post>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.PostReply>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.PostTranslation>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.ReplyTranslation>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.Announcement>(a => a.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.AnnouncementTranslation>(a => a.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.AnnouncementComment>(a => a.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.Event>(e => e.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.EventTranslation>(e => e.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.EventRsvp>(r => r.UserId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.Project>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.ProjectGoal>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoItem>(t => t.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoComment>(t => t.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoTranslation>(t => t.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.BoardTranslation>(b => b.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.ProjectTranslation>(p => p.AuthorId == targetSubjectId);
+        // KanbanBoard + its owner-field-less sub-entities (cascade — the
+        // DeleteBoardAsync shape: the board's placements + lanes go first,
+        // then the board itself). The to-dos themselves are deleted above by
+        // their own AuthorId (a to-do is a standalone row, not a board child).
+        {
+            var boardIds = await session.Query<Kumunita.Core.Projects.KanbanBoard>()
+                .Where(b => b.AuthorId == targetSubjectId)
+                .Select(b => b.Id)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var boardId in boardIds)
+            {
+                var placements = await session.Query<Kumunita.Core.Projects.BoardItemPlacement>()
+                    .Where(p => p.BoardId == boardId)
+                    .ToListAsync(ct).ConfigureAwait(false);
+                foreach (var placement in placements)
+                    session.Delete(placement);
+
+                var lanes = await session.Query<Kumunita.Core.Projects.KanbanLane>()
+                    .Where(l => l.BoardId == boardId)
+                    .ToListAsync(ct).ConfigureAwait(false);
+                foreach (var lane in lanes)
+                    session.Delete(lane);
+            }
+            contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.KanbanBoard>(b => b.AuthorId == targetSubjectId);
+        }
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Pages.Page>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Pages.PageTranslation>(p => p.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Inventory.InventoryItem>(i => i.AuthorId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Documents.Document>(d => d.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Documents.DocumentFolder>(d => d.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Bookmarks.Bookmark>(b => b.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Bookmarks.BookmarkFolder>(b => b.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Tags.Tag>(t => t.CreatedBy == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Tags.TagTranslation>(t => t.AuthorId == targetSubjectId);
+        // Conversation — the two-principal union (the resident holds a seat).
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Messaging.Conversation>(
+            c => c.ParticipantA == targetSubjectId || c.ParticipantB == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.Messaging.Message>(m => m.SenderId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.PersonalNote>(n => n.OwnerId == targetSubjectId);
+        contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.NoteFolder>(n => n.OwnerId == targetSubjectId);
+
+        // F1.U4 (DB-13 GDPR) — the resident's MediaObject catalog rows, in this
+        // SAME session / SAME commit as the content-doc deletes above (C3
+        // single-write-lane, ADR 0006; the §4 catalog pin in
+        // docs/design/prod-hardening-f1-gdpr-deletion.md). The owner field is
+        // <c>CreatedById</c> (the resident who first stored the unique file).
+        // We collect each row's <c>Id</c> (the lowercase-hex SHA-256 content id
+        // — the exact byte-store key for F1.U2's DeleteIfExistsAsync) into
+        // <c>mediaIds</c> so the post-commit byte-delete loop below can run;
+        // the catalog rows themselves are session-deleted here and committed by
+        // the single SaveChangesAsync (step 9). Orphan policy (pinned §4,
+        // owner-accepted): a dedup'd byte referenced by another resident's doc
+        // is deleted anyway — the dangling ref degrades to a 404 (C-MED·7),
+        // not a crash — so NO reference check is performed.
+        var mediaRows = await session.Query<Kumunita.Core.Media.MediaObject>()
+            .Where(o => o.CreatedById == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        var mediaIds = mediaRows.Select(o => o.Id).ToList();
+        foreach (var mediaRow in mediaRows)
+            session.Delete(mediaRow);
+        contentDocs += mediaRows.Count;
+
         // 8b. ADR 0143 — dissolve every GuardianLink row for the deleted
         //     child (any status) in this same session (C·5 — no dangling
         //     standing; C4 strong-consistency). The ADR 0142 self/admin
@@ -999,6 +1134,39 @@ public sealed class IdentityService(
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
+        // 9b. F1.U4 (DB-13 GDPR) — delete the resident's media BYTES on the
+        //     local volume, AFTER the Marten commit and BEFORE the EF Identity
+        //     delete (the §5 ordering pin: Marten commit → byte deletes → EF
+        //     Identity delete). These are filesystem ops, NOT in the Marten
+        //     session — the catalog rows were committed in step 9's single
+        //     SaveChangesAsync; only the bytes are removed here. Each
+        //     <c>DeleteIfExistsAsync</c> (F1.U2) is idempotent and never throws
+        //     for a missing file; we additionally swallow + log any unexpected
+        //     failure (a byte-delete failure after the commit leaves a
+        //     reclaimable orphan — orphan-safe per C-MED·7 — the §5 "accepted
+        //     cross-store window" for this store) so the account deletion
+        //     ALWAYS completes. Skipped entirely when the store seam was not
+        //     supplied (the two direct-construction test harnesses), which
+        //     leaves only the already-committed catalog-row deletes in place.
+        var mediaDeleted = 0;
+        if (mediaStore is not null)
+        {
+            foreach (var mediaId in mediaIds)
+            {
+                try
+                {
+                    if (await mediaStore.DeleteIfExistsAsync(mediaId, ct).ConfigureAwait(false))
+                        mediaDeleted++;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex,
+                        "F1.U4 — byte-delete failed for media id {MediaId} during account {Target} deletion; leaving a reclaimable orphan (orphan-safe per C-MED·7) and continuing.",
+                        mediaId, targetSubjectId);
+                }
+            }
+        }
+
         // 10. Delete the Identity account (EF Core, the identity schema).
         //     This removes the password hash, the role assignments, and the
         //     user row itself. Done AFTER the Marten commit (the
@@ -1018,10 +1186,11 @@ public sealed class IdentityService(
         }
 
         logger.LogInformation(
-            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed.",
+            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed, {ContentDocs} resident content docs removed (incl. {MediaRows} MediaObject catalog rows), {MediaBytes} media bytes deleted.",
             actorId, via, targetSubjectId,
             auditRows.Count, groupMemberships.Count,
-            compMemberships.Count, modAssignments.Count);
+            compMemberships.Count, modAssignments.Count, contentDocs,
+            mediaRows.Count, mediaDeleted);
     }
 
     // ── ADR 0077 — the account-lane GlobalAdmin emitters ──────────────────
@@ -1334,6 +1503,39 @@ public sealed class IdentityService(
         logger.LogInformation("Password changed for {UserId} ({ByAdmin}).", subjectId, byAdmin ? "admin" : "self");
     }
 
+    // ── Session kill-all (F5, AUTH-04) ──────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task KillAllSessionsAsync(string subjectId)
+    {
+        var user = await userManager.FindByIdAsync(subjectId)
+            ?? throw new InvalidOperationException($"No account '{subjectId}'.");
+
+        // Rotate the security stamp — the SAME seam ChangePasswordAsync uses at the
+        // password-change lane (IdentityService.cs:1477). No migration: User already
+        // carries the SecurityStamp column (inherited from IdentityUser, the InitialIdentity
+        // migration). The gate that makes this rotation operative (RevocationStampMiddleware
+        // in the Web) is the repo's actual invalidation idiom (ADR 0006-B "fat authorization,
+        // per request"; the SecurityStampValidator is intentionally neutered by the 14-day
+        // ValidationInterval — see Program.cs + PrivilegedStampMiddleware). The stamp
+        // rotation is the server-side revocation mark; the Web gate reads it per-request
+        // and signs out any session whose AuthenticationProperties.IssuedUtc (the
+        // session's birth time, set by the cookie handler at sign-in and NOT refreshed by
+        // sliding expiration) predates the stamp.
+        await userManager.UpdateSecurityStampAsync(user);
+
+        // Audit (C3 single-commit, same Marten session as the EF write — the same
+        // shape ChangePasswordAsync uses for its audit row; ADR 0006 "audit-by-default").
+        await using var session = documentStore.OpenSession(new SessionOptions());
+        session.Store(AuditRow(DateTimeOffset.UtcNow, subjectId, subjectId,
+            "session.kill_all", AccountKind, subjectId,
+            Authorization.AccessVia.Owner,
+            Authorization.AccessOutcome.Allow));
+        await session.SaveChangesAsync();
+
+        logger.LogInformation("Kill-all: security stamp rotated for {UserId}.", subjectId);
+    }
+
     // ── Guards + helpers ───────────────────────────────────────────────────
 
     private async Task<User> RequireGlobalAdminAsync(string adminSubjectId)
@@ -1350,10 +1552,23 @@ public sealed class IdentityService(
     {
         await using var session = documentStore.OpenSession(new SessionOptions());
         var now = DateTimeOffset.UtcNow;
+
+        // F2 — DUAL match (pin §5). The verify lanes present the STORED column value
+        // (Web loads the row by Id and passes token.Token); the setup lane presents the
+        // RAW env secret the operator typed. Match either so both work against a hashed
+        // column, and legacy cleartext rows (presented as-is) still verify (pin §6).
+        // CRITICAL: `Sha256Hex` is a .NET call — compute it as a LOCAL constant BEFORE
+        // the query. Marten cannot translate SHA256.HashData into SQL. Do NOT put
+        // Sha256Hex(...) inside the .Where(...) expression.
+        var presented = tokenValue;
+        var presentedHash = Sha256Hex(presented);   // local, precomputed — translatable as a constant
+
         var query = session
             .Query<IdentityToken>()
-            .Where(t => t.Token == tokenValue && t.Kind == kind)
-            .Where(t => t.ConsumedAt == null && t.ExpiresAt > now);
+            .Where(t => t.Kind == kind
+                && (t.Token == presented || t.Token == presentedHash)   // stored-value OR raw-secret
+                && t.ConsumedAt == null
+                && t.ExpiresAt > now);
         if (subjectId is not null)
             query = query.Where(t => t.UserId == subjectId);
         return await query.FirstOrDefaultAsync().ConfigureAwait(false);
@@ -1364,7 +1579,10 @@ public sealed class IdentityService(
         Id = Guid.NewGuid().ToString("N"),
         Kind = IdentityToken.KindVerify,
         UserId = userId,
-        Token = NewSecret(),   // high-entropy; never in a URL (the URL carries the row Id)
+        // F2 — AUTH-02: store the SHA-256 hex digest, never the raw secret at rest.
+        // The raw NewSecret() is a throwaway: generated, hashed, discarded. The
+        // high-entropy secret is never in a URL (the URL carries the row Id).
+        Token = Sha256Hex(NewSecret()),
         Attempt = attempt,
         CreatedAt = now,
         // The bound option (Verification__TtlDays in appsettings, default 14) — see the
@@ -1394,6 +1612,21 @@ public sealed class IdentityService(
         var bytes = new byte[32];
         System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
         return Convert.ToBase64String(bytes);
+    }
+
+    /// <summary>
+    /// F2 — AUTH-02: one-way hash of a high-entropy secret (pin §2). SHA-256 over the
+    /// UTF-8 bytes, returned as exactly 64 lowercase hex chars. <c>internal</c> so the
+    /// <see cref="Bootstrap.FirstBootSeeder"/> setup mint (pin §8.2) shares the SAME
+    /// implementation rather than duplicating the hashing in a second file. Not a
+    /// KDF (no salt/iterations): these tokens are 32 random bytes, so we need
+    /// one-way-ness (a DB leak must not yield the token), not key-stretching.
+    /// </summary>
+    internal static string Sha256Hex(string value)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(bytes).ToLowerInvariant();   // exactly 64 lowercase hex chars
     }
 
     // The link target is the Web host's AccountController.Verify action, reached

@@ -34,9 +34,9 @@ public class HomeControllerUpcomingTests
     private static (HomeController controller, IUserInfoService userInfo, IEventService events, IProjectService projects) Build(
         bool homeShowUpcoming,
         bool homeUpcomingMineOnly = false,
-        IReadOnlyList<Event> events = default,
-        IReadOnlyList<Event> mineEvents = default,
-        IReadOnlyList<TodoItem> todos = default)
+        IReadOnlyList<Event> events = default!,
+        IReadOnlyList<Event> mineEvents = default!,
+        IReadOnlyList<TodoItem> todos = default!)
     {
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync(Arg.Any<string>())

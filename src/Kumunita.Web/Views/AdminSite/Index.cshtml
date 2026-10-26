@@ -59,17 +59,17 @@
        source of the de-selected-checkboxes bug.) *@
     <div class="mb-3">
         <label for="HomeShowAboutButton" class="form-label d-block">"What it is &amp; how it works" button</label>
-        <input class="form-check-input" type="checkbox" name="HomeShowAboutButton" id="HomeShowAboutButton" value="true" @checked(Model.Home.HomeShowAboutButton) />
+        <input class="form-check-input" type="checkbox" name="HomeShowAboutButton" id="HomeShowAboutButton" value="true" @(Model.Home.HomeShowAboutButton ? "checked" : null) />
         <span class="form-text text-muted">Show the hero's link to the about page.</span>
     </div>
     <div class="mb-3">
         <label for="HomeShowFeatures" class="form-label d-block">Intro sections</label>
-        <input class="form-check-input" type="checkbox" name="HomeShowFeatures" id="HomeShowFeatures" value="true" @checked(Model.Home.HomeShowFeatures) />
+        <input class="form-check-input" type="checkbox" name="HomeShowFeatures" id="HomeShowFeatures" value="true" @(Model.Home.HomeShowFeatures ? "checked" : null) />
         <span class="form-text text-muted">Show the hero band and the feature cards together. Hiding them also hides the hero's eyebrow and lead.</span>
     </div>
     <div class="mb-3">
         <label for="HomeShowRoadmap" class="form-label d-block">"The plan" section</label>
-        <input class="form-check-input" type="checkbox" name="HomeShowRoadmap" id="HomeShowRoadmap" value="true" @checked(Model.Home.HomeShowRoadmap) />
+        <input class="form-check-input" type="checkbox" name="HomeShowRoadmap" id="HomeShowRoadmap" value="true" @(Model.Home.HomeShowRoadmap ? "checked" : null) />
         <span class="form-text text-muted">Show the roadmap of what the platform ships next.</span>
     </div>
     <button type="submit" class="btn btn-primary">Save home page</button>
@@ -95,32 +95,32 @@
     </div>
     <div class="mb-3">
         <label for="AboutShowFeatures" class="form-label d-block">Feature cards</label>
-        <input class="form-check-input" type="checkbox" name="AboutShowFeatures" id="AboutShowFeatures" value="true" @checked(Model.About.AboutShowFeatures) />
+        <input class="form-check-input" type="checkbox" name="AboutShowFeatures" id="AboutShowFeatures" value="true" @(Model.About.AboutShowFeatures ? "checked" : null) />
         <span class="form-text text-muted">Show the three cards describing what the platform is.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowScope" class="form-label d-block">Scope band</label>
-        <input class="form-check-input" type="checkbox" name="AboutShowScope" id="AboutShowScope" value="true" @checked(Model.About.AboutShowScope) />
+        <input class="form-check-input" type="checkbox" name="AboutShowScope" id="AboutShowScope" value="true" @(Model.About.AboutShowScope ? "checked" : null) />
         <span class="form-text text-muted">Show the "one neighborhood" scope band.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowPhilosophy" class="form-label d-block">Philosophy band</label>
-        <input class="form-check-input" type="checkbox" name="AboutShowPhilosophy" id="AboutShowPhilosophy" value="true" @checked(Model.About.AboutShowPhilosophy) />
+        <input class="form-check-input" type="checkbox" name="AboutShowPhilosophy" id="AboutShowPhilosophy" value="true" @(Model.About.AboutShowPhilosophy ? "checked" : null) />
         <span class="form-text text-muted">Show the FIG-philosophy band (Fair, Invisible, Generous).</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowProject" class="form-label d-block">Code &amp; docs band</label>
-        <input class="form-check-input" type="checkbox" name="AboutShowProject" id="AboutShowProject" value="true" @checked(Model.About.AboutShowProject) />
+        <input class="form-check-input" type="checkbox" name="AboutShowProject" id="AboutShowProject" value="true" @(Model.About.AboutShowProject ? "checked" : null) />
         <span class="form-text text-muted">Show the links to the project's code and documentation.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowWhatsNew" class="form-label d-block">"What's new" changelog</label>
-        <input class="form-check-input" type="checkbox" name="AboutShowWhatsNew" id="AboutShowWhatsNew" value="true" @checked(Model.About.AboutShowWhatsNew) />
+        <input class="form-check-input" type="checkbox" name="AboutShowWhatsNew" id="AboutShowWhatsNew" value="true" @(Model.About.AboutShowWhatsNew ? "checked" : null) />
         <span class="form-text text-muted">Show the list of recent changes.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowContactCta" class="form-label d-block">Contact band</label>
-        <input class="form-check-input" type="checkbox" name="AboutShowContactCta" id="AboutShowContactCta" value="true" @checked(Model.About.AboutShowContactCta) />
+        <input class="form-check-input" type="checkbox" name="AboutShowContactCta" id="AboutShowContactCta" value="true" @(Model.About.AboutShowContactCta ? "checked" : null) />
         <span class="form-text text-muted">Show the "something missing?" contact call-to-action.</span>
     </div>
     <button type="submit" class="btn btn-primary">Save about page</button>

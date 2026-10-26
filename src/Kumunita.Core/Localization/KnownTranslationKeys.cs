@@ -203,6 +203,16 @@ public static class KnownTranslationKeys
             ["projects.todo.status_assignee_hint"] = "Status is a free-text label (a string, not a fixed list). Assigning a to-do gives that resident standing over it — display + standing, never an access limit.",
             ["projects.todo.assignee"]       = "Assignee",
             ["projects.todo.unassigned"]     = "Unassigned",
+            // The to-do detail card's status / assign controls (below the
+            // body — the detail-page mutation lane): the hint under the
+            // assign picker, the "clear status" option, and the apply
+            // buttons (the closed-key registry +
+            // KnownTranslationKeys_ParityTests enforce the × 4).
+            ["projects.todo.mutation_hint"] = "Status and assignee are settable by the creator, the assignee, or a GlobalAdmin.",
+            ["projects.todo.clear_status"]  = "Clear status",
+            ["projects.todo.assign_picker"] = "Assign to…",
+            ["projects.todo.assign_apply"]  = "Apply",
+            ["projects.todo.status_apply"]  = "Set status",
             ["projects.todo.assign"]         = "Assign",
             ["projects.todo.unassign"]       = "Unassign",
             ["projects.todo.assign_to"]      = "Assign to…",
@@ -685,6 +695,12 @@ public static class KnownTranslationKeys
                 "Pick how dates and times are shown to you. Your choice is saved on your account — " +
                 "it takes effect the next time you load a page, and never affects other residents.",
             ["settings.dateformat_label"]        = "Your date & time format",
+            // ADR 0169 — the resident's first-day-of-week preference (the
+            // date-format section's sibling on the Date & time format page):
+            // the radio-group heading + its explanatory note.
+            ["settings.dateformat_firstday_label"]  = "First day of week",
+            ["settings.dateformat_firstday_note"]   =
+                "The day your calendar week starts on, and the day shown at the top of your day-of-week lists. Defaults to Monday.",
             ["settings.dateformat_default_marker"] = "— platform default",
             ["settings.dateformat_default_note"] = "The platform default is ",
             ["settings.dateformat_default_tail"] =
@@ -1058,7 +1074,7 @@ public static class KnownTranslationKeys
 
             // ── groups (Index / Detail / New / PostDetail) ──────────────────
             ["groups.title"]          = "Groups",
-            ["groups.lead"]           = "The communities you own or belong to.",
+            ["groups.lead"]           = "The groups you own or belong to.",
             ["groups.create"]         = "Create a group",
             ["groups.empty"]          = "No groups yet.",
             ["groups.back_all"]       = "← All groups",
@@ -2375,12 +2391,82 @@ public static class KnownTranslationKeys
             ["bm.list.kind.todo"]           = "To-dos",
             ["bm.list.kind.announcement"]   = "Announcements",
             ["bm.list.kind.page"]           = "Pages",
+            // ADR 0118 amendment (2026-10-16) — the project / board kinds join the closed
+            // set (the M37 PersonalNotes closed-set vocabulary already carried them;
+            // the M17 surface now matches). The terminology matches the M37
+            // pn.list.kind.project / pn.list.kind.board labels (one label, one word).
+            ["bm.list.kind.project"]        = "Projects",
+            ["bm.list.kind.board"]          = "Boards",
+            // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2
+            // directory kinds join the closed set (the M37 PersonalNotes
+            // "directory" label is re-used; "inventory" is new to M17).
+            ["bm.list.kind.inventory"]      = "Inventory",
+            ["bm.list.kind.directory"]      = "People",
             ["bm.list.unbookmark"]          = "Remove",
             ["bm.button.bookmark"]          = "Bookmark",
             ["bm.button.bookmarked"]        = "Bookmarked",
             // Obs-2 (ADR 0118 amendment) — the redirect-back flash toast keys.
             ["bm.toggle.bookmarked"]        = "Bookmarked.",
             ["bm.toggle.removed"]           = "Bookmark removed.",
+            ["bm.folder.new"]               = "New folder",
+            ["bm.folder.rename"]            = "Rename folder",
+            ["bm.folder.delete"]            = "Delete folder",
+            ["bm.folder.empty"]             = "No bookmarks in this folder yet.",
+            ["bm.bookmark.move"]            = "Move",
+
+            // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
+            // core surface, no admin toggle). The full 24-key pn.* block — the
+            // §kw-l closed list (locked in the design doc, U00's source of
+            // truth). U04 registered pn.note.attach + pn.note.attached for the
+            // _NoteButton; U05 registers the remaining 22 to complete the
+            // closed set (the parity test pins the count + the names × 4 langs).
+            ["pn.nav"]                      = "Notes",
+            ["pn.list.title"]               = "Your notes",
+            ["pn.list.empty"]               = "No notes yet.",
+            ["pn.list.degraded"]            = "No longer available",
+            ["pn.list.kind.post"]           = "Posts",
+            ["pn.list.kind.grouppost"]      = "Group posts",
+            ["pn.list.kind.event"]          = "Events",
+            ["pn.list.kind.page"]           = "Pages",
+            ["pn.list.kind.project"]        = "Projects",
+            ["pn.list.kind.todo"]           = "To-dos",
+            ["pn.list.kind.board"]          = "Boards",
+            ["pn.list.kind.document"]       = "Documents",
+            ["pn.list.kind.directory"]      = "People",
+            ["pn.note.edit"]                = "Edit",
+            ["pn.note.delete"]              = "Delete",
+            ["pn.note.move"]                = "Move",
+            ["pn.note.tag.add"]             = "Add tag",
+            ["pn.note.tag.remove"]          = "Remove tag",
+            ["pn.note.attach"]              = "Note",
+            ["pn.note.attached"]            = "Noted.",
+            ["pn.list.kind.announcement"]   = "Announcements",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            ["pn.list.kind.inventory"]      = "Inventory",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page). A page-level note
+            // is a note about the page itself (e.g. "the /announcements page
+            // needs a search box"), distinct from a note about an item on it.
+            ["pn.list.kind.page-announcements"] = "Announcements (page)",
+            ["pn.list.kind.page-community"]     = "Community (page)",
+            ["pn.list.kind.page-group"]         = "Groups (page)",
+            ["pn.list.kind.page-events"]        = "Events (page)",
+            ["pn.list.kind.page-projects"]      = "Projects (page)",
+            ["pn.list.kind.page-project"]       = "Project (page)",
+            ["pn.list.kind.page-todos"]         = "To-dos (page)",
+            ["pn.list.kind.page-boards"]        = "Boards (page)",
+            ["pn.list.kind.page-inventory"]     = "Inventory (page)",
+            ["pn.list.kind.page-documents"]     = "Documents (page)",
+            ["pn.note.body_label"]          = "Your note",
+            ["pn.note.delete_confirm"]      = "Delete this note? This cannot be undone.",
+            ["pn.note.add"]                 = "Add note",
+            ["pn.note.view"]                = "View note",
+            ["pn.folder.new"]               = "New folder",
+            ["pn.folder.rename"]            = "Rename folder",
+            ["pn.folder.delete"]            = "Delete folder",
+            ["pn.folder.empty"]             = "No notes in this folder yet.",
 
             // ── M21 (ADR 0122) — document management: the /documents feed +
             // detail + upload form (D5 standing, D6 download, D7 Deny → 404).
@@ -2462,21 +2548,27 @@ public static class KnownTranslationKeys
             // KnownTranslationKeys_ParityTests) requires every key present,
             // non-empty, in all four languages (M30·6, GATE-6). ──
             ["adminonboarding.title"]              = "Set up this community",
-            ["adminonboarding.intro"]              = "A guided walk through the seven most important initial settings for a new administrator. Each step links into the setting that already owns it — visit them in order, then mark the walk-through complete when you're set.",
+            ["adminonboarding.intro"]              = "A guided walk through the most important initial settings for a new administrator. Each step links into the setting that already owns it — visit them in order, then mark the walk-through complete when you're set.",
             ["adminonboarding.step_communityname"] = "Community name & description",
             ["adminonboarding.step_languages"]     = "Languages",
+            ["adminonboarding.step_timezone"]      = "Time zone",
+            ["adminonboarding.step_dateformat"]    = "Date & time format",
             ["adminonboarding.step_moderation"]    = "Moderation",
             ["adminonboarding.step_notifications"] = "Notifications",
+            ["adminonboarding.step_signup"]        = "Sign-up",
             ["adminonboarding.step_storage"]       = "Storage limits",
             ["adminonboarding.step_sitecontent"]   = "Site content",
             ["adminonboarding.step_escalation"]    = "Issue escalation",
             ["adminonboarding.desc_communityname"] = "What this community is called and how it describes itself — the community's base name and description.",
             ["adminonboarding.desc_languages"]     = "The languages residents can use, the translated interface strings, and the static pages.",
+            ["adminonboarding.desc_timezone"]      = "The platform-default time zone every timestamp is shown in unless a resident overrides it.",
+            ["adminonboarding.desc_dateformat"]    = "The platform-default date & time format every timestamp is shown in unless a resident overrides it.",
             ["adminonboarding.desc_moderation"]    = "How announcement comments are moderated on this instance.",
             ["adminonboarding.desc_notifications"] = "How often held notification emails are flushed to residents.",
+            ["adminonboarding.desc_signup"]        = "Whether new residents can sign up themselves, or whether sign-up is invitation-only.",
             ["adminonboarding.desc_storage"]       = "The per-file size limit and the per-user total content quota.",
             ["adminonboarding.desc_sitecontent"]   = "The landing surfaces' hero text and the show/hide toggles.",
-            ["adminonboarding.desc_escalation"]    = "Where residents' issues are surfaced and escalated (the announcements surface for now).",
+            ["adminonboarding.desc_escalation"]    = "The outbound escalation endpoint, the receiving token, and the enabled switch.",
             ["adminonboarding.visit"]              = "Visit this setting",
             ["adminonboarding.complete"]           = "Mark as complete",
             ["adminonboarding.flash_done"]         = "Admin setup complete — the walk-through is done.",
@@ -2731,6 +2823,11 @@ public static class KnownTranslationKeys
             ["a11y.close"]                   = "Close",
             ["a11y.toggle_nav"]              = "Toggle navigation",
             ["a11y.primary_nav"]             = "Primary",
+            // The rail expander (variant C): toggles each section's text
+            // label beside its icon. One button; the aria-label covers both
+            // directions (show/hide), so the state is carried by
+            // aria-expanded, not the label.
+            ["a11y.rail_expand"]             = "Toggle navigation labels",
             ["a11y.pagination"]              = "Pagination",
             ["a11y.pinned_announcement"]     = "Pinned announcement",
             ["a11y.banner_read_more"]        = "Read this announcement in full",
@@ -2820,6 +2917,10 @@ public static class KnownTranslationKeys
             ["kiosk.settings.title"]         = "Kiosk display",
             ["kiosk.settings.view_interval"] = "Change view every (seconds)",
             ["kiosk.settings.refresh_interval"] = "Refresh content every (seconds)",
+            ["kiosk.settings.display_mode"] = "Display mode",
+            ["kiosk.settings.display_mode.full_page"] = "Full page (fill the browser window)",
+            ["kiosk.settings.display_mode.full_screen"] = "Full screen (the whole monitor)",
+            ["kiosk.settings.display_mode.hint"] = "Full page fills your browser window; full screen also hides the browser's tabs and address bar (a user gesture is needed to enter it).",
         };
 
     // ─────────────────────────────────────────────────────────────────────
@@ -3047,6 +3148,16 @@ public static class KnownTranslationKeys
             ["projects.todo.status_assignee_hint"] = "Der Status ist ein freier Text (eine Zeichenkette, keine feste Liste). Eine Aufgabe zuzuweisen gibt diesem Bewohner Handhabung darüber — Anzeige + Handhabung, nie eine Zugangsgrenze.",
             ["projects.todo.assignee"]       = "Zugewiesen an",
             ["projects.todo.unassigned"]     = "Nicht zugewiesen",
+            // The to-do detail card's status / assign controls (below the
+            // body — the detail-page mutation lane): the hint under the
+            // assign picker, the "clear status" option, and the apply
+            // buttons (the closed-key registry +
+            // KnownTranslationKeys_ParityTests enforce the × 4).
+            ["projects.todo.mutation_hint"] = "Status und Zuweisung können vom Ersteller, dem Zugewiesenen oder einem GlobalAdmin geändert werden.",
+            ["projects.todo.clear_status"]  = "Status löschen",
+            ["projects.todo.assign_picker"] = "Zuweisen an…",
+            ["projects.todo.assign_apply"]  = "Übernehmen",
+            ["projects.todo.status_apply"]  = "Status setzen",
             ["projects.todo.assign"]         = "Zuweisen",
             ["projects.todo.unassign"]       = "Zuweisung aufheben",
             ["projects.todo.assign_to"]      = "Zuweisen an…",
@@ -3506,6 +3617,9 @@ public static class KnownTranslationKeys
                 "Wähle, wie dir Datum und Zeit angezeigt werden. Deine Auswahl wird in deinem Konto gespeichert — " +
                 "sie wird beim nächsten Seitenaufruf wirksam und betrifft nie andere Anwohner:innen.",
             ["settings.dateformat_label"]        = "Dein Datum- und Zeitformat",
+            ["settings.dateformat_firstday_label"]  = "Erster Wochentag",
+            ["settings.dateformat_firstday_note"]   =
+                "Der Tag, an dem deine Kalenderwoche beginnt, und der Tag oben in deinen Tageslisten. Standardmäßig Montag.",
             ["settings.dateformat_default_marker"] = "— Plattform-Vorgabe",
             ["settings.dateformat_default_note"] = "Die Plattform-Voreinstellung ist ",
             ["settings.dateformat_default_tail"] =
@@ -3840,7 +3954,7 @@ public static class KnownTranslationKeys
 
             // ── groups (Index / Detail / New / PostDetail) ──────────────────
             ["groups.title"]          = "Gruppen",
-            ["groups.lead"]           = "Die Gemeinschaften, die du betreibst oder denen du angehörst.",
+            ["groups.lead"]           = "Die Gruppen, die du betreibst oder denen du angehörst.",
             ["groups.create"]         = "Gruppe erstellen",
             ["groups.empty"]          = "Noch keine Gruppen.",
             ["groups.back_all"]       = "← Alle Gruppen",
@@ -5061,12 +5175,79 @@ public static class KnownTranslationKeys
             ["bm.list.kind.todo"]           = "Aufgaben",
             ["bm.list.kind.announcement"]   = "Ankündigungen",
             ["bm.list.kind.page"]           = "Seiten",
+            // ADR 0118 amendment (2026-10-16) — the project / board kinds join the closed
+            // set (the M37 PersonalNotes closed-set vocabulary already carried them;
+            // the M17 surface now matches). The terminology matches the M37
+            // pn.list.kind.project / pn.list.kind.board labels.
+            ["bm.list.kind.project"]        = "Projekte",
+            ["bm.list.kind.board"]          = "Boards",
+            // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2
+            // directory kinds join the closed set (the M37 PersonalNotes
+            // "directory" label is re-used; "inventory" is new to M17).
+            ["bm.list.kind.inventory"]      = "Inventar",
+            ["bm.list.kind.directory"]      = "Personen",
             ["bm.list.unbookmark"]          = "Entfernen",
             ["bm.button.bookmark"]          = "Merken",
             ["bm.button.bookmarked"]        = "Gemerkt",
             // Obs-2 (ADR 0118 Amendment) — Flash-Toast-Schlüssel.
             ["bm.toggle.bookmarked"]        = "Gemerkt.",
             ["bm.toggle.removed"]           = "Lesezeichen entfernt.",
+            ["bm.folder.new"]               = "Neuer Ordner",
+            ["bm.folder.rename"]            = "Ordner umbenennen",
+            ["bm.folder.delete"]            = "Ordner löschen",
+            ["bm.folder.empty"]             = "Noch keine Lesezeichen in diesem Ordner.",
+            ["bm.bookmark.move"]            = "Verschieben",
+
+            // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
+            // core surface). The full 24-key pn.* block — the §kw-l closed
+            // list (locked in the design doc). U04 registered pn.note.attach +
+            // pn.note.attached; U05 registers the remaining 22 to complete the
+            // closed set (the parity test pins the count + the names × 4 langs).
+            ["pn.nav"]                      = "Notizen",
+            ["pn.list.title"]               = "Deine Notizen",
+            ["pn.list.empty"]               = "Noch keine Notizen.",
+            ["pn.list.degraded"]            = "Nicht mehr verfügbar",
+            ["pn.list.kind.post"]           = "Beiträge",
+            ["pn.list.kind.grouppost"]      = "Gruppenbeiträge",
+            ["pn.list.kind.event"]          = "Veranstaltungen",
+            ["pn.list.kind.page"]           = "Seiten",
+            ["pn.list.kind.project"]        = "Projekte",
+            ["pn.list.kind.todo"]           = "Aufgaben",
+            ["pn.list.kind.board"]          = "Boards",
+            ["pn.list.kind.document"]       = "Dokumente",
+            ["pn.list.kind.directory"]      = "Personen",
+            ["pn.note.edit"]                = "Bearbeiten",
+            ["pn.note.delete"]              = "Löschen",
+            ["pn.note.move"]                = "Verschieben",
+            ["pn.note.tag.add"]             = "Tag hinzufügen",
+            ["pn.note.tag.remove"]          = "Tag entfernen",
+            ["pn.note.attach"]              = "Notiz",
+            ["pn.note.attached"]            = "Notiert.",
+            ["pn.list.kind.announcement"]   = "Ankündigungen",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            ["pn.list.kind.inventory"]      = "Inventar",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page).
+            ["pn.list.kind.page-announcements"] = "Ankündigungen (Seite)",
+            ["pn.list.kind.page-community"]     = "Gemeinschaft (Seite)",
+            ["pn.list.kind.page-group"]         = "Gruppen (Seite)",
+            ["pn.list.kind.page-events"]        = "Veranstaltungen (Seite)",
+            ["pn.list.kind.page-projects"]      = "Projekte (Seite)",
+            ["pn.list.kind.page-project"]       = "Projekt (Seite)",
+            ["pn.list.kind.page-todos"]         = "Aufgaben (Seite)",
+            ["pn.list.kind.page-boards"]        = "Boards (Seite)",
+            ["pn.list.kind.page-inventory"]     = "Inventar (Seite)",
+            ["pn.list.kind.page-documents"]     = "Dokumente (Seite)",
+            ["pn.note.body_label"]          = "Deine Notiz",
+            ["pn.note.delete_confirm"]      = "Diese Notiz löschen? Dies kann nicht rückgängig gemacht werden.",
+            ["pn.note.add"]                 = "Notiz hinzufügen",
+            ["pn.note.view"]                = "Notiz ansehen",
+            ["pn.folder.new"]               = "Neuer Ordner",
+            ["pn.folder.rename"]            = "Ordner umbenennen",
+            ["pn.folder.delete"]            = "Ordner löschen",
+            ["pn.folder.empty"]             = "Noch keine Notizen in diesem Ordner.",
 
             // ── M21 (ADR 0122) — Dokumentverwaltung: die /documents-Feed- +
             // Detail- + Upload-Oberfläche (D5 Standing, D6 Download, D7
@@ -5146,21 +5327,27 @@ public static class KnownTranslationKeys
             // KnownTranslationKeys_ParityTests) verlangt jeden Schlüssel in
             // allen vier Sprachen, nicht leer (M30·6, GATE-6). ──
             ["adminonboarding.title"]              = "Diese Gemeinschaft einrichten",
-            ["adminonboarding.intro"]              = "Ein geführter Rundgang durch die sieben wichtigsten Anfangseinstellungen für eine neue Administratorenin. Jeder Schritt führt in die Einstellung, die es bereits besitzt — besuche sie in der Reihenfolge und markiere den Rundgang als abgeschlossen, wenn du bereit bist.",
+            ["adminonboarding.intro"]              = "Ein geführter Rundgang durch die wichtigsten Anfangseinstellungen für eine neue Administratorenin. Jeder Schritt führt in die Einstellung, die es bereits besitzt — besuche sie in der Reihenfolge und markiere den Rundgang als abgeschlossen, wenn du bereit bist.",
             ["adminonboarding.step_communityname"] = "Name & Beschreibung der Gemeinschaft",
             ["adminonboarding.step_languages"]     = "Sprachen",
+            ["adminonboarding.step_timezone"]      = "Zeitzone",
+            ["adminonboarding.step_dateformat"]    = "Datums- & Zeitformat",
             ["adminonboarding.step_moderation"]    = "Moderation",
             ["adminonboarding.step_notifications"] = "Benachrichtigungen",
+            ["adminonboarding.step_signup"]        = "Registrierung",
             ["adminonboarding.step_storage"]       = "Speichergrenzen",
             ["adminonboarding.step_sitecontent"]   = "Website-Inhalte",
             ["adminonboarding.step_escalation"]    = "Eskalation von Anliegen",
             ["adminonboarding.desc_communityname"] = "Wie diese Gemeinschaft heißt und wie sie sich beschreibt — der Basisname und die Beschreibung der Gemeinschaft.",
             ["adminonboarding.desc_languages"]     = "Die Sprachen, die Bewohner verwenden können, die übersetzten Interface-Zeichenketten und die statischen Seiten.",
+            ["adminonboarding.desc_timezone"]      = "Die Standard-Zeitzone der Plattform, in der jede Zeitangabe angezeigt wird, sofern ein Bewohner sie nicht überschreibt.",
+            ["adminonboarding.desc_dateformat"]    = "Das Standard-Datums- & Zeitformat der Plattform, in dem jede Zeitangabe angezeigt wird, sofern ein Bewohner es nicht überschreibt.",
             ["adminonboarding.desc_moderation"]    = "Wie Ankündigungskommentare auf dieser Instanz moderiert werden.",
             ["adminonboarding.desc_notifications"] = "Wie oft zurückgehaltene Benachrichtigungs-E-Mails an Bewohner zugestellt werden.",
+            ["adminonboarding.desc_signup"]        = "Ob neue Bewohner sich selbst registrieren können oder die Registrierung nur auf Einladung möglich ist.",
             ["adminonboarding.desc_storage"]       = "Die Dateigrößengrenze und das Kontingent pro Nutzer für den gesamten Inhalt.",
             ["adminonboarding.desc_sitecontent"]   = "Der Hero-Text der Startseiten und die ein-/ausblenden-Schalter.",
-            ["adminonboarding.desc_escalation"]    = "Wo Anliegen von Bewohnern auftauchen und eskaliert werden (vorerst die Ankündigungsfläche).",
+            ["adminonboarding.desc_escalation"]    = "Das ausgehende Eskalierungs-Endpunkt, das Empfangstoken und der Aktivierungsschalter.",
             ["adminonboarding.visit"]              = "Zu dieser Einstellung",
             ["adminonboarding.complete"]           = "Als abgeschlossen markieren",
             ["adminonboarding.flash_done"]         = "Admin-Einrichtung abgeschlossen — der Rundgang ist erledigt.",
@@ -5411,6 +5598,11 @@ public static class KnownTranslationKeys
             ["a11y.close"]                   = "Schließen",
             ["a11y.toggle_nav"]              = "Navigation umschalten",
             ["a11y.primary_nav"]             = "Primär",
+            // The rail expander (variant C): toggles each section's text
+            // label beside its icon. One button; the aria-label covers both
+            // directions (show/hide), so the state is carried by
+            // aria-expanded, not the label.
+            ["a11y.rail_expand"]             = "Navigationstexte umschalten",
             ["a11y.pagination"]              = "Paginierung",
             ["a11y.pinned_announcement"]     = "Angepinnte Ankündigung",
             ["a11y.banner_read_more"]        = "Diese Ankündigung in vollem Umfang lesen",
@@ -5488,6 +5680,10 @@ public static class KnownTranslationKeys
             ["kiosk.settings.title"]         = "Kiosk-Anzeige",
             ["kiosk.settings.view_interval"] = "Ansicht wechseln alle (Sekunden)",
             ["kiosk.settings.refresh_interval"] = "Inhalt aktualisieren alle (Sekunden)",
+            ["kiosk.settings.display_mode"] = "Anzeigemodus",
+            ["kiosk.settings.display_mode.full_page"] = "Vollseite (Browserfenster füllen)",
+            ["kiosk.settings.display_mode.full_screen"] = "Vollbild (der ganze Monitor)",
+            ["kiosk.settings.display_mode.hint"] = "Vollseite füllt dein Browserfenster; Vollbild blendet zusätzlich die Browser-Tabs und die Adressleiste aus (zum Betreten ist eine Benutzeraktion erforderlich).",
         };
 
     /// <summary>
@@ -5700,6 +5896,16 @@ public static class KnownTranslationKeys
             ["projects.todo.status_assignee_hint"] = "Le statut est un texte libre (une chaîne de caractères, pas une liste fixe). Assigner une tâche donne à ce résident un droit d'intervention sur elle — affichage + intervention, jamais une limite d'accès.",
             ["projects.todo.assignee"]       = "Assignée à",
             ["projects.todo.unassigned"]     = "Non assignée",
+            // The to-do detail card's status / assign controls (below the
+            // body — the detail-page mutation lane): the hint under the
+            // assign picker, the "clear status" option, and the apply
+            // buttons (the closed-key registry +
+            // KnownTranslationKeys_ParityTests enforce the × 4).
+            ["projects.todo.mutation_hint"] = "Le statut et l'assignation peuvent être modifiés par le créateur, l'assigné ou un GlobalAdmin.",
+            ["projects.todo.clear_status"]  = "Effacer le statut",
+            ["projects.todo.assign_picker"] = "Assigner à…",
+            ["projects.todo.assign_apply"]  = "Appliquer",
+            ["projects.todo.status_apply"]  = "Définir le statut",
             ["projects.todo.assign"]         = "Assigner",
             ["projects.todo.unassign"]       = "Retirer l'assignation",
             ["projects.todo.assign_to"]      = "Assigner à…",
@@ -6081,6 +6287,9 @@ public static class KnownTranslationKeys
                 "Choisis le format de date et d'heure que la plateforme t'affiche. Ton choix est enregistré sur ton compte — " +
                 "il prend effet au prochain chargement de page, et n'affecte jamais les autres habitants.",
             ["settings.dateformat_label"]        = "Ton format de date et d'heure",
+            ["settings.dateformat_firstday_label"]  = "Premier jour de la semaine",
+            ["settings.dateformat_firstday_note"]   =
+                "Le jour où commence ta semaine de calendrier, et le jour placé en tête de tes listes de jours. Lundi par défaut.",
             ["settings.dateformat_default_marker"] = "— défaut de la plateforme",
             ["settings.dateformat_default_note"] = "Le défaut de la plateforme est ",
             ["settings.dateformat_default_tail"] =
@@ -6416,7 +6625,7 @@ public static class KnownTranslationKeys
 
             // ── groups (Index / Detail / New / PostDetail) ──────────────────
             ["groups.title"]          = "Groupes",
-            ["groups.lead"]           = "Les communautés que tu gères ou auxquelles tu appartiens.",
+            ["groups.lead"]           = "Les groupes que tu gères ou auxquels tu appartiens.",
             ["groups.create"]         = "Créer un groupe",
             ["groups.empty"]          = "Pas encore de groupes.",
             ["groups.back_all"]       = "← Tous les groupes",
@@ -7641,12 +7850,79 @@ public static class KnownTranslationKeys
             ["bm.list.kind.todo"]           = "À faire",
             ["bm.list.kind.announcement"]   = "Annonces",
             ["bm.list.kind.page"]           = "Pages",
+            // ADR 0118 amendment (2026-10-16) — the project / board kinds join the closed
+            // set (the M37 PersonalNotes closed-set vocabulary already carried them;
+            // the M17 surface now matches). The terminology matches the M37
+            // pn.list.kind.project / pn.list.kind.board labels.
+            ["bm.list.kind.project"]        = "Projets",
+            ["bm.list.kind.board"]          = "Tableaux",
+            // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2
+            // directory kinds join the closed set (the M37 PersonalNotes
+            // "directory" label is re-used; "inventory" is new to M17).
+            ["bm.list.kind.inventory"]      = "Inventaire",
+            ["bm.list.kind.directory"]      = "Personnes",
             ["bm.list.unbookmark"]          = "Retirer",
             ["bm.button.bookmark"]          = "Signeter",
             ["bm.button.bookmarked"]        = "Signeté",
             // Obs-2 (ADR 0118 amendement) — clés du toast de redirection.
             ["bm.toggle.bookmarked"]        = "Signeté.",
             ["bm.toggle.removed"]           = "Signet retiré.",
+            ["bm.folder.new"]               = "Nouveau dossier",
+            ["bm.folder.rename"]            = "Renommer le dossier",
+            ["bm.folder.delete"]            = "Supprimer le dossier",
+            ["bm.folder.empty"]             = "Aucun signet dans ce dossier pour l'instant.",
+            ["bm.bookmark.move"]            = "Déplacer",
+
+            // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
+            // core surface). The full 24-key pn.* block — the §kw-l closed
+            // list (locked in the design doc). U04 registered pn.note.attach +
+            // pn.note.attached; U05 registers the remaining 22 to complete the
+            // closed set (the parity test pins the count + the names × 4 langs).
+            ["pn.nav"]                      = "Notes",
+            ["pn.list.title"]               = "Tes notes",
+            ["pn.list.empty"]               = "Aucune note pour l'instant.",
+            ["pn.list.degraded"]            = "Non plus disponible",
+            ["pn.list.kind.post"]           = "Publications",
+            ["pn.list.kind.grouppost"]      = "Publications de groupe",
+            ["pn.list.kind.event"]          = "Événements",
+            ["pn.list.kind.page"]           = "Pages",
+            ["pn.list.kind.project"]        = "Projets",
+            ["pn.list.kind.todo"]           = "À faire",
+            ["pn.list.kind.board"]          = "Tableaux",
+            ["pn.list.kind.document"]       = "Documents",
+            ["pn.list.kind.directory"]      = "Personnes",
+            ["pn.note.edit"]                = "Modifier",
+            ["pn.note.delete"]              = "Supprimer",
+            ["pn.note.move"]                = "Déplacer",
+            ["pn.note.tag.add"]             = "Ajouter un tag",
+            ["pn.note.tag.remove"]          = "Retirer un tag",
+            ["pn.note.attach"]              = "Note",
+            ["pn.note.attached"]            = "Noté.",
+            ["pn.list.kind.announcement"]   = "Annonces",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            ["pn.list.kind.inventory"]      = "Inventaire",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page).
+            ["pn.list.kind.page-announcements"] = "Annonces (page)",
+            ["pn.list.kind.page-community"]     = "Communauté (page)",
+            ["pn.list.kind.page-group"]         = "Groupes (page)",
+            ["pn.list.kind.page-events"]        = "Événements (page)",
+            ["pn.list.kind.page-projects"]      = "Projets (page)",
+            ["pn.list.kind.page-project"]       = "Projet (page)",
+            ["pn.list.kind.page-todos"]         = "Tâches (page)",
+            ["pn.list.kind.page-boards"]        = "Tableaux (page)",
+            ["pn.list.kind.page-inventory"]     = "Inventaire (page)",
+            ["pn.list.kind.page-documents"]     = "Documents (page)",
+            ["pn.note.body_label"]          = "Votre note",
+            ["pn.note.delete_confirm"]      = "Supprimer cette note ? Cette action est irréversible.",
+            ["pn.note.add"]                 = "Ajouter une note",
+            ["pn.note.view"]                = "Voir la note",
+            ["pn.folder.new"]               = "Nouveau dossier",
+            ["pn.folder.rename"]            = "Renommer le dossier",
+            ["pn.folder.delete"]            = "Supprimer le dossier",
+            ["pn.folder.empty"]             = "Aucune note dans ce dossier pour l'instant.",
 
             // ── M21 (ADR 0122) — gestion des documents : la liste /documents +
             // la page détail + le formulaire de dépôt (D5 standing, D6
@@ -7726,21 +8002,27 @@ public static class KnownTranslationKeys
             // KnownTranslationKeys_ParityTests) exige chaque clé présente et
             // non vide dans les quatre langues (M30·6, GATE-6). ──
             ["adminonboarding.title"]              = "Configurer cette communauté",
-            ["adminonboarding.intro"]              = "Une marche guidée à travers les sept réglages de départ les plus importants pour un nouvel administrateur. Chaque étape mène au réglage qui l'a déjà — visite-les dans l'ordre, puis marque la marche comme terminée quand tu es prêt.",
+            ["adminonboarding.intro"]              = "Une marche guidée à travers les réglages de départ les plus importants pour un nouvel administrateur. Chaque étape mène au réglage qui l'a déjà — visite-les dans l'ordre, puis marque la marche comme terminée quand tu es prêt.",
             ["adminonboarding.step_communityname"] = "Nom & description de la communauté",
             ["adminonboarding.step_languages"]     = "Langues",
+            ["adminonboarding.step_timezone"]      = "Fuseau horaire",
+            ["adminonboarding.step_dateformat"]    = "Format de date et d'heure",
             ["adminonboarding.step_moderation"]    = "Modération",
             ["adminonboarding.step_notifications"] = "Notifications",
+            ["adminonboarding.step_signup"]        = "Inscription",
             ["adminonboarding.step_storage"]       = "Limites de stockage",
             ["adminonboarding.step_sitecontent"]   = "Contenu du site",
             ["adminonboarding.step_escalation"]    = "Escalade des problèmes",
             ["adminonboarding.desc_communityname"] = "Comment cette communauté s'appelle et comment elle se présente — le nom et la description de base de la communauté.",
             ["adminonboarding.desc_languages"]     = "Les langues que les résidents peuvent utiliser, les chaînes d'interface traduites et les pages statiques.",
+            ["adminonboarding.desc_timezone"]      = "Le fuseau horaire par défaut de la plateforme, dans lequel chaque horodatage est affiché sauf si un résident le remplace.",
+            ["adminonboarding.desc_dateformat"]    = "Le format de date et d'heure par défaut de la plateforme, dans lequel chaque horodatage est affiché sauf si un résident le remplace.",
             ["adminonboarding.desc_moderation"]    = "Comment les commentaires d'annonces sont modérés sur cette instance.",
             ["adminonboarding.desc_notifications"] = "À quelle fréquence les e-mails de notification retenus sont envoyés aux résidents.",
+            ["adminonboarding.desc_signup"]        = "Si de nouveaux résidents peuvent s'inscrire eux-mêmes ou si l'inscription est réservée aux invitations.",
             ["adminonboarding.desc_storage"]       = "La limite de taille par fichier et le quota de contenu total par utilisateur.",
             ["adminonboarding.desc_sitecontent"]   = "Le texte d'accroche des surfaces d'accueil et les interrupteurs afficher/masquer.",
-            ["adminonboarding.desc_escalation"]    = "Où les problèmes des résidents sont signalés et escaladés (pour l'instant la surface annonces).",
+            ["adminonboarding.desc_escalation"]    = "Le point de sortie d'éscalade, le jeton de réception et l'interrupteur d'activation.",
             ["adminonboarding.visit"]              = "Aller à ce réglage",
             ["adminonboarding.complete"]           = "Marquer comme terminé",
             ["adminonboarding.flash_done"]         = "Configuration admin terminée — la marche est achevée.",
@@ -7988,6 +8270,11 @@ public static class KnownTranslationKeys
                 "conservées.",
             ["pl.todo.assignee_remove_confirm"] = "Retirer l'assignation de cette tâche ?",
             ["pl.todo.move_confirm"]         = "Déplacer cette tâche sur un autre tableau ? Elle ne sera plus sur ce tableau.",
+            // The rail expander (variant C): toggles each section's text
+            // label beside its icon. One button; the aria-label covers both
+            // directions (show/hide), so the state is carried by
+            // aria-expanded, not the label.
+            ["a11y.rail_expand"]             = "Basculer les libellés de navigation",
             ["pl.todo.delete_confirm"]       = "Supprimer cette tâche et ses sous-tâches ? Cela ne peut pas être annulé.",
             ["inv.item.delete_confirm"]      = "Supprimer cet article ? Cela ne peut pas être annulé.",
             ["a11y.close"]                   = "Fermer",
@@ -8070,6 +8357,10 @@ public static class KnownTranslationKeys
             ["kiosk.settings.title"]         = "Affichage du kiosque",
             ["kiosk.settings.view_interval"] = "Changer de vue toutes les (secondes)",
             ["kiosk.settings.refresh_interval"] = "Actualiser le contenu toutes les (secondes)",
+            ["kiosk.settings.display_mode"] = "Mode d'affichage",
+            ["kiosk.settings.display_mode.full_page"] = "Page entière (remplir la fenêtre du navigateur)",
+            ["kiosk.settings.display_mode.full_screen"] = "Plein écran (tout le moniteur)",
+            ["kiosk.settings.display_mode.hint"] = "Page entière remplit votre fenêtre de navigateur ; plein écran masque aussi les onglets et la barre d'adresse du navigateur (une action de l'utilisateur est nécessaire pour l'activer).",
         };
 
     /// <summary>
@@ -8282,6 +8573,16 @@ public static class KnownTranslationKeys
             ["projects.todo.status_assignee_hint"] = "Status er en fri tekstlabel (en streng, ikke en fast liste). Tildeling af en opgave giver denne beboer håndtering af den — visning + håndtering, aldrig en adgangsbegrænsning.",
             ["projects.todo.assignee"]       = "Tildelt til",
             ["projects.todo.unassigned"]     = "Ikke tildelt",
+            // The to-do detail card's status / assign controls (below the
+            // body — the detail-page mutation lane): the hint under the
+            // assign picker, the "clear status" option, and the apply
+            // buttons (the closed-key registry +
+            // KnownTranslationKeys_ParityTests enforce the × 4).
+            ["projects.todo.mutation_hint"] = "Status og tildeling kan ændres af opretteren, den tildelte eller en GlobalAdmin.",
+            ["projects.todo.clear_status"]  = "Ryd status",
+            ["projects.todo.assign_picker"] = "Tildel til…",
+            ["projects.todo.assign_apply"]  = "Anvend",
+            ["projects.todo.status_apply"]  = "Sæt status",
             ["projects.todo.assign"]         = "Tildel",
             ["projects.todo.unassign"]       = "Fjern tildeling",
             ["projects.todo.assign_to"]      = "Tildel til…",
@@ -8661,6 +8962,9 @@ public static class KnownTranslationKeys
                 "Vælg, hvordan datoer og tidspunkter vises for dig. Dit valg gemmes på din konto — " +
                 "det træder i kraft næste gang, du indlæser en side, og påvirker aldrig andre beboere.",
             ["settings.dateformat_label"]        = "Dit dato- og tidsformat",
+            ["settings.dateformat_firstday_label"]  = "Første ugedag",
+            ["settings.dateformat_firstday_note"]   =
+                "Den dag, din kalenderuge starter på, og den dag, der vises øverst i dine dagslister. Mandag som standard.",
             ["settings.dateformat_default_marker"] = "— platformstandard",
             ["settings.dateformat_default_note"] = "Plattformens standard er ",
             ["settings.dateformat_default_tail"] =
@@ -8992,7 +9296,7 @@ public static class KnownTranslationKeys
 
             // ── groups (Index / Detail / New / PostDetail) ──────────────────
             ["groups.title"]          = "Grupper",
-            ["groups.lead"]           = "De fællesskaber, du ejer eller tilhører.",
+            ["groups.lead"]           = "De grupper, du ejer eller tilhører.",
             ["groups.create"]         = "Opret en gruppe",
             ["groups.empty"]          = "Ingen grupper endnu.",
             ["groups.back_all"]       = "← Alle grupper",
@@ -10206,12 +10510,79 @@ public static class KnownTranslationKeys
             ["bm.list.kind.todo"]           = "Opgaver",
             ["bm.list.kind.announcement"]   = "Bekendtgørelser",
             ["bm.list.kind.page"]           = "Sider",
+            // ADR 0118 amendment (2026-10-16) — the project / board kinds join the closed
+            // set (the M37 PersonalNotes closed-set vocabulary already carried them;
+            // the M17 surface now matches). The terminology matches the M37
+            // pn.list.kind.project / pn.list.kind.board labels.
+            ["bm.list.kind.project"]        = "Projekter",
+            ["bm.list.kind.board"]          = "Brætter",
+            // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2
+            // directory kinds join the closed set (the M37 PersonalNotes
+            // "directory" label is re-used; "inventory" is new to M17).
+            ["bm.list.kind.inventory"]      = "Inventar",
+            ["bm.list.kind.directory"]      = "Kontaktpersoner",
             ["bm.list.unbookmark"]          = "Fjern",
             ["bm.button.bookmark"]          = "Bogmærk",
             ["bm.button.bookmarked"]        = "Bogmærket",
             // Obs-2 (ADR 0118 ændring) — flash-toast-nøgler.
             ["bm.toggle.bookmarked"]        = "Bogmærket.",
             ["bm.toggle.removed"]           = "Bogmærke fjernet.",
+            ["bm.folder.new"]               = "Ny mappe",
+            ["bm.folder.rename"]            = "Omdøb mappe",
+            ["bm.folder.delete"]            = "Slet mappe",
+            ["bm.folder.empty"]             = "Ingen bogmærker i denne mappe endnu.",
+            ["bm.bookmark.move"]            = "Flyt",
+
+            // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
+            // core surface). The full 24-key pn.* block — the §kw-l closed
+            // list (locked in the design doc). U04 registered pn.note.attach +
+            // pn.note.attached; U05 registers the remaining 22 to complete the
+            // closed set (the parity test pins the count + the names × 4 langs).
+            ["pn.nav"]                      = "Noter",
+            ["pn.list.title"]               = "Dine noter",
+            ["pn.list.empty"]               = "Ingen noter endnu.",
+            ["pn.list.degraded"]            = "Ikke længere tilgængelig",
+            ["pn.list.kind.post"]           = "Indlæg",
+            ["pn.list.kind.grouppost"]      = "Gruppeindlæg",
+            ["pn.list.kind.event"]          = "Begivenheder",
+            ["pn.list.kind.page"]           = "Sider",
+            ["pn.list.kind.project"]        = "Projekter",
+            ["pn.list.kind.todo"]           = "Opgaver",
+            ["pn.list.kind.board"]          = "Brætter",
+            ["pn.list.kind.document"]       = "Dokumenter",
+            ["pn.list.kind.directory"]      = "Kontaktliste",
+            ["pn.note.edit"]                = "Redigér",
+            ["pn.note.delete"]              = "Slet",
+            ["pn.note.move"]                = "Flyt",
+            ["pn.note.tag.add"]             = "Tilføj tag",
+            ["pn.note.tag.remove"]          = "Fjern tag",
+            ["pn.note.attach"]              = "Noter",
+            ["pn.note.attached"]            = "Noteret.",
+            ["pn.list.kind.announcement"]   = "Meddelelser",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            ["pn.list.kind.inventory"]      = "Inventar",
+            // 2026-10-25 page-level notes lane (ADR 0167 amendment) — the 10
+            // page-level kinds (one per named platform page).
+            ["pn.list.kind.page-announcements"] = "Meddelelser (side)",
+            ["pn.list.kind.page-community"]     = "Fællesskab (side)",
+            ["pn.list.kind.page-group"]         = "Grupper (side)",
+            ["pn.list.kind.page-events"]        = "Arrangementer (side)",
+            ["pn.list.kind.page-projects"]      = "Projekter (side)",
+            ["pn.list.kind.page-project"]       = "Projekt (side)",
+            ["pn.list.kind.page-todos"]         = "Opgaver (side)",
+            ["pn.list.kind.page-boards"]        = "Brætter (side)",
+            ["pn.list.kind.page-inventory"]     = "Inventar (side)",
+            ["pn.list.kind.page-documents"]     = "Dokumenter (side)",
+            ["pn.note.body_label"]          = "Din note",
+            ["pn.note.delete_confirm"]      = "Slet denne note? Dette kan ikke fortrydes.",
+            ["pn.note.add"]                 = "Tilføj note",
+            ["pn.note.view"]                = "Vis note",
+            ["pn.folder.new"]               = "Ny mappe",
+            ["pn.folder.rename"]            = "Omdøb mappe",
+            ["pn.folder.delete"]            = "Slet mappe",
+            ["pn.folder.empty"]             = "Ingen noter i denne mappe endnu.",
 
             // ── M21 (ADR 0122) — dokumenthåndtering: /documents-feed +
             // detalje + upload-formular (D5 standing, D6 download, D7
@@ -10291,21 +10662,27 @@ public static class KnownTranslationKeys
             // kræver hver nøgle til stede og ikke-tom i alle fire sprog
             // (M30·6, GATE-6). ──
             ["adminonboarding.title"]              = "Opsæt dette fællesskab",
-            ["adminonboarding.intro"]              = "En guidet tur gennem de syv vigtigste indledende indstillinger for en ny administrator. Hvert trin henviser til den indstilling, der allerede ejer det — besøg dem i rækkefølge, og markér så runden som færdig, når du er klar.",
+            ["adminonboarding.intro"]              = "En guidet tur gennem de vigtigste indledende indstillinger for en ny administrator. Hvert trin henviser til den indstilling, der allerede ejer det — besøg dem i rækkefølge, og markér så runden som færdig, når du er klar.",
             ["adminonboarding.step_communityname"] = "Fællesskabets navn & beskrivelse",
             ["adminonboarding.step_languages"]     = "Sprog",
+            ["adminonboarding.step_timezone"]      = "Tidszone",
+            ["adminonboarding.step_dateformat"]    = "Dato- & tidsformat",
             ["adminonboarding.step_moderation"]    = "Moderation",
             ["adminonboarding.step_notifications"] = "Beskedelser",
+            ["adminonboarding.step_signup"]        = "Tilmelding",
             ["adminonboarding.step_storage"]       = "Lagringsgrænser",
             ["adminonboarding.step_sitecontent"]   = "Sideindhold",
             ["adminonboarding.step_escalation"]    = "Eskalering af henvendelser",
             ["adminonboarding.desc_communityname"] = "Hvad dette fællesskab hedder og hvordan det beskriver sig selv — fællesskabets basenavn og beskrivelse.",
             ["adminonboarding.desc_languages"]     = "De sprog, beboerne kan bruge, de oversatte grænsefladesnore og de statiske sider.",
+            ["adminonboarding.desc_timezone"]      = "Plattformens standardtidzone, som alle tidsstempler vises i, medmindre en beboer overskriver den.",
+            ["adminonboarding.desc_dateformat"]    = "Plattformens standard dato- og tidsformat, som alle tidsstempler vises i, medmindre en beboer overskriver det.",
             ["adminonboarding.desc_moderation"]    = "Hvordan annoncerkommentarer modereres på denne instans.",
             ["adminonboarding.desc_notifications"] = "Hvor ofte tilbagelagte beskedelsesmails sendes til beboerne.",
+            ["adminonboarding.desc_signup"]        = "Om nye beboere kan tilmelde sig selv, eller om tilmeldingen kun sker på invitation.",
             ["adminonboarding.desc_storage"]       = "Størrelsesgrænsen pr. fil og den samlede kvote pr. bruger.",
             ["adminonboarding.desc_sitecontent"]   = "Landesfladens overskriftstekst og vis/skub-omskifterne.",
-            ["adminonboarding.desc_escalation"]    = "Hvor beboernes henvendelser optræder og eskaleres (for nu annoncerfladen).",
+            ["adminonboarding.desc_escalation"]    = "Eskaleringens udgående endepunkt, modtagertokenet og aktiveringsskiftet.",
             ["adminonboarding.visit"]              = "Gå til denne indstilling",
             ["adminonboarding.complete"]           = "Markér som færdig",
             ["adminonboarding.flash_done"]         = "Admin-opsætning færdig — rundturen er sluttet.",
@@ -10545,6 +10922,11 @@ public static class KnownTranslationKeys
                 "Slet denne bane? Dens kort kommer af dette board — to-dos'ene selv beholdes.",
             ["pl.todo.assignee_remove_confirm"] = "Fjern den tildelte fra denne to-do?",
             ["pl.todo.move_confirm"]         = "Flyt denne to-do til et andet board? Den er ikke længere på dette board.",
+            // The rail expander (variant C): toggles each section's text
+            // label beside its icon. One button; the aria-label covers both
+            // directions (show/hide), so the state is carried by
+            // aria-expanded, not the label.
+            ["a11y.rail_expand"]             = "Skift navigationstekster",
             ["pl.todo.delete_confirm"]       = "Slet denne to-do og dens underafgørelser? Det kan ikke fortrydes.",
             ["inv.item.delete_confirm"]      = "Slet dette element? Det kan ikke fortrydes.",
             ["a11y.close"]                   = "Luk",
@@ -10626,6 +11008,10 @@ public static class KnownTranslationKeys
             ["kiosk.settings.title"]         = "Kiosk-display",
             ["kiosk.settings.view_interval"] = "Skift visning hver (sekunder)",
             ["kiosk.settings.refresh_interval"] = "Opdater indhold hver (sekunder)",
+            ["kiosk.settings.display_mode"] = "Visningstilstand",
+            ["kiosk.settings.display_mode.full_page"] = "Hele siden (fyld browservinduet)",
+            ["kiosk.settings.display_mode.full_screen"] = "Fuldskærm (hele monitoren)",
+            ["kiosk.settings.display_mode.hint"] = "Hele siden fylder dit browservindue; fuldskærm skjuler også browserens faner og adressefelt (det kræver en brugerhandling at aktivere).",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

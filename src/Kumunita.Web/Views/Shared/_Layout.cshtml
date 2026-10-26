@@ -13,6 +13,37 @@
     // the attribute is only emitted for an explicit override — no JS, no flash.
     var themeMode = ThemeCookie.Read(Context.Request);
 
+    // The navbar active highlight: the top-level section the current page
+    // belongs to — the nav item itself, or its parent (the /community feed
+    // AND the /posts/{id} detail both sit under Community; /projects/todos
+    // sits under Projects). Null on Home and on every non-nav path (admin,
+    // account, search, …) so nothing highlights there. Matched against the
+    // same hrefs the nav anchors use, so a route rename cannot silently drop
+    // the highlight. Rendered only as the .active class on the anchors — the
+    // targets, selectors, and e2e-frozen hooks are untouched; site.css paints
+    // the state (light + both dark scopes, all three nav variants).
+    string? activeNav = null;
+    if (Context?.Request is not null)
+    {
+        var _navPath = Context.Request.Path.Value ?? "";
+        if (_navPath.StartsWith("/community", StringComparison.OrdinalIgnoreCase)
+            || _navPath.StartsWith("/posts", StringComparison.OrdinalIgnoreCase))
+            activeNav = "community";
+        else if (_navPath.StartsWith("/announcements", StringComparison.OrdinalIgnoreCase))
+            activeNav = "announcements";
+        else if (_navPath.StartsWith("/groups", StringComparison.OrdinalIgnoreCase)) activeNav = "groups";
+        else if (_navPath.StartsWith("/events", StringComparison.OrdinalIgnoreCase)) activeNav = "events";
+        else if (_navPath.StartsWith("/projects", StringComparison.OrdinalIgnoreCase)) activeNav = "projects";
+        else if (_navPath.StartsWith("/inventory", StringComparison.OrdinalIgnoreCase)) activeNav = "inventory";
+        else if (_navPath.StartsWith("/bookmarks", StringComparison.OrdinalIgnoreCase)) activeNav = "bookmarks";
+        else if (_navPath.StartsWith("/notes", StringComparison.OrdinalIgnoreCase)) activeNav = "notes";
+        else if (_navPath.StartsWith("/documents", StringComparison.OrdinalIgnoreCase)) activeNav = "documents";
+        else if (_navPath.StartsWith("/pages", StringComparison.OrdinalIgnoreCase)) activeNav = "pages";
+        else if (_navPath.StartsWith("/tags", StringComparison.OrdinalIgnoreCase)) activeNav = "tags";
+        else if (_navPath.StartsWith("/directory", StringComparison.OrdinalIgnoreCase)) activeNav = "directory";
+        else if (_navPath.StartsWith("/people", StringComparison.OrdinalIgnoreCase)) activeNav = "people";
+    }
+
     // P0-6 (translation audit) — the client-JS strings bundle: the effective
     // language (the ADR 0049 chain, same seam as the Home page) is resolved
     // once per request and the client-facing keys are batch-resolved in ONE
@@ -66,6 +97,12 @@
         "tag.suggest.remove_prefix",
         "notif.fallback",
         "kiosk.slide_denied",
+        // M37 (ADR 0167) — the note-modal client strings (note-modal.ts).
+        "pn.note.body_label",
+        "pn.note.delete_confirm",
+        "pn.note.add",
+        "pn.note.view",
+        "pn.note.attached",
     };
     string clientStringsJson = "{}";
     if (Translation is not null)
@@ -90,14 +127,16 @@
     // set. A null provider (a non-HTTP render) degrades to the en floor.
     string _a11yToggleNav = "Toggle navigation";
     string _a11yPrimary   = "Primary";
+    string _a11yRailExpand = "Toggle navigation labels";
     if (Translation is not null)
     {
         try
         {
             string a11yLang = await EffectiveLanguageCode.ResolveAsync(
                 HttpContextAccessor.HttpContext?.Request, Localization, Translation);
-            _a11yToggleNav = await Translation.GetAsync("a11y.toggle_nav", a11yLang);
-            _a11yPrimary   = await Translation.GetAsync("a11y.primary_nav", a11yLang);
+            _a11yToggleNav   = await Translation.GetAsync("a11y.toggle_nav", a11yLang);
+            _a11yPrimary     = await Translation.GetAsync("a11y.primary_nav", a11yLang);
+            _a11yRailExpand  = await Translation.GetAsync("a11y.rail_expand", a11yLang);
         }
         catch
         {
@@ -115,7 +154,7 @@
     // GetLabelAsync never throws (missing row / store degrades to the kw-l
     // floor), so a null/absent service only degrades to the raw kw-l text.
     string _navHome, _navAnnouncements, _navCommunity, _navGroups,
-           _navEvents, _navProjects, _navInventory, _navBookmarks,
+           _navEvents, _navProjects, _navInventory, _navBookmarks, _navNotes,
            _navDocuments, _navPages, _navTags, _navDirectory, _navPeople;
     if (SurfaceLabels is not null)
     {
@@ -131,6 +170,11 @@
             _navProjects     = await SurfaceLabels.GetLabelAsync("projects",     "nav.projects",      navLang);
             _navInventory    = await SurfaceLabels.GetLabelAsync("inventory",    "inv.nav",           navLang);
             _navBookmarks    = await SurfaceLabels.GetLabelAsync("bookmarks",    "bm.nav",            navLang);
+            // M37 (ADR 0167) — the Personal Notes nav entry (D6: a standing
+            // core surface, no admin toggle; the M17 bookmarks nav-entry shape,
+            // immediately after the bm.nav block). The pn.nav kw-l key is the
+            // closed 24-key §kw-l set (U05 registered it).
+            _navNotes        = await SurfaceLabels.GetLabelAsync("notes",        "pn.nav",            navLang);
             _navDocuments    = await SurfaceLabels.GetLabelAsync("documents",    "documents.title",   navLang);
             _navPages        = await SurfaceLabels.GetLabelAsync("pages",        "nav.pages",         navLang);
             _navTags         = await SurfaceLabels.GetLabelAsync("tags",         "nav.tags",          navLang);
@@ -142,7 +186,7 @@
             // A resolution failure must never blank the nav (the kw-l floor).
             _navHome = "Home"; _navAnnouncements = "Announcements"; _navCommunity = "Community";
             _navGroups = "Groups"; _navEvents = "Events"; _navProjects = "Projects";
-            _navInventory = "Inventory"; _navBookmarks = "Bookmarks"; _navDocuments = "Documents";
+            _navInventory = "Inventory"; _navBookmarks = "Bookmarks"; _navNotes = "Notes"; _navDocuments = "Documents";
             _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory"; _navPeople = "People";
         }
     }
@@ -151,7 +195,7 @@
         // No service in the composition (a non-HTTP render) — the shipped en floor.
         _navHome = "Home"; _navAnnouncements = "Announcements"; _navCommunity = "Community";
         _navGroups = "Groups"; _navEvents = "Events"; _navProjects = "Projects";
-        _navInventory = "Inventory"; _navBookmarks = "Bookmarks"; _navDocuments = "Documents";
+        _navInventory = "Inventory"; _navBookmarks = "Bookmarks"; _navNotes = "Notes"; _navDocuments = "Documents";
         _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory"; _navPeople = "People";
     }
 }
@@ -169,7 +213,7 @@
        (POST /content-image) is CSRF-aware. (GetAndStoreTokens is the canonical way to get the
        bare token string in a model-less layout; the avatar lane never needed this because it
        form-POSTs, but the content-image upload is the first fetch-based consumer.) *@
-    <meta name="anti-forgery-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
+    <meta name="anti-forgery-token" content="@Antiforgery.GetAndStoreTokens(Context!).RequestToken" />
     <title>@ViewData["Title"] - Kumunita</title>
     <link rel="icon" type="image/png" href="~/images/logo/kumunita_k_logo_64x64.png" />
     <link rel="apple-touch-icon" href="~/images/logo/kumunita_k_logo_64x64.png" />
@@ -191,7 +235,7 @@
     // ADR 0111 — the nav-variant preference (the kumunita.nav cookie, ADR
     // 0001-B: a preference, never a claim). Default B (compact top row);
     // variant C (icon rail) is the explicit opt-in.
-    var navVariant = NavLayoutCookie.Read(Context.Request);
+    var navVariant = NavLayoutCookie.Read(Context!.Request);
 
     // Onboarding walk-through modal (M22/M30 rework) — this page is being
     // iframed by the shared _OnboardingModal (the M35 kiosk "frame the
@@ -214,9 +258,39 @@
     {
         // Non-HTTP render / missing context — not embedded (the floor).
     }
+
+    // M35 (ADR 0164) kiosk display — this page is being iframed by the /kiosk
+    // display (the kiosk "frame the surface's own route" idiom, M35·6). The
+    // kmb-embed class above is SHARED with the onboarding walk-through modal,
+    // which frames INTERACTIVE settings pages where the buttons ARE the point
+    // — the kiosk is the opposite: a read-only wall display that wants ONLY
+    // the title / subtitle / content. The differentiator is the referrer: a
+    // kiosk iframe navigates from the /kiosk document, while the onboarding
+    // modal iframes from whatever page hosts the walk. Same-origin, so the
+    // Referer arrives intact; we match on the /kiosk path (the leading slash
+    // keeps it from over-matching e.g. /kiosk-admin). A header read failure
+    // degrades to "not kiosk" (the floor — the full page renders, exactly the
+    // kmb-embed "the safe floor is the full page" doctrine). The kmb-kiosk
+    // body class then drives the site.css kiosk rules (hide buttons / tabs /
+    // nav, stretch the content to fill the frame, tight margins).
+    bool kmbKiosk = kmbEmbed;
+    if (kmbKiosk)
+    {
+        try
+        {
+            var referrer = Context.Request.Headers["Referer"].ToString();
+            var qIndex = referrer.IndexOf('?');
+            var refPath = (qIndex >= 0 ? referrer.Substring(0, qIndex) : referrer);
+            kmbKiosk = refPath.Contains("/kiosk");
+        }
+        catch
+        {
+            kmbKiosk = false; // missing context — not kiosk (the floor).
+        }
+    }
 }
 
-<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null)">
+<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null) @(kmbKiosk ? "kmb-kiosk" : null)">
     @* Flash toast — the one, uniform flash-message surface (TempData["info"]
        / ["error"]). Renders a fixed top-right Bootstrap toast when the
        controller left a flash value on the last redirect. Replaces the
@@ -277,10 +351,10 @@
                     <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                         <ul class="navbar-nav flex-grow-1">
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">@_navHome</a>
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5 8 2.5l5.5 5v6h-11z"/></svg>@_navHome</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark" href="/announcements">@_navAnnouncements</a>
+                                <a class="nav-link text-dark @(activeNav == "announcements" ? "active" : null)" href="/announcements"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5 10 3v10l-7.5-3.5z"/><path d="M2.5 7.5H1v4h1.5z"/><path d="M12 5.2a4 4 0 0 1 0 5.6"/><path d="M13.8 3.8a6.5 6.5 0 0 1 0 8.4"/></svg>@_navAnnouncements</a>
                             </li>
                             @if (User.Identity?.IsAuthenticated == true)
                             {
@@ -291,10 +365,10 @@
                                    are inert without that module, and absent in variant C and
                                    for signed-out users, so the fold is self-scoped. *@
                                 <li class="nav-item" data-nav-fold>
-                                    <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections">@_navCommunity</a>
+                                    <a class="nav-link text-dark @(activeNav == "community" ? "active" : null)" asp-controller="Posts" asp-action="AllSections"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 11V4.5h4v6.5H3zM8.5 11V2.5h4V11h-4z"/></svg>@_navCommunity</a>
                                 </li>
                                 <li class="nav-item" data-nav-fold>
-                                    <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index">@_navGroups</a>
+                                    <a class="nav-link text-dark @(activeNav == "groups" ? "active" : null)" asp-controller="Groups" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.5"/><path d="M2 13c.5-2.5 2-3.5 3.5-3.5S8.5 10.5 9 13"/><circle cx="11" cy="6.5" r="2"/><path d="M10.5 13c.4-1.8 1.3-2.6 2.5-2.6 1.2 0 2.1.8 2.5 2.6"/></svg>@_navGroups</a>
                                 </li>
                                 @* ADR 0111 — the More menu: the five less-frequent
                                    resident-only sections folded into one dropdown.
@@ -305,30 +379,34 @@
                                         <kw-l key="nav.more">More</kw-l>
                                     </a>
                                     <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item text-dark" href="/events">@_navEvents</a></li>
-                                        <li><a class="dropdown-item text-dark" href="/projects/todos">@_navProjects</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "events" ? "active" : null)" href="/events"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2.2 1.3"/></svg>@_navEvents</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "projects" ? "active" : null)" href="/projects/todos"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h4"/></svg>@_navProjects</a></li>
                                         @* M16 (ADR 0117) — the Inventory surface (D6: a
                                            standing core surface, no admin toggle; the M5
                                            projects nav-entry shape). *@
-                                        <li><a class="dropdown-item text-dark" href="/inventory">@_navInventory</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "inventory" ? "active" : null)" href="/inventory"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="5" width="11" height="8" rx="1"/><path d="M6 5V3.5h4V5M8 8v3M6.5 9.5h3"/></svg>@_navInventory</a></li>
                                         @* M17 (ADR 0118) — the Bookmarks surface (D6: a
                                            standing core surface, no admin toggle; the M16
                                            inventory nav-entry shape). *@
-                                        <li><a class="dropdown-item text-dark" href="/bookmarks">@_navBookmarks</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "bookmarks" ? "active" : null)" href="/bookmarks"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>@_navBookmarks</a></li>
+                                        @* M37 (ADR 0167) — the Personal Notes surface (D6: a
+                                           standing core surface, no admin toggle; the M17
+                                           bookmarks nav-entry shape, immediately after bm.nav). *@
+                                        <li><a class="dropdown-item text-dark @(activeNav == "notes" ? "active" : null)" href="/notes"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h6l2 2v9.5H4z"/><path d="M10 2.5V4.5h2"/><path d="M6 8h4M6 10.5h3"/></svg>@_navNotes</a></li>
                                         @* M21 (ADR 0122) — the Document management surface
                                            (D5 standing, D6 download; the M16/M17 nav-entry
                                            shape). Reuses documents.title (the closed 12-key set
                                            stays closed — no 13th nav.documents key). *@
-                                        <li><a class="dropdown-item text-dark" href="/documents">@_navDocuments</a></li>
-                                        <li><a class="dropdown-item text-dark" href="/pages">@_navPages</a></li>
-                                        <li><a class="dropdown-item text-dark" href="/tags">@_navTags</a></li>
-                                        <li><a class="dropdown-item text-dark" asp-controller="Directory" asp-action="Index">@_navDirectory</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "documents" ? "active" : null)" href="/documents"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h5l3.5 3.5v7.5h-8.5z"/><path d="M9 2.5V6h3.5"/><path d="M6 9.5h4M6 12h3"/></svg>@_navDocuments</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "pages" ? "active" : null)" href="/pages"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>@_navPages</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "tags" ? "active" : null)" href="/tags"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m5.5 4 6.5 6.5"/><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="12" r="1.8"/></svg>@_navTags</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "directory" ? "active" : null)" asp-controller="Directory" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="5.5" r="3"/><path d="M2.5 14c.5-3 2.5-4.5 5.5-4.5s5 1.5 5.5 4.5"/></svg>@_navDirectory</a></li>
                                         @* M23 (ADR 0123 F6) — the "People" nav
                                            entry (the find-people surface, /people):
                                            next to Directory, the same
                                            asp-controller/asp-action dropdown-item
                                            shape. *@
-                                        <li><a class="dropdown-item text-dark" asp-controller="FindPeople" asp-action="Index">@_navPeople</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5" r="2.5"/><path d="M1.5 13c.4-2.6 2-3.9 4-3.9s3.6 1.3 4 3.9"/><circle cx="11" cy="6" r="2"/><path d="M10 13c.3-2 1.4-3 3-3 1 0 1.9.6 2.3 1.6"/></svg>@_navPeople</a></li>
                                     </ul>
                                 </li>
                             }
@@ -364,84 +442,114 @@
                     <a class="kmb-rail-brand" asp-area="" asp-controller="Home" asp-action="Index">
                         <img src="~/images/logo/kumunita_k_logo_52x52.png" alt="Kumunita" />
                     </a>
+                    @* The rail expander (variant C): toggles each section's text
+                       label beside its icon. rail-expander.ts flips the body's
+                       .kmb-rail-expanded class (site.css widens the rail + shows
+                       the .kmb-rail-label spans + updates the content shift). *@
+                    <button type="button" class="kmb-rail-expander" aria-expanded="false"
+                            aria-label="@_a11yRailExpand" title="@_a11yRailExpand">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="m6.5 4.5 4.5 3.5-4.5 3.5"/><path d="M5 4.5v7"/></svg>
+                    </button>
                     <a class="kmb-rail-btn" asp-area="" asp-controller="Home" asp-action="Index">
                         <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5 8 2.5l5.5 5v6h-11z"/></svg>
                         <span class="visually-hidden">@_navHome</span>
+                        <span class="kmb-rail-label">@_navHome</span>
                         <span class="kmb-rail-tip">@_navHome</span>
                     </a>
-                    <a class="kmb-rail-btn" href="/announcements">
-                        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 5.5h10v5H3z"/><path d="m3 5.5 5 3.5 5-3.5"/></svg>
+                    <a class="kmb-rail-btn @(activeNav == "announcements" ? "active" : null)" href="/announcements">
+                        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5 10 3v10l-7.5-3.5z"/><path d="M2.5 7.5H1v4h1.5z"/><path d="M12 5.2a4 4 0 0 1 0 5.6"/><path d="M13.8 3.8a6.5 6.5 0 0 1 0 8.4"/></svg>
                         <span class="visually-hidden">@_navAnnouncements</span>
+                        <span class="kmb-rail-label">@_navAnnouncements</span>
                         <span class="kmb-rail-tip">@_navAnnouncements</span>
                     </a>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
-                        <a class="kmb-rail-btn" asp-controller="Posts" asp-action="AllSections">
+                        <a class="kmb-rail-btn @(activeNav == "community" ? "active" : null)" asp-controller="Posts" asp-action="AllSections">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 11V4.5h4v6.5H3zM8.5 11V2.5h4V11h-4z"/></svg>
                             <span class="visually-hidden">@_navCommunity</span>
+                            <span class="kmb-rail-label">@_navCommunity</span>
                             <span class="kmb-rail-tip">@_navCommunity</span>
                         </a>
-                        <a class="kmb-rail-btn" asp-controller="Groups" asp-action="Index">
+                        <a class="kmb-rail-btn @(activeNav == "groups" ? "active" : null)" asp-controller="Groups" asp-action="Index">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.5"/><path d="M2 13c.5-2.5 2-3.5 3.5-3.5S8.5 10.5 9 13"/><circle cx="11" cy="6.5" r="2"/><path d="M10.5 13c.4-1.8 1.3-2.6 2.5-2.6 1.2 0 2.1.8 2.5 2.6"/></svg>
                             <span class="visually-hidden">@_navGroups</span>
+                            <span class="kmb-rail-label">@_navGroups</span>
                             <span class="kmb-rail-tip">@_navGroups</span>
                         </a>
-                        <a class="kmb-rail-btn" href="/events">
+                        <a class="kmb-rail-btn @(activeNav == "events" ? "active" : null)" href="/events">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2.2 1.3"/></svg>
                             <span class="visually-hidden">@_navEvents</span>
+                            <span class="kmb-rail-label">@_navEvents</span>
                             <span class="kmb-rail-tip">@_navEvents</span>
                         </a>
-                        <a class="kmb-rail-btn" href="/projects/todos">
+                        <a class="kmb-rail-btn @(activeNav == "projects" ? "active" : null)" href="/projects/todos">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
                             <span class="visually-hidden">@_navProjects</span>
+                            <span class="kmb-rail-label">@_navProjects</span>
                             <span class="kmb-rail-tip">@_navProjects</span>
                         </a>
                         @* M16 (ADR 0117) — the Inventory surface rail icon
                            (the M5 projects nav-entry shape; D6 standing core
                            surface). *@
-                        <a class="kmb-rail-btn" href="/inventory">
+                        <a class="kmb-rail-btn @(activeNav == "inventory" ? "active" : null)" href="/inventory">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="5" width="11" height="8" rx="1"/><path d="M6 5V3.5h4V5M8 8v3M6.5 9.5h3"/></svg>
                             <span class="visually-hidden">@_navInventory</span>
+                            <span class="kmb-rail-label">@_navInventory</span>
                             <span class="kmb-rail-tip">@_navInventory</span>
                         </a>
                         @* M17 (ADR 0118) — the Bookmarks surface rail icon
                            (the M16 inventory nav-entry shape; D6 standing
                            core surface). *@
-                        <a class="kmb-rail-btn" href="/bookmarks">
+                        <a class="kmb-rail-btn @(activeNav == "bookmarks" ? "active" : null)" href="/bookmarks">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
                             <span class="visually-hidden">@_navBookmarks</span>
+                            <span class="kmb-rail-label">@_navBookmarks</span>
                             <span class="kmb-rail-tip">@_navBookmarks</span>
+                        </a>
+                        @* M37 (ADR 0167) — the Personal Notes surface rail icon
+                           (the M17 bookmarks rail-entry shape; D6 standing core
+                           surface). A paper + pencil glyph (a note). *@
+                        <a class="kmb-rail-btn @(activeNav == "notes" ? "active" : null)" href="/notes">
+                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h6l2 2v9.5H4z"/><path d="M10 2.5V4.5h2"/><path d="M6 8h4M6 10.5h3"/></svg>
+                            <span class="visually-hidden">@_navNotes</span>
+                            <span class="kmb-rail-label">@_navNotes</span>
+                            <span class="kmb-rail-tip">@_navNotes</span>
                         </a>
                         @* M21 (ADR 0122) — the Document management surface rail
                            icon (the M17 bookmarks rail-entry shape). Reuses
                            documents.title — the closed 12-key nav set stays
                            closed (no 13th nav.documents key). *@
-                        <a class="kmb-rail-btn" href="/documents">
+                        <a class="kmb-rail-btn @(activeNav == "documents" ? "active" : null)" href="/documents">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h5l3.5 3.5v7.5h-8.5z"/><path d="M9 2.5V6h3.5"/><path d="M6 9.5h4M6 12h3"/></svg>
                             <span class="visually-hidden">@_navDocuments</span>
+                            <span class="kmb-rail-label">@_navDocuments</span>
                             <span class="kmb-rail-tip">@_navDocuments</span>
                         </a>
-                        <a class="kmb-rail-btn" href="/pages">
+                        <a class="kmb-rail-btn @(activeNav == "pages" ? "active" : null)" href="/pages">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>
                             <span class="visually-hidden">@_navPages</span>
+                            <span class="kmb-rail-label">@_navPages</span>
                             <span class="kmb-rail-tip">@_navPages</span>
                         </a>
-                        <a class="kmb-rail-btn" href="/tags">
+                        <a class="kmb-rail-btn @(activeNav == "tags" ? "active" : null)" href="/tags">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m5.5 4 6.5 6.5"/><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="12" r="1.8"/></svg>
                             <span class="visually-hidden">@_navTags</span>
+                            <span class="kmb-rail-label">@_navTags</span>
                             <span class="kmb-rail-tip">@_navTags</span>
                         </a>
-                        <a class="kmb-rail-btn" asp-controller="Directory" asp-action="Index">
+                        <a class="kmb-rail-btn @(activeNav == "directory" ? "active" : null)" asp-controller="Directory" asp-action="Index">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="5.5" r="3"/><path d="M2.5 14c.5-3 2.5-4.5 5.5-4.5s5 1.5 5.5 4.5"/></svg>
                             <span class="visually-hidden">@_navDirectory</span>
+                            <span class="kmb-rail-label">@_navDirectory</span>
                             <span class="kmb-rail-tip">@_navDirectory</span>
                         </a>
                         @* M23 (ADR 0123 F6) — the "People" nav entry (the
                            find-people surface, /people): next to Directory in
                            the rail, the same rail-btn shape (a two-people icon). *@
-                        <a class="kmb-rail-btn" asp-controller="FindPeople" asp-action="Index">
+                        <a class="kmb-rail-btn @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5" r="2.5"/><path d="M1.5 13c.4-2.6 2-3.9 4-3.9s3.6 1.3 4 3.9"/><circle cx="11" cy="6" r="2"/><path d="M10 13c.3-2 1.4-3 3-3 1 0 1.9.6 2.3 1.6"/></svg>
                             <span class="visually-hidden">@_navPeople</span>
+                            <span class="kmb-rail-label">@_navPeople</span>
                             <span class="kmb-rail-tip">@_navPeople</span>
                         </a>
                     }
@@ -633,6 +741,14 @@
          pages without #kiosk-stage, so loading it globally is safe (the
          expand-page.js idiom). No new npm package / build step (M35·7). -->
     <script type="module" src="~/js/lib/kiosk.js"></script>
+    <!-- M37 (ADR 0167) — the personal-note modal (client/lib/note-modal.ts,
+         tsc-built). Wires the _NoteButton partial's Bootstrap modal to the
+         JSON API endpoints (GET/POST/PUT/DELETE /notes/api/...): add /
+         edit / delete a note without leaving the page. Self-guards on pages
+         without the [data-note-button] anchor (every page except the ten
+         detail surfaces), so loading it globally is safe (the expand-page.js
+         idiom). -->
+    <script type="module" src="~/js/lib/note-modal.js"></script>
     <!-- M10 U03 (ADR 0107 D5/D10) — the PWA install affordance + the
          service-worker registration (client/lib/pwa-install.ts, tsc-built).
          Registers /sw.js (U02's passive SW) and reveals the #pwa-install
@@ -645,6 +761,13 @@
          (no-op) in variant C, signed-out, and where the data-nav-* hooks are
          absent, so loading it globally is safe. -->
     <script type="module" src="~/js/lib/nav-more-fold.js"></script>
+    <!-- Rail label expander (client/lib/rail-expander.ts, tsc-built — variant C):
+         toggles the body's .kmb-rail-expanded class when the .kmb-rail-expander
+         button is clicked (site.css widens the rail + reveals each section's
+         .kmb-rail-label + updates the content shift). The preference persists
+         in localStorage. Self-guards (no-op) in variant B and where the
+         expander button is absent, so loading it globally is safe. -->
+    <script type="module" src="~/js/lib/rail-expander.js"></script>
     @* P0-6 (translation audit) — the client-JS strings bundle: the closed
        KnownTranslationKeys set resolved in the effective language, serialized
        to JSON. The client modules (rich-editor / image-editor / tag-suggest /

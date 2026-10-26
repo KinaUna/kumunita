@@ -48,6 +48,16 @@ public sealed class KioskDisplayViewModel
     /// default is <c>10</c>.</summary>
     public int RefreshIntervalSeconds { get; init; } = 10;
 
+    /// <summary>The display mode (display-only, never an access input — M35·4;
+    /// the ADR 0164 amendment "full page vs. full screen" pin):
+    /// <see cref="Kumunita.Core.Kiosk.KioskDisplayMode.FullPage"/> fills the
+    /// browser viewport; <see cref="Kumunita.Core.Kiosk.KioskDisplayMode.FullScreen"/>
+    /// requests the browser's Fullscreen API (the stage owns the whole monitor,
+    /// the M35 "shared physical display" question). The <see cref="Kumunita.Core.Kiosk.KioskPlaylist"/>
+    /// default is <c>FullPage</c> (entering true full-screen needs a user
+    /// gesture, so the display degrades to full-page where it is unavailable).</summary>
+    public KioskDisplayMode DisplayMode { get; init; } = KioskDisplayMode.FullPage;
+
     /// <summary>True when at least one slide is configured (false → the view
     /// renders the <c>kiosk.empty</c> message — M35-8 FACE).</summary>
     public bool HasSlides => Slides.Count > 0;
@@ -80,7 +90,19 @@ public sealed record KioskSlideViewModel(
     KioskViewKind Kind,
     string? Label,
     string? Href,
-    bool Denied);
+    bool Denied,
+    // ADR 0164 amendment — the slide's **content fingerprint** (an 8-char
+    // FNV-1a 32 hex digest of the display-relevant fields, see the
+    // KioskFingerprint helper). The /kiosk stage's client (client/lib/kiosk.ts)
+    // stores the last rendered fingerprint; on each REFRESH tick it fetches
+    // GET /kiosk/slide?slide=N, compares the returned Fingerprint to the
+    // stored one, and **only** reloads the iframe when they differ. This
+    // keeps the display from flickering / re-navigating on a tick where the
+    // underlying content has not changed (the user-facing "kiosk reload is
+    // too disrupting" fix). Denied slides carry a stable denied-shape
+    // fingerprint; a slide that flips visible→denied changes its fingerprint
+    // (the kind prefix guarantees they never collide).
+    string? Fingerprint = null);
 
 /// <summary>
 /// M35 (ADR 0164) — the <c>GET /kiosk/slide?slide=N</c> single-slide refresh
@@ -108,4 +130,20 @@ public sealed class KioskSlideRefreshViewModel
     /// <summary>The <c>kw-l</c> key U07 resolves for the denied shape
     /// (<c>kiosk.slide_denied</c>) — <c>null</c> when the slide is visible.</summary>
     public string? DeniedKey { get; set; }
+
+    /// <summary>The slide's **content fingerprint** (ADR 0164 amendment):
+    /// an 8-char FNV-1a 32 hex digest of the display-relevant fields for
+    /// this slide, computed server-side in
+    /// <c>KioskController.Classify*</c> via the <c>KioskFingerprint</c>
+    /// helper. <c>client/lib/kiosk.ts</c> compares this to the last rendered
+    /// fingerprint on each REFRESH tick and **skips the iframe reload** when
+    /// they match — the user-facing fix for the "kiosk reload is too
+    /// disruptive" symptom (the unconditional re-render every
+    /// <c>data-refresh-interval</c> s that the M35 U04 implementation
+    /// shipped). The fingerprint is a **display-only** signal (M35·4 — never
+    /// an access input): it is computed from the same already-Read content
+    /// the controller already loaded for the classification, so no new seam,
+    /// no new audit row (M35·5), and no new authorization branch (M35·1 /
+    /// M35·3).</summary>
+    public string? Fingerprint { get; set; }
 }

@@ -1,4 +1,5 @@
 @model Kumunita.Web.Models.KioskDisplayViewModel
+@using Kumunita.Core.Kiosk
 @{
     ViewData["Title"] = "Kiosk";
 }
@@ -11,22 +12,41 @@
   (the frozen board / calendar / todos read seam — M35·3). A slide the viewer
   cannot see renders the kiosk.slide_denied shape (M35-5 FACE: no leak, no 404);
   an empty playlist renders the kiosk.empty message (M35-8 FACE).
-  The top-level chrome (navbar / footer / flash / pinned-announcement) is hidden
-  via the ADR 0104 body.kmb-page-expanded selector set, applied here through an
-  inline <style> (style-src 'self' 'unsafe-inline'; the view-scoped rules are
-  only present on this page). The per-slide chrome (inside the iframe) is
-  U07's kiosk.ts concern (same-origin frame access + the same idiom). No inline
-  <script> (script-src 'self'); no new npm package (M35·7).
+  The top-level chrome (navbar / topbar / icon-rail / footer / flash /
+  pinned-announcement / onboarding banner / whatsnew toast / guest notice) is
+  hidden via an inline <style> (style-src 'self' 'unsafe-inline'; the
+  view-scoped rules are only present on this page) — the ADR 0104
+  body.kmb-page-expanded chrome-hide idiom extended to every chrome element the
+  layout renders, so the kiosk is truly full-page. The per-slide chrome (inside
+  the iframe) is already hidden by the layout's body.kmb-embed rules (the
+  Sec-Fetch-Dest: iframe signal). No inline <script> (script-src 'self'); no new
+  npm package (M35·7).
+  The display mode (the ADR 0164 amendment "full page vs. full screen") is
+  declared on #kiosk-stage as data-display-mode; kiosk.ts reads it and, for
+  FullScreen, requests the browser's Fullscreen API on the stage (the board /
+  calendar requestFullscreen precedent). FullPage fills the browser viewport.
 *@
 <style>
-  /* M35 — the kiosk chrome-hide + stage (the ADR 0104 body.kmb-page-expanded
-     idiom, applied to the kiosk's own top-level document). */
-  body { margin-bottom: 0; }
+  /* M35 — the kiosk chrome-hide + stage. Hide EVERY chrome element the layout
+     renders (both nav variants: the .navbar row and the .kmb-rail + .kmb-topbar
+     pair; plus the banners / toasts / footer), and stretch the stage to fill the
+     viewport (or the full-screen element, when the browser Fullscreen API is
+     active — the :fullscreen rules below handle that). */
+  body { margin: 0 !important; margin-bottom: 0 !important; }
   .navbar,
+  .kmb-rail,
+  .kmb-topbar,
   .kmb-footer,
   .kumunita-pinned-announcement,
-  .kmb-flash-toast { display: none !important; }
-  main { height: 100vh; padding: 0; }
+  .kumunita-onboarding-banner,
+  .kmb-flash-toast,
+  .kmb-whatsnew-toast,
+  .container-fluid > .alert { display: none !important; }
+  header { display: none !important; } /* the header only wraps the (already-hidden) nav */
+  main { display: block !important; height: 100vh !important; padding: 0 !important; margin: 0 !important; }
+  /* Variant C (icon rail) shifts main right by --kmb-rail-w; neutralise that
+     shift so the stage is flush to the left edge in full-page mode. */
+  body.kmb-nav-rail-mode main { margin-left: 0 !important; }
   #kiosk-stage {
     position: relative;
     display: flex;
@@ -35,18 +55,65 @@
     height: 100vh;
     overflow: hidden;
   }
+  /* When the browser's Fullscreen API is active on the stage (the FullScreen
+     display mode), the stage owns the whole monitor — fill it edge to edge and
+     drop any viewport-relative height in favour of the full-screen size. */
+  #kiosk-stage:fullscreen {
+    height: 100%;
+    width: 100%;
+    background: #10201a;
+  }
+  #kiosk-stage:fullscreen::-webkit-scrollbar { width: 0; height: 0; }
   .kmb-kiosk-title { margin: 0 0 .25rem; padding: .5rem 3.5rem .5rem 1rem; font-size: 1rem; font-weight: 600; }
+  /* In FullScreen mode the enter/exit-fullscreen button sits top-left — push the
+     title clear of it (the button is ~9rem wide, top-left). */
+  #kiosk-stage:has(.kmb-kiosk-fullscreen-btn) .kmb-kiosk-title { padding-left: 9.5rem; }
   .kmb-kiosk-iframe { flex: 1 1 auto; min-height: 0; width: 100%; border: 0; transition: opacity .3s ease; }
   .kmb-kiosk-empty,
   .kmb-kiosk-denied { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; text-align: center; padding: 2rem; }
   .kmb-kiosk-exit { position: absolute; top: .75rem; right: .75rem; z-index: 10; }
+  /* The FullScreen-mode controls (the ADR 0164 amendment "full page vs. full
+     screen"): the enter-fullscreen button (top-left, visible outside
+     full-screen) + the exit-fullscreen close (top-left, visible only while
+     full-screen). The .kmb-kiosk-exit ✕ (top-right, always) exits the kiosk
+     itself; these two only toggle the browser's Fullscreen API. */
+  .kmb-kiosk-fullscreen-btn {
+    position: absolute; top: .55rem; left: .55rem; z-index: 10;
+    display: inline-flex; align-items: center; gap: .3rem;
+    padding: .3rem .6rem; font-size: .8rem;
+    background: rgba(255,255,255,.08); color: inherit;
+    border: 1px solid rgba(255,255,255,.2); border-radius: .35rem; cursor: pointer;
+  }
+  .kmb-kiosk-fullscreen-btn:hover,
+  .kmb-kiosk-fullscreen-btn:focus { background: rgba(255,255,255,.16); outline: none; }
+  .kmb-kiosk-fullscreen-btn.kmb-kiosk-fs-active { display: none; } /* in fs → show close instead */
+  .kmb-kiosk-fullscreen-close {
+    position: absolute; top: .55rem; left: .55rem; z-index: 10;
+    display: inline-flex; align-items: center; gap: .3rem;
+    padding: .3rem .6rem; font-size: .8rem;
+    background: rgba(255,255,255,.08); color: inherit;
+    border: 1px solid rgba(255,255,255,.2); border-radius: .35rem; cursor: pointer;
+  }
+  .kmb-kiosk-fullscreen-close:hover,
+  .kmb-kiosk-fullscreen-close:focus { background: rgba(255,255,255,.16); outline: none; }
   .kmb-kiosk-slide-meta { display: none; } /* U07's kiosk.ts reads these in order */
 </style>
 
 <div id="kiosk-stage"
      data-view-interval="@Model.ViewIntervalSeconds"
      data-refresh-interval="@Model.RefreshIntervalSeconds"
-     data-slide-count="@Model.Slides.Count">
+     data-slide-count="@Model.Slides.Count"
+     data-display-mode="@(Model.DisplayMode.ToString().ToLowerInvariant())">
+    @if (Model.DisplayMode == KioskDisplayMode.FullScreen)
+    {
+        <button type="button" class="kmb-kiosk-fullscreen-btn" aria-pressed="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+            <kw-l key="common.fullscreen">Full screen</kw-l>
+        </button>
+        <button type="button" class="kmb-kiosk-fullscreen-close" hidden>
+            <kw-l key="common.exit_fullscreen">Exit full screen</kw-l>
+        </button>
+    }
     <a class="kmb-kiosk-exit" href="/" aria-label="Exit kiosk">&#10005;</a>
 
     @if (!Model.HasSlides)
@@ -70,7 +137,8 @@
                  data-index="@slide.Index"
                  data-href="@(slide.Href ?? string.Empty)"
                  data-denied="@slide.Denied.ToString().ToLowerInvariant()"
-                 data-label="@(slide.Label ?? string.Empty)"></div>
+                 data-label="@(slide.Label ?? string.Empty)"
+                 data-fingerprint="@(slide.Fingerprint ?? string.Empty)"></div>
         }
 
         @* The initial (first) slide: the iframe (the surface's own route), or

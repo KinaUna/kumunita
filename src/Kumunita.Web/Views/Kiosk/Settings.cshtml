@@ -7,7 +7,7 @@
     // (the register's example is exactly 5: board, calendar week, board,
     // calendar today, todos). A fixed-slot editor is the "boring where it can
     // be" pin (M35·7): no JS, no add/remove buttons, no drag-and-drop lib, no
-    // new npm package. Each slot is an independent row the admin fills in
+    // new npm package. Each slot is an independent row the resident fills in
     // (a "— / none" kind leaves the slot empty) or clears; the slots' top-to-
     // bottom order is the cycle order. "Remove a slide" = set its kind to
     // "—", "reorder" = move the slide to a different slot.
@@ -24,38 +24,60 @@
     const int MaxSlides = 5;
 }
 @*
-  M35 (ADR 0164) — the /admin/kiosk GlobalAdmin settings surface (U05).
+  M35 (ADR 0164) — the /settings/kiosk per-resident settings surface (U05,
+  ADR 0164 amendment: any signed-in user edits their OWN playlist, not a
+  GlobalAdmin-shared singleton).
   Two interval pickers (ViewIntervalSeconds >= 5, RefreshIntervalSeconds >= 2
   and < ViewIntervalSeconds) + a fixed-slot playlist editor (each slot: a Kind
   select Board/Calendar/Todos + the kind-conditional detail field + an
   optional Label) + the kiosk.settings.* kw-l keys (U04 co-shipped all four
   languages — M35·10). The board picker is seeded from the FROZEN M5
   IProjectService.ListBoardsAsync seam (M35·3 / M35·9 — reused, not re-shape)
-  in the SettingsGet action. The form POSTs to /admin/kiosk; the controller
+  in the SettingsGet action. The form POSTs to /settings/kiosk; the controller
   parses the Views[i].* indexed form fields + the two interval floors, then
-  calls IKioskService.SavePlaylistAsync (the one kiosk.save audit row, M35·5).
-  No new AccessAction / AccessVia / Decide() branch (M35·1 / M35·3). No new JS.
+  calls IKioskService.SavePlaylistAsync (the one kiosk.save audit row,
+  Via = Owner, keyed on the resident's subject id, M35·5).
+  No new AccessAction / Decide() branch (M35·1 / M35·3). No new JS.
 *@
-@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
+@await Html.PartialAsync("~/Views/Locale/_SettingsTabs.cshtml")
 
 <h1>
     <kw-l key="kiosk.settings.title">Kiosk display</kw-l>
 </h1>
 <p class="text-muted">
-    Configure the shared wall display: the ordered list of views it cycles
+    Configure your kiosk display: the ordered list of views it cycles
     through (top to bottom), and the two auto-cycle / auto-refresh cadences.
-    To add a slide, pick a view in an empty slot. To remove one, set its view
-    to <em>&mdash;</em> and save. To reorder, move a slide to a different slot.
-    Then open <a href="/kiosk" target="_blank" rel="noopener">/kiosk</a> on the
-    TV (signed in) to see it run.
+    This is <em>your</em> playlist — it only shapes what your own
+    <a href="/kiosk" target="_blank" rel="noopener">/kiosk</a> shows. To add a
+    slide, pick a view in an empty slot. To remove one, set its view to
+    <em>&mdash;</em> and save. To reorder, move a slide to a different slot.
+    Then open <a href="/kiosk" target="_blank" rel="noopener">/kiosk</a> (signed
+    in as you) to see it run.
 </p>
 
-<form method="post" action="/admin/kiosk">
+<form method="post" action="/settings/kiosk">
     @Html.AntiForgeryToken()
 
-    @* ── The two interval pickers (M35·4 — display-only, never an access input) ── *@
-    <h2 class="h5">Intervals</h2>
+    @* ── The display mode + the two interval pickers (M35·4 — display-only,
+         never an access input) ── *@
+    <h2 class="h5">Display</h2>
     <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-md-4">
+            <label for="DisplayMode" class="form-label">
+                <kw-l key="kiosk.settings.display_mode">Display mode</kw-l>
+            </label>
+            <select class="form-select" id="DisplayMode" name="DisplayMode" aria-label="Display mode">
+                <option value="FullPage" selected="@(Model.DisplayMode == KioskDisplayMode.FullPage ? "selected" : null)">
+                    <kw-l key="kiosk.settings.display_mode.full_page">Full page (fill the browser window)</kw-l>
+                </option>
+                <option value="FullScreen" selected="@(Model.DisplayMode == KioskDisplayMode.FullScreen ? "selected" : null)">
+                    <kw-l key="kiosk.settings.display_mode.full_screen">Full screen (the whole monitor)</kw-l>
+                </option>
+            </select>
+            <div class="form-text">
+                <kw-l key="kiosk.settings.display_mode.hint">Full page fills your browser window; full screen also hides the browser's tabs and address bar (a user gesture is needed to enter it).</kw-l>
+            </div>
+        </div>
         <div class="col-sm-6 col-md-4">
             <label for="ViewIntervalSeconds" class="form-label">
                 <kw-l key="kiosk.settings.view_interval">Change view every (seconds)</kw-l>

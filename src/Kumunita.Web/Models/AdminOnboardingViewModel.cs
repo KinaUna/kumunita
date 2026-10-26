@@ -8,9 +8,10 @@ namespace Kumunita.Web.Models;
 /// <c>AccessAudit</c> row (the
 /// <see cref="Kumunita.Core.AdminOnboarding.IAdminOnboardingService.GetAsync"/>
 /// read re-projected, M30·3). The completion-state read is the
-/// <see cref="Completed"/> value; the seven step cards are the closed set
+/// <see cref="Completed"/> value; the ten step cards are the closed set
 /// (M30·7, the design doc §2.3 + the register's §"closed <c>kw-l</c> key
-/// set" table).
+/// set" table — the original seven M30 steps, extended by the additive
+/// time-zone / date-format / sign-up steps per ADR 0153 D1).
 /// <para>
 /// **The model never writes** (M30·1, M30·6): the only write is the
 /// controller's <see cref="Kumunita.Core.AdminOnboarding.IAdminOnboardingService.CompleteAsync"/>
@@ -22,22 +23,26 @@ namespace Kumunita.Web.Models;
 /// value).
 /// </para>
 /// <para>
-/// **The <see cref="OnboardingStep"/> record is the closed seven-step set** (M30·7):
-/// the seven <c>(Key, LabelKey, Route, DescriptionKey)</c> tuples in the
-/// README / <c>Milestones.cs</c> order — community name →
+/// **The <see cref="OnboardingStep"/> record is the closed ten-step set** (M30·7,
+/// extended additively per ADR 0153 D1): the ten <c>(Key, LabelKey, Route,
+/// DescriptionKey)</c> tuples in the walk order — community name →
 /// <c>/admin/communities</c> (the community's base name + description,
 /// ADR 0062; distinct from step 2's translations surface), languages →
-/// <c>/admin/languages</c>, moderation
-/// → <c>/admin/announcements/comments</c>, notifications →
-/// <c>/admin/quiet</c>, storage limits → <c>/admin/storage/settings</c>,
+/// <c>/admin/languages</c>, time zone → <c>/admin/timezone</c> (ADR 0019,
+/// additive), date &amp; time format → <c>/admin/dateformat</c> (ADR 0020,
+/// additive), moderation → <c>/admin/announcements/comments</c>,
+/// notifications → <c>/admin/quiet</c>, sign-up → <c>/admin/signup</c>
+/// (ADR 0050, additive), storage limits → <c>/admin/storage/settings</c>,
 /// site content → <c>/admin/site</c>, issue escalation →
-/// <c>/admin/error-reports</c> (the M32 surface — the M30
-/// <c>/admin/announcements</c> placeholder's known deferral is now resolved:
-/// M32 "issue submission & escalation" shipped (ADR 0155) and U06 re-pointed
-/// this step's route, M32·11). The walk-through is **links-only** (M30·7):
-/// it does **not**
-/// inline a control, does **not** add a per-step POST, does **not** persist
-/// a step cursor, does **not** gate the admin surface on completion.
+/// <c>/admin/escalation</c> (the ESC outbound-config surface, ADR 0159 —
+/// the M30 placeholder's known deferral was first re-pointed by M32·11 to
+/// <c>/admin/error-reports</c> (the M32 "issue submission & escalation"
+/// surface, ADR 0155), then re-pointed again to <c>/admin/escalation</c>
+/// (the ADR 0159 ESC surface, which is the outbound config a new admin
+/// actually sets up first). The walk-through is **links-only** (M30·7):
+/// it does **not** inline a control, does **not** add a per-step POST,
+/// does **not** persist a step cursor, does **not** gate the admin surface
+/// on completion.
 /// </para>
 /// </summary>
 public sealed class AdminOnboardingViewModel
@@ -56,9 +61,10 @@ public sealed class AdminOnboardingViewModel
     public bool Completed { get; init; }
 
     /// <summary>
-    /// The closed seven-step set (M30·7, the design doc §2.3 table). The
-    /// Razor view iterates this list in order; each <see cref="OnboardingStep"/>
-    /// links into the existing admin surface that already owns the setting (the
+    /// The closed ten-step set (M30·7, the design doc §2.3 table, extended
+    /// additively per ADR 0153 D1). The Razor view iterates this list in
+    /// order; each <see cref="OnboardingStep"/> links into the existing admin
+    /// surface that already owns the setting (the
     /// <see cref="OnboardingStep.Route"/> — the M22 D3 "rides frozen lanes" pin,
     /// admin-scope). **No inline control, no per-step POST, no persisted step
     /// cursor, no completion gate** (the M30·7 pin — the walk-through's
@@ -74,20 +80,24 @@ public sealed class AdminOnboardingViewModel
     public IReadOnlyList<OnboardingStep> Steps { get; init; } = ClosedSteps;
 
     /// <summary>
-    /// The closed seven-step set (M30·7, the design doc §2.3 table, the
-    /// register's §"closed <c>kw-l</c> key set" table) — the seven
-    /// <see cref="OnboardingStep"/> records in the README / <c>Milestones.cs</c> order:
-    /// community name → <c>/admin/communities</c>, languages →
-    /// <c>/admin/languages</c>, moderation → <c>/admin/announcements/comments</c>,
-    /// notifications → <c>/admin/quiet</c>, storage limits →
+    /// The closed ten-step set (M30·7, the design doc §2.3 table, the
+    /// register's §"closed <c>kw-l</c> key set" table — extended additively
+    /// per ADR 0153 D1) — the ten <see cref="OnboardingStep"/> records in the
+    /// walk order: community name → <c>/admin/communities</c>, languages →
+    /// <c>/admin/languages</c>, time zone → <c>/admin/timezone</c>, date &amp;
+    /// time format → <c>/admin/dateformat</c>, moderation →
+    /// <c>/admin/announcements/comments</c>, notifications → <c>/admin/quiet</c>,
+    /// sign-up → <c>/admin/signup</c>, storage limits →
     /// <c>/admin/storage/settings</c>, site content → <c>/admin/site</c>,
-    /// issue escalation → <c>/admin/error-reports</c> (the M32 surface —
-    /// the M30 <c>/admin/announcements</c> placeholder's known deferral is
-    /// now resolved, M32·11, ADR 0155).
+    /// issue escalation → <c>/admin/escalation</c> (the ESC outbound-config
+    /// surface, ADR 0159 — the M30 placeholder's known deferral was first
+    /// re-pointed by M32·11 to <c>/admin/error-reports</c> (the M32 "issue
+    /// submission & escalation" surface, ADR 0155), then re-pointed again to
+    /// <c>/admin/escalation</c> (the ADR 0159 ESC surface).
     /// **Frozen** — the set is the ceiling (the ADR 0153 D1 pin); a future
     /// lane **adds** steps (additive per ADR 0004 §B.1, if the walk-through
     /// ever grows a per-step state), it does **not** re-shape the existing
-    /// seven. The <c>LabelKey</c> + <c>DescriptionKey</c> are the
+    /// ten. The <c>LabelKey</c> + <c>DescriptionKey</c> are the
     /// <c>adminonboarding.*</c> <c>kw-l</c> keys authored by U05 (M30·6 —
     /// the closed set parity-pinned in four languages, the M22 D7 "closed
     /// set" shape, admin-scope).
@@ -115,51 +125,93 @@ public sealed class AdminOnboardingViewModel
             LabelKey:       "adminonboarding.step_languages",
             Route:          "/admin/languages",
             DescriptionKey: "adminonboarding.desc_languages"),
-        // 3. Moderation → the announcement-comment moderation toggle (the
+        // 3. Time zone → the platform-default time zone (ADR 0019, the
+        //    /admin/timezone surface — the register's step 3; the M30 closed
+        //    seven set is **extended** by this additive step per ADR 0153 D1:
+        //    a future lane **adds** steps, it does **not** re-shape the
+        //    existing seven). Grouped with step 2 (languages) + step 4
+        //    (date & time format) as the platform-localization defaults a new
+        //    admin settles before content.
+        new OnboardingStep(
+            Key:            "timezone",
+            LabelKey:       "adminonboarding.step_timezone",
+            Route:          "/admin/timezone",
+            DescriptionKey: "adminonboarding.desc_timezone"),
+        // 4. Date & time format → the platform-default date-time format
+        //    (ADR 0020, the /admin/dateformat surface — the register's step
+        //    4; additive per ADR 0153 D1, the ADR 0019 time zone's exact
+        //    analog). Grouped with steps 2 + 3 as the platform-localization
+        //    defaults.
+        new OnboardingStep(
+            Key:            "dateformat",
+            LabelKey:       "adminonboarding.step_dateformat",
+            Route:          "/admin/dateformat",
+            DescriptionKey: "adminonboarding.desc_dateformat"),
+        // 5. Moderation → the announcement-comment moderation toggle (the
         //    ADR 0101 shape — the closest shipped "moderation" surface, the
-        //    register's step 3).
+        //    register's step 3, re-numbered step 5 after the additive
+        //    timezone + date-format steps above).
         new OnboardingStep(
             Key:            "moderation",
             LabelKey:       "adminonboarding.step_moderation",
             Route:          "/admin/announcements/comments",
             DescriptionKey: "adminonboarding.desc_moderation"),
-        // 4. Notifications → the notification-flush cadence the admin sets
+        // 6. Notifications → the notification-flush cadence the admin sets
         //    for held notification emails (the ADR 0121 M20 surface — the
-        //    register's step 4).
+        //    register's step 4, re-numbered step 6).
         new OnboardingStep(
             Key:            "notifications",
             LabelKey:       "adminonboarding.step_notifications",
             Route:          "/admin/quiet",
             DescriptionKey: "adminonboarding.desc_notifications"),
-        // 5. Storage limits → the admin-set per-file size limit + the
+        // 7. Sign-up → the open / invitation-only self-service sign-up gate
+        //    (ADR 0050, the /admin/signup surface — the register's new step
+        //    7; additive per ADR 0153 D1). A fresh instance ships
+        //    invitation-only (the ADR 0050 amended <c>false</c> floor), so a
+        //    new admin settles this gate before opening the community to new
+        //    residents — placed between the notification cadence and the
+        //    storage limits (the membership / gate settings before the
+        //    content-quota settings).
+        new OnboardingStep(
+            Key:            "signup",
+            LabelKey:       "adminonboarding.step_signup",
+            Route:          "/admin/signup",
+            DescriptionKey: "adminonboarding.desc_signup"),
+        // 8. Storage limits → the admin-set per-file size limit + the
         //    per-user total content quota (the ADR 0135 M25 surface — the
-        //    register's step 5).
+        //    register's step 5, re-numbered step 8).
         new OnboardingStep(
             Key:            "storage",
             LabelKey:       "adminonboarding.step_storage",
             Route:          "/admin/storage/settings",
             DescriptionKey: "adminonboarding.desc_storage"),
-        // 6. Site content → the landing surfaces' hero text + the show/hide
-        //    toggles (the ADR 0150 SITE lane — the register's step 6).
+        // 9. Site content → the landing surfaces' hero text + the show/hide
+        //    toggles (the ADR 0150 SITE lane — the register's step 6,
+        //    re-numbered step 9).
         new OnboardingStep(
             Key:            "sitecontent",
             LabelKey:       "adminonboarding.step_sitecontent",
             Route:          "/admin/site",
             DescriptionKey: "adminonboarding.desc_sitecontent"),
-        // 7. Issue escalation → the /admin/error-reports M32 surface
-        //    (M32·11 — the M30 placeholder's known deferral, now resolved:
-        //    M32 "issue submission & escalation" shipped, ADR 0155, and
-        //    U06 re-pointed this step's route from the M30
-        //    `/admin/announcements` placeholder to the M32
-        //    `/admin/error-reports` surface that owns issue escalation).
-        //    The step-7 `Key` / `LabelKey` / `DescriptionKey` are **unchanged**
-        //    — the `adminonboarding.step_escalation` keys are **reused**, not
-        //    re-authored; the seven-step set is **unchanged** (the M30·7
-        //    closed set).
+        // 10. Issue escalation → the /admin/escalation ESC outbound-config
+        //    surface (ADR 0159, ESC·4 — the origin GlobalAdmin sets their
+        //    receiving endpoint + token + enabled switch, the surface a new
+        //    admin actually configures first). The M30 placeholder's known
+        //    deferral was first re-pointed by M32·11 to /admin/error-reports
+        //    (the M32 "issue submission & escalation" surface, ADR 0155), but
+        //    that page is the *inbound* read-only triage list of resident
+        //    reports — not the *outbound* escalation setup. ADR 0159 (ESC)
+        //    added /admin/escalation (the outbound endpoint + token + enabled
+        //    form, the ADR 0155 E-surface), which is the surface this step's
+        //    "Issue escalation" label + "Where residents' issues are
+        //    surfaced and escalated" description point at. The step's `Key`
+        //    / `LabelKey` / `DescriptionKey` are **unchanged** — the
+        //    `adminonboarding.step_escalation` keys are **reused**, not
+        //    re-authored.
         new OnboardingStep(
             Key:            "escalation",
             LabelKey:       "adminonboarding.step_escalation",
-            Route:          "/admin/error-reports",
+            Route:          "/admin/escalation",
             DescriptionKey: "adminonboarding.desc_escalation"),
     ];
 }

@@ -182,6 +182,16 @@ public sealed record TodoDetailViewModel(
     // per-comment decision). Ordered by Created ascending. `null`/empty = no
     // comments yet (the view renders the empty-state label + composer).
     IReadOnlyList<CommentRow>? Comments = null,
+    // The **status / assign** display pin on the to-do detail (the
+    // <see cref="TodoRow.CanClaim"/> convenience-mirror shape — the real
+    // gate is the server-side re-check in the <c>set-status</c> /
+    // <c>assign</c> write lanes, C-M5·6): whether the actor holds
+    // **creator ∪ assignee ∪ GlobalAdmin** standing over the to-do. The
+    // view renders the status select + the assign picker only when this
+    // is true (a read-allowed stranger sees the detail but not the
+    // mutation controls — the dropdown's Claim / Assign-to-me items
+    // remain their own, separately-gated affordances).
+    bool CanUpdate = false,
     // ADR 0115 D2 (M14 interlock) — the **event link** on the to-do detail
     // (the D2 dangling-safe rule: all three fields are `null` when the to-do
     // has no `EventId`, or the target event is soft-deleted / unreadable by

@@ -4,6 +4,7 @@ using Kumunita.Core.Bootstrap;
 using Kumunita.Core.Logging;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Usage;
 using Kumunita.Web;
 using Kumunita.Web.Middleware;
@@ -23,6 +24,7 @@ using Microsoft.Extensions.Options;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Marten;
+using Sentry.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +85,18 @@ var kumunitaConnection = builder.Configuration.GetConnectionString("Kumunita")
                          ?? throw new InvalidOperationException(
                              "ConnectionStrings:Kumunita is required. Set it in appsettings.Development.json " +
                              "(dev) or the ConnectionStrings__Kumunita env var (OPS.md).");
+
+// F21 (SRV-04): app↔DB TLS knob (pin §4, sibling-key shape). Reads DbTls:SslMode
+// + DbTls:CaPath; if either is non-empty, appends ;SslMode=<v> and (when a CA path
+// is set) ;Root Certificate=<path> to the shared string ONCE, before either consumer
+// registers. Unset ⇒ byte-for-byte the baseline (dev compose stack boots unchanged).
+var dbTlsSslMode = builder.Configuration["DbTls:SslMode"];
+var dbTlsCaPath  = builder.Configuration["DbTls:CaPath"];
+if (!string.IsNullOrWhiteSpace(dbTlsSslMode) || !string.IsNullOrWhiteSpace(dbTlsCaPath))
+{
+    if (!string.IsNullOrWhiteSpace(dbTlsSslMode)) kumunitaConnection += $";SslMode={dbTlsSslMode}";
+    if (!string.IsNullOrWhiteSpace(dbTlsCaPath))  kumunitaConnection += $";Root Certificate={dbTlsCaPath}";
+}
 
 // Dev-only document-shape loop (ADR 0004 / 0001): document-shape auto-creation applies
 // the current `mt` schema derived from code on startup in Development only; the versioned
@@ -216,6 +230,22 @@ var marten = builder.Services.AddMarten(opts =>
     // boot both pick the surface up automatically.
     BookmarkDocTypes.Configure(opts);
 
+    // M37 (ADR 0167 D1, plan U01): the PersonalNotes bounded context's two
+    // documents (PersonalNote + NoteFolder, ADR 0004 §B.1 — the
+    // (OwnerId, TargetKind, TargetId) unique business-key index on
+    // PersonalNote (the D3/F1 idempotency witness, the M17 Bookmark shape,
+    // the M9 convo_uidx_pair shape), the (OwnerId, Created) list-ordering
+    // index + the (OwnerId, FolderId) folder-tree list index on
+    // PersonalNote, and the (OwnerId, ParentId, Name) unique index + the
+    // (OwnerId, ParentId) folder-tree list index on NoteFolder (the D6
+    // witness)). Without this call the PersonalNote / NoteFolder docs are
+    // invisible to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9/M16/M17
+    // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and
+    // the SchemaBootstrap versioned boot both pick the surface up
+    // automatically (SchemaBootstrap.cs does not call any *DocTypes
+    // surface — the Program.cs registration is the only boot wiring).
+    PersonalNotesDocTypes.Configure(opts);
+
     // M13 (ADR 0114 D1, plan U02): the Usage bounded context's document
     // (UsageEvent, ADR 0004 §B.1 — a parallel surface to PostDocTypes /
     // MediaDocTypes / …, not additive on an existing one: UsageEvent uses
@@ -304,6 +334,95 @@ if (builder.Environment.IsDevelopment())
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
 
+// F12 (OBS-06, U2) — the human alert channel (pin §2c): the SupportEmail SMTP
+// sink, gated on CommunityOptions.SupportEmail being set (the off-by-default
+// floor: gate unmet → NoopAlertSink default fires → a no-op). Registered
+// AFTER AddKumunitaCore (which binds the NoopAlertSink default,
+// DependencyInjection.cs:380) so it wins DI resolution (the F10.U2 / F11
+// registration-ordering precedent). Core stays HTTP-free (ADR 0006) — the
+// SupportEmailAlertSink is a Web channel that reuses the existing Core
+// ISmtpSender; no new seam, no new PackageReference. NoopAlertSink default
+// is KEPT (the off-by-default floor; gate-unmet dev/scratch binding).
+var f12SupportEmail = builder.Configuration["Community:SupportEmail"];
+if (!string.IsNullOrWhiteSpace(f12SupportEmail))
+{
+    builder.Services.AddTransient<IAlertSink, SupportEmailAlertSink>();
+}
+
+// F9 (AUTH-15, U3) — the signup bot-challenge seam (pin §4b): an owner-controlled,
+// OFF-BY-DEFAULT Turnstile-style gate on the signup POST. The standing owner deferral
+// (OPS.md §10, "no CAPTCHA is needed today") is honored by construction: the flag is
+// off unless the owner sets KUMUNITA__SIGNUP__BOT_CHECK=true, so an unconfigured
+// instance is byte-identical to before this seam (the NoopBotChallengeVerifier is
+// registered and the signup form has no widget / hidden input / challenge). Core owns
+// the interface + both impls (IBotChallengeVerifier / NoopBotChallengeVerifier /
+// TurnstileBotChallengeVerifier — the Turnstile impl is a plain BCL HttpClient
+// siteverify call, no SDK / no new PackageReference, pin §7); the Web is the
+// registration root (ADR 0006-D). The site key
+// (KUMUNITA__SIGNUP__BOT_CHECK__SITE_KEY) is an owner-ops open item (pin §4b); when
+// unset the Turnstile impl fails closed (returns false), so a misconfigured "on" flag
+// never silently accepts a bot.
+var kumunitaSignupBotCheckEnabled = string.Equals(
+    builder.Configuration["KUMUNITA:SIGNUP:BOT_CHECK"], "true",
+    StringComparison.OrdinalIgnoreCase);
+builder.Services.Configure<Kumunita.Core.Identity.SignupBotChallengeOptions>(o =>
+    o.SiteKey = builder.Configuration["KUMUNITA:SIGNUP:BOT_CHECK:SITE_KEY"]);
+builder.Services.AddSingleton<Kumunita.Core.Identity.IBotChallengeVerifier>(sp =>
+    kumunitaSignupBotCheckEnabled
+        ? new Kumunita.Core.Identity.TurnstileBotChallengeVerifier(sp.GetRequiredService<IOptions<Kumunita.Core.Identity.SignupBotChallengeOptions>>())
+        : new Kumunita.Core.Identity.NoopBotChallengeVerifier());
+
+// F10 (OBS-02, U2) — the error-tracker seam (pin §2): an owner-controlled,
+// OFF-BY-DEFAULT Sentry capture. The standing owner deferral (no external
+// telemetry by default) is honored by construction: the DSN is unset unless
+// the owner sets SENTRY_DSN, so an unconfigured instance is byte-identical to
+// before this seam (the UseSentry call is not executed, the pipeline is
+// unchanged). Core is untouched (ADR 0006 — the registration + the PII
+// scrubber are Web concerns; the scrubber is a SetBeforeSend callback on the
+// Sentry options, not a Core interface). The DSN is owner-ops (pin §5);
+// when unset the instance is unchanged.
+//
+// DRIFT NOTE (F10.U2, 2026-10-24): the pin §2a block references three Sentry
+// members that do not exist in Sentry.AspNetCore 6.12.1 (verified against the
+// 6.12.1 SentryOptions.cs + SentryAspNetCoreOptions.cs source):
+//   · o.SendCallback          → SetBeforeSend(Func<SentryEvent, SentryHint, SentryEvent?>)
+//   · o.AddNetworkLogBreadcrumbs → does not exist; the real lever is
+//     DisableSentryHttpMessageHandler = true (prevents the SDK from capturing
+//     outbound HTTP requests as breadcrumbs/events — the PII-scrubbing intent
+//     of the pin's §3a line is preserved)
+//   · pin §3c target 4 (breadcrumb data redaction) → structurally infeasible
+//     in the callback (Breadcrumb.Data is immutable, SentryEvent.Breadcrumbs
+//     has no setter) AND vacuous (DisableSentryHttpMessageHandler prevents
+//     http-category breadcrumbs; the app adds zero manual breadcrumbs).
+// See the ## F10.U2 handoff section for the full drift table.
+var kumunitaSentryDsn = builder.Configuration["SENTRY_DSN"];
+if (!string.IsNullOrWhiteSpace(kumunitaSentryDsn))
+{
+    // Pin §2a: builder.WebHost.UseSentry(o => …) — in 6.12.1 the config-action
+    // overload is on IWebHostBuilder (verified against the 6.12.1 NUGET assembly
+    // XML docs: UseSentry(IWebHostBuilder, Action<SentryAspNetCoreOptions>)).
+    // builder.WebHost (IWebHostBuilder) is the receiver, NOT builder
+    // (WebApplicationBuilder) — the WebApplicationBuilder overload is only in the
+    // 7.x/main line, not the pinned 6.12.1.
+    builder.WebHost.UseSentry(o =>
+    {
+        o.Dsn = kumunitaSentryDsn;
+        // PII-scrubbing contract (pin §3a): default PII off.
+        o.SendDefaultPii = false;
+        // Pin §3a "AddNetworkLogBreadcrumbs = false" — no such member in 6.12.1;
+        // DisableSentryHttpMessageHandler is the real lever (prevents outbound
+        // HTTP capture as breadcrumbs/events, preserving the pin's intent of
+        // "no URL, no headers, no body" for the SDK's own network logging).
+        o.DisableSentryHttpMessageHandler = true;
+        // Pin §3b/§3c: the SendCallback (→ SetBeforeSend in 6.12.1) redacts the
+        // known PII-bearing request surfaces; fail-closed on throw.
+        o.SetBeforeSend((e, _) => SentryPiiScrubber.Scrub(e));
+        // Pin §2d: the Sentry stack-trace in-app filter (Kumunita.Web frames are
+        // not actionable; Kumunita.Core frames are the domain).
+        o.AddInAppExclude("Kumunita.Web");
+    });
+}
+
 // M25 (U8) — the Web-only upload gate (C-UP·3): the single 413-producing
 // call-site the four upload lanes + the document edit-lane re-upload adopt
 // before IMediaStore.PutAsync. Web-layer (it returns an IActionResult — the
@@ -384,6 +503,7 @@ builder.Services.AddIdentity<User, IdentityRole>(opts =>
         opts.User.RequireUniqueEmail = true;
     })
     .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders()
     .AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory>();
 
 // Rate limiting (SECURITY.md §5 control "Rate limiting (register / login /
@@ -436,6 +556,15 @@ builder.Services.AddRateLimiter(opts =>
     // more than 30 times in 15 minutes is an anomaly at this platform's
     // scale; the limit is generous for normal use and tight for spam).
     AddWindow(opts, "write", limit: 30, window: TimeSpan.FromMinutes(15));
+
+    // F8 (WEB-10, prod-hardening) — the four upload lanes (avatar,
+    // content-image, attachment, document) each write a volume byte via
+    // PutAsync; the IUploadGate size/quota guard (C-UP·3) bounds the size
+    // per request, this bounds the request *rate* per IP. 10 per 15 minutes
+    // per IP — a resident uploading a handful of files in a burst is fine,
+    // an automated uploader is not (the audit row names this exact gap:
+    // "the four upload lanes have no [EnableRateLimiting]").
+    AddWindow(opts, "upload", limit: 10, window: TimeSpan.FromMinutes(15));
 });
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the
@@ -590,6 +719,65 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
+// F5 (AUTH-04, Option B) — session kill-all + invalidation. The `SecurityStamp`
+// (a per-user GUID, rotated by `UpdateSecurityStampAsync` on password change /
+// kill-all) is the server-side revocation mark. At sign-in, the cookie's
+// `AuthenticationProperties.Items["kumunita.stamp"]` is stamped with the user's
+// current `SecurityStamp` (via the `OnSigningIn` event below — the only reliable
+// place to set `Items`, since `CreateUserPrincipalAsync` returns a bare
+// `ClaimsPrincipal` and `SignInWithClaimsAsync` passes `AuthenticationProperties`
+// separately to `Context.SignInAsync`). The `Items` dictionary is preserved across
+// sliding renewal (`CookieAuthenticationHandler.CloneTicket` copies every `Items`
+// entry — confirmed in the .NET 10.0.13 source), so the stamp is stable for the
+// session's life. The per-request gate (`RevocationStampMiddleware`) reads the
+// cookie's stamp and compares it to the DB's current stamp: a mismatch means a
+// rotation happened after sign-in → sign out. This is the repo's actual
+// invalidation idiom (ADR 0006-B "fat authorization, per request"; the
+// `SecurityStampValidator` is intentionally neutered by the 14-day
+// `ValidationInterval`, see the comment block above).
+//
+// Two schemes are stamped:
+//   1. `Identity.Application` (the app cookie, `kumunita.auth`) — covers all
+//      live sessions (the `PasswordChange_InvalidatesOtherSessions` test).
+//   2. `Identity.TwoFactorUserId` (the pending leg-1 cookie) — closes the F3
+//      half-signed-in window (§1d of the F5 pin): a kill-all between leg-1 and
+//      leg-2 rotates the DB stamp; the pending cookie's stamp (set at leg-1)
+//      no longer matches → the leg-2 gate (in `AccountController.LoginMfa`)
+//      rejects completion before the app cookie is minted.
+//
+// The stamp is NOT a claim type (invariant-set-B preserved: `ClaimShaping.Build`
+// still mints exactly `ClaimTypes.All`). It is a non-claim property on the
+// cookie's `AuthenticationProperties`.
+{
+    var identityServices = builder.Services;
+    identityServices.Configure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, o =>
+    {
+        o.Events.OnSigningIn = async ctx =>
+        {
+            var subject = KumunitaPrincipal.SubjectId(ctx.Principal!);
+            if (string.IsNullOrEmpty(subject)) return;
+            var um = ctx.HttpContext!.RequestServices.GetRequiredService<UserManager<User>>();
+            var user = await um.FindByIdAsync(subject);
+            if (user is not null && !string.IsNullOrEmpty(user.SecurityStamp))
+                ctx.Properties.Items["kumunita.stamp"] = user.SecurityStamp;
+        };
+    });
+    identityServices.Configure<CookieAuthenticationOptions>(IdentityConstants.TwoFactorUserIdScheme, o =>
+    {
+        o.Events.OnSigningIn = async ctx =>
+        {
+            // The pending TwoFactorUserId cookie carries the user ID as the
+            // identity's Name (set by `StoreTwoFactorInfo` in the 10.0.13 source).
+            var subject = ctx.Principal!.Identity?.Name;
+            if (string.IsNullOrEmpty(subject)) return;
+            var um = ctx.HttpContext!.RequestServices.GetRequiredService<UserManager<User>>();
+            var user = await um.FindByIdAsync(subject);
+            if (user is not null && !string.IsNullOrEmpty(user.SecurityStamp))
+                ctx.Properties.Items["kumunita.stamp"] = user.SecurityStamp;
+        };
+    });
+}
+
 // Authorization: policies the /admin surfaces (step 8) will opt into; the claim-set
 // shape (invariant set B) is what lets [Authorize(Roles = "...")] work without any
 // DB read at decision time. The AuthorizationModule's fat-decision methods (CanAsync /
@@ -709,13 +897,21 @@ if (!app.Environment.IsDevelopment())
 //
 // img-src adds blob: (the WYSIWYG local-preview pane renders a blob: image,
 // rich-editor.ts) and data: (inline data-URI thumbnails) on top of 'self'.
+//
+// F9 (AUTH-15, U3, pin §4c) — the bot-challenge CSP amendment is ADDITIVE and
+// FLAG-GATED on the owner's KUMUNITA__SIGNUP__BOT_CHECK flag (the kumunitaSignupBotCheckEnabled
+// var bound above, the F7 additive-in-the-same-block precedent). When the flag is ON the
+// Turnstile widget (script + iframe + fetch to challenges.cloudflare.com) needs those
+// three origins; when the flag is OFF (the default) the CSP is byte-identical to before
+// this seam (frozen invariant — no new external origin exposed, OPS §10's deferral stands).
 var csp =
     "default-src 'self'; " +
-    "script-src 'self'; " +
+    (kumunitaSignupBotCheckEnabled ? "script-src 'self' https://challenges.cloudflare.com; " : "script-src 'self'; ") +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: blob:; " +
     "font-src 'self' data:; " +
-    "connect-src 'self'; " +
+    (kumunitaSignupBotCheckEnabled ? "connect-src 'self' https://challenges.cloudflare.com; " : "connect-src 'self'; ") +
+    (kumunitaSignupBotCheckEnabled ? "frame-src https://challenges.cloudflare.com; " : "") +
     "form-action 'self'; " +
     "base-uri 'self'; " +
     "frame-ancestors 'self'; " +
@@ -723,6 +919,15 @@ var csp =
 app.Use(async (context, next) =>
 {
     context.Response.Headers["Content-Security-Policy"] = csp;
+    // F7 (WEB-07, prod-hardening) — the two remaining global headers the
+    // 2026-10-22 audit flagged: X-Content-Type-Options: nosniff (every
+    // response, not just the per-controller serve/download lanes that already
+    // set it — the per-controller headers stay, this is the global floor) and
+    // Referrer-Policy: no-referrer (no referrer leakage cross-origin by
+    // default — the strictest sane value for a self-hosted platform whose
+    // privacy model is SECURITY.md's "the audience choice is authoritative").
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
     await next();
 });
 
@@ -738,6 +943,18 @@ app.UseRateLimiter();
 app.UseAuthentication();
 
 app.UseMiddleware<BlockedAccountMiddleware>();
+
+// F5 (AUTH-04, Option B) — session-revocation enforcement: re-reads the DB
+// security stamp on every request for authenticated principals and signs them
+// out if a rotation (UpdateSecurityStampAsync — password change or kill-all)
+// happened after this session was minted. Registered after block enforcement
+// (a blocked user is signed out unconditionally, the higher-priority gate)
+// and before time-limit / privilege-revocation (the session-level gate is
+// broader — any resident — and must fire before the narrower role-specific
+// gates so a revoked GlobalAdmin session is killed as a session, not just
+// re-read as a role change). See RevocationStampMiddleware for the full
+// mechanism and the .NET 10.0.13 source grounding.
+app.UseMiddleware<RevocationStampMiddleware>();
 
 // M28 — guardian time-limit enforcement (ADR 0151, D5): a child whose
 // guardian-set schedule window says "not now" (evaluated in the child's ADR
@@ -796,7 +1013,15 @@ await using (var probeScope = app.Services.CreateAsyncScope())
     firstBoot = await DbBootstrap.IsPristineAsync(
         probeScope.ServiceProvider.GetRequiredService<AppDbContext>());
 }
-await SchemaBootstrap.ApplyAsync(app.Services);
+
+// F22 two-role split (ADR 0171): the migration-role connection string (sibling of
+// ConnectionStrings:Kumunita). When set, the EF Core Identity migrations run as the
+// database owner (kumunita_migrate) and the demoted app role is granted DML on the
+// identity tables. When absent (a not-yet-migrated instance, or a single-role dev
+// setup), SchemaBootstrap falls back to the single-role baseline (byte-for-byte the
+// pre-split behavior). See SchemaBootstrap.ApplyAsync for the full rationale.
+var kumunitaMigrateConnection = builder.Configuration.GetConnectionString("KumunitaMigrate");
+await SchemaBootstrap.ApplyAsync(app.Services, kumunitaMigrateConnection);
 
 // Sample data (a mock neighborhood): a fresh `docker compose down -v &&
 // docker compose up --build` (dev) or a fresh deployed demo instance (ADR 0056)
@@ -906,6 +1131,18 @@ await bus.PublishAsync(new UsagePurgeTick());
 // /admin/storage Trend section is permanently empty — the M13
 // UsagePurgeTick seed precedent, M33·3).
 await bus.PublishAsync(new StorageMetricsCaptureTick());
+// F15 (UPL-04) — the MediaObject catalog + byte-store 365-day retention tick
+// (the MediaLifecycleHandler self-reschedules after each run; this seed is the
+// first-boot scheduling. Without this line the handler never fires and the
+// LocalVolumeFileStore bytes accumulate forever — the M13 UsagePurgeTick seed
+// precedent, re-using F1's idempotent DeleteIfExistsAsync byte-delete seam).
+await bus.PublishAsync(new MediaLifecycleTick());
+// F18 (MAIL-06, T4 code leg) — the in-repo bounce/complaint ingest-rate alarm
+// (the MailAlarmsHandler self-reschedules hourly after each run; this seed is
+// the first-boot scheduling. Without this line the handler never fires and the
+// T4 cross-check never runs — the F15 UsagePurgeTick/MediaLifecycleTick seed
+// precedent, re-using F12's IAlertSink seam + F17's SuppressedAddress list).
+await bus.PublishAsync(new MailAlarmsTick());
 // M20 (ADR 0121) — the deferred-notification email flush tick (the
 // NotificationFlushHandler self-reschedules at the resolved admin cadence
 // QuietCheckMinutes after each run; this seed is the first-boot scheduling).
@@ -924,4 +1161,105 @@ try
 finally
 {
     await app.StopAsync();
+}
+
+// F10 (OBS-02, U2) — the PII scrubber (pin §3b/§3c). Pure, stateless,
+// fail-closed: a redaction that throws drops the entire event (pin §3b — the
+// TurnstileBotChallengeVerifier fail-closed precedent). The three implementable
+// pin §3c targets are redacted (request headers, cookies, query-string params);
+// the fourth (breadcrumb data) is structurally infeasible in the callback
+// (Breadcrumb.Data is IReadOnlyDictionary with private init; SentryEvent.
+// Breadcrumbs is IReadOnlyCollection with no setter) AND vacuous
+// (DisableSentryHttpMessageHandler prevents http-category breadcrumbs; the
+// app adds zero manual breadcrumbs — a codebase-wide grep for
+// Sentry.AddBreadcrumb returns zero hits). Public so F10.U3's
+// Error_TrackerRegisteredWhenDsnSet test (pin §4a leg-3) can invoke it on a
+// synthetic SentryEvent without an InternalsVisibleTo (none exists in this
+// repo).
+public static class SentryPiiScrubber
+{
+    private static readonly string[] RedactedHeaderNames =
+        ["authorization", "set-cookie", "cookie"];
+
+    private static readonly string[] RedactedQueryParamNames =
+        ["token", "id", "sessionid", "csrf", "__requestverificationtoken"];
+
+    private const string RedactedValue = "REDACTED";
+
+    public static Sentry.SentryEvent? Scrub(Sentry.SentryEvent e)
+    {
+        try
+        {
+            var req = e.Request;
+            if (req is not null)
+            {
+                // Pin §3c target 1: redact the value of any header whose name
+                // matches authorization / set-cookie / cookie (case-insensitive).
+                // Headers is IDictionary<string, string> (mutable, getter-only
+                // property — mutate the returned dictionary in place).
+                foreach (var key in req.Headers.Keys.ToList())
+                {
+                    if (RedactedHeaderNames.Any(n =>
+                        key.Equals(n, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        req.Headers[key] = RedactedValue;
+                    }
+                }
+
+                // Pin §3c target 2: redact ALL cookie values (the cookie names
+                // are well-known — Kumunita.Auth, .AspNetCore.Identity.Cookie —
+                // but the values are the session + anti-forgery tokens).
+                // SentryRequest.Cookies is string? (the wire format is
+                // "name=value; name2=value2"); the entire value is PII.
+                if (!string.IsNullOrWhiteSpace(req.Cookies))
+                {
+                    req.Cookies = RedactedValue;
+                }
+
+                // Pin §3c target 3: redact the value of any query param whose
+                // name matches token / id / sessionId / sessionid / csrf /
+                // __RequestVerificationToken (case-insensitive). Other params
+                // (page, sort, etc.) are not PII and are left intact.
+                if (!string.IsNullOrWhiteSpace(req.QueryString))
+                {
+                    // ParseQuery yields IDictionary<string, StringValues> (a
+                    // non-nullable struct wrapping IEnumerable<string> — no ??).
+                    var pairs = Microsoft.AspNetCore.WebUtilities.QueryHelpers
+                        .ParseQuery(req.QueryString);
+                    if (pairs is not null && pairs.Any())
+                    {
+                        var redacted = pairs
+                            .Select(kv =>
+                            {
+                                var name = kv.Key.ToLowerInvariant();
+                                var shouldRedact = RedactedQueryParamNames.Contains(name);
+                                var value = shouldRedact
+                                    ? RedactedValue
+                                    : string.Join(",", (IEnumerable<string?>)kv.Value);
+                                return $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(value)}";
+                            })
+                            .ToList();
+                        req.QueryString = string.Join("&", redacted);
+                    }
+                }
+            }
+
+            // Pin §3c target 4 (breadcrumbs): structurally infeasible here
+            // (Breadcrumb.Data is immutable; SentryEvent.Breadcrumbs has no
+            // setter) and vacuous (DisableSentryHttpMessageHandler + zero
+            // manual breadcrumbs). See the DRIFT NOTE above and the handoff
+            // section.
+
+            return e;
+        }
+        catch
+        {
+            // Fail-closed (pin §3b): a redaction that throws drops the entire
+            // event — the PII is not sent, the owner's instance is unchanged,
+            // the owner sees a "dropped event" in Sentry's dashboard rather
+            // than a leaked PII. The TurnstileBotChallengeVerifier fail-closed
+            // precedent (Kumunita.Core/Identity/TurnstileBotChallengeVerifier.cs).
+            return null;
+        }
+    }
 }

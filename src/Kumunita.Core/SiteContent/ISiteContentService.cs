@@ -24,11 +24,12 @@ public interface ISiteContentService
     /// <summary>
     /// Saves the <c>SiteContent</c> singleton — the ADR 0050
     /// <c>SetSignupOpenAsync</c> single audited write-lane shape. Loads the
-    /// existing row (a missing row is a **no-op** — the lane does not
-    /// load-or-create; a fresh instance is already at the in-code fallback,
-    /// and the seeder is the only writer that creates the row), applies the
-    /// full 13-field set from <paramref name="content"/>, and saves in one
-    /// session (invariant C3). Exactly **one** <c>AccessAudit</c> row per
+    /// existing row (a missing row is **created** — the ADR 0170
+    /// upsert-on-missing amendment, the ADR 0164 <c>KioskService</c>
+    /// "upsert vs. no-op" shape: a save is live and idempotent even before
+    /// the seeder ran, never a silent no-op), applies the full 13-field set
+    /// from <paramref name="content"/>, and saves in one session
+    /// (invariant C3). Exactly **one** <c>AccessAudit</c> row per
     /// call (<c>Via = Admin</c>, action <c>site.save</c>, <c>TargetKind</c>
     /// "site" — the <c>signup.set-open</c> / <c>timezone.set-default</c> /
     /// <c>dateformat.set-default</c> singleton-toggle shape, SITE·2).

@@ -24,6 +24,18 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
+        @* M17 (ADR 0118) + M37 (ADR 0167) — the bookmark toggle and the
+           personal-note button, on ONE right-aligned row at the TOP of the
+           parent column (just below the nav bar, to the right). The M17
+           closed set now includes "directory" (the ADR 0118 amendment,
+           2026-10-16 — the M37 PersonalNotes closed-set vocabulary
+           re-applied to the M17 surface). *@
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            @{ var _bm = ("directory", avatarSubject ?? string.Empty, $"/directory/{avatarSubject}"); }
+            <partial name="_BookmarkButton" model="@_bm" />
+            @{ var _pn = ("directory", avatarSubject ?? string.Empty, $"/directory/{avatarSubject}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
         <p>
             <a href="@Url.Action("Index", "Directory")" class="btn btn-link p-0">
                 <kw-l key="directory.detail_back">&larr; Back to the directory</kw-l>

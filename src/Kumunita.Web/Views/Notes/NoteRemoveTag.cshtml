@@ -1,0 +1,57 @@
+@model Kumunita.Core.PersonalNotes.NoteRow
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "Remove tag";
+}
+@* M37 (ADR 0167 D5) — the remove-tag form (tags are author-set, free-form,
+   per-note; the tag set is normalized on write — the M26 Tag doc's Name
+   normalization shape). A tag is NOT a platform-wide Tag doc (the M26 tag
+   lane is a shared vocabulary; M37's tags are personal labels — different
+   shapes, different surfaces, different invariants). The owner's own note
+   (C-M37·2 — a personal read). A non-owner (a GlobalAdmin included) gets a
+   non-leaky 404 (the controller's gate). The note's current tag set is
+   rendered as a <select> pre-populated with the existing tags (the D5
+   "normalized on write" pin — the select's values are the normalized set). *@
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="pn.note.tag.remove">Remove tag</kw-l></h1>
+                </div>
+            </div>
+        </header>
+        @if (Model.Tags.Count > 0)
+        {
+            <form method="post" action="@($"/notes/{Model.Id}/tags/remove")">
+                @Html.AntiForgeryToken()
+                <div class="mb-3">
+                    <label class="form-label" for="note-tag">
+                        <kw-l key="pn.note.tag.remove">Remove tag</kw-l>
+                    </label>
+                    <select class="form-select" id="note-tag" name="tag">
+                        @foreach (var tag in Model.Tags)
+                        {
+                            <option value="@tag">@tag</option>
+                        }
+                    </select>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <kw-l key="common.remove">Remove</kw-l>
+                    </button>
+                    <a class="btn btn-secondary" href="/notes">
+                        <kw-l key="common.cancel">Cancel</kw-l>
+                    </a>
+                </div>
+            </form>
+        }
+        else
+        {
+            <div class="p-4 text-muted"><kw-l key="pn.list.empty">No notes yet.</kw-l></div>
+            <a class="btn btn-secondary" href="/notes"><kw-l key="common.cancel">Cancel</kw-l></a>
+        }
+    </div>
+</div>

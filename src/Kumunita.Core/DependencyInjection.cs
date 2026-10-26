@@ -368,6 +368,17 @@ public static class ServiceCollectionExtensions
         // to drive failure/retry/dead-letter assertions without a live relay.
         services.AddTransient<ISmtpSender, SmtpSender>();
 
+        // F11 (JOB-02, prod-hardening): the alert seam's DEFAULT binding. The
+        // IAlertSink seam + the AlertEvent payload are Core (ADR 0006 — Core
+        // stays HTTP-free: the domain "an alert-worthy event happened" + its
+        // payload are Core; the channel is Web + owner-ops). NoopAlertSink is
+        // off-by-default (the F10 DSN-gated no-op idiom): an unconfigured
+        // instance sends nothing anywhere — the /health degraded gate (OPS §8)
+        // is the always-on signal, the alert is the additive push (pin §3.0).
+        // A channel binding (the Sentry-backed SentryAlertSink, the F12 human
+        // sink) is registered LATER in Program.cs so it wins DI resolution.
+        services.AddTransient<IAlertSink, NoopAlertSink>();
+
         // Step-7 (M1 plan §6.4): the AuditPurge tiering is per-instance config,
         // not improvised (§5: "the purge decision ... is set in the job's config").
         services.AddOptions<Authorization.AuditPurgeOptions>();
@@ -385,6 +396,18 @@ public static class ServiceCollectionExtensions
         // PostService above). Resolved by the Web serving lane (U7) + upload
         // lane (U6); never touched by the raw volume directly (C-MED·6).
         services.AddTransient<IMediaStore, LocalVolumeMediaStore>();
+
+        // F16 / UPL-02 — the byte-level antivirus seam (IVirusScanner) + its
+        // fail-open local-ClamAV default impl (ClamAvScanner). Core stays
+        // HTTP-free (ADR 0006-D): the seam is a pure "bytes in → verdict out"
+        // contract; the default impl drives a local daemon over a loopback
+        // socket (no HttpClient, no package — the ISmtpSender BCL-I/O
+        // precedent). Fail-open by construction (a missing daemon → Clean), so
+        // a box without ClamAV still serves until the owner runs the F16 ops
+        // step. The serve lane (the three serve controllers) is the
+        // enforcement point, not this scanner.
+        services.AddOptions<VirusScanOptions>();
+        services.AddTransient<IVirusScanner, ClamAvScanner>();
 
         // Multilingual (ML, ADR 0005; plan U4): the two Core seams U2/U3 shipped —
         // the per-request read path (ITranslationProvider, U2) and the admin
@@ -493,6 +516,11 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Pages.IPageService>(),
             sp.GetRequiredService<Events.IEventService>(),
             sp.GetRequiredService<Projects.IProjectService>(),
+            // ADR 0118 amendment (2026-10-16) — the M16 Inventory detail
+            // page's own read (the /inventory/{id} surface's frozen
+            // IInventoryService.GetItemAsync); the M37 PersonalNotes
+            // "inventory" D3 shape re-applied to the M17 surface.
+            sp.GetRequiredService<Inventory.IInventoryService>(),
             // ADR 0118 D3/F2 (obs-4 amendment): the frozen IIdentityService,
             // used in-Core only to resolve the owner's real standing when the
             // bookmark target is an announcement — so the D3 write-lane check
@@ -500,6 +528,30 @@ public static class ServiceCollectionExtensions
             // the frozen IBookmarkService seam (the 3-method signature is
             // unchanged); this is the same category of composition as the
             // already-composed IUserInfoService.
+            sp.GetRequiredService<IIdentityService>()));
+
+        // M37 (ADR 0167, plan U02): the personal-notes service seam (bounded
+        // context Kumunita.Core.PersonalNotes — a personal-by-id record, D2).
+        // The same "AddTransient with the store injected" shape as
+        // IBookmarkService above. U02 ships the 8 note methods; the 4
+        // folder-tree methods are U03. Composes **only** frozen seams
+        // (C-M37·1): the frozen IAuthorizationService (the D3 check only) +
+        // the owning surfaces' read seams (the D7 resolution). **No**
+        // INotificationService (§deferred — the nudge lane is its own ADR).
+        services.AddTransient<PersonalNotes.IPersonalNoteService>(sp => new PersonalNotes.PersonalNoteService(
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Events.IEventService>(),
+            sp.GetRequiredService<Projects.IProjectService>(),
+            // ADR 0167 D1 (extension) — the announcement lane (the M17
+            // BookmarkService shape, ADR 0118 D3/F2 obs-4 re-applied): the
+            // detail page's own read + the owner's real standing.
+            sp.GetRequiredService<Announcements.IAnnouncementService>(),
+            // ADR 0167 extension — the M16 Inventory detail page's own read
+            // (the /inventory/{id} surface's frozen IInventoryService
+            // .GetItemAsync); the M37 "inventory" D3 shape.
+            sp.GetRequiredService<Inventory.IInventoryService>(),
             sp.GetRequiredService<IIdentityService>()));
 
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
@@ -537,6 +589,21 @@ public static class ServiceCollectionExtensions
             // transient ILocalizationService is always registered in this
             // composition (the M1/M5/M9 services above rely on the same seam).
             sp.GetRequiredService<Localization.ILocalizationService>()));
+
+        // F17 (MAIL-03, plan U3): the bounce/complaint suppression write + lookup
+        // seam — the SuppressedAddress doc's single write lane (pin
+        // docs/design/prod-hardening-f17-bounce.md §3.2). The same
+        // "AddTransient with the store injected" shape as ISiteContentService /
+        // ISurfaceLabelsService above: composes the host-registered Marten
+        // IDocumentStore (reads open a QuerySession, the write opens a write
+        // session — invariant C3, one SaveChangesAsync). Core stays HTTP-free
+        // (ADR 0006-D, pin §5·1): the Web ingest route (U3,
+        // MailSuppressionController) is the only place an IActionResult /
+        // HttpContext appear. Fully qualified Notifications.ISuppressionService
+        // for the type/namespace-collision idiom (like Notifications.
+        // NotificationService above).
+        services.AddTransient<Notifications.ISuppressionService>(sp => new Notifications.SuppressionService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
 
         // M8 (ADR 0091, U01): the Search bounded context's service seam (bounded
         // context Kumunita.Core.Search — the "find content by text" read lane over

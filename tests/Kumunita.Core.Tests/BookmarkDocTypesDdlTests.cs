@@ -91,6 +91,59 @@ public class BookmarkDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Contains("TargetId", idx.Expr!);
     }
 
+    [Fact]
+    public async Task BookmarkDocTypes_RegistersBookmarkFolderWithUniqueOwnerParentNameIndex()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(_connection);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            BookmarkDocTypes.Configure(opts);
+        });
+
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
+
+        // ── Force the document's schema to materialize (the same M17/M16/M9
+        // doc-shape test shape): round-trip-store the BookmarkFolder so
+        // mt."mt_doc_bookmarkfolder" exists, then inspect the live catalog.
+        await using (var w = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            w.Store(new BookmarkFolder
+            {
+                Id = "bmf-1",
+                OwnerId = "u-owner",
+                Name = "my root folder",
+                Created = new DateTimeOffset(2026, 9, 29, 9, 0, 0, TimeSpan.Zero),
+            });
+            await w.SaveChangesAsync(ct);
+        }
+        await using (var q = store.QuerySession())
+        {
+            var folder = (await q.LoadAsync<BookmarkFolder>("bmf-1", ct))!;
+            Assert.Equal("u-owner", folder.OwnerId);
+            Assert.Equal("my root folder", folder.Name);
+        }
+
+        // ── (1) The BookmarkFolder document registered — table mt.mt_doc_bookmarkfolder.
+        var cols = await QueryColumnsAsync("mt_doc_bookmarkfolder");
+        Assert.True(cols.Count > 0, "mt_doc_bookmarkfolder table not found in mt");
+        Assert.Contains("id", cols);
+        Assert.Contains("data", cols);
+
+        // ── (2) The ADR 0168 D2 witness — the **unique** (OwnerId, ParentId,
+        // Name) index (the M37 NoteFolder C-M37·6 pin re-applied to the
+        // bookmark surface; the D2 unique-name witness).
+        var idx = await QueryUniqueIndexAsync("mt_doc_bookmarkfolder");
+        Assert.NotNull(idx);
+        Assert.True(idx!.IsUnique, "the (OwnerId, ParentId, Name) index must be UNIQUE (ADR 0168 D2)");
+        Assert.Contains("OwnerId", idx.Expr!);
+        Assert.Contains("ParentId", idx.Expr!);
+        Assert.Contains("Name", idx.Expr!);
+    }
+
     // ── catalog helpers (the InventoryDocTypesDdlTests / AdminOverrideDdlTests shape) ──
 
     // Distinct column names on mt.<table> (information_schema).

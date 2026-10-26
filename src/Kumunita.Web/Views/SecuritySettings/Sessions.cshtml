@@ -1,0 +1,66 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Models.SessionSettingsViewModel
+@{
+    ViewData["Title"] = "Settings — Security";
+}
+
+@* F5 (AUTH-04) — the per-resident session-management surface (F5.U3). The
+   /settings/security/sessions section, the ADR 0080 settings-tab shape (the
+   same sub-nav strip + page heading + section as /settings/security/mfa).
+   <para>
+   <b>Plain-English strings, deliberately not <c>kw-l</c> keys:</b> the same
+   discipline as the F3 Mfa.cshtml view (a <c>kw-l</c> key used but not in
+   KnownTranslationKeys fails the build, and registering new keys would
+   exceed this unit's ≤3-file budget). The surface works en-only today.
+   </para>
+   <para>
+   <b>Server-side state, not a per-browser cookie read (pin §3):</b> the
+   "other active sessions" the list describes is the server's revocation
+   state (the <c>User.SecurityStamp</c>, rotated by
+   <c>KillAllSessionsAsync</c> / <c>ChangePasswordAsync</c>) — the server
+   cannot enumerate another browser's cookies. The minimum-viable surface
+   shows "this session" + the kill-all control.
+   </para>
+*@
+@await Html.PartialAsync("../Locale/_SettingsTabs.cshtml")
+
+<h1>Your settings</h1>
+
+<h2 class="mt-1">Security</h2>
+<p class="text-muted">
+    Manage your signed-in sessions. Signing out everywhere ends your other
+    active sessions immediately — any other browser or device that is signed
+    in to this account will be signed out on its next action.
+</p>
+
+<div class="card">
+    <div class="card-body">
+        <h3 class="h5">This session</h3>
+        <p class="text-muted mb-0">
+            You are currently signed in. Signing out everywhere below ends
+            this session as well as every other active session for this
+            account.
+        </p>
+    </div>
+</div>
+
+<hr />
+
+<div class="card border-danger-subtle">
+    <div class="card-body">
+        <h3 class="h5 text-danger">Sign out everywhere</h3>
+        <p class="text-muted mb-2">
+            Use this if you have signed in on a shared or public device, or
+            if you believe another session may be compromised. Every other
+            active session for this account is revoked immediately, and this
+            browser is signed out.
+        </p>
+        <form method="post" action="/settings/security/sessions/kill-all"
+              data-confirm="Sign out of every session for this account? Your other devices and browsers will be signed out immediately.">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-danger">
+                Sign out everywhere
+            </button>
+        </form>
+    </div>
+</div>

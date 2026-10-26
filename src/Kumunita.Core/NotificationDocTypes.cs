@@ -59,5 +59,15 @@ public static class NotificationDocTypes
                .Index(s => s.RecipientId)
                .Index(s => s.Kind)
                .Index(s => s.TargetId);
+
+        // ── F17 / MAIL-03 — bounce/complaint suppression (pin §1) ─────────
+        // One row per suppressed address; the Id IS the lowercased recipient
+        // e-mail (the document identity — the Notification / MediaObject
+        // externally-assigned-string-key convention). No business-key index
+        // required (pin §1.2): the gate's read is a single LoadAsync(id) by
+        // the lowercased e-mail — O(1) on the Id-unique mapping. Delta
+        // detection applies the new table idempotently at boot (ADR 0004
+        // §B.1 — zero migrations for this additive surface).
+        opts.Schema.For<SuppressedAddress>();
     }
 }

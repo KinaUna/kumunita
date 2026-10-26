@@ -278,6 +278,16 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             ViewData["TimeLimitsSection"] = new TimeLimitsSection(false, "blocked", [], []);
         }
 
+        // ADR 0169 — the child's first-day-of-week preference (resolved to the
+        // concrete ordinal, the Monday default when unset), so the Detail view
+        // orders the time-limit days picker from the child's own week's start
+        // (the time limit is applied in the child's time zone, so the child's
+        // preference — not the guardian's — drives the order). The
+        // TimeLimitsSection record is a pinned 4-field shape (the U07
+        // exact-projection pin forbids adding a field), so this rides ViewData
+        // (the MessagingRestricted / EventRsvpMode precedent).
+        ViewData["ChildFirstDayOfWeek"] = Kumunita.Core.Query.WeekAnchor.Resolve(childProfile?.FirstDayOfWeek);
+
         return View(new MembershipEditorModel(
             childId,
             groupIds.OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList(),
@@ -1077,6 +1087,17 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // (2) the GU formation seam — the (guardian, child) Active row, in the
             //     same request (G·4, one commit; C3).
             await userInfo.CreateGuardianLinkAsync(child.SubjectId, subject);
+        }
+        catch (DisallowedEmailDomainException ex)
+        {
+            // F9 (AUTH-15) — the child lane shares `RegisterCoreAsync`, so the
+            // disposable-email blocklist rejection surfaces here too. Caught BEFORE
+            // the `InvalidOperationException` catch (the dedicated type must not be
+            // swallowed by it) and shown to the guardian on the add-a-child form
+            // (pin §3b — mirrors this lane's existing error shape).
+            ModelState.AddModelError(string.Empty,
+                $"The email domain '{ex.Domain}' is not accepted for new accounts. Please use a permanent email address.");
+            return View(form);
         }
         catch (InvalidOperationException ex)
         {

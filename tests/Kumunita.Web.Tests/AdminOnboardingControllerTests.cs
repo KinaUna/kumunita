@@ -15,7 +15,9 @@ namespace Kumunita.Web.Tests;
 /// <summary>
 /// M30 U06 (ADR 0153) — the <c>/admin/onboarding</c> surface pins
 /// (M30·1 / M30·3 / M30·4 / M30·7): the GET seeds the view model with the
-/// current <c>CompletedAt</c> state + the closed seven-step list; the
+/// current <c>CompletedAt</c> state + the closed ten-step list (the original
+/// seven M30 steps, extended additively per ADR 0153 D1 by the time-zone /
+/// date-format / sign-up steps); the
 /// POST <c>/admin/onboarding/complete</c> stamps completion through the
 /// <b>one</b> <see cref="IAdminOnboardingService.CompleteAsync"/> lane
 /// (exactly one <c>AccessAudit</c> row is the service's pin — the
@@ -87,7 +89,7 @@ public class AdminOnboardingControllerTests
         var viewNotCompleted = Assert.IsType<ViewResult>(await controllerNotCompleted.Index());
         var vmNotCompleted = Assert.IsType<AdminOnboardingViewModel>(viewNotCompleted.ViewData.Model);
         Assert.False(vmNotCompleted.Completed);
-        Assert.Equal(7, vmNotCompleted.Steps.Count);
+        Assert.Equal(10, vmNotCompleted.Steps.Count);
         await svcNotCompleted.Received(1).GetAsync(Arg.Any<CancellationToken>());
 
         // (b) a completed instance (CompletedAt = stamp) → Completed = true
@@ -96,52 +98,59 @@ public class AdminOnboardingControllerTests
         var viewCompleted = Assert.IsType<ViewResult>(await controllerCompleted.Index());
         var vmCompleted = Assert.IsType<AdminOnboardingViewModel>(viewCompleted.ViewData.Model);
         Assert.True(vmCompleted.Completed);
-        Assert.Equal(7, vmCompleted.Steps.Count);
+        Assert.Equal(10, vmCompleted.Steps.Count);
         await svcCompleted.Received(1).GetAsync(Arg.Any<CancellationToken>());
 
-        // The closed seven-step set (M30·7) — in the README / Milestones.cs
-        // order, each linking into the existing admin surface by route.
-        Assert.Equal("/admin/communities", vmCompleted.Steps[0].Route);       // community name & description (the base name/description surface; was /admin/languages, which only owns the language catalog + UI-string translations)
-        Assert.Equal("/admin/languages", vmCompleted.Steps[1].Route);          // languages
-        Assert.Equal("/admin/announcements/comments", vmCompleted.Steps[2].Route); // moderation
-        Assert.Equal("/admin/quiet", vmCompleted.Steps[3].Route);              // notifications
-        Assert.Equal("/admin/storage/settings", vmCompleted.Steps[4].Route);   // storage limits
-        Assert.Equal("/admin/site", vmCompleted.Steps[5].Route);               // site content
-        Assert.Equal("/admin/error-reports", vmCompleted.Steps[6].Route);      // issue escalation (M32·11 re-point)
+        // The closed ten-step set (M30·7, extended additively per ADR 0153 D1)
+        // — in the walk order, each linking into the existing admin surface
+        // by route.
+        Assert.Equal("/admin/communities", vmCompleted.Steps[0].Route);                 // community name & description (the base name/description surface; was /admin/languages, which only owns the language catalog + UI-string translations)
+        Assert.Equal("/admin/languages", vmCompleted.Steps[1].Route);                  // languages
+        Assert.Equal("/admin/timezone", vmCompleted.Steps[2].Route);                   // time zone (ADR 0019, additive)
+        Assert.Equal("/admin/dateformat", vmCompleted.Steps[3].Route);                 // date & time format (ADR 0020, additive)
+        Assert.Equal("/admin/announcements/comments", vmCompleted.Steps[4].Route);     // moderation
+        Assert.Equal("/admin/quiet", vmCompleted.Steps[5].Route);                      // notifications (quiet-time cadence)
+        Assert.Equal("/admin/signup", vmCompleted.Steps[6].Route);                     // sign-up (ADR 0050, additive)
+        Assert.Equal("/admin/storage/settings", vmCompleted.Steps[7].Route);           // storage limits
+        Assert.Equal("/admin/site", vmCompleted.Steps[8].Route);                       // site content
+        Assert.Equal("/admin/escalation", vmCompleted.Steps[9].Route);                 // issue escalation (ADR 0159 ESC outbound-config surface)
     }
 
-    // ── M32·11 — the M30 onboarding step-7 route re-point (the §2.4 pin 19) ──
+    // ── M32·11 — the M30 onboarding escalation step route (the §2.4 pin) ──
     // M32 "issue submission & escalation" shipped (ADR 0155); U06 re-pointed
-    // the M30 step-7 (issue escalation) route from the
+    // the M30 escalation step route from the
     // `/admin/announcements` placeholder to the M32 `/admin/error-reports`
-    // surface that owns issue escalation. The step-7 `Key` / `LabelKey` /
+    // surface, then to the ADR 0159 `/admin/escalation` ESC outbound-config
+    // surface (the receiving endpoint + token + enabled switch — the surface a
+    // new admin actually configures; `/admin/error-reports` is the *inbound*
+    // read-only triage list). The escalation step's `Key` / `LabelKey` /
     // `DescriptionKey` are **reused, not re-authored** (the
-    // `adminonboarding.step_escalation` keys); the seven-step set is
-    // **unchanged** (the M30·7 closed set — this is the M32·11 re-point, not
-    // a new step).
+    // `adminonboarding.step_escalation` keys); the step is now index 9 of the
+    // ten-step set (re-ordered after the additive time-zone / date-format /
+    // sign-up steps were added per ADR 0153 D1).
 
-    [Fact(DisplayName = "M32·11 AdminOnboarding step-7 route re-points to /admin/error-reports (the M32 surface)")]
-    public async Task M32_11_AdminOnboarding_Step7_Route_Repoints_To_ErrorReports()
+    [Fact(DisplayName = "M32·11 AdminOnboarding escalation step route points to /admin/escalation (the ADR 0159 ESC surface)")]
+    public async Task M32_11_AdminOnboarding_Escalation_Step_Route_Points_To_Escalation()
     {
         var (controller, _) = Build(completedAt: null);
         var view = Assert.IsType<ViewResult>(await controller.Index());
         var vm = Assert.IsType<AdminOnboardingViewModel>(view.ViewData.Model);
 
-        // The seven-step set is unchanged (M30·7 closed set — the re-point
-        // re-points the route, it does not add a step).
-        Assert.Equal(7, vm.Steps.Count);
+        // The ten-step set (M30·7 closed set, extended additively per ADR 0153 D1).
+        Assert.Equal(10, vm.Steps.Count);
 
-        // Step 7 (index 6) — issue escalation — re-points from the M30
-        // `/admin/announcements` placeholder to the M32 `/admin/error-reports`
-        // surface (M32·11, ADR 0155).
-        Assert.Equal("/admin/error-reports", vm.Steps[6].Route);
+        // Step 10 (index 9) — issue escalation — the ADR 0159 `/admin/escalation`
+        // ESC outbound-config surface (first re-pointed by M32·11 to
+        // `/admin/error-reports`, then to the ADR 0159 surface that a new admin
+        // actually configures).
+        Assert.Equal("/admin/escalation", vm.Steps[9].Route);
 
-        // The step-7 `Key` / `LabelKey` / `DescriptionKey` are reused, not
-        // re-authored (M32·11 — the `adminonboarding.step_escalation` keys are
-        // the closed M30 set).
-        Assert.Equal("escalation", vm.Steps[6].Key);
-        Assert.Equal("adminonboarding.step_escalation", vm.Steps[6].LabelKey);
-        Assert.Equal("adminonboarding.desc_escalation", vm.Steps[6].DescriptionKey);
+        // The escalation step's `Key` / `LabelKey` / `DescriptionKey` are reused,
+        // not re-authored (the `adminonboarding.step_escalation` keys are the
+        // closed M30 set).
+        Assert.Equal("escalation", vm.Steps[9].Key);
+        Assert.Equal("adminonboarding.step_escalation", vm.Steps[9].LabelKey);
+        Assert.Equal("adminonboarding.desc_escalation", vm.Steps[9].DescriptionKey);
     }
 
     // ── 2 — the POST /admin/onboarding/complete stamps completion through the
