@@ -720,3 +720,22 @@ html[data-kmb-palette] .kmb-group-page .tab-content .form-select { border-radius
   html[data-kmb-palette] .kmb-group-page #tab-settings > form,
   html[data-kmb-palette] .kmb-group-page #tab-members > form { padding: 1rem; }
 }
+
+/* RSVP response badges (ADR 0187) — soft status chips; the text label carries the meaning. */
+html[data-kmb-palette] .kmb-rsvp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--kmb-radius-pill);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  background: var(--kmb-tint-a);
+  color: var(--kmb-ink-soft);
+}
+html[data-kmb-palette] .kmb-rsvp-badge.is-going { background: var(--kmb-chip-selected-bg); color: var(--kmb-chip-selected-ink); }
+html[data-kmb-palette] .kmb-rsvp-badge.is-maybe {
+  background: color-mix(in srgb, #f59e0b 28%, var(--kmb-surface));
+  color: var(--kmb-ink);
+}

@@ -194,3 +194,4 @@ Decision / Consequences. New decisions take the next number.
 | 0184 | Announcement detail — chips above the card, author byline under the title, translation chips with `aria-pressed`, comment cards, composer on the form look. |
 | 0185 | Community post detail — announcement-detail treatment: byline under the title with community chip, tag and translation chips, reply cards, composer on the form look. |
 | 0186 | Group detail and group posts — header card with monogram tile, feed/event cards on the Feed and Events tabs, member rows, settings cards; group post gets the post-detail treatment. |
+| 0187 | Group event detail and RSVP badges — community event layout for group events (date tile, icon rows, author band), localised RSVP labels, soft status chips for responses on both event pages. |
