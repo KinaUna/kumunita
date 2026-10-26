@@ -2688,6 +2688,12 @@ public static class KnownTranslationKeys
             ["settings.messaging.optin"]           = "Let others send me direct 1:1 messages",
             ["settings.messaging.save"]            = "Save messaging preference",
             ["guardian.messaging.title"]           = "Messaging",
+
+            // ── ADR 0174 — the per-resident Security settings tab (the MFA
+            // enrollment + session-management surface at /settings/security/mfa;
+            // the settings sub-nav label, ADR 0080 shape). ──
+            ["settings.security.title"]            = "Security",
+
             ["guardian.messaging.description"]     = "Choose whether this child can use direct 1:1 messaging. When restricted, the child cannot send or receive messages and the choice wins over their own opt-in; when allowed, the child decides for themselves on their own messaging settings page.",
             ["guardian.messaging.current_restricted"] = "Messaging is currently restricted for this child.",
             ["guardian.messaging.current_allowed"]    = "Messaging is currently allowed for this child.",
@@ -5465,6 +5471,13 @@ public static class KnownTranslationKeys
             ["settings.messaging.optin"]           = "Erlaube anderen, mir direkte 1:1-Nachrichten zu senden",
             ["settings.messaging.save"]            = "Messaging-Einstellung speichern",
             ["guardian.messaging.title"]           = "Messaging",
+
+            // ── ADR 0174 — der pro-Bewohner-Sicherheitseinstellungstab (die
+            // MFA-Anmeldung + Session-Verwaltung unter /settings/security/mfa;
+            // die Beschriftung der Einstellungen-Unternavigation, ADR 0080
+            // Form). ──
+            ["settings.security.title"]            = "Sicherheit",
+
             ["guardian.messaging.description"]     = "Wähle, ob dieses Kind 1:1-Direktnachrichten nutzen darf. Bei Einschränkung kann das Kind keine Nachrichten senden oder erhalten — diese Auswahl hat Vorrang vor seiner eigenen Opt-in. Bei Erlaubnis entscheidet das Kind selbst auf seiner eigenen Messaging-Einstellungsseite.",
             ["guardian.messaging.current_restricted"] = "Messaging ist derzeit für dieses Kind eingeschränkt.",
             ["guardian.messaging.current_allowed"]    = "Messaging ist derzeit für dieses Kind erlaubt.",
@@ -8147,6 +8160,11 @@ public static class KnownTranslationKeys
             ["settings.messaging.optin"]           = "Autoriser d'autres résidents à m'envoyer des messages directs 1:1",
             ["settings.messaging.save"]            = "Enregistrer la préférence de messagerie",
             ["guardian.messaging.title"]           = "Messagerie",
+
+            // ── ADR 0174 — l'onglet Réglages Sécurité (la surface d'inscription
+            // MFA + de gestion des sessions sur /settings/security/mfa ; étiquette
+            // de la sous-navigation des réglages, forme ADR 0080). ──
+            ["settings.security.title"]            = "Sécurité",
             ["guardian.messaging.description"]     = "Choisis si cet enfant peut utiliser la messagerie directe 1:1. Si restreinte, l'enfant ne peut ni envoyer ni recevoir de messages — ce choix prime sur son propre opt-in ; si autorisée, l'enfant décide par lui-même sur sa page de réglages de messagerie.",
             ["guardian.messaging.current_restricted"] = "La messagerie est actuellement restreinte pour cet enfant.",
             ["guardian.messaging.current_allowed"]    = "La messagerie est actuellement autorisée pour cet enfant.",
@@ -10814,6 +10832,11 @@ public static class KnownTranslationKeys
             ["settings.messaging.optin"]           = "Lad andre sende mig direkte 1:1-beskeder",
             ["settings.messaging.save"]            = "Gem beskedindstilling",
             ["guardian.messaging.title"]           = "Beskeder",
+
+            // ── ADR 0174 — indstillingstab-fanen Sikkerhed (MFA-tilslutning +
+            // session-håndtering på /settings/security/mfa ; fanen i
+            // indstillinger-undermenuen, ADR 0080 form). ──
+            ["settings.security.title"]            = "Sikkerhed",
             ["guardian.messaging.description"]     = "Vælg, om dette barn kan bruge direkte 1:1-beskeder. Ved begrænsning kan barnet hverken sende eller modtage beskeder — dette valg har forrang over dets eget opt-in; ved tilladelse vælger barnet selv på sin egen beskedindstillingsside.",
             ["guardian.messaging.current_restricted"] = "Beskeder er i øjeblikket begrænset for dette barn.",
             ["guardian.messaging.current_allowed"]    = "Beskeder er i øjeblikket tilladt for dette barn.",

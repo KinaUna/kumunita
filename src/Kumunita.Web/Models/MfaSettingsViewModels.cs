@@ -33,6 +33,15 @@ public sealed class MfaSettingsViewModel
     /// Shown **once**, at enrollment — never re-served by a subsequent GET.</summary>
     public string? OtpAuthUrl { get; init; }
 
+    /// <summary>A <c>data:image/png;base64,…</c> URI encoding the
+    /// <see cref="OtpAuthUrl"/> as a QR code (ADR 0174), so the resident can
+    /// pair their authenticator app by scanning an image. Server-side QR
+    /// encode — no client JS required; works with scripts disabled.
+    /// Shown **once**, at enrollment — never re-served by a subsequent GET.
+    /// <c>null</c> when <see cref="OtpAuthUrl"/> is absent (the steady
+    /// state / rotate leg), in which case the view renders no QR image.</summary>
+    public string? QrDataUri { get; init; }
+
     /// <summary>The 10 recovery codes from
     /// <c>UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10)</c>.
     /// Shown **once**, at enrollment/rotate — never re-served by a

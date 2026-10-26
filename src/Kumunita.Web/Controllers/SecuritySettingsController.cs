@@ -125,6 +125,57 @@ public sealed class SecuritySettingsController(
             + "&algorithm=SHA1&digits=6&period=30";
     }
 
+    /// <summary>
+    /// Encode the <c>otpauth://</c> URI as a QR <c>data:image/png</c> URI
+    /// (ADR 0174). A server-side QR encode (<see cref="QRCoder.PngByteQRCode"/>)
+    /// means the enrollment page can render a scannable image without any
+    /// client JavaScript — the authenticator-app pairing leg works with
+    /// scripts disabled, and there is no new asset to ship. The PNG is
+    /// embedded as a data URI so the image carries no cache/identity
+    /// metadata and the page stays a single round-trip.
+    /// <para>
+    /// <b>Fallback note:</b> the <c>data:</c> URI is only useful when the
+    /// <c>otpauth://</c> URI is present (the enrollment leg). On a steady
+    /// state / rotate (no setup key) the view does not render the QR at all,
+    /// so a <c>null</c> URI simply produces no image. A QR encoder failure is
+    /// not expected for the short, fixed-shape <c>otpauth://</c> payload — if
+    /// it ever throws, we return <c>null</c> and the view degrades to the
+    /// setup-key + URI text (both already rendered), which is the resident's
+    /// other pairing path.
+    /// </para>
+    /// </summary>
+    private static string? BuildQrDataUri(string otpAuthUrl)
+    {
+        try
+        {
+            // QRCoder 1.8.1 shape (build-verified against the 1.8.1 assembly):
+            // CreateQrCode(string, ECCLevel, bool, bool, EciMode, int) — the
+            // single-string overload was dropped in 1.8.x; the 6-arg form is
+            // the raw-payload entry point. ECCLevel.M (the QR standard's
+            // default, ~15% error tolerance) is the right balance for a QR
+            // scanned by a phone camera; EciMode.Default + the default
+            // 40-version cap cover the short otpauth:// payload comfortably.
+            // The last int (version cap 40) is the QR max; the payload is
+            // far below it, so the encoder picks the smallest version that
+            // fits. pixelsPerModule = 5 gives a crisp, scannable image
+            // (large enough for a phone held at arm's length, small enough
+            // to stay a light data URI).
+            var qr = new QRCoder.QRCodeGenerator().CreateQrCode(
+                otpAuthUrl,
+                QRCoder.QRCodeGenerator.ECCLevel.M,
+                false,
+                false,
+                QRCoder.QRCodeGenerator.EciMode.Default,
+                40);
+            var png = new QRCoder.PngByteQRCode(qr).GetGraphic(5);
+            return "data:image/png;base64," + Convert.ToBase64String(png);
+        }
+        catch (Exception)
+        {
+            return null; // degrade to the setup-key + URI text leg
+        }
+    }
+
     // ---- actions ---------------------------------------------------------
 
     /// <summary>
@@ -179,11 +230,17 @@ public sealed class SecuritySettingsController(
         // operator handles the nullable return (CS8604).
         var codes = (await userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, RecoveryCodeCount))!.ToArray();
 
+        // ADR 0174 — the pairing QR: encode the otpauth URI once here (the
+        // enrollment leg is the only leg that carries a setup key), and serve
+        // the resulting data: URI to the view alongside the URI + setup key.
+        var otpAuthUrl = BuildOtpAuthUrl(user, key);
+
         return View(new MfaSettingsViewModel
         {
             Enabled = false,
             SetupKey = key,
-            OtpAuthUrl = BuildOtpAuthUrl(user, key),
+            OtpAuthUrl = otpAuthUrl,
+            QrDataUri = BuildQrDataUri(otpAuthUrl),
             RecoveryCodes = codes,
             RemainingRecoveryCodes = codes.Length,
         });
