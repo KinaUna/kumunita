@@ -2415,16 +2415,21 @@ html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
   box-shadow: 0 0 0 calc(var(--bs-focus-ring-width) * 0.75) var(--bs-focus-ring-color);
 }
 
-/* --- Avatar (media feature, U8) -------------------------------------------------------
-   Every avatar <img> carries the app endpoint /profile/avatar/{subjectId}
-   as its src (C-MED·3 — served only through the audited serving lane, never
-   When that endpoint fails closed to a 404 (no avatar set,
-   a blocked profile, or a denied audience — FACES M3–M5), the
-   client/lib/avatar.ts module (loaded in the _Layout as ~/js/lib/avatar.js;
-   SECURITY.md §6 — no inline on*) hides the <img> marked
-   data-avatar-fallback and .avatar-mono, a sibling rendered server-side
-   (the resident's initial, or an empty circle when the surface has no
-   display-name channel), takes its place — no broken-image icon. */
+/* --- Avatar (media feature, U8; the kw-avatar presence lane) ------------------------
+   Every avatar slot renders through the <kw-avatar> TagHelper, which checks
+   server-side (the IAvatarPresenceChecker, ADR 0057) whether the resident
+   actually has an avatar before writing any markup:
+   - avatar present → the <img> at the audited serving lane
+     /profile/avatar/{subjectId} (C-MED·3 — served only through that lane,
+     never a static path), plus a hidden .avatar-mono sibling that
+     client/lib/avatar.ts swaps in on the rare render-then-delete race;
+   - avatar absent → just .avatar-mono (the resident's initial, or an empty
+     circle when the surface has no display-name channel), or nothing at all
+     for a slot with no monogram channel — NO <img>, so the browser makes no
+     request that would fail closed to a 404.
+   The client/lib/avatar.ts module (loaded in the _Layout as ~/js/lib/
+   avatar.js; SECURITY.md §6 — no inline on*) is kept as a belt-and-suspenders
+   fallback for the present case. */
 .avatar {
   width: 42px;
   height: 42px;

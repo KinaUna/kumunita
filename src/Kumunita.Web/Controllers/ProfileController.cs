@@ -175,12 +175,17 @@ public sealed class ProfileController(
         // pair per invocation).
         await SeedGrantPickerOptionsAsync();
 
-        // Seed the avatar <img> flag in the view (same read-only ViewData
-        // channel as the grant-picker option lists above): the serving lane
-        // fails closed to 404 when no avatar is set, so the view renders
-        // the monogram directly instead of making a doomed request.
-        ViewData["HasAvatar"] = !string.IsNullOrEmpty(savedProfile?.AvatarId);
-
+        // The avatar slot in the view is a <kw-avatar> TagHelper, which
+        // resolves the present/absent decision server-side (the
+        // IAvatarPresenceChecker, ADR 0057) — present renders the <img>,
+        // absent renders the monogram circle directly. No ViewData
+        // "HasAvatar" flag is seeded: the TagHelper's own per-request
+        // presence check (IUserInfoService.GetProfileAsync + IMediaStore.
+        // GetAsync) is the single source of truth for "does this avatar
+        // actually resolve", and it also folds the "blocked profile" and
+        // "media doc missing" cases into the same fail-closed answer that
+        // the GET /profile/avatar/{subjectId} serving lane would 404 on —
+        // so the browser never makes a request that will fail.
         return View(model);
     }
 

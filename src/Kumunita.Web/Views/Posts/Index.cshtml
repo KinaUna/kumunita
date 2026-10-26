@@ -236,9 +236,7 @@
                         <p class="airy-post-preview mb-0">@p.BodyPreview</p>
                         <div class="airy-post-meta">
                             <span class="d-inline-flex align-items-center">
-                                <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
-                                     data-avatar-fallback>
-                                <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                <kw-avatar subject="@p.AuthorSubjectId" mono="@authorAvatarInitial" />
                             </span>
                             <span>@p.AuthorDisplayName</span>
                             <span>·</span>

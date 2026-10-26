@@ -125,9 +125,7 @@
                             <div class="text-end text-muted small">
                                 <div class="d-flex align-items-center justify-content-end gap-1">
                                     <span class="d-inline-flex align-items-center">
-                                        <img class="avatar" src="/profile/avatar/@r.AuthorSubjectId" alt=""
-                                             data-avatar-fallback>
-                                        <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
+                                        <kw-avatar subject="@r.AuthorSubjectId" mono="@replyAvatarInitial" />
                                     </span>
                                     <span>@r.AuthorDisplayName</span>
                                     @* ADR 0082 — the reply's action surface: one ⋮ dropdown

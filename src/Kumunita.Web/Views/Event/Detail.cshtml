@@ -415,9 +415,7 @@
                CheckEditStanding / CanAddTranslation). *@
             <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@Model.Event.AuthorId" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                    <kw-avatar subject="@Model.Event.AuthorId" mono="@authorAvatarInitial" />
                 </span>
                 <span>
                     @Model.AuthorDisplayName
@@ -587,9 +585,7 @@
                                 : string.Empty;
                             <li class="d-flex justify-content-between py-1 align-items-center">
                                 <span class="d-inline-flex align-items-center">
-                                    <img class="avatar" src="/profile/avatar/@rsvp.Rsvp.UserId" alt=""
-                                         data-avatar-fallback>
-                                    <span class="avatar-mono" style="display:none;">@rsvpInitial</span>
+                                    <kw-avatar subject="@rsvp.Rsvp.UserId" mono="@rsvpInitial" />
                                     <span class="ms-2">@rsvp.DisplayName</span>
                                 </span>
                                 <span>

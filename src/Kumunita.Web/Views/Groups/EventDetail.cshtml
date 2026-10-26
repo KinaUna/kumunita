@@ -60,9 +60,7 @@
                 @{ var authorInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName) ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString() : string.Empty; }
                 <div class="text-muted mb-3 d-flex align-items-center gap-2 flex-wrap">
                     <span class="d-inline-flex align-items-center">
-                        <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
-                             data-avatar-fallback>
-                        <span class="avatar-mono" style="display:none;">@authorInitial</span>
+                        <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorInitial" />
                         <span class="ms-2">@Model.AuthorDisplayName</span>
                     </span>
                     <span>—</span>
@@ -151,9 +149,7 @@
                                 : string.Empty;
                             <li class="d-flex justify-content-between py-1 align-items-center">
                                 <span class="d-inline-flex align-items-center">
-                                    <img class="avatar" src="/profile/avatar/@rsvp.Rsvp.UserId" alt=""
-                                         data-avatar-fallback>
-                                    <span class="avatar-mono" style="display:none;">@rsvpInitial</span>
+                                    <kw-avatar subject="@rsvp.Rsvp.UserId" mono="@rsvpInitial" />
                                     <span class="ms-2">@rsvp.DisplayName</span>
                                 </span>
                                 <span>

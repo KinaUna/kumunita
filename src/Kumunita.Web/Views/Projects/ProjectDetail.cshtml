@@ -476,9 +476,7 @@
                monogram sibling on its fail-closed 404. *@
             <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@Model.AuthorId" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@projectAuthorInitial</span>
+                    <kw-avatar subject="@Model.AuthorId" mono="@projectAuthorInitial" />
                 </span>
                 <span>
                     @Model.AuthorDisplayName · <kw-l key="projects.todo.created">Created</kw-l>

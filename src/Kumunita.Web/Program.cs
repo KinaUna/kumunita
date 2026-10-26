@@ -439,6 +439,16 @@ builder.Services.AddScoped<Kumunita.Web.Security.IUploadGate>(sp =>
 
 builder.Services.AddScoped<Kumunita.Web.Security.IUploadLimitHint, Kumunita.Web.Security.UploadLimitHint>();
 
+// The avatar presence check (read, never a decision — the avatar serving lane
+// is "all platform users", ADR 0057): scoped so the per-subject cache is
+// request-scoped by construction, and a page listing many rows for the same
+// resident (a feed, a comment list, a board) resolves one profile + media read
+// per resident, not one per row. The <kw-avatar> TagHelper (and the
+// profile-edit / preview surfaces) resolve through it to decide, server-side,
+// whether to emit the avatar <img> at all — so a missing avatar renders the
+// monogram directly and the browser never fetches a URL that will 404.
+builder.Services.AddScoped<Kumunita.Web.Security.IAvatarPresenceChecker, Kumunita.Web.Security.AvatarPresenceChecker>();
+
 // M32 (ADR 0155, M32·5) — the escalation forwarding lane: the Web-layer
 // IEscalationForwarder is the **first outbound HTTP** in the codebase (Core
 // stays HTTP-free, ADR 0006-D). AddHttpClient() registers the

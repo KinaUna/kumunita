@@ -127,9 +127,7 @@
                 @if (!string.IsNullOrEmpty(navAvatarSubject))
                 {
                     <span class="d-inline-flex align-items-center">
-                        <img class="avatar avatar-sm" src="/profile/avatar/@navAvatarSubject" alt=""
-                             data-avatar-fallback>
-                        <span class="avatar-mono avatar-sm" style="display:none;">@navAvatarInitial</span>
+                        <kw-avatar subject="@navAvatarSubject" mono="@navAvatarInitial" size="sm" />
                     </span>
                 }
                 @if (!string.IsNullOrEmpty(navToggleLabel))
