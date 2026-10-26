@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.Controllers;
 
@@ -69,8 +68,7 @@ namespace Kumunita.Web.Controllers;
 public sealed class SecuritySettingsController(
     UserManager<User> userManager,
     SignInManager<User> signInManager,
-    IIdentityService identity,
-    IOptions<TokenOptions> tokenOptions) : Controller
+    IIdentityService identity) : Controller
 {
     private static readonly string AuthenticatorProvider = "Authenticator";
     private const int RecoveryCodeCount = 10;
@@ -96,26 +94,29 @@ public sealed class SecuritySettingsController(
     }
 
     /// <summary>
-    /// Build the <c>otpauth://</c> URI from the one-time setup key + the
-    /// configured authenticator issuer (the pin §4 enrollment leg — the app
+    /// Build the <c>otpauth://</c> URI from the one-time setup key + a
+    /// deployment-identifying issuer (the pin §4 enrollment leg — the app
     /// builds the URI; the key comes from
     /// <c>UserManager.GenerateNewAuthenticatorKey()</c>).
     /// <para>
-    /// <b>Shape note (F3.U3 compiler-verified):</b> in 10.0.13,
-    /// <c>TokenOptions.AuthenticatorTokenProvider</c> is a <c>string</c>
-    /// (the provider name, <c>"Authenticator"</c>), not a nested object.
-    /// The issuer is <c>TokenOptions.AuthenticatorIssuer</c> (a direct
-    /// <c>string</c> property). The compiler confirmed this (CS1061 on
-    /// <c>.AuthenticatorTokenProvider.AuthenticatorIssuer</c>);
-    /// <c>AuthenticatorIssuer</c> on <c>TokenOptions</c> is the correct
-    /// path.
+    /// <b>Issuer (ADR 0174 D1 errata 2, 2026-10-26):</b> the label that
+    /// authenticator apps show next to the account is
+    /// <c>"Kumunita - {host}"</c> (e.g. <c>"Kumunita - example.kumunita.com"</c>)
+    /// so residents with multiple Kumunita deployments can tell which one
+    /// an entry belongs to. The host comes from <c>Request.Host</c> (the
+    /// <c>Host</c> header the browser sent, which is the community's
+    /// deployment URL — <c>localhost:5080</c> in dev, the real domain in
+    /// prod). If <c>Request</c> is unavailable (e.g. a unit test that
+    /// didn't set a <c>Host</c>), we fall back to the bare <c>"Kumunita"</c>
+    /// so the URI is still well-formed.
     /// </para>
     /// </summary>
     private string BuildOtpAuthUrl(User user, string key)
     {
-        var issuer = string.IsNullOrWhiteSpace(tokenOptions.Value.AuthenticatorIssuer)
+        var host = Request?.Host.Host;
+        var issuer = string.IsNullOrWhiteSpace(host)
             ? "Kumunita"
-            : tokenOptions.Value.AuthenticatorIssuer;
+            : $"Kumunita - {host}";
         var account = user.Email ?? user.UserName ?? "account";
 
         return "otpauth://totp/"
@@ -148,25 +149,24 @@ public sealed class SecuritySettingsController(
     {
         try
         {
-            // QRCoder 1.8.1 shape (build-verified against the 1.8.1 assembly):
-            // CreateQrCode(string, ECCLevel, bool, bool, EciMode, int) — the
-            // single-string overload was dropped in 1.8.x; the 6-arg form is
-            // the raw-payload entry point. ECCLevel.M (the QR standard's
-            // default, ~15% error tolerance) is the right balance for a QR
-            // scanned by a phone camera; EciMode.Default + the default
-            // 40-version cap cover the short otpauth:// payload comfortably.
-            // The last int (version cap 40) is the QR max; the payload is
-            // far below it, so the encoder picks the smallest version that
-            // fits. pixelsPerModule = 5 gives a crisp, scannable image
-            // (large enough for a phone held at arm's length, small enough
-            // to stay a light data URI).
+            // QRCoder 1.8.1 shape (build-verified against the 1.8.1 assembly).
+            // Use the 2-arg overload — CreateQrCode(string, ECCLevel) — which
+            // auto-selects the SMALLEST QR version that fits the payload. The
+            // 6-arg form's last parameter is NOT a size/pixels hint, it is
+            // `requestedVersion`: passing a value there FORCES that exact QR
+            // version (and 0 throws ArgumentOutOfRangeException), so it must
+            // not be used to "cap" the version. The otpauth:// payload is
+            // ~170 bytes → ~QR version 10 (75×75 modules), well within what
+            // a phone camera resolves at the view's 220px render; forcing the
+            // version-40 max (177×177) is far too dense to decode reliably,
+            // which is why neither Google nor Microsoft Authenticator could
+            // read it (fixed 2026-10-26, ADR 0174 D1 errata). ECCLevel.M is
+            // the QR standard's default (~15% error tolerance) — the right
+            // balance for a phone-camera scan. pixelsPerModule = 5 in
+            // GetGraphic(5) gives a crisp, scannable image.
             var qr = new QRCoder.QRCodeGenerator().CreateQrCode(
                 otpAuthUrl,
-                QRCoder.QRCodeGenerator.ECCLevel.M,
-                false,
-                false,
-                QRCoder.QRCodeGenerator.EciMode.Default,
-                40);
+                QRCoder.QRCodeGenerator.ECCLevel.M);
             var png = new QRCoder.PngByteQRCode(qr).GetGraphic(5);
             return "data:image/png;base64," + Convert.ToBase64String(png);
         }

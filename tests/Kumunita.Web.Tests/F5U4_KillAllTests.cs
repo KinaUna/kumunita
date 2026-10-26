@@ -172,8 +172,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
         var secController = new SecuritySettingsController(
             userManager:    b.UserManager,
             signInManager:  signInManager,
-            identity:       b.Identity,
-            tokenOptions:   Options.Create(new TokenOptions()));
+            identity:       b.Identity);
 
         var httpCtx = new DefaultHttpContext
         {

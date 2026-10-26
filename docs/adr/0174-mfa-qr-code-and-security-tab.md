@@ -83,6 +83,33 @@ Rationale:
   the view renders the setup key + `otpauth://` URI fields (the
   manual-entry fallback) without the `<img>`.
 
+> **Errata (2026-10-26, post-ship):** the first implementation used the
+> 6-arg `CreateQrCode(string, ECCLevel, bool, bool, EciMode, int)` overload
+> with the last argument `40`, on the (wrong) assumption that it was a
+> size / pixels-per-module hint that the encoder could shrink past. In
+> QRCoder 1.8.1 that final parameter is **`requestedVersion`**: passing a
+> non-zero value **forces** that exact QR version, and `0` throws
+> `ArgumentOutOfRangeException`. Passing `40` therefore pinned the symbol
+> to **QR version 40 — the maximum density (177×177 modules)** — even
+> though the ~170-byte `otpauth://` payload naturally fits in version ~10
+> (75×75). A version-40 symbol rendered at the view's 220px is far too
+> dense for a phone camera to resolve, so **neither Google nor Microsoft
+> Authenticator could decode it**. The fix is the **2-arg overload**
+> `CreateQrCode(string, ECCLevel)`, which auto-selects the smallest
+> version that fits (verified: ~1035-byte PNG, version ~10). The `otpauth://`
+> secret encoding (base32) and the URI shape were never at fault.
+>
+> **Errata 2 (2026-10-26, post-ship):** the first implementation read the
+> issuer from `TokenOptions.AuthenticatorIssuer`, which in the running
+> deployment was the ASP.NET Identity default
+> `"Microsoft.AspNetCore.Identity.UI"` — so the entry in Google / Microsoft
+> Authenticator showed that internal label instead of something the resident
+> could recognize. The fix: build the issuer from `Request.Host.Host` as
+> `"Kumunita - {host}"` (e.g. `"Kumunita - example.kumunita.com"`), so a
+> resident with multiple Kumunita deployments can tell which one an entry
+> belongs to, and the label never leaks a framework name. The constructor's
+> now-unused `IOptions<TokenOptions>` parameter was removed.
+
 ### D2 — the QR appears only on the enrollment leg
 
 The QR is rendered **only when `Model.QrDataUri` is non-null**, which is

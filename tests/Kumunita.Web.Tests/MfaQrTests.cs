@@ -112,6 +112,20 @@ public sealed class MfaQrTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.True(
             model.OtpAuthUrl!.Contains(model.SetupKey!, StringComparison.Ordinal),
             "The OtpAuthUrl must contain the SetupKey (the otpauth URI embeds it).");
+
+        // The issuer is "Kumunita - {host}" (ADR 0174 D1 errata 2, 2026-10-26).
+        // The test sets Host = example.kumunita.com, so the issuer must be
+        // "Kumunita - example.kumunita.com" and must NOT be the ASP.NET
+        // Identity default "Microsoft.AspNetCore.Identity.UI".
+        Assert.True(
+            model.OtpAuthUrl.Contains("Kumunita", StringComparison.Ordinal),
+            $"The OtpAuthUrl issuer must contain 'Kumunita'. Got: {model.OtpAuthUrl}");
+        Assert.True(
+            model.OtpAuthUrl.Contains("example.kumunita.com", StringComparison.Ordinal),
+            $"The OtpAuthUrl issuer must contain the request host 'example.kumunita.com'. Got: {model.OtpAuthUrl}");
+        Assert.True(
+            !model.OtpAuthUrl.Contains("Microsoft.AspNetCore.Identity.UI", StringComparison.Ordinal),
+            $"The OtpAuthUrl must not use the ASP.NET Identity default issuer. Got: {model.OtpAuthUrl}");
     }
 
     // ── Pin 2 — the steady state does not emit a QR ─────────────────────────
@@ -238,22 +252,19 @@ public sealed class MfaQrTests(PostgresFixture fixture) : IClassFixture<Postgres
             Substitute.For<IAuthenticationSchemeProvider>(),
             Substitute.For<IUserConfirmation<User>>());
 
-        // The Mfa() action uses TokenOptions for the AuthenticatorIssuer.
-        var tokenOptions = Options.Create(new TokenOptions
-        {
-            AuthenticatorIssuer = "Kumunita",
-        });
-
+        // The Mfa() action builds the issuer from Request.Host (e.g.
+        // "Kumunita - example.kumunita.com"). Set a deterministic Host on
+        // the test HttpContext so the issuer is predictable.
         var controller = new SecuritySettingsController(
             userManager:    b.UserManager,
             signInManager:  signInManager,
-            identity:       Substitute.For<IIdentityService>(),
-            tokenOptions:   tokenOptions);
+            identity:       Substitute.For<IIdentityService>());
 
         // Wire the signed-in principal (the Kumunita.Sub claim — the
         // KumunitaPrincipal.SubjectId read path; the repo idiom is
         // new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(...) }))).
         var httpContext = new DefaultHttpContext();
+        httpContext.Request.Host = new Microsoft.AspNetCore.Http.HostString("example.kumunita.com");
         httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
             new[] { new Claim("Kumunita.Sub", b.User!.Id!) },
             authenticationType: "test"));
