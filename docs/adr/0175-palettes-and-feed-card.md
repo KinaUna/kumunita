@@ -46,8 +46,11 @@ date, community chip) → title (no underline) → preview → footer (reply cou
 ## Consequences / open work
 
 - `--kmb-radius` 12→16px affects every card: screenshot directory, groups, events, kanban.
-- Contrast pass for all palette×mode combinations (muted text, amber-ink-on-amber), including
-  reduced screen brightness.
+- Contrast pass (text, WCAG AA): done 2026-10-26 by measuring every visible text element on
+  /, /community, /groups, /events, /announcements and /directory in all four palette×mode
+  combinations — 0 failures after two fixes (light pinned badge, dark success badge; see the end
+  of `palettes.css`). Not yet covered: non-text contrast (control borders 3:1, focus rings),
+  hover/focus states, the admin pages, and checks at reduced screen brightness.
 - Translations for `palette.*` exist in en/de/fr/da (labels only; palette names stay Forest/Ember).
 - Per-palette logo asset instead of the `--kmb-logo-tile` placeholder.
 - Banner consolidation, Groups/Events/Home pages: later phases (see the UI refresh plan).

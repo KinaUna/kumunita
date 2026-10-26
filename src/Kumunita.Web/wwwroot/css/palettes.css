@@ -289,3 +289,26 @@ html[data-kmb-palette] .btn-outline-secondary {
   border-color: transparent;
   color: var(--kmb-chip-selected-ink);
 }
+
+/* ==========================================================================
+   Contrast fixes (ADR 0173 contrast pass, measured on the running app)
+   --------------------------------------------------------------------------
+   Found by computing WCAG ratios for every visible text element in all four
+   palette x mode combinations across /, /community, /groups, /events,
+   /announcements and /directory. Both are pre-existing Bootstrap defaults,
+   not caused by the palettes:
+     - .text-bg-warning (the "pinned" badge) is black on #b45309 in light
+       mode = 4.18:1  ->  white on #b45309 = 5.07:1.
+     - .text-bg-success on the dark success green #3fa866 is white = 3.0:1
+       ->  near-black ink #0f1a14 = about 6:1.
+   Dark mode keeps its existing warning badge (it already passes).
+   ========================================================================== */
+@media not (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='dark']) .text-bg-warning { color: #fff !important; }
+}
+html[data-kmb-theme='light'] .text-bg-warning { color: #fff !important; }
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='light']) .text-bg-success { color: #0f1a14 !important; }
+}
+html[data-kmb-theme='dark'] .text-bg-success { color: #0f1a14 !important; }
