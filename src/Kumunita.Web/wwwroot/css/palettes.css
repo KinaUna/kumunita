@@ -198,14 +198,16 @@ html[data-kmb-theme='dark'][data-kmb-palette='ember'] {
 }
 
 /* ==========================================================================
-   Palette-aware primary button
+   Palette-aware primary button + accent text
    --------------------------------------------------------------------------
-   Reads the --kmb-action-* tokens, so forest keeps green and ember gets
-   amber-with-dark-ink. TODO: site.css (Buttons, ~line 1317) sets .btn-primary
-   variables and some dark-scope !important rules; confirm this block wins in
-   all four palette×mode combinations and fold the two together.
+   site.css pins .btn-primary to green in BOTH dark scopes
+   (html:not([data-kmb-theme='light']) .btn-primary and
+   html[data-kmb-theme='dark'] .btn-primary, specificity 0,2,1). The selector
+   below ties at 0,2,1 and loads later, so it wins in all four palette x mode
+   combinations without !important. (Verified live on localhost:5080: Ember
+   dark + light show the amber button with dark ink.)
    ========================================================================== */
-.btn-primary {
+html[data-kmb-palette] .btn-primary {
   --bs-btn-bg: var(--kmb-action-bg);
   --bs-btn-border-color: var(--kmb-action-bg);
   --bs-btn-color: var(--kmb-action-ink);
@@ -215,4 +217,21 @@ html[data-kmb-theme='dark'][data-kmb-palette='ember'] {
   --bs-btn-active-bg: var(--kmb-action-bg-hover);
   --bs-btn-active-border-color: var(--kmb-action-bg-hover);
   --bs-btn-active-color: var(--kmb-action-ink);
+  --bs-btn-disabled-bg: var(--kmb-action-bg);
+  --bs-btn-disabled-border-color: var(--kmb-action-bg);
+  --bs-btn-disabled-color: var(--kmb-action-ink);
 }
+
+/* The active nav item / selected rows read --bs-primary-text-emphasis in the
+   dark patches; point it (and the sidebar's active/hover link) at the accent
+   so Ember shows amber there instead of green. Forest keeps its own values. */
+html[data-kmb-palette='ember'] {
+  --bs-primary-text-emphasis: var(--kmb-accent);
+  --bs-primary-emphasis: var(--kmb-accent);
+}
+html[data-kmb-palette] .airy-side-list a:hover,
+html[data-kmb-palette] .airy-side-list a.active {
+  color: var(--kmb-accent);
+}
+/* TODO: .btn-outline-primary, .badge / sort pills (.text-bg-secondary amber) and
+   the "Add note" button still use their own colours; review per palette. */
