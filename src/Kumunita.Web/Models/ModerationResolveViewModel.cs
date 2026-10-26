@@ -66,6 +66,19 @@ public sealed class ModerationResolveViewModel
     public string? ReplyBody { get; set; }        // the reply's body (a read, not a decision)
     public string? ReplyAuthorName { get; set; }  // IUserInfoService.GetProfileAsync read (a read, not a decision)
 
+    // ── The referenced target (ADR 0173 — the report-targets lane) ─
+    // Populated only when the report's TargetKind is one of the new
+    // surfaces (event / project / board / todo / grouppost). The
+    // Title is the target's display label (a read, not a decision),
+    // the AuthorName is the target's author's display name (a read,
+    // not a decision); both are rendered as-is / UGC rules per M·3.
+    // The platform label ("event" / "project" / …) IS translated
+    // (the moderation.resolve_target_* keys).
+    public string? TargetKind { get; set; }       // one of the closed vocabulary, or null for post / reply
+    public string? TargetId { get; set; }         // the target's own id (the new-lane identity)
+    public string? TargetTitle { get; set; }      // the target's display label (a read, not a decision)
+    public string? TargetAuthorName { get; set; } // IUserInfoService.GetProfileAsync read (a read, not a decision)
+
     // ── The standing-moderator list for the assign form ─────────────
     public IReadOnlyList<StandingModerator> Moderators { get; set; } = [];
 

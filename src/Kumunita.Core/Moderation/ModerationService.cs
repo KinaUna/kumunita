@@ -79,6 +79,76 @@ public sealed class ModerationService
     }
 
     /// <summary>
+    /// ADR 0173 — the report-targets lane's shared helper: resolve the
+    /// report's target (post OR one of the new surfaces) to the single
+    /// <see cref="IAuditableResource"/> the SoD <c>Moderate</c>
+    /// decision (F5 / F6) runs against. The original M3b shape
+    /// (a <see cref="Post"/>) uses <c>PostToAuditableResource</c>;
+    /// the new surfaces use their own ToAuditableResource adapters
+    /// (the ADR 0006-E shape — the module reads only its own
+    /// <c>OwnerId</c> / <c>Audience</c> / <c>ComponentId</c>, never
+    /// module-specific fields).
+    /// <para>
+    /// <b>Fail-closed:</b> a missing target is a failed call (no
+    /// status flip, no audit row — no partial write; the same
+    /// invariant the original <c>Post</c> load enforced).
+    /// </para>
+    /// </summary>
+    private async Task<IAuditableResource> LoadReportTargetResourceAsync(
+        Report report, IDocumentSession session)
+    {
+        if (report.TargetKind is not null && report.TargetId is not null)
+        {
+            switch (report.TargetKind)
+            {
+                case "event":
+                {
+                    var ev = await session.LoadAsync<Kumunita.Core.Events.Event>(report.TargetId).ConfigureAwait(false);
+                    if (ev is null)
+                        throw new KeyNotFoundException($"Event '{report.TargetId}' (referenced by report '{report.Id}') was not found in the session.");
+                    return new Kumunita.Core.Events.EventToAuditableResource(ev);
+                }
+                case "project":
+                {
+                    var pr = await session.LoadAsync<Kumunita.Core.Projects.Project>(report.TargetId).ConfigureAwait(false);
+                    if (pr is null)
+                        throw new KeyNotFoundException($"Project '{report.TargetId}' (referenced by report '{report.Id}') was not found in the session.");
+                    return new Kumunita.Core.Projects.ProjectToAuditableResource(pr);
+                }
+                case "board":
+                {
+                    var bd = await session.LoadAsync<Kumunita.Core.Projects.KanbanBoard>(report.TargetId).ConfigureAwait(false);
+                    if (bd is null)
+                        throw new KeyNotFoundException($"Board '{report.TargetId}' (referenced by report '{report.Id}') was not found in the session.");
+                    return new Kumunita.Core.Projects.KanbanBoardToAuditableResource(bd);
+                }
+                case "todo":
+                {
+                    var td = await session.LoadAsync<Kumunita.Core.Projects.TodoItem>(report.TargetId).ConfigureAwait(false);
+                    if (td is null)
+                        throw new KeyNotFoundException($"To-do '{report.TargetId}' (referenced by report '{report.Id}') was not found in the session.");
+                    return new Kumunita.Core.Projects.TodoItemToAuditableResource(td);
+                }
+                case "grouppost":
+                {
+                    var gp = await session.LoadAsync<Post>(report.TargetId).ConfigureAwait(false);
+                    if (gp is null)
+                        throw new KeyNotFoundException($"Group post '{report.TargetId}' (referenced by report '{report.Id}') was not found in the session.");
+                    return new PostToAuditableResource(gp);
+                }
+            }
+        }
+
+        // The original M3b / ADR 0023 shape: a post (possibly with a
+        // reply discriminator on Report.ReplyId — the post is still
+        // the auditable resource, the C-M3·1 reply-inherits rule).
+        var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{report.PostId}' (referenced by report '{report.Id}') was not found in the session.");
+        return new PostToAuditableResource(post);
+    }
+
+    /// <summary>
     /// File a resident report against a post (F1; C-M3b·1). A
     /// **resident-facing intake** action — it makes **no**
     /// <see cref="IAuthorizationService"/> call (it is not an access
@@ -210,6 +280,121 @@ public sealed class ModerationService
         // C3 — one SaveChangesAsync: the Report row and the AccessAudit
         // row commit atomically (no partial write; ADR 0006-C; §2.3
         // item 4).
+        await session.SaveChangesAsync().ConfigureAwait(false);
+
+        return 1;   // one row created
+    }
+
+    /// <summary>
+    /// File a resident report against one of the **new report-target
+    /// surfaces** (ADR 0173, the report-targets lane): an <b>event</b>,
+    /// a <b>project</b>, a <b>Kanban board</b>, a <b>to-do</b>, or a
+    /// <b>group post</b>. A **resident-facing intake** action — exactly
+    /// the same standing as <see cref="FileReportAsync"/>: it makes
+    /// **no** <see cref="IAuthorizationService"/> call (it is not an
+    /// access decision); the Web-layer gate is the surface's own single
+    /// <c>Read</c> decision, already run before the caller may file.
+    /// </summary>
+    /// <param name="targetKind">One of the closed vocabulary:
+    /// <c>"event"</c> / <c>"project"</c> / <c>"board"</c> /
+    /// <c>"todo"</c> / <c>"grouppost"</c> (the <c>post</c> and
+    /// <c>reply</c> discriminators stay with
+    /// <see cref="FileReportAsync"/> / <see cref="FileReplyReportAsync"/>)
+    /// — validated here; an unknown kind is a failed call (no report
+    /// row, no audit row — no partial write).</param>
+    /// <param name="targetId">The target document's id (the
+    /// <see cref="Report.TargetId"/> the queue resolves the target's
+    /// title + author from).</param>
+    /// <param name="componentId">The target's <c>ComponentId</c> — the
+    /// queue's standing-moderator scope (C-M3b·4). <c>null</c> is
+    /// allowed (a group post / board / to-do outside a component); a
+    /// <c>null</c> component is always out of a standing-moderator's
+    /// scope (the C-M3b·4 "no fabricated component" shape).</param>
+    /// <param name="authorId">The target's author's <c>SubjectId</c> —
+    /// the report-filed notification's recipient (skipped in the
+    /// self-report case, the <see cref="FileReportAsync"/> pin).</param>
+    /// <param name="actorId">The acting resident (the reporter; no
+    /// delegation / break-glass path).</param>
+    /// <param name="reason">Optional free-text reason (the reporter's
+    /// words, never forwarded to the author — the 2026-09-25
+    /// disclosure fix, same as the post-report lane).</param>
+    /// <param name="session">The caller-owned write session (the C3
+    /// same-transaction shape; this lane performs the single
+    /// <c>SaveChangesAsync</c>).</param>
+    public async Task<int> FileReportTargetAsync(
+        string targetKind,
+        string targetId,
+        string? componentId,
+        string? authorId,
+        string actorId,
+        string? reason,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(targetKind)) throw new ArgumentException("A target kind is required.", nameof(targetKind));
+        if (string.IsNullOrEmpty(targetId))   throw new ArgumentException("A target id is required.",  nameof(targetId));
+        if (string.IsNullOrEmpty(actorId))    throw new ArgumentException("A resident actor is required.", nameof(actorId));
+        if (session is null)                  throw new ArgumentNullException(nameof(session));
+        if (targetKind is not ("event" or "project" or "board" or "todo" or "grouppost"))
+            throw new ArgumentException($"Unknown report target kind '{targetKind}'.", nameof(targetKind));
+
+        var now = DateTimeOffset.UtcNow;
+
+        // Domain row: the report itself — the same §2.3 item-2
+        // "filed" literal pin as FileReportAsync / FileReplyReportAsync.
+        // PostId / ReplyId stay empty (the original discriminators);
+        // TargetKind + TargetId carry the new lane's identity (ADR 0173).
+        var report = new Report
+        {
+            Id           = Guid.NewGuid().ToString("N"),
+            PostId       = string.Empty,
+            ReporterId   = actorId,
+            ComponentId  = componentId,
+            Reason       = reason,
+            Status       = "filed",   // §2.3 item 2 — exact literal pin
+            At           = now,
+            TargetKind   = targetKind,
+            TargetId     = targetId,
+        };
+
+        session.Store(report);
+
+        // Audit row: the write-lane intake audit (C3 / ADR 0006-C —
+        // Always On). The pinned filing tag AccessVia.Admin (the
+        // two-negatives pin, same as FileReportAsync: NOT Report —
+        // reserved for the read branch, C-M3b·2; NOT Owner — C1).
+        var audit = new AccessAudit
+        {
+            Id                    = Guid.NewGuid().ToString("N"),
+            At                    = now,
+            ActorId               = actorId,
+            EffectivePrincipalId  = actorId,   // resident-facing: no delegation / break-glass path
+            Action                = $"report.{targetKind}.file",
+            TargetKind            = targetKind,
+            TargetId              = targetId,
+            Via                   = AccessVia.Admin,   // §2.3 item 1 — exact literal pin
+            Outcome               = AccessOutcome.Allow,
+        };
+
+        session.Store(audit);
+
+        // Report-filed emitter (same as FileReportAsync): the content's
+        // author is notified; skip the self-report case. **No reason
+        // snippet** (the 2026-09-25 security fix — the reporter's
+        // free-text is a low-privilege disclosure channel).
+        if (_notifications is not null
+            && !string.IsNullOrWhiteSpace(authorId)
+            && !string.Equals(authorId, actorId, StringComparison.Ordinal))
+        {
+            await _notifications.EmitAsync(
+                session,
+                recipientId: authorId,
+                kind: NotificationKinds.ReportFiled,
+                idempotencyKey: $"notification:report.filed:{report.Id}",
+                body: null,
+                ct: default).ConfigureAwait(false);
+        }
+
+        // C3 — one SaveChangesAsync (no partial write; ADR 0006-C).
         await session.SaveChangesAsync().ConfigureAwait(false);
 
         return 1;   // one row created
@@ -411,9 +596,13 @@ public sealed class ModerationService
         if (report is null)
             throw new KeyNotFoundException($"Report '{reportId}' was not found in the session; nothing to assign.");
 
-        var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{report.PostId}' (referenced by report '{reportId}') was not found in the session.");
+        // ADR 0173 — the report-targets lane: the report's target is
+        // EITHER a post (the original M3b shape) OR one of the new
+        // surfaces (event / project / board / todo / grouppost). Both
+        // branches reduce to a single IAuditableResource for the
+        // SoD `Moderate` decision below (the new surfaces use their
+        // own ToAuditableResource adapters — the ADR 0006-E shape).
+        var resource = await LoadReportTargetResourceAsync(report, session).ConfigureAwait(false);
 
         // SoD gate: the `Moderate` action discriminates a GlobalAdmin
         // writer from a standing-moderator writer (the M1 §A decision
@@ -424,7 +613,7 @@ public sealed class ModerationService
         // decision's audit row lands in the caller's transaction (ADR
         // 0006-E compatible lane) — no partial write either way.
         var decision = await _authz.CanAsync(
-            globalAdminId, AccessAction.Moderate, new PostToAuditableResource(post), session)
+            globalAdminId, AccessAction.Moderate, resource, session)
             .ConfigureAwait(false);
 
         if (decision.Allowed)
@@ -526,12 +715,14 @@ public sealed class ModerationService
         if (report is null)
             throw new KeyNotFoundException($"Report '{reportId}' was not found in the session; nothing to unlock.");
 
-        var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{report.PostId}' (referenced by report '{reportId}') was not found in the session.");
+        // ADR 0173 — the report-targets lane: resolve the report's
+        // target (post OR one of the new surfaces) to the single
+        // IAuditableResource the SoD `Moderate` decision runs against
+        // (the shared LoadReportTargetResourceAsync helper).
+        var resource = await LoadReportTargetResourceAsync(report, session).ConfigureAwait(false);
 
         var decision = await _authz.CanAsync(
-            globalAdminId, AccessAction.Moderate, new PostToAuditableResource(post), session)
+            globalAdminId, AccessAction.Moderate, resource, session)
             .ConfigureAwait(false);
 
         if (decision.Allowed)
@@ -589,12 +780,14 @@ public sealed class ModerationService
         if (report is null)
             throw new KeyNotFoundException($"Report '{reportId}' was not found in the session; nothing to resolve.");
 
-        var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{report.PostId}' (referenced by report '{reportId}') was not found in the session.");
+        // ADR 0173 — the report-targets lane: resolve the report's
+        // target (post OR one of the new surfaces) to the single
+        // IAuditableResource the SoD `Moderate` decision runs against
+        // (the shared LoadReportTargetResourceAsync helper).
+        var resource = await LoadReportTargetResourceAsync(report, session).ConfigureAwait(false);
 
         var decision = await _authz.CanAsync(
-            globalAdminId, AccessAction.Moderate, new PostToAuditableResource(post), session)
+            globalAdminId, AccessAction.Moderate, resource, session)
             .ConfigureAwait(false);
 
         if (decision.Allowed)

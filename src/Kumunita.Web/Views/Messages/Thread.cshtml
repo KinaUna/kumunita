@@ -100,8 +100,7 @@
                         @if (!string.IsNullOrEmpty(senderAvatarId))
                         {
                             <span class="msg-avatar d-inline-flex align-items-center">
-                                <img class="avatar" src="/profile/avatar/@senderAvatarId" alt="" data-avatar-fallback>
-                                <span class="avatar-mono" style="display:none;">@senderInitial</span>
+                                <kw-avatar subject="@senderAvatarId" mono="@senderInitial" />
                             </span>
                         }
                         <div class="msg-bundle">

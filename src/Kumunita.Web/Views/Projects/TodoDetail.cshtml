@@ -394,6 +394,17 @@
                                     }
                                 }
                             }
+                            @* ADR 0173 — the "Report this to-do" lane: any
+                               resident who can see the to-do may file a
+                               report (the C-M3b·1 standing). The dropdown
+                               item opens the shared _ReportModal below. *@
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#todo-report-modal">
+                                    <kw-l key="posts.todo_report_button">Report this to-do</kw-l>
+                                </button>
+                            </li>
                             <li>
                                 <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/delete")"
                                       data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
@@ -404,6 +415,14 @@
                         </ul>
                     </div>
                 </div>
+
+                @* ADR 0173 — the "Report this to-do" modal (the shared
+                   _ReportModal partial — the ADR 0082 modal idiom). Rendered
+                   unconditionally: any resident who can see the to-do (the
+                   detail's own Read decision already ran) may file a report
+                   (C-M3b·1, the post-report lane's standing). *@
+                @{ var _repTd = (ActionUrl: "/projects/todos/" + Model.Todo.Id + "/report", ModalId: "todo-report-modal", TitleKey: "posts.todo_report_button"); }
+                <partial name="_ReportModal" model="@_repTd" />
 
                 @* ADR 0088 — user-added translations of the to-do (the ADR 0059
                    chip-swap: the original + one variant per translation, the
@@ -868,9 +887,7 @@
                title) moves here with the author. *@
             <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@Model.Todo.AuthorId" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@todoAuthorInitial</span>
+                    <kw-avatar subject="@Model.Todo.AuthorId" mono="@todoAuthorInitial" />
                 </span>
                 <span>
                     @Model.Todo.AuthorDisplayName
@@ -984,7 +1001,7 @@
                         <div class="list-group-item">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div class="d-inline-flex align-items-center me-2">
-                                    <img class="avatar avatar-sm" src="/profile/avatar/@c.AuthorId" alt="" data-avatar-fallback>
+                                    <kw-avatar subject="@c.AuthorId" size="sm" />
                                 </div>
                                 <div>
                                     <div class="d-flex align-items-center gap-1">
@@ -1020,7 +1037,7 @@
                                     {
                                         <div class="d-flex justify-content-between align-items-start mb-2">
                                             <div class="d-inline-flex align-items-center me-2">
-                                                <img class="avatar avatar-sm" src="/profile/avatar/@r.AuthorId" alt="" data-avatar-fallback>
+                                                <kw-avatar subject="@r.AuthorId" size="sm" />
                                             </div>
                                             <div>
                                                 <div class="d-flex align-items-center gap-1">

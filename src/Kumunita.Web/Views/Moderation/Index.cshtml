@@ -45,7 +45,24 @@ else
                             <span class="badge text-bg-secondary">@r.Status</span>
                         </td>
                         <td>
-                            <div class="fw-semibold">@(r.PostTitle ?? $"Post {r.PostId}")</div>
+                            @* ADR 0173 — the report-targets lane: the new
+                               surfaces (event / project / board / todo /
+                               grouppost) carry their identity on
+                               TargetKind / TargetId; render the target
+                               title + author under the same shape the
+                               original post / reply rows use. *@
+                            @if (r.TargetKind is not null)
+                            {
+                                <div class="fw-semibold">@(r.TargetTitle ?? (r.TargetKind + " " + (r.TargetId ?? "")))</div>
+                                <div class="text-muted small">
+                                    <span class="badge text-bg-light border me-1">@r.TargetKind</span>
+                                    @r.TargetAuthorName
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="fw-semibold">@(r.PostTitle ?? $"Post {r.PostId}")</div>
+                            }
                             @* ADR 0023 — the reply-report-target lane: when the
                                report targets a specific reply, show the
                                "reply by X" line under the post title. The

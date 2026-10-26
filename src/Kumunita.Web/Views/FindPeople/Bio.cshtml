@@ -67,9 +67,7 @@
                         : string.Empty;
                     <div class="dir-card">
                         <span class="d-inline-flex align-items-center justify-content-center">
-                            <img class="avatar avatar-lg" src="/profile/avatar/@p.SubjectId" alt=""
-                                 data-avatar-fallback>
-                            <span class="avatar-mono avatar-lg" style="display:none;">@avatarInitial</span>
+                            <kw-avatar subject="@p.SubjectId" mono="@avatarInitial" size="lg" />
                         </span>
                         <span class="dname">
                             <a href="@Url.Action("Detail", "Directory", new { subjectId = p.SubjectId })">@p.DisplayName</a>

@@ -109,28 +109,31 @@
                    a Bootstrap modal; translation remove is a confirm form in
                    the menu. Gated on IsAuthor ∪ CanTranslate (a non-author
                    translator sees only the translation lanes). The service's
-                   write-lane re-check at POST is the real gate. *@
-                @if (Model.IsAuthor || Model.CanTranslate)
-                {
-                    <div class="d-flex justify-content-end mb-2">
-                        <div class="dropdown">
-                            <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
-                                    data-bs-toggle="dropdown" aria-expanded="false"
-                                    aria-label="@(ariaActionsFor.Replace("{0}", string.IsNullOrWhiteSpace(Model.Post.Title) ? "post" : Model.Post.Title))">⋮</button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                @if (Model.IsAuthor && Model.Post.DeletedAt is null)
-                                {
-                                    <li>
-                                        <a class="dropdown-item text-dark" href="@($"/groups/{Model.GroupId}/posts/{postId}/edit")">
-                                            <kw-l key="posts.detail_edit">Edit</kw-l>
-                                        </a>
-                                    </li>
-                                }
+                   write-lane re-check at POST is the real gate.
+                   ADR 0173 — the "Report this group post" item is **always**
+                   rendered (the dropdown itself too, when the actor is not
+                   author / translator): any resident who can see the post
+                   (the group membership lane already ran) may file a report
+                   (C-M3b·1, the post-report lane's standing). *@
+                <div class="d-flex justify-content-end mb-2">
+                    <div class="dropdown">
+                        <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="@(ariaActionsFor.Replace("{0}", string.IsNullOrWhiteSpace(Model.Post.Title) ? "post" : Model.Post.Title))">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            @if (Model.IsAuthor && Model.Post.DeletedAt is null)
+                            {
+                                <li>
+                                    <a class="dropdown-item text-dark" href="@($"/groups/{Model.GroupId}/posts/{postId}/edit")">
+                                        <kw-l key="posts.detail_edit">Edit</kw-l>
+                                    </a>
+                                </li>
+                            }
 
-                                @if (Model.CanTranslate)
+                            @if (Model.CanTranslate)
+                            {
+                                @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
                                 {
-                                    @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
-                                    {
                                         <li>
                                             <button type="button" class="dropdown-item text-dark"
                                                     data-bs-toggle="modal"
@@ -168,21 +171,33 @@
                                     }
                                 }
 
-                                @if (Model.IsAuthor && Model.Post.DeletedAt is null)
-                                {
-                                    <li><hr class="dropdown-divider" /></li>
-                                    <li>
-                                        <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/delete")"
-                                              data-confirm="@confirmDeletePost" style="margin:0;">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit" class="dropdown-item text-danger">
-                                                <kw-l key="posts.delete">Delete</kw-l>
-                                            </button>
-                                        </form>
-                                    </li>
-                                }
-                            </ul>
-                        </div>
+                            @if (Model.IsAuthor && Model.Post.DeletedAt is null)
+                            {
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/delete")"
+                                          data-confirm="@confirmDeletePost" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <kw-l key="posts.delete">Delete</kw-l>
+                                        </button>
+                                    </form>
+                                </li>
+                            }
+
+                            @* ADR 0173 — the "Report this group post" lane (any
+                               resident who can see the post — the group
+                               membership lane already ran — may file a report;
+                               C-M3b·1, the post-report lane's standing). *@
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#grouppost-report-modal">
+                                    <kw-l key="posts.grouppost_report_button">Report this post</kw-l>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
 
                         @* ADR 0071 modal shape — post translation modals (edit =
                            plain title + body; add = pre-filled title + rich-editor
@@ -298,7 +313,15 @@
                             }
                         }
                     </div>
-                }
+
+                @* ADR 0173 — the "Report this group post" modal (the shared
+                   _ReportModal partial — the ADR 0082 modal idiom). Rendered
+                   unconditionally: any resident who can see the group post
+                   (the group membership lane already ran) may file a report
+                   (C-M3b·1, the post-report lane's standing). *@
+                @{ var _repGp = (ActionUrl: "/groups/" + Model.GroupId + "/posts/" + postId + "/report", ModalId: "grouppost-report-modal", TitleKey: "posts.grouppost_report_button"); }
+                <partial name="_ReportModal" model="@_repGp" />
+
                 @if (Model.Post.DeletedAt is null)
                 {
                     @* TD (ADR 0027) — the authored-in language is the first,
@@ -407,9 +430,7 @@
                sibling on its fail-closed 404. *@
             <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                    <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial" />
                 </span>
                 <span>
                     @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
@@ -590,9 +611,7 @@
                             <div class="text-end text-muted small">
                                 <div class="d-flex align-items-center justify-content-end gap-1">
                                     <span class="d-inline-flex align-items-center">
-                                        <img class="avatar" src="/profile/avatar/@r.AuthorSubjectId" alt=""
-                                             data-avatar-fallback>
-                                        <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
+                                        <kw-avatar subject="@r.AuthorSubjectId" mono="@replyAvatarInitial" />
                                     </span>
                                     <span>@r.AuthorDisplayName</span>
                                     @* Author-only reply edit (ADR 0016) + delete

@@ -246,6 +246,18 @@
                                     </li>
                                 }
 
+                                @* ADR 0173 — the "Report this event" lane: any
+                                   resident who can see the event may file a
+                                   report (the C-M3b·1 standing). The dropdown
+                                   item opens the shared _ReportModal below. *@
+                                <li>
+                                    <button type="button" class="dropdown-item text-dark"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#event-report-modal">
+                                        <kw-l key="posts.event_report_button">Report this event</kw-l>
+                                    </button>
+                                </li>
+
                                 @if (Model.CanTranslate)
                                 {
                                     @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
@@ -304,6 +316,14 @@
                         </div>
                     </div>
                 </div>
+
+                @* ADR 0173 — the "Report this event" modal (the shared
+                   _ReportModal partial — the ADR 0082 modal idiom). Rendered
+                   unconditionally: any resident who can see the event (the
+                   detail's own Read decision already ran) may file a report
+                   (C-M3b·1, the post-report lane's standing). *@
+                @{ var _repEv = (ActionUrl: "/events/" + Model.Event.Id + "/report", ModalId: "event-report-modal", TitleKey: "posts.event_report_button"); }
+                <partial name="_ReportModal" model="@_repEv" />
 
                 @* M12 (ADR 0112, U04) — the "Add to calendar" affordance: a
                    plain link to the lane-1 file (GET /events/{id}.ics, U02).
@@ -395,9 +415,7 @@
                CheckEditStanding / CanAddTranslation). *@
             <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@Model.Event.AuthorId" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                    <kw-avatar subject="@Model.Event.AuthorId" mono="@authorAvatarInitial" />
                 </span>
                 <span>
                     @Model.AuthorDisplayName
@@ -567,9 +585,7 @@
                                 : string.Empty;
                             <li class="d-flex justify-content-between py-1 align-items-center">
                                 <span class="d-inline-flex align-items-center">
-                                    <img class="avatar" src="/profile/avatar/@rsvp.Rsvp.UserId" alt=""
-                                         data-avatar-fallback>
-                                    <span class="avatar-mono" style="display:none;">@rsvpInitial</span>
+                                    <kw-avatar subject="@rsvp.Rsvp.UserId" mono="@rsvpInitial" />
                                     <span class="ms-2">@rsvp.DisplayName</span>
                                 </span>
                                 <span>

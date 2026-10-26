@@ -343,9 +343,7 @@
                                             @if (row.AuthorSubjectId is { } authorId && row.Author is not null)
                                             {
                                                 <span class="d-inline-flex align-items-center me-1">
-                                                    <img class="avatar" src="/profile/avatar/@authorId" alt=""
-                                                         data-avatar-fallback>
-                                                    <span class="avatar-mono" style="display:none;">@avatarInitial</span>
+                                                    <kw-avatar subject="@authorId" mono="@avatarInitial" />
                                                 </span>
                                                 <span>@row.Author</span>
                                                 <span class="ms-1">·</span>

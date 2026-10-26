@@ -384,6 +384,17 @@
                                     }
                                 }
                             }
+                            @* ADR 0173 — the "Report this board" lane: any
+                               resident who can see the board may file a
+                               report (the C-M3b·1 standing). The dropdown
+                               item opens the shared _ReportModal below. *@
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#board-report-modal">
+                                    <kw-l key="posts.board_report_button">Report this board</kw-l>
+                                </button>
+                            </li>
                             <li>
                                 <form method="post" action="@($"/projects/boards/{Model.Board.Id}/delete")"
                                       data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
@@ -396,6 +407,14 @@
                 </div>
             </div>
         </header>
+
+        @* ADR 0173 — the "Report this board" modal (the shared
+           _ReportModal partial — the ADR 0082 modal idiom). Rendered
+           unconditionally: any resident who can see the board (the
+           detail's own Read decision already ran) may file a report
+           (C-M3b·1, the post-report lane's standing). *@
+        @{ var _repBd = (ActionUrl: "/projects/boards/" + Model.Board.Id + "/report", ModalId: "board-report-modal", TitleKey: "posts.board_report_button"); }
+        <partial name="_ReportModal" model="@_repBd" />
 
         @* ADR 0082 — the board's translation management (add / edit / remove)
            now lives in the ⋮ action dropdown above (dropdown items opening

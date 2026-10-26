@@ -363,9 +363,7 @@
                fail-closed 404. *@
             <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                    <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial" />
                 </span>
                 <span>
                     @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>

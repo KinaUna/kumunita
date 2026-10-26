@@ -45,9 +45,7 @@
             @if (!string.IsNullOrEmpty(avatarSubject))
             {
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar avatar-lg" src="/profile/avatar/@avatarSubject" alt=""
-                         data-avatar-fallback>
-                    <span class="avatar-mono avatar-lg" style="display:none;">@avatarInitial</span>
+                    <kw-avatar subject="@avatarSubject" mono="@avatarInitial" size="lg" />
                 </span>
             }
             else

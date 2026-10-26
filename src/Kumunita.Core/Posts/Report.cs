@@ -18,6 +18,29 @@ public sealed class Report
     public DateTimeOffset At { get; set; }
 
     /// <summary>
+    /// The report's **target surface** (ADR 0173, the report-targets lane):
+    /// one of the closed vocabulary <c>post</c> / <c>reply</c> /
+    /// <c>event</c> / <c>project</c> / <c>board</c> / <c>todo</c> /
+    /// <c>grouppost</c>. <b>Derived at display time</b> for the two
+    /// pre-existing discriminators — a <c>null</c> <see cref="ReplyId"/>
+    /// is a <c>post</c>-targeted report, a set <see cref="ReplyId"/> a
+    /// <c>reply</c>-targeted one — so no new column is required for the
+    /// original M3b shape and pre-existing rows stay valid (ADR 0004 §B.1
+    /// additive-only). New filing lanes set this directly.
+    /// </summary>
+    public string? TargetKind { get; set; }
+
+    /// <summary>
+    /// The target's own id for the new lanes (ADR 0173): an
+    /// <c>event</c> / <c>project</c> / <c>board</c> / <c>todo</c> /
+    /// <c>grouppost</c> document id. <b>Null</b> for the original
+    /// <c>post</c> and <c>reply</c> discriminators (their ids live on
+    /// <see cref="PostId"/> / <see cref="ReplyId"/>). ADR 0004 §B.1
+    /// additive (delta-detected, idempotent; no migration or back-fill).
+    /// </summary>
+    public string? TargetId { get; set; }
+
+    /// <summary>
     /// The reply a report targets — <b>nullable</b> (an ADR 0004 §B.1
     /// additive POCO field: Marten delta-detects the new column and it is
     /// idempotent across re-seed, so pre-existing rows keep <c>null</c> and

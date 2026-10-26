@@ -79,4 +79,13 @@ public sealed record ReportRow(
     string? Status,
     DateTimeOffset At,
     string? ReplyId = null,
-    string? ReplyAuthorName = null);
+    string? ReplyAuthorName = null,
+    // ADR 0173 — the report-targets lane: the target's display title +
+    // author name for the new surfaces (event / project / board / todo /
+    // grouppost). Null for the original post / reply discriminators
+    // (their identity is on PostId / ReplyId + PostTitle /
+    // ReplyAuthorName above).
+    string? TargetKind = null,
+    string? TargetId = null,
+    string? TargetTitle = null,
+    string? TargetAuthorName = null);

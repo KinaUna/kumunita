@@ -372,9 +372,7 @@
                                 <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
                                 <div class="airy-post-meta">
                                     <span class="d-inline-flex align-items-center">
-                                        <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
-                                             data-avatar-fallback>
-                                        <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                        <kw-avatar subject="@p.AuthorSubjectId" mono="@authorAvatarInitial" />
                                     </span>
                                     <span>@p.AuthorDisplayName</span>
                                     <span>·</span>
@@ -447,9 +445,7 @@
                                 <div class="text-end text-muted small">
                                     <div class="d-flex align-items-center justify-content-end gap-1">
                                         <span class="d-inline-flex align-items-center">
-                                            <img class="avatar" src="/profile/avatar/@e.AuthorSubjectId" alt=""
-                                                 data-avatar-fallback>
-                                            <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                            <kw-avatar subject="@e.AuthorSubjectId" mono="@authorAvatarInitial" />
                                         </span>
                                         <span>@e.AuthorDisplayName</span>
                                     </div>

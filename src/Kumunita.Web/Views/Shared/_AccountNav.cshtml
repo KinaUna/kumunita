@@ -127,9 +127,7 @@
                 @if (!string.IsNullOrEmpty(navAvatarSubject))
                 {
                     <span class="d-inline-flex align-items-center">
-                        <img class="avatar avatar-sm" src="/profile/avatar/@navAvatarSubject" alt=""
-                             data-avatar-fallback>
-                        <span class="avatar-mono avatar-sm" style="display:none;">@navAvatarInitial</span>
+                        <kw-avatar subject="@navAvatarSubject" mono="@navAvatarInitial" size="sm" />
                     </span>
                 }
                 @if (!string.IsNullOrEmpty(navToggleLabel))
@@ -343,6 +341,37 @@
                                     <button type="submit" class="btn btn-link text-dark text-decoration-none dropdown-item px-3 py-1 text-start @(isActive ? "fw-semibold" : "")">
                                         <kw-l key="@modeKey"></kw-l>
                                         @(isActive ? " ✓" : "")
+                                    </button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                </li>
+                @* ADR 0175 — the palette picker (Forest / Ember): the member's override
+                   of the platform default the admin chose. "Platform default" posts an
+                   empty value, which clears the kumunita.palette cookie. Same shape as
+                   the appearance picker above (a preference, never a claim). *@
+                @{ var memberPalette = (httpReq is null ? null : PaletteCookie.ReadOverride(httpReq)) ?? string.Empty; /* empty = following the platform default */ }
+                <li class="px-3 pt-2 pb-1 small text-secondary">
+                    <kw-l key="palette.label">Palette</kw-l>
+                </li>
+                <li>
+                    <ul class="list-unstyled m-0">
+                        @foreach (var (palId, palKey) in new[] {
+                            (string.Empty, "palette.default"),
+                            (PaletteCookie.Forest, "palette.forest"),
+                            (PaletteCookie.Ember, "palette.ember"),
+                        })
+                        {
+                            var palActive = memberPalette == palId;
+                            <li class="px-3">
+                                <form method="post" action="/palette" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <input type="hidden" name="palette" value="@palId" />
+                                    <button type="submit" class="btn btn-link text-dark text-decoration-none dropdown-item px-3 py-1 text-start @(palActive ? "fw-semibold" : "")">
+                                        <kw-l key="@palKey"></kw-l>
+                                        @(palActive ? " ✓" : "")
                                     </button>
                                 </form>
                             </li>

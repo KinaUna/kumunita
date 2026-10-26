@@ -159,6 +159,10 @@ public static class KnownTranslationKeys
             ["theme.auto"]       = "Auto (match device)",
             ["theme.light"]      = "Light",
             ["theme.dark"]       = "Dark",
+            ["palette.label"]    = "Palette",
+            ["palette.default"]  = "Platform default",
+            ["palette.forest"]   = "Forest",
+            ["palette.ember"]    = "Ember",
 
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Events",
@@ -1281,6 +1285,17 @@ public static class KnownTranslationKeys
             ["posts.detail_why_label"] = "Why can I see this?",
             ["posts.report_button"] = "Report this post",
             ["posts.reply_report_button"] = "Report this reply",
+            // ADR 0173 — the new report-target surfaces (event / project /
+            // board / to-do / group-post). Same shape as the two existing
+            // report buttons above (a kw-l key whose en floor is the label
+            // text; the _ReportModal partial + the per-surface ⋮ item both
+            // consume the same key, so one string serves both the dropdown
+            // item and the modal title).
+            ["posts.event_report_button"] = "Report this event",
+            ["posts.project_report_button"] = "Report this project",
+            ["posts.board_report_button"] = "Report this board",
+            ["posts.todo_report_button"] = "Report this to-do",
+            ["posts.grouppost_report_button"] = "Report this post",
             ["posts.report_reason_label"] = "What's wrong?",
             ["posts.report_optional"] = "optional",
             ["posts.report_note"] =
@@ -2677,6 +2692,12 @@ public static class KnownTranslationKeys
             ["settings.messaging.optin"]           = "Let others send me direct 1:1 messages",
             ["settings.messaging.save"]            = "Save messaging preference",
             ["guardian.messaging.title"]           = "Messaging",
+
+            // ── ADR 0174 — the per-resident Security settings tab (the MFA
+            // enrollment + session-management surface at /settings/security/mfa;
+            // the settings sub-nav label, ADR 0080 shape). ──
+            ["settings.security.title"]            = "Security",
+
             ["guardian.messaging.description"]     = "Choose whether this child can use direct 1:1 messaging. When restricted, the child cannot send or receive messages and the choice wins over their own opt-in; when allowed, the child decides for themselves on their own messaging settings page.",
             ["guardian.messaging.current_restricted"] = "Messaging is currently restricted for this child.",
             ["guardian.messaging.current_allowed"]    = "Messaging is currently allowed for this child.",
@@ -3110,6 +3131,10 @@ public static class KnownTranslationKeys
             ["theme.auto"]       = "Automatisch (wie das Gerät)",
             ["theme.light"]      = "Hell",
             ["theme.dark"]       = "Dunkel",
+            ["palette.label"]    = "Farbpalette",
+            ["palette.default"]  = "Standard der Plattform",
+            ["palette.forest"]   = "Forest",
+            ["palette.ember"]    = "Ember",
 
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Veranstaltungen",
@@ -5454,6 +5479,13 @@ public static class KnownTranslationKeys
             ["settings.messaging.optin"]           = "Erlaube anderen, mir direkte 1:1-Nachrichten zu senden",
             ["settings.messaging.save"]            = "Messaging-Einstellung speichern",
             ["guardian.messaging.title"]           = "Messaging",
+
+            // ── ADR 0174 — der pro-Bewohner-Sicherheitseinstellungstab (die
+            // MFA-Anmeldung + Session-Verwaltung unter /settings/security/mfa;
+            // die Beschriftung der Einstellungen-Unternavigation, ADR 0080
+            // Form). ──
+            ["settings.security.title"]            = "Sicherheit",
+
             ["guardian.messaging.description"]     = "Wähle, ob dieses Kind 1:1-Direktnachrichten nutzen darf. Bei Einschränkung kann das Kind keine Nachrichten senden oder erhalten — diese Auswahl hat Vorrang vor seiner eigenen Opt-in. Bei Erlaubnis entscheidet das Kind selbst auf seiner eigenen Messaging-Einstellungsseite.",
             ["guardian.messaging.current_restricted"] = "Messaging ist derzeit für dieses Kind eingeschränkt.",
             ["guardian.messaging.current_allowed"]    = "Messaging ist derzeit für dieses Kind erlaubt.",
@@ -5684,6 +5716,14 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Vollseite (Browserfenster füllen)",
             ["kiosk.settings.display_mode.full_screen"] = "Vollbild (der ganze Monitor)",
             ["kiosk.settings.display_mode.hint"] = "Vollseite füllt dein Browserfenster; Vollbild blendet zusätzlich die Browser-Tabs und die Adressleiste aus (zum Betreten ist eine Benutzeraktion erforderlich).",
+
+            // ADR 0173 — the new report-target surfaces (the en-parity
+            // extension, the posts.*-set shape above).
+            ["posts.event_report_button"] = "Diese Veranstaltung melden",
+            ["posts.project_report_button"] = "Dieses Projekt melden",
+            ["posts.board_report_button"] = "Dieses Board melden",
+            ["posts.todo_report_button"] = "Diese Aufgabe melden",
+            ["posts.grouppost_report_button"] = "Diesen Beitrag melden",
         };
 
     /// <summary>
@@ -5784,6 +5824,10 @@ public static class KnownTranslationKeys
             ["theme.auto"]       = "Automatique (comme l’appareil)",
             ["theme.light"]      = "Clair",
             ["theme.dark"]       = "Sombre",
+            ["palette.label"]    = "Palette",
+            ["palette.default"]  = "Par défaut de la plateforme",
+            ["palette.forest"]   = "Forest",
+            ["palette.ember"]    = "Ember",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annuler",
@@ -8128,6 +8172,11 @@ public static class KnownTranslationKeys
             ["settings.messaging.optin"]           = "Autoriser d'autres résidents à m'envoyer des messages directs 1:1",
             ["settings.messaging.save"]            = "Enregistrer la préférence de messagerie",
             ["guardian.messaging.title"]           = "Messagerie",
+
+            // ── ADR 0174 — l'onglet Réglages Sécurité (la surface d'inscription
+            // MFA + de gestion des sessions sur /settings/security/mfa ; étiquette
+            // de la sous-navigation des réglages, forme ADR 0080). ──
+            ["settings.security.title"]            = "Sécurité",
             ["guardian.messaging.description"]     = "Choisis si cet enfant peut utiliser la messagerie directe 1:1. Si restreinte, l'enfant ne peut ni envoyer ni recevoir de messages — ce choix prime sur son propre opt-in ; si autorisée, l'enfant décide par lui-même sur sa page de réglages de messagerie.",
             ["guardian.messaging.current_restricted"] = "La messagerie est actuellement restreinte pour cet enfant.",
             ["guardian.messaging.current_allowed"]    = "La messagerie est actuellement autorisée pour cet enfant.",
@@ -8361,6 +8410,14 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Page entière (remplir la fenêtre du navigateur)",
             ["kiosk.settings.display_mode.full_screen"] = "Plein écran (tout le moniteur)",
             ["kiosk.settings.display_mode.hint"] = "Page entière remplit votre fenêtre de navigateur ; plein écran masque aussi les onglets et la barre d'adresse du navigateur (une action de l'utilisateur est nécessaire pour l'activer).",
+
+            // ADR 0173 — the new report-target surfaces (the en-parity
+            // extension, the posts.*-set shape above).
+            ["posts.event_report_button"] = "Signaler cet événement",
+            ["posts.project_report_button"] = "Signaler ce projet",
+            ["posts.board_report_button"] = "Signaler ce tableau",
+            ["posts.todo_report_button"] = "Signaler cette tâche",
+            ["posts.grouppost_report_button"] = "Signaler ce message",
         };
 
     /// <summary>
@@ -8461,6 +8518,10 @@ public static class KnownTranslationKeys
             ["theme.auto"]       = "Automatisk (som enheden)",
             ["theme.light"]      = "Lys",
             ["theme.dark"]       = "Mørk",
+            ["palette.label"]    = "Palet",
+            ["palette.default"]  = "Platformens standard",
+            ["palette.forest"]   = "Forest",
+            ["palette.ember"]    = "Ember",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annullér",
@@ -10787,6 +10848,11 @@ public static class KnownTranslationKeys
             ["settings.messaging.optin"]           = "Lad andre sende mig direkte 1:1-beskeder",
             ["settings.messaging.save"]            = "Gem beskedindstilling",
             ["guardian.messaging.title"]           = "Beskeder",
+
+            // ── ADR 0174 — indstillingstab-fanen Sikkerhed (MFA-tilslutning +
+            // session-håndtering på /settings/security/mfa ; fanen i
+            // indstillinger-undermenuen, ADR 0080 form). ──
+            ["settings.security.title"]            = "Sikkerhed",
             ["guardian.messaging.description"]     = "Vælg, om dette barn kan bruge direkte 1:1-beskeder. Ved begrænsning kan barnet hverken sende eller modtage beskeder — dette valg har forrang over dets eget opt-in; ved tilladelse vælger barnet selv på sin egen beskedindstillingsside.",
             ["guardian.messaging.current_restricted"] = "Beskeder er i øjeblikket begrænset for dette barn.",
             ["guardian.messaging.current_allowed"]    = "Beskeder er i øjeblikket tilladt for dette barn.",
@@ -11012,6 +11078,14 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Hele siden (fyld browservinduet)",
             ["kiosk.settings.display_mode.full_screen"] = "Fuldskærm (hele monitoren)",
             ["kiosk.settings.display_mode.hint"] = "Hele siden fylder dit browservindue; fuldskærm skjuler også browserens faner og adressefelt (det kræver en brugerhandling at aktivere).",
+
+            // ADR 0173 — the new report-target surfaces (the en-parity
+            // extension, the posts.*-set shape above).
+            ["posts.event_report_button"] = "Anmelde denne begivenhed",
+            ["posts.project_report_button"] = "Anmelde dette projekt",
+            ["posts.board_report_button"] = "Anmelde dette bræt",
+            ["posts.todo_report_button"] = "Anmelde denne todo",
+            ["posts.grouppost_report_button"] = "Anmelde dette indlæg",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

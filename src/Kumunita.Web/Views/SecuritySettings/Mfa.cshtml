@@ -139,9 +139,20 @@ else
                 <p class="text-muted">
                     Add this account to your authenticator app (Google
                     Authenticator, 1Password, Authy, or any TOTP app). Scan
-                    the QR-equivalent setup key below, or enter the key
-                    manually.
+                    the QR code below, or enter the setup key manually.
                 </p>
+                @* ADR 0174 — the pairing QR. Server-side QR encode (QRCoder,
+                   ADR 0174) embedded as a data: URI, so the resident can scan
+                   an image with no client JS — the page works with scripts
+                   disabled. The <img> is the primary affordance; the setup
+                   key + otpauth URI below are the manual-entry fallback. *@
+                @if (!string.IsNullOrEmpty(Model.QrDataUri))
+                {
+                    <div class="d-flex justify-content-center mb-3">
+                        <img src="@Model.QrDataUri" alt="QR code to pair your authenticator app"
+                             class="rounded border" style="width:220px;height:220px;" />
+                    </div>
+                }
                 <div class="mb-2">
                     <label for="otpAuthUrl" class="form-label d-block">otpauth URI</label>
                     <input type="text" class="form-control font-monospace" id="otpAuthUrl"

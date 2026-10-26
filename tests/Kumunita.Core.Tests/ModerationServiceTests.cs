@@ -1,9 +1,13 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Moderation;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
+using NSubstitute;
 using Xunit;
 
 namespace Kumunita.Core.Tests;
@@ -587,6 +591,190 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
                                    && a.Outcome == AccessOutcome.Deny);
     }
 
+    // ── T1 — FileReportTargetAsync_Filing_WritesReportWithTargetKind ─────
+    //
+    // ADR 0173 (the report-targets lane) — the filing shape for the new
+    // target kinds: the Report row carries TargetKind + TargetId,
+    // PostId stays empty (the original discriminators stay untouched),
+    // Status is the same "filed" literal pin, and the intake audit row
+    // carries the per-kind Action tag ("report.event.file"),
+    // TargetKind = the target kind, Via = AccessVia.Admin (the
+    // §2.3 item-1 pin, same as the post lane).
+
+    [Fact]
+    public async Task FileReportTargetAsync_Filing_WritesReportWithTargetKind()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string reporter = "u-t1-reporter";
+
+        await Plant(store, new Kumunita.Core.Events.Event
+        {
+            Id = "t1-event", Title = "t1 event", AuthorId = "u-t1-author",
+            Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow,
+        });
+
+        string? createdReportId = null;
+        await RunInSession(store, async session =>
+        {
+            await svc.FileReportTargetAsync(
+                "event", "t1-event", ComponentId, "u-t1-author", reporter, "spam", session);
+            var filed = await session.Query<Report>()
+                .Where(r => r.TargetId == "t1-event")
+                .ToListAsync(TestContext.Current.CancellationToken);
+            createdReportId = Assert.Single(filed).Id;
+        });
+
+        await using (var s2 = store.QuerySession())
+        {
+            var report = await s2.LoadAsync<Report>(createdReportId!, TestContext.Current.CancellationToken);
+            Assert.NotNull(report);
+            Assert.Equal("filed", report!.Status);
+            Assert.Equal("event", report.TargetKind);
+            Assert.Equal("t1-event", report.TargetId);
+            Assert.Equal(string.Empty, report.PostId);
+            Assert.Equal("u-t1-reporter", report.ReporterId);
+        }
+
+        // The intake audit row: the per-kind Action tag + the Admin
+        // Via pin (the two-negatives shape, same as the post lane).
+        var rows = await AllAudits(store);
+        var filingRow = Assert.Single(rows, a => a.Action == "report.event.file");
+        Assert.Equal(AccessVia.Admin, filingRow.Via);
+        Assert.NotEqual(AccessVia.Report, filingRow.Via);
+        Assert.Equal("event", filingRow.TargetKind);
+        Assert.Equal("t1-event", filingRow.TargetId);
+        Assert.Equal(reporter, filingRow.ActorId);
+        Assert.Equal(AccessOutcome.Allow, filingRow.Outcome);
+    }
+
+    // ── T2 — FileReportTargetAsync_AllFiveKinds_WritesRows ───────────────
+    //
+    // ADR 0173 — the closed vocabulary end-to-end: each of the five
+    // target kinds files a report row with the right TargetKind and the
+    // per-kind audit Action tag.
+
+    [Theory]
+    [InlineData("event", "t2-event")]
+    [InlineData("project", "t2-project")]
+    [InlineData("board", "t2-board")]
+    [InlineData("todo", "t2-todo")]
+    [InlineData("grouppost", "t2-grouppost")]
+    public async Task FileReportTargetAsync_AllFiveKinds_WritesRows(string kind, string targetId)
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string reporter = "u-t2-reporter";
+
+        await RunInSession(store, async session =>
+            await svc.FileReportTargetAsync(
+                kind, targetId, ComponentId, "u-t2-author", reporter, "reason", session));
+
+        await using (var s2 = store.QuerySession())
+        {
+            var filed = await s2.Query<Report>()
+                .Where(r => r.TargetId == targetId)
+                .ToListAsync(TestContext.Current.CancellationToken);
+            var report = Assert.Single(filed);
+            Assert.Equal(kind, report.TargetKind);
+            Assert.Equal("filed", report.Status);
+        }
+
+        var rows = await AllAudits(store);
+        Assert.Contains(rows, a => a.Action == $"report.{kind}.file"
+                                        && a.TargetKind == kind
+                                        && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── T3 — FileReportTargetAsync_SelfReport_NoNotificationEmission ─────
+    //
+    // ADR 0173 (the FileReportAsync self-report pin carried over) — a
+    // resident reporting their **own** event emits no ReportFiled
+    // notification (the authorId == actorId skip); the report row and
+    // audit row still commit (the emission skip is not a write skip).
+
+    [Fact]
+    public async Task FileReportTargetAsync_SelfReport_NoNotificationEmission()
+    {
+        var (store, svc, staged) = await BootTargetStoreAsync();
+        const string author = "u-t3-author";
+        await PlantProfile(store, author, "t3-author@kumunita");
+
+        await Plant(store, new Kumunita.Core.Events.Event
+        {
+            Id = "t3-event", Title = "t3 event", AuthorId = author,
+            Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.FileReportTargetAsync(
+                "event", "t3-event", ComponentId, author, author, "self", session));
+
+        Assert.Empty(staged);
+
+        await using (var s2 = store.QuerySession())
+        {
+            var filed = await s2.Query<Report>()
+                .Where(r => r.TargetId == "t3-event")
+                .ToListAsync(TestContext.Current.CancellationToken);
+            Assert.Single(filed);
+        }
+    }
+
+    // ── T4 — FileReportTargetAsync_ThirdPartyReport_EmitsNotification ────
+    //
+    // ADR 0173 (the FileReportAsync notification pin carried over) — a
+    // report against another resident's event stages the ReportFiled
+    // emission for the author with the §6.3 key shape
+    // notification:report.filed:{reportId}.
+
+    [Fact]
+    public async Task FileReportTargetAsync_ThirdPartyReport_EmitsNotification()
+    {
+        var (store, svc, staged) = await BootTargetStoreAsync();
+        const string author = "u-t4-author";
+        const string reporter = "u-t4-reporter";
+        await PlantProfile(store, author, "t4-author@kumunita");
+
+        await Plant(store, new Kumunita.Core.Events.Event
+        {
+            Id = "t4-event", Title = "t4 event", AuthorId = author,
+            Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.FileReportTargetAsync(
+                "event", "t4-event", ComponentId, author, reporter, "harassment", session));
+
+        var email = Assert.Single(staged);
+        Assert.StartsWith("notification:report.filed:", email.Key);
+        Assert.Equal("t4-author@kumunita", email.Recipient);
+    }
+
+    // ── T5 — FileReportTargetAsync_UnknownKind_Throws_NoPartialWrite ─────
+    //
+    // ADR 0173 — the closed vocabulary is enforced at the service
+    // boundary: an unknown kind throws ArgumentException **before** any
+    // row is written (no report row, no audit row — no partial write).
+
+    [Fact]
+    public async Task FileReportTargetAsync_UnknownKind_Throws_NoPartialWrite()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => RunInSession(store,
+            session => svc.FileReportTargetAsync(
+                "page", "t5-page", ComponentId, "u-t5-author", "u-t5-reporter", "x", session)));
+
+        await using (var s2 = store.QuerySession())
+        {
+            var reports = await s2.Query<Report>().ToListAsync(TestContext.Current.CancellationToken);
+            Assert.Empty(reports);
+        }
+        Assert.Empty(await AllAudits(store));
+    }
+
 
     // ── Shared helpers (mirror the PostServiceTests shape) ──────────────
 
@@ -605,6 +793,93 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
         return store;
+    }
+
+    /// <summary>
+    /// Compose the service trio + a <see cref="NotificationService"/> wired
+    /// with the recording mailer (the <c>NotificationServiceTests</c>
+    /// <c>RecordingMailer</c> shape, reused verbatim) — the T3/T4 tests need
+    /// the ReportFiled emission observable as staged outbox rows.
+    /// </summary>
+    private async Task<(IDocumentStore store, ModerationService svc,
+        List<(string Key, string Recipient, string Subject, string Body)> staged)>
+        BootTargetStoreAsync()
+    {
+        var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
+            null, null, TestContext.Current.CancellationToken);
+
+        var staged = new List<(string Key, string Recipient, string Subject, string Body)>();
+        var mailer = Substitute.For<IMailerStage>();
+        mailer.StageAsync(
+                Arg.Any<IDocumentSession>(), Arg.Any<string>(),
+                Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                staged.Add(((string)callInfo[1], (string)callInfo[2],
+                            (string)callInfo[3], (string)callInfo[4]));
+                return Task.CompletedTask;
+            });
+
+        var translator = Substitute.For<ITranslationProvider>();
+        translator.GetAsync(
+                Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(ci => Task.FromResult($"{(string)ci[0]}-{(string?)ci[1] ?? "en"}"));
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync(Arg.Any<string>())
+            .Returns(ci =>
+            {
+                var subjectId = (string)ci[0];
+                return LoadProfileAsync(store, subjectId);
+            });
+
+        var userInfoReal = new UserInfoService(store);
+        var authz = new AuthorizationService(store, userInfoReal);
+        var notifications = new NotificationService(
+            store, userInfo, translator, mailer, null, null, null);
+        var moderation = new ModerationService(userInfoReal, authz, store, notifications);
+
+        return (store, moderation, staged);
+    }
+
+    /// <summary>Plant a minimal <see cref="Profile"/> row for the notification
+    /// emission to resolve the recipient's email (the
+    /// <c>NotificationServiceTests.PlantProfile</c> shape, reused).</summary>
+    private static async Task PlantProfile(IDocumentStore store, string subjectId, string email)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var w = store.OpenSession(new Marten.Services.SessionOptions());
+        w.Store(new Profile
+        {
+            SubjectId   = subjectId,
+            DisplayName = subjectId,
+            Verified    = true,
+            Email       = email,
+        });
+        await w.SaveChangesAsync(ct);
+    }
+
+    /// <summary>The <see cref="IUserInfoService.GetProfileAsync"/> read lane
+    /// (the ADR 0061 seam) — reads the planted <see cref="Profile"/> from the
+    /// live store; <c>null</c> when no profile exists for the subject (the
+    /// <c>NotificationServiceTests.PlantProfileReadAsync</c> shape, reused).</summary>
+    private static async Task<Profile?> LoadProfileAsync(IDocumentStore store, string subjectId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.LoadAsync<Profile>(subjectId, ct);
     }
 
     /// <summary>Compose the M3b service trio: <see cref="UserInfoService"/> +

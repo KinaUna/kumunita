@@ -1709,37 +1709,35 @@ public static class FirstBootSeeder
              "follow and what you get by email is always up to you.\n"),
             ("projects", "Projects",
              "## Projects\n\n" +
-             "Projects is where the neighborhood's shared work lives — the " +
-             "to-dos you and your neighbors write down, who they're assigned " +
-             "to, and the boards that keep the whole picture visible.\n\n" +
-             "**Writing a to-do.** Open **Projects** in the top bar and start " +
-             "a new to-do. Give it a title, and a body if you need to explain " +
-             "the why. A to-do is a full piece of work on its own — it can be " +
-             "assigned to a neighbor, a group, or the community as a whole, " +
-             "and it can hold subtasks.\n\n" +
-             "**Assigning it.** A to-do with no assignee is on the table for " +
-             "anyone. Pick a neighbor and it lands in their list; pick a group " +
-             "and it lands in the group's. You can reassign it at any time — " +
-             "the assignment is always up to date with who you last chose.\n\n" +
-             "**Subtasks.** Break a big to-do into smaller ones with subtasks. " +
-             "A subtask is a full to-do — it has its own title, assignee, and " +
-             "status — but it stays kept under the parent, so the big picture " +
-             "and the pieces stay together.\n\n" +
-             "**Boards.** A board arranges to-dos in lanes. A lane can carry " +
-             "a status — a to-do moved into it picks that status up — and an " +
-             "optional limit on how many cards it holds. Use lanes to show " +
-             "where the work is at, not to gate it: moving a card is a view " +
-             "of the state, not a lock on it.\n\n" +
-             "**Waiting on.** A to-do can point at another one it's waiting " +
-             "on. That's a hint to the reader, not a rule — it doesn't block " +
-             "anyone, it just says \"this comes after that.\"\n\n" +
-             "**Comments.** Anyone who can see a to-do can leave a comment on " +
-             "it, and reply to comments, the way they would on a post.\n\n" +
-             "By default a to-do, a board, and a goal are visible to everyone " +
-             "in the community. You can narrow who can see it in the audience " +
-             "section, the same way you do for a post. What a to-do is " +
-             "written in, and who may translate it, follows the same rules as " +
-             "a post — see " +
+             "Projects is where the neighborhood's higher-level shared work " +
+             "lives — the direction (a **goal**), the work toward it (a " +
+             "**project**), and, underneath both, the to-dos that do the " +
+             "actual work (see [To-dos](/pages/system/help/projects/todos)).\n\n" +
+             "**A goal is a direction.** Open **Projects** in the top bar and " +
+             "pick **New goal**. A goal says what the neighborhood is working " +
+             "toward — it has a title, an optional description, and an " +
+             "audience, but no dates and no status: a goal is a *direction*, " +
+             "not a scheduled thing. A goal is the umbrella the rest hangs " +
+             "under.\n\n" +
+             "**A project is a stretch of work toward a goal.** Pick **New " +
+             "project**. A project has a title, an optional description, " +
+             "optional start and due dates, an optional status, and an " +
+             "audience. A project points at the goal it serves — but a project " +
+             "with no goal is a standalone project, and both are fine.\n\n" +
+             "**To-dos are the work inside the stretch.** To-dos are where the " +
+             "actual work gets done — assigned, tracked, moved across " +
+             "boards. See [To-dos](/pages/system/help/projects/todos) for the " +
+             "to-do walk-through, and [Boards](/pages/system/help/projects/boards) " +
+             "for the board view of them.\n\n" +
+             "**What this page is not.** It does not replace [To-dos](/pages/system/help/projects/todos) or " +
+             "[Boards](/pages/system/help/projects/boards) — those are the " +
+             "work-items themselves. This page is the layer *on top*: the " +
+             "direction, and the stretch of work that goes toward it.\n\n" +
+             "By default a goal and a project are visible to everyone in the " +
+             "community. You can narrow who can see one in the audience " +
+             "section, the same way you do for a post. What a goal or project " +
+             "is written in, and who may translate it, follows the same rules " +
+             "as a post — see " +
              "[Language](/pages/system/help/language) and " +
              "[Translators](/pages/system/help/translator).\n"),
             ("announcements", "Announcements",
@@ -1850,6 +1848,22 @@ public static class FirstBootSeeder
              "**A bookmark that goes away.** If the thing you bookmarked is " +
              "removed, your bookmark stays — it shows as \"no longer " +
              "available\" in your list. You can remove it with a click.\n"),
+            ("notes", "Notes",
+             "## Notes\n\n" +
+             "A note is a short piece of your own writing, attached to something " +
+             "on the platform — a post, a group, an event, a page, a goal or " +
+             "project, a to-do, a board, a document, an announcement, or an " +
+             "inventory item. A note is yours, for yourself — it never shows up " +
+             "on the thing it's attached to, and no one else can see it.\n\n" +
+             "**To add one.** Open the thing and click **Add note**, write your " +
+             "note, and save. Come back any time and the button reads **View " +
+             "note**; open it to reword or delete your note.\n\n" +
+             "**To find yours.** Open **Notes** in the top bar. Your notes are " +
+             "grouped by the kind of thing they're about. You can also collect " +
+             "them into folders — make a folder, then move a note into it — to " +
+             "keep a shelf of notes about one subject together.\n\n" +
+             "A note is a reminder you keep for yourself, not a comment for the " +
+             "thing's author or its readers.\n"),
             ("documents", "Documents",
              "## Documents\n\n" +
              "Documents is the neighborhood's file shelf — the place for " +
@@ -2112,19 +2126,13 @@ public static class FirstBootSeeder
              "is purely a matter of how the list is paginated for you.\n\n" +
              "If you never set one, the platform's default applies.\n"),
             ("home", "Home page",
+
              "## Home page\n\n" +
-             "Your **home page** is the page that opens when you sign in — the " +
-             "first thing you land on.\n\n" +
-             "**To set yours.** Open **Settings → Home page** and pick which " +
-             "page opens: the community feed, the announcements, or another " +
-             "surface. It is saved on your account.\n\n" +
-             "**What it changes.** Where you land after signing in, and where the " +
-             "platform's **home** link takes you for you. It is a convenience — " +
-             "you can still reach every surface from the top bar any time.\n\n" +
-             "**What it doesn't change.** It does not change what you can see. " +
-             "Every surface is still reachable; the home page only decides which " +
-             "one opens first.\n\n" +
-             "If you never set one, the platform's default home opens.\n"),
+             "Your **home page** is the page that opens when you sign in — the first thing you land on. It has two parts you can tune: the intro sections at the top, and the *upcoming* block that lists what's coming up.\n\n" +
+             "**Hide the intro.** When you sign in, the home page opens with a short intro (what Kumunita is and does). Tick **Hide the intro sections** and the home page goes straight to the feed. Untick it any time to bring the intro back.\n\n" +
+             "**Show what's coming up.** Tick **Show upcoming events and to-dos** and a block appears above the feed with the next events and to-dos. Tick **Show only my own events and to-dos** under it and that block lists only the events you're attending or created and the to-dos assigned to you — leave it off to see the community's.\n\n" +
+             "Both choices are saved on your account, and neither changes what you can see elsewhere — every surface is still reachable from the top bar. If you never set either, the home page opens with its intro and no upcoming block.")
+,
             ("quiet-hours", "Quiet hours",
              "## Quiet hours\n\n" +
              "**Quiet hours** are the window of the day when the platform holds " +
@@ -2839,48 +2847,15 @@ public static class FirstBootSeeder
              "markieren. Was du folgst und was dir per E-Mail kommt, " +
              "entscheidest du allein.\n"),
             ("projects", "Projekte",
+
              "## Projekte\n\n" +
-             "Projekte ist der Ort für die gemeinsame Arbeit des Viertels — " +
-             "die Aufgaben, die du und deine Nachbarn aufgeschrieben habt — " +
-             "wem sie zugeteilt sind — und die Boards, die das Gesamtbild " +
-             "sichtbar halten.\n\n" +
-             "**Eine Aufgabe anlegen.** Öffne **Projekte** in der Leiste oben " +
-             "und starte eine neue Aufgabe. Gib ihr einen Titel, und einen " +
-             "Text, wenn du das Warum erklären willst. Eine Aufgabe ist in " +
-             "sich ein vollständiges Arbeitsvorhaben — sie kann einem Nachbarn, " +
-             "einer Gruppe oder der ganzen Gemeinschaft zugeteilt werden, " +
-             "und sie kann Unteraufgaben tragen.\n\n" +
-             "**Zuweisen.** Eine Aufgabe ohne Zuweisung liegt für jeden auf " +
-             "dem Tisch. Wähle eine Nachbarin oder einen Nachbarn, und sie " +
-             "landet in deren Liste; wähle eine Gruppe, und sie landet in " +
-             "der der Gruppe. Du kannst sie jederzeit umzuweisen — die " +
-             "Zuweisung ist immer aktuell mit der Person, die du zuletzt " +
-             "gewählt hast.\n\n" +
-             "**Unteraufgaben.** Zerlege eine große Aufgabe in kleinere mit " +
-             "Unteraufgaben. Eine Unteraufgabe ist eine volle Aufgabe — sie " +
-             "hat ihren eigenen Titel, ihre eigene Zuweisung und ihren " +
-             "eigenen Status — bleibt aber unter der übergeordneten Aufgabe, " +
-             "damit das große Bild und die Teile zusammen bleiben.\n\n" +
-             "**Boards.** Ein Board richtet Aufgaben in Spuren an. Eine Spur " +
-             "kann einen Status tragen — eine Aufgabe, die dort hingelegt " +
-             "wird, übernimmt diesen Status — und eine optionale Begrenzung " +
-             "für die Anzahl der Karten. Nutze Spuren, um zu zeigen, wo die " +
-             "Arbeit steht, nicht um sie abzugreifen: eine Karte zu bewegen " +
-             "ist eine Ansicht des Zustands, kein Schloss darauf.\n\n" +
-             "**Wartet auf.** Eine Aufgabe kann auf eine andere zeigen, auf " +
-             "die sie wartet. Das ist ein Hinweis für die Leserin, keine " +
-             "Regel — es blockiert niemanden, es sagt nur: \"Das kommt nach " +
-             "jenem.\"\n\n" +
-             "**Kommentare.** Jede Person, die eine Aufgabe sehen kann, kann " +
-             "dazu einen Kommentar hinterlassen und auf Kommentare antworten, " +
-             "wie bei einem Beitrag.\n\n" +
-             "Standardmäßig sind eine Aufgabe, ein Board und ein Ziel für die " +
-             "ganze Gemeinschaft sichtbar. Wer sie sehen darf, lässt sich in " +
-             "dem Empfängerbereich einschränken, so wie bei einem Beitrag. " +
-             "In welcher Sprache eine Aufgabe geschrieben ist und wer sie " +
-             "übersetzen darf, folgt denselben Regeln wie ein Beitrag — sie " +
-             "sehen unter [Sprache](/pages/system/help/language) und " +
-             "[Übersetzer](/pages/system/help/translator).\n"),
+             "Projekte ist der Ort für die höhere Ebene der gemeinsamen Arbeit des Viertels — die Richtung (ein **Ziel**), die Arbeit darauf hin (ein **Projekt**) und, darunter, die Aufgaben, die die eigentliche Arbeit leisten (siehe [Aufgaben](/pages/system/help/projects/todos)).\n\n" +
+             "**Ein Ziel ist eine Richtung.** Öffne **Projekte** in der Leiste oben und wähle **Neues Ziel**. Ein Ziel sagt, worauf das Viertel arbeitet — es hat einen Titel, eine optionale Beschreibung und eine Zielgruppe, aber keine Termine und keinen Status: ein Ziel ist eine *Richtung*, kein geplantes Ding. Ein Ziel ist der Rahmen, unter dem der Rest hängt.\n\n" +
+             "**Ein Projekt ist ein Arbeitsabschnitt auf ein Ziel.** Wähle **Neues Projekt**. Ein Projekt hat einen Titel, eine optionale Beschreibung, optionale Start- und Fälligkeitsdaten, einen optionalen Status und eine Zielgruppe. Ein Projekt verweist auf das Ziel, dem es dient — aber ein Projekt ohne Ziel ist ein eigenständiges Projekt, und beides ist in Ordnung.\n\n" +
+             "**Aufgaben sind die Arbeit im Abschnitt.** Aufgaben sind der Ort, an dem die eigentliche Arbeit passiert — zugewiesen, verfolgt, über Boards bewegt. Siehe [Aufgaben](/pages/system/help/projects/todos) für den Aufgaben-Leitfaden und [Boards](/pages/system/help/projects/boards) für die Board-Ansicht.\n\n" +
+             "**Was diese Seite nicht ist.** Sie ersetzt nicht [Aufgaben](/pages/system/help/projects/todos) oder [Boards](/pages/system/help/projects/boards) — das sind die Arbeitsitems selbst. Diese Seite ist die Ebene *darüber*: die Richtung und der Arbeitsabschnitt, der darauf hinausgeht.\n\n" +
+             "Standardmäßig sind ein Ziel und ein Projekt für die ganze Gemeinschaft sichtbar. Wer sie sehen darf, lässt sich im Empfängerbereich einschränken, so wie bei einem Beitrag. In welcher Sprache ein Ziel oder Projekt geschrieben ist und wer es übersetzen darf, folgt denselben Regeln wie ein Beitrag — sie sehen unter [Sprache](/pages/system/help/language) und [Übersetzer](/pages/system/help/translator).")
+,
             ("announcements", "Ankündigungen",
              "## Ankündigungen\n\n" +
              "Ankündigungen sind Hinweise, die die Plattform auf ihrer eigenen " +
@@ -3004,6 +2979,25 @@ public static class FirstBootSeeder
              "entfernt wird, bleibt dein Lesezeichen — es wird in deiner " +
              "Liste als „nicht mehr verfügbar\u201C angezeigt. Du kannst es mit " +
              "einem Klick entfernen.\n"),
+            ("notes", "Notizen",
+             "## Notizen\n\n" +
+             "Eine Notiz ist ein kurzer Text von dir, der an etwas auf der " +
+             "Plattform hängt — an einen Beitrag, eine Gruppe, eine " +
+             "Veranstaltung, eine Seite, ein Ziel oder Projekt, eine Aufgabe, " +
+             "ein Board, ein Dokument, eine Ankündigung oder ein Inventar-" +
+             "stück. Eine Notiz gehört dir, nur für dich — sie erscheint nicht " +
+             "an der Sache, an die sie hängt, und niemand anderes sieht sie.\n\n" +
+             "**Eine hinzufügen.** Öffne die Sache und klicke auf **Notiz " +
+             "hinzufügen**, schreibe deine Notiz und speichere. Später liest " +
+             "der Knopf **Notiz ansehen**; öffne sie, um sie zu ändern oder zu " +
+             "löschen.\n\n" +
+             "**Deine finden.** Öffne **Notizen** in der oberen Leiste. Deine " +
+             "Notizen sind nach der Art der Sache gruppiert, die sie betreffen. " +
+             "Du kannst sie auch in Ordnern sammeln — einen Ordner anlegen und " +
+             "eine Notiz hineinbewegen — um eine Sammlung zu einem Thema " +
+             "beisammenzuhalten.\n\n" +
+             "Eine Notiz ist eine Erinnerung für dich selbst, kein Kommentar für " +
+             "den Autor oder die Leser der Sache.\n"),
             ("documents", "Dokumente",
              "## Dokumente\n\n" +
              "Dokumente ist die gemeinsame Ablage für Dateien — der Ort für " +
@@ -3306,22 +3300,13 @@ public static class FirstBootSeeder
              "darum, wie dir die Liste paginiert wird.\n\n" +
              "Wenn du keine wählst, gilt die Standard der Plattform.\n"),
             ("home", "Startseite",
+
              "## Startseite\n\n" +
-             "Deine **Startseite** ist die Seite, die sich öffnet, wenn du dich " +
-             "einloggst — das erste, worauf du landest.\n\n" +
-             "**So setzt du deine.** Öffne **Einstellungen → Startseite** und " +
-             "wähle, welche Seite sich öffnet: der Gemeinschafts-Feed, die " +
-             "Ankündigungen oder eine andere Oberfläche. Sie wird auf deinem " +
-             "Konto gespeichert.\n\n" +
-             "**Was sie ändert.** Wo du nach der Anmeldung landest, und wohin " +
-             "der **Start**-Link der Plattform für dich führt. Es ist eine " +
-             "Bequemlichkeit — jede Oberfläche erreichst du trotzdem jederzeit " +
-             "über die obere Leiste.\n\n" +
-             "**Was sie nicht ändert.** Sie ändert nicht, was du sehen kannst. " +
-             "Jede Oberfläche bleibt erreichbar; die Startseite entscheidet nur, " +
-             "welche zuerst aufmacht.\n\n" +
-             "Wenn du keine wählst, öffnet sich die Standard-Startseite der " +
-             "Plattform.\n"),
+             "Deine **Startseite** ist die Seite, die sich öffnet, wenn du dich einloggst — das erste, worauf du landest. Zwei Teile kannst du einstellen: die Intro-Abschnitte oben und der *Demnächst*-Block, der Zeigt, was ansteht.\n\n" +
+             "**Intro ausblenden.** Wenn du dich einloggst, öffnet sich die Startseite mit einer kurzen Einführung (was Kumunita ist und tut). Hake **Intro-Abschnitte ausblenden** an und die Startseite geht direkt zur Feed. Hake sie jederzeit wieder ab, um die Intro zurückzubringen.\n\n" +
+             "**Zeigen, was ansteht.** Hake **Demnächst Termine und Aufgaben anzeigen** an und über der Feed erscheint ein Block mit den nächsten Terminen und Aufgaben. Hake darunter **Nur meine eigenen Termine und Aufgaben anzeigen** an und dieser Block listet nur die Termine, denen du beiswohnst oder die du erstellt hast, und die Aufgaben, die dir zugeteilt sind — lass es aus, um die der Gemeinschaft zu sehen.\n\n" +
+             "Beide Wahlungen werden auf deinem Konto gespeichert und ändern nichts daran, was du sonst sehen kannst — jede Oberfläche bleibt jederzeit über die obere Leiste erreichbar. Wählst du nichts, öffnet sich die Startseite mit ihrer Intro und ohne Demnächst-Block.")
+,
             ("quiet-hours", "Ruhezeiten",
              "## Ruhezeiten\n\n" +
              "**Ruhezeiten** sind das Zeitfenster des Tages, in dem die Plattform " +
@@ -3994,46 +3979,15 @@ public static class FirstBootSeeder
              "seul clic. Ce que tu suis et ce qui t'arrive par e-mail " +
              "reste ton choix.\n"),
             ("projects", "Projets",
+
              "## Projets\n\n" +
-             "Les projets sont l'endroit où vit le travail partagé du quartier " +
-             "— les tâches que tu écris, à qui elles sont attribuées, et les " +
-             "tableaux qui gardent l'ensemble visible.\n\n" +
-             "**Écrire une tâche.** Ouvre **Projets** en haut de l'écran et " +
-             "crée une nouvelle tâche. Donne-lui un titre, et un corps si tu " +
-             "veux expliquer le pourquoi. Une tâche est en soi une unité de " +
-             "travail complète — elle peut être attribuée à un voisin, à un " +
-             "groupe, ou à toute la communauté, et elle peut porter des " +
-             "sous-tâches.\n\n" +
-             "**L'attribuer.** Une tâche sans assignation est posée pour " +
-             "tout le monde. Choisis un voisin et elle arrive dans sa liste ; " +
-             "choisis un groupe et elle arrive dans le sien. Tu peux la " +
-             "réattribuer à tout moment — l'assignation est toujours à jour " +
-             "avec la personne que tu as choisie en dernier.\n\n" +
-             "**Les sous-tâches.** Découpe une grande tâche en plus petites " +
-             "avec des sous-tâches. Une sous-tâche est une tâche complète — " +
-             "elle a son propre titre, sa propre assignation et son propre " +
-             "statut — mais elle reste sous la tâche principale, pour que la " +
-             "vue d'ensemble et les pièces restent ensemble.\n\n" +
-             "**Les tableaux.** Un tableau range les tâches en voies. Une voie " +
-             "peut porter un statut — une tâche qui y est posée reprend ce " +
-             "statut — et une limite optionnelle sur le nombre de cartes. " +
-             "Sers-toi des voies pour montrer où en est le travail, pas pour " +
-             "le bloquer : déplacer une carte est une vue de l'état, pas un " +
-             "cadenas dessus.\n\n" +
-             "**En attente de.** Une tâche peut pointer vers une autre dont " +
-             "elle dépend. C'est un indice pour le lecteur, pas une règle — " +
-             "elle ne bloque personne, elle dit simplement : \"ça vient après " +
-             "ça.\"\n\n" +
-             "**Les commentaires.** Quiconque peut voir une tâche peut y " +
-             "laisser un commentaire et répondre aux commentaires, comme sur " +
-             "un message.\n\n" +
-             "Par défaut, une tâche, un tableau et un objectif sont visibles " +
-             "par toute la communauté. Tu peux restreindre qui peut les voir " +
-             "dans la section public, comme pour un message. La langue dans " +
-             "laquelle une tâche est écrite et qui peut la traduire suit les " +
-             "mêmes règles qu'un message — voir " +
-             "[Langue](/pages/system/help/language) et " +
-             "[Traducteurs](/pages/system/help/translator).\n"),
+             "Les projets sont l'endroit où vit le travail partagé du quartier à un niveau plus élevé — la direction (un **objectif**), le travail vers elle (un **projet**) et, en dessous, les tâches qui font le travail effectif (voir [Tâches](/pages/system/help/projects/todos)).\n\n" +
+             "**Un objectif est une direction.** Ouvre **Projets** dans la barre du haut et choisis **Nouvel objectif**. Un objectif dit vers quoi le quartier travaille — il a un titre, une description optionnelle et une audience, mais pas de dates ni de statut : un objectif est une *direction*, pas une chose planifiée. C'est le cadre sous lequel le reste se suspend.\n\n" +
+             "**Un projet est un tronçon de travail vers un objectif.** Choisis **Nouveau projet**. Un projet a un titre, une description optionnelle, des dates de début et d'échéance optionnelles, un statut optionnel et une audience. Un projet pointe vers l'objectif qu'il sert — mais un projet sans objectif est un projet autonome, et les deux vont bien.\n\n" +
+             "**Les tâches sont le travail dans le tronçon.** Les tâches sont là où le travail effectif se fait — attribuées, suivies, déplacées sur des tableaux. Voir [Tâches](/pages/system/help/projects/todos) pour la marche à suivre, et [Tableaux](/pages/system/help/projects/boards) pour la vue en tableau.\n\n" +
+             "**Ce que cette page n'est pas.** Elle ne remplace pas [Tâches](/pages/system/help/projects/todos) ni [Tableaux](/pages/system/help/projects/boards) — ce sont les éléments de travail eux-mêmes. Cette page est la couche *au-dessus* : la direction et le tronçon de travail qui y mène.\n\n" +
+             "Par défaut, un objectif et un projet sont visibles de toute la communauté. Qui peut les voir se restreint dans la section audience, comme pour un message. La langue dans laquelle un objectif ou un projet est écrit, et qui peut le traduire, suit les mêmes règles qu'un message — voir [Langue](/pages/system/help/language) et [Traducteurs](/pages/system/help/translator).")
+,
             ("announcements", "Annonces",
              "## Annonces\n\n" +
              "Les annonces sont des notes que la plateforme affiche sur sa " +
@@ -4153,6 +4107,24 @@ public static class FirstBootSeeder
              "**Un signet qui disparaît.** Si la chose que tu as signetée " +
              "est supprimée, ton signet reste — il apparaît dans ta liste " +
              "comme « non plus disponible ». Tu peux le retirer d'un clic.\n"),
+            ("notes", "Notes",
+             "## Notes\n\n" +
+             "Une note est un court texte qui est à toi, rattaché à quelque " +
+             "chose sur la plateforme — un message, un groupe, un événement, " +
+             "une page, un objectif ou un projet, une tâche, un tableau, un " +
+             "document, une annonce, ou un article d'inventaire. Une note est " +
+             "la tienne, pour toi — elle n'apparaît jamais sur la chose à " +
+             "laquelle elle est rattachée, et personne d'autre ne peut la voir.\n\n" +
+             "**En ajouter une.** Ouvre la chose et clique sur **Ajouter une " +
+             "note**, écris ta note, et enregistre. Plus tard, le bouton dit " +
+             "**Voir la note** ; ouvre-la pour la modifier ou la supprimer.\n\n" +
+             "**Trouver les tiennes.** Ouvre **Notes** dans la barre du haut. " +
+             "Tes notes sont regroupées par le type de chose à laquelle elles " +
+             "se rapportent. Tu peux aussi les rassembler dans des dossiers — " +
+             "crée un dossier, puis déplace une note dedans — pour garder une " +
+             "collection sur un même sujet rassemblée.\n\n" +
+             "Une note est un rappel pour toi, pas un commentaire pour " +
+             "l'auteur de la chose ni pour ses lecteurs.\n"),
             ("documents", "Documents",
              "## Documents\n\n" +
              "Les documents sont l'étagère de fichiers du quartier — la " +
@@ -4475,22 +4447,13 @@ public static class FirstBootSeeder
              "Si tu n'en defines jamais un, le format par défaut de la " +
              "plateforme s'applique.\n"),
             ("home", "Page d'accueil",
+
              "## Page d'accueil\n\n" +
-             "Ta **page d'accueil** est la page qui s'ouvre quand tu te " +
-             "connectes — la première chose où tu arrives.\n\n" +
-             "**Comment la définir.** Ouvre **Paramètres → Page d'accueil** " +
-             "et choisis quelle page s'ouvre : le flux communautaire, les " +
-             "annonces, ou une autre surface. Elle est enregistrée sur ton " +
-             "compte.\n\n" +
-             "**Ce qu'elle change.** Où tu arrives après la connexion, et " +
-             "où le lien **accueil** de la plateforme te mène. C'est une " +
-             "pratique — tu peux tout de même atteindre chaque surface " +
-             "depuis la barre du haut à tout moment.\n\n" +
-             "**Ce qu'elle ne change pas.** Elle ne change pas ce que tu " +
-             "peux voir. Chaque surface reste atteignable ; la page " +
-             "d'accueil ne décide que de laquelle s'ouvre d'abord.\n\n" +
-             "Si tu n'en defines jamais une, la page d'accueil par défaut " +
-             "de la plateforme s'ouvre.\n"),
+             "Ta **page d'accueil** est la page qui s'ouvre quand tu te connectes — la première chose où tu arrives. Deux parties sont réglables : les sections d'introduction en haut, et le bloc *à venir* qui liste ce qui s'approche.\n\n" +
+             "**Masquer l'introduction.** Quand tu te connectes, la page d'accueil s'ouvre avec une brève introduction (ce qu'est Kumunita et ce qu'elle fait). Coche **Masquer les sections d'introduction** et la page d'accueil va directement au fil. Décoche-le à tout moment pour rappeler l'introduction.\n\n" +
+             "**Montrer ce qui arrive.** Coche **Montrer les événements et tâches à venir** et un bloc apparaît au-dessus du fil avec les prochains événements et tâches. Coche **Ne montrer que mes propres événements et tâches** en dessous et ce bloc ne liste que les événements auxquels tu as répondu ou que tu as créés et les tâches qui t'ont été attribuées — laisse-le décoché pour voir ceux de la communauté.\n\n" +
+             "Les deux choix sont enregistrés sur ton compte et ne changent rien à ce que tu peux voir ailleurs — chaque surface reste accessible depuis la barre du haut à tout moment. Si tu ne choisis rien, la page d'accueil s'ouvre avec son introduction et sans bloc à venir.")
+,
             ("quiet-hours", "Heures de silence",
              "## Heures de silence\n\n" +
              "Les **heures de silence** sont la fenêtre de la journée " +
@@ -5172,42 +5135,15 @@ public static class FirstBootSeeder
              "Du kan markere hele indbakken som læst med ét klik. Hvad du " +
              "følger, og hvad du får på e-mail, bestemmer du selv.\n"),
             ("projects", "Projekter",
+
              "## Projekter\n\n" +
-             "Projekter er det sted, hvor nabolagets fælles arbejde bor — de " +
-             "opgaver, du og dine naboer skriver ned, hvem de er tildelt, og " +
-             "de brætter, der holder hele billedet synligt.\n\n" +
-             "**At skrive en opgave.** Åbn **Projekter** i bjælken øverst og " +
-             "start en ny opgave. Giv den en titel, og en tekst, hvis du vil " +
-             "forklare hvorfor. En opgave er i sig selv et helt stykke " +
-             "arbejde — den kan gives til en nabo, en gruppe, eller hele " +
-             "fællesskabet, og den kan bære underopgaver.\n\n" +
-             "**At tildele.** En opgave uden en tildeles ligger fremme for " +
-             "alle. Vælg en nabo, og den lander i deres liste; vælg en gruppe, " +
-             "og den lander i gruppens. Du kan tildele den om igen når som " +
-             "helst — tildelelsen er altid opdateret med den, du sidst " +
-             "vælgte.\n\n" +
-             "**Underopgaver.** Del en stor opgave op i mindre med " +
-             "underopgaver. En underopgave er en hel opgave — den har sin " +
-             "egen titel, sin egen tildelelse og sin egen status — men den " +
-             "bliver holdt under overopgaven, så det store billede og " +
-             "delene forbliver sammen.\n\n" +
-             "**Brætter.** Et bræt arrangerer opgaver i baner. En bane kan " +
-             "bære en status — en opgave, der lægges ind der, overtager den " +
-             "status — og en valgfri grænse for antallet af kort. Brug baner " +
-             "til at vise, hvor arbejdet står, ikke til at låse det: at flytte " +
-             "et kort er et billede af tilstanden, ikke et lås på det.\n\n" +
-             "**Venter på.** En opgave kan pege på en anden, den venter på. " +
-             "Det er en hint til læseren, ikke en regel — den blokerer " +
-             "ingen, den siger bare: \"det kommer efter det.\"\n\n" +
-             "**Kommentarer.** Alle, der kan se en opgave, kan skrive en " +
-             "kommentar til den og svare på kommentarer, som ved et indlæg.\n\n" +
-             "Som standard kan en opgave, et bræt og et mål ses af hele " +
-             "fællesskabet. Du kan indskrænke, hvem der kan se dem, i " +
-             "modtagerfeltet, som ved et indlæg. Hvilket sprog en opgave er " +
-             "skrevet på, og hvem der må oversætte den, følger de samme " +
-             "regler som et indlæg — se " +
-             "[Sprog](/pages/system/help/language) og " +
-             "[Oversættere](/pages/system/help/translator).\n"),
+             "Projekter er stedet, hvor nabolagets fælles arbejde på et højere niveau lever — retningen (et **mål**), arbejdet mod det (et **projekt**) og, derunder, opgaverne, der udfører det faktiske arbejde (se [Opgaver](/pages/system/help/projects/todos)).\n\n" +
+             "**Et mål er en retning.** Åbn **Projekter** i topp bjælken og vælg **Nyt mål**. Et mål siger, hvad nabolaget arbejder hen imod — det har en titel, en valgfri beskrivelse og en modtagerkreds, men ingen datoer og ingen status: et mål er en *retning*, ikke en planlagt ting. Et mål er rammen, hvori resten hænger.\n\n" +
+             "**Et projekt er en strækning af arbejde mod et mål.** Vælg **Nyt projekt**. Et projekt har en titel, en valgfri beskrivelse, valgfri start- og forfaldsdatoer, en valgfri status og en modtagerkreds. Et projekt peger på det mål, det tjener — men et projekt uden mål er et selvstændigt projekt, og begge dele er fine.\n\n" +
+             "**Opgaver er arbejdet i strækningen.** Opgaver er, hvor det faktiske arbejde udføres — tildelt, fulgt, flyttet på brædder. Se [Opgaver](/pages/system/help/projects/todos) for gennemgangen og [Brædder](/pages/system/help/projects/boards) for bræddernes visning.\n\n" +
+             "**Hvad denne side ikke er.** Den erstatter ikke [Opgaver](/pages/system/help/projects/todos) eller [Brædder](/pages/system/help/projects/boards) — det er arbejdsitemene selv. Denne side er laget *ovenpå*: retningen og arbejdsstrækningen, der går mod den.\n\n" +
+             "Som udgangspunkt er et mål og et projekt synlige for hele fællesskabet. Hvem der må se dem, indskrænktes i modtagerkreds-sektionen, som ved et indlæg. Det sprog, et mål eller projekt er skrevet på, og hvem der må oversætte det, følger samme regler som et indlæg — se [Sprog](/pages/system/help/language) og [Oversættere](/pages/system/help/translator).")
+,
             ("announcements", "Bekendtgørelser",
              "## Bekendtgørelser\n\n" +
              "Bekendtgørelser er notitser, som platformen viser på sin egen " +
@@ -5330,6 +5266,24 @@ public static class FirstBootSeeder
              "bogmærket, fjernes, forbliver dit bogmærke — det vises " +
              "på din liste som „Ikke længere tilgængelig\u201C. Du kan " +
              "fjerne det med et klik.\n"),
+            ("notes", "Noter",
+             "## Noter\n\n" +
+             "En note er et kort stykke, du selv har skrevet, som er knyttet " +
+             "til noget på platformen — et indlæg, en gruppe, en begivenhed, " +
+             "en side, et mål eller et projekt, en opgave, et bræt, et " +
+             "dokument, en bekendtgørelse eller et inventar. En note er din, " +
+             "til dig selv — den vises aldrig på det, den er knyttet til, og " +
+             "ingen anden kan se den.\n\n" +
+             "**At tilføje en.** Åbn det, du vil knytte en note til, og klik på " +
+             "**Tilføj note**, skriv din note, og gem. Senere står der " +
+             "**Vis note** på knappen; åbn den for at rette eller slette din " +
+             "note.\n\n" +
+             "**At finde dine.** Åbn **Noter** i topp bjælken. Dine noter er " +
+             "grupperet efter typen af det, de handler om. Du kan også " +
+             "indsamle dem i mapper — opret en mappe, og flyt en note ind i " +
+             "den — for at holde en samling om et emne sammen.\n\n" +
+             "En note er en påmindelse til dig selv, ikke en kommentar til " +
+             "den persons, der skrev det, eller dets læsere.\n"),
             ("documents", "Dokumenter",
              "## Dokumenter\n\n" +
              "Dokumenter er nabolagets filhylde — pladsen til filer, " +
@@ -5629,21 +5583,13 @@ public static class FirstBootSeeder
              "det. Det er ren paginering af listen for dig.\n\n" +
              "Hvis du aldrig sætter en, gælder platformens standard.\n"),
             ("home", "Startside",
+
              "## Startside\n\n" +
-             "Din **startside** er den side, der åbnes, når du logger " +
-             "ind — det første, du lander på.\n\n" +
-             "**Sådan sætter du din.** Åbn **Indstillinger → Startside** " +
-             "og vælg, hvilken side der åbnes: fællesfeeden, " +
-             "meddelelserne, eller en anden overflade. Den gemmes på " +
-             "din konto.\n\n" +
-             "**Hvad den ændrer.** Hvor du lander efter at have logget " +
-             "ind, og hvor platformens **start**-link tager dig hen. " +
-             "Det er en bekvemmelighed — du kan stadig nå hver overflade " +
-             "fra topp bjælken til enhver tid.\n\n" +
-             "**Hvad den ikke ændrer.** Den ændrer ikke, hvad du kan se. " +
-             "Hver overflade er stadig nåelig; startside afgør kun, " +
-             "hvilken der åbnes først.\n\n" +
-             "Hvis du aldrig sætter en, åbnes platformens standardstart.\n"),
+             "Din **startside** er den side, der åbnes, når du logger ind — det første, du lander på. To dele kan indstilles: intro-sektionerne øverst og *Kommende*-blok, der lister, hvad der er på vej.\n\n" +
+             "**Skjul introen.** Når du logger ind, åbner startsiden med en kort introduktion (hvad Kumunita er og hvad den gør). Sæt kryds i **Skjul intro-sektionerne** og startsiden går direkte til feeden. Fjern krydset til enhver tid for at bringe introen tilbage.\n\n" +
+             "**Vis, hvad der er på vej.** Sæt kryds i **Vis kommende begivenheder og opgaver** og en blok vises over feeden med de næste begivenheder og opgaver. Sæt kryds i **Vis kun mine egne begivenheder og opgaver** derunder, og blokken lister kun de begivenheder, du har svaret på eller oprettet, og de opgaver, der er tildelt dig — lad det stå, for at se fællesskabets.\n\n" +
+             "Begge valg gemmes på din konto og ændrer ikke, hvad du ellers kan se — hver overflade er stadig nåelig fra topp bjælken til enhver tid. Vælger du intet, åbner startsiden med sin intro og uden kommende-blok.")
+,
             ("quiet-hours", "Stille timer",
              "## Stille timer\n\n" +
              "**Stille timer** er vinduet af dagen, hvor platformen " +
@@ -6032,6 +5978,7 @@ public static class FirstBootSeeder
              "- [People](/pages/system/help/people) — finding people by tag or bio\n" +
              "- [Inventory](/pages/system/help/inventory) — shared and private items, check out and in\n" +
              "- [Bookmarks](/pages/system/help/bookmarks) — the things you've saved\n" +
+             "- [Notes](/pages/system/help/notes) — your own private notes, attached to a thing\n" +
              "- [Documents](/pages/system/help/documents) — shared files the community can open\n" +
              "- [Pages](/pages/system/help/pages) — community and platform pages\n" +
              "- [Tags](/pages/system/help/tags) — short labels that connect things\n" +
@@ -6159,6 +6106,7 @@ public static class FirstBootSeeder
              "- [Menschen](/pages/system/help/people) — Menschen nach Tag oder Biografie finden\n" +
              "- [Inventar](/pages/system/help/inventory) — Geteilte und private Gegenstände, ausleihen und zurückgeben\n" +
              "- [Lesezeichen](/pages/system/help/bookmarks) — Was du gespeichert hast\n" +
+             "- [Notizen](/pages/system/help/notes) — Deine eigenen, privaten Notizen, an etwas geheftet\n" +
              "- [Dokumente](/pages/system/help/documents) — Gemeinsame Dateien, die die Gemeinde öffnen kann\n" +
              "- [Seiten](/pages/system/help/pages) — Community- und Plattformseiten\n" +
              "- [Tags](/pages/system/help/tags) — Kurze Beschriftungen, die Dinge verbinden\n" +
@@ -6291,6 +6239,7 @@ public static class FirstBootSeeder
              "- [Personnes](/pages/system/help/people) — Trouver des personnes par tag ou par bio\n" +
              "- [Inventaire](/pages/system/help/inventory) — Les objets partagés et privés, prêter et rendre\n" +
              "- [Signets](/pages/system/help/bookmarks) — Ce que tu as sauvegardé\n" +
+             "- [Notes](/pages/system/help/notes) — Tes propres notes privées, rattachées à une chose\n" +
              "- [Documents](/pages/system/help/documents) — Les fichiers partagés que la communauté peut ouvrir\n" +
              "- [Pages](/pages/system/help/pages) — Les pages communautaires et les pages de la plateforme\n" +
              "- [Étiquettes](/pages/system/help/tags) — Les mots courts qui relient les choses\n" +
@@ -6420,6 +6369,7 @@ public static class FirstBootSeeder
              "- [Personer](/pages/system/help/people) — Find personer efter tag eller bio\n" +
              "- [Inventar](/pages/system/help/inventory) — Fælles og private genstande, lån og giv tilbage\n" +
              "- [Bogmærker](/pages/system/help/bookmarks) — Det du har gemt\n" +
+             "- [Noter](/pages/system/help/notes) — Dine egne private noter, knyttet til noget\n" +
              "- [Dokumenter](/pages/system/help/documents) — Fælles filer, som fællesskabet kan åbne\n" +
              "- [Sider](/pages/system/help/pages) — Fællesskabssider og platformssider\n" +
              "- [Tags](/pages/system/help/tags) — Korte ord, der forbinder ting\n" +
