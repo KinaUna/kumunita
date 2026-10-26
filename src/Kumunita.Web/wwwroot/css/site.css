@@ -3047,24 +3047,51 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
 .airy-invite-row .row-actions { margin-left: auto; display: flex; gap: 0.5rem; }
 .airy-group-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--kmb-feed-gap, 1rem);
   margin-bottom: 2rem;
 }
+/* ADR 0177 — group tile: rounded-square monogram + name + members. */
 .airy-group-card {
+  position: relative;            /* anchors the stretched-link */
   display: flex;
   align-items: center;
-  gap: 1rem;
-  background: #fff;
+  gap: 0.875rem;
+  background: var(--kmb-surface);
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius);
-  padding: 1.125rem 1.375rem;
+  padding: 1rem 1.25rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.airy-group-card:hover { border-color: var(--kmb-hover-border); }
-.airy-group-card .gname { font-size: 1rem; font-weight: 600; color: var(--kmb-ink); }
-.airy-group-card .gname a { color: inherit; }
-.airy-group-card .gname a:hover { color: var(--bs-primary); }
-.airy-group-card .gcount { margin-left: auto; font-size: 0.8125rem; color: var(--kmb-muted); text-align: right; white-space: nowrap; }
+.airy-group-card:hover {
+  border-color: var(--kmb-hover-border);
+  box-shadow: var(--bs-box-shadow-sm);
+}
+.airy-group-card .airy-group-mono {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;           /* groups: rounded square; people: circle */
+  font-size: 1.25rem;
+}
+.airy-group-card .gtext { display: flex; flex-direction: column; min-width: 0; }
+.airy-group-card .gname { font-size: 1rem; font-weight: 600; color: var(--kmb-ink); overflow-wrap: anywhere; }
+.airy-group-card .gname a { color: inherit; text-decoration: none; }
+.airy-group-card .gname a:hover { color: var(--kmb-accent, var(--bs-primary)); }
+.airy-group-card .gcount { font-size: 0.8125rem; color: var(--kmb-muted); }
+.airy-group-card .row-actions { margin-inline-start: auto; position: relative; z-index: 1; }
+
+/* ADR 0177 — friendly empty state (first user: /groups). */
+.kmb-empty {
+  text-align: center;
+  background: var(--kmb-surface);
+  border: 1px dashed var(--kmb-hover-border);
+  border-radius: var(--kmb-radius);
+  padding: 2rem 1.5rem;
+  margin-bottom: 2rem;
+}
+.kmb-empty-title { font-family: var(--bs-heading-font-family); font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem; }
+.kmb-empty-body { color: var(--kmb-muted); margin-bottom: 1rem; }
 
 /* A: pages — the tree becomes a bordered ledger (indentation kept;
    each row links full-width via the inner <a>). */
