@@ -193,3 +193,4 @@ Decision / Consequences. New decisions take the next number.
 | 0183 | Announcements as cards — `/announcements` rows become feed cards (avatar header, scope/pinned chips, preview, quiet Edit/Delete footer), pinned accent bar, own `.kmb-ann-list` so shared `.airy-ann-list` pages are untouched. |
 | 0184 | Announcement detail — chips above the card, author byline under the title, translation chips with `aria-pressed`, comment cards, composer on the form look. |
 | 0185 | Community post detail — announcement-detail treatment: byline under the title with community chip, tag and translation chips, reply cards, composer on the form look. |
+| 0186 | Group detail and group posts — header card with monogram tile, feed/event cards on the Feed and Events tabs, member rows, settings cards; group post gets the post-detail treatment. |

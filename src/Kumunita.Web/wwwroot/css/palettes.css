@@ -661,3 +661,62 @@ html[data-kmb-palette] .kmb-section-title .text-muted { color: var(--kmb-muted) 
   .kmb-ann-byline { flex-wrap: wrap; }
   .kmb-ann-byline .kmb-chip { margin-inline-start: 0; }
 }
+
+/* Group detail + group post (ADR 0186) */
+html[data-kmb-palette] .kmb-group-head {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.kmb-group-head h1 { font-size: 1.75rem; line-height: 1.2; align-self: center; overflow-wrap: anywhere; }
+.kmb-group-head .kmb-group-mono {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  font-size: 1.5rem;
+}
+html[data-kmb-palette] .kmb-group-owner { color: var(--kmb-muted); margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+html[data-kmb-palette] .kmb-group-desc { color: var(--kmb-ink-soft); margin: 0.75rem 0 0; }
+html[data-kmb-palette] .kmb-group-empty { color: var(--kmb-muted); }
+.kmb-group-page .tab-content h2 {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--kmb-ink);
+}
+.kmb-group-page .tab-pane > .airy-feed { margin-top: 1rem; }
+/* Members and pending lists: one bordered row per person. */
+.kmb-member-list { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+html[data-kmb-palette] .kmb-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 0.625rem 1rem;
+}
+.kmb-member-name { display: inline-flex; align-items: center; gap: 0.75rem; min-width: 0; overflow-wrap: anywhere; }
+/* Settings sections and the invite / add forms: a card per form. */
+html[data-kmb-palette] .kmb-group-page #tab-settings > form,
+html[data-kmb-palette] .kmb-group-page #tab-members > form {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+html[data-kmb-palette] .kmb-group-page #tab-settings > .border-top { border-color: var(--kmb-border) !important; }
+html[data-kmb-palette] .kmb-group-page .tab-content .form-control,
+html[data-kmb-palette] .kmb-group-page .tab-content .form-select { border-radius: var(--kmb-radius-input); }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-group-head { padding: 1rem; }
+  .kmb-group-head h1 { font-size: 1.5rem; }
+  .kmb-group-head .kmb-group-mono { width: 48px; height: 48px; font-size: 1.25rem; }
+  html[data-kmb-palette] .kmb-group-page #tab-settings > form,
+  html[data-kmb-palette] .kmb-group-page #tab-members > form { padding: 1rem; }
+}
