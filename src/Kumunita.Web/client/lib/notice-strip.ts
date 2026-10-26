@@ -46,9 +46,7 @@
     root.hidden = false;
     current = ((current % q.length) + q.length) % q.length;
     for (const el of all) {
-      const active = el === q[current];
-      el.hidden = !active && !isGone(el);
-      if (active) el.hidden = false;
+      el.hidden = el !== q[current];
     }
     more.hidden = q.length < 2;
     more.textContent = `+${q.length - 1}`;

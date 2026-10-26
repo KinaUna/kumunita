@@ -4193,6 +4193,6 @@ body.kmb-page-expanded #events-calendar:fullscreen .page-expand-close {
 .kmb-notices-more:hover { border-color: var(--kmb-accent, currentColor); }
 .kmb-notices-more[hidden] { display: none; }
 /* Leave room so the text never runs under the "+N" pill. */
-.kmb-notices:has(.kmb-notices-more:not([hidden])) .kmb-notice .d-flex .me-auto { margin-inline-end: 3.5rem; }
+.kmb-notices:has(.kmb-notices-more:not([hidden])) .kmb-notice .d-flex > .btn-close { margin-inline-start: 3.25rem; }
 body.kmb-embed .kmb-notices,
 body.kmb-kiosk .kmb-notices { display: none; }
