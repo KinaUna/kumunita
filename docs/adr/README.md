@@ -192,3 +192,4 @@ Decision / Consequences. New decisions take the next number.
 | 0182 | One calm look for card-per-field-group forms — CSS-only restyle of `form > .card` (surface tokens, 16px radius, tighter gap, clearer labels/hints, 12px inputs), shared rich-editor colours on the accent, quiet Cancel. About twenty forms, no markup changes. |
 | 0183 | Announcements as cards — `/announcements` rows become feed cards (avatar header, scope/pinned chips, preview, quiet Edit/Delete footer), pinned accent bar, own `.kmb-ann-list` so shared `.airy-ann-list` pages are untouched. |
 | 0184 | Announcement detail — chips above the card, author byline under the title, translation chips with `aria-pressed`, comment cards, composer on the form look. |
+| 0185 | Community post detail — announcement-detail treatment: byline under the title with community chip, tag and translation chips, reply cards, composer on the form look. |

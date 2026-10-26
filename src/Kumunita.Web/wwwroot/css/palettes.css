@@ -648,3 +648,16 @@ html[data-kmb-palette] .kmb-ann-composer .form-label {
   .kmb-ann-detail .kmb-ann-title { font-size: 1.375rem; }
   html[data-kmb-palette] .kmb-ann-comment { padding: 0.875rem 1rem; }
 }
+
+/* Post detail (ADR 0185) — reuses the announcement detail classes (ADR 0184). */
+html[data-kmb-palette] .kmb-section-title {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1.0625rem;
+  color: var(--kmb-ink);
+}
+html[data-kmb-palette] .kmb-section-title .text-muted { color: var(--kmb-muted) !important; }
+.kmb-ann-byline .kmb-chip { margin-inline-start: auto; }
+@media (max-width: 575.98px) {
+  .kmb-ann-byline { flex-wrap: wrap; }
+  .kmb-ann-byline .kmb-chip { margin-inline-start: 0; }
+}
