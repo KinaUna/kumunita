@@ -49,8 +49,16 @@ date, community chip) → title (no underline) → preview → footer (reply cou
 - Contrast pass (text, WCAG AA): done 2026-10-26 by measuring every visible text element on
   /, /community, /groups, /events, /announcements and /directory in all four palette×mode
   combinations — 0 failures after two fixes (light pinned badge, dark success badge; see the end
-  of `palettes.css`). Not yet covered: non-text contrast (control borders 3:1, focus rings),
-  hover/focus states, the admin pages, and checks at reduced screen brightness.
+  of `palettes.css`).
+- Non-text contrast pass: done 2026-10-26 on /community, /groups, /events, /directory in all four
+  combinations. Found: form-field borders 1.2-1.5:1 (they used the quiet `--kmb-border`) and focus
+  indicators of 1.2-2.7:1 (Bootstrap's 4px 25% glow; browser default 1px ring in light mode).
+  Fixed with `--kmb-control-border` (>= 3.2:1 on canvas and surface) for `.form-control`,
+  `.form-select`, `.form-check-input`, and one global `:focus-visible` ring: 2px solid
+  `--kmb-accent`, 2px offset (measured 5.0-10.8:1). Text-labelled buttons, sort pills and chips keep
+  their quiet border on purpose (the label identifies them). Not yet covered: hover states, the
+  admin pages, custom `outline: 0/none` rules in site.css (rich editor etc.), and reduced screen
+  brightness.
 - Translations for `palette.*` exist in en/de/fr/da (labels only; palette names stay Forest/Ember).
 - Per-palette logo asset instead of the `--kmb-logo-tile` placeholder.
 - Banner consolidation, Groups/Events/Home pages: later phases (see the UI refresh plan).

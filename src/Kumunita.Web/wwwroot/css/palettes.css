@@ -312,3 +312,47 @@ html[data-kmb-theme='light'] .text-bg-warning { color: #fff !important; }
   html:not([data-kmb-theme='light']) .text-bg-success { color: #0f1a14 !important; }
 }
 html[data-kmb-theme='dark'] .text-bg-success { color: #0f1a14 !important; }
+
+/* ==========================================================================
+   Non-text contrast (WCAG 1.4.11 / 2.4.7 / 2.4.11) — ADR 0173 follow-up
+   --------------------------------------------------------------------------
+   Measured on the running app: card/divider borders (--kmb-border) are
+   deliberately quiet (~1.2:1) and are fine as decoration, but they were also
+   the border of form fields (a field with no other boundary needs 3:1), and
+   focus indicators were Bootstrap's 4px 25%-alpha shadow (1.2-2.7:1) or the
+   browser default 1px ring (2.2-2.4:1 in light mode).
+     --kmb-control-border  : >= 3.2:1 against the canvas AND the card surface
+     focus ring            : 2px solid --kmb-accent, 2px offset (>= 4.5:1 in
+                             all four combinations; the accent is the palette's
+                             own readable colour on its canvas)
+   Text-labelled buttons (btn-outline-secondary, sort pills, chips) are
+   identified by their label, so they keep the quiet border on purpose.
+   ========================================================================== */
+:root { --kmb-control-border: #898e8a; }                       /* forest light */
+html[data-kmb-palette='ember'] { --kmb-control-border: #8e877f; } /* ember light */
+@media (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='light'])[data-kmb-palette='forest'] { --kmb-control-border: #70746c; }
+  html:not([data-kmb-theme='light'])[data-kmb-palette='ember']  { --kmb-control-border: #746f67; }
+}
+html[data-kmb-theme='dark'][data-kmb-palette='forest'] { --kmb-control-border: #70746c; }
+html[data-kmb-theme='dark'][data-kmb-palette='ember']  { --kmb-control-border: #746f67; }
+
+html[data-kmb-palette] .form-control,
+html[data-kmb-palette] .form-select,
+html[data-kmb-palette] .form-check-input {
+  border-color: var(--kmb-control-border);
+}
+html[data-kmb-palette] :focus-visible {
+  outline: 2px solid var(--kmb-accent);
+  outline-offset: 2px;
+}
+/* Replace Bootstrap's low-contrast focus glow with the outline above. */
+html[data-kmb-palette] :is(.btn, .btn-close, .page-link, .form-check-input, .accordion-button):focus-visible,
+html[data-kmb-palette] :is(.form-control, .form-select):focus {
+  box-shadow: none;
+}
+html[data-kmb-palette] :is(.form-control, .form-select):focus {
+  border-color: var(--kmb-accent);
+  outline: 2px solid var(--kmb-accent);
+  outline-offset: 1px;
+}
