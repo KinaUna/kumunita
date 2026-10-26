@@ -502,3 +502,80 @@ html[data-kmb-palette] .event-block.event-chip-overlap {
   box-shadow: 0 0 0 1px var(--kmb-accent);
   border-color: var(--kmb-accent);
 }
+
+/* ==========================================================================
+   Forms (ADR 0182) — one calm look for every card-per-field-group form
+   --------------------------------------------------------------------------
+   About 20 forms (events, posts, projects, documents, profile,
+   announcements...) are `<form>` > `.card.mb-4` > `.card-body`. Styled once
+   here, no markup changes. Scoped to a card that is a DIRECT child of a form,
+   so cards elsewhere (detail pages, lists) are untouched.
+   ========================================================================== */
+html[data-kmb-palette] form > .card {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  margin-bottom: 1rem !important;
+}
+html[data-kmb-palette] form > .card > .card-body { padding: 1.25rem 1.5rem; }
+
+/* Labels and hints. */
+html[data-kmb-palette] form > .card .form-label,
+html[data-kmb-palette] form > .card legend {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kmb-ink);
+  margin-bottom: 0.375rem;
+}
+html[data-kmb-palette] form > .card .text-muted.small,
+html[data-kmb-palette] form > .card .form-text {
+  color: var(--kmb-muted) !important;
+}
+
+/* Inputs: 12px radius (ADR 0173 D4); the field border is --kmb-control-border
+   (patch 8), the focus ring the global accent ring. */
+html[data-kmb-palette] form > .card .form-control:not(.form-control-color),
+html[data-kmb-palette] form > .card .form-select {
+  border-radius: var(--kmb-radius-input);
+}
+html[data-kmb-palette] form > .card .form-control-color {
+  border-radius: var(--kmb-radius-input);
+  padding: 0.25rem;
+}
+
+/* Rich editor (shared by every form that uses it). */
+html[data-kmb-palette] .rc-editor-toolbar {
+  border-color: var(--kmb-border);
+  border-radius: var(--kmb-radius-input);
+  background-color: var(--kmb-tint-a);
+}
+html[data-kmb-palette] .rc-editor-toolbar .rc-btn { color: var(--kmb-ink-soft); border-radius: 8px; }
+html[data-kmb-palette] .rc-editor-toolbar .rc-btn:hover {
+  background-color: var(--kmb-surface-2, var(--kmb-tint-a));
+  border-color: var(--kmb-hover-border);
+  color: var(--kmb-accent);
+}
+html[data-kmb-palette] .rc-editor-toolbar .rc-btn.rc-btn-active {
+  background-color: var(--kmb-chip-selected-bg);
+  border-color: var(--kmb-accent);
+  color: var(--kmb-chip-selected-ink);
+}
+html[data-kmb-palette] .rc-editor-pane {
+  border-color: var(--kmb-border);
+  border-radius: var(--kmb-radius-input);
+  background-color: var(--kmb-surface);
+}
+html[data-kmb-palette] .rc-editor-toolbar .rc-btn:focus-visible { outline-color: var(--kmb-accent); }
+/* The WYSIWYG pane's focus outline was Bootstrap primary (green in every palette). */
+html[data-kmb-palette] .rc-editor-pane[contenteditable="true"] {
+  outline: 2px solid var(--kmb-accent);
+  outline-offset: 1px;
+}
+
+/* Action row (the submit + Cancel pair that ends a form): quiet Cancel. */
+html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link { color: var(--kmb-muted); text-decoration: none; }
+html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link:hover { color: var(--kmb-accent); }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] form > .card > .card-body { padding: 1rem; }
+}
