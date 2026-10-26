@@ -460,6 +460,8 @@ builder.Services.AddScoped<Kumunita.Web.Security.IAvatarPresenceChecker, Kumunit
 // column, never a per-row field).
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<Kumunita.Web.Services.IEscalationForwarder, Kumunita.Web.Services.EscalationForwarder>();
+// ADR 0175 — the cached platform-default palette read by _Layout.
+builder.Services.AddSingleton<Kumunita.Web.Services.PlatformPaletteProvider>();
 
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,

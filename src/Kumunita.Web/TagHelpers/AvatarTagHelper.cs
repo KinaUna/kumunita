@@ -59,6 +59,15 @@ public sealed class AvatarTagHelper(IAvatarPresenceChecker presence) : TagHelper
     [HtmlAttributeName("mono")]
     public string? Mono { get; set; }
 
+    /// <summary>
+    /// A stable per-resident monogram hue in <c>[0, 6)</c> (ADR 0175,
+    /// <see cref="Security.AvatarHue"/>) — emitted as a <c>data-hue</c>
+    /// attribute on the <c>.avatar-mono</c> circle so site.css can colour it.
+    /// Presentation only; omit it (the default) for the uncoloured monogram.
+    /// </summary>
+    [HtmlAttributeName("mono-hue")]
+    public int? MonoHue { get; set; }
+
     /// <summary>The size variant: <c>"lg"</c>, <c>"sm"</c>, or empty (the
     /// default). Maps to the existing <c>avatar-lg</c> /
     /// <c>avatar-sm</c> / <c>avatar-mono-lg</c> / <c>avatar-mono-sm</c>
@@ -102,7 +111,7 @@ public sealed class AvatarTagHelper(IAvatarPresenceChecker presence) : TagHelper
             var img = $"<img class=\"avatar{sizeSuffix}\" src=\"/profile/avatar/{subjectUrl}\" alt=\"\" data-avatar-fallback>";
             var hiddenMono = mono is null
                 ? string.Empty
-                : $"<span class=\"avatar-mono{sizeSuffix}\" style=\"display:none;\">{WebUtility.HtmlEncode(mono)}</span>";
+                : $"<span class=\"avatar-mono{sizeSuffix}\"{HueAttr} style=\"display:none;\">{WebUtility.HtmlEncode(mono)}</span>";
             RenderSlot(output, img + hiddenMono);
             return;
         }
@@ -116,8 +125,13 @@ public sealed class AvatarTagHelper(IAvatarPresenceChecker presence) : TagHelper
         // A non-null Mono → the monogram circle stands in directly — no <img>,
         // no request. (This is the profile-preview empty-circle case, where
         // Mono is "" and the circle is the placeholder.)
-        RenderSlot(output, $"<span class=\"avatar-mono{sizeSuffix}\">{WebUtility.HtmlEncode(mono)}</span>");
+        RenderSlot(output, $"<span class=\"avatar-mono{sizeSuffix}\"{HueAttr}>{WebUtility.HtmlEncode(mono)}</span>");
     }
+
+    /// <summary>The <c>data-hue</c> attribute (ADR 0175) when a
+    /// <see cref="MonoHue"/> is set and in range; empty otherwise.</summary>
+    private string HueAttr =>
+        MonoHue is >= 0 and < 6 ? $" data-hue=\"{MonoHue}\"" : string.Empty;
 
     /// <summary>Rename the element to the app's avatar wrapper
     /// <c>&lt;span&gt;</c> (honoring <see cref="WrapperClass"/>) and set its

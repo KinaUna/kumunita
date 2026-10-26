@@ -159,6 +159,10 @@ public static class KnownTranslationKeys
             ["theme.auto"]       = "Auto (match device)",
             ["theme.light"]      = "Light",
             ["theme.dark"]       = "Dark",
+            ["palette.label"]    = "Palette",
+            ["palette.default"]  = "Platform default",
+            ["palette.forest"]   = "Forest",
+            ["palette.ember"]    = "Ember",
 
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Events",
@@ -3127,6 +3131,10 @@ public static class KnownTranslationKeys
             ["theme.auto"]       = "Automatisch (wie das Gerät)",
             ["theme.light"]      = "Hell",
             ["theme.dark"]       = "Dunkel",
+            ["palette.label"]    = "Farbpalette",
+            ["palette.default"]  = "Standard der Plattform",
+            ["palette.forest"]   = "Forest",
+            ["palette.ember"]    = "Ember",
 
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Veranstaltungen",
@@ -5816,6 +5824,10 @@ public static class KnownTranslationKeys
             ["theme.auto"]       = "Automatique (comme l’appareil)",
             ["theme.light"]      = "Clair",
             ["theme.dark"]       = "Sombre",
+            ["palette.label"]    = "Palette",
+            ["palette.default"]  = "Par défaut de la plateforme",
+            ["palette.forest"]   = "Forest",
+            ["palette.ember"]    = "Ember",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annuler",
@@ -8506,6 +8518,10 @@ public static class KnownTranslationKeys
             ["theme.auto"]       = "Automatisk (som enheden)",
             ["theme.light"]      = "Lys",
             ["theme.dark"]       = "Mørk",
+            ["palette.label"]    = "Palet",
+            ["palette.default"]  = "Platformens standard",
+            ["palette.forest"]   = "Forest",
+            ["palette.ember"]    = "Ember",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annullér",

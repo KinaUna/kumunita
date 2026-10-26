@@ -1,0 +1,218 @@
+/* ==========================================================================
+   Palettes — ADR 0175
+   --------------------------------------------------------------------------
+   A palette is the platform's colour identity; it is independent of the
+   light/dark/auto MODE (ADR 0133). _Layout emits
+       <html data-kmb-palette="forest|ember" data-kmb-theme="light|dark|(none)">
+   and this file re-points the same tokens site.css already reads. Load it
+   AFTER site.css. Palette choice: member cookie (kumunita.palette) → the
+   admin's platform default → forest.
+
+   Matrix (4 token blocks + 1 auto-dark copy of each dark block):
+     forest · light  → no override; site.css :root IS forest light.
+     forest · dark   → warmed (olive-tinted) Forest dark, replaces the cold
+                       #0f1a14 canvas. Written in the two dark scopes.
+     ember  · light  → cream + amber.
+     ember  · dark   → warm charcoal-brown + amber.
+
+   The two dark scopes mirror site.css (ADR 0133): (a) OS prefers dark AND
+   not forced light, (b) forced dark. CSS has no mixins, so each dark block is
+   written twice.
+   TODO (Phase 0): collapse both scopes with `color-scheme` + `light-dark()`
+   so every token is declared once; then this file shrinks to 2 palettes ×
+   1 block.
+
+   Contrast (WCAG AA, checked against the mockup values — re-run the
+   validator on the final tokens before shipping):
+     TODO: verify muted-on-surface >= 4.5:1 and amber-ink-on-amber >= 4.5:1
+           in all four combinations; verify at reduced screen brightness.
+   ========================================================================== */
+
+/* ---- New action / accent tokens (all palettes; forest-light is the base) -- */
+:root {
+  --kmb-action-bg: #1c4532;        /* primary button fill              */
+  --kmb-action-bg-hover: #173728;
+  --kmb-action-ink: #ffffff;       /* text on the primary button       */
+  --kmb-accent: #1c4532;           /* active nav item, selected chip text */
+  --kmb-chip-selected-bg: #e0ebe3; /* "All" chip / selected filter     */
+  --kmb-chip-selected-ink: #173728;
+  --kmb-logo-tile: #c8553d;        /* TODO: swap for the real logo asset per palette */
+}
+
+/* ==========================================================================
+   FOREST · dark (warmed)
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='light'])[data-kmb-palette='forest'] {
+    --bs-body-bg: #131b15;        --bs-body-bg-rgb: 19, 27, 21;
+    --bs-body-color: #ece9e0;     --bs-body-color-rgb: 236, 233, 224;
+    --bs-emphasis-color: #f3f0e8; --bs-emphasis-color-rgb: 243, 240, 232;
+    --bs-tertiary-bg: #1c2620;    --bs-tertiary-bg-rgb: 28, 38, 32;
+    --bs-border-color: #2f3d34;   --bs-border-color-rgb: 47, 61, 52;
+    --bs-light-border-subtle: #2a382e;
+
+    --kmb-ink: #ece9e0;
+    --kmb-ink-soft: #d5d3c8;
+    --kmb-muted: #a3ad9f;
+    --kmb-tint-a: #22302a;
+    --kmb-border: #2f3d34;
+    --kmb-border-soft: #26332b;
+    --kmb-hover-border: #44574b;
+    --kmb-hover-row: #19231d;
+    --kmb-surface: #1c2620;       /* card fill (lighter than canvas) */
+    --kmb-surface-2: #232f28;
+    --kmb-band: #101812;
+
+    --kmb-action-bg: #3c7a58;     --kmb-action-bg-hover: #4a8c67;
+    --kmb-action-ink: #ffffff;
+    --kmb-accent: #9ad0ae;
+    --kmb-chip-selected-bg: #2c4a37;
+    --kmb-chip-selected-ink: #d6ecdc;
+    --kmb-logo-tile: #c8553d;
+  }
+}
+html[data-kmb-theme='dark'][data-kmb-palette='forest'] {
+  --bs-body-bg: #131b15;        --bs-body-bg-rgb: 19, 27, 21;
+  --bs-body-color: #ece9e0;     --bs-body-color-rgb: 236, 233, 224;
+  --bs-emphasis-color: #f3f0e8; --bs-emphasis-color-rgb: 243, 240, 232;
+  --bs-tertiary-bg: #1c2620;    --bs-tertiary-bg-rgb: 28, 38, 32;
+  --bs-border-color: #2f3d34;   --bs-border-color-rgb: 47, 61, 52;
+  --bs-light-border-subtle: #2a382e;
+
+  --kmb-ink: #ece9e0;
+  --kmb-ink-soft: #d5d3c8;
+  --kmb-muted: #a3ad9f;
+  --kmb-tint-a: #22302a;
+  --kmb-border: #2f3d34;
+  --kmb-border-soft: #26332b;
+  --kmb-hover-border: #44574b;
+  --kmb-hover-row: #19231d;
+  --kmb-surface: #1c2620;
+  --kmb-surface-2: #232f28;
+  --kmb-band: #101812;
+
+  --kmb-action-bg: #3c7a58;     --kmb-action-bg-hover: #4a8c67;
+  --kmb-action-ink: #ffffff;
+  --kmb-accent: #9ad0ae;
+  --kmb-chip-selected-bg: #2c4a37;
+  --kmb-chip-selected-ink: #d6ecdc;
+  --kmb-logo-tile: #c8553d;
+}
+
+/* ==========================================================================
+   EMBER · light
+   ========================================================================== */
+html[data-kmb-palette='ember'] {
+  --bs-body-bg: #fbf6ee;        --bs-body-bg-rgb: 251, 246, 238;
+  --bs-body-color: #2a2118;     --bs-body-color-rgb: 42, 33, 24;
+  --bs-emphasis-color: #2a1c0a; --bs-emphasis-color-rgb: 42, 28, 10;
+  --bs-tertiary-bg: #f5ecdd;    --bs-tertiary-bg-rgb: 245, 236, 221;
+  --bs-border-color: #eadfce;   --bs-border-color-rgb: 234, 223, 206;
+  --bs-link-color: #8a5a12;     --bs-link-color-rgb: 138, 90, 18;
+  --bs-link-hover-color: #6b4710; --bs-link-hover-color-rgb: 107, 71, 16;
+
+  --kmb-ink: #2a2118;
+  --kmb-ink-soft: #3d3126;
+  --kmb-muted: #6f6050;
+  --kmb-tint-a: #f6e7cc;
+  --kmb-tint-b: #f5ecdd;
+  --kmb-border: #eadfce;
+  --kmb-border-soft: #f0e6d6;
+  --kmb-hover-border: #d9c9b0;
+  --kmb-hover-row: #fffaf0;
+  --kmb-surface: #fffdf8;
+  --kmb-surface-2: #fbf3e4;
+
+  --kmb-action-bg: #f0b45c;     --kmb-action-bg-hover: #e8a64a;
+  --kmb-action-ink: #2a1c0a;    /* dark ink on amber — never white */
+  --kmb-accent: #8a5a12;
+  --kmb-chip-selected-bg: #f6e7cc;
+  --kmb-chip-selected-ink: #6b4710;
+  --kmb-logo-tile: #d4694e;
+}
+
+/* ==========================================================================
+   EMBER · dark
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='light'])[data-kmb-palette='ember'] {
+    --bs-body-bg: #1a1613;        --bs-body-bg-rgb: 26, 22, 19;
+    --bs-body-color: #f1e9dc;     --bs-body-color-rgb: 241, 233, 220;
+    --bs-emphasis-color: #f7f0e4; --bs-emphasis-color-rgb: 247, 240, 228;
+    --bs-tertiary-bg: #262019;    --bs-tertiary-bg-rgb: 38, 32, 25;
+    --bs-border-color: #352d26;   --bs-border-color-rgb: 53, 45, 38;
+    --bs-light-border-subtle: #352d26;
+    --bs-link-color: #8fcaa6;     --bs-link-color-rgb: 143, 202, 166;
+    --bs-link-hover-color: #b0dcc1; --bs-link-hover-color-rgb: 176, 220, 193;
+
+    --kmb-ink: #f1e9dc;
+    --kmb-ink-soft: #dccfbc;
+    --kmb-muted: #b3a592;
+    --kmb-tint-a: #3b3126;
+    --kmb-tint-b: #2a2114;
+    --kmb-border: #352d26;
+    --kmb-border-soft: #2d261f;
+    --kmb-hover-border: #4d4237;
+    --kmb-hover-row: #211b16;
+    --kmb-surface: #262019;
+    --kmb-surface-2: #2d2721;
+    --kmb-band: #14100d;
+
+    --kmb-action-bg: #f0b45c;     --kmb-action-bg-hover: #f5c378;
+    --kmb-action-ink: #2a1c0a;
+    --kmb-accent: #f0b45c;
+    --kmb-chip-selected-bg: #3b3126;
+    --kmb-chip-selected-ink: #f6dcae;
+    --kmb-logo-tile: #d4694e;
+  }
+}
+html[data-kmb-theme='dark'][data-kmb-palette='ember'] {
+  --bs-body-bg: #1a1613;        --bs-body-bg-rgb: 26, 22, 19;
+  --bs-body-color: #f1e9dc;     --bs-body-color-rgb: 241, 233, 220;
+  --bs-emphasis-color: #f7f0e4; --bs-emphasis-color-rgb: 247, 240, 228;
+  --bs-tertiary-bg: #262019;    --bs-tertiary-bg-rgb: 38, 32, 25;
+  --bs-border-color: #352d26;   --bs-border-color-rgb: 53, 45, 38;
+  --bs-light-border-subtle: #352d26;
+  --bs-link-color: #8fcaa6;     --bs-link-color-rgb: 143, 202, 166;
+  --bs-link-hover-color: #b0dcc1; --bs-link-hover-color-rgb: 176, 220, 193;
+
+  --kmb-ink: #f1e9dc;
+  --kmb-ink-soft: #dccfbc;
+  --kmb-muted: #b3a592;
+  --kmb-tint-a: #3b3126;
+  --kmb-tint-b: #2a2114;
+  --kmb-border: #352d26;
+  --kmb-border-soft: #2d261f;
+  --kmb-hover-border: #4d4237;
+  --kmb-hover-row: #211b16;
+  --kmb-surface: #262019;
+  --kmb-surface-2: #2d2721;
+  --kmb-band: #14100d;
+
+  --kmb-action-bg: #f0b45c;     --kmb-action-bg-hover: #f5c378;
+  --kmb-action-ink: #2a1c0a;
+  --kmb-accent: #f0b45c;
+  --kmb-chip-selected-bg: #3b3126;
+  --kmb-chip-selected-ink: #f6dcae;
+  --kmb-logo-tile: #d4694e;
+}
+
+/* ==========================================================================
+   Palette-aware primary button
+   --------------------------------------------------------------------------
+   Reads the --kmb-action-* tokens, so forest keeps green and ember gets
+   amber-with-dark-ink. TODO: site.css (Buttons, ~line 1317) sets .btn-primary
+   variables and some dark-scope !important rules; confirm this block wins in
+   all four palette×mode combinations and fold the two together.
+   ========================================================================== */
+.btn-primary {
+  --bs-btn-bg: var(--kmb-action-bg);
+  --bs-btn-border-color: var(--kmb-action-bg);
+  --bs-btn-color: var(--kmb-action-ink);
+  --bs-btn-hover-bg: var(--kmb-action-bg-hover);
+  --bs-btn-hover-border-color: var(--kmb-action-bg-hover);
+  --bs-btn-hover-color: var(--kmb-action-ink);
+  --bs-btn-active-bg: var(--kmb-action-bg-hover);
+  --bs-btn-active-border-color: var(--kmb-action-bg-hover);
+  --bs-btn-active-color: var(--kmb-action-ink);
+}
