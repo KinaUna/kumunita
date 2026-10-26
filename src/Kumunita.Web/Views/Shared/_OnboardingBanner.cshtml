@@ -53,8 +53,8 @@
     string ariaAction   = await Translation.GetAsync("a11y.onboarding_action", effLang);
     string ariaDismiss  = await Translation.GetAsync("a11y.onboarding_dismiss", effLang);
 
-    <div class="kumunita-onboarding-banner alert alert-secondary alert-dismissible fade show mb-3"
-         role="region" aria-label="@ariaRegion">
+    <div class="kumunita-onboarding-banner kmb-notice alert alert-dismissible fade show"
+         data-kmb-notice="onboarding" role="region" aria-label="@ariaRegion">
         <div class="container-fluid py-2 d-flex align-items-center gap-2">
             <span class="me-auto me-2">
                 <kw-l key="onboarding.banner.text">Finish setting up your account?</kw-l>

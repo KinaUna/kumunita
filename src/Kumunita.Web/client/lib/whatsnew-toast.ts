@@ -1,68 +1,47 @@
 /**
- * What's-new toast (the VN lane, ADR 0110).
+ * What's-new notice (the VN lane, ADR 0110; reshaped by ADR 0176).
  *
- * `_WhatsNewToast.cshtml` (rendered at the top of <body> in
- * `_Layout.cshtml`, next to `_FlashToast` / `_PinnedAnnouncement`) announces
- * the current platform version with a link to the About page's "What's new"
- * section. The server renders it unconditionally — it cannot read the
- * visitor's localStorage — so this module owns the dismissal decision:
+ * `_WhatsNewToast.cshtml` renders the "Kumunita {v} is now in use" notice
+ * inside the `.kmb-notices` strip. The server cannot read the visitor's
+ * localStorage, so this module owns the dismissal decision:
  *
- *   - If the current version (the toast's `data-whatsnew-version`) is already
- *     recorded in localStorage under `kumunita-whatsnew-seen-version`, the
- *     toast is removed from the DOM before first paint (no flash, no
- *     announcement for a version the resident has already seen).
- *   - Otherwise the toast is shown (the `show` class is in the markup, so it
- *     is visible to a JS-less / no-DOM user on first run too), auto-hidden
- *     after 8 s, and its version recorded the first time it appears — so the
- *     next page load is quiet.
+ *   - If the notice's `data-whatsnew-version` is already recorded under
+ *     `kumunita-whatsnew-seen-version`, the notice is removed before first
+ *     paint.
+ *   - Otherwise it stays until the resident closes it; the close button
+ *     records the version. (It used to record on first display and auto-hide
+ *     after 8 s; inside a strip that shows one notice at a time, a notice
+ *     queued behind another must not count as seen.)
  *
- * Mirrors the flash-toast conventions: a plain ES module (tsc-built, no
- * bundler), a Bootstrap 5.3 `Toast` via the UMD global loaded earlier in
- * `_Layout.cshtml`, and graceful degradation if `window.bootstrap` is absent
- * (the toast still renders and its close button still works via
- * `data-bs-dismiss`).
+ * Plain ES module (tsc-built, no bundler); storage failures degrade to
+ * "show it again next load".
  */
 (() => {
   'use strict';
 
   const SEEN_KEY = 'kumunita-whatsnew-seen-version';
-  const AUTOHIDE_DELAY_MS = 8000;
 
-  const toast = document.querySelector<HTMLElement>('#whatsnew-toast-container .toast');
-  if (!toast) return; // nothing to wire on this render
+  const notice = document.querySelector<HTMLElement>('#whatsnew-toast-container');
+  if (!notice) return;
+  const version = notice.dataset.whatsnewVersion;
+  if (!version) return;
 
-  const version = toast.dataset.whatsnewVersion;
-  if (!version) return; // no version stamped → nothing to record or auto-hide
-
-  // First run for this version (or no stored record): keep the toast, record
-  // the version so the next load is quiet, and arm the auto-hide timer.
-  let seen;
+  let seen: string | null = null;
   try {
     seen = window.localStorage.getItem(SEEN_KEY);
   } catch {
-    seen = null; // storage blocked (private mode, etc.) → behave as first run
+    seen = null;
   }
-
   if (seen === version) {
-    // Already announced to this browser — take it out quietly.
-    const container = toast.parentElement;
-    container?.remove();
+    notice.remove();
     return;
   }
 
-  try {
-    window.localStorage.setItem(SEEN_KEY, version);
-  } catch {
-    // storage blocked → the toast still shows; it just re-appears next load
-  }
-
-  // @ts-expect-error — bootstrap.bundle exposes a global `bootstrap`
-  // (the UMD build loaded before this module in _Layout.cshtml).
-  const Toast = window.bootstrap?.Toast;
-  if (!Toast) return; // bootstrap failed to load; the toast renders and its
-                      // close button works (data-bs-dismiss), just no auto-hide.
-  // The element already carries `show` in the markup; the explicit `show()`
-  // is what schedules the auto-hide timer (see flash-toast.ts for why the
-  // data API alone can't).
-  Toast.getOrCreateInstance(toast, { autohide: true, delay: AUTOHIDE_DELAY_MS }).show();
+  notice.querySelector<HTMLElement>('.btn-close')?.addEventListener('click', () => {
+    try {
+      window.localStorage.setItem(SEEN_KEY, version);
+    } catch {
+      // storage blocked → it simply reappears next load
+    }
+  });
 })();

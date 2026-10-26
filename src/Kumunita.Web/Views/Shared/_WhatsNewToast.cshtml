@@ -58,21 +58,17 @@
         ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["a11y.close"]
         : await Translation.GetAsync("a11y.close", effLang);
 }
-<div class="toast-container position-fixed top-0 end-0 p-3 kmb-whatsnew-toast"
-     id="whatsnew-toast-container" aria-label="@ariaWhatsNewRegion"
-     data-whatsnew-version="@version">
-    <div class="toast align-items-center text-bg-primary border-0 show"
-         role="status" aria-live="polite" aria-atomic="true"
-         data-whatsnew-version="@version">
-        <div class="d-flex">
-            <div class="toast-body">
-                @label
-                <a class="link-light ms-1 text-decoration-underline" href="/about#whats-new">
-                    @seeLabel
-                </a>
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                    data-bs-dismiss="toast" aria-label="@ariaClose"></button>
-        </div>
+@* ADR 0176 — an inline notice inside the .kmb-notices strip (was a fixed
+   top-right toast). Dismissal is the resident's click on the close button,
+   remembered per browser by whatsnew-toast.js (localStorage). *@
+<div class="kmb-notice kmb-whatsnew-toast alert alert-dismissible fade show"
+     id="whatsnew-toast-container" role="region" aria-label="@ariaWhatsNewRegion"
+     data-kmb-notice="whatsnew" data-whatsnew-version="@version">
+    <div class="container-fluid py-2 d-flex align-items-center gap-2">
+        <span class="me-auto">
+            @label
+            <a class="ms-1" href="/about#whats-new">@seeLabel</a>
+        </span>
+        <button type="button" class="btn-close" aria-label="@ariaClose"></button>
     </div>
 </div>
