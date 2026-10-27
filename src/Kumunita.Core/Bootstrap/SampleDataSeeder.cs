@@ -1640,8 +1640,13 @@ public static class SampleDataSeeder
             }
             else
             {
-                // Resolve the existing id (we matched by title above).
-                id = existingProjects.Single(p => p.Title == sampleProject.Title).Id;
+                // Resolve the existing id (we matched by title above). FirstOrDefault, not
+                // Single: the DB may hold more than one project with this title (a resident
+                // project or a legacy duplicate) — the warm-backfill contract is
+                // create-if-missing, so any match is a valid anchor (the map above is the
+                // same last-wins shape). Single threw "more than one matching element" in
+                // production on exactly this.
+                id = existingProjects.First(p => p.Title == sampleProject.Title).Id;
             }
             // Top-up the project's translation rows.
             var havePrjTrans = existingPrjTrans

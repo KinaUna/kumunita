@@ -277,6 +277,64 @@ public sealed class SampleDataCorpusBackfillTests(PostgresFixture fixture) : ICl
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // 2c — A warm DB may hold MORE THAN ONE project with a sample title
+    // ═══════════════════════════════════════════════════════════════════════
+    [Fact(DisplayName = "ADR 0130 duplicate-title projects: two existing projects with a sample title don't crash the warm backfill")]
+    public async Task Backfill_ToleratesDuplicateSampleProjectTitles()
+    {
+        var (store, db, userManager, roleManager, userInfo) =
+            await BootAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Plant TWO projects carrying the sample corpus' project title — e.g.
+        // a resident-created project named like the sample (or a legacy
+        // duplicate). The warm DB holds both; the backfill's projects branch
+        // must tolerate the ambiguity (create-if-missing contract) instead of
+        // throwing "Sequence contains more than one matching element"
+        // (production crash, 2026-10-27 — the branch used Single over the
+        // whole-DB project list).
+        await using (var s = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            s.Store(new Project
+            {
+                Id = "prj-dup-a",
+                Title = ProjectTitle,
+                Description = "resident duplicate, first",
+                AuthorId = "author-0",
+                ComponentId = "safety",
+                LanguageCode = "en",
+                Created = DateTimeOffset.UtcNow,
+            });
+            s.Store(new Project
+            {
+                Id = "prj-dup-b",
+                Title = ProjectTitle,
+                Description = "resident duplicate, second",
+                AuthorId = "author-0",
+                ComponentId = "social",
+                LanguageCode = "en",
+                Created = DateTimeOffset.UtcNow,
+            });
+            await s.SaveChangesAsync(ct);
+        }
+
+        // Must not throw; and must not clobber either existing project.
+        await RunBackfill(db, store, userManager, roleManager, userInfo, ct);
+
+        await using var q = store.OpenSession(new Marten.Services.SessionOptions());
+        var dups = await Marten.QueryableExtensions.ToListAsync(
+            q.Query<Project>().Where(p => p.Title == ProjectTitle && (p.Id == "prj-dup-a" || p.Id == "prj-dup-b")), ct);
+        Assert.Equal(2, dups.Count);
+        Assert.Contains(dups, p => p.Description == "resident duplicate, first");
+        Assert.Contains(dups, p => p.Description == "resident duplicate, second");
+
+        // The rest of the corpus still backfills (the failure is local to the
+        // projects branch, not all-or-nothing).
+        Assert.True(await Count<Event>(store, ct) > 0, "no events created");
+        Assert.True(await Count<Post>(store, ct) > 0, "no posts created");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // 2b — Never clobbers the admin's display name on a reboot (ADR 0042 D1)
     // ═══════════════════════════════════════════════════════════════════════
     [Fact(DisplayName = "ADR 0130 never clobbers: the admin's in-app display name survives a warm-boot backfill")]
