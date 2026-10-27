@@ -55,8 +55,19 @@ public sealed class ChangePasswordLockedViewModel
 /// </summary>
 public sealed class SampleAdminViewModel
 {
-    /// <summary>Whether the lock is currently on
+    /// <summary>Whether the password lock is currently on
     /// (<see cref="Kumunita.Core.Identity.IIdentityService.IsSamplePasswordChangeLockedAsync"/>,
     /// the <c>false</c> floor).</summary>
     public bool PasswordChangeLocked { get; init; }
+
+    /// <summary>Whether the MFA (two-factor) lock is currently on (ADR 0194,
+    /// <see cref="Kumunita.Core.Identity.IIdentityService.IsSampleMfaLockedAsync"/>,
+    /// the <c>false</c> floor) — the ADR 0138 password lock's MFA analog, the
+    /// second toggle on the same <c>/admin/sample</c> page. A locked,
+    /// non-admin sample account is denied the MFA settings surface (the
+    /// <c>SecuritySettingsController</c> MFA enrollment / rotation / disable
+    /// legs), so a demo visitor can't mint a TOTP secret or recovery codes
+    /// that break the shared credential; the sample <c>GlobalAdmin</c> and
+    /// every real account are unaffected.</summary>
+    public bool MfaLocked { get; init; }
 }

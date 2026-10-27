@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.73.0 entry (Portability import modes — ADR 0193) — 0.72.0 (Security tab + MFA QR) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.74.0 entry (Sample-data MFA lock — ADR 0194) — 0.73.0 (Portability import modes) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -115,16 +115,25 @@ public sealed class WhatsNewTests
         // (issue submission & escalation) 0.48.0 entry.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.73.0" && head.Date == "2026-10-27",
-            "The Portability-import-modes 0.73.0 (2026-10-27) entry must be the head of the registry; got "
+            head.Version == "0.74.0" && head.Date == "2026-10-27",
+            "The Sample-data-MFA-lock 0.74.0 (2026-10-27) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("portability import modes", StringComparison.OrdinalIgnoreCase)
+            head.Changes.Any(c => c.Contains("MFA", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("sample", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("lock", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0194", StringComparison.OrdinalIgnoreCase)),
+            "The 0.74.0 head entry must name the Sample-data-MFA-lock lane + the ADR 0194.");
+
+        // The Portability-import-modes entry (0.73.0) slides one row back.
+        var portabilityImport = WhatsNew.All.Single(v => v.Version == "0.73.0");
+        Assert.True(
+            portabilityImport.Changes.Any(c => c.Contains("portability import modes", StringComparison.OrdinalIgnoreCase)
                                  && c.Contains("keep existing", StringComparison.OrdinalIgnoreCase)
                                  && c.Contains("ADR 0193", StringComparison.OrdinalIgnoreCase)),
-            "The 0.73.0 head entry must name the Portability-import-modes lane + the ADR 0193.");
+            "The 0.73.0 entry must name the Portability-import-modes lane + the ADR 0193.");
 
-        // The Security-tab + MFA-pairing-QR entry (0.72.0) slides one row back.
+        // The Security-tab + MFA-pairing-QR entry (0.72.0) slides two rows back.
         var securityTab = WhatsNew.All.Single(v => v.Version == "0.72.0");
         Assert.True(
             securityTab.Changes.Any(c => c.Contains("Security", StringComparison.OrdinalIgnoreCase)

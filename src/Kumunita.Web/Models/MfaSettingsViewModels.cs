@@ -80,3 +80,24 @@ public sealed class MfaDisableViewModel
     [Required, StringLength(10, MinimumLength = 6)]
     public string Code { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// The <b>locked</b> notice shown to a sample account on a
+/// <c>SampleData__Enabled</c> instance that has opted in to the MFA lock
+/// (ADR 0194, amending ADR 0138) — the MFA enrollment surface is replaced by
+/// this static notice (no form, no write, no TOTP secret minted). The
+/// resident can still use every other feature; only the MFA settings surface
+/// is denied (so a demo visitor can't mint a TOTP secret or recovery codes
+/// that break the shared credential for the everyone else who signs in with
+/// the sample account). The <c>GlobalAdmin</c> sample admin and every real
+/// (non-sample) account are unaffected (they keep their own MFA lane). The
+/// back-to-settings affordance is rendered by the view. The model exists so
+/// the view has an explicit <c>@model</c> contract (the repo's Razor
+/// convention, the <see cref="ChangePasswordLockedViewModel"/> shape).
+/// </summary>
+public sealed class MfaLockedViewModel
+{
+    // No bindable fields: the surface is a notice, not a form. The model
+    // exists so the view has an explicit @model contract (the ADR 0138
+    // ChangePasswordLockedViewModel shape, re-applied to the MFA surface).
+}

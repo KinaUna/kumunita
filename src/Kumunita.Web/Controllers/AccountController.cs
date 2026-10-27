@@ -853,13 +853,29 @@ public sealed class AccountController(
         // (user, true)` + issues recovery codes via F3.U3's `MfaEnable`
         // action) the resident re-signs-in and leg 1.5 now returns
         // `TwoFactorRequired`, completing via the leg-2 challenge.
+        // ADR 0194 — the sample-admin exemption: a sample account (a member of
+        // the closed SampleAccountEmails set, on a SampleData__Enabled
+        // instance) is EXEMPT from this forced enrollment. Without this
+        // exemption, a locked demo instance (the admin has locked MFA for the
+        // sample accounts so a visitor can't break the shared credential)
+        // would redirect the sample GlobalAdmin to /settings/security/mfa on
+        // every sign-in — but that page is itself locked for the sample
+        // accounts (IsMfaLockedForAsync), so the admin could never sign in
+        // with the shared password. The exemption reads the two-conjunct
+        // IsSampleDataAccountAsync seam (conjuncts 1+3 only — the admin-toggle
+        // gate is NOT consulted, so a locked instance still lets its admin
+        // through; the GlobalAdmin check is NOT applied either, since the
+        // exemption the login path needs is *precisely for* the sample
+        // GlobalAdmin). A real (non-sample) account and the non-sample
+        // GlobalAdmin are unaffected — this leg still forces them to enroll.
         // Use `UserManager.GetRolesAsync` (the repo's verified pattern —
         // `AccountController.cs:281`) + `Kumunita.Core.Identity.Roles.GlobalAdmin`
         // (NOT `ClaimsPrincipal.IsInRole`, which does not see the custom
         // `Kumunita.Role` claim type).
         var userRoles = await userManager.GetRolesAsync(user);
         if (userRoles.Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)
-            && !await signInManager.IsTwoFactorEnabledAsync(user))
+            && !await signInManager.IsTwoFactorEnabledAsync(user)
+            && !(user.Id is not null && await identity.IsSampleDataAccountAsync(user.Id)))
         {
             // **Do NOT sign out here.** The `SecuritySettingsController`
             // (F3.U3) is `[Authorize]`, so the resident must be signed in to

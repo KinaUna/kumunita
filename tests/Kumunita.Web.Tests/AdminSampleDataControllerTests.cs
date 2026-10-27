@@ -108,6 +108,34 @@ public class AdminSampleDataControllerTests
         Assert.False(vm.PasswordChangeLocked);
     }
 
+    // ── ADR 0194 — the MFA lock (the ADR 0138 analog, the second toggle) ──
+
+    [Fact]
+    public async Task Index_SampleDataEnabled_MfaLocked_Seeded()
+    {
+        var (controller, identity) = Build(sampleDataEnabled: true);
+        identity.IsSampleMfaLockedAsync().Returns(true);
+
+        var action = await controller.Index();
+        var view = Assert.IsType<ViewResult>(action);
+        var vm = Assert.IsType<Kumunita.Web.Models.SampleAdminViewModel>(view.ViewData.Model);
+
+        Assert.True(vm.MfaLocked);
+    }
+
+    [Fact]
+    public async Task Index_SampleDataEnabled_MfaLockOff_FalseFloor()
+    {
+        var (controller, identity) = Build(sampleDataEnabled: true);
+        identity.IsSampleMfaLockedAsync().Returns(false);
+
+        var action = await controller.Index();
+        var view = Assert.IsType<ViewResult>(action);
+        var vm = Assert.IsType<Kumunita.Web.Models.SampleAdminViewModel>(view.ViewData.Model);
+
+        Assert.False(vm.MfaLocked);
+    }
+
     // ── Save ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -147,5 +175,70 @@ public class AdminSampleDataControllerTests
         Assert.Equal(nameof(AdminSampleDataController.Index), redirect.ActionName);
 
         await identity.Received(1).SetSamplePasswordChangeLockedAsync(false, Admin);
+    }
+
+    // ── ADR 0194 — the MFA lock Save tests (the ADR 0138 analog) ────────────
+
+    [Fact]
+    public async Task Save_MfaLocked_CallsMfaServiceAndRedirects()
+    {
+        var (controller, identity) = Build(sampleDataEnabled: true);
+
+        var action = await controller.Save(passwordChangeLocked: true, mfaLocked: true);
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSampleDataController.Index), redirect.ActionName);
+
+        // Both locks were written (the ADR 0138 password lock + the ADR 0194 MFA lock).
+        await identity.Received(1).SetSamplePasswordChangeLockedAsync(true, Admin);
+        await identity.Received(1).SetSampleMfaLockedAsync(true, Admin);
+    }
+
+    [Fact]
+    public async Task Save_MfaUnlocked_CallsMfaServiceAndRedirects()
+    {
+        var (controller, identity) = Build(sampleDataEnabled: true);
+
+        var action = await controller.Save(passwordChangeLocked: false, mfaLocked: false);
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSampleDataController.Index), redirect.ActionName);
+
+        // Both locks were written (the ADR 0138 password lock + the ADR 0194 MFA lock).
+        await identity.Received(1).SetSamplePasswordChangeLockedAsync(false, Admin);
+        await identity.Received(1).SetSampleMfaLockedAsync(false, Admin);
+    }
+
+    [Fact]
+    public async Task Save_MfaSampleDataDisabled_Returns404_AndDoesNotWrite()
+    {
+        // The gate is authoritative on the write path too — a crafted POST to
+        // a real instance is refused (the ADR 0050 gate shape); the MFA lock
+        // seam is not invoked.
+        var (controller, identity) = Build(sampleDataEnabled: false);
+
+        var action = await controller.Save(passwordChangeLocked: true, mfaLocked: true);
+        Assert.IsType<NotFoundResult>(action);
+
+        await identity.DidNotReceiveWithAnyArgs()
+            .SetSampleMfaLockedAsync(Arg.Any<bool>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task Save_Pre0194_SingleArg_MfaLockDefaultsToFalse()
+    {
+        // The ADR 0138 Save(bool) signature (pre-ADR-0194) still works — the
+        // mfaLocked parameter defaults to false (the ADR 0194 `false` floor).
+        // A pre-0194 form that posts only passwordChangeLocked still works,
+        // leaving the MFA gate unchanged at its false floor.
+        var (controller, identity) = Build(sampleDataEnabled: true);
+
+        var action = await controller.Save(true);
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSampleDataController.Index), redirect.ActionName);
+
+        // The password lock was written; the MFA lock was written to false (the
+        // default, the ADR 0194 `false` floor — the pre-0194 form did not post
+        // mfaLocked, so it stays off).
+        await identity.Received(1).SetSamplePasswordChangeLockedAsync(true, Admin);
+        await identity.Received(1).SetSampleMfaLockedAsync(false, Admin);
     }
 }

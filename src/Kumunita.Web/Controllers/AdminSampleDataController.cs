@@ -69,31 +69,44 @@ public sealed class AdminSampleDataController(
 
         return View(new SampleAdminViewModel
         {
-            PasswordChangeLocked = await identity.IsSamplePasswordChangeLockedAsync()
+            PasswordChangeLocked = await identity.IsSamplePasswordChangeLockedAsync(),
+            // ADR 0194 — the MFA lock (the ADR 0138 analog, the second toggle
+            // on this same page), the `false` floor.
+            MfaLocked = await identity.IsSampleMfaLockedAsync()
         });
     }
 
     /// <summary>
-    /// <c>POST /admin/sample</c> — sets the lock. Returns <b>404</b> when the
-    /// <c>SampleData__Enabled</c> flag is not set (the gate is authoritative
-    /// on the write path too, not just the hidden link — a crafted POST to a
-    /// real instance is refused, the ADR 0050 gate shape). Otherwise delegates
-    /// to <see cref="IIdentityService.SetSamplePasswordChangeLockedAsync"/>
-    /// (the single audited write lane — exactly one <c>AccessAudit</c> row,
-    /// <c>Via = Admin</c>). Success → a surfaced <c>info</c> + redirect (the
-    /// change is live on the very next <c>IsChangePasswordLockedForAsync</c> /
-    /// render — data, not config).
+    /// <c>POST /admin/sample</c> — sets the lock(s). Returns <b>404</b> when
+    /// the <c>SampleData__Enabled</c> flag is not set (the gate is
+    /// authoritative on the write path too, not just the hidden link — a
+    /// crafted POST to a real instance is refused, the ADR 0050 gate shape).
+    /// Otherwise delegates to
+    /// <see cref="IIdentityService.SetSamplePasswordChangeLockedAsync"/>
+    /// (ADR 0138 — the password lock) and
+    /// <see cref="IIdentityService.SetSampleMfaLockedAsync"/> (ADR 0194 — the
+    /// MFA lock), each the single audited write lane for its gate (exactly one
+    /// <c>AccessAudit</c> row each, <c>Via = Admin</c>). Success → a surfaced
+    /// <c>info</c> + redirect (the change is live on the very next
+    /// <c>IsChangePasswordLockedForAsync</c> /
+    /// <c>IsMfaLockedForAsync</c> / render — data, not config). The
+    /// <c>mfaLocked</c> parameter is optional (defaults to the ADR 0138
+    /// password-only form shape — a pre-ADR-0194 form that posts only
+    /// <c>passwordChangeLocked</c> still works, leaving the MFA gate
+    /// unchanged at its <c>false</c> floor).
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(bool passwordChangeLocked)
+    public async Task<IActionResult> Save(bool passwordChangeLocked, bool mfaLocked = false)
     {
-        // ADR 0138 — the existence gate, authoritative on the write path too.
+        // ADR 0138 / ADR 0194 — the existence gate, authoritative on the write
+        // path too.
         if (!await identity.IsSampleDataEnabledAsync())
             return NotFound();
 
         var actor = ActorId(User) ?? string.Empty;
         await identity.SetSamplePasswordChangeLockedAsync(passwordChangeLocked, actor);
+        await identity.SetSampleMfaLockedAsync(mfaLocked, actor);
         TempData["info"] = passwordChangeLocked
             ? "Sample accounts are now locked out of changing their own password (the demo admin can still change theirs). Visitors can test features without breaking the shared credentials."
             : "Sample accounts can change their own password again.";

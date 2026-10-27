@@ -1002,6 +1002,19 @@ public static class KnownTranslationKeys
             ["admin.sample_lock_label"] = "Sample account password changes",
             ["admin.sample_lock_on"] = "Locked — sample accounts can't change their own password",
             ["admin.sample_lock_off"] = "Unlocked — sample accounts can change their own password",
+
+            // ── ADR 0194 — the sample-account MFA (two-factor) lock (amends
+            //    ADR 0138): the /settings/security/mfa lock notice, the
+            //    settings back-link, and the /admin/sample MFA toggle ──
+            ["settings.security.mfa_locked_title"] = "Two-factor authentication is locked",
+            ["settings.security.mfa_locked_body"] =
+                "This is a demo account and two-factor authentication (MFA) is locked by the " +
+                "administrator so everyone can keep using the shared credentials. You can still " +
+                "use every other feature of the platform.",
+            ["settings.security.back"] = "Back to your settings",
+            ["admin.sample_mfa_label"] = "Sample account two-factor (MFA)",
+            ["admin.sample_mfa_on"] = "Locked — sample accounts can't enable or change two-factor",
+            ["admin.sample_mfa_off"] = "Unlocked — sample accounts can use the MFA settings page",
             ["account.login.error.blocked"] =
                 "Your account has been temporarily suspended. Contact an administrator.",
             ["account.login.error.removed"] =
@@ -3920,6 +3933,17 @@ public static class KnownTranslationKeys
             ["admin.sample_lock_label"] = "Passwortänderungen der Beispielkonten",
             ["admin.sample_lock_on"] = "Gesperrt — Beispielkonten können ihr Passwort nicht ändern",
             ["admin.sample_lock_off"] = "Nicht gesperrt — Beispielkonten können ihr Passwort ändern",
+
+            // ── ADR 0194 — the sample-account MFA lock (amends ADR 0138) ──
+            ["settings.security.mfa_locked_title"] = "Zwei-Faktor-Authentifizierung ist gesperrt",
+            ["settings.security.mfa_locked_body"] =
+                "Dies ist ein Demo-Konto und die Zwei-Faktor-Authentifizierung (MFA) ist vom " +
+                "Administrator gesperrt, damit alle die gemeinsamen Zugangsdaten weiter nutzen " +
+                "können. Alle anderen Funktionen der Plattform kannst du weiterhin verwenden.",
+            ["settings.security.back"] = "Zurück zu deinen Einstellungen",
+            ["admin.sample_mfa_label"] = "Zwei-Faktor (MFA) der Beispielkonten",
+            ["admin.sample_mfa_on"] = "Gesperrt — Beispielkonten können Zwei-Faktor nicht aktivieren oder ändern",
+            ["admin.sample_mfa_off"] = "Nicht gesperrt — Beispielkonten können die MFA-Einstellungsseite nutzen",
             ["account.login.error.blocked"] =
                 "Dein Konto wurde vorübergehend gesperrt. Wende dich an einen Administrator.",
             ["account.login.error.removed"] =
@@ -6615,6 +6639,18 @@ public static class KnownTranslationKeys
             ["admin.sample_lock_label"] = "Changements de mot de passe des comptes d'exemple",
             ["admin.sample_lock_on"] = "Verrouillé — les comptes d'exemple ne peuvent pas changer leur mot de passe",
             ["admin.sample_lock_off"] = "Déverrouillé — les comptes d'exemple peuvent changer leur mot de passe",
+
+            // ── ADR 0194 — the sample-account MFA lock (amends ADR 0138) ──
+            ["settings.security.mfa_locked_title"] = "L'authentification à deux facteurs est verrouillée",
+            ["settings.security.mfa_locked_body"] =
+                "Ceci est un compte de démonstration et l'authentification à deux facteurs (MFA) est " +
+                "verrouillée par l'administrateur afin que tous puissent continuer à utiliser les " +
+                "identifiants partagés. Tu peux toujours utiliser toutes les autres fonctionnalités " +
+                "de la plateforme.",
+            ["settings.security.back"] = "Retour à tes paramètres",
+            ["admin.sample_mfa_label"] = "Deux facteurs (MFA) des comptes d'exemple",
+            ["admin.sample_mfa_on"] = "Verrouillé — les comptes d'exemple ne peuvent pas activer ou modifier la MFA",
+            ["admin.sample_mfa_off"] = "Déverrouillé — les comptes d'exemple peuvent utiliser la page MFA",
             ["account.login.error.blocked"] =
                 "Votre compte a été suspendu temporairement. Contactez un administrateur.",
             ["account.login.error.removed"] =
@@ -9309,6 +9345,17 @@ public static class KnownTranslationKeys
             ["admin.sample_lock_label"] = "Eksempelkontos adgangskodeændringer",
             ["admin.sample_lock_on"] = "Låst — eksempelkonti kan ikke ændre deres egen adgangskode",
             ["admin.sample_lock_off"] = "Ulåst — eksempelkonti kan ændre deres egen adgangskode",
+
+            // ── ADR 0194 — the sample-account MFA lock (amends ADR 0138) ──
+            ["settings.security.mfa_locked_title"] = "To-faktor-godkendelse er låst",
+            ["settings.security.mfa_locked_body"] =
+                "Dette er en demo-konto, og to-faktor-godkendelse (MFA) er låst af administrator, " +
+                "så alle kan fortsætte med at bruge de fælles adgangspunkter. Du kan fortsat bruge " +
+                "alle andre funktioner i platformen.",
+            ["settings.security.back"] = "Tilbage til dine indstillinger",
+            ["admin.sample_mfa_label"] = "To-faktor (MFA) for eksempelkonti",
+            ["admin.sample_mfa_on"] = "Låst — eksempelkonti kan ikke aktivere eller ændre to-faktor",
+            ["admin.sample_mfa_off"] = "Ulåst — eksempelkonti kan bruge MFA-indstillings-siden",
             ["account.login.error.blocked"] =
                 "Din konto er midlertidigt suspenderet. Kontakt en administrator.",
             ["account.login.error.removed"] =

@@ -109,6 +109,28 @@ public sealed class SecuritySettingsController(
     }
 
     /// <summary>
+    /// ADR 0194 — the sample-account MFA-lock decision (the single place the
+    /// rule lives, so the <c>GET /settings/security/mfa</c> notice and the
+    /// <c>MfaEnable</c> / <c>MfaRotateRecovery</c> / <c>MfaDisable</c>
+    /// enforcement guards agree). Combines the four ADR 0138 / ADR 0194
+    /// conjuncts via the Core
+    /// <see cref="IIdentityService.IsMfaLockedForAsync"/> seam: the
+    /// <c>SampleData__Enabled</c> flag, the admin MFA-lock gate, sample-account
+    /// membership (the closed set), and the sample-<c>GlobalAdmin</c>
+    /// exemption. Every real account and the sample admin are never locked.
+    /// </summary>
+    private async Task<bool> IsMfaLockedAsync()
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+        {
+            return false;   // fail-closed: no subject → not locked (no MFA surface to guard)
+        }
+
+        return await identity.IsMfaLockedForAsync(subject);
+    }
+
+    /// <summary>
     /// Build the <c>otpauth://</c> URI from the one-time setup key + a
     /// deployment-identifying issuer (the pin §4 enrollment leg — the app
     /// builds the URI; the key comes from
@@ -252,6 +274,16 @@ public sealed class SecuritySettingsController(
             return View(new MfaSettingsViewModel());
         }
 
+        // ADR 0194 — the sample-account MFA lock: a locked, non-admin sample
+        // account gets the static MfaLocked notice instead of the enrollment
+        // surface (the ADR 0138 "surface replaced by a notice" shape, re-
+        // applied to the MFA surface). The guard is authoritative on the
+        // write path too (the MfaEnable / MfaRotateRecovery / MfaDisable
+        // actions below), so a crafted POST is refused even if the view
+        // were bypassed.
+        if (await IsMfaLockedAsync())
+            return View("MfaLocked", new MfaLockedViewModel());
+
         var enabled = await userManager.GetTwoFactorEnabledAsync(user);
 
         if (enabled)
@@ -326,6 +358,13 @@ public sealed class SecuritySettingsController(
             return RedirectToAction(nameof(Mfa));
         }
 
+        // ADR 0194 — the lock, authoritative on the write path (defense in
+        // depth over the Mfa() GET notice above): a locked, non-admin sample
+        // account is refused before any MFA write, even if the form were
+        // crafted by hand (the ADR 0138 ChangePassword guard shape).
+        if (await IsMfaLockedAsync())
+            return RedirectToAction(nameof(Mfa));
+
         if (!ModelState.IsValid)
         {
             return RedirectToAction(nameof(Mfa));
@@ -372,6 +411,12 @@ public sealed class SecuritySettingsController(
             return View(new MfaSettingsViewModel());
         }
 
+        // ADR 0194 — the lock: a locked, non-admin sample account gets the
+        // static MfaLocked notice instead of the recovery surface (the same
+        // "surface replaced by a notice" shape as the Mfa() GET above).
+        if (await IsMfaLockedAsync())
+            return View("MfaLocked", new MfaLockedViewModel());
+
         var enabled = await userManager.GetTwoFactorEnabledAsync(user);
         var remaining = await userManager.CountRecoveryCodesAsync(user);
         // Render the single Mfa view (one .cshtml for the whole enrollment
@@ -397,6 +442,13 @@ public sealed class SecuritySettingsController(
         {
             return RedirectToAction(nameof(Mfa));
         }
+
+        // ADR 0194 — the lock, authoritative on the write path (defense in
+        // depth over the Mfa() GET notice): a locked, non-admin sample account
+        // is refused before the recovery codes are rotated (a rotation would
+        // mint new one-time codes for a shared credential the admin locked).
+        if (await IsMfaLockedAsync())
+            return RedirectToAction(nameof(Mfa));
 
         var enabled = await userManager.GetTwoFactorEnabledAsync(user);
         if (!enabled)
@@ -435,6 +487,13 @@ public sealed class SecuritySettingsController(
         {
             return RedirectToAction(nameof(Mfa));
         }
+
+        // ADR 0194 — the lock, authoritative on the write path (defense in
+        // depth over the Mfa() GET notice): a locked, non-admin sample account
+        // is refused before the MFA flag is cleared (disabling would remove a
+        // second factor the admin locked onto the shared credential).
+        if (await IsMfaLockedAsync())
+            return RedirectToAction(nameof(Mfa));
 
         var enabled = await userManager.GetTwoFactorEnabledAsync(user);
         if (!enabled)
