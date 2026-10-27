@@ -36,7 +36,7 @@
 
         @if (Model.ComponentPickerOptions.Count > 0)
         {
-            <form method="get" action="/projects" class="mb-4">
+            <form method="get" action="/projects" class="kmb-filter-bar mb-4">
                 <div class="d-flex gap-2 align-items-end">
                     <div>
                         <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
@@ -152,7 +152,7 @@
                                 {
                                     @* C-PL·4 — a free string, not an enum: rendered
                                        verbatim as a badge (the M5 status-badge shape). *@
-                                    <span class="kmb-chip ms-2">@card.Status</span>
+                                    <partial name="_StatusChip" model="@(card.Status ?? string.Empty)" />
                                 }
                                 @if (card.ComponentDisplayName is not null)
                                 {

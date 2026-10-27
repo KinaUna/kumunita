@@ -801,3 +801,40 @@ html[data-kmb-palette] button.badge.text-bg-light.border[aria-pressed='true'] {
 @media (max-width: 767.98px) {
   html[data-kmb-palette] .airy-ann-list:not(ul) > .airy-ann-row { padding: 1rem 1.125rem; }
 }
+
+/* To-dos (ADR 0189) */
+/* Status chip: soft chip with a coloured dot; the text label always carries the meaning. */
+html[data-kmb-palette] .kmb-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-inline-start: 0.5rem;
+  padding: 0.3125rem 0.75rem;
+  border-radius: var(--kmb-radius-pill);
+  background: var(--kmb-tint-a);
+  color: var(--kmb-ink-soft);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.kmb-status-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--kmb-muted); flex: none; }
+html[data-kmb-palette] .kmb-status.is-in-progress .kmb-status-dot { background: #f59e0b; }
+html[data-kmb-palette] .kmb-status.is-done { background: var(--kmb-chip-selected-bg); color: var(--kmb-chip-selected-ink); }
+html[data-kmb-palette] .kmb-status.is-done .kmb-status-dot { background: var(--kmb-accent); }
+html[data-kmb-palette] .kmb-status.is-cancelled { color: var(--kmb-muted); text-decoration: line-through; }
+html[data-kmb-palette] .kmb-status.is-cancelled .kmb-status-dot { background: var(--kmb-hover-border); }
+/* Meta line: assignee avatar inline, overdue due date. */
+.kmb-assignee { display: inline-flex; align-items: center; gap: 0.375rem; vertical-align: middle; }
+html[data-kmb-palette] .kmb-overdue { color: var(--kmb-ink); font-weight: 600; }
+/* Filter toolbar (to-dos, projects, boards): a quiet bar above the list. */
+html[data-kmb-palette] .kmb-filter-bar {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 0.875rem 1rem;
+}
+html[data-kmb-palette] .kmb-filter-bar .form-label { font-family: var(--bs-heading-font-family); font-size: 0.8125rem; color: var(--kmb-ink-soft); margin-bottom: 0.25rem; }
+html[data-kmb-palette] .kmb-filter-bar .form-select { border-radius: var(--kmb-radius-input); }
+html[data-kmb-palette] .kmb-filter-bar .form-check { margin-bottom: 0.5rem; }

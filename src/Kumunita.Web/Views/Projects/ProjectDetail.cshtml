@@ -160,7 +160,7 @@
                         }
                         @if (Model.Status is not null)
                         {
-                            <span class="kmb-chip ms-2">@Model.Status</span>
+                            <partial name="_StatusChip" model="@(Model.Status ?? string.Empty)" />
                         }
                         @if (Model.ComponentDisplayName is not null)
                         {
@@ -531,7 +531,7 @@
                                     }
                                     @if (card.Status is not null)
                                     {
-                                        <span class="kmb-chip ms-2">@card.Status</span>
+                                        <partial name="_StatusChip" model="@(card.Status ?? string.Empty)" />
                                     }
                                 </div>
                             </div>

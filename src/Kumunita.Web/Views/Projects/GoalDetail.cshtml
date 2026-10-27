@@ -149,7 +149,7 @@
                                     }
                                     @if (card.Status is not null)
                                     {
-                                        <span class="kmb-chip ms-2">@card.Status</span>
+                                        <partial name="_StatusChip" model="@(card.Status ?? string.Empty)" />
                                     }
                                 </div>
                                 @if (card.DescriptionHtml is not null)
