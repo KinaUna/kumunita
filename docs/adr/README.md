@@ -197,3 +197,4 @@ Decision / Consequences. New decisions take the next number.
 | 0187 | Group event detail and RSVP badges — community event layout for group events (date tile, icon rows, author band), localised RSVP labels, soft status chips for responses on both event pages. |
 | 0188 | Projects landing, goal / project detail, shared list rows — tab strip follows the accent, `.airy-ann-list` rows become cards app-wide, neutral badges become chips. |
 | 0189 | To-dos — shared status chip with dot, assignee avatar in the meta line, overdue marker, filter toolbar, detail cards and comment cards. |
+| 0190 | Kanban boards — board breaks out of the page column, fixed-width lanes with sideways scroll, lane/card surfaces and accent focus/drag states on palette tokens. CSS only. |

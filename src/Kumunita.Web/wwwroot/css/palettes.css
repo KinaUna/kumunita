@@ -838,3 +838,72 @@ html[data-kmb-palette] .kmb-filter-bar {
 html[data-kmb-palette] .kmb-filter-bar .form-label { font-family: var(--bs-heading-font-family); font-size: 0.8125rem; color: var(--kmb-ink-soft); margin-bottom: 0.25rem; }
 html[data-kmb-palette] .kmb-filter-bar .form-select { border-radius: var(--kmb-radius-input); }
 html[data-kmb-palette] .kmb-filter-bar .form-check { margin-bottom: 0.5rem; }
+
+/* Kanban boards (ADR 0190) */
+
+/* Wider board: the lanes row breaks out of the page column (header and description
+   stay in it) up to 1400px, with fixed-width lanes that scroll sideways. Not applied
+   in full screen, expanded-page, kiosk or embed modes (their own layouts), or on
+   phones (the board just scrolls inside the column). */
+@media (min-width: 992px) {
+  html[data-kmb-palette] body:not(.kmb-page-expanded):not(.kmb-kiosk):not(.kmb-embed) .kanban-board:not(:fullscreen):not(.kanban-full) {
+    width: min(1400px, calc(100vw - 2rem));
+    max-width: none;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+html[data-kmb-palette] .kanban-board { gap: 1rem; padding-bottom: 0.75rem; }
+html[data-kmb-palette] .kanban-lane {
+  flex: 0 0 18rem;
+  min-width: 17rem;
+  max-width: none;
+  background: color-mix(in srgb, var(--kmb-border) 18%, var(--bs-body-bg));
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 0.875rem;
+}
+html[data-kmb-palette] .kanban-lane-new {
+  flex: 0 0 14rem;
+  min-width: 14rem;
+  max-width: none;
+  background: transparent;
+  border: 1px dashed var(--kmb-hover-border);
+  border-radius: var(--kmb-radius);
+}
+html[data-kmb-palette] .kanban-lane-head h3 {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1rem;
+  color: var(--kmb-ink);
+}
+html[data-kmb-palette] .kanban-lane-at-limit {
+  border-color: var(--kmb-border);
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+html[data-kmb-palette] .kanban-card {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: 12px;
+  padding: 0.75rem 0.875rem;
+  box-shadow: none;
+}
+html[data-kmb-palette] .kanban-card:hover {
+  border-color: var(--kmb-hover-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+html[data-kmb-palette] .kanban-card:focus,
+html[data-kmb-palette] .kanban-card:focus-within {
+  border-color: var(--kmb-accent);
+  box-shadow: none;
+}
+html[data-kmb-palette] .kanban-card a:hover { color: var(--kmb-accent); }
+html[data-kmb-palette] .kanban-card h4 { font-family: var(--bs-heading-font-family); font-weight: 600; color: var(--kmb-ink); }
+html[data-kmb-palette] .kanban-lane.drag-over {
+  border-color: var(--kmb-accent);
+  background: color-mix(in srgb, var(--kmb-accent) 8%, var(--bs-body-bg));
+  outline: 2px dashed var(--kmb-accent);
+}
+html[data-kmb-palette] .kanban-board:fullscreen,
+html[data-kmb-palette] .kanban-board.kanban-full { background: var(--bs-body-bg); }
+html[data-kmb-palette] .kanban-board-empty { background: var(--kmb-surface); border: 1px dashed var(--kmb-hover-border) !important; border-radius: var(--kmb-radius) !important; }
