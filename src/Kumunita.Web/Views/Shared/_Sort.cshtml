@@ -44,8 +44,11 @@
         bool asc = string.Equals(activeDir, "asc", StringComparison.OrdinalIgnoreCase);
         string indicator = isActive ? (asc ? "↑" : "↓") : string.Empty;
         string title = isActive ? (asc ? "Sorted ascending — click for descending" : "Sorted descending — click for ascending") : "Sort by this field";
-        <a class="sort-link badge @(isActive ? "bg-primary text-white" : "bg-secondary text-white")"
+        @* ADR 0173 — quiet segmented pills: neutral outline when inactive, the palette's
+           selected-chip tint when active (palettes.css .kmb-sort-pill). *@
+        <a class="sort-link kmb-sort-pill @(isActive ? "is-active" : null)"
            href="@SortLink(key, nextDir)"
+           aria-current="@(isActive ? "true" : null)"
            title="@title"><kw-l key="sort.@key">@key</kw-l>@(string.IsNullOrEmpty(indicator) ? string.Empty : " " + indicator)</a>
     }
 </div>

@@ -300,14 +300,17 @@ public class PwaManifestTests
     /// <summary>
     /// U06 / D6 — the <c>site.css</c> media-block boundary is pinned:
     /// exactly <b>four</b> <c>@media (max-width: 767.98px)</c> blocks +
-    /// <b>one</b> <c>@media (max-width: 575.98px)</c> block (the ADR 0111
-    /// collapsed-mobile-navbar block — Bootstrap's navbar-expand-sm
-    /// breakpoint, narrower than the app's 767.98px block) + <b>one</b>
+    /// <b>four</b> <c>@media (max-width: 575.98px)</c> blocks (the ADR 0111
+    /// collapsed-mobile-navbar block + the ADR 0175 D4 feed-card phone block
+    /// + the ADR 0179 event-card phone block + the ADR 0180 event-detail
+    /// phone tile block — all at Bootstrap's narrower-than-767.98px
+    /// sm-collapsed breakpoint) + <b>one</b>
     /// <c>@media (prefers-reduced-motion: reduce)</c> block, for a total of
-    /// <b>six</b> <c>@media</c> occurrences. The 575.98px block is a recorded
-    /// drift-guard entry (ADR 0111), so it is expected here. Any OTHER count
-    /// change without a recorded entry is a breach (the design doc §drift-guard
-    /// frozen pin #7).
+    /// <b>eleven</b> <c>@media</c> occurrences (thirteen counting the two ADR
+    /// 0133 dark blocks below). Every 575.98px block is a recorded
+    /// drift-guard entry (ADR 0111, ADR 0175, ADR 0179, ADR 0180), so it is
+    /// expected here. Any OTHER count change without a recorded entry is a
+    /// breach (the design doc §drift-guard frozen pin #7).
     /// </summary>
     [Fact(DisplayName = "M10 U06: site.css media-block boundary pinned (D6)")]
     public void Site_Css_Media_Block_Boundary_Pinned()
@@ -322,11 +325,14 @@ public class PwaManifestTests
         Assert.True(widthBlocks.Count == 4,
             $"Expected exactly 4 '@media (max-width: 767.98px)' blocks (the U00–U05 baseline); found {widthBlocks.Count}.");
 
-        // The one collapsed-mobile navbar block (ADR 0111 — the 575.98px
-        // breakpoint where navbar-expand-sm collapses; a recorded drift entry).
+        // The four 575.98px blocks (all recorded drift entries): the ADR 0111
+        // collapsed-mobile navbar (the breakpoint where navbar-expand-sm
+        // collapses) + the ADR 0175 D4 feed-card phone rule (16px padding /
+        // 12px gap on phones) + the ADR 0179 event-card phone rule + the ADR
+        // 0180 event-detail phone tile rule.
         var collapsedBlocks = Regex.Matches(css, @"@media\s*\(max-width:\s*575\.98px\)");
-        Assert.True(collapsedBlocks.Count == 1,
-            $"Expected exactly 1 '@media (max-width: 575.98px)' block (the ADR 0111 collapsed navbar); found {collapsedBlocks.Count}.");
+        Assert.True(collapsedBlocks.Count == 4,
+            $"Expected exactly 4 '@media (max-width: 575.98px)' blocks (the ADR 0111 collapsed navbar + the ADR 0175 D4 feed-card phone rule + the ADR 0179 event-card phone rule + the ADR 0180 event-detail phone rule); found {collapsedBlocks.Count}.");
 
         // The one reduced-motion block.
         var motionBlocks = Regex.Matches(css, @"@media\s*\(prefers-reduced-motion:\s*reduce\)");
@@ -341,13 +347,14 @@ public class PwaManifestTests
         Assert.True(darkBlocks.Count == 2,
             $"Expected exactly 2 '@media (prefers-color-scheme: dark)' blocks (ADR 0133 Forest theme); found {darkBlocks.Count}.");
 
-        // The total @media count is eight (4 width + 1 collapsed + 1 motion +
-        // 2 dark) — the "no new boundary without a record" witness (the design
-        // doc §drift-guard frozen pin #7: "a count change without a recorded
-        // entry is a breach").
+        // The total @media count is eleven (4 width + 4 collapsed + 1 motion
+        // + 2 dark) — the "no new boundary without a record" witness (the
+        // design doc §drift-guard frozen pin #7: "a count change without a
+        // recorded entry is a breach"). The fourth collapsed block is the ADR
+        // 0180 event-detail phone rule.
         var allMedia = Regex.Matches(css, @"@media");
-        Assert.True(allMedia.Count == 8,
-            $"Expected exactly 8 '@media' occurrences total (4 width + 1 collapsed + 1 reduced-motion + 2 dark / ADR 0133); found {allMedia.Count}.");
+        Assert.True(allMedia.Count == 11,
+            $"Expected exactly 11 '@media' occurrences total (4 width + 4 collapsed (ADR 0111 + ADR 0175 D4 + ADR 0179 + ADR 0180) + 1 reduced-motion + 2 dark / ADR 0133); found {allMedia.Count}.");
     }
 
     // ── shared helper ───────────────────────────────────────────────────────

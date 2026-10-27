@@ -96,29 +96,10 @@
             <section class="mb-4">
                 <h2 class="h5 mb-1"><kw-l key="events.mine.title">Your upcoming events</kw-l></h2>
                 <p class="text-muted small mb-3"><kw-l key="events.mine.hint">Events you've RSVPed to or organized.</kw-l></p>
-                <div class="airy-ann-list" id="events-mine-list">
+                <div class="kmb-event-list" id="events-mine-list">
                     @for (int _mi = 0; _mi < Model.MyEvents.Count; _mi++)
                     {
-                        var row = Model.MyEvents[_mi];
-                        <div class="airy-ann-row" @(_mi >= _mineVisible ? "hidden" : null)>
-                            <div>
-                                <h3 class="airy-ann-title">
-                                    <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
-                                </h3>
-                                <div class="text-muted small mb-1">
-                                    @row.AuthorDisplayName — <kw-dt dt="@row.Start" format="g"></kw-dt>
-                                    @if (row.ComponentDisplayName is not null)
-                                    {
-                                        <span class="badge text-bg-light border ms-2">@row.ComponentDisplayName</span>
-                                    }
-                                </div>
-                                @if (!string.IsNullOrWhiteSpace(row.Location))
-                                {
-                                    <div class="mb-1">@row.Location</div>
-                                }
-                                <p class="mb-1">@MarkdownRenderer.PlainTextPreview(row.Body, 250)</p>
-                            </div>
-                        </div>
+                        <partial name="_EventCard" model="(Model.MyEvents[_mi], _mi >= _mineVisible)" />
                     }
                 </div>
                 @if (_mineHidden > 0)
@@ -136,7 +117,7 @@
             </section>
         }
 
-        <div class="airy-ann-list">
+        <div class="kmb-event-feed">
             @* The shared sort control (the _Sort partial) sits at the TOP of
                the feed — above the list — so the sort options are the first
                thing the viewer sees (it renders nothing when the VM field is
@@ -149,34 +130,16 @@
             {
                 @if (Model.Past)
                 {
-                    <div class="p-4 text-muted"><kw-l key="events.past_empty">No past events yet.</kw-l></div>
+                    <div class="kmb-empty"><p class="kmb-empty-title mb-0"><kw-l key="events.past_empty">No past events yet.</kw-l></p></div>
                 }
                 else
                 {
-                    <div class="p-4 text-muted"><kw-l key="events.empty">No upcoming events yet.</kw-l></div>
+                    <div class="kmb-empty"><p class="kmb-empty-title mb-0"><kw-l key="events.empty">No upcoming events yet.</kw-l></p></div>
                 }
             }
             @foreach (var row in Model.Events)
             {
-                <div class="airy-ann-row">
-                    <div>
-                        <h3 class="airy-ann-title">
-                            <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
-                        </h3>
-                        <div class="text-muted small mb-1">
-                            @row.AuthorDisplayName — <kw-dt dt="@row.Start" format="g"></kw-dt>
-                            @if (row.ComponentDisplayName is not null)
-                            {
-                                <span class="badge text-bg-light border ms-2">@row.ComponentDisplayName</span>
-                            }
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(row.Location))
-                        {
-                            <div class="mb-1">@row.Location</div>
-                        }
-                        <p class="mb-1">@MarkdownRenderer.PlainTextPreview(row.Body, 250)</p>
-                    </div>
-                </div>
+                <partial name="_EventCard" model="(row, false)" />
             }
 
             @* M7 (ADR 0090 D5) — the event feed's shared pager (F2 one-page

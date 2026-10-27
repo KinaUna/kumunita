@@ -36,7 +36,7 @@
                         scrolls that reply into view, and highlights it. *@
 }
 
-<li class="list-group-item" id="reply-@r.Id">
+<li class="kmb-ann-comment" id="reply-@r.Id">
                         @* TD (ADR 0027) — the reply's authored-in language is the
                            first, default-visible variant; each added translation
                            is a hidden variant; the chip row is a selector that
@@ -89,16 +89,18 @@
                                         <span class="text-muted small">
                                             <kw-l key="posts.translations_label">Translations</kw-l>:
                                         </span>
-                                        <button type="button" class="badge text-bg-light border"
+                                        <button type="button" class="kmb-chip kmb-chip-btn"
                                                 data-translation-chip data-td-group="reply-@r.Id"
-                                                data-td-variant="@r.OriginalLanguageCode">
+                                                data-td-variant="@r.OriginalLanguageCode"
+                                                aria-pressed="@(replyOriginalHidden ? "false" : "true")">
                                             @LangName(r.OriginalLanguageCode)
                                         </button>
                                         @foreach (var t in r.Translations.OrderBy(x => x.LanguageCode))
                                         {
-                                            <button type="button" class="badge text-bg-light border"
+                                            <button type="button" class="kmb-chip kmb-chip-btn"
                                                     data-translation-chip data-td-group="reply-@r.Id"
-                                                    data-td-variant="@t.LanguageCode">
+                                                    data-td-variant="@t.LanguageCode"
+                                                    aria-pressed="@(String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">
                                                 @LangName(t.LanguageCode)
                                             </button>
                                         }

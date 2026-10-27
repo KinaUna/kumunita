@@ -81,7 +81,7 @@
             &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.CommunityDisplayName
         </a>
 
-        <div class="card mt-2 mb-4">
+        <div class="card kmb-detail-card kmb-ann-detail mt-2 mb-4">
             <div class="card-body">
                 @* Author-only edit + delete entry points (both lanes are
                    author-only at the Web layer — the non-author never sees the
@@ -130,7 +130,7 @@
                         @* Title row — the title (variant-aware) on the left; the ⋮
                            actions dropdown (ADR 0082) and the bookmark toggle (M17 /
                            ADR 0118) on the right, on the same line. *@
-                        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                        <div class="d-flex align-items-start justify-content-between gap-3 mb-2">
                             <div class="min-w-0">
                                 @* Authored-in title — the SHARED FALLBACK heading
                                    (td-variant-shared). Default-visible unless ADR 0049
@@ -141,7 +141,7 @@
                                    either way. *@
                                 <div class="td-variant td-variant-shared" data-td-variant="@Model.OriginalLanguageCode"
                                      @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                                    <h4 class="mb-0">
+                                    <h4 class="mb-0 kmb-ann-title">
                                         @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                             ? Model.Post.Title
                                             : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
@@ -160,7 +160,7 @@
                                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                         <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
                                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                            <h4 class="mb-0">@t.Title</h4>
+                                            <h4 class="mb-0 kmb-ann-title">@t.Title</h4>
                                         </div>
                                     }
                                 }
@@ -256,6 +256,33 @@
                             </div>
                         </div>
 
+                        @* ADR 0185 — the author byline under the title (the feed card
+                           header: 44px avatar, name, date, edited, community chip),
+                           the same shape as the announcement detail (ADR 0184). The
+                           avatar <img> links the audited serving lane (GET
+                           /profile/avatar/{subjectId}), monogram sibling on its
+                           fail-closed 404. Not a .td-variant, so it stays put on a
+                           translation swap. *@
+                        <div class="airy-post-head kmb-ann-byline">
+                            <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial"
+                                      mono-hue="@AvatarHue.For(Model.AuthorSubjectId)" />
+                            <span class="airy-post-author">
+                                <span class="name">@Model.AuthorDisplayName</span>
+                                <span class="when">
+                                    <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                                    @if (Model.Post.Modified is not null)
+                                    {
+                                        <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
+                                    }
+                                </span>
+                            </span>
+                            @if (!string.IsNullOrEmpty(Model.CommunityDisplayName))
+                            {
+                                <a class="kmb-chip"
+                                   href="@Url.Action("Index","Posts", new { componentId = Model.Post.ComponentId })">@Model.CommunityDisplayName</a>
+                            }
+                        </div>
+
                         @* Body — the original variant's body (default-visible unless
                            originalHidden), then one body per added translation. *@
                         <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
@@ -299,7 +326,7 @@
                             <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                                 @foreach (var tag in Model.Tags)
                                 {
-                                    <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                                    <a class="kmb-chip"
                                        href="/tags/@tag.Slug">@tag.DisplayedName</a>
                                 }
                             </div>
@@ -315,16 +342,18 @@
                                 <span class="text-muted small fw-semibold">
                                     <kw-l key="posts.translations_label">Translations</kw-l>
                                 </span>
-                                <button type="button" class="badge text-bg-light border"
+                                <button type="button" class="kmb-chip kmb-chip-btn"
                                         data-translation-chip data-td-group="post"
-                                        data-td-variant="@Model.OriginalLanguageCode">
+                                        data-td-variant="@Model.OriginalLanguageCode"
+                                        aria-pressed="@(originalHidden ? "false" : "true")">
                                     @LangName(Model.OriginalLanguageCode)
                                 </button>
                                 @foreach (var t in Model.PostTranslations.OrderBy(x => x.LanguageCode))
                                 {
-                                    <button type="button" class="badge text-bg-light border"
+                                    <button type="button" class="kmb-chip kmb-chip-btn"
                                             data-translation-chip data-td-group="post"
-                                            data-td-variant="@t.LanguageCode">
+                                            data-td-variant="@t.LanguageCode"
+                                            aria-pressed="@(String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">
                                         @LangName(t.LanguageCode)
                                     </button>
                                 }
@@ -356,23 +385,6 @@
                 </details>
             </div>
 
-            @* Author footer band (the Announcement Detail pattern): the author sits
-               at the BOTTOM of the section, below the body + tags + translations,
-               as its own card band — avatar links the audited serving lane
-               (GET /profile/avatar/{subjectId}), monogram sibling on its
-               fail-closed 404. *@
-            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
-                <span class="d-inline-flex align-items-center">
-                    <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial" />
-                </span>
-                <span>
-                    @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
-                    @if (Model.Post.Modified is not null)
-                    {
-                        <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
-                    }
-                </span>
-            </div>
         </div>
 
         @* ADR 0082 — the "Report this" modal (C-M3b·1, F1). The form is
@@ -538,7 +550,7 @@
             }
         }
 
-        <h5 class="mt-4 mb-2" style="font-weight:600;">
+        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             <kw-l key="posts.replies_heading">Replies</kw-l> <span class="text-muted">(@Model.Replies.Count)</span>
         </h5>
 
@@ -548,7 +560,7 @@
         }
         else
         {
-            <ul class="list-group mb-4">
+            <ul class="kmb-ann-comments list-unstyled p-0 mb-4">
                 @foreach (var r in Model.Replies)
                 {
                     <partial name="_PostReply" model="new PostReplyModel(r, postId, Model.Languages, defaultVariant, confirmRemoveTrans, confirmDeleteReply, ariaActionsFor, reportReasonPlaceholder)" />
@@ -557,7 +569,7 @@
             </ul>
         }
 
-        <h5 class="mt-4 mb-2" style="font-weight:600;">
+        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             @if (Model.IsAuthor)
             {
                 <text><kw-l key="posts.reply_heading_author">Reply (you are the author of this post)</kw-l></text>
@@ -568,7 +580,7 @@
             }
         </h5>
 
-        <div class="card">
+        <div class="card kmb-detail-card kmb-ann-composer">
             <div class="card-body">
                 <form class="mb-0" method="post"
                       action="@($"/posts/{postId}/replies")">

@@ -43,7 +43,7 @@
 
   // Rows beyond the first five carry the native `hidden` attribute.
   const remaining = (): HTMLElement[] =>
-    Array.from(list.querySelectorAll<HTMLElement>('.airy-ann-row[hidden]'));
+    Array.from(list.querySelectorAll<HTMLElement>('.airy-ann-row[hidden], .kmb-event-card[hidden]'));
 
   function updateLabel(count: number): void {
     if (count <= 0) return;

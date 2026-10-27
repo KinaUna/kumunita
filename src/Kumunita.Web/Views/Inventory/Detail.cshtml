@@ -40,9 +40,22 @@
             </div>
         </header>
 
-        <div class="card mb-4">
+        @* ADR 0191 — type + availability chips above the summary card. *@
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <span class="kmb-chip">@Model.Item.OwnerKind</span>
+            @if (Model.Item.CurrentHolderId is not null)
+            {
+                <span class="kmb-status is-in-progress ms-0"><span class="kmb-status-dot" aria-hidden="true"></span><kw-l key="inv.detail.currentHolder">Currently with</kw-l>&nbsp;@Model.CurrentHolderName</span>
+            }
+            else
+            {
+                <span class="kmb-status is-done ms-0"><span class="kmb-status-dot" aria-hidden="true"></span><kw-l key="inv.list.available">Available</kw-l></span>
+            }
+        </div>
+
+        <div class="card kmb-detail-card mb-4">
             <div class="card-body">
-                <dl class="row mb-0">
+                <dl class="row mb-0 kmb-dl">
                     <dt class="col-sm-3"><kw-l key="inv.create.ownerKind">Type</kw-l></dt>
                     <dd class="col-sm-9">@Model.Item.OwnerKind</dd>
 
@@ -111,11 +124,11 @@
             }
             else
             {
-                <ul class="list-group">
+                <ul class="kmb-ann-comments list-unstyled p-0">
                     @foreach (var row in Model.History)
                     {
                         var checkout = row.Checkout;
-                        <li class="list-group-item">
+                        <li class="kmb-ann-comment">
                             <span class="fw-semibold">@row.BorrowerName</span>
                             <span class="text-muted small ms-2">
                                 · <kw-l key="inv.detail.checkOut">Check out</kw-l> <kw-dt dt="@checkout.CheckedOutAt" format="g"></kw-dt>
@@ -125,7 +138,7 @@
                                 }
                                 else
                                 {
-                                    <span class="badge bg-warning text-dark ms-2">open</span>
+                                    <span class="kmb-status is-in-progress"><span class="kmb-status-dot" aria-hidden="true"></span><kw-l key="inv.detail.checkedOut">Out</kw-l></span>
                                 }
                             </span>
                             @if (!string.IsNullOrWhiteSpace(checkout.Note))

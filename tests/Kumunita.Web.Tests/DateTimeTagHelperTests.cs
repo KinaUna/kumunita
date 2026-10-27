@@ -120,6 +120,19 @@ public class DateTimeTagHelperTests
         Assert.NotEqual("14:25", rendered);
     }
 
+    [Theory(DisplayName = "ADR 0179 sentinels: month / day / weekday render just that part of the wall-clock time")]
+    [InlineData("month", "Mar")]
+    [InlineData("day", "10")]
+    [InlineData("weekday", "Tue")]
+    [InlineData("MONTH", "Mar")]
+    public void DateTile_Sentinels_RenderOnlyThatPart(string format, string expected)
+    {
+        var helper = BuildHelper(timeOnly: false, dt: Instant);
+        helper.Format = format;
+
+        Assert.Equal(expected, Run(helper));
+    }
+
     [Fact(DisplayName = "A null instant renders nothing (the 'no value → no text' floor)")]
     public void NullDt_RendersEmpty()
     {

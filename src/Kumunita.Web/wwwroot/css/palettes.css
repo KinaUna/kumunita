@@ -142,8 +142,8 @@ html[data-kmb-palette='ember'] {
     --bs-tertiary-bg: #262019;    --bs-tertiary-bg-rgb: 38, 32, 25;
     --bs-border-color: #352d26;   --bs-border-color-rgb: 53, 45, 38;
     --bs-light-border-subtle: #352d26;
-    --bs-link-color: #8fcaa6;     --bs-link-color-rgb: 143, 202, 166;
-    --bs-link-hover-color: #b0dcc1; --bs-link-hover-color-rgb: 176, 220, 193;
+    --bs-link-color: #f0b45c;     --bs-link-color-rgb: 240, 180, 92;
+    --bs-link-hover-color: #f5c378; --bs-link-hover-color-rgb: 245, 195, 120;
 
     --kmb-ink: #f1e9dc;
     --kmb-ink-soft: #dccfbc;
@@ -173,8 +173,8 @@ html[data-kmb-theme='dark'][data-kmb-palette='ember'] {
   --bs-tertiary-bg: #262019;    --bs-tertiary-bg-rgb: 38, 32, 25;
   --bs-border-color: #352d26;   --bs-border-color-rgb: 53, 45, 38;
   --bs-light-border-subtle: #352d26;
-  --bs-link-color: #8fcaa6;     --bs-link-color-rgb: 143, 202, 166;
-  --bs-link-hover-color: #b0dcc1; --bs-link-hover-color-rgb: 176, 220, 193;
+  --bs-link-color: #f0b45c;     --bs-link-color-rgb: 240, 180, 92;
+  --bs-link-hover-color: #f5c378; --bs-link-hover-color-rgb: 245, 195, 120;
 
   --kmb-ink: #f1e9dc;
   --kmb-ink-soft: #dccfbc;
@@ -235,3 +235,684 @@ html[data-kmb-palette] .airy-side-list a.active {
 }
 /* TODO: .btn-outline-primary, .badge / sort pills (.text-bg-secondary amber) and
    the "Add note" button still use their own colours; review per palette. */
+
+/* ==========================================================================
+   Quiet controls (ADR 0173)
+   --------------------------------------------------------------------------
+   Amber stays reserved for the single primary action. Secondary (outline)
+   buttons and the sort control become neutral: muted outline, soft tint and
+   accent text on hover. Same specificity-tie trick as .btn-primary above
+   (html[data-kmb-palette] beats site.css's dark-scope .btn-outline-secondary
+   by load order), so this applies in all four palette x mode combinations.
+   TODO: once the dark scopes are collapsed (Phase 0), fold this into site.css.
+   ========================================================================== */
+html[data-kmb-palette] .btn-outline-secondary {
+  --bs-btn-color: var(--kmb-ink-soft);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: var(--kmb-hover-border);
+  --bs-btn-hover-color: var(--kmb-accent);
+  --bs-btn-hover-bg: var(--kmb-tint-a);
+  --bs-btn-hover-border-color: var(--kmb-hover-border);
+  --bs-btn-active-color: var(--kmb-accent);
+  --bs-btn-active-bg: var(--kmb-tint-a);
+  --bs-btn-active-border-color: var(--kmb-hover-border);
+  --bs-btn-active-shadow: none;
+  --bs-btn-focus-shadow-rgb: 128, 128, 128;
+  --bs-btn-disabled-color: var(--kmb-muted);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--kmb-border);
+}
+
+/* Sort control (Views/Shared/_Sort.cshtml): Created / Modified / Title. */
+.kmb-sort-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3125rem 0.875rem;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius-pill);
+  background: transparent;
+  color: var(--kmb-muted);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+}
+.kmb-sort-pill:hover {
+  color: var(--kmb-accent);
+  border-color: var(--kmb-hover-border);
+  text-decoration: none;
+}
+.kmb-sort-pill.is-active {
+  background: var(--kmb-chip-selected-bg);
+  border-color: transparent;
+  color: var(--kmb-chip-selected-ink);
+}
+
+/* ==========================================================================
+   Contrast fixes (ADR 0173 contrast pass, measured on the running app)
+   --------------------------------------------------------------------------
+   Found by computing WCAG ratios for every visible text element in all four
+   palette x mode combinations across /, /community, /groups, /events,
+   /announcements and /directory. Both are pre-existing Bootstrap defaults,
+   not caused by the palettes:
+     - .text-bg-warning (the "pinned" badge) is black on #b45309 in light
+       mode = 4.18:1  ->  white on #b45309 = 5.07:1.
+     - .text-bg-success on the dark success green #3fa866 is white = 3.0:1
+       ->  near-black ink #0f1a14 = about 6:1.
+   Dark mode keeps its existing warning badge (it already passes).
+   ========================================================================== */
+@media not (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='dark']) .text-bg-warning { color: #fff !important; }
+}
+html[data-kmb-theme='light'] .text-bg-warning { color: #fff !important; }
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='light']) .text-bg-success { color: #0f1a14 !important; }
+}
+html[data-kmb-theme='dark'] .text-bg-success { color: #0f1a14 !important; }
+
+/* ==========================================================================
+   Non-text contrast (WCAG 1.4.11 / 2.4.7 / 2.4.11) — ADR 0173 follow-up
+   --------------------------------------------------------------------------
+   Measured on the running app: card/divider borders (--kmb-border) are
+   deliberately quiet (~1.2:1) and are fine as decoration, but they were also
+   the border of form fields (a field with no other boundary needs 3:1), and
+   focus indicators were Bootstrap's 4px 25%-alpha shadow (1.2-2.7:1) or the
+   browser default 1px ring (2.2-2.4:1 in light mode).
+     --kmb-control-border  : >= 3.2:1 against the canvas AND the card surface
+     focus ring            : 2px solid --kmb-accent, 2px offset (>= 4.5:1 in
+                             all four combinations; the accent is the palette's
+                             own readable colour on its canvas)
+   Text-labelled buttons (btn-outline-secondary, sort pills, chips) are
+   identified by their label, so they keep the quiet border on purpose.
+   ========================================================================== */
+:root { --kmb-control-border: #898e8a; }                       /* forest light */
+html[data-kmb-palette='ember'] { --kmb-control-border: #8e877f; } /* ember light */
+@media (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='light'])[data-kmb-palette='forest'] { --kmb-control-border: #70746c; }
+  html:not([data-kmb-theme='light'])[data-kmb-palette='ember']  { --kmb-control-border: #746f67; }
+}
+html[data-kmb-theme='dark'][data-kmb-palette='forest'] { --kmb-control-border: #70746c; }
+html[data-kmb-theme='dark'][data-kmb-palette='ember']  { --kmb-control-border: #746f67; }
+
+html[data-kmb-palette] .form-control,
+html[data-kmb-palette] .form-select,
+html[data-kmb-palette] .form-check-input {
+  border-color: var(--kmb-control-border);
+}
+html[data-kmb-palette] :focus-visible {
+  outline: 2px solid var(--kmb-accent);
+  outline-offset: 2px;
+}
+/* Replace Bootstrap's low-contrast focus glow with the outline above. */
+html[data-kmb-palette] :is(.btn, .btn-close, .page-link, .form-check-input, .accordion-button):focus-visible,
+html[data-kmb-palette] :is(.form-control, .form-select):focus {
+  box-shadow: none;
+}
+html[data-kmb-palette] :is(.form-control, .form-select):focus {
+  border-color: var(--kmb-accent);
+  outline: 2px solid var(--kmb-accent);
+  outline-offset: 1px;
+}
+
+/* ==========================================================================
+   Home (ADR 0178) — restyle only; section order and visibility settings
+   (HomeShowFeatures, HideIntro, ...) are unchanged.
+   --------------------------------------------------------------------------
+   - Ember gets a warm hero, feature band and CTA band instead of the green
+     ones (Forest keeps its green; it already matches).
+   - Feature cards and the Coming up / What's new columns use the same card
+     language as the feed: --kmb-surface, 16px radius, border, soft shadow
+     on hover only.
+   ========================================================================== */
+html[data-kmb-palette='ember'] .kmb-hero {
+  background-color: #3a2819;
+  background-image: var(--kmb-hero-bg, linear-gradient(165deg, #4d3621 0%, #3a2819 55%, #2a1c10 100%));
+}
+html[data-kmb-palette='ember'] .kmb-hero::before {
+  background: linear-gradient(180deg, rgba(26, 18, 10, 0.4), rgba(26, 18, 10, 0.25));
+}
+html[data-kmb-palette='ember'] .kmb-features-band { background-color: #2a1c10; }
+html[data-kmb-palette='ember'] .kmb-cta-band {
+  background-color: #3a2819;
+  background-image: linear-gradient(120deg, #4d3621 0%, #2a1c10 100%);
+}
+
+html[data-kmb-palette] .kmb-feat-card {
+  background-color: var(--kmb-surface);
+  border-radius: var(--kmb-radius);
+}
+html[data-kmb-palette] .kmb-feat-icon { color: var(--kmb-accent); }
+html[data-kmb-palette] .kmb-feat-icon.kmb-feat-icon-warm { color: var(--kmb-accent); }
+
+.kmb-home-card {
+  height: 100%;
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.25rem 1.5rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.kmb-home-card:hover {
+  border-color: var(--kmb-hover-border);
+  box-shadow: var(--bs-box-shadow-sm);
+}
+.kmb-home-card .list-group-item {
+  background: transparent;
+  border-color: var(--kmb-border-soft, var(--kmb-border));
+  color: var(--kmb-ink);
+}
+.kmb-home-card .list-group-item > a { color: var(--kmb-ink); }
+.kmb-home-card .list-group-item > a:hover { color: var(--kmb-accent); }
+@media (max-width: 575.98px) {
+  .kmb-home-card { padding: 1rem; }
+}
+
+/* Ember: ordinary links follow the amber accent in dark mode too (they were the
+   Forest green #8fcaa6), and so does the pinned-announcement link, which
+   site.css pins to a light green with !important in both dark scopes. */
+html[data-kmb-palette='ember'] .kumunita-pinned-announcement .btn-link {
+  color: var(--kmb-accent) !important;
+}
+
+/* ==========================================================================
+   Calendar (ADR 0181) — toolbar, grid lines, today, event chips
+   --------------------------------------------------------------------------
+   CSS only plus calendar-today.ts. Specificity-tie trick (html[data-kmb-palette]
+   loads after site.css) so these win over site.css's dark-scope patches.
+   ========================================================================== */
+
+/* View toggle: one segmented pill; the active segment uses the selected-chip
+   colours (the old active state was dark green on dark, unreadable). */
+html[data-kmb-palette] .events-view-toggle.btn-group {
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--kmb-hover-border);
+  border-radius: var(--kmb-radius-pill);
+}
+html[data-kmb-palette] .events-view-toggle.btn-group > .btn {
+  border: 0;
+  border-radius: var(--kmb-radius-pill);
+  background: transparent;
+  color: var(--kmb-ink-soft);
+  padding-inline: 0.875rem;
+}
+html[data-kmb-palette] .events-view-toggle.btn-group > .btn:hover {
+  background: var(--kmb-tint-a);
+  color: var(--kmb-accent);
+}
+html[data-kmb-palette] .events-view-toggle.btn-group > .btn.active {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+  font-weight: 600;
+}
+
+/* Community filter label: quiet, small. */
+html[data-kmb-palette] label[for='calendar-component-filter'] {
+  font-size: 0.75rem;
+  font-weight: 600 !important;
+  color: var(--kmb-muted);
+  margin-bottom: 0.25rem;
+}
+
+/* Grid lines: the "soft" border was ~1.1:1 on the card surface in dark. */
+html[data-kmb-palette] .events-calendar-grid { border-color: var(--kmb-border); }
+html[data-kmb-palette] .events-calendar-day {
+  background: var(--kmb-surface);
+  border-top-color: var(--kmb-border);
+  border-right-color: var(--kmb-border);
+}
+html[data-kmb-palette] .events-time-column { border-left-color: var(--kmb-border); }
+html[data-kmb-palette] .events-time-body {
+  background-image: linear-gradient(to bottom, var(--kmb-border) 1px, transparent 1px);
+}
+html[data-kmb-palette] .events-time-ruler-label { border-bottom-color: var(--kmb-border); }
+
+/* Today (class added by calendar-today.ts). */
+html[data-kmb-palette] .events-calendar-day.is-today { background: var(--kmb-chip-selected-bg); }
+html[data-kmb-palette] .events-calendar-day.is-today .events-calendar-day-label {
+  color: var(--kmb-chip-selected-ink) !important;
+  font-weight: 700;
+}
+html[data-kmb-palette] .events-time-column.is-today .events-time-column-label {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+}
+
+/* Event chips (Month) and blocks (Day/Week): soft tint, a coloured leading
+   bar instead of an outline, no underline. The overlap flag is a thin accent
+   ring (was a 2px gold ring that made every clash look selected). */
+html[data-kmb-palette] .event-chip,
+html[data-kmb-palette] .event-block {
+  border: 0;
+  border-inline-start: 3px solid var(--event-color, var(--kmb-accent));
+  border-radius: 8px;
+}
+html[data-kmb-palette] .event-chip a,
+html[data-kmb-palette] .event-block a {
+  color: var(--kmb-ink);
+  text-decoration: none;
+}
+html[data-kmb-palette] .event-chip a:hover,
+html[data-kmb-palette] .event-block a:hover { color: var(--kmb-accent); }
+html[data-kmb-palette] .event-chip-overlap,
+html[data-kmb-palette] .event-block.event-chip-overlap {
+  box-shadow: 0 0 0 1px var(--kmb-accent);
+  border-color: var(--kmb-accent);
+}
+
+/* ==========================================================================
+   Forms (ADR 0182) — one calm look for every card-per-field-group form
+   --------------------------------------------------------------------------
+   About 20 forms (events, posts, projects, documents, profile,
+   announcements...) are `<form>` > `.card.mb-4` > `.card-body`. Styled once
+   here, no markup changes. Scoped to a card that is a DIRECT child of a form,
+   so cards elsewhere (detail pages, lists) are untouched.
+   ========================================================================== */
+html[data-kmb-palette] form > .card {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  margin-bottom: 1rem !important;
+}
+html[data-kmb-palette] form > .card > .card-body { padding: 1.25rem 1.5rem; }
+
+/* Labels and hints. */
+html[data-kmb-palette] form > .card .form-label,
+html[data-kmb-palette] form > .card legend {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kmb-ink);
+  margin-bottom: 0.375rem;
+}
+html[data-kmb-palette] form > .card .text-muted.small,
+html[data-kmb-palette] form > .card .form-text {
+  color: var(--kmb-muted) !important;
+}
+
+/* Inputs: 12px radius (ADR 0173 D4); the field border is --kmb-control-border
+   (patch 8), the focus ring the global accent ring. */
+html[data-kmb-palette] form > .card .form-control:not(.form-control-color),
+html[data-kmb-palette] form > .card .form-select {
+  border-radius: var(--kmb-radius-input);
+}
+html[data-kmb-palette] form > .card .form-control-color {
+  border-radius: var(--kmb-radius-input);
+  padding: 0.25rem;
+}
+
+/* Rich editor (shared by every form that uses it). */
+html[data-kmb-palette] .rc-editor-toolbar {
+  border-color: var(--kmb-border);
+  border-radius: var(--kmb-radius-input);
+  background-color: var(--kmb-tint-a);
+}
+html[data-kmb-palette] .rc-editor-toolbar .rc-btn { color: var(--kmb-ink-soft); border-radius: 8px; }
+html[data-kmb-palette] .rc-editor-toolbar .rc-btn:hover {
+  background-color: var(--kmb-surface-2, var(--kmb-tint-a));
+  border-color: var(--kmb-hover-border);
+  color: var(--kmb-accent);
+}
+html[data-kmb-palette] .rc-editor-toolbar .rc-btn.rc-btn-active {
+  background-color: var(--kmb-chip-selected-bg);
+  border-color: var(--kmb-accent);
+  color: var(--kmb-chip-selected-ink);
+}
+html[data-kmb-palette] .rc-editor-pane {
+  border-color: var(--kmb-border);
+  border-radius: var(--kmb-radius-input);
+  background-color: var(--kmb-surface);
+}
+html[data-kmb-palette] .rc-editor-toolbar .rc-btn:focus-visible { outline-color: var(--kmb-accent); }
+/* The WYSIWYG pane's focus outline was Bootstrap primary (green in every palette). */
+html[data-kmb-palette] .rc-editor-pane[contenteditable="true"] {
+  outline: 2px solid var(--kmb-accent);
+  outline-offset: 1px;
+}
+
+/* Action row (the submit + Cancel pair that ends a form): quiet Cancel. */
+html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link { color: var(--kmb-muted); text-decoration: none; }
+html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link:hover { color: var(--kmb-accent); }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] form > .card > .card-body { padding: 1rem; }
+}
+
+/* Announcements (ADR 0183) — the feed card, plus a pinned accent. */
+.kmb-ann-list { display: flex; flex-direction: column; gap: var(--kmb-feed-gap); }
+html[data-kmb-palette] .kmb-ann-card.is-pinned {
+  border-inline-start: 4px solid var(--kmb-accent);
+}
+.kmb-ann-chips {
+  margin-inline-start: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+html[data-kmb-palette] .kmb-chip-pinned {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+}
+.kmb-ann-actions { padding-top: 0.5rem; }
+html[data-kmb-palette] .kmb-ann-actions .link-quiet:hover { color: var(--kmb-accent); }
+@media (max-width: 575.98px) {
+  /* Chips drop under the author line instead of squeezing the name. */
+  .kmb-ann-card .airy-post-head { flex-wrap: wrap; }
+  .kmb-ann-chips { margin-inline-start: 0; justify-content: flex-start; flex-basis: 100%; }
+}
+
+/* Announcement detail (ADR 0184) */
+.kmb-ann-detail .kmb-ann-title {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--kmb-ink);
+}
+.kmb-ann-byline { margin-bottom: 1.25rem; }
+html[data-kmb-palette] .kmb-chip-draft {
+  background: transparent;
+  color: var(--kmb-ink-soft);
+  box-shadow: inset 0 0 0 1px var(--kmb-hover-border);
+}
+/* Translation selector: chips that are buttons; aria-pressed marks the shown one. */
+html[data-kmb-palette] .kmb-chip-btn {
+  border: 0;
+  cursor: pointer;
+}
+html[data-kmb-palette] .kmb-chip-btn:hover { color: var(--kmb-accent); }
+html[data-kmb-palette] .kmb-chip-btn[aria-pressed='true'] {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+}
+/* Comments: one quiet card per comment. */
+.kmb-ann-comments { display: flex; flex-direction: column; gap: 0.75rem; }
+html[data-kmb-palette] .kmb-ann-comment {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1rem 1.25rem;
+}
+html[data-kmb-palette] .kmb-ann-composer .form-control,
+html[data-kmb-palette] .kmb-ann-composer .form-select { border-radius: var(--kmb-radius-input); }
+html[data-kmb-palette] .kmb-ann-composer .form-label {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--kmb-ink);
+}
+@media (max-width: 575.98px) {
+  .kmb-ann-detail .kmb-ann-title { font-size: 1.375rem; }
+  html[data-kmb-palette] .kmb-ann-comment { padding: 0.875rem 1rem; }
+}
+
+/* Post detail (ADR 0185) — reuses the announcement detail classes (ADR 0184). */
+html[data-kmb-palette] .kmb-section-title {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1.0625rem;
+  color: var(--kmb-ink);
+}
+html[data-kmb-palette] .kmb-section-title .text-muted { color: var(--kmb-muted) !important; }
+.kmb-ann-byline .kmb-chip { margin-inline-start: auto; }
+@media (max-width: 575.98px) {
+  .kmb-ann-byline { flex-wrap: wrap; }
+  .kmb-ann-byline .kmb-chip { margin-inline-start: 0; }
+}
+
+/* Group detail + group post (ADR 0186) */
+html[data-kmb-palette] .kmb-group-head {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.kmb-group-head h1 { font-size: 1.75rem; line-height: 1.2; align-self: center; overflow-wrap: anywhere; }
+.kmb-group-head .kmb-group-mono {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  font-size: 1.5rem;
+}
+html[data-kmb-palette] .kmb-group-owner { color: var(--kmb-muted); margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+html[data-kmb-palette] .kmb-group-desc { color: var(--kmb-ink-soft); margin: 0.75rem 0 0; }
+html[data-kmb-palette] .kmb-group-empty { color: var(--kmb-muted); }
+.kmb-group-page .tab-content h2 {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--kmb-ink);
+}
+.kmb-group-page .tab-pane > .airy-feed { margin-top: 1rem; }
+/* Members and pending lists: one bordered row per person. */
+.kmb-member-list { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+html[data-kmb-palette] .kmb-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 0.625rem 1rem;
+}
+.kmb-member-name { display: inline-flex; align-items: center; gap: 0.75rem; min-width: 0; overflow-wrap: anywhere; }
+/* Settings sections and the invite / add forms: a card per form. */
+html[data-kmb-palette] .kmb-group-page #tab-settings > form,
+html[data-kmb-palette] .kmb-group-page #tab-members > form {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+html[data-kmb-palette] .kmb-group-page #tab-settings > .border-top { border-color: var(--kmb-border) !important; }
+html[data-kmb-palette] .kmb-group-page .tab-content .form-control,
+html[data-kmb-palette] .kmb-group-page .tab-content .form-select { border-radius: var(--kmb-radius-input); }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-group-head { padding: 1rem; }
+  .kmb-group-head h1 { font-size: 1.5rem; }
+  .kmb-group-head .kmb-group-mono { width: 48px; height: 48px; font-size: 1.25rem; }
+  html[data-kmb-palette] .kmb-group-page #tab-settings > form,
+  html[data-kmb-palette] .kmb-group-page #tab-members > form { padding: 1rem; }
+}
+
+/* RSVP response badges (ADR 0187) — soft status chips; the text label carries the meaning. */
+html[data-kmb-palette] .kmb-rsvp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--kmb-radius-pill);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  background: var(--kmb-tint-a);
+  color: var(--kmb-ink-soft);
+}
+html[data-kmb-palette] .kmb-rsvp-badge.is-going { background: var(--kmb-chip-selected-bg); color: var(--kmb-chip-selected-ink); }
+html[data-kmb-palette] .kmb-rsvp-badge.is-maybe {
+  background: color-mix(in srgb, #f59e0b 28%, var(--kmb-surface));
+  color: var(--kmb-ink);
+}
+
+/* Projects section + shared list rows (ADR 0188) */
+
+/* Section tab strip (.kmb-tab-under-navbar, ~20 pages): keep the navbar-attached
+   shape, but the hover / active label follows the palette accent instead of the
+   hard-coded pine. (Dark scopes already follow the palette via
+   --bs-primary-text-emphasis and keep their !important rules.) */
+html[data-kmb-palette] .kmb-tab-under-navbar .nav-link:hover,
+html[data-kmb-palette] .kmb-tab-under-navbar .nav-link:focus,
+html[data-kmb-palette] .kmb-tab-under-navbar .nav-link.active { color: var(--kmb-accent); }
+
+/* Shared list rows (.airy-ann-list: Projects, To-dos, Boards, Documents, ...):
+   one bordered card per row with the feed gap, instead of one divided box.
+   The bookmarks <ul> variant keeps its own look. */
+html[data-kmb-palette] .airy-ann-list:not(ul) {
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  gap: var(--kmb-feed-gap);
+}
+html[data-kmb-palette] .airy-ann-list:not(ul) > .airy-ann-row {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: var(--kmb-card-pad-y) var(--kmb-card-pad-x);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+html[data-kmb-palette] .airy-ann-list:not(ul) > .airy-ann-row:hover {
+  background: var(--kmb-surface);
+  border-color: var(--kmb-hover-border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+html[data-kmb-palette] .airy-ann-list:not(ul) > .airy-ann-row .airy-ann-title a { text-decoration: none; }  /* ADR 0175: no underline on titles */
+html[data-kmb-palette] .airy-ann-list:not(ul) > .airy-ann-row .airy-ann-title a:hover { color: var(--kmb-accent); }
+/* The in-list empty state ("No goals yet ...") */
+html[data-kmb-palette] .airy-ann-list:not(ul) > .p-4.text-muted {
+  background: var(--kmb-surface);
+  border: 1px dashed var(--kmb-hover-border);
+  border-radius: var(--kmb-radius);
+  text-align: center;
+  color: var(--kmb-muted) !important;
+}
+
+/* Neutral "badge text-bg-light border" labels (component, status, language) read as chips. */
+html[data-kmb-palette] .badge.text-bg-light.border {
+  background: var(--kmb-tint-a) !important;
+  color: var(--kmb-ink-soft) !important;
+  border: 0 !important;
+  border-radius: var(--kmb-radius-pill);
+  padding: 0.3125rem 0.75rem;
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+html[data-kmb-palette] button.badge.text-bg-light.border[aria-pressed='true'] {
+  background: var(--kmb-chip-selected-bg) !important;
+  color: var(--kmb-chip-selected-ink) !important;
+}
+@media (max-width: 767.98px) {
+  html[data-kmb-palette] .airy-ann-list:not(ul) > .airy-ann-row { padding: 1rem 1.125rem; }
+}
+
+/* To-dos (ADR 0189) */
+/* Status chip: soft chip with a coloured dot; the text label always carries the meaning. */
+html[data-kmb-palette] .kmb-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-inline-start: 0.5rem;
+  padding: 0.3125rem 0.75rem;
+  border-radius: var(--kmb-radius-pill);
+  background: var(--kmb-tint-a);
+  color: var(--kmb-ink-soft);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.kmb-status-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--kmb-muted); flex: none; }
+html[data-kmb-palette] .kmb-status.is-in-progress .kmb-status-dot { background: #f59e0b; }
+html[data-kmb-palette] .kmb-status.is-done { background: var(--kmb-chip-selected-bg); color: var(--kmb-chip-selected-ink); }
+html[data-kmb-palette] .kmb-status.is-done .kmb-status-dot { background: var(--kmb-accent); }
+html[data-kmb-palette] .kmb-status.is-cancelled { color: var(--kmb-muted); text-decoration: line-through; }
+html[data-kmb-palette] .kmb-status.is-cancelled .kmb-status-dot { background: var(--kmb-hover-border); }
+/* Meta line: assignee avatar inline, overdue due date. */
+.kmb-assignee { display: inline-flex; align-items: center; gap: 0.375rem; vertical-align: middle; }
+html[data-kmb-palette] .kmb-overdue { color: var(--kmb-ink); font-weight: 600; }
+/* Filter toolbar (to-dos, projects, boards): a quiet bar above the list. */
+html[data-kmb-palette] .kmb-filter-bar {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 0.875rem 1rem;
+}
+html[data-kmb-palette] .kmb-filter-bar .form-label { font-family: var(--bs-heading-font-family); font-size: 0.8125rem; color: var(--kmb-ink-soft); margin-bottom: 0.25rem; }
+html[data-kmb-palette] .kmb-filter-bar .form-select { border-radius: var(--kmb-radius-input); }
+html[data-kmb-palette] .kmb-filter-bar .form-check { margin-bottom: 0.5rem; }
+
+/* Kanban boards (ADR 0190) */
+
+/* Wider board: the lanes row breaks out of the page column (header and description
+   stay in it) up to 1400px, with fixed-width lanes that scroll sideways. Not applied
+   in full screen, expanded-page, kiosk or embed modes (their own layouts), or on
+   phones (the board just scrolls inside the column). */
+@media (min-width: 992px) {
+  html[data-kmb-palette] body:not(.kmb-page-expanded):not(.kmb-kiosk):not(.kmb-embed) .kanban-board:not(:fullscreen):not(.kanban-full) {
+    width: min(1400px, calc(100vw - 2rem));
+    max-width: none;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+html[data-kmb-palette] .kanban-board { gap: 1rem; padding-bottom: 0.75rem; }
+html[data-kmb-palette] .kanban-lane {
+  flex: 0 0 18rem;
+  min-width: 17rem;
+  max-width: none;
+  background: color-mix(in srgb, var(--kmb-border) 18%, var(--bs-body-bg));
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 0.875rem;
+}
+html[data-kmb-palette] .kanban-lane-new {
+  flex: 0 0 14rem;
+  min-width: 14rem;
+  max-width: none;
+  background: transparent;
+  border: 1px dashed var(--kmb-hover-border);
+  border-radius: var(--kmb-radius);
+}
+html[data-kmb-palette] .kanban-lane-head h3 {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1rem;
+  color: var(--kmb-ink);
+}
+html[data-kmb-palette] .kanban-lane-at-limit {
+  border-color: var(--kmb-border);
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+html[data-kmb-palette] .kanban-card {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: 12px;
+  padding: 0.75rem 0.875rem;
+  box-shadow: none;
+}
+html[data-kmb-palette] .kanban-card:hover {
+  border-color: var(--kmb-hover-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+html[data-kmb-palette] .kanban-card:focus,
+html[data-kmb-palette] .kanban-card:focus-within {
+  border-color: var(--kmb-accent);
+  box-shadow: none;
+}
+html[data-kmb-palette] .kanban-card a:hover { color: var(--kmb-accent); }
+html[data-kmb-palette] .kanban-card h4 { font-family: var(--bs-heading-font-family); font-weight: 600; color: var(--kmb-ink); }
+html[data-kmb-palette] .kanban-lane.drag-over {
+  border-color: var(--kmb-accent);
+  background: color-mix(in srgb, var(--kmb-accent) 8%, var(--bs-body-bg));
+  outline: 2px dashed var(--kmb-accent);
+}
+html[data-kmb-palette] .kanban-board:fullscreen,
+html[data-kmb-palette] .kanban-board.kanban-full { background: var(--bs-body-bg); }
+html[data-kmb-palette] .kanban-board-empty { background: var(--kmb-surface); border: 1px dashed var(--kmb-hover-border) !important; border-radius: var(--kmb-radius) !important; }
+
+/* Inventory (ADR 0191) — availability reuses the status chip (.kmb-status); the item summary list. */
+html[data-kmb-palette] .kmb-dl dt {
+  color: var(--kmb-muted);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+html[data-kmb-palette] .kmb-dl dd { color: var(--kmb-ink); }
