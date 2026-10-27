@@ -907,3 +907,12 @@ html[data-kmb-palette] .kanban-lane.drag-over {
 html[data-kmb-palette] .kanban-board:fullscreen,
 html[data-kmb-palette] .kanban-board.kanban-full { background: var(--bs-body-bg); }
 html[data-kmb-palette] .kanban-board-empty { background: var(--kmb-surface); border: 1px dashed var(--kmb-hover-border) !important; border-radius: var(--kmb-radius) !important; }
+
+/* Inventory (ADR 0191) — availability reuses the status chip (.kmb-status); the item summary list. */
+html[data-kmb-palette] .kmb-dl dt {
+  color: var(--kmb-muted);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+html[data-kmb-palette] .kmb-dl dd { color: var(--kmb-ink); }
