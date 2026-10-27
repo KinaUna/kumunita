@@ -526,6 +526,35 @@ builder.Services.AddIdentity<User, IdentityRole>(opts =>
 // A 429 response is returned when the policy's limit is exceeded.
 builder.Services.AddRateLimiter(opts =>
 {
+    // Rejection shape (shared by every throttled endpoint). The built-in
+    // limiter returns 503 Service Unavailable by default — a misleading code
+    // for a throttled request (it reads "server is down", not "slow down").
+    // Return 429 Too Many Requests instead, carry the Retry-After hint, and
+    // send a short explanatory body so a browser navigating to the response
+    // (a form POST) sees something meaningful rather than an empty 503.
+    opts.OnRejected = async (context, ct) =>
+    {
+        var response = context.HttpContext.Response;
+        response.StatusCode = StatusCodes.Status429TooManyRequests;
+        // The rate limiter middleware sets Retry-After before calling OnRejected —
+        // read it back to word the body accurately (no IRateLimitFeature needed).
+        var retryAfter = response.Headers["Retry-After"].ToString();
+        var wait = string.IsNullOrEmpty(retryAfter)
+            ? "a short while"
+            : $"about {retryAfter} seconds";
+        response.ContentType = "text/html; charset=utf-8";
+        await response.WriteAsync(
+            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+            "<title>Too many requests</title></head>" +
+            "<body style=\"font-family:system-ui,sans-serif;max-width:38rem;margin:4rem auto;padding:0 1rem;\">" +
+            "<h1>Too many requests</h1>" +
+            "<p>You've sent a lot of requests in a short time. To keep the site " +
+            "responsive, please wait " + wait + " before trying again.</p>" +
+            "</body></html>",
+            ct);
+    };
+
     // A reusable fixed-window policy: allow `limit` requests per `window`
     // per partition key (the resolved client IP — real IP behind the edge).
     // AddPolicy takes a Func<HttpContext, RateLimitPartition<TPartitionKey>>.
@@ -542,9 +571,39 @@ builder.Services.AddRateLimiter(opts =>
                 }));
     }
 
-    // Login: 5 attempts per 15 minutes per IP (per-account lockout already
-    // covers the same-account brute-force; this covers cross-account stuffing).
-    AddWindow(opts, "login", limit: 5, window: TimeSpan.FromMinutes(15));
+    // Login: 5 attempts per 15 minutes per IP for regular accounts (per-account
+    // Identity lockout already covers same-account brute-force; this covers
+    // cross-account stuffing). **Exempt**: the sample/test accounts
+    // (SampleDataSeeder.SampleAccountEmails — the closed set sourced from the
+    // embedded sample-data document) are unlimited, so an operator switching
+    // between test logins is never throttled (the live-site report: "randomly
+    // cannot log in with the test accounts"). Reading the posted e-mail here is
+    // safe: the rate limiter runs before model binding, and ASP.NET Core caches
+    // the FormCollection after the first read, so this does not block the
+    // controller's binding. (Brute-force on a sample account stays bounded by
+    // the account-level Identity lockout, which is independent of this IP limit;
+    // sample accounts also use random high-entropy passwords on a deploy.)
+    opts.AddPolicy("login", (context) =>
+    {
+        var postedEmail = context.Request.HasFormContentType
+            ? context.Request.Form["Email"].ToString()
+            : null;
+
+        if (postedEmail is not null
+            && SampleDataSeeder.SampleAccountEmails.Contains(postedEmail))
+        {
+            return RateLimitPartition.GetNoLimiter("sample-exempt");
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                AutoReplenishment = true
+            });
+    });
 
     // Signup: 5 per hour per IP (account-creation flood).
     AddWindow(opts, "signup", limit: 5, window: TimeSpan.FromHours(1));
