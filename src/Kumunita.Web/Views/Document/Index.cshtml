@@ -8,6 +8,20 @@
     ViewData["Title"] = "Documents";
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
 
+    // Human-readable byte size (the row meta line; the Detail.cshtml helper).
+    string FormatSize(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        double size = bytes;
+        int unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+        return unit == 0 ? $"{bytes} {units[unit]}" : $"{size:0.#} {units[unit]}";
+    }
+
     // M29 (ADR 0152) — the surface header label (M29·1: the same value the nav
     // item resolves — one resolver, one value, so a rename is never "nav says
     // X, header says Y"). A non-blank admin label wins; otherwise the
@@ -83,22 +97,28 @@
             }
             @foreach (var d in Model.Visible)
             {
+                @* ADR 0192 — file-kind tile + title / summary / meta (size, date). *@
                 <div class="airy-ann-row">
-                    <div>
-                        <h3 class="airy-ann-title">
-                            <a href="/documents/@d.Id">@d.Title</a>
-                        </h3>
-                        @if (!string.IsNullOrWhiteSpace(d.Summary))
-                        {
-                            <p class="airy-ann-preview mb-2">@d.Summary</p>
-                        }
-                        <div class="airy-ann-meta">
-                            <span><kw-dt dt="@d.Created" format="g"></kw-dt></span>
+                    <div class="kmb-doc-main">
+                        <partial name="_FileTile" model="d.ContentType" />
+                        <div class="min-w-0">
+                            <h3 class="airy-ann-title">
+                                <a href="/documents/@d.Id">@d.Title</a>
+                            </h3>
+                            @if (!string.IsNullOrWhiteSpace(d.Summary))
+                            {
+                                <p class="airy-ann-preview mb-2">@d.Summary</p>
+                            }
+                            <div class="airy-ann-meta">
+                                <span>@FormatSize(d.SizeBytes)</span>
+                                <span>·</span>
+                                <span><kw-dt dt="@d.Created" format="g"></kw-dt></span>
+                            </div>
                         </div>
                     </div>
                     <div class="airy-ann-side">
                         <div class="airy-ann-actions">
-                            <a class="link-quiet small text-decoration-none" href="/documents/@d.Id/download">
+                            <a class="btn btn-sm btn-outline-secondary" href="/documents/@d.Id/download">
                                 <kw-l key="documents.download">Download</kw-l>
                             </a>
                         </div>

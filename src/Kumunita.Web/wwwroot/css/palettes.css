@@ -916,3 +916,40 @@ html[data-kmb-palette] .kmb-dl dt {
   font-weight: 600;
 }
 html[data-kmb-palette] .kmb-dl dd { color: var(--kmb-ink); }
+
+/* Documents (ADR 0192) */
+.kmb-doc-main { display: flex; align-items: flex-start; gap: 1rem; min-width: 0; }
+/* File-kind tile: a rounded square with the kind as text, tinted per kind over the surface. */
+html[data-kmb-palette] .kmb-file {
+  --kmb-file-hue: #8b8f8a;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 56px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--kmb-file-hue) 24%, var(--kmb-surface));
+  border: 1px solid color-mix(in srgb, var(--kmb-file-hue) 40%, var(--kmb-surface));
+  color: var(--kmb-ink);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+html[data-kmb-palette] .kmb-file.is-pdf { --kmb-file-hue: #d9534f; }
+html[data-kmb-palette] .kmb-file.is-doc { --kmb-file-hue: #4a7fd1; }
+html[data-kmb-palette] .kmb-file.is-xls { --kmb-file-hue: #3f9b5f; }
+html[data-kmb-palette] .kmb-file.is-ppt { --kmb-file-hue: #e0873a; }
+html[data-kmb-palette] .kmb-file.is-img { --kmb-file-hue: #8a62c9; }
+html[data-kmb-palette] .kmb-file.is-zip { --kmb-file-hue: #c9a227; }
+.kmb-doc-main + .airy-ann-side { align-self: center; }
+html[data-kmb-palette] .kmb-meta-label {
+  color: var(--kmb-muted);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-file { width: 40px; height: 48px; font-size: 0.6875rem; }
+}

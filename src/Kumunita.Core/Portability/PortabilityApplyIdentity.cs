@@ -56,17 +56,58 @@ public static class PortabilityApplyIdentity
     /// <param name="principals">The <c>identity/principals.json</c> rows —
     /// the eight allowed fields each, the no-secret set (the credential
     /// columns are structurally absent, C-M11·2).</param>
+    /// <param name="mode">The import mode (ADR 0193).
+    /// <see cref="PortabilityImportMode.CleanSlate"/> — the D1 restore
+    /// semantic: a fresh instance is assumed (a pre-existing principal is
+    /// caught by the caller's collision gate before this unit runs).
+    /// <see cref="PortabilityImportMode.KeepExisting"/> — merge mode: an
+    /// existing principal (matched by <c>SubjectId</c> or <c>NormalizedEmail</c>)
+    /// is <b>skipped entirely</b> — no password reset, no role churn, no
+    /// security-stamp rotation. Only new principals are created.</param>
     /// <param name="ct">Cancellation.</param>
     public static async Task ApplyAsync(
         UserManager<User> userManager,
         RoleManager<IdentityRole> roleManager,
         IReadOnlyList<PortabilityPrincipal> principals,
+        PortabilityImportMode mode,
         CancellationToken ct)
     {
         foreach (var principal in principals)
         {
             ct.ThrowIfCancellationRequested();
 
+            // ── KeepExisting (ADR 0193) — skip an existing principal ───
+            // The existing account is kept intact: no password reset, no
+            // role churn, no security-stamp rotation. The existing
+            // principal's content docs are also skipped by
+            // PortabilityApplyDocuments (the same id-based skip).
+            if (mode == PortabilityImportMode.KeepExisting)
+            {
+                var existing = string.IsNullOrEmpty(principal.NormalizedEmail)
+                    ? await userManager.FindByIdAsync(principal.SubjectId).ConfigureAwait(false)
+                    : await userManager.FindByEmailAsync(principal.Email).ConfigureAwait(false);
+                if (existing is not null)
+                {
+                    // Ensure the archived roles are present on the existing
+                    // account (additive only — never removes existing roles).
+                    // This is the "only added if it doesn't exist" semantic
+                    // for role standing: a new role from the archive is
+                    // added; existing roles are untouched.
+                    foreach (var role in principal.Roles)
+                    {
+                        if (string.IsNullOrEmpty(role))
+                            continue;
+                        if (await roleManager.FindByNameAsync(role) is null)
+                            await roleManager.CreateAsync(new IdentityRole(role));
+                        var inRole = await userManager.IsInRoleAsync(existing, role).ConfigureAwait(false);
+                        if (!inRole)
+                            await userManager.AddToRoleAsync(existing, role).ConfigureAwait(false);
+                    }
+                    continue; // skip — the existing account is kept intact
+                }
+            }
+
+            // ── CleanSlate / new principal — the D1 restore semantic ───
             // The eight allowed §principals fields — the C-M11·2 boundary:
             // no PasswordHash / SecurityStamp / AccessToken / RefreshToken /
             // RecoveryCode is ever read (there is none in the archive, by
@@ -74,9 +115,9 @@ public static class PortabilityApplyIdentity
             //
             // The D1 restore semantic: a fresh instance — the principal
             // does not pre-exist (a collision is a validate-phase failure,
-            // C-M11·4). Create keyed by the exported subjectId (the stable
-            // id the rest of the graph references — the §principals "key"
-            // column).
+            // C-M11·4, caught by the caller's collision gate). Create
+            // keyed by the exported subjectId (the stable id the rest of
+            // the graph references — the §principals "key" column).
             var user = new User
             {
                 Id = principal.SubjectId,

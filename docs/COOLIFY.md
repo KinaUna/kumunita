@@ -438,6 +438,39 @@ subsequent boots are a no-op.
 4. Seeded admin exists; log in **once** with the setup token → set password;
 the token invalidates on use. Then **remove `SeedAdmin__*` from env**
 (nothing reusable remains to leak — OPS Procedure 2, step 4).
+
+   **How to tell the setup POST worked** — the successful POST signs the
+   operator in and redirects to `/profile/edit`; the token is consumed and
+   the lane is **permanently closed**. Every *subsequent* GET or POST to
+   `/admin/setup` returns **404 by design** (the controller's `NotFound()`
+   is the closed-lane signal, uniform for "already used", "wrong email",
+   and "wrong token" so an anonymous caller cannot distinguish them — see
+   `AdminSetupController.cs`). So:
+
+   - A **404 on re-submit is success, not failure.** If you see
+     "not found" after submitting, first verify the account actually has a
+     password: `SELECT "Email" FROM identity."AspNetUsers"` (run after
+     `\c kumunita`) and try to sign in at `/Account/Login` with the
+     password you just set. If that works, the setup is done — do not
+     re-submit the form, and do not try to "re-open" the lane.
+   - **Gate the submit on `/health` = 200.** The app needs ~8 s to finish
+     booting (Marten schema + Wolverine leadership); Coolify's health check
+     will restart the container if it sees a non-200 at the moment of your
+     POST, which kills the in-flight response *after* the DB transaction
+     has already committed. The password is set, the token is consumed,
+     but the browser never gets the redirect and instead sees the next
+     boot's 404. Wait for `curl -fsS https://<domain>/health` to return
+     `200` before opening `/admin/setup` and submitting the form.
+   - If you are *genuinely* stuck (no password set, token still unconsumed,
+     and `/admin/setup` 404s on a *first* attempt), the token is either
+     expired or the email you typed doesn't match the seeded one — probe
+     `mt.mt_doc_identitytoken` (run after `\c kumunita`):
+     `SELECT data->>'ConsumedAt', data->>'ExpiresAt', data->>'UserId'
+      FROM mt.mt_doc_identitytoken WHERE data->>'Kind' = 'setup';`
+     A non-null `ConsumedAt` means it was already used (sign in instead);
+     a past `ExpiresAt` means the TTL (`Verification__TtlDays`, default
+     14 days from first boot) elapsed — re-seed a fresh token per OPS
+     Procedure 2.
 5. `/health` reports `ok` (email dead-letter count 0); a test email arrives
 at the destination inbox (OPS Procedure 2 step 5).
 6. **Confirm the verification link is absolute** (requires `Verification__BaseUrl`,
@@ -461,5 +494,6 @@ SHA, admin contact, dates).
 | Logged out / bounced to login after a redeploy,
 | Health check `database` failed on boot | `Host` in the connection string (should be the internal addon name, not `localhost`) |
 | Boot loops, "permission denied: schema" | the `kumunita_migrate` role isn't the **owner** of the `kumunita` database (or the `mt` schema isn't owned by it / the app role lacks `CREATE` on `mt`) — re-run §4 step 5 (two-role split, ADR 0171) |
+| `/admin/setup` 404s on submit (or re-submit) | **This is usually success, not failure.** The setup lane is one-time: a successful POST consumes the token, sets the password, and *permanently closes* the lane — every later GET/POST to `/admin/setup` then returns 404 by design (the controller's uniform `NotFound()`, so it can't reveal "used" vs "wrong token" vs "wrong email"). Confirm the account has a password (`SELECT "Email" FROM identity."AspNetUsers"` after `\c kumunita`) and sign in at `/Account/Login` with the password you set. If that works, setup is done. Only if the account has *no* password is this a real failure — see §6 step 4 for the token probes |
 | TLS not issued | DNS not pointing at the VPS yet (§2), or port 80/443 closed |
 | Nothing renders, port 8080 open | you are (a) not on the `release` branch (OPS §3) or (b) hitting the exposed internal port directly instead of the domain |

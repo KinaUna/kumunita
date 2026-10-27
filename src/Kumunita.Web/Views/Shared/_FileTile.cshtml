@@ -1,0 +1,21 @@
+@* ADR 0192 — a rounded file-kind tile (PDF / DOC / XLS / PPT / IMG / TXT / ZIP,
+   else a generic FILE) for the document list and detail. Model: the document's
+   content type. The tile is decorative (aria-hidden): the content type is
+   always printed as text beside it. Colour is a per-kind tint (palettes.css),
+   never the only carrier of the kind. *@
+@model string
+@{
+    var ct = (Model ?? string.Empty).Trim().ToLowerInvariant();
+    (string kind, string label) = ct switch
+    {
+        "application/pdf" => ("pdf", "PDF"),
+        var c when c.Contains("wordprocessingml") || c == "application/msword" || c.Contains("opendocument.text") => ("doc", "DOC"),
+        var c when c.Contains("spreadsheetml") || c.Contains("ms-excel") || c == "text/csv" || c.Contains("opendocument.spreadsheet") => ("xls", "XLS"),
+        var c when c.Contains("presentationml") || c.Contains("ms-powerpoint") || c.Contains("opendocument.presentation") => ("ppt", "PPT"),
+        var c when c.StartsWith("image/") => ("img", "IMG"),
+        var c when c.StartsWith("text/") => ("txt", "TXT"),
+        var c when c.Contains("zip") || c.Contains("compressed") || c.Contains("tar") => ("zip", "ZIP"),
+        _ => ("file", "FILE"),
+    };
+}
+<span class="kmb-file is-@kind" aria-hidden="true">@label</span>

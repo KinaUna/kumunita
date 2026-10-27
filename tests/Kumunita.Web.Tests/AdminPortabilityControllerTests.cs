@@ -185,7 +185,7 @@ public class AdminPortabilityControllerTests
         var payload = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
         var formFile = new TestFormFile("kumunita.kumunita", "application/octet-stream", payload);
 
-        portability.ImportAsync(Admin, Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+        portability.ImportAsync(Admin, Arg.Any<Stream>(), Arg.Any<Kumunita.Core.Portability.PortabilityImportMode>(), Arg.Any<CancellationToken>())
             .Returns(PortabilityImportResult.Success);
 
         var action = await controller.Import(formFile);
@@ -195,7 +195,7 @@ public class AdminPortabilityControllerTests
         Assert.Equal("portability.status.ok", controller.TempData["info"]);
 
         await portability.Received(1).ImportAsync(
-            Admin, Arg.Any<Stream>(), Arg.Any<CancellationToken>());
+            Admin, Arg.Any<Stream>(), Arg.Any<Kumunita.Core.Portability.PortabilityImportMode>(), Arg.Any<CancellationToken>());
     }
 
     // ── Import (failure) ──────────────────────────────────────────────────
@@ -207,7 +207,7 @@ public class AdminPortabilityControllerTests
         var payload = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
         var formFile = new TestFormFile("kumunita.kumunita", "application/octet-stream", payload);
 
-        portability.ImportAsync(Admin, Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+        portability.ImportAsync(Admin, Arg.Any<Stream>(), Arg.Any<Kumunita.Core.Portability.PortabilityImportMode>(), Arg.Any<CancellationToken>())
             .Returns(new PortabilityImportResult(false, new[] { "format.unsupported" }));
 
         var action = await controller.Import(formFile);
@@ -219,7 +219,7 @@ public class AdminPortabilityControllerTests
         Assert.Contains("format.unsupported", error);
 
         await portability.Received(1).ImportAsync(
-            Admin, Arg.Any<Stream>(), Arg.Any<CancellationToken>());
+            Admin, Arg.Any<Stream>(), Arg.Any<Kumunita.Core.Portability.PortabilityImportMode>(), Arg.Any<CancellationToken>());
     }
 
     // ── Import (null / empty guard) ───────────────────────────────────────
@@ -236,7 +236,7 @@ public class AdminPortabilityControllerTests
         Assert.Equal("portability.status.failure", controller.TempData["error"]);
 
         await portability.DidNotReceive()
-            .ImportAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>());
+            .ImportAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<Kumunita.Core.Portability.PortabilityImportMode>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -252,7 +252,47 @@ public class AdminPortabilityControllerTests
         Assert.Equal("portability.status.failure", controller.TempData["error"]);
 
         await portability.DidNotReceive()
-            .ImportAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>());
+            .ImportAsync(Arg.Any<string>(), Arg.Any<Stream>(), Arg.Any<Kumunita.Core.Portability.PortabilityImportMode>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0193 — the mode binding (keepExisting checkbox → mode) ───────
+
+    [Fact]
+    public async Task Import_Unticked_DefaultsToCleanSlateMode()
+    {
+        var (controller, portability) = Build();
+        var payload = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
+        var formFile = new TestFormFile("kumunita.kumunita", "application/octet-stream", payload);
+
+        portability.ImportAsync(Admin, Arg.Any<Stream>(), Arg.Any<Kumunita.Core.Portability.PortabilityImportMode>(), Arg.Any<CancellationToken>())
+            .Returns(PortabilityImportResult.Success);
+
+        // keepExisting absent (the form default) → CleanSlate (the D1 replace semantic).
+        await controller.Import(formFile);
+
+        await portability.Received(1).ImportAsync(
+            Admin, Arg.Any<Stream>(),
+            Kumunita.Core.Portability.PortabilityImportMode.CleanSlate,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Import_Ticked_UsesKeepExistingMode()
+    {
+        var (controller, portability) = Build();
+        var payload = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
+        var formFile = new TestFormFile("kumunita.kumunita", "application/octet-stream", payload);
+
+        portability.ImportAsync(Admin, Arg.Any<Stream>(), Arg.Any<Kumunita.Core.Portability.PortabilityImportMode>(), Arg.Any<CancellationToken>())
+            .Returns(PortabilityImportResult.Success);
+
+        // keepExisting = true (the checkbox ticked) → KeepExisting (the merge semantic).
+        await controller.Import(formFile, keepExisting: true);
+
+        await portability.Received(1).ImportAsync(
+            Admin, Arg.Any<Stream>(),
+            Kumunita.Core.Portability.PortabilityImportMode.KeepExisting,
+            Arg.Any<CancellationToken>());
     }
 
     // ── kw-l parity — the six portability.* keys the controller emits ────
@@ -262,6 +302,8 @@ public class AdminPortabilityControllerTests
     [InlineData("portability.export")]
     [InlineData("portability.import")]
     [InlineData("portability.confirm.import")]
+    [InlineData("portability.import.keep_existing")]
+    [InlineData("portability.import.keep_existing_hint")]
     [InlineData("portability.status.ok")]
     [InlineData("portability.status.failure")]
     public void KwLPortabilityKeys_ArePresent_En(string key)

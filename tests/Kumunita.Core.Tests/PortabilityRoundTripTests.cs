@@ -746,6 +746,233 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         }
     }
 
+    // ── ADR 0193 — the two import modes (the user's "import over an instance
+    //    that already has accounts/content" scenario, which was a 500) ──────
+
+    // ADR 0193 D1 — CleanSlate (the default, unchecked): the import REPLACES
+    // the instance's state. The target already holds the SAME principals +
+    // content (the user's collision), and the import still SUCCEEDS: the
+    // wipe removes the target's principals + content first, then the archive
+    // is applied onto the fresh store. Witnesses: the import is clean (not the
+    // "principal already exists" 500), the archive's content graph is present,
+    // and exactly one portability.import audit row was emitted by this import.
+    [Fact]
+    public async Task PortabilityImport_CleanSlate_OverInstanceWithSameAccounts_ReplacesAndSucceeds()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — plant the representative instance + export the archive.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the collision: it already holds the SAME principals +
+        // content (a prior import / a demo-seeded instance). The principals
+        // have their own role standing (GlobalAdmin-only, NOT the archive's
+        // GlobalAdmin+Moderator), which lets the assertion below distinguish
+        // "re-created from the archive" from "left in place".
+        var (storeB, dbB, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-resident-001", "pt-resident", "pt-resident@maplewood.example",
+            [Roles.Member], ct);
+        // B's own content (a group the archive also carries, by id) — the
+        // wipe must remove it so the archive's copy is the one that lands.
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Group
+            {
+                Id = "pt-group-001",
+                Name = "B's local group (pre-import state)",
+                OwnerId = "pt-admin-001",
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+        // B's own history (an audit row the CleanSlate import must NOT keep).
+        await using (var ab = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            ab.Store(new AccessAudit
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                At = DateTimeOffset.UtcNow,
+                ActorId = "pt-admin-001",
+                Action = "b.local.prior.activity",
+                TargetKind = "group",
+                TargetId = "pt-group-001",
+                Via = AccessVia.Owner,
+                Outcome = AccessOutcome.Allow,
+            });
+            await ab.SaveChangesAsync(ct);
+        }
+
+        // The import (CleanSlate — the default mode). The collision that was
+        // the user's 500 now resolves to a clean replace.
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.CleanSlate, ct);
+        Assert.True(result.Ok,
+            "the CleanSlate import should succeed over the colliding instance — failure set: " +
+            string.Join(", ", result.Failures));
+
+        // The archive's content graph is the instance's state now (B's local
+        // group "B's local group (pre-import state)" is gone; A's group — the
+        // plant's "Maplewood Neighbors" — is what survives).
+        await using (var q = storeB.QuerySession())
+        {
+            var group = await q.LoadAsync<Group>("pt-group-001", ct);
+            Assert.Equal("Maplewood Neighbors", group!.Name);
+            Assert.Equal("pt-admin-001", group.OwnerId);
+        }
+
+        // The principals were re-created from the archive (fresh credentials +
+        // the archive's role standing — NOT B's prior GlobalAdmin-only standing).
+        var adminB = await userManagerB.FindByIdAsync("pt-admin-001");
+        Assert.NotNull(adminB);
+        var adminRoles = await userManagerB.GetRolesAsync(adminB);
+        Assert.Contains(Roles.GlobalAdmin, adminRoles);
+        Assert.Contains(Roles.Moderator, adminRoles); // the archive's standing, re-applied
+
+        // Exactly one portability.import audit row (the one this import
+        // emitted — B's own prior history does not count against this).
+        await using (var auditB = storeB.QuerySession())
+        {
+            var auditRows = await Marten.QueryableExtensions.ToListAsync(
+                auditB.Query<AccessAudit>().Where(a => a.Action == "portability.import"), ct);
+            Assert.Single(auditRows);
+            Assert.Equal(AccessVia.Admin, auditRows[0].Via);
+        }
+    }
+
+    // ADR 0193 D2 — KeepExisting (checked): the import is a MERGE. The
+    // target's existing accounts + content are kept intact (never overwritten,
+    // credentials never reset), and only NEW content from the archive is
+    // added. Witnesses: the pre-existing account keeps its password (not the
+    // archive's fresh one), the pre-existing content's local mutation survives,
+    // and a NEW group from the archive (absent pre-import) is added.
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_KeepsExistingContentAndAddsOnlyNew()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — plant the representative instance + export the archive.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var planted = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the same principals (the keep-existing targets) + its
+        // own content (a group, by id) that it has since mutated locally.
+        var (storeB, dbB, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        const string bPassword = "BLocalPassword123!";
+        // Create the collision principals with a KNOWN password (BPassword123!)
+        // + the archive's subjectId. The KeepExisting import must NOT touch
+        // that password (a CleanSlate import would have reset it to the
+        // archive's fresh one) — the CheckPasswordAsync assertion below
+        // witnesses the keep.
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct, password: bPassword);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-resident-001", "pt-resident", "pt-resident@maplewood.example",
+            [Roles.Member], ct);
+
+        // B's local group — a DIFFERENT id from the archive's group (so the
+        // archive's group is genuinely NEW for B, and B's local one is
+        // genuinely EXISTING). Two witnesses:
+        //   (1) keep — B's local group (id "b-local-group") survives intact.
+        //   (2) add — the archive's group (id planted.groupId) is NEW for B
+        //       and is added (present after, absent before).
+        const string bLocalGroupId = "b-local-group";
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Group { Id = bLocalGroupId, Name = "B's local group name", OwnerId = "pt-admin-001" });
+            await sb.SaveChangesAsync(ct);
+        }
+        // B does NOT yet hold the archive's group (the "add" witness target).
+        await using (var qb0 = storeB.QuerySession())
+        {
+            var preHold = await qb0.LoadAsync<Group>(planted.groupId, ct);
+            Assert.True(preHold is null,
+                "B must not pre-hold the archive's group (the add witness)");
+        }
+
+        // The import (KeepExisting — the checked box). A MERGE, not a replace.
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        // (1) keep — the existing account is intact: its LOCAL password
+        //     survives (a CleanSlate import would have reset it).
+        var adminB = await userManagerB.FindByIdAsync("pt-admin-001");
+        Assert.NotNull(adminB);
+        Assert.True(await userManagerB.CheckPasswordAsync(adminB, bPassword),
+            "KeepExisting must not reset the existing account's password");
+
+        await using (var q = storeB.QuerySession())
+        {
+            // (1) keep — B's local group survives intact (not wiped).
+            var localGroup = await q.LoadAsync<Group>(bLocalGroupId, ct);
+            Assert.Equal("B's local group name", localGroup!.Name);
+            Assert.Equal("pt-admin-001", localGroup.OwnerId);
+
+            // (2) add — the archive's group (NEW for B) is now present.
+            var addedGroup = await q.LoadAsync<Group>(planted.groupId, ct);
+            Assert.Equal("Maplewood Neighbors", addedGroup!.Name);
+            Assert.Equal("pt-admin-001", addedGroup.OwnerId);
+
+            // The group set is the union (B's local + the archive's) — both
+            // present, so the count is at least 2 (the archive carries
+            // exactly one group; B's local one is the extra).
+            var groupCount = await q.Query<Group>().CountAsync(ct);
+            Assert.True(groupCount >= 2,
+                $"KeepExisting should hold B's local group AND the archive's (got {groupCount})");
+        }
+    }
+
+    /// <summary>
+    /// ADR 0193 test helper — creates a principal (the archive's principal
+    /// shape: subjectId + username + email) + the role standing, ensuring the
+    /// elevated role rows exist first. The KeepExisting / CleanSlate collision
+    /// setups use this to give instance B its pre-existing accounts.
+    /// </summary>
+    private static async Task EnsurePrincipalWithRolesAsync(
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        string id, string username, string email,
+        string[] roles, CancellationToken ct, string password = "ExistingPass123!")
+    {
+        foreach (var role in roles)
+        {
+            if (await roleManager.FindByNameAsync(role) is null)
+                await roleManager.CreateAsync(new IdentityRole(role));
+        }
+        var existing = await userManager.FindByIdAsync(id);
+        if (existing is null)
+        {
+            existing = new User
+            {
+                Id = id,
+                UserName = username,
+                Email = email,
+                NormalizedEmail = email.ToUpperInvariant(),
+            };
+            var created = await userManager.CreateAsync(existing, password);
+            if (!created.Succeeded)
+                throw new InvalidOperationException($"principal create failed for {id}: " +
+                    string.Join(", ", created.Errors.Select(e => e.Description)));
+        }
+        foreach (var role in roles)
+            await userManager.AddToRoleAsync(existing, role);
+    }
+
     // ── The D9b no-secret pin — the C-M11·2 boundary, both halves ──────────
 
     [Fact]
