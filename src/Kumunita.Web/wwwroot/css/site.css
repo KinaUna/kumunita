@@ -1989,6 +1989,7 @@ body.kmb-nav-rail-mode main,
 body.kmb-nav-rail-mode .kmb-footer,
 body.kmb-nav-rail-mode .kumunita-pinned-announcement,
 body.kmb-nav-rail-mode .kumunita-onboarding-banner,
+body.kmb-nav-rail-mode .kmb-whatsnew-toast,
 body.kmb-nav-rail-mode .kmb-topbar {
   margin-left: var(--kmb-rail-w, 68px);
 }
@@ -2007,6 +2008,7 @@ body.kmb-nav-rail-mode.kmb-page-expanded main,
 body.kmb-nav-rail-mode.kmb-page-expanded .kmb-footer,
 body.kmb-nav-rail-mode.kmb-page-expanded .kumunita-pinned-announcement,
 body.kmb-nav-rail-mode.kmb-page-expanded .kumunita-onboarding-banner,
+body.kmb-nav-rail-mode.kmb-page-expanded .kmb-whatsnew-toast,
 body.kmb-nav-rail-mode.kmb-page-expanded .kmb-topbar {
   margin-left: 0;
 }
