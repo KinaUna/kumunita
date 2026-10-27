@@ -119,8 +119,12 @@ $aBaseline = @(
 # inventory keys x en/de/fr/da added to KnownTranslationKeys.cs (11020 ->
 # 11106) — the same shipped-additions mechanism as above; the gate's ceiling
 # starts from 11106 now.
+# Re-baselined again 2026-10-27 (the ADR 0193 portability import-modes lane
+# close): two new portability.import.keep_existing* keys x en/de/fr/da added
+# to KnownTranslationKeys.cs (11106 -> 11114) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 11114 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11106
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11114
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5257
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
