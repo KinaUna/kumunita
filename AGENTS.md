@@ -164,6 +164,22 @@ the source file** — and the user's report outranks your source reading.
     `<a href>` links into POST forms and dropping the `{…}` braces). Grep the
     whole codebase with `grep -rnoE '@\(\$"[^"]*@[A-Za-z_]' src/Kumunita.Web/Views/`
     — any hit is this bug.
+  - **A bare `@expr` inside a `<script>` block IS HTML-encoded in .NET 10** —
+    a `<script type="application/json" id="x">@myJson</script>` block does
+    **not** carry raw JSON: the `"` becomes `&quot;`, so the client's
+    `JSON.parse(el.textContent)` fails ("Expected property name at position
+    1"). Emit the value via `@Html.Raw(json)` (outputs as-is); if a value can
+    contain a literal `</script>`, neutralize it first:
+    `@Html.Raw(json.Replace("</", "<\\/"))` (`<\/` is a valid JSON escape that
+    cannot close the script). **Latent bug, not yet fixed:** the
+    `_Layout.cshtml` `#kumunita-strings` block wraps its JSON in
+    `HttpUtility.HtmlEncode` — under this rule that **double-encodes** it
+    (served bytes show `&amp;quot;`), so the P0-6 client strings bundle
+    (`rich-editor.ts`, `tag-suggest.ts`, `kiosk.ts`, `note-modal.ts`,
+    `onboarding-modal.ts`, `notifications-bell.ts`, `image-editor.ts`) is
+    unparseable and silently falls back to the English floor strings. The
+    ADR 0195 `#card-edit-prefills` block (this lane) uses the correct
+    `@Html.Raw(...)` form.
 - A URL or link that shows a **literal `@Model.X`** (404s, `/groups/@Model.GroupId/posts`)
 is the same class of bug — an uninterpolated Razor attribute value, not a
   routing problem. Fix the markup; don't debug the route.

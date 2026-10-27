@@ -956,6 +956,75 @@
             </div>
         </div>
     }
+
+    @* ADR 0195 — the board card's edit modal (ONE instance per board page,
+       not per card). The card click / the ⋮ menu's "Edit" item open this
+       (the client/lib/board-edit-modal.ts module) — it populates the
+       form's fields from the card's stored values (the
+       <c>card-edit-prefills</c> JSON data block below) and the board's
+       shared picker (the <c>CardEditPicker</c> seed), then shows it.
+       The form POSTs to <c>/projects/todos/{id}</c> (the UpdatePost lane) —
+       the <c>action</c> is set to the clicked card's TodoId by the client.
+       The body + tags are plain form fields (a Markdown textarea + a
+       comma-separated tags input) — the modal deliberately does NOT use
+       the <c>bindRichEditor</c> / <c>tag-suggest.ts</c> chip components
+       (they bind-once-at-load and read their seed attribute once per bind,
+       which is awkward in a single-instance modal reused per card; see the
+       <c>_BoardCardEditModal</c> comments). The board-modal.ts
+       re-home-to-body (the ADR 0071 / transform trap) covers this modal
+       too. *@
+    <partial name="_BoardCardEditModal"
+             model="new BoardCardEditModalModel(Model.CardEditPicker
+                        ?? new CardEditPicker([], [], [], [], [], []))" />
+
+    @* ADR 0195 — the per-card prefill JSON (the client reads it to populate
+       the modal's fields). Keyed by the card's TodoId. The values are
+       the card's stored Title / Body / Status / AssigneeId / ParentId /
+       BlockedByTodoId / StartAt / DueAt (wall-clock in the actor's zone) /
+       ComponentId / LanguageCode + the current tag slugs. A "read, not a
+       decision" surface (C-M5·3) — the standing write gate is the
+       service's on the POST lane. The **audience** is deliberately NOT
+       here: the modal mirrors the UpdateTodoRequest fields (no Audience
+       field on the update lane — see the _BoardCardEditModal comment);
+       the audience editor lives on the standalone Edit view. *@
+    @{
+        var cardEditPrefillsJson = System.Text.Json.JsonSerializer.Serialize(
+            (Model.CardEditPrefills ?? new Dictionary<string, CardEditPrefill>())
+                .ToDictionary(
+                    kv => kv.Key,
+                    kv => new
+                    {
+                        title = kv.Value.Title,
+                        body = kv.Value.Body,
+                        status = kv.Value.Status,
+                        assigneeId = kv.Value.AssigneeId,
+                        parentId = kv.Value.ParentId,
+                        blockedByTodoId = kv.Value.BlockedByTodoId,
+                        startAt = kv.Value.StartAt is not null
+                            ? kv.Value.StartAt.Value.ToString("yyyy-MM-ddTHH:mm")
+                            : null,
+                        dueAt = kv.Value.DueAt is not null
+                            ? kv.Value.DueAt.Value.ToString("yyyy-MM-ddTHH:mm")
+                            : null,
+                        componentId = kv.Value.ComponentId,
+                        languageCode = kv.Value.LanguageCode,
+                        tagSlugs = kv.Value.TagSlugs,
+                    }),
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = false });
+    }
+    @* ADR 0195 — this is a <script type="application/json"> data block that must
+       carry the RAW JSON so the client's JSON.parse can read it. In .NET 10's
+       Razor, a bare @expr inside a <script> IS html-encoded (the `"` becomes
+       &quot;), which would break JSON.parse — so the value must be emitted via
+       Html.Raw (which outputs as-is). The only remaining hazard is a body value
+       containing a literal `</script>` (a pasted HTML snippet) closing this
+       <script> early, so neutralize `</` to `<\/` (a valid JSON escape that
+       cannot form `</script>`). NOTE: the _Layout.cshtml #kumunita-strings block
+       wraps its JSON in HttpUtility.HtmlEncode — under this same encoding rule
+       that double-encodes it (&amp;quot;), so the P0-6 client strings bundle is
+       currently unparseable and falls back to the en floor; that is a separate
+       latent bug, NOT fixed here. *@
+    <script type="application/json" id="card-edit-prefills">@Html.Raw(cardEditPrefillsJson.Replace("</", "<\\/"))</script>
 </div>
 
 @section Scripts {
@@ -966,19 +1035,31 @@
          translation lanes use). data-rich-editor-no-image keeps the board
          translation body text-only. -->
     <script type="module" src="~/js/lib/rich-editor.js"></script>
+    <!-- ADR 0195 — the board card's edit modal (the card click / the ⋮
+         menu's "Edit" item). client/lib/board-edit-modal.ts: opens the
+         #board-card-edit-modal on card click, populates the form's fields
+         from the card's stored values (the <c>card-edit-prefills</c> JSON
+         below), binds the rich editor + tag-suggest (the modal is hidden at
+         load; bindRichEditor / bindTagSuggest are called after populating,
+         before showing), sets the form's action to the card's
+         /projects/todos/{id}, then shows the modal. The form POSTs natively
+         (CSRF via the anti-forgery token; the server is authoritative —
+         the standing gate is the service's on the POST lane). -->
+    <script type="module" src="~/js/lib/board-edit-modal.js"></script>
     <!-- Projects board (M5 — ADR 0067) — client/lib/projects-board.ts,
          tsc-built; keyboard reorder / move on a focused card (Arrow keys →
          the card's own move-… POST form, CSRF-aware, server-authoritative —
          C-M5·9 / D10: no HTML5 drag, no optimistic reordering). The menu
          channel is the plain POST forms above (the browser handles them). -->
     <script type="module" src="~/js/lib/projects-board.js"></script>
-    <!-- Board card modals (subtask / assign) — client/lib/board-modal.ts.
-         Re-homes the card's Bootstrap modals to <body> on open so they
-         escape any transformed / stacking-context ancestor of the board
-         (a CSS transform on .kanban-board turns it into the containing
-         block + stacking context for the modal's position:fixed, which
-         lets the body-level backdrop paint above the modal and cover the
-         form fields — the "can't type in the Add-subtask modal" bug).
-         The detach-menu.ts precedent, generalized to modals. -->
+    <!-- Board card modals (subtask / assign / edit) — client/lib/
+         board-modal.ts. Re-homes the card's Bootstrap modals to <body> on
+         open so they escape any transformed / stacking-context ancestor of
+         the board (a CSS transform on .kanban-board turns it into the
+         containing block + stacking context for the modal's position:fixed,
+         which lets the body-level backdrop paint above the modal and cover
+         the form fields — the "can't type in the Add-subtask modal" bug).
+         The detach-menu.ts precedent, generalized to modals. ADR 0195
+         extends this to the card edit modal. -->
     <script type="module" src="~/js/lib/board-modal.js"></script>
 }

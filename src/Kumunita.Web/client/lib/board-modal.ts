@@ -54,10 +54,16 @@
 
   // The card's modals (the _BoardCard shapes: `#subtask-{todoId}` +
   // `#assign-{todoId}`). `querySelectorAll` on the board captures both
-  // regardless of how many cards are on the page.
+  // regardless of how many cards are on the page. ADR 0195 — the card
+  // **edit** modal (`#board-card-edit-modal`) is a board-level modal (a
+  // sibling of the lanes, NOT inside a `.kanban-card`), so it is added
+  // explicitly here; the re-home-to-body invariant is the same (it must
+  // escape any transformed / stacking-context ancestor of the board).
   const cardModals = Array.from(
     board.querySelectorAll<HTMLElement>('.kanban-card .modal'),
   );
+  const editModal = document.querySelector<HTMLElement>('#board-card-edit-modal');
+  if (editModal) cardModals.push(editModal);
   if (cardModals.length === 0) return;
 
   // The modal's original parent (so `hidden.bs.modal` re-homes it back

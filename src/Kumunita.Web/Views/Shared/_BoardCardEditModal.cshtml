@@ -1,0 +1,333 @@
+@* _BoardCardEditModal — the board card's edit modal (ADR 0195).
+   Rendered ONCE per board page (not per card — the audience editor is a
+   single-instance partial, the _GrantPickers shape; the per-card values
+   are the client's to fill in from the <c>card-edit-prefills</c> JSON
+   data block before the modal opens).
+
+   The form POSTs to <c>/projects/todos/{id}</c> (the UpdatePost lane) —
+   the <c>action</c> is set by the client to the clicked card's TodoId.
+   All fields mirror the standalone Edit view (Views/Projects/Edit.cshtml);
+   the values are placeholders (no value= / selected=) — the client
+   populates them from the prefill JSON before showing the modal.
+
+   The audience editor (the "Everyone" checkbox + the mode radios + the
+   _GrantPickers partial) starts in the default public shape (Everyone
+   checked, Mode Any, Grants []); the client sets it from the card's
+   stored audience. The hidden <c>Audience.Grants</c> textarea is the only
+   form-bound grant field (the U11/F13 single-source pin); the
+   _GrantPickers checkboxes are display-only (the grant-picker-sync.ts
+   keeps them in sync).
+
+   The rich editor (body) + the tag-suggest input are NOT self-wired at
+   load (they are inside a hidden modal); the client calls
+   bindRichEditor / bindTagSuggest after populating the fields, before
+   showing the modal. *@
+@model Kumunita.Web.Models.BoardCardEditModalModel
+@using Kumunita.Core.Projects
+@using Kumunita.Web.Models
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var tagsExample = await Translation.GetAsync("tags.events_example", _kwL);
+    // The fixed status vocabulary's label keys (ADR 0069 — the same closed
+    // set the Kanban lane's Set-status select offers: None + the four codes).
+    static string StatusLabelKey(string code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
+    // The "Assign to…" assignee options (the seeded Audience_Users — the
+    // Edit view's assignee select uses the same list; the "Assign to me"
+    // self-assign lane is the card menu's separate item).
+    var assigneeOptions = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+}
+
+<div class="modal fade kmb-edit-modal" id="board-card-edit-modal" tabindex="-1"
+     data-edit-modal aria-labelledby="board-card-edit-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="board-card-edit-form" method="post" action="">
+                @Html.AntiForgeryToken()
+                @* ADR 0195 — the hidden <c>Audience.Mode</c> field. The
+                   <c>POST /projects/todos/{id}</c> lane validates
+                   <see cref="TodoEditorModel.IsValid"/>, which requires a
+                   well-formed <c>Audience</c> (a non-empty
+                   <c>Audience.Mode</c> of "Any" / "All") — but the service's
+                   <c>UpdateTodoAsync</c> **never writes** the to-do's
+                   audience (the <see cref="UpdateTodoRequest"/> has no
+                   Audience field). So the audience on the update form is a
+                   validation-gate artifact, not a write surface. This modal
+                   carries no audience editor (changing the audience is the
+                   standalone Edit view's job), so it posts a throwaway
+                   <c>Audience.Mode=Any</c> to satisfy the shared
+                   <see cref="TodoEditorModel"/> validation contract without
+                   touching the model / controller (the other surfaces +
+                   tests depend on their shape). <c>Audience.Grants</c> is
+                   omitted (a null Grants is a well-formed shape per
+                   <see cref="AudienceEditorModel.IsValid"/>). *@
+                <input type="hidden" name="Audience.Mode" value="Any" />
+                <div class="modal-header">
+                    <h5 class="modal-title" id="board-card-edit-modal-label">
+                        <kw-l key="projects.todo.edit_heading">Edit to-do</kw-l>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if (ViewData.ModelState?.ErrorCount > 0)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <ul class="mb-0">
+                                @foreach (var msg in ViewData.ModelState
+                                    .SelectMany(kvp => kvp.Value?.Errors ?? [])
+                                    .Select(e => e.ErrorMessage))
+                                {
+                                    <li>@msg</li>
+                                }
+                            </ul>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    @* Title *@
+                    <div class="mb-3">
+                        <label class="form-label" for="bce-title" style="font-weight:600;">
+                            <kw-l key="common.title">Title</kw-l>
+                        </label>
+                        <input class="form-control" type="text" id="bce-title" name="Title"
+                               maxlength="120" required value="" />
+                    </div>
+
+                    @* Status + Assignee *@
+                    <div class="row g-2 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label" for="bce-status" style="font-weight:600;">
+                                <kw-l key="projects.todo.status">Status</kw-l>
+                            </label>
+                            @* ADR 0195 — the status vocabulary (ADR 0069) is
+                               the same closed set the Kanban lane's
+                               Set-status select offers. A **legacy**
+                               free-text status (pre-ADR-0069) is not in
+                               the known set — the client injects it as an
+                               extra <c>option</c> when the card's stored
+                               status is not one of the known codes (the
+                               Edit view's idiom: "editing never loses a
+                               pre-ADR-0069 free-text status", C3). The
+                               <c>value</c> is the raw status string (the
+                               server renders / stores it verbatim). *@
+                            <select class="form-control" id="bce-status" name="Status">
+                                <option value=""><kw-l key="projects.board.status.none">None</kw-l></option>
+                                @foreach (var statusCode in KanbanStatuses.Known)
+                                {
+                                    <option value="@statusCode">
+                                        <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label" for="bce-assignee" style="font-weight:600;">
+                                <kw-l key="projects.todo.assignee">Assignee</kw-l>
+                            </label>
+                            <select class="form-control" id="bce-assignee" name="AssigneeId">
+                                <option value=""><kw-l key="projects.todo.unassigned">Unassigned</kw-l></option>
+                                @foreach (var o in assigneeOptions)
+                                {
+                                    <option value="@o.Id">@o.Label</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    @* Parent + ClearParent *@
+                    <div class="mb-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-sm-6">
+                                <label class="form-label" for="bce-parent" style="font-weight:600;">
+                                    <kw-l key="projects.todo.parent">Parent</kw-l>
+                                </label>
+                                <select class="form-control" id="bce-parent" name="ParentId">
+                                    <option value=""><kw-l key="projects.todo.no_parent">No parent (top-level)</kw-l></option>
+                                    @foreach (var (id, title) in Model.Picker.ParentOptions)
+                                    {
+                                        <option value="@id">@title</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-sm-6 d-flex align-items-end pb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="bce-clear-parent"
+                                           name="ClearParent" value="true" />
+                                    <input type="hidden" name="ClearParent" value="false" />
+                                    <label class="form-check-label" for="bce-clear-parent">
+                                        <kw-l key="projects.todo.clear_parent">Clear parent (make top-level)</kw-l>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="projects.todo.reparent_hint">A subtask is a full to-do with its own status, assignee, and board placement. Reparenting to a descendant is refused (cycle guard).</kw-l>
+                        </div>
+                    </div>
+
+                    @* BlockedByTodoId + ClearBlockedBy (ADR 0087) *@
+                    <div class="mb-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-sm-6">
+                                <label class="form-label" for="bce-blocked-by" style="font-weight:600;">
+                                    <kw-l key="todo.blocked_by">Waiting on</kw-l>
+                                </label>
+                                <select class="form-control" id="bce-blocked-by" name="BlockedByTodoId">
+                                    <option value=""><kw-l key="todo.blocked_by_none">No blocker</kw-l></option>
+                                    @foreach (var (id, title) in Model.Picker.BlockerOptions)
+                                    {
+                                        <option value="@id">@title</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-sm-6 d-flex align-items-end pb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="bce-clear-blocked-by"
+                                           name="ClearBlockedBy" value="true" />
+                                    <input type="hidden" name="ClearBlockedBy" value="false" />
+                                    <label class="form-check-label" for="bce-clear-blocked-by">
+                                        <kw-l key="todo.blocked_by_none">No blocker</kw-l>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="todo.blocked_by">Waiting on</kw-l> — purely informational: a blocker never blocks this to-do itself, and a reference back to a to-do already in its own chain is refused (cycle guard).
+                        </div>
+                    </div>
+
+                    @* StartAt + DueAt (ADR 0079) *@
+                    <div class="mb-3">
+                        <div class="row g-2">
+                            <div class="col">
+                                <label class="form-label" for="bce-start-at" style="font-weight:600;">
+                                    <kw-l key="projects.todo.start">Start</kw-l>
+                                </label>
+                                <input class="form-control" type="datetime-local" id="bce-start-at" name="StartAt" value="" />
+                            </div>
+                            <div class="col">
+                                <label class="form-label" for="bce-due-at" style="font-weight:600;">
+                                    <kw-l key="projects.todo.due">Due</kw-l>
+                                </label>
+                                <input class="form-control" type="datetime-local" id="bce-due-at" name="DueAt" value="" />
+                            </div>
+                        </div>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="projects.todo.dates_hint">Both are optional — leave blank for no date. Shown to viewers in their own timezone.</kw-l>
+                        </div>
+                    </div>
+
+                    @* Tags (ADR 0044 / 0147) — a plain comma-separated text
+                       input. ADR 0195 — the modal deliberately uses a plain
+                       <c>TagIds</c> text field (CSV) rather than the
+                       <c>tag-suggest.ts</c> chip component: the chip
+                       component wraps its input at bind time (chips /
+                       dropdown / hidden field) and reads
+                       <c>data-tag-suggest-initial</c> once per bind, which
+                       is awkward in a single-instance modal reused per card.
+                       The server's <see cref="TagSlugs.Parse"/> accepts a
+                       JSON array OR a raw CSV string (the documented
+                       fallback), so a comma-separated field posts the same
+                       tag set the chip component would. The full chip UI is
+                       on the standalone Edit view (Views/Projects/Edit.cshtml). *@
+                    <div class="mb-3">
+                        <label class="form-label" for="bce-tags" style="font-weight:600;">
+                            <kw-l key="nav.tags">Tags</kw-l>
+                        </label>
+                        <input class="form-control" type="text" id="bce-tags"
+                               name="TagIds"
+                               maxlength="256"
+                               placeholder="@tagsExample" />
+                        <div class="text-muted small mt-1">
+                            <kw-l key="projects.board.card_edit.tags_hint">Comma-separated. A blank field removes all tags.</kw-l>
+                        </div>
+                    </div>
+
+                    @* Body — a plain Markdown textarea. ADR 0195 — the modal
+                       deliberately uses a plain <c>Body</c> textarea rather
+                       than the <c>bindRichEditor</c> WYSIWYG surface: the
+                       rich editor binds the contenteditable pane + preview at
+                       load and is the standalone Edit view's enhancement; in
+                       a single-instance modal reused per card the pane /
+                       preview sync is a moving target. The plain textarea
+                       posts the same <c>Body</c> field (Markdown) the server
+                       renders via <see cref="MarkdownRenderer"/>. The full
+                       WYSIWYG editor is on the standalone Edit view. *@
+                    <div class="mb-3">
+                        <label class="form-label" for="bce-body" style="font-weight:600;">
+                            <kw-l key="common.body">Body</kw-l>
+                        </label>
+                        <textarea class="form-control" id="bce-body" name="Body" rows="6"></textarea>
+                        <div class="text-muted small mt-1">
+                            <kw-l key="projects.board.card_edit.body_hint">Markdown. Leave blank for a title-only to-do.</kw-l>
+                        </div>
+                    </div>
+
+                    @* ComponentId (the community picker) *@
+                    @if (Model.Picker.Components.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label" for="bce-component" style="font-weight:600;">
+                                <kw-l key="nav.community">Community</kw-l>
+                            </label>
+                            <select class="form-control" id="bce-component" name="ComponentId">
+                                <option value=""><kw-l key="projects.todo.all_communities">All communities</kw-l></option>
+                                @foreach (var (id, name) in Model.Picker.Components)
+                                {
+                                    <option value="@id">@name</option>
+                                }
+                            </select>
+                        </div>
+                    }
+
+                    @* LanguageCode *@
+                    <div class="mb-3">
+                        <label class="form-label" for="bce-language" style="font-weight:600;">
+                            <kw-l key="common.language">Language</kw-l>
+                        </label>
+                        <select class="form-control" id="bce-language" name="LanguageCode">
+                            @foreach (var (languageCode, nativeName) in Model.Picker.Languages)
+                            {
+                                <option value="@languageCode">@nativeName</option>
+                            }
+                        </select>
+                    </div>
+
+                    @* ADR 0195 — the modal mirrors the **update** lane's
+                       fields (Title / Status / AssigneeId / ParentId /
+                       BlockedByTodoId / StartAt / DueAt / ComponentId /
+                       LanguageCode / TagIds / Body). The **audience** is
+                       deliberately NOT in this modal: the UpdateTodoRequest
+                       (the POST /projects/todos/{id} lane) has no Audience
+                       field — the update lane does not change the to-do's
+                       audience (a silent no-op would mislead the actor).
+                       The audience editor (and the project / event
+                       association lanes) live on the standalone Edit view
+                       (Views/Projects/Edit.cshtml) — reachable from the
+                       card's ⋮ menu "View details" item (the to-do detail
+                       page's ⋮ "Edit" item). The standing write gate
+                       (creator ∪ assignee ∪ GlobalAdmin) is the service's
+                       on the POST lane. *@
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <kw-l key="common.cancel">Cancel</kw-l>
+                    </button>
+                    <button type="submit" class="btn btn-primary" form="board-card-edit-form">
+                        <kw-l key="projects.todo.save">Save changes</kw-l>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.74.0 entry (Sample-data MFA lock — ADR 0194) — 0.73.0 (Portability import modes) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.75.0 entry (Kanban board card edit modal — ADR 0195) — 0.74.0 (Sample-data MFA lock) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -115,15 +115,23 @@ public sealed class WhatsNewTests
         // (issue submission & escalation) 0.48.0 entry.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.74.0" && head.Date == "2026-10-27",
-            "The Sample-data-MFA-lock 0.74.0 (2026-10-27) entry must be the head of the registry; got "
+            head.Version == "0.75.0" && head.Date == "2026-10-27",
+            "The Kanban-board-card-edit-modal 0.75.0 (2026-10-27) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("MFA", StringComparison.OrdinalIgnoreCase)
+            head.Changes.Any(c => c.Contains("board", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("modal", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0195", StringComparison.OrdinalIgnoreCase)),
+            "The 0.75.0 head entry must name the Kanban-board-card-edit-modal lane + the ADR 0195.");
+
+        // The Sample-data-MFA-lock entry (0.74.0) slides one row back.
+        var sampleMfaLock = WhatsNew.All.Single(v => v.Version == "0.74.0");
+        Assert.True(
+            sampleMfaLock.Changes.Any(c => c.Contains("MFA", StringComparison.OrdinalIgnoreCase)
                                  && c.Contains("sample", StringComparison.OrdinalIgnoreCase)
                                  && c.Contains("lock", StringComparison.OrdinalIgnoreCase)
                                  && c.Contains("ADR 0194", StringComparison.OrdinalIgnoreCase)),
-            "The 0.74.0 head entry must name the Sample-data-MFA-lock lane + the ADR 0194.");
+            "The 0.74.0 entry must name the Sample-data-MFA-lock lane + the ADR 0194.");
 
         // The Portability-import-modes entry (0.73.0) slides one row back.
         var portabilityImport = WhatsNew.All.Single(v => v.Version == "0.73.0");

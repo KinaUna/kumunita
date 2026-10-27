@@ -251,6 +251,17 @@ public static class KnownTranslationKeys
             // ADR 0106 — self-assign lane + card details expander.
             ["projects.todo.assign_to_me"]   = "Assign to me",
             ["projects.todo.details"]        = "Details",
+            // ADR 0195 — the board card's edit-modal surface (the card click /
+            // the ⋮ menu's "Edit" item open the to-do's full edit form as a
+            // Bootstrap modal on the board page, instead of navigating to the
+            // to-do's detail). The "View details" item is the ⋮ menu's path to
+            // the to-do's full detail page (comments / translations / subtasks
+            // — the modal is the edit shape only). The tags / body hints are
+            // the modal's plain-text fields (the CSV tags input + the Markdown
+            // body textarea).
+            ["projects.todo.view_details"]       = "View details",
+            ["projects.board.card_edit.tags_hint"] = "Comma-separated. A blank field removes all tags.",
+            ["projects.board.card_edit.body_hint"] = "Markdown. Leave blank for a title-only to-do.",
             ["projects.todo.community"]      = "Community",
             ["projects.todo.subtasks"]       = "Subtasks",
             ["projects.todo.boards"]         = "Boards",
@@ -3235,6 +3246,10 @@ public static class KnownTranslationKeys
             ["projects.todo.assign_to_me"]   = "Mir zuweisen",
             ["projects.todo.details"]        = "Details",
             ["projects.todo.community"]      = "Community",
+            // ADR 0195 — die Karten-Bearbeitungsmodal (Klick auf die Karte / "Bearbeiten" im ⋮-Menü öffnen das volle Bearbeitungsformular der Aufgabe als Bootstrap-Modal auf der Board-Seite). "Details anzeigen" ist der Pfad im ⋮-Menü zur vollen Detailseite (Kommentare / Übersetzungen / Unteraufgaben). Die Tags-/Body-Hinweise sind die Textfelder der Modal (CSV-Tag-Feld + Markdown-Body-Textarea).
+            ["projects.todo.view_details"]       = "Details anzeigen",
+            ["projects.board.card_edit.tags_hint"] = "Kommagetrennt. Ein leeres Feld entfernt alle Tags.",
+            ["projects.board.card_edit.body_hint"] = "Markdown. Leer lassen für eine nur betitelte Aufgabe.",
             ["projects.todo.subtasks"]       = "Unteraufgaben",
             ["projects.todo.boards"]         = "Boards",
             // ADR 0100 — Kommentare + Antworten (C-M3·1 — Kommentare erben die
@@ -6017,6 +6032,10 @@ public static class KnownTranslationKeys
             // ADR 0106 — voie d'auto-attribution + panneau de détails de carte.
             ["projects.todo.assign_to_me"]   = "M'attribuer",
             ["projects.todo.details"]        = "Détails",
+            // ADR 0195 — la modale d'édition de la carte (le clic sur la carte / « Modifier » dans le menu ⋮ ouvrent le formulaire d'édition complet de la tâche comme modale Bootstrap sur la page du tableau). « Voir les détails » est le chemin du menu ⋮ vers la page de détails complète (commentaires / traductions / sous-tâches). Les indications tags / corps sont les champs texte de la modale (champ de tags CSV + zone Markdown du corps).
+            ["projects.todo.view_details"]       = "Voir les détails",
+            ["projects.board.card_edit.tags_hint"] = "Séparés par des virgules. Un champ vide supprime tous les tags.",
+            ["projects.board.card_edit.body_hint"] = "Markdown. Laisser vide pour une tâche sans corps.",
             ["projects.todo.community"]      = "Communauté",
             ["projects.todo.subtasks"]       = "Sous-tâches",
             ["projects.todo.boards"]         = "Tableaux",
@@ -8728,6 +8747,10 @@ public static class KnownTranslationKeys
             // ADR 0106 — selvtildelings-sporet + kortdetaljs udvidelsesfelt.
             ["projects.todo.assign_to_me"]   = "Tildel mig",
             ["projects.todo.details"]        = "Detaljer",
+            // ADR 0195 — kortets redigeringsmodal (klik på kortet / "Rediger" i ⋮-menuen åbner opgavens fulde redigeringsformular som Bootstrap-modal på board-siden). "Se detaljer" er ⋮-menuens vej til den fulde detaljesside (kommentarer / oversættelser / delopgaver). Tags-/krop-hintene er modalens tekstfelter (CSV-tagfelt + Markdown-krop-tekstfelt).
+            ["projects.todo.view_details"]       = "Se detaljer",
+            ["projects.board.card_edit.tags_hint"] = "Kommasepareret. Et tomt felt fjerner alle tags.",
+            ["projects.board.card_edit.body_hint"] = "Markdown. Lad stå tomt for en kun-betitlet opgave.",
             ["projects.todo.community"]      = "Fællesskab",
             ["projects.todo.subtasks"]       = "Delopgaver",
             ["projects.todo.boards"]         = "Boards",

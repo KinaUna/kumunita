@@ -71,8 +71,22 @@
                                         </span>
                                     }
                                     <div class="flex-grow-1">
+                                        @* ADR 0195 — the card title is the edit-modal
+                                           trigger (the card click / the ⋮ menu's "Edit"
+                                           item both open the _BoardCardEditModal via
+                                           client/lib/board-edit-modal.ts). The full detail
+                                           page (comments / translations / subtasks) is
+                                           still reachable via the ⋮ menu's "View details"
+                                           item. The title is a button (not a link):
+                                           the click opens the modal (no navigation);
+                                           the drag + keyboard channels (projects-board.ts)
+                                           are unaffected (a button is still a grab
+                                           point for the dragstart — the card's
+                                           .kanban-card ancestor is the drag source). *@
                                         <h4 class="h6 mb-1">
-                                            <a href="@($"/projects/todos/{card.TodoId}")">@card.Title</a>
+                                            <button type="button" class="btn btn-link p-0 text-reset kanban-card-title"
+                                                    data-board-card-edit
+                                                    style="text-decoration:none;">@card.Title</button>
                                         </h4>
                                         <div class="text-muted small">
                                             @if (!string.IsNullOrWhiteSpace(effectiveStatus))
@@ -248,8 +262,24 @@
                                                     </form>
                                                 </li>
                                             }
+                                            @* ADR 0195 — "Edit" is now a button opening the
+                                               card's edit modal (the _BoardCardEditModal
+                                               partial, the board page's single instance —
+                                               the card click + this item both open it via
+                                               client/lib/board-edit-modal.ts). "View details"
+                                               is the navigation to the to-do's full detail
+                                               page (the comments / translations / subtasks
+                                               surface — the modal is the edit shape only).
+                                               The card's title (the h4 link) no longer
+                                               navigates; it is the modal trigger too. *@
                                             <li>
-                                                <a class="dropdown-item text-dark" href="@($"/projects/todos/{card.TodoId}")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                                                <button type="button" class="dropdown-item text-dark"
+                                                        data-board-card-edit>
+                                                    <kw-l key="projects.todo.edit">Edit</kw-l>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-dark" href="@($"/projects/todos/{card.TodoId}")"><kw-l key="projects.todo.view_details">View details</kw-l></a>
                                             </li>
                                             @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
                                             {

@@ -1305,6 +1305,43 @@ public sealed class ProjectsController : Controller
     }
 
     /// <summary>
+    /// Seeds the **parent picker** options (the actor's visible top-level
+    /// to-dos — the F9 pin: a subtask is a full to-do, and picking a parent
+    /// never mutates the parent). A read, never a decision (the service's
+    /// <c>CanSeeAsync(Read)</c> already gates the rows).
+    /// </summary>
+    private async Task<IReadOnlyList<(string Id, string Title)>> SeedTodoParentOptionsAsync(string actorId)
+    {
+        if (actorId.Length == 0)
+            return [];
+        // ADR 0195 — a **display surface, never a gate** (C3): a denied seam
+        // (UnauthorizedAccessException) or a seam that returns no page (a
+        // test-harness substitute / a missing read) is a display no-op — the
+        // picker offers an empty option set (the F10-hides-the-picker rule
+        // the BoardEdit / BoardNew views apply), never an error on the board
+        // read itself.
+        IReadOnlyList<TodoItem> candidates;
+        try
+        {
+            var page = await projects.ListTodosAsync(null, null, actorId, page: 1, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3
+            candidates = page?.Items ?? [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
+        catch (KeyNotFoundException)
+        {
+            return [];
+        }
+        return candidates
+            .Where(t => t is not null && t.ParentId is null)
+            .Select(t => (Id: t.Id, Title: string.IsNullOrWhiteSpace(t.Title) ? t.Id : t.Title))
+            .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
     /// Re-seeds the <see cref="TodoEditorModel"/> project picker (the
     /// standalone <c>set-project</c> card) on an invalid-POST re-render of the
     /// <c>Edit</c> view — the <see cref="TodoEditorModel.ProjectId"/> prefill
@@ -2525,6 +2562,64 @@ public sealed class ProjectsController : Controller
             .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
         ViewData["Assign_Communities"] = communityOptions;
+
+        // ADR 0195 — the card edit-modal surface. Two read surfaces (both
+        // "a read, never a decision" — C-M5·3: every card's own Read decision
+        // already ran in GetBoardAsync's two-level decision; the standing
+        // write gate is the service's on the POST /projects/todos/{id} lane):
+        //   (a) per-card prefill — each card's stored values (Title / Body /
+        //       Status / AssigneeId / ParentId / BlockedByTodoId / StartAt /
+        //       DueAt (wall-clock in the actor's zone, the TodoEditGet idiom)
+        //       / ComponentId / LanguageCode + the current tag slugs, the
+        //       data-tag-suggest-initial prefill shape);
+        //   (b) board-level picker — the option lists shared by every card's
+        //       modal (parent / blocker / community / language + the
+        //       grant-picker users + groups seeded into ViewData above).
+        // Both are display conveniences: a missing / unreadable value simply
+        // yields an empty picker option (the same F10-hides-the-picker
+        // rule the BoardEdit / BoardNew views apply).
+        var actorId0 = SubjectId(User) ?? string.Empty;
+        var zone0 = await ResolveZoneAsync();
+        var prefills = new Dictionary<string, CardEditPrefill>(StringComparer.Ordinal);
+        if (actorId0.Length > 0)
+        {
+            foreach (var laneDetail in result.Lanes)
+            {
+                foreach (var card in laneDetail.Cards)
+                {
+                    // ADR 0079 / ADR 0019 — the stored StartAt / DueAt are UTC
+                    // instants; convert to wall-clock in the actor's effective
+                    // zone so the modal's <c>datetime-local</c> shows the local
+                    // time the author chose (a blank field on POST is the clear
+                    // intent — the UpdateTodoRequest partial shape).
+                    var slugs = await SeedExistingTagSlugsAsync(card.TagIds);
+                    prefills[card.Id] = new CardEditPrefill(
+                        TodoId: card.Id,
+                        Title: card.Title,
+                        Body: card.Body,
+                        Status: card.Status,
+                        AssigneeId: card.AssigneeId,
+                        ParentId: card.ParentId,
+                        BlockedByTodoId: card.BlockedByTodoId,
+                        StartAt: card.StartAt is not null ? TimeZoneInfo.ConvertTime(card.StartAt.Value, zone0) : null,
+                        DueAt:   card.DueAt   is not null ? TimeZoneInfo.ConvertTime(card.DueAt.Value,   zone0) : null,
+                        ComponentId: card.ComponentId,
+                        LanguageCode: card.LanguageCode ?? string.Empty,
+                        TagSlugs: slugs);
+                }
+            }
+        }
+        vm = vm with
+        {
+            CardEditPrefills = prefills,
+            CardEditPicker = new CardEditPicker(
+                ParentOptions: await SeedTodoParentOptionsAsync(actorId0),
+                BlockerOptions: await SeedBlockerPickerAsync(),
+                Components: await SeedComponentPickerAsync(),
+                Languages: await SeedLanguagePickerAsync(),
+                GrantUsers: (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>(),
+                GrantGroups: (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>()),
+        };
         return View("BoardDetail", vm);
     }
 
@@ -4612,10 +4707,15 @@ public sealed class ProjectsController : Controller
     private async Task<IReadOnlyList<(string Id, string Title)>> SeedBlockerPickerAsync()
     {
         var actorId = SubjectId(User) ?? string.Empty;
+        // ADR 0195 — null-tolerant (a test-harness substitute that does not
+        // stub `ListPickerTodosAsync` returns null; the existing
+        // `SeedTodoParentOptionsAsync` idiom — a **display surface, never a
+        // gate** (C3): an unstubbed seam is a display no-op, not an error).
         IReadOnlyList<Kumunita.Core.Projects.TodoItem> list;
         try
         {
-            list = (await projects.ListPickerTodosAsync(actorId, 1, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3
+            var page = await projects.ListPickerTodosAsync(actorId, 1, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3
+            list = page?.Items ?? [];
         }
         catch (KeyNotFoundException)
         {
@@ -4627,6 +4727,7 @@ public sealed class ProjectsController : Controller
         }
 
         return (list ?? [])
+            .Where(t => t is not null)
             .Select(t => (Id: t.Id, Title: string.IsNullOrWhiteSpace(t.Title) ? t.Id : t.Title))
             .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();
