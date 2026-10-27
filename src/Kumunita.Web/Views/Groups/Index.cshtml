@@ -4,6 +4,12 @@
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
+@functions {
+    // First letter of the group name, upper-cased; "?" for a blank name.
+    // Presentation only (ADR 0177).
+    private static string GroupInitial(string? name) =>
+        string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[..1].ToUpperInvariant();
+}
 @{
     ViewData["Title"] = "Groups";
 
@@ -117,10 +123,13 @@
 
         @if (Model.Groups.Count == 0)
         {
-            <div class="alert alert-info">
-                <kw-l key="groups.empty">No groups yet.</kw-l>
-                <a href="@Url.Action("Create", "Groups")">Create one</a>
-                to organize residents (e.g. "Building 4", "Volunteers", "Bike owners").
+            @* ADR 0177 — friendly empty state (was a bare .alert-info). *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="groups.empty">No groups yet.</kw-l></p>
+                <p class="kmb-empty-body">
+                    Groups organize residents, e.g. "Building 4", "Volunteers", "Bike owners".
+                </p>
+                <a href="@Url.Action("Create", "Groups")" class="btn btn-primary">Create a group</a>
             </div>
         }
         else
@@ -128,13 +137,19 @@
             <div class="airy-group-grid">
                 @foreach (var g in Model.Groups)
                 {
+                    @* ADR 0177 — monogram tile (rounded square, so groups read
+                       differently from the round person avatars) + name +
+                       member count; the whole card is the link (stretched-link). *@
                     <div class="airy-group-card">
-                        <span class="gname">
-                            <a href="@Url.Action("Detail", "Groups", new { id = g.Id })">@g.Name</a>
-                        </span>
-                        <span class="gcount">
-                            @g.MemberCount
-                            member@(g.MemberCount == 1 ? "" : "s")
+                        <span class="avatar-mono airy-group-mono" data-hue="@AvatarHue.For(g.Id)" aria-hidden="true">@GroupInitial(g.Name)</span>
+                        <span class="gtext">
+                            <span class="gname">
+                                <a class="stretched-link" href="@Url.Action("Detail", "Groups", new { id = g.Id })">@g.Name</a>
+                            </span>
+                            <span class="gcount">
+                                @g.MemberCount
+                                member@(g.MemberCount == 1 ? "" : "s")
+                            </span>
                         </span>
                     </div>
                 }
@@ -157,16 +172,19 @@
                 @foreach (var g in Model.PublicGroups)
                 {
                     <div class="airy-group-card">
-                        <span class="gname">@g.Name</span>
-                        <span class="gcount">
-                            @g.MemberCount
-                            member@(g.MemberCount == 1 ? "" : "s")
+                        <span class="avatar-mono airy-group-mono" data-hue="@AvatarHue.For(g.Id)" aria-hidden="true">@GroupInitial(g.Name)</span>
+                        <span class="gtext">
+                            <span class="gname">@g.Name</span>
+                            <span class="gcount">
+                                @g.MemberCount
+                                member@(g.MemberCount == 1 ? "" : "s")
+                            </span>
                         </span>
                         <span class="row-actions">
                             <form method="post"
                                   action="@Url.Action("RequestToJoin", "Groups", new { id = g.Id })">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="groups.request_join">Request to join</kw-l></button>
+                                <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="groups.request_join">Request to join</kw-l></button>
                             </form>
                         </span>
                     </div>

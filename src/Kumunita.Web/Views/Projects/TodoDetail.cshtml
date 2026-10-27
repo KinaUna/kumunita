@@ -82,15 +82,15 @@
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
             @if (!string.IsNullOrWhiteSpace(Model.Todo.Status))
             {
-                <span class="badge text-bg-light border">@Model.Todo.Status</span>
+                <partial name="_StatusChip" model="@(Model.Todo.Status ?? string.Empty)" />
             }
             @if (Model.Todo.ComponentDisplayName is not null)
             {
-                <span class="badge text-bg-light border">@Model.Todo.ComponentDisplayName</span>
+                <span class="kmb-chip">@Model.Todo.ComponentDisplayName</span>
             }
             @if (Model.Todo.GroupNames is { Count: > 0 })
             {
-                <span class="badge text-bg-light border">
+                <span class="kmb-chip">
                     <kw-l key="projects.todo.addressed_to">Addressed to</kw-l>: @string.Join(", ", Model.Todo.GroupNames)
                 </span>
             }
@@ -287,7 +287,7 @@
                 }
             }
 
-        <div class="card mb-4">
+        <div class="card kmb-detail-card mb-4">
             <div class="card-body">
                 @* The to-do's ⋮ action surface (ADR 0082), now INSIDE the card
                    (the community-posts idiom): a right-aligned row at the top of
@@ -608,7 +608,7 @@
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                         @foreach (var tag in Model.Tags)
                         {
-                            <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                            <a class="kmb-chip"
                                href="/tags/@tag.Slug">@tag.DisplayedName</a>
                         }
                     </div>
@@ -649,7 +649,7 @@
                    lane (blank = unassign). *@
                 @if (Model.CanUpdate)
                 {
-                    <div class="card mt-4">
+                    <div class="card kmb-detail-card mt-4">
                         <div class="card-body">
                             <div class="row g-2 align-items-end">
                                 <div class="col-sm-6">
@@ -770,7 +770,7 @@
                    surface). *@
                 @if (Model.EventPicker is not null)
                 {
-                    <div class="card mt-4">
+                    <div class="card kmb-detail-card mt-4">
                         <div class="card-body">
                             <label class="form-label fw-semibold" for="set-event-select">
                                 <kw-l key="todo.set_event.label">Link to event</kw-l>
@@ -933,7 +933,7 @@
                                     <span> · <kw-dt dt="@sub.Created" format="g"></kw-dt></span>
                                     @if (!string.IsNullOrWhiteSpace(sub.Status))
                                     {
-                                        <span class="badge text-bg-light border ms-2">@sub.Status</span>
+                                        <partial name="_StatusChip" model="@(sub.Status ?? string.Empty)" />
                                     }
                                 </div>
                             </div>
@@ -949,10 +949,10 @@
         {
             <section class="mb-4">
                 <h2 class="h5 mb-3"><kw-l key="projects.todo.boards">Boards</kw-l></h2>
-                <div class="list-group">
+                <div class="kmb-member-list">
                     @foreach (var placement in Model.Placements)
                     {
-                        <div class="list-group-item">
+                        <div class="kmb-member-row">
                             <a href="@($"/projects/boards/{placement.BoardId}")">
                                 @placement.BoardTitle
                                 @if (string.IsNullOrWhiteSpace(placement.BoardTitle))
@@ -995,10 +995,10 @@
             }
             else
             {
-                <div class="list-group mb-3">
+                <div class="kmb-ann-comments mb-3">
                     @foreach (var c in topLevel)
                     {
-                        <div class="list-group-item">
+                        <div class="kmb-ann-comment">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div class="d-inline-flex align-items-center me-2">
                                     <kw-avatar subject="@c.AuthorId" size="sm" />
@@ -1009,7 +1009,7 @@
                                         <span class="text-muted small"><kw-dt dt="@c.Created" format="g"></kw-dt></span>
                                         @if (c.DeletedAt is not null)
                                         {
-                                            <span class="badge text-bg-light border"><kw-l key="projects.todo.comment_deleted">This comment has been deleted by its author.</kw-l></span>
+                                            <span class="kmb-chip"><kw-l key="projects.todo.comment_deleted">This comment has been deleted by its author.</kw-l></span>
                                         }
                                         @if (c.IsAuthor && c.DeletedAt is null)
                                         {
@@ -1045,7 +1045,7 @@
                                                     <span class="text-muted small"><kw-dt dt="@r.Created" format="g"></kw-dt></span>
                                                     @if (r.DeletedAt is not null)
                                                     {
-                                                        <span class="badge text-bg-light border"><kw-l key="projects.todo.comment_deleted">This comment has been deleted by its author.</kw-l></span>
+                                                        <span class="kmb-chip"><kw-l key="projects.todo.comment_deleted">This comment has been deleted by its author.</kw-l></span>
                                                     }
                                                     @if (r.IsAuthor && r.DeletedAt is null)
                                                     {
@@ -1074,7 +1074,7 @@
             @* The composer (any signed-in resident who can see the to-do may
                comment — C-M3·1). The M3 reply-form shape: rc-editor + language
                picker (ADR 0018 — the authored-in tag). *@
-            <div class="card">
+            <div class="card kmb-detail-card kmb-ann-composer">
                 <div class="card-body">
                     <form class="mb-0" method="post" action="@($"/projects/todos/{Model.Todo.Id}/comments")">
                         @Html.AntiForgeryToken()

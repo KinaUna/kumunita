@@ -113,7 +113,14 @@ public sealed class RevocationStampMiddleware
         // reads the correct cookie regardless of the default-scheme
         // configuration.
         var authResult = await context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
-        var cookieStamp = authResult.Properties?.Items["kumunita.stamp"] as string;
+        // TryGetValue, not the indexer: a session minted before F5 shipped (or a
+        // sign-in path that never hit the OnSigningIn stamp) has a Properties
+        // dictionary without the key — the indexer throws
+        // KeyNotFoundException (crash loop on every request) where the
+        // backward-compat rule below demands a simple "no stamp → pass through".
+        var cookieStamp = authResult.Properties?.Items.TryGetValue("kumunita.stamp", out var stampObj) == true
+            ? stampObj as string
+            : null;
 
         // No stamp in the cookie (e.g. a session minted before F5 shipped) —
         // let it through (the resident can still kill-all via the new surface;

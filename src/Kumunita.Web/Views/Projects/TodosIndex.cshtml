@@ -106,8 +106,8 @@
             </div>
         </header>
 
-        <form method="get" action="/projects/todos" class="mb-4">
-            <div class="d-flex gap-2 align-items-end flex-wrap">
+        <form method="get" action="/projects/todos" class="kmb-filter-bar mb-4">
+            <div class="d-flex gap-3 align-items-end flex-wrap">
                 @if (Model.Components.Count > 0)
                 {
                     <div>
@@ -166,29 +166,18 @@
                         <h3 class="airy-ann-title">
                             <a href="@($"/projects/todos/{row.Id}")">@row.Title</a>
                         </h3>
-                        @* The assignee avatar (the BoardDetail card pattern): the
-                           <img> links the audited serving lane (GET
-                           /profile/avatar/{subjectId}) and avatar.ts hides it
-                           on the 404 it fails closed to (no avatar set),
-                           showing the monogram sibling — the assignee's
-                           initial. The board already carries one on each
-                           card; this row is the todo-list parity. *@
-                        @if (!string.IsNullOrWhiteSpace(row.AssigneeId))
-                        {
-                            string assigneeInitial = !string.IsNullOrWhiteSpace(row.AssigneeDisplayName)
-                                ? char.ToUpperInvariant(row.AssigneeDisplayName.TrimStart()[0]).ToString()
-                                : string.Empty;
-                            <div class="mb-1">
-                                <span class="d-inline-flex align-items-center">
-                                    <kw-avatar subject="@row.AssigneeId" mono="@assigneeInitial" size="sm" />
-                                </span>
-                            </div>
-                        }
                         <div class="text-muted small mb-1">
                             @row.AuthorDisplayName
                             @if (!string.IsNullOrWhiteSpace(row.AssigneeDisplayName))
                             {
-                                <span>· <kw-l key="projects.todo.assignee">Assignee</kw-l>: @row.AssigneeDisplayName</span>
+                                @* ADR 0189 — the assignee avatar rides the meta line (it used
+                                   to sit on a line of its own under the title). The <img>
+                                   links the audited serving lane (GET
+                                   /profile/avatar/{subjectId}); avatar.ts hides it on the
+                                   404 and the monogram sibling shows. *@
+                                string assigneeInitial = char.ToUpperInvariant(row.AssigneeDisplayName.TrimStart()[0]).ToString();
+                                <span class="kmb-assignee">· <kw-avatar subject="@row.AssigneeId" mono="@assigneeInitial" size="sm" />
+                                    <kw-l key="projects.todo.assignee">Assignee</kw-l>: @row.AssigneeDisplayName</span>
                             }
                             else
                             {
@@ -206,12 +195,14 @@
                                 }
                                 @if (row.DueAt is not null)
                                 {
-                                    <span>· <kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@row.DueAt" format="g"></kw-dt></span>
+                                    var overdue = row.DueAt.Value < DateTimeOffset.UtcNow
+                                        && row.Status != "done" && row.Status != "cancelled";
+                                    <span class="@(overdue ? "kmb-overdue" : null)" title="@(overdue ? "Overdue" : null)">· <kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@row.DueAt" format="g"></kw-dt></span>
                                 }
                             }
                             @if (!string.IsNullOrWhiteSpace(row.Status))
                             {
-                                <span class="badge text-bg-light border ms-2">@row.Status</span>
+                                <partial name="_StatusChip" model="@(row.Status ?? string.Empty)" />
                             }
                             @if (row.ComponentDisplayName is not null)
                             {

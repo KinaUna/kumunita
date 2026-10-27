@@ -189,6 +189,7 @@
                 @if (upcoming.Events.Count > 0)
                 {
                 <div class="col-12 col-lg-6">
+                    <div class="kmb-home-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.upcoming_events">Events</kw-l></h3>
                         <a href="/events" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
@@ -235,6 +236,7 @@
                             </button>
                         </div>
                     }
+                    </div>
                 </div>
                 }
 
@@ -242,6 +244,7 @@
                 @if (upcoming.Todos.Count > 0)
                 {
                 <div class="col-12 col-lg-6">
+                    <div class="kmb-home-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.upcoming_todos">To-dos</kw-l></h3>
                         <a href="/projects/todos" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
@@ -288,6 +291,7 @@
                             </button>
                         </div>
                     }
+                    </div>
                 </div>
                 }
             </div>
@@ -316,6 +320,7 @@
                     @if (feed.Posts.Count > 0)
                     {
                         <div class="col-12 col-lg-4">
+                            <div class="kmb-home-card">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.feed_posts">Posts</kw-l></h3>
                                 <a href="/community" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
@@ -356,12 +361,14 @@
                                     </div>
                                 }
                             </div>
+                            </div>
                         </div>
                     }
 
                     @if (feed.Announcements.Count > 0)
                     {
                         <div class="col-12 col-lg-4">
+                            <div class="kmb-home-card">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.feed_announcements">Announcements</kw-l></h3>
                                 <a href="/announcements" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
@@ -398,12 +405,14 @@
                                     </div>
                                 }
                             </div>
+                            </div>
                         </div>
                     }
 
                     @if (feed.Pages.Count > 0)
                     {
                         <div class="col-12 col-lg-4">
+                            <div class="kmb-home-card">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.feed_pages">Pages</kw-l></h3>
                                 <a href="/pages" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
@@ -421,6 +430,7 @@
                                         }
                                     </div>
                                 }
+                            </div>
                             </div>
                         </div>
                     }

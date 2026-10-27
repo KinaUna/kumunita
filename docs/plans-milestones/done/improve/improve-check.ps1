@@ -115,8 +115,16 @@ $aBaseline = @(
 # new page-* note kinds added 10 pn.list.kind.page-* keys x en/de/fr/da to
 # KnownTranslationKeys.cs (10970 -> 11020) — the same shipped-additions
 # mechanism as above; the gate's ceiling starts from 11020 now.
+# Re-baselined again 2026-10-27 (the ADR 0191 inventory lane close): two new
+# inventory keys x en/de/fr/da added to KnownTranslationKeys.cs (11020 ->
+# 11106) — the same shipped-additions mechanism as above; the gate's ceiling
+# starts from 11106 now.
+# Re-baselined again 2026-10-27 (the ADR 0193 portability import-modes lane
+# close): two new portability.import.keep_existing* keys x en/de/fr/da added
+# to KnownTranslationKeys.cs (11106 -> 11114) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 11114 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11020
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11114
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5257
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
@@ -309,7 +317,14 @@ $fBaselineSizes = @{
   # Re-baselined 2026-10-25 (the prod-hardening close): TodoDetail grew from
   # the M36 mention link pass + the M37 _NoteButton partial + the M14 linked
   # to-do / project chips (the lane's shipped additions, the M29 precedent).
-  'src/Kumunita.Web/Views/Projects/TodoDetail.cshtml'  = 1137
+  'src/Kumunita.Web/Views/Projects/TodoDetail.cshtml'  = 1154
+  # Re-baselined 2026-10-27 (the ADR 0176 / 0189 lane close): _Layout crossed
+  # the 800 ceiling from the ADR 0176 single-notice-strip pass (the
+  # `notice-strip.js` surface + the what's-new inline notice, shipped
+  # additions) and TodoDetail grew from the ADR 0189 to-do restyle (status
+  # chip / assignee meta line / overdue marker / detail+comment cards) — the
+  # same shipped-additions mechanism as above (the M29 precedent).
+  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 816
 }
 $fNew = [System.Collections.Generic.List[string]]::new()
 foreach ($v in $fViolations) {

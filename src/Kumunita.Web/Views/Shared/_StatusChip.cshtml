@@ -1,0 +1,17 @@
+@* ADR 0189 — a to-do / project / board status as a soft chip with a coloured
+   dot. Model: the raw status string (the closed KanbanStatuses set —
+   not-started / in-progress / done / cancelled — or a pre-ADR-0069 free-text
+   value, which renders as a neutral chip). The label stays the verbatim text
+   (the M5 status-badge shape); the dot never carries meaning alone. *@
+@model string
+@{
+    var kind = (Model ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "not-started" => "is-not-started",
+        "in-progress" => "is-in-progress",
+        "done"        => "is-done",
+        "cancelled"   => "is-cancelled",
+        _             => "is-other",
+    };
+}
+<span class="kmb-status @kind"><span class="kmb-status-dot" aria-hidden="true"></span>@Model</span>

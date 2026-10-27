@@ -1,0 +1,52 @@
+@*
+    _EventCard.cshtml — one event in the /events feed and "Your upcoming events"
+    (ADR 0179). Model: (EventRow row, bool hidden). `hidden` carries the native
+    attribute the mine-more.js "show more" module reveals.
+
+    Date tile (month + day, in the resident's zone via kw-dt sentinels) + title
+    (stretched link = the whole card is the link) + weekday/time range +
+    location + community chip + 2-line preview + organizer. No data changes.
+*@
+@using Kumunita.Web.Models
+@using Kumunita.Web.Security
+@model (EventRow Row, bool Hidden)
+@{
+    var row = Model.Row;
+    bool hasEnd = row.End > row.Start;
+}
+<article class="kmb-event-card" @(Model.Hidden ? "hidden" : null)>
+    <div class="kmb-event-date" aria-hidden="true">
+        <span class="kmb-event-month"><kw-dt dt="@row.Start" format="month"></kw-dt></span>
+        <span class="kmb-event-day"><kw-dt dt="@row.Start" format="day"></kw-dt></span>
+    </div>
+    <div class="kmb-event-body">
+        <div class="kmb-event-head">
+            <h3 class="kmb-event-title">
+                <a class="stretched-link" href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
+            </h3>
+            @if (row.ComponentDisplayName is not null)
+            {
+                <span class="kmb-chip">@row.ComponentDisplayName</span>
+            }
+        </div>
+        <div class="kmb-event-meta">
+            <span class="kmb-event-when">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <kw-dt dt="@row.Start" format="weekday"></kw-dt>
+                <kw-dt dt="@row.Start" format="timeonly"></kw-dt>@if (hasEnd){<text>–<kw-dt dt="@row.End" format="timeonly"></kw-dt></text>}
+            </span>
+            @if (!string.IsNullOrWhiteSpace(row.Location))
+            {
+                <span class="kmb-event-where">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                    @row.Location
+                </span>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(row.Body))
+        {
+            <p class="kmb-event-preview">@MarkdownRenderer.PlainTextPreview(row.Body, 250)</p>
+        }
+        <div class="kmb-event-org">@row.AuthorDisplayName</div>
+    </div>
+</article>

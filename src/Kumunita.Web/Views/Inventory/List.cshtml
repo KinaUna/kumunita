@@ -65,7 +65,7 @@
             <partial name="_NoteButton" model="@_pn" />
         </div>
 
-        <form method="get" action="/inventory" class="mb-4">
+        <form method="get" action="/inventory" class="kmb-filter-bar mb-4">
             <div class="d-flex gap-2 align-items-end flex-wrap">
                 <div>
                     <label class="form-label" for="ownerkind-filter" style="font-weight:600;">
@@ -116,12 +116,18 @@
                             <a href="@($"/inventory/{row.Id}")">@row.Name</a>
                         </h3>
                         <div class="text-muted small">
-                            <span class="badge bg-light text-dark border me-2">
+                            <span class="kmb-chip me-2">
                                 <kw-l key="@OwnerKindKey(row.OwnerKind)">@row.OwnerKind</kw-l>
                             </span>
+                            @* ADR 0191 — availability at a glance: a chip, amber dot while
+                               the item is out (with the holder's name), green when free. *@
                             @if (row.CurrentHolderName is not null)
                             {
-                                <span><kw-l key="inv.detail.currentHolder">Currently with</kw-l> @row.CurrentHolderName · </span>
+                                <span class="kmb-status is-in-progress ms-0 me-2"><span class="kmb-status-dot" aria-hidden="true"></span><kw-l key="inv.detail.currentHolder">Currently with</kw-l>&nbsp;@row.CurrentHolderName</span>
+                            }
+                            else
+                            {
+                                <span class="kmb-status is-done ms-0 me-2"><span class="kmb-status-dot" aria-hidden="true"></span><kw-l key="inv.list.available">Available</kw-l></span>
                             }
                             <span><kw-dt dt="@row.Created" format="g"></kw-dt></span>
                         </div>

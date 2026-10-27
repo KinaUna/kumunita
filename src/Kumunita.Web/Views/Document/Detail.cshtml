@@ -34,7 +34,10 @@
             </a>
         </p>
 
-        <h1>@Model.Document.Title</h1>
+        <div class="d-flex align-items-center gap-3 mb-2">
+            <partial name="_FileTile" model="Model.Document.ContentType" />
+            <h1 class="mb-0 min-w-0">@Model.Document.Title</h1>
+        </div>
 
         @if (!string.IsNullOrWhiteSpace(Model.Document.Summary))
         {
@@ -52,7 +55,7 @@
             <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                 @foreach (var tag in Model.Tags)
                 {
-                    <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                    <a class="kmb-chip"
                        href="/tags/@tag.Slug">@tag.DisplayedName</a>
                 }
             </div>
@@ -65,16 +68,16 @@
         @if (Model.FolderId is not null && !string.IsNullOrWhiteSpace(Model.FolderName))
         {
             <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                <span class="badge rounded-pill text-bg-light border">
+                <span class="kmb-chip">
                     <kw-l key="documents.folder">Folder</kw-l>: @Model.FolderName
                 </span>
             </div>
         }
 
-        <div class="card mb-4">
+        <div class="card kmb-detail-card mb-4">
             <div class="card-body">
                 <div class="row g-2">
-                    <div class="col-sm-3 col-md-2 fw-semibold">
+                    <div class="col-sm-3 col-md-2 kmb-meta-label">
                         <kw-l key="documents.detail.type_size">File type / size</kw-l>
                     </div>
                     <div class="col-sm-9 col-md-10">
@@ -83,7 +86,7 @@
                     </div>
                 </div>
                 <div class="row g-2 mt-1">
-                    <div class="col-sm-3 col-md-2 fw-semibold">
+                    <div class="col-sm-3 col-md-2 kmb-meta-label">
                         <kw-l key="documents.detail.updated">Last updated</kw-l>
                     </div>
                     <div class="col-sm-9 col-md-10">

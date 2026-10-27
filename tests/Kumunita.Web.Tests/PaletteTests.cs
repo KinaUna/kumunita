@@ -81,7 +81,7 @@ public sealed class PaletteTests
 
         controller.Save("nope", "/community");
 
-        Assert.Contains($"Expires=Thu, 01 Jan 1970",
+        Assert.Contains("expires=Thu, 01 Jan 1970",
             controller.Response.Headers.SetCookie.ToString());
     }
 

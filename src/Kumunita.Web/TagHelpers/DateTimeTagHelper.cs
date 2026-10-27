@@ -137,10 +137,18 @@ public sealed class DateTimeTagHelper : TagHelper
         // the class-level note on why a new [HtmlAttributeName] flag is not
         // used). Any other `Format` value falls through to the effective
         // (dated) format resolved per request.
-        var timeOnly = string.Equals(Format, "timeonly", System.StringComparison.OrdinalIgnoreCase);
-        var rendered = timeOnly
-            ? wallTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)
-            : wallTime.ToString(await _formatResolver.GetAsync(), System.Globalization.CultureInfo.InvariantCulture);
+        // ADR 0179 — three more sentinels for the event date tile / meta line:
+        // "month" → MMM, "day" → d, "weekday" → ddd (all in the effective zone,
+        // invariant culture, like the other renders).
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var rendered = (Format ?? string.Empty).ToLowerInvariant() switch
+        {
+            "timeonly" => wallTime.ToString("HH:mm", inv),
+            "month" => wallTime.ToString("MMM", inv),
+            "day" => wallTime.ToString("%d", inv),
+            "weekday" => wallTime.ToString("ddd", inv),
+            _ => wallTime.ToString(await _formatResolver.GetAsync(), inv),
+        };
 
         // SetContent auto-escapes (the safer choice — the kw-l TagHelper uses
         // the same idiom); the element's inner reference is the pre-conversion

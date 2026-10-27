@@ -9,6 +9,10 @@
     // provider the ADR 0072 attribute idiom; confirm.js intercepts the submit).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var importConfirm = await Translation.GetAsync("portability.confirm.import", _kwL);
+    // The ADR 0193 mode choice (the "keep existing content" checkbox label —
+    // a kw-l key, resolved through the provider the same as importConfirm).
+    var keepExistingLabel = await Translation.GetAsync("portability.import.keep_existing", _kwL);
+    var keepExistingHint = await Translation.GetAsync("portability.import.keep_existing_hint", _kwL);
 }
 
 <a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
@@ -50,9 +54,10 @@
         <div class="fw-semibold mb-2"><kw-l key="portability.import">Import</kw-l></div>
         <small class="text-muted d-block mb-3">
             Restore a <code>*.kumunita</code> archive into this instance.
-            Importing replaces the instance's state — keep a pre-import
-            backup; residents re-authenticate after the restore (passwords
-            are reset).
+            By default the import <b>replaces</b> this instance's state —
+            keep a pre-import backup; residents re-authenticate after the
+            restore (passwords are reset). Tick the option below to keep the
+            existing accounts and content and only add what is new.
         </small>
         <form method="post" action="/admin/portability/import" enctype="multipart/form-data"
               data-confirm="@importConfirm">
@@ -64,6 +69,19 @@
                 <div class="col-sm-4">
                     <button type="submit" class="btn btn-primary"><kw-l key="portability.import">Import</kw-l></button>
                 </div>
+            </div>
+            @* ADR 0193 — the mode choice. Unchecked (the default) = CleanSlate
+               (replace the instance's state); checked = KeepExisting (keep the
+               existing accounts/content, only add what is new). The checkbox is a
+               plain form field (name="keepExisting") — the controller binds it to
+               the bool keepExisting parameter; a checkbox posts nothing when
+               unchecked, so the default (false) is the CleanSlate path. *@
+            <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" name="keepExisting" id="keepExisting" value="true" />
+                <label class="form-check-label" for="keepExisting">
+                    @keepExistingLabel
+                    <span class="text-muted d-block small">@keepExistingHint</span>
+                </label>
             </div>
         </form>
     </div>

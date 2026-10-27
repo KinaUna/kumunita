@@ -46,10 +46,20 @@ public static class PortabilityApplyConfig
     /// <param name="config">The <c>config.json</c> POCO — the
     /// <c>community</c> / <c>locale</c> / <c>languages[]</c> blocks (the
     /// U02 <see cref="ConfigExport"/> mirror, verbatim).</param>
+    /// <param name="mode">The import mode (ADR 0193).
+    /// <see cref="PortabilityImportMode.CleanSlate"/> — the D1 restore
+    /// semantic: the <c>LocaleSettings</c> singleton and every
+    /// <c>LanguageCatalog</c> row are re-materialized from the archive
+    /// (a fresh instance has no rows; a re-import overwrites them).
+    /// <see cref="PortabilityImportMode.KeepExisting"/> — merge mode: a
+    /// row that already exists in the target store is <b>kept intact</b>
+    /// (the existing config is never overwritten); only new
+    /// <c>LanguageCatalog</c> rows are added.</param>
     /// <param name="ct">Cancellation.</param>
     public static async Task ApplyAsync(
         Marten.IDocumentStore documentStore,
         PortabilityConfig config,
+        PortabilityImportMode mode,
         CancellationToken ct)
     {
         // The full session (the IDocumentStore.OpenSession seam, the same
@@ -59,29 +69,61 @@ public static class PortabilityApplyConfig
 
         // The LocaleSettings singleton (one row per instance, Id =
         // "singleton") — the seven instance-level locale fields, verbatim
-        // from the U02 ConfigExport mirror (the §config field set). The
-        // load-then-Store idempotent shape (the FirstBootSeeder idiom —
-        // a fresh instance has no row, a re-import overwrites it with the
-        // archive's state).
-        var locale = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
-            ?? new LocaleSettings { Id = LocaleSettings.SingletonId };
-        locale.DefaultLanguageCode = config.Locale.DefaultLanguageCode!;
-        locale.DefaultTimezone = config.Locale.DefaultTimezone!;
-        locale.DefaultDateFormat = config.Locale.DefaultDateFormat!;
-        locale.IsSignupOpen = config.Locale.IsSignupOpen;
-        locale.NotifyAdminsOnSignup = config.Locale.NotifyAdminsOnSignup;
-        locale.AnnouncementCommentsEnabled = config.Locale.AnnouncementCommentsEnabled;
-        locale.MessagingEnabled = config.Locale.MessagingEnabled;
-        session.Store(locale);
+        // from the U02 ConfigExport mirror (the §config field set).
+        // CleanSlate (the D1 restore semantic): the load-then-Store
+        // idempotent shape (the FirstBootSeeder idiom — a fresh instance
+        // has no row, a re-import overwrites it with the archive's state).
+        // KeepExisting (ADR 0193): an existing row is kept intact — the
+        // instance's current config is never overwritten.
+        var locale = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct);
+        if (locale is null)
+        {
+            // A fresh instance (or a CleanSlate re-import) — re-materialize.
+            locale = new LocaleSettings { Id = LocaleSettings.SingletonId };
+            locale.DefaultLanguageCode = config.Locale.DefaultLanguageCode!;
+            locale.DefaultTimezone = config.Locale.DefaultTimezone!;
+            locale.DefaultDateFormat = config.Locale.DefaultDateFormat!;
+            locale.IsSignupOpen = config.Locale.IsSignupOpen;
+            locale.NotifyAdminsOnSignup = config.Locale.NotifyAdminsOnSignup;
+            locale.AnnouncementCommentsEnabled = config.Locale.AnnouncementCommentsEnabled;
+            locale.MessagingEnabled = config.Locale.MessagingEnabled;
+            session.Store(locale);
+        }
+        // KeepExisting — the existing LocaleSettings row is kept intact
+        // (the load returned non-null; nothing to store).
 
         // Every LanguageCatalog row (the per-instance language catalog —
         // the §config languages[] field set, the U02 ConfigExport mirror,
         // verbatim). Keyed by the BCP-47 code (the catalog's identity,
-        // ADR 0005 B); the load-then-Store idempotent shape (a fresh
-        // instance has no row, a re-import overwrites it with the
-        // archive's state).
+        // ADR 0005 B).
+        // CleanSlate (the D1 restore semantic): the load-then-Store
+        // idempotent shape — a fresh instance has no row (created), a
+        // re-import overwrites it with the archive's state.
+        // KeepExisting (ADR 0193): an existing row is kept intact — only
+        // a new language code is added (the "only added if it doesn't
+        // exist already" semantic).
         foreach (var language in config.Languages)
         {
+            if (string.IsNullOrEmpty(language.Id))
+                continue;
+
+            if (mode == PortabilityImportMode.KeepExisting)
+            {
+                // KeepExisting — the existing row is kept intact.
+                if (await session.LoadAsync<LanguageCatalog>(language.Id, ct) is not null)
+                    continue;
+                session.Store(new LanguageCatalog
+                {
+                    Id = language.Id,
+                    NativeName = language.NativeName,
+                    Enabled = language.Enabled,
+                    SortOrder = language.SortOrder,
+                });
+                continue;
+            }
+
+            // CleanSlate — the load-then-Store idempotent shape (the
+            // original D1 restore behaviour, unchanged).
             var row = await session.LoadAsync<LanguageCatalog>(language.Id, ct)
                 ?? new LanguageCatalog { Id = language.Id };
             row.NativeName = language.NativeName;

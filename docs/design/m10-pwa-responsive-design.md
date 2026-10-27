@@ -937,6 +937,19 @@ carries the per-unit entries):
   the ADR 0107 D2 text, and this §SW contract statement are amended
   in step; no test string-pins the fall-through line (verified against
   `PwaManifestTests` — it string-pins only the `ALLOWLIST` array).
+- **ADR 0175 (2026-10-26) — the refreshed feed card adds one recorded
+  `@media (max-width: 575.98px)` block.** ADR 0175 D4 ("Card padding 24px /
+  gap 16px (16px / 12px on phones)") ships a second 575.98px block
+  (`.airy-feed` gap, `.airy-post-card` padding, `.airy-post-title` size) at
+  the same Bootstrap `navbar-expand-sm` breakpoint as the ADR 0111 collapsed
+  navbar block. This is a **recorded** drift entry (frozen pin #7's
+  "count change without a recorded entry is a breach" — the record is this
+  line + the ADR 0175 D4 text), not a drive-by. The pinned counts move from
+  4 width + 1 collapsed + 1 motion + 2 dark = **8** to 4 width + 2
+  collapsed + 1 motion + 2 dark = **9** `@media` occurrences;
+  `PwaManifestTests.Site_Css_Media_Block_Boundary_Pinned` and
+  `NavMoreFoldTests.Site_Css_Styles_Fold_State_Outside_Media_Block` both
+  pin the new total in step.
 
 ## §the three acceptance tests (template)
 

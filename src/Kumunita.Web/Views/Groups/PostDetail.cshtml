@@ -71,7 +71,7 @@
             &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.GroupDisplayName
         </a>
 
-        <div class="card mt-2 mb-4">
+        <div class="card kmb-detail-card kmb-ann-detail mt-2 mb-4">
             <div class="card-body">
                 @* Author-only edit entry point (ADR 0016 — the edit lane is
                    author-only at the Web layer, so a non-author never sees
@@ -328,6 +328,24 @@
                        default-visible variant; each added translation is a
                        hidden variant; the chip row is a selector that swaps
                        them. This group wrapper is the post's toggle scope. *@
+                    @* ADR 0186 — the author byline above the title (the feed card
+                       header, as in the post detail ADR 0185): 44px avatar with
+                       per-resident hue, name, date, edited. Outside the
+                       data-td-group wrapper, so it stays put on a swap. *@
+                    <div class="airy-post-head kmb-ann-byline">
+                        <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial"
+                                  mono-hue="@AvatarHue.For(Model.AuthorSubjectId)" />
+                        <span class="airy-post-author">
+                            <span class="name">@Model.AuthorDisplayName</span>
+                            <span class="when">
+                                <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                                @if (Model.Post.Modified is not null)
+                                {
+                                    <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
+                                }
+                            </span>
+                        </span>
+                    </div>
                     <div data-td-group="post">
                         @* Original variant — default-visible unless ADR 0049
                            auto-selects a translation of it into the viewer's
@@ -335,7 +353,7 @@
                            (ADR 0027) are unchanged either way. *@
                         <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
                              @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                            <h4>
+                            <h4 class="kmb-ann-title">
                                 @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                     ? Model.Post.Title
                                     : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
@@ -356,7 +374,7 @@
                                  @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                                 @if (!string.IsNullOrWhiteSpace(t.Title))
                                 {
-                                    <h4>@t.Title</h4>
+                                    <h4 class="kmb-ann-title">@t.Title</h4>
                                 }
                                 <div class="mb-3 rc-body">
                                     <partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" />
@@ -372,16 +390,18 @@
                                 <span class="text-muted small fw-semibold">
                                     <kw-l key="posts.translations_label">Translations</kw-l>
                                 </span>
-                                <button type="button" class="badge text-bg-light border"
+                                <button type="button" class="kmb-chip kmb-chip-btn"
                                         data-translation-chip data-td-group="post"
-                                        data-td-variant="@Model.OriginalLanguageCode">
+                                        data-td-variant="@Model.OriginalLanguageCode"
+                                        aria-pressed="@(originalHidden ? "false" : "true")">
                                     @LangName(Model.OriginalLanguageCode)
                                 </button>
                                 @foreach (var t in Model.PostTranslations.OrderBy(x => x.LanguageCode))
                                 {
-                                    <button type="button" class="badge text-bg-light border"
+                                    <button type="button" class="kmb-chip kmb-chip-btn"
                                             data-translation-chip data-td-group="post"
-                                            data-td-variant="@t.LanguageCode">
+                                            data-td-variant="@t.LanguageCode"
+                                            aria-pressed="@(String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">
                                         @LangName(t.LanguageCode)
                                     </button>
                                 }
@@ -423,26 +443,9 @@
                 </details>
             </div>
 
-            @* Author footer band (the community Posts/Detail.cshtml pattern):
-               the author sits at the BOTTOM of the card, below the body +
-               translations, as its own band — the <img> links the audited
-               serving lane (GET /profile/avatar/{subjectId}), the monogram
-               sibling on its fail-closed 404. *@
-            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
-                <span class="d-inline-flex align-items-center">
-                    <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial" />
-                </span>
-                <span>
-                    @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
-                    @if (Model.Post.Modified is not null)
-                    {
-                        <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
-                    }
-                </span>
-            </div>
         </div>
 
-        <h5 class="mt-4 mb-2" style="font-weight:600;">
+        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             Replies <span class="text-muted">(@Model.Replies.Count)</span>
         </h5>
 
@@ -452,13 +455,13 @@
         }
         else
         {
-            <ul class="list-group mb-4">
+            <ul class="kmb-ann-comments list-unstyled p-0 mb-4">
                 @foreach (var r in Model.Replies)
                 {
                     string replyAvatarInitial = !string.IsNullOrWhiteSpace(r.AuthorDisplayName)
                         ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
                         : string.Empty;
-                    <li class="list-group-item">
+                    <li class="kmb-ann-comment">
                         @* TD (ADR 0027) — the reply's authored-in language is the
                            first, default-visible variant; each added translation
                            is a hidden variant; the chip row is a selector that
@@ -500,16 +503,18 @@
                                         <span class="text-muted small">
                                             <kw-l key="posts.translations_label">Translations</kw-l>:
                                         </span>
-                                        <button type="button" class="badge text-bg-light border"
+                                        <button type="button" class="kmb-chip kmb-chip-btn"
                                                 data-translation-chip data-td-group="reply-@r.Id"
-                                                data-td-variant="@r.OriginalLanguageCode">
+                                                data-td-variant="@r.OriginalLanguageCode"
+                                                aria-pressed="@(replyOriginalHidden ? "false" : "true")">
                                             @LangName(r.OriginalLanguageCode)
                                         </button>
                                         @foreach (var t in r.Translations.OrderBy(x => x.LanguageCode))
                                         {
-                                            <button type="button" class="badge text-bg-light border"
+                                            <button type="button" class="kmb-chip kmb-chip-btn"
                                                     data-translation-chip data-td-group="reply-@r.Id"
-                                                    data-td-variant="@t.LanguageCode">
+                                                    data-td-variant="@t.LanguageCode"
+                                                    aria-pressed="@(String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">
                                                 @LangName(t.LanguageCode)
                                             </button>
                                         }
@@ -676,7 +681,7 @@
             group-lane decision; there is no per-reply audience. The route
             re-runs the parent's group-lane decision before the write (C4).
         *@
-        <h5 class="mt-4 mb-2" style="font-weight:600;">
+        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             @if (Model.IsAuthor)
             {
                 <text>Reply (you are the author of this post)</text>
@@ -687,7 +692,7 @@
             }
         </h5>
 
-        <div class="card">
+        <div class="card kmb-detail-card kmb-ann-composer">
             <div class="card-body">
                 <form class="mb-0" method="post"
                       action="@($"/groups/{Model.GroupId}/posts/{postId}/replies")">

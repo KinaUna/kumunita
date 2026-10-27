@@ -129,14 +129,16 @@
                             <div class="mt-2">
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="text-muted small fw-semibold"><kw-l key="posts.translations_label">Translations</kw-l></span>
-                                    <button type="button" class="badge text-bg-light border"
+                                    <button type="button" class="kmb-chip kmb-chip-btn"
                                             data-translation-chip data-td-group="project-title"
-                                            data-td-variant="@Model.OriginalLanguageCode">@Model.OriginalLanguageCode</button>
+                                            data-td-variant="@Model.OriginalLanguageCode"
+                                            aria-pressed="@(_originalHidden ? "false" : "true")">@Model.OriginalLanguageCode</button>
                                     @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
                                     {
-                                        <button type="button" class="badge text-bg-light border"
+                                        <button type="button" class="kmb-chip kmb-chip-btn"
                                                 data-translation-chip data-td-group="project-title"
-                                                data-td-variant="@tr.LanguageCode">@tr.LanguageCode</button>
+                                                data-td-variant="@tr.LanguageCode"
+                                                aria-pressed="@(String.Equals(tr.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">@tr.LanguageCode</button>
                                     }
                                 </div>
                             </div>
@@ -158,11 +160,11 @@
                         }
                         @if (Model.Status is not null)
                         {
-                            <span class="badge text-bg-light border ms-2">@Model.Status</span>
+                            <partial name="_StatusChip" model="@(Model.Status ?? string.Empty)" />
                         }
                         @if (Model.ComponentDisplayName is not null)
                         {
-                            <span class="badge text-bg-light border ms-2">@Model.ComponentDisplayName</span>
+                            <span class="kmb-chip ms-2">@Model.ComponentDisplayName</span>
                         }
                     </div>
                     @* The goal link (D10): present only when the project has a
@@ -433,7 +435,7 @@
            variant per translation, each a Markdown body rendered through the
            one MarkdownRenderer (the ADR 0025 shape). A variant with no body
            shows the empty-description hint. *@
-        <div data-td-group="project-description" class="card mb-4">
+        <div data-td-group="project-description" class="card kmb-detail-card mb-4">
             <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
                  @(_originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
                 <div class="card-body rc-body">
@@ -529,7 +531,7 @@
                                     }
                                     @if (card.Status is not null)
                                     {
-                                        <span class="badge text-bg-light border ms-2">@card.Status</span>
+                                        <partial name="_StatusChip" model="@(card.Status ?? string.Empty)" />
                                     }
                                 </div>
                             </div>
