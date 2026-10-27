@@ -1,6 +1,7 @@
 using Kumunita.Core.Identity;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -49,19 +50,33 @@ namespace Kumunita.Web.Controllers;
 /// <c>/settings/security/mfa/recovery</c> GET) are unchanged.
 /// </para>
 /// <para>
-/// <b>Ordering note (F3.U3 refinement of pin §4):</b> the pin prescribes
-/// "verify the TOTP code, <i>then</i> flip the flag". In 10.0.13,
-/// <c>UserManager.VerifyTwoFactorTokenAsync</c> is gated on the flag already
-/// being enabled (it routes through
-/// <c>CanGenerateTwoFactorTokenAsync → IsTwoFactorEnabledAsync</c>, which
-/// returns <c>false</c> when the flag is off, so the token is never
-/// validated). At enrollment the flag is still <c>false</c>, so that order
-/// would be runtime-broken. The enable action therefore orders the
-/// <b>same build-verified members</b> as <c>SetTwoFactorEnabledAsync(user,
-/// true)</c> → <c>VerifyTwoFactorTokenAsync(user, "Authenticator", code)</c>
-/// → <c>SetTwoFactorEnabledAsync(user, false)</c> <b>(rollback)</b> on a
-/// failed verify. No member name is substituted; only the order is the one
-/// the 10.0.13 runtime honors.
+/// <b>Ordering + persistence notes (verified against the .NET 10.0.13 source,
+/// dotnet/aspnetcore v10.0.13):</b>
+/// <list type="bullet">
+/// <item><b>Key persistence:</b> <c>UserManager.GenerateNewAuthenticatorKey()</c>
+/// does <b>not</b> persist the key — in 10.0.13 it is simply
+/// <c>public virtual string GenerateNewAuthenticatorKey() =&gt; NewSecurityStamp();</c>.
+/// The enrollment <c>GET</c> therefore persists it explicitly via
+/// <c>SetAuthenticationTokenAsync(user, "[AspNetUserStore]", "AuthenticatorKey", key)</c>
+/// — the same token-store coordinates the framework uses for the authenticator
+/// key (<c>UserStoreBase.Set/GetAuthenticatorKeyAsync</c>). Without this, the
+/// enable POST's <c>VerifyTwoFactorTokenAsync</c> finds no key and always fails.
+/// <c>SetAuthenticationTokenAsync</c> does <b>not</b> rotate the
+/// <c>SecurityStamp</c>, so it does not invalidate the live session.</item>
+/// <item><b>Verify-first, no rollback:</b> <c>VerifyTwoFactorTokenAsync</c> is
+/// <b>not</b> gated on the <c>TwoFactorEnabled</c> flag (it routes straight to
+/// <c>AuthenticatorTokenProvider.ValidateAsync</c>, which reads the key). The
+/// enable action therefore <b>verifies first</b> and only flips the flag when
+/// the code is valid — a wrong code never touches the flag, so there is no
+/// enable→rollback partial state and no stamp rotation on a bad code.</item>
+/// <item><b>Re-stamp the live cookie:</b> <c>SetTwoFactorEnabledAsync</c>
+/// <b>does</b> rotate the <c>SecurityStamp</c> (10.0.13:
+/// <c>UpdateSecurityStampInternal</c>). This repo's
+/// <see cref="Kumunita.Web.Security.RevocationStampMiddleware"/> signs a
+/// resident out when the cookie's <c>kumunita.stamp</c> no longer matches the
+/// DB stamp, so the enable/disable actions re-mint the session cookie after
+/// that call (<see cref="RestampSessionAsync"/>).</item>
+/// </list>
 /// </para>
 /// </summary>
 [Authorize]
@@ -176,6 +191,43 @@ public sealed class SecuritySettingsController(
         }
     }
 
+    /// <summary>
+    /// Re-mint the resident's live session cookie so its <c>kumunita.stamp</c>
+    /// matches the DB <c>SecurityStamp</c> after a <c>UserManager</c> call that
+    /// rotated the stamp as a side effect (<c>SetTwoFactorEnabledAsync</c> /
+    /// <c>ResetAuthenticatorKeyAsync</c> both do — 10.0.13
+    /// <c>UpdateSecurityStampInternal</c>). Without this, this repo's
+    /// <see cref="Kumunita.Web.Security.RevocationStampMiddleware"/> sees the
+    /// stale cookie stamp ≠ the fresh DB stamp and signs the resident out
+    /// mid-flow (the "logged out when enabling MFA" bug).
+    /// <para>
+    /// We preserve the SAME principal + <c>AuthenticationProperties</c> (so the
+    /// 14-day persistent session survives) and set <c>kumunita.stamp</c> to the
+    /// fresh stamp directly; re-signing in also re-triggers the <c>OnSigningIn</c>
+    /// stamp registered in <c>Program.cs</c> (which writes the same fresh
+    /// value), so the two agree.
+    /// </para>
+    /// </summary>
+    private async Task RestampSessionAsync(User user)
+    {
+        var scheme = IdentityConstants.ApplicationScheme;
+        var auth = await HttpContext.AuthenticateAsync(scheme);
+        if (!auth.Succeeded || auth.Principal is null)
+        {
+            return; // not signed in on this scheme — nothing to re-stamp
+        }
+
+        var properties = auth.Properties
+            ?? new Microsoft.AspNetCore.Authentication.AuthenticationProperties();
+        var stamp = await userManager.GetSecurityStampAsync(user);
+        if (!string.IsNullOrEmpty(stamp))
+        {
+            properties.Items["kumunita.stamp"] = stamp;
+        }
+
+        await HttpContext.SignInAsync(scheme, auth.Principal, properties);
+    }
+
     // ---- actions ---------------------------------------------------------
 
     /// <summary>
@@ -214,17 +266,23 @@ public sealed class SecuritySettingsController(
         }
 
         // Enrollment leg — the one-time secrets (shown once on this response).
-        // GenerateNewAuthenticatorKey() persists the key as a side effect
-        // (standard Identity behavior: it calls IUserAuthenticatorKeyStore.
-        // SetAuthenticatorKeyAsync internally), so the enable POST's
-        // VerifyTwoFactorTokenAsync has a key to validate against. The
-        // public UserManager surface does NOT expose SetAuthenticatorKeyAsync
-        // (it is on the store interface, not promoted to UserManager in
-        // 10.0.13 — CS1061 confirmed by the repo compiler); the pin's
-        // §2.1 build-verified surface lists only
-        // GetAuthenticatorKeyAsync / ResetAuthenticatorKeyAsync / 
-        // GenerateNewAuthenticatorKey on UserManager.
+        // .NET 10.0.13 CORRECTION (the prior comment was wrong): 
+        // GenerateNewAuthenticatorKey() does NOT persist the key — in 10.0.13 it
+        // is simply `public virtual string GenerateNewAuthenticatorKey() => 
+        // NewSecurityStamp();`. Without an explicit persist, the enable POST's
+        // VerifyTwoFactorTokenAsync → AuthenticatorTokenProvider.ValidateAsync →
+        // GetAuthenticatorKeyAsync(user) finds NO key and ALWAYS returns false
+        // ("code not valid"), with any authenticator app (Google, Microsoft, …).
+        // Persist it via the token store at the SAME coordinates the framework
+        // uses for the authenticator key (UserStoreBase: "[AspNetUserStore]" /
+        // "AuthenticatorKey" — the backing row of Set/GetAuthenticatorKeyAsync),
+        // so VerifyTwoFactorTokenAsync has a key to validate against.
+        // SetAuthenticationTokenAsync does NOT rotate the SecurityStamp, so the
+        // enrollment leg does not invalidate the live session (no mid-flow sign- 
+        // out).
         var key = userManager.GenerateNewAuthenticatorKey();
+        await userManager.SetAuthenticationTokenAsync(
+            user, "[AspNetUserStore]", "AuthenticatorKey", key);
         // Shape note (F3.U3 compiler-verified): returns IEnumerable<string>?,
         // not string[] (CS0266) — .ToArray() materializes it; the null-forgiving
         // operator handles the nullable return (CS8604).
@@ -273,20 +331,26 @@ public sealed class SecuritySettingsController(
             return RedirectToAction(nameof(Mfa));
         }
 
-        // Enable first so 10.0.13's VerifyTwoFactorTokenAsync is un-gated, then
-        // verify, then roll back on a failed verify (see the type-level note).
-        // Shape note (F3.U3 compiler-verified): VerifyTwoFactorTokenAsync
-        // returns bool (not IdentityResult) in 10.0.13 — the round-2 pin
-        // assumed .Succeeded on an IdentityResult (CS1061 on 'bool'); the
-        // real shape is a bare bool (true = valid, false = invalid).
-        await userManager.SetTwoFactorEnabledAsync(user, true);
+        // Verify FIRST (the key was persisted by the enrollment GET, and 10.0.13's
+        // VerifyTwoFactorTokenAsync does NOT gate on the TwoFactorEnabled flag —
+        // it routes straight to AuthenticatorTokenProvider.ValidateAsync, which
+        // reads the key). Only flip the flag when the code is valid, so a wrong
+        // code never touches the flag: no enable→rollback partial state and no
+        // SecurityStamp rotation on a bad code (so a bad code does not sign the
+        // resident out). VerifyTwoFactorTokenAsync returns a bare bool in
+        // 10.0.13 (true = valid, false = invalid).
         var verified = await userManager.VerifyTwoFactorTokenAsync(user, AuthenticatorProvider, model.Code);
         if (!verified)
         {
-            await userManager.SetTwoFactorEnabledAsync(user, false); // rollback
             TempData["error"] = "The authenticator code was not valid. Enable two-factor authentication again.";
             return RedirectToAction(nameof(Mfa));
         }
+
+        // SetTwoFactorEnabledAsync rotates the SecurityStamp as a side effect
+        // (10.0.13: UpdateSecurityStampInternal) — re-stamp the live cookie so
+        // RevocationStampMiddleware does not sign the resident out mid-flow.
+        await userManager.SetTwoFactorEnabledAsync(user, true);
+        await RestampSessionAsync(user);
 
         TempData["info"] = "Two-factor authentication is now enabled. Sign in with your authenticator app from now on.";
         // The recovery codes were shown once at enrollment; redirect to the
@@ -395,9 +459,14 @@ public sealed class SecuritySettingsController(
             return RedirectToAction(nameof(Mfa));
         }
 
-        // Flag off + clear the key (the pin §4 optional-disable leg).
+        // Flag off + clear the key (the pin §4 optional-disable leg). Both
+        // SetTwoFactorEnabledAsync and ResetAuthenticatorKeyAsync rotate the
+        // SecurityStamp (10.0.13: UpdateSecurityStampInternal), so re-stamp the
+        // live cookie afterwards so RevocationStampMiddleware does not sign the
+        // resident out.
         await userManager.SetTwoFactorEnabledAsync(user, false);
         await userManager.ResetAuthenticatorKeyAsync(user);
+        await RestampSessionAsync(user);
         TempData["info"] = "Two-factor authentication has been disabled.";
         return RedirectToAction(nameof(Mfa));
     }
