@@ -83,7 +83,7 @@ public static class PortabilityApplyIdentity
             // PortabilityApplyDocuments (the same id-based skip).
             if (mode == PortabilityImportMode.KeepExisting)
             {
-                var existing = string.IsNullOrEmpty(principal.NormalizedEmail)
+                var existing = string.IsNullOrEmpty(principal.Email)
                     ? await userManager.FindByIdAsync(principal.SubjectId).ConfigureAwait(false)
                     : await userManager.FindByEmailAsync(principal.Email).ConfigureAwait(false);
                 if (existing is not null)

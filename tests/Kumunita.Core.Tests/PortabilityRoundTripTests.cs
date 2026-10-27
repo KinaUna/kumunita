@@ -937,6 +937,96 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         }
     }
 
+    // ADR 0193 D3 (errata) — the business-key collision. The user's live 500:
+    // a KeepExisting import of a real instance's archive over another instance
+    // that already held the same logical entity. The collision is on the
+    // type's UNIQUE BUSINESS-KEY index (TranslationResource (Key, LanguageCode)),
+    // NOT the surrogate id — the two instances' rows for the same logical
+    // (Key, LanguageCode) carry DIFFERENT surrogate ids (two independent
+    // instances), so an id-only skip misses them and the Store collides on the
+    // unique index (23505 "Key (nav.home, en) already exists" — the exact log).
+    // The keep-existing skip must dedupe on the natural identity (surrogate id
+    // + the type's unique-index member set), so this import succeeds and keeps
+    // B's existing row intact. The regression: pre-fix this threw 23505.
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_BusinessKeyCollisionAcrossInstances_KeepsExisting()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — plant the representative instance, then ADD a
+        // TranslationResource row (the UI-string catalog shape the first-boot
+        // seeder writes on a real instance) and export. The archive now carries
+        // a (nav.home, en) row under A's own surrogate id.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new TranslationResource
+            {
+                Id = "ar-a-nav-home",        // A's own surrogate id
+                Key = "nav.home",
+                LanguageCode = "en",
+                Text = "A's Home (the archive's copy)",
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a DIFFERENT instance that already holds the SAME
+        // (nav.home, en) business key under B's OWN surrogate id (the first-boot
+        // seeder's row), with different text. This is the cross-instance shape:
+        // same business key, different id. The KeepExisting import must keep B's
+        // row (the existing content is intact) and NOT collide on the unique
+        // (Key, LanguageCode) index.
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new TranslationResource
+            {
+                Id = "ar-b-nav-home",        // B's own surrogate id (≠ A's)
+                Key = "nav.home",            // same business key as A's
+                LanguageCode = "en",
+                Text = "B's Home (the existing row, kept intact)",
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        // The import (KeepExisting). Pre-fix: the archive's (nav.home, en) row
+        // (id ar-a-nav-home) is not in B's id set {ar-b-nav-home}, so it is not
+        // skipped → the Store hits the (Key, LanguageCode) unique index → 23505.
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed over a business-key collision " +
+            "(same Key/LanguageCode, different surrogate id) — failure set: " +
+            string.Join(", ", result.Failures));
+
+        // B's existing row is kept intact (the archive's copy was skipped):
+        // exactly ONE (nav.home, en) row, and it is B's text.
+        await using (var q = storeB.QuerySession())
+        {
+            var rows = await q.Query<TranslationResource>()
+                .Where(t => t.Key == "nav.home" && t.LanguageCode == "en")
+                .ToListAsync(ct);
+            Assert.True(rows.Count == 1,
+                "the (Key, LanguageCode) business key must be at-most-one after a " +
+                "KeepExisting import over a collision (the unique index) — got " +
+                rows.Count + " rows");
+            Assert.True(
+                rows[0].Text == "B's Home (the existing row, kept intact)"
+                && rows[0].Id == "ar-b-nav-home",
+                "the existing (Key, LanguageCode) row must be kept intact (B's text + " +
+                "B's id) — the archive's copy must have been skipped, not inserted; " +
+                $"got id={rows[0].Id} text={rows[0].Text}");
+        }
+    }
+
     /// <summary>
     /// ADR 0193 test helper — creates a principal (the archive's principal
     /// shape: subjectId + username + email) + the role standing, ensuring the

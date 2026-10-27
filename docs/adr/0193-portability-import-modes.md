@@ -138,12 +138,24 @@ additive:
   semantic). A non-existent principal is created (the M11 re-creator path,
   unchanged — fresh non-portable password + fresh security stamp, the C-M11·2
   boundary).
-- **Content docs** (`PortabilityApplyDocuments.ApplyAsync`): a row whose id
-  already exists in the target store is **skipped** (the existing content is
-  kept intact, never overwritten); only new rows are stored. The existing-id
-  set is read per doc type via the generic `PortabilityApplyDocuments.
-  QueryAllAsync<T>` helper (the same data-driven id-property convention the
-  §validate (b) integrity loop uses: `Id`, except `Profile`'s `SubjectId`).
+- **Content docs** (`PortabilityApplyDocuments.ApplyAsync`): a row the target
+  store **already holds — keyed on the type's natural identity, not just the
+  surrogate id — is skipped** (the existing content is kept intact, never
+  overwritten); only new rows are stored. The natural identity is the union of
+  the surrogate id (the U05 id-property convention: `Id`, except `Profile`'s
+  `SubjectId`) and the member set of **every unique index on the type's table**
+  (the DB-enforced business key — e.g. `TranslationResource` `(Key,
+  LanguageCode)`, `GroupMembership` `(GroupId, UserId)`, the `*Translation`
+  `(ParentId, LanguageCode)` rows), derived from the Marten mapping
+  (`IDocumentStore.Options` → `FindOrResolveDocumentType` → `IDocumentType.
+  Indexes` → `DocumentIndex.IsUnique` + `.Columns`) so the skip key always
+  matches the actual constraint. This is the errata to the D1 "restore onto a
+  fresh instance" assumption: two independent instances carry **different
+  surrogate ids** for the **same logical entity**, so an id-only skip misses
+  them and the `Store` collides on the unique index (the live
+  `23505 … (nav.home, en) already exists` — the bug this lane's first release
+  shipped with). `PortabilityApplyDocuments.QueryAllAsync<T>` reads the
+  existing rows per doc type for the skip set.
 - **Media** (`PortabilityApplyMedia.ApplyAsync`): unchanged — the C-MED·4
   dedup makes it idempotent in both modes (identical bytes → same id → no
   second volume file).
