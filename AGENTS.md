@@ -171,15 +171,15 @@ the source file** — and the user's report outranks your source reading.
     1"). Emit the value via `@Html.Raw(json)` (outputs as-is); if a value can
     contain a literal `</script>`, neutralize it first:
     `@Html.Raw(json.Replace("</", "<\\/"))` (`<\/` is a valid JSON escape that
-    cannot close the script). **Latent bug, not yet fixed:** the
-    `_Layout.cshtml` `#kumunita-strings` block wraps its JSON in
-    `HttpUtility.HtmlEncode` — under this rule that **double-encodes** it
-    (served bytes show `&amp;quot;`), so the P0-6 client strings bundle
-    (`rich-editor.ts`, `tag-suggest.ts`, `kiosk.ts`, `note-modal.ts`,
-    `onboarding-modal.ts`, `notifications-bell.ts`, `image-editor.ts`) is
-    unparseable and silently falls back to the English floor strings. The
-    ADR 0195 `#card-edit-prefills` block (this lane) uses the correct
-    `@Html.Raw(...)` form.
+    cannot close the script). **Fixed 2026-10-27:** the `_Layout.cshtml`
+    `#kumunita-strings` block (the P0-6 client strings bundle) used to wrap
+    its JSON in `HttpUtility.HtmlEncode` — under this rule that
+    **double-encoded** it (served bytes showed `&amp;quot;`), so every
+    client module (`rich-editor.ts`, `tag-suggest.ts`, `kiosk.ts`,
+    `note-modal.ts`, `onboarding-modal.ts`, `notifications-bell.ts`,
+    `image-editor.ts`) was silently falling back to the English floor
+    strings. It now uses the correct `@Html.Raw(...)` form. The ADR 0195
+    `#card-edit-prefills` block uses the same form.
 - A URL or link that shows a **literal `@Model.X`** (404s, `/groups/@Model.GroupId/posts`)
 is the same class of bug — an uninterpolated Razor attribute value, not a
   routing problem. Fix the markup; don't debug the route.

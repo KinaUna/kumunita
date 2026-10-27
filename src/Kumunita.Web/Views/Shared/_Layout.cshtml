@@ -807,10 +807,19 @@
     @* P0-6 (translation audit) — the client-JS strings bundle: the closed
        KnownTranslationKeys set resolved in the effective language, serialized
        to JSON. The client modules (rich-editor / image-editor / tag-suggest /
-       notifications-bell) read this once and localize their modals, labels
-       and alerts (with the en floor as the in-code fallback). HtmlEncoded so
-       a value containing `</script>` can never terminate the element. *@
-    <script type="application/json" id="kumunita-strings">@System.Web.HttpUtility.HtmlEncode(clientStringsJson)</script>
+       notifications-bell / kiosk / note-modal / onboarding-modal) read this
+       once and localize their modals, labels and alerts (with the en floor
+       as the in-code fallback).
+
+       Must be emitted via Html.Raw so the JSON arrives unencoded (a bare
+       @expr inside a <script> IS HTML-encoded in .NET 10's Razor — the `"`
+       becomes &quot; and JSON.parse fails). The only hazard is a value
+       containing a literal `</script>` closing the element early, so
+       neutralize `</` to `<\/` (a valid JSON escape that cannot form
+       `</script>`). The previous form (HttpUtility.HtmlEncode) double-encoded
+       the block (&amp;quot;), making the entire P0-6 bundle unparseable —
+       the client modules silently fell back to the en floor strings. *@
+    <script type="application/json" id="kumunita-strings">@Html.Raw(clientStringsJson.Replace("</", "<\\/"))</script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
