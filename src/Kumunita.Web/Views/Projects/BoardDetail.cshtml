@@ -972,4 +972,13 @@
          C-M5·9 / D10: no HTML5 drag, no optimistic reordering). The menu
          channel is the plain POST forms above (the browser handles them). -->
     <script type="module" src="~/js/lib/projects-board.js"></script>
+    <!-- Board card modals (subtask / assign) — client/lib/board-modal.ts.
+         Re-homes the card's Bootstrap modals to <body> on open so they
+         escape any transformed / stacking-context ancestor of the board
+         (a CSS transform on .kanban-board turns it into the containing
+         block + stacking context for the modal's position:fixed, which
+         lets the body-level backdrop paint above the modal and cover the
+         form fields — the "can't type in the Add-subtask modal" bug).
+         The detach-menu.ts precedent, generalized to modals. -->
+    <script type="module" src="~/js/lib/board-modal.js"></script>
 }
