@@ -88,13 +88,20 @@ hardening violation (OPS §10).
 4. **Bootstrap superuser `postgres`**: set a **strong unique** password on
 first creation (`POSTGRES_PASSWORD`). `postgres` is **admin/restore-only**
 (OPS §5) and **never** the app connection.
-5. **Create the migration role + app role + database ownership with one init script.** First, set the addon's **Initial database** field to `kumunita` (instead of the default `postgres`) — this makes the postgres image auto-create the `kumunita` database *and* run your init script inside it, which is where `CREATE SCHEMA` is valid (it's a per-database operation). Then paste the template below into the addon's **Initialization scripts** field (General → Initialization scripts), replacing only the two `<strong-…-password>` placeholders:
+5. **Create the migration role + app role + database ownership with one init script.** Paste the template below into the addon's **Initialization scripts** field (General → Initialization scripts), replacing only the two `<strong-…-password>` placeholders. The script is **self-contained**: it creates the `kumunita` database itself, then switches into it for the per-database statements — so the addon's **Initial database** field can stay at the default (`postgres`). (If you *do* set Initial database = `kumunita`, the script still works: its `CREATE DATABASE` is suppressed harmlessly and the rest runs inside `kumunita` either way.)
 ```sql
 CREATE ROLE kumunita_migrate LOGIN PASSWORD '<strong-migrate-password>';
 CREATE ROLE kumunita        LOGIN PASSWORD '<strong-app-password>';
--- Transfer ownership of the auto-created `kumunita` database to the migration role:
+-- Create the app database owned by the migration role (cluster-level). Suppressed
+-- harmlessly if the entrypoint already created it (Initial database = kumunita):
+\set ON_ERROR_STOP 0
+CREATE DATABASE kumunita OWNER kumunita_migrate;
+\set ON_ERROR_STOP 1
+-- Database-level statements (valid from any connection, idempotent):
 ALTER DATABASE kumunita OWNER TO kumunita_migrate;
 GRANT CONNECT ON DATABASE kumunita TO kumunita;
+-- Per-database statements must run *inside* the app database — switch into it:
+\c kumunita
 -- Pre-create the `mt` schema, owned by the migration role (the forced exception —
 -- the app role gets CREATE on it so Wolverine + Marten can create their tables at boot):
 CREATE SCHEMA mt AUTHORIZATION kumunita_migrate;

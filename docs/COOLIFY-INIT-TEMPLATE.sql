@@ -2,11 +2,14 @@
 --
 -- Paste this into the Postgres addon's **Initialization scripts** field
 -- (General → Initialization scripts), replacing ONLY the two
--- `<strong-…-password>` placeholders. Prerequisite: set the addon's
--- **Initial database** field to `kumunita` (not the default `postgres`) so
--- the postgres image auto-creates the `kumunita` database and runs this
--- script *inside it* — `CREATE SCHEMA` is per-database and is invalid
--- against the default `postgres` database.
+-- `<strong-…-password>` placeholders.
+--
+-- The script is self-contained: it creates the `kumunita` database itself
+-- (cluster-level), then `\c`s into it to run the per-database statements
+-- (`CREATE SCHEMA mt`, grants, `ALTER DATABASE`). The addon's **Initial
+-- database** field can stay at the default (`postgres`) — if it *is* set to
+-- `kumunita`, the `CREATE DATABASE` below is suppressed harmlessly and the
+-- rest of the script still runs inside the `kumunita` database.
 --
 -- This is the two-role split (**ADR 0171** / F22), in the exact shape the
 -- runtime needs (mirrors `01-app-role.sql` + `02-app-schemas.sh`, the
@@ -37,9 +40,18 @@
 -- connection strings).
 CREATE ROLE kumunita_migrate LOGIN PASSWORD '<strong-migrate-password>';
 CREATE ROLE kumunita        LOGIN PASSWORD '<strong-app-password>';
--- Transfer ownership of the auto-created `kumunita` database to the migration role:
+-- Create the app database owned by the migration role. Cluster-level, so it
+-- works from any connection. If the addon already created `kumunita` (because
+-- "Initial database" = kumunita), this fails harmlessly — we suppress the
+-- error and continue; the ownership transfer below then fixes the owner:
+\set ON_ERROR_STOP 0
+CREATE DATABASE kumunita OWNER kumunita_migrate;
+\set ON_ERROR_STOP 1
+-- Database-level statements (valid from any connection, idempotent):
 ALTER DATABASE kumunita OWNER TO kumunita_migrate;
 GRANT CONNECT ON DATABASE kumunita TO kumunita;
+-- Per-database statements must run *inside* the app database — switch into it:
+\c kumunita
 -- Pre-create the `mt` schema, owned by the migration role (the app role is
 -- granted CREATE on it below so it can create the wolverine_* / mt_doc_* tables
 -- it owns at boot; it does NOT own the schema):
