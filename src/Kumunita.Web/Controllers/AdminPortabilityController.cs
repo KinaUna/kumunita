@@ -79,29 +79,32 @@ public sealed class AdminPortabilityController(
     /// <summary>
     /// <c>POST /admin/portability/import</c> — applies the uploaded
     /// <c>*.kumunita</c> archive (the design doc §surface: the D5
-    /// import half). Delegates to
-    /// <see cref="IPortabilityService.ImportAsync"/> — which emits
-    /// exactly one <c>portability.import</c> <c>AccessAudit</c> row
-    /// (<c>TargetKind "portability"</c>, <c>Via = Admin</c>, verb
-    /// <c>import</c>; the controller adds none — C-M11·6, the ADR 0105
-    /// <c>messaging.toggle</c> one-audit-row shape).
-    /// <para>
-    /// **Fail-closed render (C-M11·4):** a validate failure returns the
-    /// <c>PortabilityImportResult</c> closed failure set (the U07
-    /// fail-closed pin) — this action renders it into
-    /// <c>TempData["error"]</c> (the <c>portability.status.failure</c>
-    /// kw-l key + the failure list) + the instance is unchanged. A clean
-    /// import renders <c>TempData["info"]</c> (the
-    /// <c>portability.status.ok</c> kw-l key). The
-    /// <c>_FlashToast</c> partial (the one, uniform flash surface)
-    /// renders either, the
-    /// house <c>AdminMessagingController</c> <c>TempData["info"]</c> +
-    /// redirect idiom.
-    /// </para>
+    /// import half) in the mode the operator chose (ADR 0193):
+    /// <list type="bullet">
+    /// <item><b>unchecked</b> (the default — <c>keepExisting</c> absent) =
+    /// <see cref="Kumunita.Core.Portability.PortabilityImportMode.CleanSlate"/> —
+    /// the import <b>replaces</b> the instance's state: the instance's
+    /// version of the archive's surface (principals + content docs + media
+    /// bytes) is wiped first, then the archive is applied. This is the D1
+    /// restore semantic and what makes an import over an instance that
+    /// already has accounts/content succeed (the operator's pre-import
+    /// backup is the rollback path).</item>
+    /// <item><b>checked</b> (<c>keepExisting</c> present) =
+    /// <see cref="Kumunita.Core.Portability.PortabilityImportMode.KeepExisting"/> —
+    /// merge mode: existing accounts and content are kept intact; only new
+    /// (non-existent) accounts and content are added. Existing data is never
+    /// overwritten.</item>
+    /// </list>
+    /// Delegates to
+    /// <see cref="IPortabilityService.ImportAsync(string, Stream, Kumunita.Core.Portability.PortabilityImportMode, CancellationToken)"/>
+    /// — which emits exactly one <c>portability.import</c>
+    /// <c>AccessAudit</c> row (<c>TargetKind "portability"</c>,
+    /// <c>Via = Admin</c>, verb <c>import</c>; the controller adds none —
+    /// C-M11·6, the ADR 0105 <c>messaging.toggle</c> one-audit-row shape).
     /// </summary>
     [HttpPost("import")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Import(IFormFile archive)
+    public async Task<IActionResult> Import(IFormFile archive, bool keepExisting = false)
     {
         var actor = ActorId(User) ?? string.Empty;
 
@@ -111,8 +114,12 @@ public sealed class AdminPortabilityController(
             return RedirectToAction(nameof(Index));
         }
 
+        var mode = keepExisting
+            ? Kumunita.Core.Portability.PortabilityImportMode.KeepExisting
+            : Kumunita.Core.Portability.PortabilityImportMode.CleanSlate;
+
         await using var stream = archive.OpenReadStream();
-        var result = await portability.ImportAsync(actor, stream);
+        var result = await portability.ImportAsync(actor, stream, mode);
 
         if (result.Ok)
         {

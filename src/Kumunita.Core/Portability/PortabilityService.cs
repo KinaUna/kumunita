@@ -1,5 +1,6 @@
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Marten;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 
@@ -61,7 +62,30 @@ public interface IPortabilityService
     /// </summary>
     /// <param name="actorId">The GlobalAdmin actor's <c>subjectId</c> (the audit row's actor).</param>
     /// <param name="archive">The uploaded <c>*.kumunita</c> archive stream.</param>
+    /// <param name="ct">Cancellation.</param>
     Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default);
+
+    /// <summary>
+    /// The <see cref="ImportAsync(string, Stream, CancellationToken)"/>
+    /// overload with an explicit <see cref="PortabilityImportMode"/> (ADR
+    /// 0193). The Web surface resolves this (the
+    /// <c>AdminPortabilityController</c> import action reads the form's
+    /// <c>keepExisting</c> checkbox into the mode) and the tests target
+    /// this overload verbatim. <see cref="PortabilityImportMode.CleanSlate"/> (the default —
+    /// the D1 restore semantic): a clean/fresh instance is assumed; if any
+    /// archived principal already exists in the target identity store the
+    /// import is refused with a per-account <c>principal.exists:{email}</c>
+    /// failure (a closed, renderable refusal — not an unhandled 500).
+    /// <see cref="PortabilityImportMode.KeepExisting"/>: merge mode —
+    /// existing principals and content documents are kept intact; only new
+    /// (non-existent) ones are added; existing content is never overwritten.
+    /// </summary>
+    /// <param name="actorId">The GlobalAdmin actor's <c>subjectId</c> (the audit row's actor).</param>
+    /// <param name="archive">The uploaded <c>*.kumunita</c> archive stream.</param>
+    /// <param name="mode">The import mode (ADR 0193).</param>
+    /// <param name="ct">Cancellation.</param>
+    Task<PortabilityImportResult> ImportAsync(
+        string actorId, Stream archive, PortabilityImportMode mode, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -137,7 +161,13 @@ public sealed class PortabilityService(
     }
 
     /// <inheritdoc />
-    public async Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default)
+    public Task<PortabilityImportResult> ImportAsync(
+        string actorId, Stream archive, CancellationToken ct = default)
+        => ImportAsync(actorId, archive, PortabilityImportMode.CleanSlate, ct);
+
+    /// <inheritdoc />
+    public async Task<PortabilityImportResult> ImportAsync(
+        string actorId, Stream archive, PortabilityImportMode mode, CancellationToken ct = default)
     {
         // ── Read the archive (the §layout inverse) ─────────────────────
         var data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
@@ -171,25 +201,47 @@ public sealed class PortabilityService(
         // content graph is stored).
         var principals = KumunitaArchive.FromJson<List<PortabilityPrincipal>>(data.Principals)
             ?? new List<PortabilityPrincipal>();
-        await PortabilityApplyIdentity.ApplyAsync(userManager, roleManager, principals, ct).ConfigureAwait(false);
+
+        // The ADR 0193 mode gate (before any write):
+        // ── CleanSlate (the default — the D1 restore semantic): the import
+        //    REPLACES the instance's state. First the instance's version of
+        //    the archive's surface (the identity principals + the content
+        //    docs + the media bytes) is wiped, then the archive is applied
+        //    onto the now-fresh store. This is what makes an import over an
+        //    instance that already has accounts/content succeed (the user's
+        //    original 500 — a "principal already exists" collision — is now
+        //    resolved by the wipe). The operator's pre-import backup is the
+        //    rollback path (the M11 D1 semantic, unchanged).
+        // ── KeepExisting: merge mode — NO wipe. Existing principals and
+        //    content docs are kept intact; only new (non-existent) ones are
+        //    added. The collision is expected and not a failure.
+        if (mode == PortabilityImportMode.CleanSlate)
+            await WipeForCleanSlateImportAsync(data, ct).ConfigureAwait(false);
+
+        await PortabilityApplyIdentity.ApplyAsync(
+            userManager, roleManager, principals, mode, ct).ConfigureAwait(false);
 
         // Step 2 — store the domain documents in the registry's
-        // import order (parents before children — the D7 order).
-        await PortabilityApplyDocuments.ApplyAsync(documentStore, data, ct).ConfigureAwait(false);
+        // import order (parents before children — the D7 order). In
+        // KeepExisting mode, rows whose id already exists in the target
+        // store are skipped (the existing content is kept intact).
+        await PortabilityApplyDocuments.ApplyAsync(documentStore, data, mode, ct).ConfigureAwait(false);
 
         // Step 3 — copy the media bytes into the volume at the
         // {Id[0..2]}/{Id} content-addressed layout (C-M11·3 — the
         // same layout as the local volume; the dedup-by-content-hash
-        // is preserved).
+        // is preserved). Idempotent in both modes (the C-MED·4 dedup:
+        // identical bytes → same id → no second volume file).
         await PortabilityApplyMedia.ApplyAsync(mediaFileStore, data, ct).ConfigureAwait(false);
 
         // Step 4 — the config apply (the LocaleSettings + the
         // LanguageCatalog — the §config field set; the U02 ConfigExport
         // mirror, verbatim). The last apply step (the §apply order —
         // the LanguageCatalog / LocaleSettings re-materialize after the
-        // *Translation rows that reference them are stored).
+        // *Translation rows that reference them are stored). In
+        // KeepExisting mode, rows that already exist are kept intact.
         var config = KumunitaArchive.FromJson<PortabilityConfig>(data.Config) ?? new PortabilityConfig();
-        await PortabilityApplyConfig.ApplyAsync(documentStore, config, ct).ConfigureAwait(false);
+        await PortabilityApplyConfig.ApplyAsync(documentStore, config, mode, ct).ConfigureAwait(false);
 
         // The one portability.import AccessAudit row (TargetKind
         // "portability", Via = Admin, verb import) — emitted by the
@@ -214,5 +266,124 @@ public sealed class PortabilityService(
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return PortabilityImportResult.Success;
+    }
+
+    /// <summary>
+    /// The CleanSlate wipe (ADR 0193) — runs <em>before</em> the apply, so
+    /// the archive is applied onto a fresh instance (the D1 restore
+    /// semantic: the instance's version of the archive's surface is
+    /// replaced, not merged). Wipes, in the pinned order:
+    /// <ol>
+    /// <li>The <b>Identity principals</b> (the EF Core <c>identity</c>
+    /// schema — every <c>AspNetUsers</c> row, which cascades the
+    /// <c>AspNetUserRoles</c> / <c>AspNetUserClaims</c> /
+    /// <c>AspNetUserTokens</c> / <c>AspNetUserLogins</c> rows), so the
+    /// archive's principals re-create cleanly (no "already taken"
+    /// collision — the user's original 500).</li>
+    /// <li>The <b>Marten content docs</b> — every document type in the
+    /// §inventory's 44 closed set (the same <see cref="PortabilityDocTypes"/>
+    /// registry the apply loop drives off, via
+    /// <see cref="PortabilityApplyDocuments.DeleteAllAsync{T}"/>).</li>
+    /// <li>The <b>media bytes</b> on the volume + the <c>MediaObject</c>
+    /// catalog rows (already covered by the docs wipe, but the <em>bytes</em>
+    /// are a separate surface — the <see cref="IMediaFileStore"/> delete).</li>
+    /// </ol>
+    /// The operational docs (<c>AccessAudit</c> / <c>OutboxEmail</c> /
+    /// <c>EmailDeadLetter</c> / <c>IdentityToken</c>) are deliberately
+    /// <b>not</b> wiped — they are the instance's own operational state
+    /// (the §inventory "Excluded" set), not resident content the archive
+    /// carries. The audit trail of the wipe itself (the
+    /// <c>portability.import</c> row) is emitted <em>after</em> the apply,
+    /// so it survives.
+    /// <para>
+    /// <b>KeepExisting mode does not call this</b> — the existing state is
+    /// the point (merge, not replace).
+    /// </para>
+    /// </summary>
+    private async Task WipeForCleanSlateImportAsync(
+        KumunitaArchiveData data, CancellationToken ct)
+    {
+        // 1. The Identity principals (the EF Core identity schema). The
+        //    user-dependent tables are wiped <em>first, in the dependent-
+        //    order</em> (AspNetUserRoles / Claims / Logins / Tokens, then
+        //    AspNetUsers) — this is deliberate and not left to cascade:
+        //    <see cref="Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ExecuteDeleteAsync"/>
+        //    does not reliably cascade the dependent rows, and a surviving
+        //    AspNetUserRoles row for a re-created subjectId would collide
+        //    with the apply's <c>AddToRoleAsync</c> (a duplicate
+        //    (userId, roleId) — the exact class of 500 the ADR 0193 lane
+        //    exists to remove). The AspNetRoles / AspNetRoleClaims rows are
+        //    the standing definitions (Member / Moderator / GlobalAdmin /
+        //    Translator) — left in place; the re-creator's
+        //    roleManager.FindByNameAsync / CreateAsync ensures existence
+        //    and the archive's roles re-attach onto the fresh principals.
+        var users = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+            .ToListAsync(appDbContext.Users, ct).ConfigureAwait(false);
+        if (users.Count > 0)
+        {
+            var userIds = users.Select(u => u.Id).ToList();
+            // The four user-dependent tables (the stock Identity schema,
+            // all keyed by the principal id). Each is a flat delete of the
+            // rows for the to-be-deleted principals — one ExecuteDelete per
+            // table, no cascade reliance.
+            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .ExecuteDeleteAsync(appDbContext.UserRoles
+                    .Where(r => userIds.Contains(r.UserId)), ct).ConfigureAwait(false);
+            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .ExecuteDeleteAsync(appDbContext.UserClaims
+                    .Where(c => userIds.Contains(c.UserId)), ct).ConfigureAwait(false);
+            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .ExecuteDeleteAsync(appDbContext.UserLogins
+                    .Where(l => userIds.Contains(l.UserId)), ct).ConfigureAwait(false);
+            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .ExecuteDeleteAsync(appDbContext.UserTokens
+                    .Where(t => userIds.Contains(t.UserId)), ct).ConfigureAwait(false);
+            // The principals themselves.
+            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .ExecuteDeleteAsync(appDbContext.Users
+                    .Where(u => userIds.Contains(u.Id)), ct).ConfigureAwait(false);
+            // ExecuteDeleteAsync bypasses the change tracker — any User /
+            // dependent entities already attached to this context's tracker
+            // (e.g. a principal read earlier in the same scoped request) stay
+            // tracked, and the apply's re-CreateAsync of the same subjectId
+            // would then throw an EF identity conflict ("another instance with
+            // the same key value … is already being tracked"). A clean-slate
+            // import wipes every principal, so dropping the whole tracker is
+            // the correct fresh-slate semantic and keeps the re-create clean
+            // regardless of what was previously tracked in this context.
+            appDbContext.ChangeTracker.Clear();
+        }
+
+        // 2. The media bytes (the volume) — for every MediaObject listed in
+        //    the archive's media manifest, the byte file. DeleteIfExists is
+        //    idempotent (a missing file is a no-op).
+        if (data.Manifest?.MediaManifest is not null)
+        {
+            foreach (var m in data.Manifest.MediaManifest)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (string.IsNullOrEmpty(m.Id))
+                    continue;
+                await mediaFileStore.DeleteIfExistsAsync(m.Id, ct).ConfigureAwait(false);
+            }
+        }
+
+        // 3. The Marten content docs — every document type in the 44 closed
+        //    §inventory set (the same registry the apply loop drives off,
+        //    via the generic DeleteAllAsync<T> helper). This wipes the
+        //    MediaObject catalog rows, the Profile rows (keyed by the
+        //    now-deleted principal's subjectId), the config rows
+        //    (LocaleSettings / LanguageCatalog), and the full content graph.
+        foreach (var entry in PortabilityDocTypes.InOrder())
+        {
+            ct.ThrowIfCancellationRequested();
+            var docType = PortabilityExportDocuments.NameToType[entry.Type];
+            var deleteAll = typeof(PortabilityApplyDocuments)
+                .GetMethod(nameof(PortabilityApplyDocuments.DeleteAllAsync),
+                    System.Reflection.BindingFlags.NonPublic
+                    | System.Reflection.BindingFlags.Static)!
+                .MakeGenericMethod(docType);
+            await (Task)deleteAll.Invoke(null, [documentStore, (object)ct])!;
+        }
     }
 }

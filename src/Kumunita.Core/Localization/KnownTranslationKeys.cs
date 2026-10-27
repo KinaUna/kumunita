@@ -2332,6 +2332,8 @@ public static class KnownTranslationKeys
             ["portability.export"]       = "Export",
             ["portability.import"]       = "Import",
             ["portability.confirm.import"] = "Import this archive? This replaces the instance's content (the restore path — the operator's pre-import backup is the rollback).",
+            ["portability.import.keep_existing"] = "Keep existing accounts and content",
+            ["portability.import.keep_existing_hint"] = "Unticked: the import replaces this instance's accounts and content. Ticked: existing accounts and content are kept unchanged, and only what is new is added.",
             ["portability.status.ok"]    = "Done.",
             ["portability.status.failure"] = "Refused — the archive was rejected before anything was written:",
 
@@ -5136,6 +5138,8 @@ public static class KnownTranslationKeys
             ["portability.export"]       = "Exportieren",
             ["portability.import"]       = "Importieren",
             ["portability.confirm.import"] = "Dieses Archiv importieren? Es ersetzt den Inhalt der Instanz (der Wiederherstellungspfad — das Vorkopie-Backup des Operators ist der Rollback).",
+            ["portability.import.keep_existing"] = "Bestehende Konten und Inhalte behalten",
+            ["portability.import.keep_existing_hint"] = "Nicht angehakt: Der Import ersetzt die Konten und Inhalte dieser Instanz. Angehakt: Bestehende Konten und Inhalte bleiben unverändert, es wird nur ergänzt, was neu ist.",
             ["portability.status.ok"]    = "Fertig.",
             ["portability.status.failure"] = "Abgelehnt — das Archiv wurde abgelehnt, bevor etwas geschrieben wurde:",
 
@@ -7832,6 +7836,8 @@ public static class KnownTranslationKeys
             ["portability.export"]       = "Exporter",
             ["portability.import"]       = "Importer",
             ["portability.confirm.import"] = "Importer cette archive ? Elle remplace le contenu de l'instance (le chemin de restauration — la sauvegarde pré-import de l'opérateur est le retour arrière).",
+            ["portability.import.keep_existing"] = "Conserver les comptes et contenus existants",
+            ["portability.import.keep_existing_hint"] = "Non cochée : l'import remplace les comptes et contenus de cette instance. Cochée : les comptes et contenus existants restent inchangés, et seul ce qui est nouveau est ajouté.",
             ["portability.status.ok"]    = "Terminé.",
 
             // M15 U05 (ADR 0116, D8) — les clés de lot côté éditeur
@@ -10513,6 +10519,8 @@ public static class KnownTranslationKeys
             ["portability.export"]       = "Eksportér",
             ["portability.import"]       = "Importér",
             ["portability.confirm.import"] = "Importér denne arkiv? Den erstanser indholdet i instansen (gendannelsesstien — operatørens backup før import er tilbageskrivningen).",
+            ["portability.import.keep_existing"] = "Behol eksisterende konti og indhold",
+            ["portability.import.keep_existing_hint"] = "Umarkeret: importen erstanser konti og indhold i denne instans. Markeret: eksisterende konti og indhold forbliver uændrede, og kun det, der er nyt, tilføjes.",
             ["portability.status.ok"]    = "Færdig.",
 
             // M15 U05 (ADR 0116, D8) — de editorbaserede bulk-nøgler

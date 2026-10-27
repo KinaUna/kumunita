@@ -201,3 +201,4 @@ Decision / Consequences. New decisions take the next number.
 | 0190 | Kanban boards — board breaks out of the page column, fixed-width lanes with sideways scroll, lane/card surfaces and accent focus/drag states on palette tokens. CSS only. |
 | 0191 | Inventory — availability chips (Available / Currently with ...), type chip, summary and history cards, filter bar; two new translation keys. |
 | 0192 | Documents — file-kind tile (PDF/DOC/XLS/...), size in the meta line, outline Download, detail summary card and chips. |
+| 0193 | Portability import modes — a "keep existing" choice: unchecked = clean-slate replace (wipe the instance's accounts/content, then apply), checked = merge (keep existing accounts + content intact, only add what is new). Amends 0108 (M11 D1 restore semantic). |
