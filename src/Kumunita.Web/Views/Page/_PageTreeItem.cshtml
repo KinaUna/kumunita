@@ -18,7 +18,7 @@
         <a href="@Model.Path">@Model.Title</a>
         @if (Model.IsDraft)
         {
-            <span class="badge text-bg-warning ms-2" title="Only you can see this — it is not yet published">
+            <span class="kmb-chip kmb-chip-draft ms-2" title="Only you can see this — it is not yet published">
                 <kw-l key="posts.draft_badge">Draft</kw-l>
             </span>
         }
@@ -32,7 +32,7 @@ else
                 <a href="@Model.Path">@Model.Title</a>
                 @if (Model.IsDraft)
                 {
-                    <span class="badge text-bg-warning ms-2" title="Only you can see this — it is not yet published">
+                    <span class="kmb-chip kmb-chip-draft ms-2" title="Only you can see this — it is not yet published">
                         <kw-l key="posts.draft_badge">Draft</kw-l>
                     </span>
                 }

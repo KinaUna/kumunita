@@ -953,3 +953,29 @@ html[data-kmb-palette] .kmb-meta-label {
 @media (max-width: 575.98px) {
   html[data-kmb-palette] .kmb-file { width: 40px; height: 48px; font-size: 0.6875rem; }
 }
+
+/* Pages (ADR 0196) */
+/* Each tree section is one surface card of soft ledger rows. */
+html[data-kmb-palette] .airy-page-list {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  overflow: hidden;
+}
+html[data-kmb-palette] .airy-page-list li { border-bottom-color: var(--kmb-border-soft); }
+html[data-kmb-palette] .airy-page-list li:last-child { border-bottom: 0; }
+html[data-kmb-palette] .airy-page-list a { color: var(--kmb-ink); text-decoration: none; font-weight: 600; }
+html[data-kmb-palette] .airy-page-list li:hover > a,
+html[data-kmb-palette] .airy-page-list li > a:focus-visible,
+html[data-kmb-palette] .airy-page-list .kmb-page-branch > summary:hover a { color: var(--kmb-accent); }
+html[data-kmb-palette] .airy-page-list .kmb-page-branch > summary:hover { background: var(--kmb-tint-a); }
+/* Accent chevron; rotates when the branch is open. */
+html[data-kmb-palette] .airy-page-list .kmb-page-branch > summary::before { color: var(--kmb-accent); }
+/* Child count: a quiet chip. */
+html[data-kmb-palette] .kmb-page-branch-count {
+  background: var(--kmb-tint-a);
+  color: var(--kmb-ink-soft);
+  border-radius: var(--kmb-radius-pill);
+}
+/* Draft: outlined chip (shared with announcements). */
+html[data-kmb-palette] .airy-page-list .kmb-chip-draft { vertical-align: middle; }
