@@ -74,8 +74,10 @@
                         <dd class="col-sm-9">@Model.CurrentHolderName</dd>
                     }
 
-                    <dt class="col-sm-3"><kw-dt dt="@Model.Item.Created" format="g"></kw-dt></dt>
-                    <dd class="col-sm-9">@Model.Item.Created</dd>
+                    @* ADR 0212 — the dt was the formatted date and the dd the raw DateTime (the date
+                       twice, no label); a "Created" label and one formatted date. *@
+                    <dt class="col-sm-3"><kw-l key="events.created">Created</kw-l></dt>
+                    <dd class="col-sm-9"><kw-dt dt="@Model.Item.Created" format="g"></kw-dt></dd>
                 </dl>
             </div>
         </div>

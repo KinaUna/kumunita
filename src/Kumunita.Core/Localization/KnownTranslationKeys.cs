@@ -1120,6 +1120,8 @@ public static class KnownTranslationKeys
                 "No posts yet. Write the first one — it will be visible to the current members.",
             ["groups.posts_empty"]    = "No posts here yet.",
             ["groups.members_heading"]  = "Members",
+            ["groups.member_count_one"]   = "{0} member",
+            ["groups.member_count_other"] = "{0} members",
             ["groups.members_empty"]    = "No members yet.",
             ["groups.member_leave"]     = "Leave",
             ["groups.invite_heading"]   = "Invite a resident",
@@ -1911,6 +1913,8 @@ public static class KnownTranslationKeys
             ["events.all_communities"] = "All communities",
             ["events.community_hint"] =
                 "The community this event appears under — a filter, not an access limit.",
+            ["events.community_hint_generic"] =
+                "The community this appears under — a filter, not an access limit.",
             ["events.tags_placeholder"] = "e.g. cleanup, social, garden",
             ["events.audience_heading"] = "Audience — who can see this event",
             ["events.audience_default"] =
@@ -4044,6 +4048,8 @@ public static class KnownTranslationKeys
                 "Noch keine Beiträge. Schreibe den ersten — er ist für die aktuellen Mitglieder sichtbar.",
             ["groups.posts_empty"]    = "Noch keine Beiträge hier.",
             ["groups.members_heading"]  = "Mitglieder",
+            ["groups.member_count_one"]   = "{0} Mitglied",
+            ["groups.member_count_other"] = "{0} Mitglieder",
             ["groups.members_empty"]    = "Noch keine Mitglieder.",
             ["groups.member_leave"]     = "Verlassen",
             ["groups.invite_heading"]   = "Bewohner:in einladen",
@@ -4784,6 +4790,8 @@ public static class KnownTranslationKeys
             ["events.all_communities"] = "Alle Gemeinden",
             ["events.community_hint"] =
                 "Die Gemeinde, unter der diese Veranstaltung erscheint — ein Filter, keine Zugangsgrenze.",
+            ["events.community_hint_generic"] =
+                "Die Gemeinde, unter der dies erscheint — ein Filter, keine Zugangsgrenze.",
             ["events.tags_placeholder"] = "z. B. Reinigung, Treffen, Garten",
             ["events.audience_heading"] = "Zielgruppe — wer diese Veranstaltung sehen kann",
             ["events.audience_default"] =
@@ -6762,6 +6770,8 @@ public static class KnownTranslationKeys
                 "Pas encore de publications. Écris la première — elle sera visible par les membres actuels.",
             ["groups.posts_empty"]    = "Pas encore de publications ici.",
             ["groups.members_heading"]  = "Membres",
+            ["groups.member_count_one"]   = "{0} membre",
+            ["groups.member_count_other"] = "{0} membres",
             ["groups.members_empty"]    = "Pas encore de membres.",
             ["groups.member_leave"]     = "Quitter",
             ["groups.invite_heading"]   = "Inviter un habitant",
@@ -7504,6 +7514,8 @@ public static class KnownTranslationKeys
             ["events.all_communities"] = "Toutes les communautés",
             ["events.community_hint"] =
                 "La communauté sous laquelle cet événement apparaît — un filtre, pas une limite d'accès.",
+            ["events.community_hint_generic"] =
+                "La communauté sous laquelle cet élément apparaît — un filtre, pas une limite d'accès.",
             ["events.tags_placeholder"] = "ex. nettoyage, rencontre, jardin",
             ["events.audience_heading"] = "Public — qui peut voir cet événement",
             ["events.audience_default"] =
@@ -9477,6 +9489,8 @@ public static class KnownTranslationKeys
                 "Ingen indlæg endnu. Skriv det første — det vises for de nuværende medlemmer.",
             ["groups.posts_empty"]    = "Ingen indlæg her endnu.",
             ["groups.members_heading"]  = "Medlemmer",
+            ["groups.member_count_one"]   = "{0} medlem",
+            ["groups.member_count_other"] = "{0} medlemmer",
             ["groups.members_empty"]    = "Ingen medlemmer endnu.",
             ["groups.member_leave"]     = "Forlad",
             ["groups.invite_heading"]   = "Indbyd en beboer",
@@ -10212,6 +10226,8 @@ public static class KnownTranslationKeys
             ["events.all_communities"] = "Alle fællesskaber",
             ["events.community_hint"] =
                 "Det fællesskab, dette arrangement optræder under — et filter, ikke en adgangsgrænse.",
+            ["events.community_hint_generic"] =
+                "Det fællesskab, dette optræder under — et filter, ikke en adgangsgrænse.",
             ["events.tags_placeholder"] = "fx oprydning, socialt, have",
             ["events.audience_heading"] = "Publikum — hvem der kan se dette arrangement",
             ["events.audience_default"] =
