@@ -16,9 +16,12 @@ checks of the board header, announcement detail, Pages tree and member page.
 - Ember checkboxes, radios and switches used Forest's green-grey controls. Unchecked: warm surface + control border.
   Checked: action fill (amber) with a dark mark (white marks fail on amber).
 
+- Home milestone list (Ember only): the `M35`-style id chip kept Forest's dark pine (light) or a green tint (dark), and the
+  Done pills were bright green. Both now use the accent on a 16% accent tint (a tint of the accent, because the band behind
+  them is already `--kmb-chip-selected-bg`, which would make a selected-bg chip vanish). Forest is unchanged.
+
 ## Left alone
 
-- Home milestone "Done" pills are `badge text-bg-success`: a semantic green, kept.
 - Group monogram colours include a green hue by design (six stable hues).
 
 ## Open

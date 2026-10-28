@@ -1220,3 +1220,13 @@ html[data-kmb-palette='ember'] .form-check-input:checked[type='radio'] {
 html[data-kmb-palette='ember'] .form-switch .form-check-input:checked {
   --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%231a1613'/%3e%3c/svg%3e");
 }
+
+/* Home milestone list on Ember (ADR 0201): the id chip and the Done pill follow the amber accent, not Forest green. */
+html[data-kmb-palette='ember'] .kmb-milestone-id {
+  color: var(--kmb-accent) !important;
+  background-color: color-mix(in srgb, var(--kmb-accent) 16%, transparent) !important;
+}
+html[data-kmb-palette='ember'] li[data-rm] .badge.text-bg-success {
+  color: var(--kmb-accent) !important;
+  background-color: color-mix(in srgb, var(--kmb-accent) 16%, transparent) !important;
+}
