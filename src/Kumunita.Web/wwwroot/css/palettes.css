@@ -1236,3 +1236,11 @@ html[data-kmb-palette='ember'] li[data-rm] .badge.text-bg-success {
    not centre it mid-height; the tile stays put and the title gets the width. */
 .kmb-doc-head .kmb-file { flex: 0 0 auto; margin-top: .35rem; }
 .kmb-doc-head h1 { overflow-wrap: anywhere; }
+
+/* ── Error text contrast, dark (ADR 0203) ────────────────────────────────
+   Bootstrap's .text-danger (#c65a53) is 3.7:1 on the dark cards; this lighter
+   red is >= 6.5:1 on both dark palettes. Two dark scopes, as above. */
+@media (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme="light"]) .text-danger { color: #f28b82 !important; }
+}
+html[data-kmb-palette][data-kmb-theme="dark"] .text-danger { color: #f28b82 !important; }
