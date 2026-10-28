@@ -40,7 +40,9 @@
 }
 
 <div class="table-responsive">
-    <table class="table table-sm align-middle">
+    @* ADR 0222 — below 576px palettes.css stacks each row into a card (kmb-stack-table);
+       the data-label attributes become the captions, kmb-cell-empty hides a blank cell. *@
+    <table class="table table-sm align-middle kmb-stack-table">
         <thead>
             <tr>
                 <th>Account</th>
@@ -69,7 +71,7 @@
                             <span class="badge text-bg-danger">blocked</span>
                         }
                     </td>
-                    <td>
+                    <td data-label="Roles" class="@(a.Roles.Any() ? null : "kmb-cell-empty")">
                         @foreach (var r in a.Roles)
                         {
                             <span class="badge text-bg-secondary">
@@ -81,7 +83,7 @@
                             </span>
                         }
                     </td>
-                    <td>
+                    <td data-label="Scope" class="@(a.Roles.Contains(Roles.Moderator) ? null : "kmb-cell-empty")">
                         @if (a.Roles.Contains(Roles.Moderator))
                         {
                             var names = Model.Components
@@ -91,7 +93,7 @@
                             @string.Join(", ", names)
                         }
                     </td>
-                    <td>
+                    <td data-label="Posting">
                         @{
                             var posting = Model.Components
                                 .Where(c => a.CommunityIds.Contains(c.Id))
