@@ -3,6 +3,22 @@
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Document.Title) ? "Document" : Model.Document.Title;
 
+    // ADR 0202 — a friendly file-kind name for the meta row; unknown types fall
+    // back to the raw content type. TODO: localise via kw-l keys.
+    string FriendlyType(string contentType)
+    {
+        var ct = (contentType ?? string.Empty).Trim().ToLowerInvariant();
+        if (ct == "application/pdf") return "PDF document";
+        if (ct.Contains("wordprocessingml") || ct == "application/msword" || ct.Contains("opendocument.text")) return "Word document";
+        if (ct == "text/csv") return "CSV file";
+        if (ct.Contains("spreadsheetml") || ct.Contains("ms-excel") || ct.Contains("opendocument.spreadsheet")) return "Spreadsheet";
+        if (ct.Contains("presentationml") || ct.Contains("ms-powerpoint") || ct.Contains("opendocument.presentation")) return "Presentation";
+        if (ct.StartsWith("image/")) return "Image";
+        if (ct.StartsWith("text/")) return "Text file";
+        if (ct.Contains("zip") || ct.Contains("compressed") || ct.Contains("tar")) return "ZIP archive";
+        return contentType ?? string.Empty;
+    }
+
     // Human-readable byte size (the detail meta block).
     string FormatSize(long bytes)
     {
@@ -34,7 +50,7 @@
             </a>
         </p>
 
-        <div class="d-flex align-items-center gap-3 mb-2">
+        <div class="kmb-doc-head d-flex align-items-start gap-3 mb-2">
             <partial name="_FileTile" model="Model.Document.ContentType" />
             <h1 class="mb-0 min-w-0">@Model.Document.Title</h1>
         </div>
@@ -81,7 +97,7 @@
                         <kw-l key="documents.detail.type_size">File type / size</kw-l>
                     </div>
                     <div class="col-sm-9 col-md-10">
-                        @Model.Document.ContentType
+                        <span title="@Model.Document.ContentType">@FriendlyType(Model.Document.ContentType)</span>
                         &middot; @FormatSize(Model.Document.SizeBytes)
                     </div>
                 </div>

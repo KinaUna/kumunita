@@ -210,3 +210,4 @@ Decision / Consequences. New decisions take the next number.
 | 0199 | Admin shared look — tables as surface cards with soft chips, dashboard tiles and section cards, list groups on tokens (CSS only). |
 | 0200 | Projects forms and board header — board header as a surface card with byline and chips; audience block and submit row tidy (CSS). |
 | 0201 | Verification round 3 — board byline on phones, Ember outline buttons and form controls on the amber accent, and the home milestone id chip and Done pills on the accent tint (Ember only). |
+| 0202 | Documents verification — detail tile top-aligned, friendly file-type name (CSS + Razor). |

@@ -1230,3 +1230,9 @@ html[data-kmb-palette='ember'] li[data-rm] .badge.text-bg-success {
   color: var(--kmb-accent) !important;
   background-color: color-mix(in srgb, var(--kmb-accent) 16%, transparent) !important;
 }
+
+/* ── Documents detail (ADR 0202) ─────────────────────────────────────────
+   Tile top-aligned beside the title so a long wrapped title on a phone does
+   not centre it mid-height; the tile stays put and the title gets the width. */
+.kmb-doc-head .kmb-file { flex: 0 0 auto; margin-top: .35rem; }
+.kmb-doc-head h1 { overflow-wrap: anywhere; }
