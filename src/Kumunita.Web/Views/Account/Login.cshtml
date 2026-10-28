@@ -56,8 +56,7 @@
         @if (Model.MfaPending)
         {
             <div class="alert alert-info">
-                <b>@(Model.Email)</b> has two-factor authentication enabled.
-                Enter the code from your authenticator app, or a recovery code.
+                <b>@(Model.Email)</b> <kw-l key="account.mfa.challenge_intro">has two-factor authentication enabled. Enter the code from your authenticator app, or a recovery code.</kw-l>
             </div>
 
             <form asp-action="LoginMfa" asp-route-returnUrl="@Model.ReturnUrl" method="post">
@@ -78,26 +77,25 @@
                 <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
 
                 <div class="mb-3">
-                    <label asp-for="MfaCode" class="form-label">Authenticator code</label>
+                    <label asp-for="MfaCode" class="form-label"><kw-l key="account.mfa.code_label">Authenticator code</kw-l></label>
                     <input asp-for="MfaCode" class="form-control" inputmode="numeric"
                            autocomplete="one-time-code" pattern="[0-9]{6,8}" autofocus />
                     <span asp-validation-for="MfaCode" class="text-danger"></span>
-                    <div class="form-text">Enter the 6-digit code from your authenticator app.</div>
+                    <div class="form-text"><kw-l key="account.mfa.code_hint">Enter the 6-digit code from your authenticator app.</kw-l></div>
                 </div>
 
                 <hr />
 
                 <div class="mb-3">
-                    <label asp-for="MfaRecoveryCode" class="form-label">Recovery code (optional)</label>
+                    <label asp-for="MfaRecoveryCode" class="form-label"><kw-l key="account.mfa.recovery_label">Recovery code (optional)</kw-l></label>
                     <input asp-for="MfaRecoveryCode" class="form-control" autocomplete="off" />
                     <span asp-validation-for="MfaRecoveryCode" class="text-danger"></span>
                     <div class="form-text">
-                        If you lost your authenticator app, enter one of your
-                        recovery codes instead. A recovery code can only be used once.
+                        <kw-l key="account.mfa.recovery_hint">If you lost your authenticator app, enter one of your recovery codes instead. A recovery code can only be used once.</kw-l>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Verify</button>
+                <button type="submit" class="btn btn-primary"><kw-l key="account.mfa.verify">Verify</kw-l></button>
             </form>
         }
         else

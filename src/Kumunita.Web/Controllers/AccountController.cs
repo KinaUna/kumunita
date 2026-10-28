@@ -38,6 +38,32 @@ public sealed class AccountController(
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
 
+    // ADR 0215 — the MFA challenge's model errors are localized from the registry
+    // (account.mfa.error.*), resolved from the request scope like LocalizeValidationAsync;
+    // the English text is the floor when there is no provider (unit-test harness) or
+    // the lookup fails.
+    private async Task<string> MfaTextAsync(string key, string english)
+    {
+        var services = HttpContext?.RequestServices;
+        var provider = services?.GetService<Kumunita.Core.Localization.ITranslationProvider>();
+        if (services is null || provider is null)
+        {
+            return english;
+        }
+        try
+        {
+            var localization = services.GetService<Kumunita.Core.Localization.ILocalizationService>();
+            var lang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(
+                HttpContext?.Request, localization, provider);
+            var text = await provider.GetAsync(key, lang);
+            return string.IsNullOrWhiteSpace(text) ? english : text;
+        }
+        catch
+        {
+            return english;
+        }
+    }
+
     // P1-5 (translation audit) — localize the four Account forms' DataAnnotations
     // messages. The platform's closed translation surface is the KnownTranslationKeys
     // registry (ADR 0015); the four account.err.* keys live there (en/de/fr/da).
@@ -1021,7 +1047,8 @@ public sealed class AccountController(
                         // the current stamp.
                         await signInManager.SignOutAsync();
                         ModelState.AddModelError(string.Empty,
-                            "This sign-in was revoked. Please enter your password again.");
+                            await MfaTextAsync("account.mfa.error.revoked",
+                    "This sign-in was revoked. Please enter your password again."));
                         model.MfaPending = true;
                         return View("Login", model);
                     }
@@ -1035,7 +1062,8 @@ public sealed class AccountController(
             && string.IsNullOrWhiteSpace(model.MfaRecoveryCode))
         {
             ModelState.AddModelError(string.Empty,
-                "Enter a code from your authenticator app, or a recovery code.");
+                await MfaTextAsync("account.mfa.error.empty",
+                    "Enter a code from your authenticator app, or a recovery code."));
             model.MfaPending = true;
             return View("Login", model);
         }
@@ -1102,7 +1130,8 @@ public sealed class AccountController(
             {
                 await signInManager.SignOutAsync();
                 ModelState.AddModelError(string.Empty,
-                    "Too many incorrect codes. This account is temporarily locked; try again later.");
+                    await MfaTextAsync("account.mfa.error.locked",
+                    "Too many incorrect codes. This account is temporarily locked; try again later."));
                 model.MfaPending = false;
                 model.MfaCode = null;
                 model.MfaRecoveryCode = null;
@@ -1112,7 +1141,8 @@ public sealed class AccountController(
             }
 
             ModelState.AddModelError(string.Empty,
-                "The code was not valid. Try again, or use a recovery code.");
+                await MfaTextAsync("account.mfa.error.invalid",
+                    "The code was not valid. Try again, or use a recovery code."));
             // Re-render with the wrong code cleared (the tag helper prefers ModelState
             // over the model, so the ModelState entries are removed too).
             model.MfaCode = null;
