@@ -1522,3 +1522,41 @@ html[data-kmb-palette][data-kmb-theme='dark'] .form-select {
   }
   html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td.text-end > * { margin: 0 !important; }
 }
+
+/* ==========================================================================
+   ADR 0225 — palette choice cards (admin Appearance form)
+   The preview uses literal colours (not the page tokens, which follow whichever palette is
+   active): left half = light, right half = dark, each a mini canvas with a card, an ink line,
+   an accent line and an action button.
+   ========================================================================== */
+.kmb-pal-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 18rem)); gap: 1rem; }
+html[data-kmb-palette] .kmb-pal-choice {
+  display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'radio text' 'preview preview';
+  align-items: center; gap: 0.5rem 0.625rem;
+  padding: 0.75rem; cursor: pointer;
+  background: var(--kmb-surface); border: 1px solid var(--kmb-border); border-radius: var(--kmb-radius, 16px);
+}
+html[data-kmb-palette] .kmb-pal-choice:hover { border-color: var(--kmb-hover-border, var(--kmb-border)); }
+html[data-kmb-palette] .kmb-pal-choice:has(.kmb-pal-radio:checked) {
+  border-color: var(--kmb-accent); box-shadow: 0 0 0 1px var(--kmb-accent);
+}
+html[data-kmb-palette] .kmb-pal-choice:has(.kmb-pal-radio:focus-visible) { outline: 2px solid var(--kmb-accent); outline-offset: 2px; }
+.kmb-pal-radio { grid-area: radio; margin: 0; }
+.kmb-pal-text { grid-area: text; display: flex; flex-direction: column; line-height: 1.25; }
+.kmb-pal-preview {
+  grid-area: preview; display: grid; grid-template-columns: 1fr 1fr;
+  border-radius: 10px; overflow: hidden; border: 1px solid rgba(128, 128, 128, 0.35);
+}
+.kmb-pal-half { display: block; padding: 0.5rem; background: var(--p-canvas); }
+.kmb-pal-card {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  padding: 0.45rem; border-radius: 7px;
+  background: var(--p-surface); border: 1px solid var(--p-border);
+}
+.kmb-pal-line { display: block; height: 5px; width: 75%; border-radius: 3px; background: var(--p-ink); opacity: 0.85; }
+.kmb-pal-line--accent { width: 45%; background: var(--p-accent); opacity: 1; }
+.kmb-pal-btn { display: block; height: 11px; width: 36px; margin-top: 0.15rem; border-radius: 6px; background: var(--p-action); }
+.kmb-pal-preview--forest .kmb-pal-half--light { --p-canvas: #fbfaf7; --p-surface: #ffffff; --p-border: #dde3dd; --p-ink: #1f2a25; --p-accent: #1c4532; --p-action: #1c4532; }
+.kmb-pal-preview--forest .kmb-pal-half--dark  { --p-canvas: #131b15; --p-surface: #1c2620; --p-border: #2f3d34; --p-ink: #ece9e0; --p-accent: #9ad0ae; --p-action: #3c7a58; }
+.kmb-pal-preview--ember  .kmb-pal-half--light { --p-canvas: #fbf6ee; --p-surface: #fffdf8; --p-border: #eadfce; --p-ink: #2a2118; --p-accent: #8a5a12; --p-action: #f0b45c; }
+.kmb-pal-preview--ember  .kmb-pal-half--dark  { --p-canvas: #1a1613; --p-surface: #262019; --p-border: #352d26; --p-ink: #f1e9dc; --p-accent: #f0b45c; --p-action: #f0b45c; }

@@ -22,18 +22,36 @@
 </p>
 <form method="post" action="/admin/site/save-palette">
     @Html.AntiForgeryToken()
-    <div class="mb-3">
-        <label for="DefaultPalette" class="form-label d-block">Default palette</label>
-        <select class="form-select w-auto" name="DefaultPalette" id="DefaultPalette">
+    @* ADR 0225 — two selectable cards instead of a <select> (a native option can't show a
+       swatch). Same posted field (DefaultPalette), so the controller and its tests are
+       unchanged; the preview is decorative (aria-hidden), the label text names the choice. *@
+    <fieldset class="mb-3">
+        <legend class="form-label fs-6">Default palette</legend>
+        <div class="kmb-pal-choices">
             @foreach (var pal in Kumunita.Web.Security.PaletteCookie.All)
             {
-                <option value="@pal" selected="@(Model.Appearance.DefaultPalette == pal)">
-                    @(pal == Kumunita.Web.Security.PaletteCookie.Ember ? "Ember — warm charcoal and amber" : "Forest — green")
-                </option>
+                var isEmber = pal == Kumunita.Web.Security.PaletteCookie.Ember;
+                <label class="kmb-pal-choice" for="@($"DefaultPalette-{pal}")">
+                    <input class="form-check-input kmb-pal-radio" type="radio" name="DefaultPalette"
+                           id="@($"DefaultPalette-{pal}")" value="@pal"
+                           checked="@(Model.Appearance.DefaultPalette == pal)" />
+                    <span class="kmb-pal-preview kmb-pal-preview--@pal" aria-hidden="true">
+                        <span class="kmb-pal-half kmb-pal-half--light">
+                            <span class="kmb-pal-card"><span class="kmb-pal-line"></span><span class="kmb-pal-line kmb-pal-line--accent"></span><span class="kmb-pal-btn"></span></span>
+                        </span>
+                        <span class="kmb-pal-half kmb-pal-half--dark">
+                            <span class="kmb-pal-card"><span class="kmb-pal-line"></span><span class="kmb-pal-line kmb-pal-line--accent"></span><span class="kmb-pal-btn"></span></span>
+                        </span>
+                    </span>
+                    <span class="kmb-pal-text">
+                        <span class="fw-semibold">@(isEmber ? "Ember" : "Forest")</span>
+                        <span class="text-muted small">@(isEmber ? "warm charcoal and amber" : "green")</span>
+                    </span>
+                </label>
             }
-        </select>
-        @* TODO (ADR 0175): a live swatch preview next to the select. *@
-    </div>
+        </div>
+        <div class="form-text">Each card shows the palette in light (left) and dark (right).</div>
+    </fieldset>
     <button type="submit" class="btn btn-primary">Save appearance</button>
 </form>
 
