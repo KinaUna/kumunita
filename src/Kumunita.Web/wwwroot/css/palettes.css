@@ -1045,3 +1045,70 @@ html[data-kmb-palette] .kmb-auth > p:last-child { text-align: center; }
 }
 /* My storage: stat tiles on the detail card look. */
 html[data-kmb-palette] .kmb-stat .fs-4 { font-family: var(--bs-heading-font-family); color: var(--kmb-ink); }
+
+/* Admin (ADR 0199) — shared look for the ~20 admin screens, CSS only. */
+/* Tables: a surface card, quiet small-caps header, hairline rows, hover tint, no stripes. */
+html[data-kmb-palette] .table-responsive {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+}
+html[data-kmb-palette] .table {
+  --bs-table-bg: transparent;
+  --bs-table-striped-bg: transparent;
+  --bs-table-striped-color: var(--kmb-ink);
+  --bs-table-hover-bg: var(--kmb-tint-a);
+  --bs-table-color: var(--kmb-ink);
+  --bs-table-border-color: var(--kmb-border-soft);
+  margin-bottom: 0;
+}
+html[data-kmb-palette] .table > thead > tr > th {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--kmb-muted);
+  background: transparent;
+  border-bottom: 1px solid var(--kmb-border);
+  padding: 0.75rem 1rem;
+}
+html[data-kmb-palette] .table > tbody > tr > td { padding: 0.75rem 1rem; }
+html[data-kmb-palette] .table > tbody > tr:last-child > td { border-bottom: 0; }
+html[data-kmb-palette] .table > tbody > tr:hover > td { background: var(--kmb-tint-a); }
+/* Badges inside tables and admin lists become soft chips; the word still carries the meaning. */
+html[data-kmb-palette] :is(.table, .list-group) .badge {
+  border-radius: var(--kmb-radius-pill);
+  padding: 0.3125rem 0.625rem;
+  font-family: var(--bs-heading-font-family);
+  font-weight: 600;
+  color: var(--kmb-ink) !important;
+  background-color: color-mix(in srgb, var(--kmb-muted) 22%, var(--kmb-surface)) !important;
+}
+html[data-kmb-palette] :is(.table, .list-group) .badge.text-bg-warning { background-color: color-mix(in srgb, #f59e0b 30%, var(--kmb-surface)) !important; }
+html[data-kmb-palette] :is(.table, .list-group) .badge.text-bg-danger { background-color: color-mix(in srgb, #dc3545 30%, var(--kmb-surface)) !important; }
+html[data-kmb-palette] :is(.table, .list-group) .badge.text-bg-success { background-color: var(--kmb-chip-selected-bg) !important; color: var(--kmb-chip-selected-ink) !important; }
+/* Stat tiles and section cards on the dashboard. */
+html[data-kmb-palette] .card.text-bg-light {
+  background-color: var(--kmb-surface) !important;
+  color: var(--kmb-ink) !important;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+}
+html[data-kmb-palette] .card.text-bg-light .fs-4 { font-family: var(--bs-heading-font-family); }
+html[data-kmb-palette] a.card.text-decoration-none {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  color: var(--kmb-ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+html[data-kmb-palette] a.card.text-decoration-none:hover { border-color: var(--kmb-hover-border); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
+html[data-kmb-palette] a.card.text-decoration-none .card-title,
+html[data-kmb-palette] a.card.text-decoration-none h2,
+html[data-kmb-palette] a.card.text-decoration-none h3 { font-family: var(--bs-heading-font-family); color: var(--kmb-ink); }
+/* List groups (admin settings lists, onboarding steps, notifications...): surface rows, hairlines, hover tint. */
+html[data-kmb-palette] .list-group { --bs-list-group-border-radius: var(--kmb-radius); --bs-list-group-bg: var(--kmb-surface); --bs-list-group-border-color: var(--kmb-border); --bs-list-group-color: var(--kmb-ink); --bs-list-group-action-color: var(--kmb-ink); --bs-list-group-action-hover-bg: var(--kmb-tint-a); --bs-list-group-action-hover-color: var(--kmb-ink); --bs-list-group-action-active-bg: var(--kmb-tint-b); }
+html[data-kmb-palette] .list-group-item { border-color: var(--kmb-border-soft); }
+html[data-kmb-palette] .list-group-item-action:hover,
+html[data-kmb-palette] .list-group-item-action:focus-visible { color: var(--kmb-accent); }

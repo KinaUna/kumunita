@@ -207,3 +207,4 @@ Decision / Consequences. New decisions take the next number.
 | 0196 | Pages — tree sections as surface cards of soft ledger rows, accent chevron, quiet count and Draft chips; page view uses the shared detail card and chip buttons. |
 | 0197 | Profile and Directory — equal-height member cards with Verified chip, member page header + About/Interests/Contact cards, preview and avatar cards on the detail look. |
 | 0198 | Account pages — centred auth card with logo tile and full-width submit for login, signup, verify, password and delete; storage tiles on the detail card look. |
+| 0199 | Admin shared look — tables as surface cards with soft chips, dashboard tiles and section cards, list groups on tokens (CSS only). |
