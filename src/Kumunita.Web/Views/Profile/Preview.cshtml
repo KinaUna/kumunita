@@ -1,5 +1,7 @@
 @using Kumunita.Web.Models
+@using Kumunita.Core.UserInfo
 @using Kumunita.Web.Security
+@inject IUserInfoService UserInfo
 @model ProfilePreviewViewModel
 @{
     ViewData["Title"] = "Preview — how I appear";
@@ -30,12 +32,23 @@
         *@
         @{
             string? avatarSubject = KumunitaPrincipal.SubjectId(User);
+            // ADR 0204 — the author's own initial + hue (the Directory pattern),
+            // so the no-photo fallback is a monogram, not a blank circle. Falls
+            // back to the empty circle when no display name is set.
+            string avatarInitial = string.Empty;
+            if (!string.IsNullOrEmpty(avatarSubject))
+            {
+                var ownProfile = await UserInfo.GetProfileAsync(avatarSubject);
+                avatarInitial = !string.IsNullOrWhiteSpace(ownProfile?.DisplayName)
+                    ? char.ToUpperInvariant(ownProfile.DisplayName.TrimStart()[0]).ToString()
+                    : string.Empty;
+            }
         }
         @if (!string.IsNullOrEmpty(avatarSubject))
         {
             <div class="d-flex align-items-center gap-3">
                 <span class="d-inline-flex align-items-center">
-                    <kw-avatar subject="@avatarSubject" mono="" size="lg" />
+                    <kw-avatar subject="@avatarSubject" mono="@avatarInitial" size="lg" mono-hue="@AvatarHue.For(avatarSubject)" />
                 </span>
                 <span class="text-muted small">
                     <kw-l key="profile.preview_avatar_note">Your avatar, as it appears next to your name in the neighbor directory.</kw-l>

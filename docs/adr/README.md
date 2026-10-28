@@ -212,3 +212,4 @@ Decision / Consequences. New decisions take the next number.
 | 0201 | Verification round 3 — board byline on phones, Ember outline buttons and form controls on the amber accent, and the home milestone id chip and Done pills on the accent tint (Ember only). |
 | 0202 | Documents verification — detail tile top-aligned, friendly file-type name (CSS + Razor). |
 | 0203 | Signed-out auth verification — lighter `.text-danger` in dark (CSS). |
+| 0204 | Profile preview avatar — own initial and hue instead of a blank circle (Razor). |
