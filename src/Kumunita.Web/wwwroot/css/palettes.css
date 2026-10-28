@@ -1267,3 +1267,37 @@ html[data-kmb-palette] .kmb-board-links .kmb-chip {
   border-radius: 1rem;
   text-align: start;
 }
+
+/* Contrast pass (ADR 0208) */
+/* "Tertiary" text was Bootstrap's 50% alpha ink (3.0:1 light); use the palette's muted token instead. */
+html[data-kmb-palette] .text-body-tertiary { color: var(--kmb-muted) !important; }
+/* Row-level red buttons: darker red on light surfaces (>= 6:1), lighter on dark (>= 5.5:1). */
+html[data-kmb-palette] .table :is(.btn-danger, .btn-outline-danger) {
+  --bs-btn-color: #b02a37;
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: #b02a37;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #b02a37;
+  --bs-btn-hover-border-color: #b02a37;
+  --bs-btn-focus-shadow-rgb: 176, 42, 55;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #8f2230;
+  --bs-btn-active-border-color: #8f2230;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme="light"]) .table :is(.btn-danger, .btn-outline-danger) {
+    --bs-btn-color: #f08a94; --bs-btn-border-color: #f08a94;
+    --bs-btn-hover-color: #2a1015; --bs-btn-hover-bg: #f08a94; --bs-btn-hover-border-color: #f08a94;
+    --bs-btn-active-color: #2a1015; --bs-btn-active-bg: #f4a3ab; --bs-btn-active-border-color: #f4a3ab;
+  }
+}
+html[data-kmb-palette][data-kmb-theme="dark"] .table :is(.btn-danger, .btn-outline-danger) {
+  --bs-btn-color: #f08a94; --bs-btn-border-color: #f08a94;
+  --bs-btn-hover-color: #2a1015; --bs-btn-hover-bg: #f08a94; --bs-btn-hover-border-color: #f08a94;
+  --bs-btn-active-color: #2a1015; --bs-btn-active-bg: #f4a3ab; --bs-btn-active-border-color: #f4a3ab;
+}
+/* Ember milestone id chip and Done pill: the amber accent text is 3.9:1 on the light tint; use the soft ink in light. */
+@media not (prefers-color-scheme: dark) {
+  html[data-kmb-palette='ember']:not([data-kmb-theme="dark"]) :is(.kmb-milestone-id, li[data-rm] .badge.text-bg-success) { color: var(--kmb-ink-soft) !important; }
+}
+html[data-kmb-palette='ember'][data-kmb-theme="light"] :is(.kmb-milestone-id, li[data-rm] .badge.text-bg-success) { color: var(--kmb-ink-soft) !important; }
