@@ -995,10 +995,10 @@
             }
             else
             {
-                <div class="kmb-ann-comments mb-3">
+                <div class="kmb-detail-comments mb-3">
                     @foreach (var c in topLevel)
                     {
-                        <div class="kmb-ann-comment">
+                        <div class="kmb-detail-comment">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div class="d-inline-flex align-items-center me-2">
                                     <kw-avatar subject="@c.AuthorId" size="sm" />
@@ -1074,7 +1074,7 @@
             @* The composer (any signed-in resident who can see the to-do may
                comment — C-M3·1). The M3 reply-form shape: rc-editor + language
                picker (ADR 0018 — the authored-in tag). *@
-            <div class="card kmb-detail-card kmb-ann-composer">
+            <div class="card kmb-detail-card kmb-detail-composer">
                 <div class="card-body">
                     <form class="mb-0" method="post" action="@($"/projects/todos/{Model.Todo.Id}/comments")">
                         @Html.AntiForgeryToken()

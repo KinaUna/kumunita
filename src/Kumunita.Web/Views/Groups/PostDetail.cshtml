@@ -71,7 +71,7 @@
             &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.GroupDisplayName
         </a>
 
-        <div class="card kmb-detail-card kmb-ann-detail mt-2 mb-4">
+        <div class="card kmb-detail-card kmb-detail-page mt-2 mb-4">
             <div class="card-body">
                 @* Author-only edit entry point (ADR 0016 — the edit lane is
                    author-only at the Web layer, so a non-author never sees
@@ -332,7 +332,7 @@
                        header, as in the post detail ADR 0185): 44px avatar with
                        per-resident hue, name, date, edited. Outside the
                        data-td-group wrapper, so it stays put on a swap. *@
-                    <div class="airy-post-head kmb-ann-byline">
+                    <div class="airy-post-head kmb-detail-byline">
                         <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial"
                                   mono-hue="@AvatarHue.For(Model.AuthorSubjectId)" />
                         <span class="airy-post-author">
@@ -353,7 +353,7 @@
                            (ADR 0027) are unchanged either way. *@
                         <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
                              @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                            <h1 class="kmb-ann-title">
+                            <h1 class="kmb-detail-title">
                                 @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                     ? Model.Post.Title
                                     : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
@@ -374,7 +374,7 @@
                                  @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                                 @if (!string.IsNullOrWhiteSpace(t.Title))
                                 {
-                                    <h1 class="kmb-ann-title">@t.Title</h1>
+                                    <h1 class="kmb-detail-title">@t.Title</h1>
                                 }
                                 <div class="mb-3 rc-body">
                                     <partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" />
@@ -455,13 +455,13 @@
         }
         else
         {
-            <ul class="kmb-ann-comments list-unstyled p-0 mb-4">
+            <ul class="kmb-detail-comments list-unstyled p-0 mb-4">
                 @foreach (var r in Model.Replies)
                 {
                     string replyAvatarInitial = !string.IsNullOrWhiteSpace(r.AuthorDisplayName)
                         ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
                         : string.Empty;
-                    <li class="kmb-ann-comment">
+                    <li class="kmb-detail-comment">
                         @* TD (ADR 0027) — the reply's authored-in language is the
                            first, default-visible variant; each added translation
                            is a hidden variant; the chip row is a selector that
@@ -692,7 +692,7 @@
             }
         </h2>
 
-        <div class="card kmb-detail-card kmb-ann-composer">
+        <div class="card kmb-detail-card kmb-detail-composer">
             <div class="card-body">
                 <form class="mb-0" method="post"
                       action="@($"/groups/{Model.GroupId}/posts/{postId}/replies")">

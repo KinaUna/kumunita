@@ -119,15 +119,17 @@ public sealed class MediaOptions
 
     /// <summary>
     /// The resolved document allowlist (M21, ADR 0122 D3). A neighborhood set of
-    /// OFFICIAL document types — PDF / Office docs / text / csv / zip (the
-    /// attachment set minus the raster image types — an official document is not
-    /// a photo). Reuses <see cref="MaxBytes"/> (not a second size cap). The
+    /// document types — PDF / Office docs (incl. PowerPoint) / text / csv / zip,
+    /// plus the four raster image types (ADR 0228 amends ADR 0122 D3: the first
+    /// version excluded images and PowerPoint; a plan, a scanned notice or a
+    /// slide deck is a legitimate neighborhood document). Still a download, never
+    /// inline (D6) and SVG stays excluded. Reuses <see cref="MaxBytes"/> (not a second size cap). The
     /// attachment lane's <see cref="ResolvedAttachmentAllowedTypes"/> and the
     /// image lane's <see cref="ResolvedAllowedTypes"/> are both untouched.
     /// </summary>
     public IEnumerable<string> ResolvedDocumentAllowedTypes =>
         (DocumentAllowedContentTypes ??
-         "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/zip,application/x-zip-compressed")
+         "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,application/zip,application/x-zip-compressed,image/jpeg,image/png,image/webp,image/gif")
             .Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
 
     /// <summary>

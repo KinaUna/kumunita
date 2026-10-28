@@ -236,3 +236,4 @@ Decision / Consequences. New decisions take the next number.
 | 0225 | Admin Appearance form: the palette select becomes two radio cards with a light/dark mini preview of Forest and Ember (same `DefaultPalette` field) (Razor, CSS). |
 | 0226 | Feed card footer shows a reply count: batched `PostService.CountRepliesAsync`, `PostListItem.ReplyCount`, shared `_PostCardFoot` partial, `posts.reply_count_*` keys (C#, Razor, CSS, ADR). |
 | 0227 | Feed card footer gets a bookmark toggle: batched `IBookmarkService.ListBookmarkedIdsAsync`, state read in the host views, existing `/bookmarks` form lanes (C#, Razor, CSS, ADR). |
+| 0228 | Housekeeping: palette tokens collapsed with `light-dark()` + `color-scheme`, shared detail classes renamed `kmb-detail-*`, `overflow-anchor: none` on the notice strip, Documents allow-list gains PowerPoint and raster images (CSS, Razor, C#, ADR). |

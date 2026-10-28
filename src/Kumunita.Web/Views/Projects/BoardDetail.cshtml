@@ -192,7 +192,7 @@
                     @* ADR 0200 — author byline (avatar + name + dates) and one chip row for
                        the community, project link and event link; same pattern as the
                        announcement detail (ADR 0184). The links keep their dangling rules. *@
-                    <div class="airy-post-head kmb-ann-byline mt-2">
+                    <div class="airy-post-head kmb-detail-byline mt-2">
                         <kw-avatar subject="@Model.Board.AuthorId"
                                    mono="@(string.IsNullOrWhiteSpace(Model.Board.AuthorDisplayName) ? "" : char.ToUpperInvariant(Model.Board.AuthorDisplayName.TrimStart()[0]).ToString())"
                                    mono-hue="@AvatarHue.For(Model.Board.AuthorId)" />

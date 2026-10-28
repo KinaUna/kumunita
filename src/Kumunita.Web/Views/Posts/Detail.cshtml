@@ -81,7 +81,7 @@
             &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.CommunityDisplayName
         </a>
 
-        <div class="card kmb-detail-card kmb-ann-detail mt-2 mb-4">
+        <div class="card kmb-detail-card kmb-detail-page mt-2 mb-4">
             <div class="card-body">
                 @* Author-only edit + delete entry points (both lanes are
                    author-only at the Web layer — the non-author never sees the
@@ -141,7 +141,7 @@
                                    either way. *@
                                 <div class="td-variant td-variant-shared" data-td-variant="@Model.OriginalLanguageCode"
                                      @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                                    <h1 class="mb-0 kmb-ann-title">
+                                    <h1 class="mb-0 kmb-detail-title">
                                         @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                             ? Model.Post.Title
                                             : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
@@ -160,7 +160,7 @@
                                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                         <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
                                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                            <h1 class="mb-0 kmb-ann-title">@t.Title</h1>
+                                            <h1 class="mb-0 kmb-detail-title">@t.Title</h1>
                                         </div>
                                     }
                                 }
@@ -263,7 +263,7 @@
                            /profile/avatar/{subjectId}), monogram sibling on its
                            fail-closed 404. Not a .td-variant, so it stays put on a
                            translation swap. *@
-                        <div class="airy-post-head kmb-ann-byline">
+                        <div class="airy-post-head kmb-detail-byline">
                             <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial"
                                       mono-hue="@AvatarHue.For(Model.AuthorSubjectId)" />
                             <span class="airy-post-author">
@@ -560,7 +560,7 @@
         }
         else
         {
-            <ul class="kmb-ann-comments list-unstyled p-0 mb-4">
+            <ul class="kmb-detail-comments list-unstyled p-0 mb-4">
                 @foreach (var r in Model.Replies)
                 {
                     <partial name="_PostReply" model="new PostReplyModel(r, postId, Model.Languages, defaultVariant, confirmRemoveTrans, confirmDeleteReply, ariaActionsFor, reportReasonPlaceholder)" />
@@ -580,7 +580,7 @@
             }
         </h2>
 
-        <div class="card kmb-detail-card kmb-ann-composer">
+        <div class="card kmb-detail-card kmb-detail-composer">
             <div class="card-body">
                 <form class="mb-0" method="post"
                       action="@($"/posts/{postId}/replies")">

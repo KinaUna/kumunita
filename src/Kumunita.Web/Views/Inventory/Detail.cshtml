@@ -126,11 +126,11 @@
             }
             else
             {
-                <ul class="kmb-ann-comments list-unstyled p-0">
+                <ul class="kmb-detail-comments list-unstyled p-0">
                     @foreach (var row in Model.History)
                     {
                         var checkout = row.Checkout;
-                        <li class="kmb-ann-comment">
+                        <li class="kmb-detail-comment">
                             <span class="fw-semibold">@row.BorrowerName</span>
                             <span class="text-muted small ms-2">
                                 · <kw-l key="inv.detail.checkOut">Check out</kw-l> <kw-dt dt="@checkout.CheckedOutAt" format="g"></kw-dt>

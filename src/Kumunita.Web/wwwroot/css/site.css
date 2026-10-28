@@ -4291,6 +4291,10 @@ body.kmb-page-expanded #events-calendar:fullscreen .page-expand-close {
 .kmb-notices {
   position: relative;
   border-bottom: 1px solid var(--bs-border-color);
+  /* ADR 0228: when a notice hides (dismiss / "+N" rotation) the strip changes
+     height; without this the browser's scroll anchoring could leave the page
+     scrolled by that height after load. */
+  overflow-anchor: none;
 }
 .kmb-notices .kmb-notice {
   margin: 0;
