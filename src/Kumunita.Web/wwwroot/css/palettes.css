@@ -1185,3 +1185,38 @@ html[data-kmb-palette] form > .card .form-switch + hr:has(+ .audience-restricted
 html[data-kmb-palette] form > .d-flex.gap-2:has(> .btn-primary) { align-items: center; gap: 1rem !important; }
 html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link { color: var(--kmb-ink-soft); text-decoration: none; }
 html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link:hover { color: var(--kmb-accent); text-decoration: underline; }
+
+/* Verification round 3 fixes (ADR 0201) */
+/* Board header byline: keep the avatar beside the name on phones. */
+html[data-kmb-palette] .kmb-board-head .kmb-ann-byline { flex-wrap: nowrap; }
+html[data-kmb-palette] .kmb-board-head .kmb-ann-byline .airy-post-author { min-width: 0; }
+/* Ember: outline-primary buttons follow the amber accent, not Bootstrap's green primary. */
+html[data-kmb-palette='ember'] .btn-outline-primary {
+  --bs-btn-color: var(--kmb-accent);
+  --bs-btn-border-color: color-mix(in srgb, var(--kmb-accent) 60%, transparent);
+  --bs-btn-hover-color: var(--kmb-action-ink);
+  --bs-btn-hover-bg: var(--kmb-action-bg);
+  --bs-btn-hover-border-color: var(--kmb-action-bg);
+  --bs-btn-active-color: var(--kmb-action-ink);
+  --bs-btn-active-bg: var(--kmb-action-bg-hover);
+  --bs-btn-active-border-color: var(--kmb-action-bg-hover);
+  --bs-btn-focus-shadow-rgb: 240, 180, 92;
+}
+/* Ember: checkboxes, radios and switches on warm tokens; checked = accent fill with a dark mark. */
+html[data-kmb-palette='ember'] .form-check-input:not(:checked) {
+  background-color: var(--kmb-surface-2);
+  border-color: var(--kmb-control-border);
+}
+html[data-kmb-palette='ember'] .form-check-input:checked {
+  background-color: var(--kmb-action-bg);
+  border-color: var(--kmb-action-bg);
+}
+html[data-kmb-palette='ember'] .form-check-input:checked[type='checkbox'] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%231a1613' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+}
+html[data-kmb-palette='ember'] .form-check-input:checked[type='radio'] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%231a1613'/%3e%3c/svg%3e");
+}
+html[data-kmb-palette='ember'] .form-switch .form-check-input:checked {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%231a1613'/%3e%3c/svg%3e");
+}
