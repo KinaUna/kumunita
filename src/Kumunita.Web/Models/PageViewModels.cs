@@ -213,7 +213,76 @@ public sealed record PageShowViewModel(
     /// row and the effective state re-resolves (opt-IN default: disabled
     /// until an explicit row says otherwise).
     /// </summary>
-    bool Subscribed);
+    bool Subscribed,
+    /// <summary>
+    /// The page's **ancestor chain**, root-first (the "where am I in the
+    /// tree" navigation aid). A root page's chain is empty (there is no
+    /// parent to navigate to); a nested page's chain is its parent, its
+    /// grandparent, and so on up to the root — each a link. This is the
+    /// **parent** half of the hierarchy navigation: combined with
+    /// <see cref="SubPages"/> (the **child** half), a resident on any page
+    /// can jump to its parent, its siblings (the parent's other children,
+    /// surfaced as the parent's <c>SubPages</c> when the resident visits the
+    /// parent), and its children without returning to the <c>/pages</c>
+    /// tree browse. <b>Display-only</b>: the hrefs derive from the real
+    /// ancestor chain (<see cref="Security.PagePaths"/>), storage is
+    /// untouched, and the chain carries no access decision of its own — the
+    /// caller already passed the page's own <c>Read</c> decision, and each
+    /// ancestor link resolves through the page's own
+    /// <see cref="Kumunita.Core.Authorization.IAuthorizationService"/>
+    /// decision when visited.
+    /// </summary>
+    IReadOnlyList<PageBreadcrumbItem> Breadcrumb,
+    /// <summary>
+    /// The page's **direct sub-pages** (its children, one level down) — the
+    /// "what is under this page" list. A leaf page's list is empty (it has
+    /// no sub-pages; the view then omits the section). <b>Read-filtered
+    /// like the tree browse</b>: a child the caller may not read is absent
+    /// (not blanked) — the same C6 <c>CanSeeAsync</c>(Read) aggregate
+    /// <see cref="PageController.Index"/> runs — and a draft child is
+    /// absent unless the caller authored it (the author-only draft gate).
+    /// Display-only: each href derives from the real ancestor chain, and
+    /// the filter is a read projection, not a write decision.
+    /// </summary>
+    IReadOnlyList<PageSubPageItem> SubPages);
+
+/// <summary>
+/// One entry in the <see cref="PageShowViewModel.Breadcrumb"/> chain — a
+/// **visible ancestor** of the current page (root-first). The chain
+/// excludes the current page itself (the view renders the current page's
+/// title as the breadcrumb's active item, <c>aria-current="page"</c>);
+/// each entry is a link to its ancestor. A root page's chain is empty
+/// (no ancestors to link to). The href is the ancestor's derived path
+/// (<see cref="Security.PagePaths"/>); the title is the ancestor's
+/// authored-in title (the ADR 0022 floor — the per-page translation
+/// chip-swap is a separate concern and not applied to the breadcrumb).
+/// </summary>
+public sealed record PageBreadcrumbItem(
+    string Title,
+    /// <summary>The ancestor's derived <c>/pages/…</c> href.</summary>
+    string Href);
+
+/// <summary>
+/// One entry in the <see cref="PageShowViewModel.SubPages"/> list — a
+/// **direct child** of the current page (one level down). Read-filtered
+/// by the caller's <c>Read</c> decision (absent if denied, not blanked);
+/// a draft child is absent unless the caller authored it. The href is the
+/// child's derived <c>/pages/…</c> href; the title is the child's
+/// authored-in title; <see cref="IsDraft"/> is <c>true</c> only when the
+/// caller authored the child (the author-only draft gate), so the view can
+/// badge it.
+/// </summary>
+public sealed record PageSubPageItem(
+    string Title,
+    /// <summary>The child's derived <c>/pages/…</c> href.</summary>
+    string Href,
+    /// <summary>
+    /// <c>true</c> when the child is a draft the caller authored (the view
+    /// renders the draft badge, same as the tree browse); <c>false</c>
+    /// otherwise (a non-author never sees a draft child at all — it is
+    /// filtered out before reaching the view model).
+    /// </summary>
+    bool IsDraft);
 
 /// <summary>
 /// The model the <c>Views/Shared/_PageTranslationModals</c> partial renders

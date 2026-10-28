@@ -1390,6 +1390,9 @@ public static class KnownTranslationKeys
             ["pages.section_platform_lede"] =
                 "Published by the platform — terms, help, privacy, and the " +
                 "code of conduct.",
+            // The page detail's "sub-pages" section heading (the hierarchy
+            // navigation aid: a page's direct children, one level down).
+            ["pages.children"]        = "Sub-pages",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             // The /blog/{userId} feed — a resident's own User-kind pages,
@@ -4286,6 +4289,9 @@ public static class KnownTranslationKeys
             ["pages.section_platform_lede"] =
                 "Von der Plattform veröffentlicht — Nutzungsbedingungen, Hilfe, " +
                 "Datenschutz und Verhaltenskodex.",
+            // Die „Unterseiten"-Sektion der Seitendetailansicht (die
+            // Hierarchie-Navigation: die direkten Kindseiten, eine Ebene tiefer).
+            ["pages.children"]        = "Unterseiten",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Neue Blogseite",
@@ -6997,6 +7003,9 @@ public static class KnownTranslationKeys
             ["pages.section_platform_lede"] =
                 "Publi\u00e9es par la plateforme — conditions, aide, confidentialit\u00e9 " +
                 "et r\u00e8gles de conduite.",
+            // La section « sous-pages » de la page de d\u00e9tail (l'aide \u00e0 la
+            // navigation hi\u00e9rarchique : les pages directes, un niveau plus bas).
+            ["pages.children"]        = "Sous-pages",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Nouvelle page de blog",
@@ -9704,6 +9713,9 @@ public static class KnownTranslationKeys
             ["pages.section_platform_lede"] =
                 "Udgivet af platformen — vilk\u00e5r, hj\u00e6lp, privatliv og " +
                 "adf\u00e6rskode.",
+            // Sektionens overskrift "Undersider" p\u00e5 sidesdetaljen (hj\u00e6lp til
+            // hierarkinavigation: de direkte undersider, \u00e9t niveau nede).
+            ["pages.children"]        = "Undersider",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Ny blogside",

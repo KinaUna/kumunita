@@ -266,6 +266,68 @@ public sealed class PageController(
         var byId = tree.ToDictionary(p => p.Id, StringComparer.Ordinal);
         var isAuthor = string.Equals(page.AuthorId, actorId ?? string.Empty, StringComparison.Ordinal);
 
+        // ── Hierarchy navigation: breadcrumb (ancestors, root-first) +
+        //    sub-pages (direct children, one level down) ─────────────
+        // Both are read projections over the same tree already loaded
+        // (GetTreeAsync) — no extra store read. The sub-pages list is
+        // filtered with the same C6 CanSeeAsync(Read) aggregate the
+        // /pages Index uses (one bulk decision, not one per child) and
+        // the author-only draft gate (a non-author never sees a draft
+        // child). A child that is denied or is a draft the caller did
+        // not author is ABSENT (not blanked) — the C6 idiom.
+        //
+        // Breadcrumb: walk page → parent → grandparent → … (root-first),
+        // excluding the current page itself (the view renders it as the
+        // active item). Each ancestor's href is its derived path
+        // (PagePaths). The chain is display-only; visiting an ancestor
+        // resolves through the page's own Read decision (the same split
+        // the current page passed).
+        var breadcrumb = new List<PageBreadcrumbItem>();
+        {
+            Page? ancestor = page.ParentId is { } pid && byId.TryGetValue(pid, out var ap) ? ap : null;
+            int guard = 0;
+            while (ancestor is not null && ++guard <= 64)
+            {
+                breadcrumb.Insert(0, new PageBreadcrumbItem(ancestor.Title, PagePaths.Href(byId, ancestor)));
+                ancestor = ancestor.ParentId is { } apid && byId.TryGetValue(apid, out var aap) ? aap : null;
+            }
+        }
+
+        var subPages = new List<PageSubPageItem>();
+        {
+            // Direct children of the current page in the live tree.
+            var candidates = tree
+                .Where(c => string.Equals(c.ParentId, page.Id, StringComparison.Ordinal))
+                .ToList();
+
+            // (1) author-only draft gate: a non-author never sees a draft child.
+            var visible = candidates
+                .Where(c => !(c.IsDraft && !string.Equals(c.AuthorId, actorId ?? string.Empty, StringComparison.Ordinal)))
+                .ToList();
+
+            // (2) the C6 CanSeeAsync(Read) aggregate (one bulk decision over
+            //     the whole candidate set — same idiom as Index, which runs
+            //     the aggregate even for anonymous viewers so a non-public
+            //     child is absent to them, not a free pass).
+            if (visible.Count > 0)
+            {
+                var visibleIds = (await authz.CanSeeAsync(
+                        actorId ?? string.Empty, Authorization.AccessAction.Read,
+                        visible.Select(c => new PageToAuditableResource(c)))
+                    .ConfigureAwait(false)).Visible
+                    .Select(v => v.Id)
+                    .ToHashSet(StringComparer.Ordinal);
+                visible = visible.Where(c => visibleIds.Contains(c.Id)).ToList();
+            }
+
+            foreach (var c in visible
+                         .OrderBy(c => c.Created)
+                         .ThenBy(c => c.Slug, StringComparer.Ordinal))
+            {
+                subPages.Add(new PageSubPageItem(c.Title, PagePaths.Href(byId, c), c.IsDraft));
+            }
+        }
+
         // The ADR 0027 chip-swap language set: the enabled catalog, marking
         // which have a stored PageTranslation row (the original is always
         // available — it IS the page's own language).
@@ -340,7 +402,9 @@ public sealed class PageController(
             communityName,
             canTranslate,
             defaultVariant,
-            subscribed
+            subscribed,
+            breadcrumb,
+            subPages
         ));
     }
 

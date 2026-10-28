@@ -18,13 +18,29 @@
     // attribute, and can't substitute). The en floor is the server fallback
     // (a null provider — a non-HTTP render — degrades to en).
     string ariaActionsFor = "Actions for {0}";
+    string ariaBreadcrumb = "Breadcrumb";
     if (Translation is not null)
     {
         var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
         confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", effLang);
         confirmDeletePage  = await Translation.GetAsync("pages.delete_confirm", effLang);
         ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", effLang);
+        ariaBreadcrumb     = await Translation.GetAsync("a11y.breadcrumb", effLang);
     }
+
+    // Hierarchy navigation (the parent / sibling / child aids):
+    //   · Breadcrumb — the ancestor chain, root-first. Each entry is a
+    //     link; the current page is the active (non-link) item. Rendered
+    //     only when the page has at least one ancestor (a root page has no
+    //     breadcrumb — the "← Back to the pages" link above is its home).
+    //   · SubPages — the page's direct children (one level down). Rendered
+    //     only when the list is non-empty (a leaf page has none, so the
+    //     section is omitted — no empty card).
+    // Both are read projections (the controller already ran the C6
+    // CanSeeAsync(Read) aggregate + the author-only draft gate over the
+    // sub-pages; the breadcrumb is the page's own ancestor chain, which
+    // the caller can already read — visiting an ancestor is the page's
+    // own Read decision, the same split the current page passed).
 
     // ADR 0027 chip-swap (TD): the authored-in language is the first
     // default-visible variant; each added translation is a hidden variant;
@@ -74,11 +90,38 @@
             @{ var _pn = ("page", Model.Id, Model.Path); }
             <partial name="_NoteButton" model="@_pn" />
         </div>
-        <p>
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
             <a href="/pages" class="btn btn-link p-0">
                 <kw-l key="pages.back">← Back to the pages</kw-l>
             </a>
-        </p>
+            @* Hierarchy navigation — the breadcrumb (parent half). Rendered
+               only when the page has at least one visible ancestor (a root
+               page has no breadcrumb; the "← Back to the pages" link above
+               is its home). The current page is the active (non-link) item;
+               each ancestor is a link. The chain is display-only: the
+               controller already passed the current page's Read decision,
+               and visiting an ancestor resolves through its own Read
+               decision (the same page-specific 404/403 split the current
+               page passed). Siblings are surfaced when the resident visits
+               the parent (the parent's SubPages list). *@
+            @if (Model.Breadcrumb.Count > 0)
+            {
+                <span class="text-muted" aria-hidden="true">·</span>
+                <nav aria-label="@ariaBreadcrumb" class="min-w-0">
+                    <ol class="breadcrumb small mb-0">
+                        @foreach (var crumb in Model.Breadcrumb)
+                        {
+                            <li class="breadcrumb-item"><a href="@crumb.Href">@crumb.Title</a></li>
+                        }
+                        <li class="breadcrumb-item active" aria-current="page">
+                            @(string.IsNullOrWhiteSpace(Model.Title)
+                                ? "Untitled page"
+                                : Model.Title)
+                        </li>
+                    </ol>
+                </nav>
+            }
+        </div>
 
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
             @* ADR 0037 — draft surface: visible to the author only. *@
@@ -346,6 +389,44 @@
                 </div>
             </div>
         </div>
+
+        @* Hierarchy navigation — the sub-pages (child half). Rendered only
+           when the page has at least one visible direct child (a leaf page
+           has none, so the section is omitted — no empty card). Each child
+           is a link to its own page; the draft badge is shown only for a
+           child the viewer authored (a non-author never sees a draft child
+           at all — it is filtered out by the controller's C6
+           CanSeeAsync(Read) aggregate + author-only draft gate). The list
+           is display-only: the controller already ran the read filter, and
+           visiting a child resolves through its own Read decision (the
+           same page-specific 404/403 split). The list is the direct-
+           children level only (one level down); deeper descendants are
+           reached by clicking into the child. *@
+        @if (Model.SubPages.Count > 0)
+        {
+            <section class="mt-4" aria-label="Sub-pages">
+                <h2 class="h5 mb-2 mt-1 kmb-section-title">
+                    <kw-l key="pages.children">Sub-pages</kw-l>
+                    <span class="text-muted fw-normal small ms-2" aria-hidden="true">
+                        · @Model.SubPages.Count
+                    </span>
+                </h2>
+                <ul class="airy-page-list list-unstyled mb-0">
+                    @foreach (var child in Model.SubPages)
+                    {
+                        <li style="--kmb-page-depth: 1">
+                            <a href="@child.Href">@child.Title</a>
+                            @if (child.IsDraft)
+                            {
+                                <span class="kmb-chip kmb-chip-draft ms-2" title="Only you can see this — it is not yet published">
+                                    <kw-l key="posts.draft_badge">Draft</kw-l>
+                                </span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
     </div>
 </div>
 
