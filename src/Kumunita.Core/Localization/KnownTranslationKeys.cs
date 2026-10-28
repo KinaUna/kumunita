@@ -1393,6 +1393,11 @@ public static class KnownTranslationKeys
             // The page detail's "sub-pages" section heading (the hierarchy
             // navigation aid: a page's direct children, one level down).
             ["pages.children"]        = "Sub-pages",
+            // The page detail's prev/next sibling navigation (the page's
+            // neighbours in the parent's child list; null on either side
+            // for the first / last visible child or a root page).
+            ["pages.prev"]            = "← Previous",
+            ["pages.next"]            = "Next →",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             // The /blog/{userId} feed — a resident's own User-kind pages,
@@ -4292,6 +4297,10 @@ public static class KnownTranslationKeys
             // Die „Unterseiten"-Sektion der Seitendetailansicht (die
             // Hierarchie-Navigation: die direkten Kindseiten, eine Ebene tiefer).
             ["pages.children"]        = "Unterseiten",
+            // Die Vorher/Weiter-Navigation der Seitendetailansicht (die
+            // Nachbarseiten in der Kindseitenliste der übergeordneten Seite).
+            ["pages.prev"]            = "← Vorherige",
+            ["pages.next"]            = "Nächste →",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Neue Blogseite",
@@ -7006,6 +7015,10 @@ public static class KnownTranslationKeys
             // La section « sous-pages » de la page de d\u00e9tail (l'aide \u00e0 la
             // navigation hi\u00e9rarchique : les pages directes, un niveau plus bas).
             ["pages.children"]        = "Sous-pages",
+            // La navigation pr\u00e9c\u00e9dente/suivante de la page de d\u00e9tail
+            // (les voisines dans la liste d'enfants de la page parente).
+            ["pages.prev"]            = "← Pr\u00e9c\u00e9dente",
+            ["pages.next"]            = "Suivante →",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Nouvelle page de blog",
@@ -9716,6 +9729,10 @@ public static class KnownTranslationKeys
             // Sektionens overskrift "Undersider" p\u00e5 sidesdetaljen (hj\u00e6lp til
             // hierarkinavigation: de direkte undersider, \u00e9t niveau nede).
             ["pages.children"]        = "Undersider",
+            // Forrige/n\u00e6ste-navigation p\u00e5 sidesdetaljen (nabosiderne i
+            // moderens undersideliste).
+            ["pages.prev"]            = "← Forrige",
+            ["pages.next"]            = "N\u00e6ste →",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Ny blogside",

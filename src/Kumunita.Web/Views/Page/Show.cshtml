@@ -427,6 +427,44 @@
                 </ul>
             </section>
         }
+
+        @* Sibling navigation (the prev/next half of the hierarchy aids).
+           Rendered only when the page sits inside a parent's child list and
+           has a visible neighbour on that side (a root page, or the
+           first / last VISIBLE child, has null on that side — a child the
+           viewer may not read is absent from the navigation, not a broken
+           link, so the link jumps to the nearest visible neighbour). Both
+           hrefs derive from the real ancestor chain (the controller ran
+           the same draft gate + C6 CanSeeAsync(Read) aggregate the
+           SubPages list uses); visiting a sibling resolves through its
+           own Read decision (the same 404/403 split this page passed). *@
+        @if (Model.PrevSibling is not null || Model.NextSibling is not null)
+        {
+            <nav class="mt-4 d-flex justify-content-between align-items-center gap-2" aria-label="Previous and next page in this section">
+                @if (Model.PrevSibling is { } prev)
+                {
+                    <a class="text-decoration-none" href="@prev.Href">
+                        <kw-l key="pages.prev">← Previous</kw-l>
+                        <span class="d-block small text-truncate">
+                            @(string.IsNullOrWhiteSpace(prev.Title) ? "Untitled page" : prev.Title)
+                        </span>
+                    </a>
+                }
+                else
+                {
+                    <span aria-hidden="true"></span>
+                }
+                @if (Model.NextSibling is { } next)
+                {
+                    <a class="text-decoration-none text-end" href="@next.Href">
+                        <kw-l key="pages.next">Next →</kw-l>
+                        <span class="d-block small text-truncate">
+                            @(string.IsNullOrWhiteSpace(next.Title) ? "Untitled page" : next.Title)
+                        </span>
+                    </a>
+                }
+            </nav>
+        }
     </div>
 </div>
 

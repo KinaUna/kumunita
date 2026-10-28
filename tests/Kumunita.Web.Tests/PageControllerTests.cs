@@ -1477,6 +1477,311 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.DoesNotContain(model.SubPages, sp => sp.Title == "Non-Public Child");
     }
 
+    // ── Sibling navigation: prev/next within the parent's child list ──────
+
+    /// <summary>
+    /// A page that is the **middle** sibling of its parent (three children,
+    /// the current one second by Created order) has
+    /// <see cref="PageShowViewModel.PrevSibling"/> = the first child and
+    /// <see cref="PageShowViewModel.NextSibling"/> = the third — each the
+    /// nearest visible neighbour, with the title + derived
+    /// <c>/pages/…</c> href of that sibling. The order is the same
+    /// stable Created-then-Slug order the <see cref="PageShowViewModel
+    /// .SubPages"/> list uses.
+    /// </summary>
+    [Fact]
+    public async Task Show_MiddleSibling_PrevAndNext_AreTheVisibleNeighbours()
+    {
+        const string path = "parent/current";
+        var parent = new Page
+        {
+            Id = "pg-p", Slug = "parent", Title = "Parent", Body = "p",
+            ParentId = null, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var first = new Page
+        {
+            Id = "pg-1", Slug = "first", Title = "First", Body = "1",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var current = new Page
+        {
+            Id = "pg-2", Slug = "current", Title = "Current", Body = "2",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var last = new Page
+        {
+            Id = "pg-3", Slug = "last", Title = "Last", Body = "3",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync(path).Returns(current);
+        pages.GetTranslationsAsync(current.Id).Returns(new List<PageTranslation>());
+        pages.GetTreeAsync().Returns(new List<Page> { parent, first, current, last });
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj"));
+        // The C6 CanSeeAsync aggregate over the siblings: all three visible.
+        authz.CanSeeAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IEnumerable<IAuditableResource>>())
+            .Returns(new VisibleSet(
+                new List<(string, AccessVia)>
+                {
+                    ("pg-1", AccessVia.Audience),
+                    ("pg-2", AccessVia.Audience),
+                    ("pg-3", AccessVia.Audience),
+                },
+                HiddenCount: 0));
+
+        var controller = Build(pages, authz, IsAuthenticated: true,
+            subjectId: "subj", roles: new[] { Roles.Member });
+
+        var view = (await controller.Show(path)) as ViewResult;
+        Assert.NotNull(view);
+        var model = view!.ViewData.Model as PageShowViewModel;
+        Assert.NotNull(model);
+        Assert.NotNull(model!.PrevSibling);
+        Assert.Equal("First", model.PrevSibling.Title);
+        Assert.Equal("/pages/parent/first", model.PrevSibling.Href);
+        Assert.NotNull(model.NextSibling);
+        Assert.Equal("Last", model.NextSibling.Title);
+        Assert.Equal("/pages/parent/last", model.NextSibling.Href);
+    }
+
+    /// <summary>
+    /// The **first / last** visible siblings have one side <c>null</c>:
+    /// the first has <see cref="PageShowViewModel.PrevSibling"/> = <c>null</c>
+    /// (nothing before it) and a next; the last has the mirror shape. A
+    /// **root** page (no parent, hence no sibling list) has **both**
+    /// <c>null</c>.
+    /// </summary>
+    [Fact]
+    public async Task Show_FirstAndLastSibling_OneSideNull_RootBothNull()
+    {
+        var parent = new Page
+        {
+            Id = "pg-p", Slug = "parent", Title = "Parent", Body = "p",
+            ParentId = null, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var first = new Page
+        {
+            Id = "pg-1", Slug = "first", Title = "First", Body = "1",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var last = new Page
+        {
+            Id = "pg-2", Slug = "last", Title = "Last", Body = "2",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var root = new Page
+        {
+            Id = "pg-root", Slug = "standalone", Title = "Standalone", Body = "r",
+            ParentId = null, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("parent/first").Returns(first);
+        pages.GetByPathAsync("parent/last").Returns(last);
+        pages.GetByPathAsync("standalone").Returns(root);
+        pages.GetTranslationsAsync(Arg.Any<string>()).Returns(new List<PageTranslation>());
+        pages.GetTreeAsync().Returns(new List<Page> { parent, first, last, root });
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj"));
+        authz.CanSeeAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IEnumerable<IAuditableResource>>())
+            .Returns(new VisibleSet(
+                new List<(string, AccessVia)>
+                {
+                    ("pg-1", AccessVia.Audience),
+                    ("pg-2", AccessVia.Audience),
+                },
+                HiddenCount: 0));
+
+        var controller = Build(pages, authz, IsAuthenticated: true,
+            subjectId: "subj", roles: new[] { Roles.Member });
+
+        // The first sibling: no prev, a next.
+        var viewFirst = (await controller.Show("parent/first")) as ViewResult;
+        var mFirst = viewFirst!.ViewData.Model as PageShowViewModel;
+        Assert.NotNull(mFirst);
+        Assert.Null(mFirst!.PrevSibling);
+        Assert.NotNull(mFirst.NextSibling);
+        Assert.Equal("Last", mFirst.NextSibling.Title);
+
+        // The last sibling: a prev, no next.
+        var viewLast = (await controller.Show("parent/last")) as ViewResult;
+        var mLast = viewLast!.ViewData.Model as PageShowViewModel;
+        Assert.NotNull(mLast);
+        Assert.NotNull(mLast!.PrevSibling);
+        Assert.Equal("First", mLast.PrevSibling.Title);
+        Assert.Null(mLast.NextSibling);
+
+        // The root: no sibling list at all — both null.
+        var viewRoot = (await controller.Show("standalone")) as ViewResult;
+        var mRoot = viewRoot!.ViewData.Model as PageShowViewModel;
+        Assert.NotNull(mRoot);
+        Assert.Null(mRoot!.PrevSibling);
+        Assert.Null(mRoot.NextSibling);
+    }
+
+    /// <summary>
+    /// A sibling the caller may **not read** (the C6 <c>CanSeeAsync</c>
+    /// aggregate excludes it) is **skipped** by the prev/next navigation —
+    /// the link jumps to the nearest *visible* neighbour (the C6 idiom:
+    /// absent, not blanked; the same filter the
+    /// <see cref="PageShowViewModel.SubPages"/> list applies). Here the
+    /// current page's immediate predecessor is denied, so
+    /// <see cref="PageShowViewModel.PrevSibling"/> is the earlier sibling
+    /// before the denied one — not a link to a page that would 403.
+    /// </summary>
+    [Fact]
+    public async Task Show_DeniedSibling_IsSkipped_PrevJumpsToNearestVisible()
+    {
+        var parent = new Page
+        {
+            Id = "pg-p", Slug = "parent", Title = "Parent", Body = "p",
+            ParentId = null, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var earlier = new Page
+        {
+            Id = "pg-a", Slug = "earlier", Title = "Earlier", Body = "a",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var denied = new Page
+        {
+            Id = "pg-b", Slug = "denied", Title = "Denied", Body = "b",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var current = new Page
+        {
+            Id = "pg-c", Slug = "current", Title = "Current", Body = "c",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("parent/current").Returns(current);
+        pages.GetTranslationsAsync(current.Id).Returns(new List<PageTranslation>());
+        pages.GetTreeAsync().Returns(new List<Page> { parent, earlier, denied, current });
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj"));
+        // The sibling candidate set: 'denied' is hidden; 'earlier' +
+        // 'current' visible. (The SubPages list sees the same split.)
+        authz.CanSeeAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IEnumerable<IAuditableResource>>())
+            .Returns(new VisibleSet(
+                new List<(string, AccessVia)>
+                {
+                    ("pg-a", AccessVia.Audience),
+                    ("pg-c", AccessVia.Audience),
+                },
+                HiddenCount: 1));
+
+        var controller = Build(pages, authz, IsAuthenticated: true,
+            subjectId: "subj", roles: new[] { Roles.Member });
+
+        var view = (await controller.Show("parent/current")) as ViewResult;
+        Assert.NotNull(view);
+        var model = view!.ViewData.Model as PageShowViewModel;
+        Assert.NotNull(model);
+        // The prev jumps OVER the denied sibling to 'earlier' (the nearest
+        // visible predecessor) — it is never a link to 'denied'.
+        Assert.NotNull(model!.PrevSibling);
+        Assert.Equal("Earlier", model.PrevSibling.Title);
+        Assert.Equal("/pages/parent/earlier", model.PrevSibling.Href);
+        Assert.Null(model.NextSibling);
+    }
+
+    /// <summary>
+    /// A **draft** sibling the caller did **not** author is **skipped** by
+    /// the prev/next navigation (the author-only draft gate — the same pin
+    /// that keeps it out of <see cref="PageShowViewModel.SubPages"/>): a
+    /// non-author's navigation never points at a draft it could not open.
+    /// </summary>
+    [Fact]
+    public async Task Show_ForeignDraftSibling_IsSkipped_NonAuthorNavigation()
+    {
+        var parent = new Page
+        {
+            Id = "pg-p", Slug = "parent", Title = "Parent", Body = "p",
+            ParentId = null, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var live = new Page
+        {
+            Id = "pg-a", Slug = "live", Title = "Live", Body = "a",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var foreignDraft = new Page
+        {
+            Id = "pg-b", Slug = "foreign-draft", Title = "Foreign Draft", Body = "b",
+            ParentId = parent.Id, AuthorId = "the-draft-author", Audience = null,
+            ComponentId = null, IsDraft = true, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var current = new Page
+        {
+            Id = "pg-c", Slug = "current", Title = "Current", Body = "c",
+            ParentId = parent.Id, AuthorId = "someone", Audience = null,
+            ComponentId = null, IsDraft = false, IsDeleted = false,
+            Created = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero),
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("parent/current").Returns(current);
+        pages.GetTranslationsAsync(current.Id).Returns(new List<PageTranslation>());
+        pages.GetTreeAsync().Returns(new List<Page> { parent, live, foreignDraft, current });
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj"));
+        // The draft gate removes 'foreign-draft' BEFORE CanSeeAsync runs;
+        // the aggregate then sees live + current only.
+        authz.CanSeeAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IEnumerable<IAuditableResource>>())
+            .Returns(new VisibleSet(
+                new List<(string, AccessVia)>
+                {
+                    ("pg-a", AccessVia.Audience),
+                    ("pg-c", AccessVia.Audience),
+                },
+                HiddenCount: 0));
+
+        var controller = Build(pages, authz, IsAuthenticated: true,
+            subjectId: "subj", roles: new[] { Roles.Member });
+
+        var view = (await controller.Show("parent/current")) as ViewResult;
+        Assert.NotNull(view);
+        var model = view!.ViewData.Model as PageShowViewModel;
+        Assert.NotNull(model);
+        // The prev jumps OVER the foreign draft to 'live'.
+        Assert.NotNull(model!.PrevSibling);
+        Assert.Equal("Live", model.PrevSibling.Title);
+        Assert.Null(model.NextSibling);
+        // And the foreign draft is absent from the SubPages list too (the
+        // same gate, the same view).
+        Assert.DoesNotContain(model.SubPages, sp => sp.Title == "Foreign Draft");
+    }
+
     // ── PG6 harness helper ─────────────────────────────────────────────────
 
     /// <summary>

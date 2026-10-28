@@ -328,6 +328,66 @@ public sealed class PageController(
             }
         }
 
+        // ── Sibling navigation: prev/next within the parent's child list ──
+        // The page's siblings are the parent's children (the same sibling
+        // list the parent's Show surfaces as its SubPages), in the same
+        // stable order (Created, then Slug). The prev/next links jump to
+        // the nearest visible predecessor / successor: the candidate set is
+        // read-filtered exactly like SubPages above (author-only draft gate
+        // first, then ONE C6 CanSeeAsync(Read) aggregate over the whole set
+        // — the denied / foreign-draft sibling is ABSENT from the
+        // navigation, not blanked), so for a viewer the ordering is "what
+        // they can see" and the prev/next pair skips over what they
+        // cannot. A root page has no parent, hence no sibling list — both
+        // are null. Display-only: the hrefs derive from the real ancestor
+        // chain; visiting a sibling resolves through its own Read decision
+        // (the same 404/403 split the current page passed).
+        PageBreadcrumbItem? prevSibling = null, nextSibling = null;
+        // The parent must itself be in the live tree to enumerate its
+        // children (a page whose parent was soft-deleted / is not in the
+        // tree has no knowable sibling list — both links stay null).
+        if (page.ParentId is { } parentId && byId.TryGetValue(parentId, out _))
+        {
+            var siblings = tree
+                .Where(s => string.Equals(s.ParentId, parentId, StringComparison.Ordinal))
+                // (1) the author-only draft gate (a non-author never sees a
+                //     draft sibling — the same pin as SubPages above).
+                .Where(s => !(s.IsDraft && !string.Equals(s.AuthorId, actorId ?? string.Empty, StringComparison.Ordinal)))
+                .ToList();
+
+            // (2) the C6 CanSeeAsync(Read) aggregate (one bulk decision over
+            //     the whole candidate set — same idiom as Index / SubPages;
+            //     runs even for anonymous viewers so a non-public sibling
+            //     is absent to them, not a free pass).
+            if (siblings.Count > 0)
+            {
+                // A null aggregate (an unstubbed test seam) degrades to
+                // "no visibility decided" — the siblings stay as the
+                // candidate set; the live service always returns a set.
+                var result = await authz.CanSeeAsync(
+                        actorId ?? string.Empty, Authorization.AccessAction.Read,
+                        siblings.Select(s => new PageToAuditableResource(s)))
+                    .ConfigureAwait(false);
+                if (result is not null)
+                {
+                    var visibleIds = result.Visible
+                        .Select(v => v.Id)
+                        .ToHashSet(StringComparer.Ordinal);
+                    siblings = siblings.Where(s => visibleIds.Contains(s.Id)).ToList();
+                }
+            }
+
+            var ordered = siblings
+                .OrderBy(s => s.Created)
+                .ThenBy(s => s.Slug, StringComparer.Ordinal)
+                .ToList();
+            var idx = ordered.FindIndex(s => string.Equals(s.Id, page.Id, StringComparison.Ordinal));
+            if (idx > 0)
+                prevSibling = new PageBreadcrumbItem(ordered[idx - 1].Title, PagePaths.Href(byId, ordered[idx - 1]));
+            if (idx >= 0 && idx < ordered.Count - 1)
+                nextSibling = new PageBreadcrumbItem(ordered[idx + 1].Title, PagePaths.Href(byId, ordered[idx + 1]));
+        }
+
         // The ADR 0027 chip-swap language set: the enabled catalog, marking
         // which have a stored PageTranslation row (the original is always
         // available — it IS the page's own language).
@@ -404,7 +464,9 @@ public sealed class PageController(
             defaultVariant,
             subscribed,
             breadcrumb,
-            subPages
+            subPages,
+            prevSibling,
+            nextSibling
         ));
     }
 

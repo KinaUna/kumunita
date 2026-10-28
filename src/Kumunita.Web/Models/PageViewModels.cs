@@ -244,7 +244,29 @@ public sealed record PageShowViewModel(
     /// Display-only: each href derives from the real ancestor chain, and
     /// the filter is a read projection, not a write decision.
     /// </summary>
-    IReadOnlyList<PageSubPageItem> SubPages);
+    IReadOnlyList<PageSubPageItem> SubPages,
+    /// <summary>
+    /// The **previous sibling** — the page immediately before this one in
+    /// its parent's ordered child list (Created, then Slug — the same
+    /// stable order the <see cref="SubPages"/> list and the tree browse
+    /// use). <c>null</c> when the page is a root (no parent, no sibling
+    /// list) or is the first visible child. Read-filtered exactly like
+    /// <see cref="SubPages"/>: a sibling the caller may not read is absent
+    /// (not blanked), and a draft sibling is absent unless the caller
+    /// authored it — so the prev link jumps to the nearest *visible*
+    /// predecessor, if any. Display-only: the href derives from the real
+    /// ancestor chain (<see cref="Security.PagePaths"/>); visiting the
+    /// sibling resolves through its own Read decision.
+    /// </summary>
+    PageBreadcrumbItem? PrevSibling,
+    /// <summary>
+    /// The **next sibling** — the page immediately after this one in its
+    /// parent's ordered child list (the <see cref="PrevSibling"/> twin;
+    /// <c>null</c> for a root page or the last visible child; read-filtered
+    /// the same way, so the next link jumps to the nearest *visible*
+    /// successor, if any).
+    /// </summary>
+    PageBreadcrumbItem? NextSibling);
 
 /// <summary>
 /// One entry in the <see cref="PageShowViewModel.Breadcrumb"/> chain — a
