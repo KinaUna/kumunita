@@ -1437,4 +1437,15 @@ html[data-kmb-palette][data-kmb-theme="light"] .btn-outline-warning {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
     overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
   }
+  /* ADR 0220 — the hidden link label doubles as the tooltip: on hover / keyboard focus it is
+     un-clipped into a small bubble under the icon (same look as the rail tips). It is the same
+     element, so assistive tech hears the name once. */
+  .kmb-nav-row .navbar-nav > .nav-item > .nav-link { position: relative; }
+  .kmb-nav-row .navbar-nav > .nav-item > .nav-link:is(:hover, :focus-visible) > .kmb-nav-label {
+    top: calc(100% + 0.25rem); left: 50%; width: auto; height: auto; margin: 0;
+    padding: 0.3rem 0.6rem; clip: auto; overflow: visible;
+    transform: translateX(-50%); z-index: 1040; pointer-events: none;
+    font-size: 0.8125rem; line-height: 1.2; border-radius: 6px;
+    background: var(--kmb-ink); color: var(--kmb-surface);
+  }
 }
