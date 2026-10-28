@@ -1112,3 +1112,20 @@ html[data-kmb-palette] .list-group { --bs-list-group-border-radius: var(--kmb-ra
 html[data-kmb-palette] .list-group-item { border-color: var(--kmb-border-soft); }
 html[data-kmb-palette] .list-group-item-action:hover,
 html[data-kmb-palette] .list-group-item-action:focus-visible { color: var(--kmb-accent); }
+
+/* Row-level destructive buttons (ADR 0196, follow-up): outline red inside tables, solid on hover/focus.
+   Solid btn-danger stays for confirmations and standalone pages (e.g. Delete account). */
+html[data-kmb-palette] .table .btn-danger {
+  --bs-btn-color: #dc3545;
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: #dc3545;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #dc3545;
+  --bs-btn-hover-border-color: #dc3545;
+  --bs-btn-focus-shadow-rgb: 220, 53, 69;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #b02a37;
+  --bs-btn-active-border-color: #b02a37;
+}
+html[data-kmb-theme='dark'] .table .btn-danger,
+html:not([data-kmb-theme='light']) .table .btn-danger { --bs-btn-color: #f08a94; }

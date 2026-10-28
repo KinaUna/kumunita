@@ -15,6 +15,8 @@ CSS only (`palettes.css`), no markup changes, so all ~20 admin screens move at o
 - Dashboard: `.card.text-bg-light` stat tiles and `a.card.text-decoration-none` section cards use surface tokens;
   section cards gain a hover border and shadow.
 - List groups use surface rows, soft hairlines, and an accent + tint hover on action items.
+- Row-level destructive buttons: `.table .btn-danger` renders as an outline red button (solid on hover and focus); solid
+  `btn-danger` stays for confirmations and standalone pages such as Delete account.
 - The admin tab strip already follows the accent tab strip from ADR 0191.
 
 ## Side effects (intentional)
@@ -27,4 +29,4 @@ Onboarding, Notifications, Messages, Home, Guardian, Tag pages, Community manage
 - Not previewed: the preview account is not an admin. Verify /admin, /admin/accounts, /admin/audit, /admin/analytics and
   one list-group page (Notifications) in both palettes, light and dark, and at phone width (table scrolls inside its card).
 - Admin forms rely on the form look (ADR 0185); modal and inline forms are not covered.
-- `btn-danger`, `alert-*` colours are untouched.
+- `alert-*` colours and standalone `btn-danger` are untouched; verified live on /admin/accounts (Ember dark) before this follow-up.
