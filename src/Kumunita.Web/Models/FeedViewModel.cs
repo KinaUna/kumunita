@@ -176,6 +176,8 @@ public sealed record PostListItem(
 
 /// <summary>
 /// Model of the shared <c>_PostCardFoot</c> partial (ADR 0226): where the card's
-/// "N replies" link goes (already ending in <c>#replies</c>) and the count.
+/// "N replies" link goes (already ending in <c>#replies</c>), the count, the post
+/// id, whether the viewer has bookmarked it (ADR 0227, one batched read per page
+/// in the host view) and where the bookmark forms return to (the current feed URL).
 /// </summary>
-public sealed record PostCardFootModel(string RepliesHref, int ReplyCount);
+public sealed record PostCardFootModel(string RepliesHref, int ReplyCount, string PostId, bool IsBookmarked, string ReturnUrl);

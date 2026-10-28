@@ -2,8 +2,25 @@
 @model Kumunita.Web.Models.GroupDetailViewModel
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Bookmarks.IBookmarkService Bookmarks
 @{
     ViewData["Title"] = Model.Name;
+    // ADR 0227 — the viewer's bookmarked posts on this page: one batched personal
+    // read (IBookmarkService.ListBookmarkedIdsAsync), never one query per card.
+    // Best-effort: a failed read degrades to "no bookmarks" rather than blanking the feed.
+    IReadOnlySet<string> _bookmarkedIds = new HashSet<string>();
+    var _feedReturnUrl = Context.Request.Path + Context.Request.QueryString;
+    try
+    {
+        var _viewer = KumunitaPrincipal.SubjectId(User);
+        if (!string.IsNullOrEmpty(_viewer))
+            _bookmarkedIds = await Bookmarks.ListBookmarkedIdsAsync(_viewer, "post", Model.GroupPosts.Select(x => x.Id).ToList());
+    }
+    catch
+    {
+        // keep the empty set
+    }
+
     // Render-time localization of the description + filter placeholders (the
     // <kw-l> TagHelper always emits a <kw-l> element, so it can't sit inside a
     // placeholder="..." attribute — resolve server-side, the _GrantPickers /
@@ -386,7 +403,7 @@
                                     </a>
                                 </div>
                                 <p class="airy-post-preview mb-0">@p.BodyPreview</p>
-                                <partial name="_PostCardFoot" model="@(new PostCardFootModel($"/groups/{Model.GroupId}/posts/{p.Id}#replies", p.ReplyCount))" />
+                                <partial name="_PostCardFoot" model="@(new PostCardFootModel($"/groups/{Model.GroupId}/posts/{p.Id}#replies", p.ReplyCount, p.Id, _bookmarkedIds.Contains(p.Id), _feedReturnUrl))" />
                             </div>
                         }
                     </div>

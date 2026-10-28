@@ -1575,3 +1575,25 @@ html[data-kmb-palette] .kmb-pal-choice:has(.kmb-pal-radio:focus-visible) { outli
   .kmb-post-replies { min-height: 44px; }
 }
 #replies { scroll-margin-top: 4.5rem; }
+
+/* ADR 0227 — feed card footer bookmark toggle (right end of the footer). */
+.airy-post-foot .kmb-post-bookmark { margin: 0 0 0 auto; }
+.kmb-post-bookmark-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: var(--kmb-radius, 12px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.kmb-post-bookmark-btn:hover,
+.kmb-post-bookmark-btn:focus-visible { color: var(--kmb-accent, var(--bs-primary)); }
+.kmb-post-bookmark-btn.is-on { color: var(--kmb-accent, var(--bs-primary)); }
+@media (pointer: coarse) {
+  .kmb-post-bookmark-btn { min-width: 44px; min-height: 44px; }
+}
