@@ -30,3 +30,24 @@ Onboarding, Notifications, Messages, Home, Guardian, Tag pages, Community manage
   one list-group page (Notifications) in both palettes, light and dark, and at phone width (table scrolls inside its card).
 - Admin forms rely on the form look (ADR 0185); modal and inline forms are not covered.
 - `alert-*` colours and standalone `btn-danger` are untouched; verified live on /admin/accounts (Ember dark) before this follow-up.
+
+## Follow-up: Forest / light-mode check (2026-10-28)
+
+Verified live: Forest dark and light, Ember light and dark on Admin, Pages, Announcements, Directory, Projects, a kanban
+board, Inventory and Change password. Three small fixes (patch 31):
+
+- `.text-secondary` is pinned to amber-brown (`#8a5a12`) in `site.css`; in Forest light it now uses `--kmb-muted`
+  (Ember keeps the brown, dark modes keep their existing overrides).
+- `.kmb-chip-verified` gets a gap between the check and the word.
+- Kanban card meta (status chip, assignee, start, due) is a wrapping flex row instead of running text.
+
+## Follow-up: selected chip state (2026-10-28, patch 32)
+
+Ember's selected-chip fill (`--kmb-chip-selected-bg`) equals the resting chip tint (`--kmb-tint-a`) in both modes, so the
+shown translation (and the active sort pill and calendar view) differed from the others only by text colour. Selected
+`.kmb-chip-btn`, `button.badge[aria-pressed]`, `.kmb-sort-pill.is-active` and the active calendar view button now also
+get a 1.5px accent ring. `aria-pressed` was already correct.
+
+The event detail translation chips (`Event/Detail.cshtml`) were still Bootstrap `badge text-bg-light border` buttons
+without a server-rendered `aria-pressed`; they are now `.kmb-chip.kmb-chip-btn` like the other detail pages. Not converted:
+the to-do detail (outline button group) and the admin site hero editor (admin selector).

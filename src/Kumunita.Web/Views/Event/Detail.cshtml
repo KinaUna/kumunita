@@ -391,16 +391,18 @@
                             <span class="text-muted small fw-semibold">
                                 <kw-l key="posts.translations_label">Translations</kw-l>
                             </span>
-                            <button type="button" class="badge text-bg-light border"
+                            <button type="button" class="kmb-chip kmb-chip-btn"
                                     data-translation-chip data-td-group="event"
-                                    data-td-variant="@originalCode">
+                                    data-td-variant="@originalCode"
+                                    aria-pressed="@(originalHidden ? "false" : "true")">
                                 @LangName(originalCode)
                             </button>
                             @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
                             {
-                                <button type="button" class="badge text-bg-light border"
+                                <button type="button" class="kmb-chip kmb-chip-btn"
                                         data-translation-chip data-td-group="event"
-                                        data-td-variant="@t.LanguageCode">
+                                        data-td-variant="@t.LanguageCode"
+                                        aria-pressed="@(String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">
                                     @LangName(t.LanguageCode)
                                 </button>
                             }
