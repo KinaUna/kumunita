@@ -2981,8 +2981,8 @@ html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
   font-size: 0.8125rem;
   color: var(--kmb-muted);
 }
-/* TODO: footer content (reply count, bookmark button) once PostListItem carries
-   the reply count; until then the footer is not rendered. */
+/* ADR 0226: the footer carries the reply count (palettes.css styles the link).
+   TODO: the bookmark button, once per-viewer bookmark state is available. */
 
 /* One chip style for community tags, filters and statuses (ADR 0175). */
 .kmb-chip {

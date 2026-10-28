@@ -1,0 +1,35 @@
+@model Kumunita.Web.Models.PostCardFootModel
+@* ADR 0226 — the feed card footer: the reply count as a link to the post's
+   replies. Shared by the community feed and the group feed. The bookmark button
+   stays a TODO (it needs per-viewer bookmark state, a separate data change).
+   Plural keys follow the groups.member_count_* precedent: {0} replaced here;
+   English literals are the floor so a missing key never blanks the card. *@
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    string none = "No replies yet", one = "{0} reply", other = "{0} replies";
+    try
+    {
+        string lang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(
+            HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        none = await Translation.GetAsync("posts.reply_count_none", lang);
+        one = await Translation.GetAsync("posts.reply_count_one", lang);
+        other = await Translation.GetAsync("posts.reply_count_other", lang);
+    }
+    catch
+    {
+        // Never blank the card: keep the English floor.
+    }
+    var n = Model.ReplyCount;
+    var label = n == 0 ? none : (n == 1 ? one : other).Replace("{0}", n.ToString());
+}
+<div class="airy-post-foot">
+    <a class="kmb-post-replies" href="@Model.RepliesHref">
+        <svg class="kmb-post-replies-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
+        </svg>
+        <span>@label</span>
+    </a>
+</div>

@@ -234,3 +234,4 @@ Decision / Consequences. New decisions take the next number.
 | 0223 | Error flash toasts (role=alert) no longer auto-hide after 5 s and stay until dismissed; info toasts keep the timer (TS). |
 | 0224 | Post, Project, Announcement and group-post forms get the Event form's headed section cards (2–3 sections each, new `form.section_*` keys in en/de/fr/da) (Razor, ADR). |
 | 0225 | Admin Appearance form: the palette select becomes two radio cards with a light/dark mini preview of Forest and Ember (same `DefaultPalette` field) (Razor, CSS). |
+| 0226 | Feed card footer shows a reply count: batched `PostService.CountRepliesAsync`, `PostListItem.ReplyCount`, shared `_PostCardFoot` partial, `posts.reply_count_*` keys (C#, Razor, CSS, ADR). |

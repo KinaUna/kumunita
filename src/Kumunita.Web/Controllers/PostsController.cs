@@ -231,6 +231,8 @@ public sealed class PostsController(
                 c.Id,
                 effLang is not null ? await ResolveCommunityNameAsync(c.Id, c.Name, effLang) : c.Name));
 
+        // ADR 0226 — one batched read for the page's reply counts (the feed card footer).
+        var replyCounts = await posts.CountRepliesAsync(feed.Visible.Select(p => p.Id).ToList());
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
@@ -251,7 +253,8 @@ public sealed class PostsController(
                 preview,
                 post.Created,
                 profile?.DisplayName ?? post.AuthorId,
-                post.AuthorId));
+                post.AuthorId,
+                ReplyCount: replyCounts.GetValueOrDefault(post.Id)));
         }
 
         return View(new FeedViewModel
@@ -420,6 +423,8 @@ public sealed class PostsController(
                 c.Id,
                 effLang is not null ? await ResolveCommunityNameAsync(c.Id, c.Name, effLang) : c.Name));
 
+        // ADR 0226 — one batched read for the page's reply counts (the feed card footer).
+        var replyCounts = await posts.CountRepliesAsync(feed.Visible.Select(p => p.Id).ToList());
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
@@ -433,7 +438,8 @@ public sealed class PostsController(
                 profile?.DisplayName ?? post.AuthorId,
                 post.AuthorId,
                 nameByComponentId.TryGetValue(post.ComponentId, out var name) ? name : null,
-                post.ComponentId));
+                post.ComponentId,
+                replyCounts.GetValueOrDefault(post.Id)));
         }
 
         return View("Index", new FeedViewModel

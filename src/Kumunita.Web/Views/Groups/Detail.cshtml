@@ -386,6 +386,7 @@
                                     </a>
                                 </div>
                                 <p class="airy-post-preview mb-0">@p.BodyPreview</p>
+                                <partial name="_PostCardFoot" model="@(new PostCardFootModel($"/groups/{Model.GroupId}/posts/{p.Id}#replies", p.ReplyCount))" />
                             </div>
                         }
                     </div>

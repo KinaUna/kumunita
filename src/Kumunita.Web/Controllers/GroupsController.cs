@@ -378,6 +378,8 @@ public sealed class GroupsController(
         int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
         var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: page, sort: postSort, pageSize: pageSize);
 
+        // ADR 0226 — one batched read for the page's reply counts (the feed card footer).
+        var replyCounts = await posts.CountRepliesAsync(feed.Visible.Select(p => p.Id).ToList());
         var groupPosts = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
@@ -389,7 +391,8 @@ public sealed class GroupsController(
                 preview,
                 post.Created,
                 profile?.DisplayName ?? post.AuthorId,
-                post.AuthorId));
+                post.AuthorId,
+                ReplyCount: replyCounts.GetValueOrDefault(post.Id)));
         }
 
         // CanPost: the SAME rule the CreateGroupPost gate enforces (G·3) —
