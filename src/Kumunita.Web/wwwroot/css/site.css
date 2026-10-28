@@ -3372,6 +3372,37 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
      witness). */
 }
 
+/* Pages — touch target (ADR 0107 Floor A, the 44×44 px a11y floor the
+   M10 responsive pass applied to the navbar / toasts / .action-glyph-btn,
+   which the pages tree missed): on a touch device the small › chevron +
+   the ~29 px summary strip are fiddly to hit, so the whole branch row
+   becomes the target — a 44 px tall <summary> (the row's hover/focus
+   affordance already painted the full row, so the geometry now agrees
+   with the affordance) — and the chevron is enlarged (a 22 px glyph in
+   a 2rem gutter, left-aligned against the title; the branch title
+   shifts slightly right of its leaf siblings, the standard trade for a
+   bigger branch cue). Leaf rows get the same 44 px floor. @media
+   (pointer: coarse) scopes it to touch: pointer devices keep the
+   compact rows. The padding-left re-declarations come after the base
+   .airy-page-list li rules (and the mobile block above), so the depth
+   indent is preserved instead of being flattened by the shorthand. */
+@media (pointer: coarse) {
+  .airy-page-list li {
+    padding: 1rem 1rem;
+    padding-left: calc(1.5rem + var(--kmb-page-depth, 0) * 1.5rem);
+  }
+  .airy-page-list li:has(> .kmb-page-branch) {
+    padding-left: calc(0.25rem + var(--kmb-page-depth, 0) * 1.5rem);
+  }
+  .airy-page-list .kmb-page-branch > summary { min-height: 44px; }
+  .airy-page-list .kmb-page-branch > summary::before {
+    flex-basis: 2rem;
+    font-size: 1.375rem;
+    text-align: left;
+    padding-left: 0.125rem;
+  }
+}
+
 /* The shared base for the Month chip (.event-chip) and the Day/Week block
    (.event-block): the author's picked calendar color (the pool item's
    --event-color inline custom property — set in Calendar.cshtml from
