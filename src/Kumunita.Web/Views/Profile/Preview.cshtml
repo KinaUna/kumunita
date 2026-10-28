@@ -55,7 +55,7 @@
             <div class="alert alert-success">
                 <b><kw-l key="profile.preview_visible_badge">Visible.</kw-l></b> As <b>@Model.AsDisplayName</b>, <kw-l key="profile.preview_visible_tail">you would see this contact block in the neighbor directory.</kw-l>
             </div>
-            <dl class="row mt-3">
+            <div class="card kmb-detail-card"><div class="card-body"><dl class="row mb-0">
                 @if (!string.IsNullOrEmpty(Model.Address))
                 {
                     <dt class="col-sm-3"><kw-l key="profile.contact_address">Address</kw-l></dt>
@@ -71,7 +71,7 @@
                     <dt class="col-sm-3"><kw-l key="profile.contact_phone">Phone</kw-l></dt>
                     <dd class="col-sm-9">@Model.Phone</dd>
                 }
-            </dl>
+            </dl></div></div>
         }
         else
         {
