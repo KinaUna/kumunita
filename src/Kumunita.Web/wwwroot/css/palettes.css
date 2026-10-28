@@ -1049,9 +1049,17 @@ html[data-kmb-palette] .kmb-stat .fs-4 { font-family: var(--bs-heading-font-fami
 /* Admin (ADR 0199) — shared look for the ~20 admin screens, CSS only. */
 /* Tables: a surface card, quiet small-caps header, hairline rows, hover tint, no stripes. */
 html[data-kmb-palette] .table-responsive {
-  background: var(--kmb-surface);
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius);
+  /* Scroll shadows (ADR 0205): the two "local" layers cover the "scroll"
+     edge shadows at the scroll ends, so a fade shows only on a side that has
+     more content. Accent-tinted so it reads in light and dark. */
+  background:
+    linear-gradient(to right, var(--kmb-surface) 30%, transparent) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--kmb-surface) 30%, transparent) right center / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--kmb-accent) 45%, transparent), transparent) left center / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--kmb-accent) 45%, transparent), transparent) right center / 14px 100% no-repeat scroll,
+    var(--kmb-surface);
 }
 html[data-kmb-palette] .table {
   --bs-table-bg: transparent;

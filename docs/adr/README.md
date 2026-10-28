@@ -213,3 +213,4 @@ Decision / Consequences. New decisions take the next number.
 | 0202 | Documents verification — detail tile top-aligned, friendly file-type name (CSS + Razor). |
 | 0203 | Signed-out auth verification — lighter `.text-danger` in dark (CSS). |
 | 0204 | Profile preview avatar — own initial and hue instead of a blank circle (Razor). |
+| 0205 | Admin table scroll shadows — edge fades on `.table-responsive` (CSS). |
