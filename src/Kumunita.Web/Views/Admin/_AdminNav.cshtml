@@ -1,11 +1,14 @@
 @* The /admin section sub-nav (ADR 0062). A small nav-tabs strip shared by the
-   five admin pages so an admin can jump between sections without scrolling back
-   to the dashboard. The active tab is derived from the current action name (the
-   AdminController owns all five GET actions; the audit / break-glass pages
-   belong to the security section). *@
+   six admin pages so an admin can jump between sections without scrolling back
+   to the dashboard. The active tab is derived from the current request path
+   (longest matching tab href wins; the audit / break-glass pages under
+   /admin/security belong to the security section). The action name cannot be
+   used here: several pages are `Index` actions of different controllers (e.g.
+   /admin/analytics is AdminAnalyticsController.Index under [Route] — the
+   action-name switch below used to mis-highlight it as "Overview"). *@
 @{
-    var action = (ViewContext.RouteData.Values["action"] as string) ?? "Index";
-    var inSecurity = action is "Audit" or "BreakGlass";
+    var path = (ViewContext.HttpContext.Request.Path.Value ?? "/admin").TrimEnd('/');
+    if (path.Length == 0) { path = "/admin"; }
     var tabs = new (string Label, string Href)[]
     {
         ("Overview",    "/admin"),
@@ -15,15 +18,11 @@
         ("Security",    "/admin/security"),
         ("Analytics",   "/admin/analytics"),
     };
-    var activeLabel = inSecurity ? "Security" : action switch
-    {
-        "Accounts"    => "Accounts",
-        "Communities" => "Communities",
-        "Platform"    => "Platform",
-        "Security"    => "Security",
-        "Analytics"   => "Analytics",
-        _             => "Overview",
-    };
+    var activeLabel = tabs
+        .Where(t => path == t.Href || path.StartsWith(t.Href + "/", StringComparison.Ordinal))
+        .OrderByDescending(t => t.Href.Length)
+        .Select(t => t.Label)
+        .FirstOrDefault() ?? "Overview";
 }
 @* M30 (ADR 0153, M30·5) — the admin onboarding affordance: the dismissible
    banner (the _AdminOnboardingBanner partial, the M22 _OnboardingBanner's
