@@ -1252,3 +1252,18 @@ html[data-kmb-palette='ember'] li[data-rm] .badge.text-bg-success {
   html[data-kmb-palette]:not([data-kmb-theme="light"]) .text-danger { color: #f28b82 !important; }
 }
 html[data-kmb-palette][data-kmb-theme="dark"] .text-danger { color: #f28b82 !important; }
+
+/* Board header link chips wrap (ADR 0206) ──────────────────────────────
+   A long project/event title made the chip row 670px wide in a 364px card on
+   a phone. The component/project/event chips flow as normal text (inline-flex
+   split label and title into shrinking items), wrap within the card, and break
+   an unbroken word only as a last resort. */
+html[data-kmb-palette] .kmb-board-links { min-width: 0; }
+html[data-kmb-palette] .kmb-board-links .kmb-chip {
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  border-radius: 1rem;
+  text-align: start;
+}
