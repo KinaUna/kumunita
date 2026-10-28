@@ -1449,3 +1449,32 @@ html[data-kmb-palette][data-kmb-theme="light"] .btn-outline-warning {
     background: var(--kmb-ink); color: var(--kmb-surface);
   }
 }
+
+/* ==========================================================================
+   ADR 0221 — non-text contrast (WCAG 1.4.11, 3:1) pass
+   Measured in all four palette/theme combinations. Unchecked checkbox/radio/switch
+   edges were 2.2-2.5:1 (older site.css pins #a3b2a8 / #4e6357 beat the control-border
+   token; Ember even borrowed Forest's green-grey), the checked Ember box in light mode
+   was amber on cream (1.8:1), and the select chevron was Bootstrap's #343a40 on the dark
+   field (~1.6:1). Text-labelled buttons, chips and cards keep their quiet borders
+   (decorative or identified by their label, not required by 1.4.11).
+   ========================================================================== */
+html[data-kmb-palette] .form-check-input:not(:checked):not(:focus) {
+  border-color: var(--kmb-control-border) !important;
+}
+@media not (prefers-color-scheme: dark) {
+  html[data-kmb-palette='ember']:not([data-kmb-theme='dark']) .form-check-input:checked {
+    border-color: var(--kmb-control-border);
+  }
+}
+html[data-kmb-palette='ember'][data-kmb-theme='light'] .form-check-input:checked {
+  border-color: var(--kmb-control-border);
+}
+@media (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme='light']) .form-select {
+    --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23d5d3c8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  }
+}
+html[data-kmb-palette][data-kmb-theme='dark'] .form-select {
+  --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23d5d3c8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
