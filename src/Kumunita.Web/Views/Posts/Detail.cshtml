@@ -141,11 +141,11 @@
                                    either way. *@
                                 <div class="td-variant td-variant-shared" data-td-variant="@Model.OriginalLanguageCode"
                                      @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                                    <h4 class="mb-0 kmb-ann-title">
+                                    <h1 class="mb-0 kmb-ann-title">
                                         @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                             ? Model.Post.Title
                                             : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
-                                    </h4>
+                                    </h1>
                                 </div>
                                 @* One dedicated title per user-added translation
                                    (only when it has one) — td-variant-title, shown
@@ -160,7 +160,7 @@
                                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                         <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
                                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                            <h4 class="mb-0 kmb-ann-title">@t.Title</h4>
+                                            <h1 class="mb-0 kmb-ann-title">@t.Title</h1>
                                         </div>
                                     }
                                 }
@@ -550,9 +550,9 @@
             }
         }
 
-        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             <kw-l key="posts.replies_heading">Replies</kw-l> <span class="text-muted">(@Model.Replies.Count)</span>
-        </h5>
+        </h2>
 
         @if (Model.Replies.Count == 0)
         {
@@ -569,7 +569,7 @@
             </ul>
         }
 
-        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             @if (Model.IsAuthor)
             {
                 <text><kw-l key="posts.reply_heading_author">Reply (you are the author of this post)</kw-l></text>
@@ -578,7 +578,7 @@
             {
                 <text><kw-l key="posts.reply_heading">Reply</kw-l></text>
             }
-        </h5>
+        </h2>
 
         <div class="card kmb-detail-card kmb-ann-composer">
             <div class="card-body">

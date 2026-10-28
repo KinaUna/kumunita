@@ -274,7 +274,7 @@
                                way. *@
                             <div class="td-variant td-variant-shared" data-td-variant="@Model.OriginalLanguageCode"
                                  @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                                <h4 class="mb-0 kmb-ann-title">
+                                <h1 class="mb-0 kmb-ann-title">
                                     @if (string.IsNullOrWhiteSpace(Model.Title))
                                     {
                                         <span class="text-body-tertiary"><kw-l key="announcements.detail_untitled">Untitled announcement</kw-l></span>
@@ -283,7 +283,7 @@
                                     {
                                         @Model.Title
                                     }
-                                </h4>
+                                </h1>
                             </div>
                             @* One dedicated title per user-added translation
                                (only when it has one) — td-variant-title, shown in
@@ -298,7 +298,7 @@
                                     bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                     <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
                                          @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                        <h4 class="mb-0 kmb-ann-title">@t.Title</h4>
+                                        <h1 class="mb-0 kmb-ann-title">@t.Title</h1>
                                     </div>
                                 }
                             }

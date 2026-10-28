@@ -215,3 +215,4 @@ Decision / Consequences. New decisions take the next number.
 | 0204 | Profile preview avatar — own initial and hue instead of a blank circle (Razor). |
 | 0205 | Admin table scroll shadows — edge fades on `.table-responsive` (CSS). |
 | 0206 | Board header chips wrap — long project/event titles stay inside the card on phones (CSS). |
+| 0207 | Detail page titles are `<h1>` — announcement, community post and group post titles; post Replies/Reply headings `<h2>` (Razor). |
