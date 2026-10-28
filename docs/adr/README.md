@@ -227,3 +227,4 @@ Decision / Consequences. New decisions take the next number.
 | 0216 | Pages tree and page detail at phone width — whole-row leaf links, breadcrumb on its own row, 36-44px touch targets for back link, crumbs and translation chips (CSS, Razor hooks). |
 | 0217 | Admin Appearance form checked end to end; the five admin views that rendered the flash message a second time inline (next to the layout toast) no longer do (Razor). |
 | 0218 | Hover states: rail tooltips were clipped by the scrolling rail (now fixed-position, placed by a small TS module); folded More menu hover takes the accent; pager has no active-page markup (CSS/TS/Razor). |
+| 0219 | Numbered pager pages without a count (window around the current page, active `aria-current`); the variant-B top row no longer squeezes search or wraps icons at 576–767px (labels visually hidden, search floor) (Razor, CSS). |

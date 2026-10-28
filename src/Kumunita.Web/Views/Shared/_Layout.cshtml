@@ -384,10 +384,10 @@
                     <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                         <ul class="navbar-nav flex-grow-1">
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5 8 2.5l5.5 5v6h-11z"/></svg>@_navHome</a>
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5 8 2.5l5.5 5v6h-11z"/></svg><span class="kmb-nav-label">@_navHome</span></a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark @(activeNav == "announcements" ? "active" : null)" href="/announcements"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5 10 3v10l-7.5-3.5z"/><path d="M2.5 7.5H1v4h1.5z"/><path d="M12 5.2a4 4 0 0 1 0 5.6"/><path d="M13.8 3.8a6.5 6.5 0 0 1 0 8.4"/></svg>@_navAnnouncements</a>
+                                <a class="nav-link text-dark @(activeNav == "announcements" ? "active" : null)" href="/announcements"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5 10 3v10l-7.5-3.5z"/><path d="M2.5 7.5H1v4h1.5z"/><path d="M12 5.2a4 4 0 0 1 0 5.6"/><path d="M13.8 3.8a6.5 6.5 0 0 1 0 8.4"/></svg><span class="kmb-nav-label">@_navAnnouncements</span></a>
                             </li>
                             @if (User.Identity?.IsAuthenticated == true)
                             {
@@ -398,10 +398,10 @@
                                    are inert without that module, and absent in variant C and
                                    for signed-out users, so the fold is self-scoped. *@
                                 <li class="nav-item" data-nav-fold>
-                                    <a class="nav-link text-dark @(activeNav == "community" ? "active" : null)" asp-controller="Posts" asp-action="AllSections"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 11V4.5h4v6.5H3zM8.5 11V2.5h4V11h-4z"/></svg>@_navCommunity</a>
+                                    <a class="nav-link text-dark @(activeNav == "community" ? "active" : null)" asp-controller="Posts" asp-action="AllSections"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 11V4.5h4v6.5H3zM8.5 11V2.5h4V11h-4z"/></svg><span class="kmb-nav-label">@_navCommunity</span></a>
                                 </li>
                                 <li class="nav-item" data-nav-fold>
-                                    <a class="nav-link text-dark @(activeNav == "groups" ? "active" : null)" asp-controller="Groups" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.5"/><path d="M2 13c.5-2.5 2-3.5 3.5-3.5S8.5 10.5 9 13"/><circle cx="11" cy="6.5" r="2"/><path d="M10.5 13c.4-1.8 1.3-2.6 2.5-2.6 1.2 0 2.1.8 2.5 2.6"/></svg>@_navGroups</a>
+                                    <a class="nav-link text-dark @(activeNav == "groups" ? "active" : null)" asp-controller="Groups" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.5"/><path d="M2 13c.5-2.5 2-3.5 3.5-3.5S8.5 10.5 9 13"/><circle cx="11" cy="6.5" r="2"/><path d="M10.5 13c.4-1.8 1.3-2.6 2.5-2.6 1.2 0 2.1.8 2.5 2.6"/></svg><span class="kmb-nav-label">@_navGroups</span></a>
                                 </li>
                                 @* ADR 0111 — the More menu: the five less-frequent
                                    resident-only sections folded into one dropdown.

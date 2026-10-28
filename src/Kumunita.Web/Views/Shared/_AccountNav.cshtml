@@ -132,7 +132,10 @@
                 }
                 @if (!string.IsNullOrEmpty(navToggleLabel))
                 {
-                    <span title="@navToggleLabelFull">@navToggleLabel</span>
+                    @* ADR 0219 — with an avatar present, palettes.css visually hides the name
+                       between 576 and 767px (the row is too full); it stays in the DOM so the
+                       toggle keeps its accessible name. Without an avatar the name must stay. *@
+                    <span title="@navToggleLabelFull" class="@(string.IsNullOrEmpty(navAvatarSubject) ? null : "kmb-acct-name")">@navToggleLabel</span>
                 }
                 else
                 {
