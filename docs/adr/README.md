@@ -232,3 +232,4 @@ Decision / Consequences. New decisions take the next number.
 | 0221 | Non-text contrast pass: unchecked checkbox/radio/switch edges, the Ember light checked box and the dark select chevron raised to ≥3:1; text-labelled buttons, chips and cards left soft on purpose (CSS). |
 | 0222 | Admin Accounts table stacks into labelled cards below 576px (no sideways scroll, actions visible); reusable `kmb-stack-table` (Razor, CSS). |
 | 0223 | Error flash toasts (role=alert) no longer auto-hide after 5 s and stay until dismissed; info toasts keep the timer (TS). |
+| 0224 | Post, Project, Announcement and group-post forms get the Event form's headed section cards (2–3 sections each, new `form.section_*` keys in en/de/fr/da) (Razor, ADR). |
