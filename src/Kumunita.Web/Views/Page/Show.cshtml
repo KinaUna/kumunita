@@ -90,8 +90,8 @@
             @{ var _pn = ("page", Model.Id, Model.Path); }
             <partial name="_NoteButton" model="@_pn" />
         </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-            <a href="/pages" class="btn btn-link p-0">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-2 kmb-page-trail">
+            <a href="/pages" class="btn btn-link p-0 kmb-page-back">
                 <kw-l key="pages.back">← Back to the pages</kw-l>
             </a>
             @* Hierarchy navigation — the breadcrumb (parent half). Rendered
@@ -106,8 +106,8 @@
                the parent (the parent's SubPages list). *@
             @if (Model.Breadcrumb.Count > 0)
             {
-                <span class="text-muted" aria-hidden="true">·</span>
-                <nav aria-label="@ariaBreadcrumb" class="min-w-0">
+                <span class="text-muted kmb-page-trail-sep" aria-hidden="true">·</span>
+                <nav aria-label="@ariaBreadcrumb" class="min-w-0 kmb-page-crumbs">
                     <ol class="breadcrumb small mb-0">
                         @foreach (var crumb in Model.Breadcrumb)
                         {

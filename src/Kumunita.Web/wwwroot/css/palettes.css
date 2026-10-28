@@ -979,6 +979,24 @@ html[data-kmb-palette] .kmb-page-branch-count {
 }
 /* Draft: outlined chip (shared with announcements). */
 html[data-kmb-palette] .airy-page-list .kmb-chip-draft { vertical-align: middle; }
+/* Pages on a phone (ADR 0216). Leaf rows: the whole row is the link (stretched), not just the text. */
+html[data-kmb-palette] .airy-page-list li:not(:has(> .kmb-page-branch)) { position: relative; }
+html[data-kmb-palette] .airy-page-list li:not(:has(> .kmb-page-branch)) > a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+@media (max-width: 575.98px) {
+  /* The "·" between "Back to the pages" and the breadcrumb dangled at a line end; the trail gets its own row. */
+  html[data-kmb-palette] .kmb-page-trail-sep { display: none; }
+  html[data-kmb-palette] .kmb-page-crumbs { flex: 1 0 100%; }
+}
+@media (pointer: coarse) {
+  /* Touch targets: back link, breadcrumb links and translation chips were 20-26px tall. */
+  html[data-kmb-palette] .kmb-page-back { display: inline-flex; align-items: center; min-height: 44px; }
+  html[data-kmb-palette] .kmb-page-crumbs .breadcrumb-item a { display: inline-block; padding: 0.5rem 0; }
+  html[data-kmb-palette] .kmb-chip-btn { min-height: 2.25rem; }
+}
 
 /* Profile / Directory (ADR 0197) */
 html[data-kmb-palette] .kmb-chip-verified {

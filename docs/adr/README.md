@@ -224,3 +224,4 @@ Decision / Consequences. New decisions take the next number.
 | 0213 | Event form in four headed sections (Details, When, Where, Audience and reminders) on create and edit (Razor, CSS, keys). |
 | 0214 | Login and MFA fixes — a wrong code keeps the pending sign-in (retry works), lockout returns to the password form, error announced and focused, code field cleared, plural text (Razor, C#). |
 | 0215 | MFA challenge page and its error messages translated — ten `account.mfa.*` keys in en/de/fr/da, controller errors resolved from the registry (Razor, C#, keys). |
+| 0216 | Pages tree and page detail at phone width — whole-row leaf links, breadcrumb on its own row, 36-44px touch targets for back link, crumbs and translation chips (CSS, Razor hooks). |
