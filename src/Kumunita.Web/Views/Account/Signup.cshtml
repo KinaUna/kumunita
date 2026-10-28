@@ -5,6 +5,8 @@
 
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
+        <div class="kmb-auth">
+            <span class="kmb-auth-logo" aria-hidden="true">K</span>
         <h1><kw-l key="account.signup_title">Sign up</kw-l></h1>
         <form asp-action="Signup" method="post">
             @Html.AntiForgeryToken()
@@ -78,6 +80,7 @@
         <p class="mt-3 text-muted">
             <kw-l key="account.signup_has_account">Already have an account?</kw-l> <a asp-action="Login">Sign in</a>.
         </p>
+        </div>
     </div>
 </div>
 

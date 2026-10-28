@@ -1004,3 +1004,44 @@ html[data-kmb-palette] .dir-card .dir-msg-form { margin-top: auto !important; pa
   .kmb-member-msg { width: 100%; }
   .kmb-member-msg .btn { width: 100%; }
 }
+
+/* Account pages (ADR 0198) */
+/* The short auth/account pages: one centred surface card. */
+html[data-kmb-palette] .kmb-auth {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 2rem;
+  margin-top: 1rem;
+}
+html[data-kmb-palette] .kmb-auth h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+.kmb-auth-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  background: var(--kmb-logo-tile, var(--kmb-accent));
+  color: #fff;
+  font-family: var(--bs-heading-font-family);
+  font-weight: 700;
+  font-size: 1.375rem;
+}
+html[data-kmb-palette] .kmb-auth .form-label { font-family: var(--bs-heading-font-family); font-size: 0.875rem; font-weight: 600; color: var(--kmb-ink-soft); margin-bottom: 0.25rem; }
+html[data-kmb-palette] .kmb-auth .form-control { border-radius: var(--kmb-radius-input); border-color: var(--kmb-control-border); }
+html[data-kmb-palette] .kmb-auth .form-text,
+html[data-kmb-palette] .kmb-auth .text-muted { color: var(--kmb-muted) !important; }
+/* The submit is the page's one primary action: full width. */
+html[data-kmb-palette] .kmb-auth form > .btn-primary,
+html[data-kmb-palette] .kmb-auth form > .btn-danger { width: 100%; margin-top: 0.5rem; }
+html[data-kmb-palette] .kmb-auth .alert { border-radius: var(--kmb-radius-input); }
+/* Links and hints below the form: quiet, centred. */
+html[data-kmb-palette] .kmb-auth form + p,
+html[data-kmb-palette] .kmb-auth > p:last-child { text-align: center; }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-auth { padding: 1.25rem; }
+}
+/* My storage: stat tiles on the detail card look. */
+html[data-kmb-palette] .kmb-stat .fs-4 { font-family: var(--bs-heading-font-family); color: var(--kmb-ink); }
