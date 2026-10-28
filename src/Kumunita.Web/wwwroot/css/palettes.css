@@ -1301,3 +1301,43 @@ html[data-kmb-palette][data-kmb-theme="dark"] .table :is(.btn-danger, .btn-outli
   html[data-kmb-palette='ember']:not([data-kmb-theme="dark"]) :is(.kmb-milestone-id, li[data-rm] .badge.text-bg-success) { color: var(--kmb-ink-soft) !important; }
 }
 html[data-kmb-palette='ember'][data-kmb-theme="light"] :is(.kmb-milestone-id, li[data-rm] .badge.text-bg-success) { color: var(--kmb-ink-soft) !important; }
+
+/* ── Hover and active states pass (ADR 0210) ─────────────────────────────
+   Found by hovering in Ember light: the nav links carry Bootstrap's `text-dark`
+   (an !important #17251d), so the hover colour never applied and the nav text was
+   a green-black; the active pill was a hard-coded pine tint; footer, rail and
+   dropdown hovers were #1c4532 (Forest green); disabled/active pagination and the
+   active dropdown item fell back to Bootstrap grey/blue. All now follow the palette. */
+html[data-kmb-palette] .navbar .nav-link.text-dark { color: var(--kmb-ink-soft) !important; }
+html[data-kmb-palette] .navbar .navbar-nav .nav-link { border-radius: 8px; }
+html[data-kmb-palette] .navbar .navbar-nav .nav-link:not(.active):is(:hover, :focus-visible) {
+  color: var(--kmb-accent) !important;
+  background: color-mix(in srgb, var(--kmb-accent) 8%, transparent);
+}
+html[data-kmb-palette] .navbar .navbar-nav .nav-link.active,
+html[data-kmb-palette] .navbar .dropdown-menu .dropdown-item.active {
+  color: var(--kmb-accent) !important;
+  background: color-mix(in srgb, var(--kmb-accent) 14%, transparent);
+}
+html[data-kmb-palette] :is(.kmb-footer a, .kmb-rail-btn, .kmb-rail-expander, .kmb-nav-folded .navbar-nav .dropdown-item):is(:hover, :focus-visible) {
+  color: var(--kmb-accent);
+}
+html[data-kmb-palette] .pagination {
+  --bs-pagination-disabled-bg: var(--kmb-tint-a);
+  --bs-pagination-disabled-color: var(--kmb-muted);
+  --bs-pagination-disabled-border-color: var(--kmb-border-soft);
+  --bs-pagination-active-bg: var(--kmb-action-bg);
+  --bs-pagination-active-color: var(--kmb-action-ink);
+  --bs-pagination-active-border-color: var(--kmb-action-bg);
+}
+html[data-kmb-palette] .dropdown-menu {
+  --bs-dropdown-link-active-bg: color-mix(in srgb, var(--kmb-accent) 14%, transparent);
+  --bs-dropdown-link-active-color: var(--kmb-accent);
+}
+/* Ember light footer: the band, text and brand were Forest values (#f4f3ee, #46534b, #1c4532). */
+@media not (prefers-color-scheme: dark) {
+  html[data-kmb-palette='ember']:not([data-kmb-theme='dark']) .kmb-footer { background-color: var(--kmb-surface-2); color: var(--kmb-ink-soft); }
+  html[data-kmb-palette='ember']:not([data-kmb-theme='dark']) .kmb-footer .navbar-brand { color: var(--kmb-ink) !important; }
+}
+html[data-kmb-palette='ember'][data-kmb-theme='light'] .kmb-footer { background-color: var(--kmb-surface-2); color: var(--kmb-ink-soft); }
+html[data-kmb-palette='ember'][data-kmb-theme='light'] .kmb-footer .navbar-brand { color: var(--kmb-ink) !important; }

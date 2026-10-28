@@ -218,3 +218,4 @@ Decision / Consequences. New decisions take the next number.
 | 0207 | Detail page titles are `<h1>` — announcement, community post and group post titles; post Replies/Reply headings `<h2>` (Razor). |
 | 0208 | Contrast pass — rendered-pixel scan in all four palette/mode combinations: tertiary text, row-level red buttons and Ember milestone chips raised to AA (CSS). |
 | 0209 | Focus rings — the two `outline: 0/none` rules (⋮ action button, Kanban card) use the accent outline, keyboard-only on cards (CSS). |
+| 0210 | Hover and active states — nav links get real hover (text-dark override), accent active pill, footer/rail/dropdown hovers, pagination and Ember footer on palette tokens (CSS). |
