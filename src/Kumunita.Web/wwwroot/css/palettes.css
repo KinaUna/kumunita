@@ -1341,3 +1341,50 @@ html[data-kmb-palette] .dropdown-menu {
 }
 html[data-kmb-palette='ember'][data-kmb-theme='light'] .kmb-footer { background-color: var(--kmb-surface-2); color: var(--kmb-ink-soft); }
 html[data-kmb-palette='ember'][data-kmb-theme='light'] .kmb-footer .navbar-brand { color: var(--kmb-ink) !important; }
+
+/* ── Contrast pass, remaining pages (ADR 0211) ───────────────────────────
+   Found scanning admin pages, group pages, forms, the calendar and open modals. */
+/* Inline <code> was Bootstrap pink #d63384 (3.9-4.3:1); follow the palette accent. */
+html[data-kmb-palette] { --bs-code-color: var(--kmb-accent); }
+/* Outline danger buttons anywhere (the table rule above only covered rows): darker red on
+   light (>= 6:1), lighter on dark. Solid .btn-danger stays (white on #dc3545 is 4.5:1). */
+html[data-kmb-palette] .btn-outline-danger {
+  --bs-btn-color: #b02a37;
+  --bs-btn-border-color: #b02a37;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #b02a37;
+  --bs-btn-hover-border-color: #b02a37;
+  --bs-btn-focus-shadow-rgb: 176, 42, 55;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #8f2230;
+  --bs-btn-active-border-color: #8f2230;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme="light"]) .btn-outline-danger {
+    --bs-btn-color: #f08a94; --bs-btn-border-color: #f08a94;
+    --bs-btn-hover-color: #2a1015; --bs-btn-hover-bg: #f08a94; --bs-btn-hover-border-color: #f08a94;
+    --bs-btn-focus-shadow-rgb: 240, 138, 148;
+    --bs-btn-active-color: #2a1015; --bs-btn-active-bg: #f4a3ab; --bs-btn-active-border-color: #f4a3ab;
+  }
+}
+html[data-kmb-palette][data-kmb-theme="dark"] .btn-outline-danger {
+  --bs-btn-color: #f08a94; --bs-btn-border-color: #f08a94;
+  --bs-btn-hover-color: #2a1015; --bs-btn-hover-bg: #f08a94; --bs-btn-hover-border-color: #f08a94;
+  --bs-btn-focus-shadow-rgb: 240, 138, 148;
+  --bs-btn-active-color: #2a1015; --bs-btn-active-bg: #f4a3ab; --bs-btn-active-border-color: #f4a3ab;
+}
+/* Outline warning (admin "Make optional"): Bootstrap yellow #ffc107 on cream is 1.4:1 in light. */
+@media not (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme="dark"]) .btn-outline-warning {
+    --bs-btn-color: #7a5100; --bs-btn-border-color: #7a5100;
+    --bs-btn-hover-color: #fff; --bs-btn-hover-bg: #7a5100; --bs-btn-hover-border-color: #7a5100;
+    --bs-btn-active-color: #fff; --bs-btn-active-bg: #5f3f00; --bs-btn-active-border-color: #5f3f00;
+    --bs-btn-focus-shadow-rgb: 122, 81, 0;
+  }
+}
+html[data-kmb-palette][data-kmb-theme="light"] .btn-outline-warning {
+  --bs-btn-color: #7a5100; --bs-btn-border-color: #7a5100;
+  --bs-btn-hover-color: #fff; --bs-btn-hover-bg: #7a5100; --bs-btn-hover-border-color: #7a5100;
+  --bs-btn-active-color: #fff; --bs-btn-active-bg: #5f3f00; --bs-btn-active-border-color: #5f3f00;
+  --bs-btn-focus-shadow-rgb: 122, 81, 0;
+}
