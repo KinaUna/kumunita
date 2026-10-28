@@ -226,3 +226,4 @@ Decision / Consequences. New decisions take the next number.
 | 0215 | MFA challenge page and its error messages translated — ten `account.mfa.*` keys in en/de/fr/da, controller errors resolved from the registry (Razor, C#, keys). |
 | 0216 | Pages tree and page detail at phone width — whole-row leaf links, breadcrumb on its own row, 36-44px touch targets for back link, crumbs and translation chips (CSS, Razor hooks). |
 | 0217 | Admin Appearance form checked end to end; the five admin views that rendered the flash message a second time inline (next to the layout toast) no longer do (Razor). |
+| 0218 | Hover states: rail tooltips were clipped by the scrolling rail (now fixed-position, placed by a small TS module); folded More menu hover takes the accent; pager has no active-page markup (CSS/TS/Razor). |

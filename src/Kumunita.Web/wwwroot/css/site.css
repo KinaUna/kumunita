@@ -1931,9 +1931,11 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
 }
 .kmb-rail-tip {
   display: none;
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
+  /* ADR 0218 — fixed, not absolute: the rail clips its overflow, which hid the tip entirely.
+     rail-tips.ts sets --kmb-rail-tip-y (the hovered button's centre) on the rail. */
+  position: fixed;
+  left: calc(var(--kmb-rail-w, 68px) + 10px);
+  top: var(--kmb-rail-tip-y, 0);
   transform: translateY(-50%);
   white-space: nowrap;
   z-index: 20;
@@ -1945,8 +1947,8 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
   border-radius: 6px;
   pointer-events: none;
 }
-.kmb-rail-btn:hover .kmb-rail-tip,
-.kmb-rail-btn:focus .kmb-rail-tip {
+.kmb-rail-tips-js .kmb-rail-btn:hover .kmb-rail-tip,
+.kmb-rail-tips-js .kmb-rail-btn:focus .kmb-rail-tip {
   display: block;
 }
 .kmb-rail-body {

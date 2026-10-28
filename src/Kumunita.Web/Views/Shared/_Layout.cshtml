@@ -804,6 +804,12 @@
          in localStorage. Self-guards (no-op) in variant B and where the
          expander button is absent, so loading it globally is safe. -->
     <script type="module" src="~/js/lib/rail-expander.js"></script>
+    <!-- Rail hover/focus tooltips (client/lib/rail-tips.ts, tsc-built — variant C):
+         the .kmb-rail-tip is position:fixed (the rail clips its overflow, which hid
+         the old absolute tip); this sets its vertical position from the hovered
+         button and adds .kmb-rail-tips-js (site.css shows the tips only then).
+         Self-guards (no-op) in variant B / signed-out. -->
+    <script type="module" src="~/js/lib/rail-tips.js"></script>
     @* P0-6 (translation audit) — the client-JS strings bundle: the closed
        KnownTranslationKeys set resolved in the effective language, serialized
        to JSON. The client modules (rich-editor / image-editor / tag-suggest /
