@@ -1091,14 +1091,34 @@ public sealed class AccountController(
 
         if (!result.Succeeded)
         {
-            // On a wrong code → fail (no persistent cookie minted); the temp
-            // sign-in is discarded by the next request / sign-out (the pin §5
-            // leg 2). Sign out the temp cookie (clears the
-            // `TwoFactorUserIdScheme` + the app scheme) and re-render the
-            // challenge form with the resident's prior input preserved.
-            await signInManager.SignOutAsync();
+            // ADR 0214 — a wrong code used to SignOutAsync here, which discards the
+            // pending `TwoFactorUserId` cookie: the challenge re-rendered with
+            // "Try again", but the retry could never succeed (no pending sign-in
+            // left), so every typo forced the resident back to the password leg.
+            // Identity already counts each failed TOTP / recovery code towards
+            // lockout (AccessFailedAsync inside the leg-2 methods), so the pending
+            // cookie is kept for another try and only a lockout ends the challenge.
+            if (result.IsLockedOut)
+            {
+                await signInManager.SignOutAsync();
+                ModelState.AddModelError(string.Empty,
+                    "Too many incorrect codes. This account is temporarily locked; try again later.");
+                model.MfaPending = false;
+                model.MfaCode = null;
+                model.MfaRecoveryCode = null;
+                ModelState.Remove(nameof(model.MfaCode));
+                ModelState.Remove(nameof(model.MfaRecoveryCode));
+                return View("Login", model);
+            }
+
             ModelState.AddModelError(string.Empty,
                 "The code was not valid. Try again, or use a recovery code.");
+            // Re-render with the wrong code cleared (the tag helper prefers ModelState
+            // over the model, so the ModelState entries are removed too).
+            model.MfaCode = null;
+            model.MfaRecoveryCode = null;
+            ModelState.Remove(nameof(model.MfaCode));
+            ModelState.Remove(nameof(model.MfaRecoveryCode));
             model.MfaPending = true;
             return View("Login", model);
         }

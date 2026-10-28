@@ -129,6 +129,50 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
         Assert.Equal(9, await h.UserManager.CountRecoveryCodesAsync(h.User!));
     }
 
+    // ── ADR 0214 — a wrong code keeps the pending sign-in ──────────────────
+
+    /// <summary>
+    /// A wrong authenticator code re-renders the challenge **without** signing out:
+    /// the pending <c>TwoFactorUserId</c> cookie must survive so a retry can succeed
+    /// (the old <c>SignOutAsync</c> made every retry fail). The typed code is cleared.
+    /// </summary>
+    [Fact]
+    public async Task WrongTotpCode_KeepsPendingSignIn_AndClearsTheField()
+    {
+        var h = await BuildAsync(globalAdmin: true, mfaEnabled: true);
+        h.SignInManager
+            .TwoFactorAuthenticatorSignInAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>())
+            .Returns(Microsoft.AspNetCore.Identity.SignInResult.Failed);
+
+        var action = await h.Controller.LoginMfa(new LoginViewModel { MfaCode = "000000" });
+
+        var view = Assert.IsType<ViewResult>(action);
+        var model = Assert.IsType<LoginViewModel>(view.ViewData.Model);
+        Assert.True(model.MfaPending);
+        Assert.Null(model.MfaCode);
+        await h.SignInManager.DidNotReceive().SignOutAsync();
+    }
+
+    /// <summary>
+    /// A lockout ends the challenge: the pending cookie is cleared and the password
+    /// form (not the code form) is shown with a lockout message.
+    /// </summary>
+    [Fact]
+    public async Task LockedOutTotpCode_SignsOut_AndReturnsToThePasswordForm()
+    {
+        var h = await BuildAsync(globalAdmin: true, mfaEnabled: true);
+        h.SignInManager
+            .TwoFactorAuthenticatorSignInAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>())
+            .Returns(Microsoft.AspNetCore.Identity.SignInResult.LockedOut);
+
+        var action = await h.Controller.LoginMfa(new LoginViewModel { MfaCode = "000000" });
+
+        var view = Assert.IsType<ViewResult>(action);
+        var model = Assert.IsType<LoginViewModel>(view.ViewData.Model);
+        Assert.False(model.MfaPending);
+        await h.SignInManager.Received(1).SignOutAsync();
+    }
+
     // ── Pin §7 test 3 (§5 Leg 1.5c) ────────────────────────────────────────
 
     /// <summary>

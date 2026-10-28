@@ -222,3 +222,4 @@ Decision / Consequences. New decisions take the next number.
 | 0211 | Contrast pass, remaining pages — outline danger/warning buttons and inline code raised to AA on admin, group, form, calendar and modal pages (CSS). |
 | 0212 | Quick fixes — multi-day event time, translated member count, inventory created date, neutral community hint (Razor, keys). |
 | 0213 | Event form in four headed sections (Details, When, Where, Audience and reminders) on create and edit (Razor, CSS, keys). |
+| 0214 | Login and MFA fixes — a wrong code keeps the pending sign-in (retry works), lockout returns to the password form, error announced and focused, code field cleared, plural text (Razor, C#). |

@@ -44,8 +44,7 @@
 {
     <div class="alert alert-info">
         Two-factor authentication is <b>enabled</b> on this account. You have
-        <b>@Model.RemainingRecoveryCodes</b> unused recovery code
-        @(Model.RemainingRecoveryCodes == 1 ? "" : "s") remaining.
+        <b>@Model.RemainingRecoveryCodes</b> unused recovery code@(Model.RemainingRecoveryCodes == 1 ? "" : "s") remaining.
     </div>
 
     <div class="card">
@@ -54,8 +53,7 @@
             <p class="text-muted mb-2">
                 If you lose your authenticator app, a recovery code lets you
                 sign in once and reset your second factor. You have
-                @Model.RemainingRecoveryCodes unused code
-                @(Model.RemainingRecoveryCodes == 1 ? "" : "s").
+                @Model.RemainingRecoveryCodes unused code@(Model.RemainingRecoveryCodes == 1 ? "" : "s").
             </p>
             <form method="post" action="/settings/security/mfa/recovery"
                   data-confirm="Replace your 10 recovery codes with a fresh set? The current codes stop working immediately.">
