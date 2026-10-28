@@ -1915,6 +1915,10 @@ public static class KnownTranslationKeys
                 "The community this event appears under — a filter, not an access limit.",
             ["events.community_hint_generic"] =
                 "The community this appears under — a filter, not an access limit.",
+            ["events.section_details"] = "Details",
+            ["events.section_when"] = "When",
+            ["events.section_where"] = "Where",
+            ["events.section_audience"] = "Audience and reminders",
             ["events.tags_placeholder"] = "e.g. cleanup, social, garden",
             ["events.audience_heading"] = "Audience — who can see this event",
             ["events.audience_default"] =
@@ -4792,6 +4796,10 @@ public static class KnownTranslationKeys
                 "Die Gemeinde, unter der diese Veranstaltung erscheint — ein Filter, keine Zugangsgrenze.",
             ["events.community_hint_generic"] =
                 "Die Gemeinde, unter der dies erscheint — ein Filter, keine Zugangsgrenze.",
+            ["events.section_details"] = "Details",
+            ["events.section_when"] = "Wann",
+            ["events.section_where"] = "Wo",
+            ["events.section_audience"] = "Zielgruppe und Erinnerungen",
             ["events.tags_placeholder"] = "z. B. Reinigung, Treffen, Garten",
             ["events.audience_heading"] = "Zielgruppe — wer diese Veranstaltung sehen kann",
             ["events.audience_default"] =
@@ -7516,6 +7524,10 @@ public static class KnownTranslationKeys
                 "La communauté sous laquelle cet événement apparaît — un filtre, pas une limite d'accès.",
             ["events.community_hint_generic"] =
                 "La communauté sous laquelle cet élément apparaît — un filtre, pas une limite d'accès.",
+            ["events.section_details"] = "Détails",
+            ["events.section_when"] = "Quand",
+            ["events.section_where"] = "Où",
+            ["events.section_audience"] = "Public et rappels",
             ["events.tags_placeholder"] = "ex. nettoyage, rencontre, jardin",
             ["events.audience_heading"] = "Public — qui peut voir cet événement",
             ["events.audience_default"] =
@@ -10228,6 +10240,10 @@ public static class KnownTranslationKeys
                 "Det fællesskab, dette arrangement optræder under — et filter, ikke en adgangsgrænse.",
             ["events.community_hint_generic"] =
                 "Det fællesskab, dette optræder under — et filter, ikke en adgangsgrænse.",
+            ["events.section_details"] = "Detaljer",
+            ["events.section_when"] = "Hvornår",
+            ["events.section_where"] = "Hvor",
+            ["events.section_audience"] = "Målgruppe og påmindelser",
             ["events.tags_placeholder"] = "fx oprydning, socialt, have",
             ["events.audience_heading"] = "Publikum — hvem der kan se dette arrangement",
             ["events.audience_default"] =

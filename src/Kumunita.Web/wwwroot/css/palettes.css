@@ -1189,6 +1189,17 @@ html[data-kmb-palette] form > .card .card-title {
 html[data-kmb-palette] form > .card .form-switch > .text-muted.small { margin-left: 0 !important; margin-top: 0.125rem; }
 html[data-kmb-palette] form > .card hr { border-color: var(--kmb-border-soft); opacity: 1; }
 html[data-kmb-palette] form > .card .form-switch + hr:has(+ .audience-restricted.d-none) { display: none; }
+/* Headed form sections (ADR 0213): one card per group, a heading, fields spaced inside. */
+html[data-kmb-palette] .kmb-form-section-title {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  color: var(--kmb-ink);
+  margin: 0 0 1rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--kmb-border-soft);
+}
+html[data-kmb-palette] .kmb-form-field + .kmb-form-field { margin-top: 1.25rem; }
 /* Submit row: primary action and a quiet Cancel on one centred line. */
 html[data-kmb-palette] form > .d-flex.gap-2:has(> .btn-primary) { align-items: center; gap: 1rem !important; }
 html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link { color: var(--kmb-ink-soft); text-decoration: none; }

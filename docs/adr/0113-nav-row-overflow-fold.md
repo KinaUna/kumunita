@@ -12,7 +12,9 @@ closed-key registry + en/de/fr/da parity pins** (ADR 0015 — this lane adds
 **no** new key: the folded items keep their existing `nav.community` /
 `nav.groups` labels), the **site.css media-block boundary pin** (the M10
 drift-guard frozen pin #7 + `PwaManifestTests.Site_Css_Media_Block_Boundary_
-Pinned` — six `@media` occurrences total), and the **e2e-frozen selectors**
+Pinned` — six `@media` occurrences total at the time of this ADR; the
+inventory has since grown to **twelve** blocks — see the M10 design doc
+§drift-guard log), and the **e2e-frozen selectors**
 (ADR 0111 D6 / `e2e-pwa-responsive.spec.ts` — `header .navbar`,
 `.navbar-toggler`, `a#accountMenu`, `a#notifications-bell`,
 `a#languageMenu`). This ADR removes the horizontal scrollbar that appears in
@@ -46,9 +48,10 @@ The fix must satisfy the standing constraints:
 
 - **No new `kw-l` key** — the folded items are re-homed, not re-labelled,
   so the closed-registry + parity pins are untouched (ADR 0015).
-- **No new `@media` block** — the six-`@media` inventory is a frozen M10
-  drift-guard pin, so the fold's styling must be a state-scoped,
-  non-media rule.
+- **No new `@media` block** — the `@media` inventory (six at the time of
+  this ADR; now **twelve** blocks — see the M10 design doc §drift-guard
+  log) is a frozen M10 drift-guard pin, so the fold's styling must be a
+  state-scoped, non-media rule.
 - **No inline script in a Razor view** (SECURITY.md §6) — the fold logic is
   a tsc-only module (ADR 0031).
 - **Self-scoped** — it must be a clean no-op in variant C (the icon rail),
@@ -100,7 +103,8 @@ section: `.kmb-nav-folded .navbar-nav .dropdown-item` re-asserts the navbar
 link voice (`font-size: 0.9375rem` + the `--kmb-ink-soft` colour, pine on
 hover/focus) so the two folded items read as the same links, now inside the
 More menu. The rule is **deliberately not inside an `@media` block** — it
-preserves the six-`@media` inventory pinned by
+preserves the `@media` inventory (six at the time of this ADR; now
+twelve blocks — see the M10 design doc §drift-guard log) pinned by
 `Site_Css_Media_Block_Boundary_Pinned` (M10 drift-guard frozen pin #7) — and
 it is inert unless `.kmb-nav-folded` is present, so variant C and signed-out
 layouts are untouched. Bootstrap's own `navbar-expand-sm` collapse (below
@@ -137,8 +141,10 @@ re-scoped, so the ADR 0015 closed-registry + parity pins are untouched.
   server: the module exists and is a strict IIFE; `_Layout.cshtml` carries
   exactly two `data-nav-fold` hooks, one `data-nav-more` hook, the module
   `<script type="module">` tag, and the two existing `kw-l` labels; `site.css`
-  styles `.kmb-nav-folded` and keeps exactly six `@media` occurrences (the
-  M10 boundary); and ADR 0113 is recorded + indexed.
+  styles `.kmb-nav-folded` and keeps the pinned `@media` count (six at the
+  time of this ADR; now **twelve** blocks — see the M10 design doc
+  §drift-guard log; the live total is pinned by the two media tests, not a
+  hard-coded six); and ADR 0113 is recorded + indexed.
 - **Follow-on (out of scope).** The behavioural guarantee (fold fires at a
   given width) is the Playwright e2e surface, the ADR 0107/0111
   `e2e-pwa-responsive.spec.ts` precedent. If a future nav addition widens the
@@ -161,6 +167,8 @@ re-scoped, so the ADR 0015 closed-registry + parity pins are untouched.
   layout" line annotated)
 - **Changed:** `docs/adr/README.md` (the ADR 0113 index row)
 - **Untouched (by design):** the `kw-l` registry + the en/de/fr/da parity
-  pins (no new key); the six-`@media` inventory (the fold rule is
-  state-scoped, not a media block); variant C; `_AccountNav.cshtml`; the
+  pins (no new key); the `@media` inventory (six at the time of this ADR;
+  now **twelve** blocks — see the M10 design doc §drift-guard log; the
+  fold rule is state-scoped, not a media block); variant C;
+  `_AccountNav.cshtml`; the
   e2e-frozen selectors; Core / schema / authorization.

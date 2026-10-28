@@ -221,3 +221,4 @@ Decision / Consequences. New decisions take the next number.
 | 0210 | Hover and active states — nav links get real hover (text-dark override), accent active pill, footer/rail/dropdown hovers, pagination and Ember footer on palette tokens (CSS). |
 | 0211 | Contrast pass, remaining pages — outline danger/warning buttons and inline code raised to AA on admin, group, form, calendar and modal pages (CSS). |
 | 0212 | Quick fixes — multi-day event time, translated member count, inventory created date, neutral community hint (Razor, keys). |
+| 0213 | Event form in four headed sections (Details, When, Where, Audience and reminders) on create and edit (Razor, CSS, keys). |
