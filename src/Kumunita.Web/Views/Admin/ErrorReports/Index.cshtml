@@ -76,10 +76,6 @@
    shape: TempData["info"] is a server-resolved string (the controller's
    FlashAsync, the AdminOnboardingController.FlashAsync idiom). A no-op
    (an already-triaged report, M31·6) sets no flash → no alert. *@
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
 
 @if (Model.Reports.Count == 0)
 {

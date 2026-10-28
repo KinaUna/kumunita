@@ -16,15 +16,6 @@
     and the page header always agree).
 </p>
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-info">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 <form method="post" action="/admin/labels">
     @Html.AntiForgeryToken()
 

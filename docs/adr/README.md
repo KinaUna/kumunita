@@ -225,3 +225,4 @@ Decision / Consequences. New decisions take the next number.
 | 0214 | Login and MFA fixes — a wrong code keeps the pending sign-in (retry works), lockout returns to the password form, error announced and focused, code field cleared, plural text (Razor, C#). |
 | 0215 | MFA challenge page and its error messages translated — ten `account.mfa.*` keys in en/de/fr/da, controller errors resolved from the registry (Razor, C#, keys). |
 | 0216 | Pages tree and page detail at phone width — whole-row leaf links, breadcrumb on its own row, 36-44px touch targets for back link, crumbs and translation chips (CSS, Razor hooks). |
+| 0217 | Admin Appearance form checked end to end; the five admin views that rendered the flash message a second time inline (next to the layout toast) no longer do (Razor). |

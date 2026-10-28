@@ -65,14 +65,6 @@
    success); TempData["error"] is the failure / not-configured flash
    (escalate.flash_failure / escalate.not_configured). Both are server-
    resolved strings (the controller's FlashAsync). *@
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
 
 @* The report's full field set (the 15-member M32 ceiling, the M32·3 pin).
    The M31 11 + the M32 4 additive (Origin / ResolvedAt / ResolvedBy /

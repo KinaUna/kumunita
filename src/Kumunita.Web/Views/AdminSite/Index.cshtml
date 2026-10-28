@@ -14,15 +14,6 @@
     saving one does not touch the other.
 </p>
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-info">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 <h2 class="h5 mt-4">Appearance</h2>
 <p class="text-muted">
     The platform's default colour palette. Members see it until they pick their
