@@ -111,7 +111,7 @@
             <span><kw-l key="common.exit_full_page">Exit full page</kw-l></span>
         </button>
 
-        <header class="airy-head">
+        <header class="airy-head kmb-board-head">
             <div class="head-row">
                 @* flex:1 1 0 + min-w-0: the left column (title + description +
                    author + tags + links) has a ZERO flex-basis and grows to fill
@@ -174,33 +174,60 @@
                             <div class="mt-2">
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="text-muted small fw-semibold"><kw-l key="posts.translations_label">Translations</kw-l></span>
-                                    <button type="button" class="badge text-bg-light border"
+                                    <button type="button" class="kmb-chip kmb-chip-btn"
                                             data-translation-chip data-td-group="board"
-                                            data-td-variant="@(Model.Board.LanguageCode)">@Model.Board.LanguageCode</button>
+                                            data-td-variant="@(Model.Board.LanguageCode)"
+                                            aria-pressed="@(_originalHidden ? "false" : "true")">@Model.Board.LanguageCode</button>
                                     @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
                                     {
-                                        <button type="button" class="badge text-bg-light border"
+                                        <button type="button" class="kmb-chip kmb-chip-btn"
                                                 data-translation-chip data-td-group="board"
-                                                data-td-variant="@tr.LanguageCode">@tr.LanguageCode</button>
+                                                data-td-variant="@tr.LanguageCode"
+                                                aria-pressed="@(String.Equals(tr.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">@tr.LanguageCode</button>
                                     }
                                 </div>
                             </div>
                         }
                     </div>
-                    <div class="text-muted small mt-1">
-                        @Model.Board.AuthorDisplayName
-                        <span>· <kw-l key="projects.todo.created">Created</kw-l>
-                        <kw-dt dt="@Model.Board.Created" format="g"></kw-dt></span>
-                        @if (Model.Board.Modified is not null)
-                        {
-                            <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
-                            <kw-dt dt="@Model.Board.Modified" format="g"></kw-dt></span>
-                        }
-                        @if (Model.Board.ComponentDisplayName is not null)
-                        {
-                            <span class="badge text-bg-light border ms-2">@Model.Board.ComponentDisplayName</span>
-                        }
+                    @* ADR 0200 — author byline (avatar + name + dates) and one chip row for
+                       the community, project link and event link; same pattern as the
+                       announcement detail (ADR 0184). The links keep their dangling rules. *@
+                    <div class="airy-post-head kmb-ann-byline mt-2">
+                        <kw-avatar subject="@Model.Board.AuthorId"
+                                   mono="@(string.IsNullOrWhiteSpace(Model.Board.AuthorDisplayName) ? "" : char.ToUpperInvariant(Model.Board.AuthorDisplayName.TrimStart()[0]).ToString())"
+                                   mono-hue="@AvatarHue.For(Model.Board.AuthorId)" />
+                        <span class="airy-post-author">
+                            <span class="name">@Model.Board.AuthorDisplayName</span>
+                            <span class="when">
+                                <kw-l key="projects.todo.created">Created</kw-l>
+                                <kw-dt dt="@Model.Board.Created" format="g"></kw-dt>
+                                @if (Model.Board.Modified is not null)
+                                {
+                                    <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                                    <kw-dt dt="@Model.Board.Modified" format="g"></kw-dt></span>
+                                }
+                            </span>
+                        </span>
                     </div>
+                    @if (Model.Board.ComponentDisplayName is not null
+                         || (Model.ProjectId is not null && Model.ProjectTitle is not null)
+                         || (Model.EventId is not null && Model.EventTitle is not null))
+                    {
+                        <div class="d-flex flex-wrap align-items-center gap-2 mt-2 kmb-board-links">
+                            @if (Model.Board.ComponentDisplayName is not null)
+                            {
+                                <span class="kmb-chip">@Model.Board.ComponentDisplayName</span>
+                            }
+                            @if (Model.ProjectId is not null && Model.ProjectTitle is not null)
+                            {
+                                <a class="kmb-chip" href="@($"/projects/projects/{Model.ProjectId}")"><kw-l key="pl.board.project_link">Project</kw-l>:&nbsp;@Model.ProjectTitle</a>
+                            }
+                            @if (Model.EventId is not null && Model.EventTitle is not null)
+                            {
+                                <a class="kmb-chip" href="@Model.EventLinkPath"><kw-l key="board.event_link">Linked event</kw-l>:&nbsp;@Model.EventTitle</a>
+                            }
+                        </div>
+                    }
                     @* ADR 0044 / 0147 — the board's tags (display names in
                        the viewer's language, resolved by the controller from
                        the access-scoped read seam — the
@@ -214,7 +241,7 @@
                         <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
                             @foreach (var tag in Model.Tags)
                             {
-                                <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                                <a class="kmb-chip"
                                    href="/tags/@tag.Slug">@tag.DisplayedName</a>
                             }
                         </div>
@@ -225,27 +252,6 @@
                        both fields are `null` when the target is soft-deleted
                        or unreadable, and the link is omitted entirely). A
                        display surface, never a gate (C-PL·3). *@
-                    @if (Model.ProjectId is not null && Model.ProjectTitle is not null)
-                    {
-                        <div class="text-muted small mt-1">
-                            <kw-l key="pl.board.project_link">Project</kw-l>:
-                            <a href="@($"/projects/projects/{Model.ProjectId}")">@Model.ProjectTitle</a>
-                        </div>
-                    }
-                    @* ADR 0115 D2 (M14 interlock carried to the board
-                       surface) — the **event link**: present only when the
-                       board has an `EventId` that resolves to a readable,
-                       non-deleted event (the D2 dangling rule — all three
-                       fields are `null` when the target is soft-deleted or
-                       unreadable, and the chip is omitted entirely). A
-                       display surface, never a gate (C-M14·2). *@
-                    @if (Model.EventId is not null && Model.EventTitle is not null)
-                    {
-                        <div class="text-muted small mt-1">
-                            <kw-l key="board.event_link">Linked event</kw-l>:
-                            <a href="@Model.EventLinkPath">@Model.EventTitle</a>
-                        </div>
-                    }
                 </div>
                 @* The board action dropdown (the _AccountNav.cshtml Bootstrap
                    dropdown shape): delete board — a plain POST form to the

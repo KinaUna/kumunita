@@ -1155,3 +1155,33 @@ html[data-kmb-palette] button.badge.text-bg-light.border[aria-pressed='true'] {
 }
 html[data-kmb-palette] .kmb-sort-pill.is-active { border-color: var(--kmb-accent); }
 html[data-kmb-palette] .events-view-toggle.btn-group > .btn.active { box-shadow: inset 0 0 0 1.5px var(--kmb-accent); }
+
+/* Projects forms and board header (ADR 0200) */
+/* Board header: a surface card in the normal page width, above the board. */
+html[data-kmb-palette] .kmb-board-head {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+html[data-kmb-palette] .kmb-board-head h1 { font-size: 1.625rem; margin-bottom: 0.25rem; overflow-wrap: anywhere; }
+html[data-kmb-palette] .kmb-board-head .head-row { align-items: flex-start; }
+html[data-kmb-palette] .kmb-board-head .kmb-ann-byline .when { color: var(--kmb-muted); }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-board-head { padding: 1rem; }
+}
+/* Audience block: switch, label and hint aligned; the divider only shows with the restricted panel. */
+html[data-kmb-palette] form > .card .card-title {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  color: var(--kmb-ink-soft);
+  margin-bottom: 0.75rem;
+}
+html[data-kmb-palette] form > .card .form-switch > .text-muted.small { margin-left: 0 !important; margin-top: 0.125rem; }
+html[data-kmb-palette] form > .card hr { border-color: var(--kmb-border-soft); opacity: 1; }
+html[data-kmb-palette] form > .card .form-switch + hr:has(+ .audience-restricted.d-none) { display: none; }
+/* Submit row: primary action and a quiet Cancel on one centred line. */
+html[data-kmb-palette] form > .d-flex.gap-2:has(> .btn-primary) { align-items: center; gap: 1rem !important; }
+html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link { color: var(--kmb-ink-soft); text-decoration: none; }
+html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link:hover { color: var(--kmb-accent); text-decoration: underline; }
