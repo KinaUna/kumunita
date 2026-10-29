@@ -24,6 +24,9 @@
     // authored-in language (the ADR 0027 floor). The ADR 0027 click-to-swap +
     // return path are untouched — only *which* variant shows first changes.
     var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", defaultVariant);
+    var draftTip = Translation is null ? "Only you can see this — it is not yet public" : await Translation.GetAsync("common.draft_tooltip", defaultVariant);
+    var pinnedTip = Translation is null ? "Shown as a banner at the top of every page" : await Translation.GetAsync("announcements.pinned_tooltip", defaultVariant);
 
     // The remove-translation form's data-confirm (the ADR 0072 attribute
     // idiom — the confirm.js seam reads the attribute verbatim; the kw-l
@@ -83,7 +86,7 @@
             </span>
             @if (Model.Pinned)
             {
-                <span class="kmb-chip kmb-chip-pinned" title="Shown as a banner at the top of every page">
+                <span class="kmb-chip kmb-chip-pinned" title="@pinnedTip">
                     <kw-l key="announcements.pinned_badge">pinned</kw-l>
                 </span>
             }
@@ -93,7 +96,7 @@
                that clears the flag (the author-only lane). *@
             @if (Model.IsDraft && Model.IsAuthor)
             {
-                <span class="kmb-chip kmb-chip-draft" title="Only you can see this — it is not yet public">
+                <span class="kmb-chip kmb-chip-draft" title="@draftTip">
                     <kw-l key="posts.draft_badge">Draft</kw-l>
                 </span>
                 <form class="d-inline" method="post" action="/announcements/@Model.Id/publish">
@@ -125,7 +128,7 @@
                                                 <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                    aria-label="Close"></button>
+                                                    aria-label="@ariaClose"></button>
                                         </div>
                                         <div class="modal-body">
                                             <div class="mb-3">
@@ -194,7 +197,7 @@
                                                 <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                    aria-label="Close"></button>
+                                                    aria-label="@ariaClose"></button>
                                         </div>
                                         <div class="modal-body">
                                             <div class="mb-3">

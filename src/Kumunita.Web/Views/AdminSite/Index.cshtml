@@ -1,4 +1,10 @@
 @model Kumunita.Web.Controllers.AdminSiteController.AdminSiteViewModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _closeLang);
+}
 @{
     ViewData["Title"] = "Admin — Site content";
 }
@@ -381,7 +387,7 @@
                         <h5 class="modal-title" id="@($"site-trans-add-label-{lang.Code}")">
                             Add — <b>@LangName(lang.Code)</b>
                         </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                     </div>
                     <div class="modal-body">
                         @* Six hero fields, each optional (a blank one falls back
@@ -428,7 +434,7 @@
                         <h5 class="modal-title" id="@($"site-trans-edit-label-{t.LanguageCode}")">
                             Edit — <b>@LangName(t.LanguageCode)</b>
                         </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                     </div>
                     <div class="modal-body">
                         @* Six hero fields, each optional (a blank one clears that

@@ -1,4 +1,10 @@
 @model Kumunita.Web.Models.InventoryEditorModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _closeLang);
+}
 @{
     ViewData["Title"] = "Edit item";
     var itemId = ViewData["itemId"] as string ?? throw new InvalidOperationException("The item id is not in the view data.");
@@ -19,7 +25,7 @@
                         <li>@msg</li>
                     }
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
             </div>
         }
 

@@ -6,6 +6,7 @@
     ViewData["Title"] = "New goal";
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -26,7 +27,7 @@
                         <li>@msg</li>
                     }
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
             </div>
         }
 

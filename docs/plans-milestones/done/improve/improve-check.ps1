@@ -141,8 +141,13 @@ $aBaseline = @(
 # everyone-audience seeds grew ProjectsController.cs (5358 -> 5370) — the
 # same shipped-additions mechanism as above; the gate's ceiling now starts
 # from the 2026-10-29 baseline (again).
+# Re-baselined again 2026-10-29 (the ADR 0258 shared-close/tooltips close):
+# the three new tooltip keys (pages.draft_tooltip, pages.scoped_tooltip,
+# announcements.pinned_tooltip) x en/de/fr/da added to KnownTranslationKeys.cs
+# (11835 -> 11859) — the same shipped-additions mechanism as above; the
+# gate's ceiling starts from 11859 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11835
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11859
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926

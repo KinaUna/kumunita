@@ -12,6 +12,7 @@
     // placeholder="..." attribute — resolve server-side, the _GrantPickers / Profile/Edit
     // pattern). Same chain the <kw-l> TagHelper uses (M·5/M·8, ADR 0049).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
 
     // The delete post / reply + remove-translation forms' data-confirms (the
     // ADR 0072 attribute idiom — the confirm.js seam reads the attribute
@@ -403,7 +404,7 @@
                             <h5 class="modal-title" id="report-modal-label">
                                 <kw-l key="posts.report_button">Report this post</kw-l>
                             </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                         </div>
                         <div class="modal-body">
                             <label class="form-label" for="report-reason" style="font-weight:600;">
@@ -447,7 +448,7 @@
                                     <h5 class="modal-title" id="@($"post-trans-edit-label-{existing.LanguageCode}")">
                                         <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                     </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
                                     <label class="form-label mb-1">
@@ -506,7 +507,7 @@
                                     <h5 class="modal-title" id="@($"post-trans-add-label-{lang.Code}")">
                                         <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                     </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
                                     <label class="form-label mb-1">

@@ -45,7 +45,7 @@
         confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
         ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
     }
-    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("common.close", _kwL);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     var filterNamePlaceholder = Translation is null
         ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["common.filter_name"]
         : await Translation.GetAsync("common.filter_name", _kwL);

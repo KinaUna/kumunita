@@ -39,6 +39,7 @@
 @{
     var _kwL = await EffectiveLanguageCode.ResolveAsync(
         ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     string titleFloor = Kumunita.Core.Localization.KnownTranslationKeys.EnValues[Model.TitleKey];
     string reasonPlaceholder = Kumunita.Core.Localization.KnownTranslationKeys.EnValues["posts.report_reason_placeholder"];
     if (Translation is not null)
@@ -60,7 +61,7 @@
                         <kw-l key="@Model.TitleKey">@titleFloor</kw-l>
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"
-                            aria-label="Close"></button>
+                            aria-label="@ariaClose"></button>
                 </div>
                 <div class="modal-body">
                     <label class="form-label" for="@reasonId">

@@ -5,6 +5,12 @@
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var draftTip = Translation is null ? "Only you can see this — it is not yet public" : await Translation.GetAsync("common.draft_tooltip", _closeLang);
+    var draftPubTip = Translation is null ? "Only you can see this — it is not yet published" : await Translation.GetAsync("pages.draft_tooltip", _closeLang);
+    var scopedTip = Translation is null ? "Scoped to a community" : await Translation.GetAsync("pages.scoped_tooltip", _closeLang);
+}
+@{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Page" : Model.Title;
 
     // The remove-translation + delete-page forms' data-confirms (the ADR 0072
@@ -127,7 +133,7 @@
             @* ADR 0037 — draft surface: visible to the author only. *@
             @if (Model.IsDraft && Model.IsAuthor)
             {
-                <span class="kmb-chip kmb-chip-draft" title="Only you can see this — it is not yet public">
+                <span class="kmb-chip kmb-chip-draft" title="@draftTip">
                     <kw-l key="posts.draft_badge">Draft</kw-l>
                 </span>
                 <form class="d-inline" method="post" action="/pages/@Model.Id/publish">
@@ -140,7 +146,7 @@
 
             @if (Model.CommunityDisplayName is not null)
             {
-                <span class="kmb-chip" title="Scoped to a community">
+                <span class="kmb-chip" title="@scopedTip">
                     @Model.CommunityDisplayName
                 </span>
             }
@@ -418,7 +424,7 @@
                             <a href="@child.Href">@child.Title</a>
                             @if (child.IsDraft)
                             {
-                                <span class="kmb-chip kmb-chip-draft ms-2" title="Only you can see this — it is not yet published">
+                                <span class="kmb-chip kmb-chip-draft ms-2" title="@draftPubTip">
                                     <kw-l key="posts.draft_badge">Draft</kw-l>
                                 </span>
                             }

@@ -1,5 +1,11 @@
 @using Kumunita.Web.Security
 @model Kumunita.Web.Models.AdminDashboardViewModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _closeLang);
+}
 @{
     ViewData["Title"] = "Admin";
 }
@@ -72,7 +78,7 @@
             </select>
             <button class="btn btn-primary btn-sm" type="submit"><kw-l key="admin.verify">Verify</kw-l></button>
         </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
     </form>
 }
 

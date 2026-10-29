@@ -6,6 +6,7 @@
     ViewData["Title"] = "New board";
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
     // ADR 0072 — the initial-lane suggested-title placeholder (was the
     // hardcoded "Planned"), resolved the same way as optionalPlaceholder.
@@ -34,7 +35,7 @@
                         <li>@msg</li>
                     }
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
             </div>
         }
 

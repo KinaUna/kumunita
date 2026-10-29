@@ -1211,6 +1211,12 @@ public static class KnownTranslationKeys
                 "Your post will be visible to the current members of this group only.",
             ["common.draft_tooltip"] =
                 "Only you can see this — it is not yet public",
+            ["pages.draft_tooltip"] =
+                "Only you can see this — it is not yet published",
+            ["pages.scoped_tooltip"] =
+                "Scoped to a community",
+            ["announcements.pinned_tooltip"] =
+                "Shown as a banner at the top of every page",
             ["common.range_to"] =
                 "to",
             ["groups.new_back"]       = "back to the group",
@@ -4290,6 +4296,12 @@ public static class KnownTranslationKeys
                 "Dein Beitrag ist nur für die aktuellen Mitglieder dieser Gruppe sichtbar.",
             ["common.draft_tooltip"] =
                 "Nur du kannst das sehen — es ist noch nicht öffentlich",
+            ["pages.draft_tooltip"] =
+                "Nur du kannst das sehen — es ist noch nicht veröffentlicht",
+            ["pages.scoped_tooltip"] =
+                "Auf eine Community beschränkt",
+            ["announcements.pinned_tooltip"] =
+                "Wird als Banner oben auf jeder Seite angezeigt",
             ["common.range_to"] =
                 "bis",
             ["groups.new_back"]       = "zurück zur Gruppe",
@@ -7164,6 +7176,12 @@ public static class KnownTranslationKeys
                 "Votre publication ne sera visible que pour les membres actuels de ce groupe.",
             ["common.draft_tooltip"] =
                 "Vous seul pouvez voir ceci — ce n’est pas encore public",
+            ["pages.draft_tooltip"] =
+                "Vous seul pouvez voir ceci — ce n’est pas encore publié",
+            ["pages.scoped_tooltip"] =
+                "Limité à une communauté",
+            ["announcements.pinned_tooltip"] =
+                "Affiché comme bannière en haut de chaque page",
             ["common.range_to"] =
                 "à",
             ["groups.new_back"]       = "retour au groupe",
@@ -10035,6 +10053,12 @@ public static class KnownTranslationKeys
                 "Dit indlæg er kun synligt for gruppens nuværende medlemmer.",
             ["common.draft_tooltip"] =
                 "Kun du kan se dette — det er endnu ikke offentligt",
+            ["pages.draft_tooltip"] =
+                "Kun du kan se dette — det er endnu ikke udgivet",
+            ["pages.scoped_tooltip"] =
+                "Begrænset til et fællesskab",
+            ["announcements.pinned_tooltip"] =
+                "Vises som banner øverst på hver side",
             ["common.range_to"] =
                 "til",
             ["groups.new_back"]       = "tilbage til gruppen",

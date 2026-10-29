@@ -15,7 +15,7 @@
     string optionalPlaceholder = "optional";
     if (Translation is not null)
     {
-        ariaClose         = await Translation.GetAsync("common.close", _kwL);
+        ariaClose         = await Translation.GetAsync("a11y.close", _kwL);
         optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
     }
 }

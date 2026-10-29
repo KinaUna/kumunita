@@ -14,14 +14,14 @@ event time range ("to"), the draft tooltip on the group event page, and `aria-la
 - The text moves to `<kw-l>`; attributes (`aria-label`, `title`) are resolved server-side with `Translation.GetAsync` and a null-provider English floor.
 - Existing keys are reused wherever the English matched: `posts.replies_heading`, `posts.reply_heading(_author)`, `posts.reply_label`,
   `posts.reply_language_label/_note`, `posts.reply_audience_note_label`, `posts.reply_submit/_edit/_save/_delete`, `groups.create`,
-  `common.add`, `common.remove`, `common.close`.
+  `common.add`, `common.remove`, `a11y.close`.
 - Twenty new keys in en/de/fr/da (de/fr/da machine-written, review parked): `groups.owned_by`, `you_own`, `private_chip`,
   `pending_invitations_heading`, `invite_cancel`, `filter_residents_label`, `resident_label`, `invite_note`, `invite_submit`,
   `all_members_already`, `add_member_heading`, `add_member_note`, `post_why_heading`, `post_why_body`, `replies_empty`,
   `reply_audience_note` (group wording, unlike `posts.reply_audience_note`), `index_empty_body`, `new_visibility_note`, plus the shared
   `common.draft_tooltip` and `common.range_to`.
-- `common.close` is used on the Groups views only (Detail, PostDetail, EventNew, EventEdit); the other views with `aria-label="Close"` follow in a
-  separate patch.
+- `a11y.close` is used on the Groups views (Detail, PostDetail, EventNew, EventEdit); the other views with `aria-label="Close"` follow in ADR 0258.
+  (Patch 91 used `common.close`; ADR 0258 switches it to `a11y.close`, the key the board views already used.)
 - The invite note no longer links the word "Groups" to the groups page (`<kw-l>` escapes its content and the sentence is one key); the groups page
   is one click away in the navbar.
 

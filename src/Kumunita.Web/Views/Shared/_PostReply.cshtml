@@ -1,3 +1,7 @@
+@{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _closeLang);
+}
 @* _PostReply — one reply on a post detail (U06, IMPROVE lane).
    Extracted verbatim from Views/Posts/Detail.cshtml so a future reply lane
    (ADR 0016 reply-edit / 0023 reply-report / 0022 reply-translation / 0049
@@ -248,7 +252,7 @@
                                                 <h5 class="modal-title" id="@($"reply-edit-modal-label-{r.Id}")">
                                                     <kw-l key="posts.reply_edit">Edit</kw-l> — <kw-l key="posts.reply_heading">reply</kw-l>
                                                 </h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                             </div>
                                             <div class="modal-body">
                                                 @* RE U06 — image OFF (same RC reply-image gap). *@
@@ -297,7 +301,7 @@
                                             <h5 class="modal-title" id="@($"reply-report-modal-label-{r.Id}")">
                                                 <kw-l key="posts.reply_report_button">Report this reply</kw-l>
                                             </h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                         </div>
                                         <div class="modal-body">
                                             <label class="form-label" for="@($"reply-report-reason-{r.Id}")" style="font-weight:600;">
@@ -339,7 +343,7 @@
                                                     <h5 class="modal-title" id="@($"reply-trans-edit-label-{r.Id}-{existing.LanguageCode}")">
                                                         <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                                     </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <label class="form-label" for="@($"reply-trans-edit-body-{r.Id}-{existing.LanguageCode}")">
@@ -378,7 +382,7 @@
                                                     <h5 class="modal-title" id="@($"reply-trans-add-label-{r.Id}-{lang.Code}")">
                                                         <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                                     </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <label class="form-label" for="@($"reply-trans-add-body-{r.Id}-{lang.Code}")">

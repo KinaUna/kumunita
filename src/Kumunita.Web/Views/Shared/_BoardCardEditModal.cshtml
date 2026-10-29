@@ -30,6 +30,7 @@
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     var tagsExample = await Translation.GetAsync("tags.events_example", _kwL);
     // The fixed status vocabulary's label keys (ADR 0069 — the same closed
     // set the Kanban lane's Set-status select offers: None + the four codes).
@@ -76,7 +77,7 @@
                         <kw-l key="projects.todo.edit_heading">Edit to-do</kw-l>
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"
-                            aria-label="Close"></button>
+                            aria-label="@ariaClose"></button>
                 </div>
                 <div class="modal-body">
                     @if (ViewData.ModelState?.ErrorCount > 0)
@@ -90,7 +91,7 @@
                                     <li>@msg</li>
                                 }
                             </ul>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
                         </div>
                     }
 

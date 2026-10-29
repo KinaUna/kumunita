@@ -9,6 +9,7 @@
     // tags.events_example registry key — the neighborhood-appropriate
     // cleanup/social/garden set, the Event/Edit.cshtml idiom).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     var tagsExample = await Translation.GetAsync("tags.events_example", _kwL);
 }
 
@@ -30,7 +31,7 @@
                         <li>@msg</li>
                     }
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
             </div>
         }
 

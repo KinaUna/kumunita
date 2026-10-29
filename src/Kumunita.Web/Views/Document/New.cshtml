@@ -9,6 +9,7 @@
     ViewData["Title"] = "Upload a document";
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     // Null-safe: U03's GET New() returns View("New") with no model (the form is
     // blank); the POST re-render path passes the bound form. So read the model
     // through Model? — both paths render.
@@ -61,7 +62,7 @@
                         <li>@msg</li>
                     }
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
             </div>
         }
 

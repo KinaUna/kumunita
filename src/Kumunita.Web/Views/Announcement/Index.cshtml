@@ -6,6 +6,10 @@
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
 @{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var pinnedTip = Translation is null ? "Shown as a banner at the top of every page" : await Translation.GetAsync("announcements.pinned_tooltip", _closeLang);
+}
+@{
     ViewData["Title"] = "Announcements";
     bool isGlobalAdmin = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
     bool isModerator = User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.Moderator) ?? false;
@@ -132,7 +136,7 @@
                         <span class="kmb-ann-chips">
                             @if (a.Pinned)
                             {
-                                <span class="kmb-chip kmb-chip-pinned" title="Shown as a banner at the top of every page">
+                                <span class="kmb-chip kmb-chip-pinned" title="@pinnedTip">
                                     <kw-l key="announcements.pinned_badge">pinned</kw-l>
                                 </span>
                             }

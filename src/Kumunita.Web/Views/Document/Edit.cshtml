@@ -9,6 +9,7 @@
     ViewData["Title"] = "Edit a document";
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     // ADR 0125 (U03) — the owner-only edit form. The audience editor is
     // pre-filled from the stored Document.Audience (ADR 0036 single source,
     // AudienceEditorModel.FromAudience — the controller did that on GET); the
@@ -67,7 +68,7 @@
                         <li>@msg</li>
                     }
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
             </div>
         }
 

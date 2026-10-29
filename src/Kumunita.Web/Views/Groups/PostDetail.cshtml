@@ -28,7 +28,7 @@
     // reply block below (in scope for both). The ADR 0027 click-to-swap +
     // return path are untouched — only *which* variant shows first changes.
     var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
-    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("common.close", defaultVariant);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", defaultVariant);
     bool originalHidden = Model.PostTranslations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
 
     // The delete post / reply + remove-translation forms' data-confirms (the
