@@ -191,8 +191,16 @@ $aBaseline = @(
 # security.flash_* / tags.flash_* keys x en/de/fr/da added to
 # KnownTranslationKeys.cs (12839 -> 12975) — the same shipped-additions
 # mechanism as above; the gate's ceiling starts from 12975 now.
+# Re-baselined again 2026-10-29 (the ADR 0269 ModelState close): the 63 new
+# validation.* keys x en/de/fr/da added to KnownTranslationKeys.cs
+# (12975 -> 13227) — the same shipped-additions mechanism as above.
+# Re-baselined again 2026-10-29 (the ADR 0270 BadRequest-bodies close): the
+# 4 new validation.* keys (validation.folder_name_required / choose_image /
+# choose_file / document_id_required) x en/de/fr/da added to
+# KnownTranslationKeys.cs (13227 -> 13243) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 13243 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 12975
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 13243
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926

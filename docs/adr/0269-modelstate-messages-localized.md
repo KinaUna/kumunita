@@ -20,3 +20,7 @@ Projects) rendered English validation and sign-in/permission text under every lo
 ## Not covered
 Not compiled or run (no .NET SDK here); de/fr/da text machine-written, review parked. Remaining literal English in controllers: 8 `BadRequest("…")` bodies and
 service exception text surfaced via `ex.Message` / `ModelState` (English at the source in Core). Client-side (TypeScript) messages were not part of this scan.
+
+Compiled and run 2026-10-29 (build clean; `Kumunita.Web.Tests` green).
+
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 12975 -> 13243 on 2026-10-29 for the 63 new keys x en/de/fr/da of this lane (12975 -> 13227; the ADR 0265/0266 shipped-additions mechanism).
