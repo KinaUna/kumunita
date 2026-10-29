@@ -88,15 +88,15 @@ test('a signed-in resident publishes one post and it appears', async ({ page }) 
   }
   expect(
     loginResponse.status(),
-    'the login POST should produce a response (a redirect to /profile/edit)',
+    'the login POST should produce a response (a redirect to Home)',
   ).toBeLessThan(500);
   // waitForResponse resolves on the 302, before the browser finishes navigating
   // — wait for the final URL so the assertion is deterministic.
-  await page.waitForURL(/\/profile\/edit/, { timeout: 10_000 });
+  await page.waitForURL((url) => url.pathname === '/', { timeout: 10_000 });
   expect(
-    page.url(),
-    'after login, the browser should be on /profile/edit (the controller\'s Redirect("/profile/edit"))',
-  ).toContain('/profile/edit');
+    new URL(page.url()).pathname,
+    'after login, the browser should be on Home (ADR 0234: the controller\'s Redirect("/"))',
+  ).toBe('/');
 
   // ── One write (pin §2.1 step 5, verbatim — the shared write leg) ──
   // The SAME helper Flow A calls (helpers/post-write.ts): navigate to

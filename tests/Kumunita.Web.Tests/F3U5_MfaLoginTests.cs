@@ -82,7 +82,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
 
         var mfaModel = new LoginViewModel { MfaCode = "123456" };
         var redirect = Assert.IsType<RedirectResult>(await h.Controller.LoginMfa(mfaModel));
-        Assert.Equal("/profile/edit", redirect.Url);
+        Assert.Equal("/", redirect.Url);   // ADR 0234 — Home
     }
 
     // ── Pin §7 test 2 (§6) ─────────────────────────────────────────────────
@@ -109,7 +109,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
 
         var firstAction = await h.Controller.LoginMfa(new LoginViewModel { MfaRecoveryCode = firstCode });
         var firstRedirect = Assert.IsType<RedirectResult>(firstAction);
-        Assert.Equal("/profile/edit", firstRedirect.Url);
+        Assert.Equal("/settings/security/mfa", firstRedirect.Url);   // ADR 0234 — recovery → MFA settings
 
         // The "redeem under the hood" (the real <c>SignInManager</c> calls
         // <c>UserManager.RedeemTwoFactorRecoveryCodeAsync</c> internally, pin
@@ -203,7 +203,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
         // Sign-in completes **directly** (a redirect, no challenge) —
         // MFA is optional for a non-GlobalAdmin (proves §5 Leg 1.5c).
         var redirect = Assert.IsType<RedirectResult>(action);
-        Assert.Equal("/profile/edit", redirect.Url);
+        Assert.Equal("/", redirect.Url);   // ADR 0234 — Home
     }
 
     // ── ADR 0194 — the sample-admin login-enrollment exemption ─────────────
@@ -215,7 +215,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
     /// instance) with <c>TwoFactorEnabled == false</c> posts a correct
     /// password to <see cref="AccountController.Login"/>. Asserts the
     /// response is a <b>direct sign-in</b> (a <see cref="RedirectResult"/>
-    /// to <c>/profile/edit</c>, the leg 1.5c path) — NOT the enrollment
+    /// to <c>/</c> (Home), the leg 1.5c path) — NOT the enrollment
     /// redirect to <c>/settings/security/mfa</c> (leg 1.5b). The exemption
     /// reads the <c>IsSampleDataAccountAsync</c> seam (conjuncts 1+3 only —
     /// the admin-toggle gate is NOT consulted, so a locked instance still
@@ -240,11 +240,11 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
         var model = new LoginViewModel { Email = AdminEmail, Password = Password };
         var action = await h.Controller.Login(model);
 
-        // Sign-in completes **directly** (a redirect to /profile/edit, the
+        // Sign-in completes **directly** (a redirect to Home, the
         // leg 1.5c path) — NOT the enrollment redirect to /settings/security/mfa
         // (leg 1.5b is skipped by the ADR 0194 exemption).
         var redirect = Assert.IsType<RedirectResult>(action);
-        Assert.Equal("/profile/edit", redirect.Url);
+        Assert.Equal("/", redirect.Url);   // ADR 0234 — Home
 
         // The IsSampleDataAccountAsync seam was consulted (the exemption read).
         await h.Identity
@@ -423,7 +423,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
     /// the success-path <c>Url.IsLocalUrl(...)</c>) resolves in the
     /// direct-construction harness (the <c>KioskControllerTests</c> idiom).
     /// <c>IsLocalUrl</c> returns <c>false</c> so the controller takes the
-    /// <c>Redirect("/profile/edit")</c> branch (the assertions' target).
+    /// <c>Redirect("/")</c> branch (the assertions' target).
     /// </summary>
     private sealed class StubUrlHelper : IUrlHelper
     {

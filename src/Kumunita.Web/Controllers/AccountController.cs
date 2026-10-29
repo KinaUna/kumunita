@@ -740,7 +740,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Login([FromQuery] string? returnUrl = null, [FromQuery] string? error = null)
     {
         if (User.Identity?.IsAuthenticated == true)
-            return Redirect("/profile/edit");
+            return Redirect("/");   // ADR 0234 — sign-in lands on Home
 
         // `error` arrives as a short code (not the message text) — the query string is
         // user-visible and may be bookmarked/shared, so keep it token-like. The
@@ -944,7 +944,7 @@ public sealed class AccountController(
 
         return Url.IsLocalUrl(model.ReturnUrl)
             ? Redirect(model.ReturnUrl)
-            : Redirect("/profile/edit");
+            : Redirect("/");   // ADR 0234 — sign-in lands on Home
     }
 
     // ── MFA challenge leg (F3.U4, the pin §5 leg 2) ──────────────────────────────────
@@ -1157,9 +1157,16 @@ public sealed class AccountController(
         // "complete the sign-in and mint the auth cookie on success"). The
         // cookie was minted by the leg-2 sign-in method above (via
         // `DoTwoFactorSignInAsync` → `SignInWithClaimsAsync`).
+        //
+        // ADR 0234 — a recovery-code sign-in means the second factor is lost or
+        // suspect: send the person to the MFA settings to re-enroll or rotate the
+        // remaining codes. It wins over a ReturnUrl (the code was just spent).
+        if (!string.IsNullOrWhiteSpace(model.MfaRecoveryCode))
+            return Redirect("/settings/security/mfa");
+
         return Url.IsLocalUrl(model.ReturnUrl)
             ? Redirect(model.ReturnUrl)
-            : Redirect("/profile/edit");
+            : Redirect("/");   // ADR 0234 — Home, not the profile editor
     }
 
     // ── Sign-out ────────────────────────────────────────────────────────────────────────

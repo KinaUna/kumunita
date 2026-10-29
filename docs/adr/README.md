@@ -242,3 +242,4 @@ Decision / Consequences. New decisions take the next number.
 | 0231 | Phone audit of admin/account pages: sub-nav tab strips scroll in one row with edge fades (`tab-strip.ts`), Analytics window buttons wrap, Platform pages table stacks, Platform/Communities heading levels (CSS, TS, Razor, ADR). |
 | 0232 | Verification gaps closed (MFA challenge, recovery code, lockout, PPTX/image upload all verified); FAQ accordion made theme-aware (token-driven colours, currentColor chevron) after failing dark mode (CSS, ADR). |
 | 0233 | A rejected document upload (blank title, no file, too large or over quota, wrong type) re-renders New/Edit with the same status and a localized error instead of a blank page; fixes the false "Mode field is required" alert on GET /documents/new (Razor/C#, keys, tests, ADR). |
+| 0234 | Sign-in lands on Home instead of /profile/edit; a recovery-code sign-in lands on the MFA settings; sign-up/verify unchanged (C#, tests, e2e, ADR). |
