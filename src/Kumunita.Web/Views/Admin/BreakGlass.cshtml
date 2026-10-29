@@ -16,8 +16,7 @@
 @if (!Model.HasOverride)
 {
     <div class="alert alert-secondary">
-        No break-glass code has been set up for your account. Ask the operator to
-        set one up before using this page.
+        <kw-l key="admin.breakglass.no_code">No break-glass code has been set up for your account. Ask the operator to set one up before using this page.</kw-l>
     </div>
 }
 else
@@ -57,10 +56,7 @@ else
     else
     {
         <p class="text-muted">
-            Once activated, the elevation stays in effect until its own
-            <em>expiry</em>; every privileged action taken under it is written
-            to the audit log (see <a asp-action="Audit">the audit log</a>).
-            This page will not let you activate the same code twice.
+            <kw-l key="admin.breakglass.once_active">Once activated, the elevation stays in effect until its own expiry; every privileged action taken under it is written to the audit log (see the audit log). This page will not let you activate the same code twice.</kw-l>
         </p>
     }
 }

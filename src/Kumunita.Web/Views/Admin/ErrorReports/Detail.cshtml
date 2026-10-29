@@ -78,7 +78,7 @@
        errorreport.list.status.new + .triaged + .resolved keys). The <dt> is
        a plain "Status" label (a value, not a kw-l key — the M32·9 closed
        set has no generic "status" key). *@
-    <dt class="col-sm-3">Status</dt>
+    <dt class="col-sm-3"><kw-l key="admin.errorreport.status">Status</kw-l></dt>
     <dd class="col-sm-9">
         @if (r.TriageStatus == "new")
         {
@@ -135,7 +135,7 @@
     @* The contact email (optional, the M31 list-view precedent). *@
     @if (!string.IsNullOrEmpty(r.ContactEmail))
     {
-        <dt class="col-sm-3">Email</dt>
+        <dt class="col-sm-3"><kw-l key="common.email">Email</kw-l></dt>
         <dd class="col-sm-9"><span>@r.ContactEmail</span></dd>
     }
 
@@ -152,7 +152,7 @@
        {"error-page","general"} extended additively to "escalated" in ESC·2).
        Rendered as plain text (a value, not a platform label — no kw-l key,
        the M32·9 closed set has no origin.* key). *@
-    <dt class="col-sm-3">Origin</dt>
+    <dt class="col-sm-3"><kw-l key="admin.errorreport.origin">Origin</kw-l></dt>
     <dd class="col-sm-9">
         <span class="badge text-bg-secondary">@r.Origin</span>
     </dd>
@@ -177,7 +177,7 @@
 
     @if (r.EscalationReceivedAt is not null)
     {
-        <dt class="col-sm-3">Received</dt>
+        <dt class="col-sm-3"><kw-l key="admin.errorreport.received">Received</kw-l></dt>
         <dd class="col-sm-9">
             <kw-dt dt="@r.EscalationReceivedAt.Value" format="g"></kw-dt>
         </dd>
@@ -190,7 +190,7 @@
        "Escalated to operator endpoint" marker when escalated). *@
     @if (r.ResolvedAt is not null)
     {
-        <dt class="col-sm-3">Resolved</dt>
+        <dt class="col-sm-3"><kw-l key="admin.errorreport.resolved">Resolved</kw-l></dt>
         <dd class="col-sm-9">
             <kw-dt dt="@r.ResolvedAt.Value" format="g"></kw-dt>
             @if (!string.IsNullOrEmpty(r.ResolvedBy))

@@ -7,19 +7,18 @@
    treatment, site.css). *@
 @await Html.PartialAsync("_AdminNav.cshtml")
 
-<h1>Security</h1>
+<h1><kw-l key="admin.hub.security_title">Security</kw-l></h1>
 <p class="text-muted">
-    The security surfaces — the always-on access-decision log and the one-time
-    break-glass elevation path. Both are their own pages; this is the section hub.
+    <kw-l key="admin.security.lede">The security surfaces — the always-on access-decision log and the one-time break-glass elevation path. Both are their own pages; this is the section hub.</kw-l>
 </p>
 
 <div class="list-group">
     <a asp-action="Audit" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Access audit log</div>
+        <div class="fw-semibold"><kw-l key="admin.platform.audit_title">Access audit log</kw-l></div>
         <small class="text-muted">A record of who was allowed or denied access to restricted content, plus admin actions. Filter by actor, via, or outcome.</small>
     </a>
     <a asp-action="BreakGlass" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Break-glass</div>
-        <small class="text-muted">The one-time elevation path for emergencies — consume an operator-written token to act with elevated standing for a bounded window.</small>
+        <div class="fw-semibold"><kw-l key="admin.platform.breakglass_title">Break-glass</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.security.breakglass_desc">The one-time elevation path for emergencies — consume an operator-written token to act with elevated standing for a bounded window.</kw-l></small>
     </a>
 </div>

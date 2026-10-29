@@ -5,6 +5,10 @@
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _deleteConfirm = Translation is null ? "Delete this account permanently? Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed. This cannot be undone." : await Translation.GetAsync("admin.manage.delete_confirm", _aL);
+}
+@{
     ViewData["Title"] = $"Admin — {Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId}";
     var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     string ariaBreadcrumb = await Translation.GetAsync("a11y.breadcrumb", effLang);
@@ -12,7 +16,7 @@
 
 <nav aria-label="@ariaBreadcrumb">
     <ol class="breadcrumb small">
-        <li class="breadcrumb-item"><a href="/admin">Admin</a></li>
+        <li class="breadcrumb-item"><a href="/admin"><kw-l key="nav.admin">Admin</kw-l></a></li>
         <li class="breadcrumb-item active" aria-current="page">
             @(Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId)
         </li>
@@ -32,7 +36,7 @@
         <div class="d-flex gap-2 mt-2 flex-wrap">
             @if (Model.Account.Roles.Count == 0)
             {
-                <span class="badge text-bg-light border">Member</span>
+                <span class="badge text-bg-light border"><kw-l key="admin.manage.member">Member</kw-l></span>
             }
             @foreach (var r in Model.Account.Roles)
             {
@@ -79,18 +83,18 @@
     {
         <form method="post" asp-action="DeleteAccount"
               class="ms-2 d-inline-flex"
-              data-confirm="Delete this account permanently? Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed. This cannot be undone.">
+              data-confirm="@_deleteConfirm">
             @Html.AntiForgeryToken()
             <input type="hidden" name="subjectId" value="@Model.Account.SubjectId" />
             <button class="btn btn-danger" type="submit">
-                Delete account
+                <kw-l key="guardian.delete_child_submit">Delete account</kw-l>
             </button>
         </form>
     }
 </div>
 
 <div class="card mb-4">
-    <div class="card-header">Standing</div>
+    <div class="card-header"><kw-l key="admin.manage.standing">Standing</kw-l></div>
     <div class="card-body">
         @* Two forms on the same page (roles/scope + posting membership): both
            submit to the same page and are independent writes (the Core lanes
@@ -153,7 +157,7 @@
                 </fieldset>
             }
 
-            <button class="btn btn-primary" type="submit">Save roles</button>
+            <button class="btn btn-primary" type="submit"><kw-l key="admin.manage.save_roles">Save roles</kw-l></button>
         </form>
 
         <hr class="my-4" />
@@ -170,7 +174,7 @@
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="targetSubjectId" value="@Model.Account.SubjectId" />
                 <fieldset>
-                    <legend class="h6">Posting membership</legend>
+                    <legend class="h6"><kw-l key="admin.manage.posting_membership">Posting membership</kw-l></legend>
                     <p class="text-muted small mb-2">
                         The communities this account may post to.
                         @* Disabled communities are still listed (a membership row may
@@ -203,7 +207,7 @@
                         }
                     </div>
                 </fieldset>
-                <button class="btn btn-primary mt-2" type="submit">Save membership</button>
+                <button class="btn btn-primary mt-2" type="submit"><kw-l key="admin.manage.save_membership">Save membership</kw-l></button>
             </form>
         }
     </div>

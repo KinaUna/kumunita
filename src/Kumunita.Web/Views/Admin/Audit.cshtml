@@ -10,7 +10,7 @@
 
 <form method="get" class="row g-2 mb-3">
     <div class="col-auto">
-        <label class="visually-hidden">Via</label>
+        <label class="visually-hidden"><kw-l key="admin.audit.col_via">Via</kw-l></label>
         <select name="via" class="form-select form-select-sm">
             <option value="">all (via)</option>
             <option value="Owner" selected="@(Model.Via is "Owner" ? "selected" : null)">via:Owner</option>
@@ -20,11 +20,11 @@
         </select>
     </div>
     <div class="col-auto">
-        <label class="visually-hidden">Outcome</label>
+        <label class="visually-hidden"><kw-l key="admin.audit.col_outcome">Outcome</kw-l></label>
         <select name="outcome" class="form-select form-select-sm">
-            <option value="">all (outcome)</option>
-            <option value="Allow" selected="@(Model.Outcome is "Allow" ? "selected" : null)">Allow</option>
-            <option value="Deny" selected="@(Model.Outcome is "Deny" ? "selected" : null)">Deny</option>
+            <option value=""><kw-l key="admin.audit.all_outcomes">all (outcome)</kw-l></option>
+            <option value="Allow" selected="@(Model.Outcome is "Allow" ? "selected" : null)"><kw-l key="admin.audit.allow">Allow</kw-l></option>
+            <option value="Deny" selected="@(Model.Outcome is "Deny" ? "selected" : null)"><kw-l key="admin.audit.deny">Deny</kw-l></option>
         </select>
     </div>
     <div class="col-auto">

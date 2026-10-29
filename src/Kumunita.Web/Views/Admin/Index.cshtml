@@ -17,8 +17,7 @@
 
 <h1><kw-l key="admin.title">Admin</kw-l></h1>
 <p class="text-muted">
-    One neighborhood, instance-wide: accounts, communities, platform settings, and
-    the security surfaces. Pick a section below.
+    <kw-l key="admin.hub.lede">One neighborhood, instance-wide: accounts, communities, platform settings, and the security surfaces. Pick a section below.</kw-l>
 </p>
 
 @* Overview cards — the counts at a glance. The numbers are the dashboard's job:
@@ -67,7 +66,7 @@
     <form method="post" asp-controller="Admin" asp-action="ManuallyVerify"
           class="alert alert-info alert-dismissible fade show mb-4 d-flex align-items-center gap-3 flex-wrap">
         @Html.AntiForgeryToken()
-        <span class="fw-semibold">Verify an unverified account</span>
+        <span class="fw-semibold"><kw-l key="admin.hub.verify_heading">Verify an unverified account</kw-l></span>
         <span class="text-muted small">(@Model.UnverifiedCount waiting)</span>
         <div class="input-group input-group-sm ms-auto">
             <select class="form-select" name="subjectId" id="verifySubject" autocomplete="off">
@@ -89,32 +88,32 @@
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/accounts">
             <div class="card-body">
-                <div class="fw-semibold">Accounts</div>
-                <small class="text-muted">The account list, the verify queue, and per-account roles, scope, and standing.</small>
+                <div class="fw-semibold"><kw-l key="admin.hub.accounts_title">Accounts</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.accounts_desc">The account list, the verify queue, and per-account roles, scope, and standing.</kw-l></small>
             </div>
         </a>
     </div>
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/communities">
             <div class="card-body">
-                <div class="fw-semibold">Communities</div>
-                <small class="text-muted">Add, edit, enable/disable, and set the mandatory standing of the neighborhood's feeds.</small>
+                <div class="fw-semibold"><kw-l key="admin.hub.communities_title">Communities</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.communities_desc">Add, edit, enable/disable, and set the mandatory standing of the neighborhood's feeds.</kw-l></small>
             </div>
         </a>
     </div>
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/platform">
             <div class="card-body">
-                <div class="fw-semibold">Platform</div>
-                <small class="text-muted">Languages, time zone, date &amp; time format, sign-up, and the five shipped platform pages.</small>
+                <div class="fw-semibold"><kw-l key="admin.hub.platform_title">Platform</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.platform_desc">Languages, time zone, date & time format, sign-up, and the five shipped platform pages.</kw-l></small>
             </div>
         </a>
     </div>
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/security">
             <div class="card-body">
-                <div class="fw-semibold">Security</div>
-                <small class="text-muted">The access audit log and the break-glass elevation path.</small>
+                <div class="fw-semibold"><kw-l key="admin.hub.security_title">Security</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.security_desc">The access audit log and the break-glass elevation path.</kw-l></small>
             </div>
         </a>
     </div>
@@ -126,8 +125,8 @@
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/storage">
             <div class="card-body">
-                <div class="fw-semibold">Storage</div>
-                <small class="text-muted">How full the byte store is, how much is resident content, and the space used per user. Read-only.</small>
+                <div class="fw-semibold"><kw-l key="admin.hub.storage_title">Storage</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.storage_desc">How full the byte store is, how much is resident content, and the space used per user. Read-only.</kw-l></small>
             </div>
         </a>
     </div>
@@ -141,32 +140,32 @@
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/storage/settings">
             <div class="card-body">
-                <div class="fw-semibold">Storage settings</div>
-                <small class="text-muted">The community's upload limits — per-file size cap, per-user content quota, and total usage.</small>
+                <div class="fw-semibold"><kw-l key="admin.hub.storage_settings_title">Storage settings</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.storage_settings_desc">The community's upload limits — per-file size cap, per-user content quota, and total usage.</kw-l></small>
             </div>
         </a>
     </div>
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/announcements/comments">
             <div class="card-body">
-                <div class="fw-semibold">Announcement comments</div>
-                <small class="text-muted">Whether signed-in residents may comment on announcements.</small>
+                <div class="fw-semibold"><kw-l key="admin.anncomments_title">Announcement comments</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.anncomments_desc">Whether signed-in residents may comment on announcements.</kw-l></small>
             </div>
         </a>
     </div>
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/messaging">
             <div class="card-body">
-                <div class="fw-semibold">Direct messaging</div>
-                <small class="text-muted">Whether signed-in residents may open direct 1:1 conversations (off by default).</small>
+                <div class="fw-semibold"><kw-l key="admin.messaging_title">Direct messaging</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.messaging_desc">Whether signed-in residents may open direct 1:1 conversations (off by default).</kw-l></small>
             </div>
         </a>
     </div>
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/portability">
             <div class="card-body">
-                <div class="fw-semibold">Portability</div>
-                <small class="text-muted">Export the whole instance as one archive, or restore an archive into this instance.</small>
+                <div class="fw-semibold"><kw-l key="admin.hub.portability_title">Portability</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.portability_desc">Export the whole instance as one archive, or restore an archive into this instance.</kw-l></small>
             </div>
         </a>
     </div>
@@ -178,8 +177,8 @@
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/escalation">
             <div class="card-body">
-                <div class="fw-semibold">Escalation</div>
-                <small class="text-muted">Configure the operator escalation endpoint and the tokens other platforms present to escalate issues to this instance.</small>
+                <div class="fw-semibold"><kw-l key="admin.hub.escalation_title">Escalation</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.escalation_desc">Configure the operator escalation endpoint and the tokens other platforms present to escalate issues to this instance.</kw-l></small>
             </div>
         </a>
     </div>
@@ -195,7 +194,7 @@
             <a class="card text-decoration-none" href="/admin/guests">
                 <div class="card-body">
                     <div class="fw-semibold"><kw-l key="admin.guests_title">Guest accounts</kw-l></div>
-                    <small class="text-muted">Settle the bounded window and allowed surfaces for a guest (a limited, time-bounded standing outside the resident circle).</small>
+                    <small class="text-muted"><kw-l key="admin.hub.guests_desc">Settle the bounded window and allowed surfaces for a guest (a limited, time-bounded standing outside the resident circle).</kw-l></small>
                 </div>
             </a>
         </div>
