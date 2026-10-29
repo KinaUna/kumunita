@@ -1619,3 +1619,14 @@ html[data-kmb-palette] .accordion.kmb-faq .accordion-button:not(.collapsed)::aft
 html[data-kmb-palette] .accordion.kmb-faq .accordion-button:focus-visible {
   box-shadow: 0 0 0 2px var(--kmb-accent) !important;
 }
+
+/* ==========================================================================
+   ADR 0243 — one-line cells on small screens (admin Audit)
+   A table with .kmb-nowrap keeps every cell on one line below 768px. Long ids and timestamps used to
+   wrap one character per line (rows 236px tall on a phone); now rows stay one line tall and the
+   .table-responsive wrapper scrolls sideways (with the edge fades above). Desktop is unchanged.
+   ========================================================================== */
+@media (max-width: 767.98px) {
+  html[data-kmb-palette] .table.kmb-nowrap > thead > tr > th,
+  html[data-kmb-palette] .table.kmb-nowrap > tbody > tr > td { white-space: nowrap; }
+}

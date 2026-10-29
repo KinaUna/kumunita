@@ -33,7 +33,9 @@
 </form>
 
 <div class="table-responsive">
-    <table class="table table-sm table-striped align-middle">
+    @* ADR 0243 — below 768px palettes.css keeps each cell on one line (kmb-nowrap): the 32-character ids no
+       longer wrap one character per line, so rows stay one line tall and the table scrolls sideways. *@
+    <table class="table table-sm table-striped align-middle kmb-nowrap">
         <thead>
             <tr>
                 <th><kw-l key="admin.audit_th_at">At (UTC)</kw-l></th>
