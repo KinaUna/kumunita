@@ -16,4 +16,6 @@ English `TempData` messages: community/user/moderator/role/account actions, plat
 
 ## Not covered
 Compiled and run 2026-10-29 (build clean; `Kumunita.Web.Tests` 1156 tests, 0 failed). de/fr/da text machine-written, review parked. Admin-facing text, so lowest priority for review.
+
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 12675 -> 12839 on 2026-10-29 for the 41 new keys x en/de/fr/da of this lane (the ADR 0265/0266 shipped-additions mechanism).
 Remaining literal flashes: 49 (Account, Inventory, Kiosk, Languages, Locale, MessagingSettings, Moderation, ReportTargets, SecuritySettings, Tag, UserPortability), then BadRequest/ModelState text.

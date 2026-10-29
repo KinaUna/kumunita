@@ -180,8 +180,13 @@ $aBaseline = @(
 # groups.flash_* keys x en/de/fr/da added to KnownTranslationKeys.cs
 # (12587 -> 12675) — the same shipped-additions mechanism as above; the gate's
 # ceiling starts from 12675 now.
+# Re-baselined again 2026-10-29 (the ADR 0267 admin-flash close): the 41 new
+# admin.flash_* / flash.translation_gone_add / flash.translation_gone /
+# flash.choose_language_remove keys x en/de/fr/da added to
+# KnownTranslationKeys.cs (12675 -> 12839) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 12839 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 12675
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 12839
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
