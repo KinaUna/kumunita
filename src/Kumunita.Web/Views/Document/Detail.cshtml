@@ -1,7 +1,18 @@
 @model Kumunita.Web.Models.DocumentDetailViewModel
 @using Kumunita.Core.Documents
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Document.Title) ? "Document" : Model.Document.Title;
+
+    // ADR 0240 — the delete confirmation text, resolved server-side in the viewer's
+    // language (the kw-l TagHelper cannot wrap an attribute) and carried on the form's
+    // data-confirm attribute (client/lib/confirm.ts, the house confirm-before-submit).
+    var kwlLang = await EffectiveLanguageCode.ResolveAsync(
+        ViewContext.HttpContext?.Request, Localization, Translation);
+    var deleteConfirm = (await Translation.GetAsync("documents.delete_confirm", kwlLang))
+        .Replace("{0}", string.IsNullOrWhiteSpace(Model.Document.Title) ? "?" : Model.Document.Title);
 
     // ADR 0202 — a friendly file-kind name for the meta row; unknown types fall
     // back to the raw content type. TODO: localise via kw-l keys.
@@ -123,15 +134,12 @@
                         <kw-dt dt="@(Model.Document.Modified ?? Model.Document.Created)" format="g"></kw-dt>
                     </div>
                 </div>
-                @* ADR 0239 D2 — show **who** last changed the document. The
-                   controller resolves <c>Model.ModifiedByName</c> to the
-                   owner's name when <c>Document.ModifiedById</c> is null (a
-                   pre-ADR-0239 document that has never been edited — the
-                   owner is the implicit last modifier). When the modifier is
-                   the same as the uploader, the row is redundant with the
-                   "Uploaded by" row above; we still render it (the date + name
-                   pair is the ADR 0125 D4 "set on a future replace" field,
-                   now exercised — and the name is the new D1 content). *@
+                @* ADR 0239 D1 / ADR 0240 — show **who** last changed the document, but only
+                   when that is someone other than the uploader. The controller leaves
+                   <c>Model.ModifiedByName</c> null when the last modifier is the uploader (or
+                   there is none): the row would repeat "Uploaded by", and the date is
+                   already in "Last updated". Edit and delete are owner-only today, so the
+                   row appears once another lane can change a document. *@
                 @if (Model.ModifiedByName is { } modifierName)
                 {
                     <div class="row g-2 mt-1">
@@ -167,14 +175,14 @@
                 @* ADR 0239 D6 — the owner-only delete affordance. Rendered only
                    when the actor is the document's owner (CanDelete — the ADR
                    0125 CanEdit shape); a non-owner never sees it (the ADR 0122
-                   D7 posture: the route's existence is not leaked). A plain
-                   form POST — the Posts/Detail.cshtml author-delete button
-                   shape (no confirm dialog, the route 404s for a non-owner).
-                   On success the controller redirects to the feed — the
-                   document is gone from the detail page by construction (D4). *@
+                   D7 posture: the route's existence is not leaked). A form POST
+                   behind the house confirm-before-submit (data-confirm, ADR 0240),
+                   since there is no restore lane yet. On success the controller
+                   redirects to the feed — the document is gone from the detail
+                   page by construction (D4). *@
                 @if (Model.CanDelete)
                 {
-                    <form method="post" action="/documents/@Model.Document.Id/delete">
+                    <form method="post" action="/documents/@Model.Document.Id/delete" data-confirm="@deleteConfirm">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-outline-danger">
                             <kw-l key="documents.delete">Delete</kw-l>

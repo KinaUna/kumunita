@@ -135,6 +135,53 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     }
 
     /// <summary>
+    /// ADR 0240 — the detail page names the last modifier only when it is someone
+    /// other than the uploader: a modifier who differs resolves to a display name.
+    /// </summary>
+    [Fact]
+    public async Task Detail_ModifiedByAnotherResident_ShowsModifierName()
+    {
+        var doc = MakeDoc();
+        doc.Modified = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero);
+        doc.ModifiedById = "subj-someone-else";
+        var names = Substitute.For<IUserInfoService>();
+        names.GetProfileAsync(Actor).Returns(new Profile { SubjectId = Actor, DisplayName = "Uma Uploader" });
+        names.GetProfileAsync("subj-someone-else").Returns(new Profile { SubjectId = "subj-someone-else", DisplayName = "Eli Editor" });
+        var (controller, _) = BuildDetailController(allow: true, shaped: doc, names: names);
+
+        var view = Assert.IsType<ViewResult>(await controller.Detail(DocId));
+        var vm = Assert.IsType<DocumentDetailViewModel>(view.ViewData.Model);
+        Assert.Equal("Uma Uploader", vm.OwnerName);
+        Assert.Equal("Eli Editor", vm.ModifiedByName);
+    }
+
+    /// <summary>
+    /// ADR 0240 — an edit by the uploader (the only editor today), or a document that
+    /// was never edited, leaves <c>ModifiedByName</c> null: the row would repeat
+    /// "Uploaded by".
+    /// </summary>
+    [Theory]
+    [InlineData(true)]   // edited by the uploader
+    [InlineData(false)]  // never edited
+    public async Task Detail_ModifiedByUploaderOrNobody_HidesModifierName(bool editedByUploader)
+    {
+        var doc = MakeDoc();
+        if (editedByUploader)
+        {
+            doc.Modified = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero);
+            doc.ModifiedById = Actor;
+        }
+        var names = Substitute.For<IUserInfoService>();
+        names.GetProfileAsync(Actor).Returns(new Profile { SubjectId = Actor, DisplayName = "Uma Uploader" });
+        var (controller, _) = BuildDetailController(allow: true, shaped: doc, names: names);
+
+        var view = Assert.IsType<ViewResult>(await controller.Detail(DocId));
+        var vm = Assert.IsType<DocumentDetailViewModel>(view.ViewData.Model);
+        Assert.Equal("Uma Uploader", vm.OwnerName);
+        Assert.Null(vm.ModifiedByName);
+    }
+
+    /// <summary>
     /// GATE-2 / D7 — <c>GET /documents/{id}</c> for a **missing** document
     /// returns 404. <see cref="DocumentService.GetAsync"/> loads null →
     /// <c>Document = null</c> (no decision ran, no audit row — the M2 detail
@@ -1013,9 +1060,9 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     /// <c>LoadAsync</c> seam, directly stubbable).
     /// </summary>
     private static (DocumentController Controller, IAuthorizationService Authz) BuildDetailController(
-        bool allow, bool missing = false)
+        bool allow, bool missing = false, Document? shaped = null, IUserInfoService? names = null)
     {
-        var doc = MakeDoc();
+        var doc = shaped ?? MakeDoc();
 
         var store = Substitute.For<IDocumentStore>();
         var readSession = Substitute.For<IQuerySession>();
@@ -1032,7 +1079,8 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var docs = new DocumentService(
             Substitute.For<IUserInfoService>(), authz, store);
-        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(), Options.Create(new MediaOptions()), store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(), Options.Create(new MediaOptions()), store,
+            userInfo: names);
         controller.ControllerContext = new ControllerContext { HttpContext = PrincipalHttpContext(new[] { "GlobalAdmin" }) };
         return (controller, authz);
     }

@@ -2,6 +2,7 @@
 
 Status: Accepted
 Date: 2026-10-29
+Amended by: ADR 0240 (D1: the "Last modified by" row is shown only when the modifier differs from the uploader; D6: Delete is behind a confirm)
 Relates to: ADR 0122 (document management), ADR 0125 (owner-only edit), ADR 0024 (author soft-delete)
 
 ## Context

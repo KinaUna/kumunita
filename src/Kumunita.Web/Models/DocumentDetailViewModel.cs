@@ -40,10 +40,9 @@ public sealed record DocumentDetailViewModel(
     // profile degrades to the raw owner id).
     string OwnerName,
     // The name of the actor who last changed the document (the
-    // <c>Document.ModifiedById</c> resolved to a display name; a
-    // <c>null</c> <c>ModifiedById</c> — a pre-ADR-0239 document that has
-    // never been edited — degrades to <c>OwnerName</c>, the uploader, per
-    // ADR 0239 D1).
+    // <c>Document.ModifiedById</c> resolved to a display name). <c>null</c> when
+    // there is no modifier or the modifier is the uploader (ADR 0240: the detail
+    // row is shown only when it adds a name other than "Uploaded by").
     string? ModifiedByName,
     // ADR 0239 D6 — true iff the actor is the document's owner (the ADR 0125
     // <c>CanEdit</c> shape); the view renders the Delete button only when this

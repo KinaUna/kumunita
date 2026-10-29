@@ -2589,6 +2589,7 @@ public static class KnownTranslationKeys
             ["documents.detail.last_modified_by"] = "Last modified by",
             ["documents.delete"]              = "Delete",
             ["documents.flash_deleted"]       = "Document deleted.",
+            ["documents.delete_confirm"]      = "Delete \"{0}\"? It disappears for everyone and cannot be restored from the app.",
 
             // The "documents organization" lane (tags + folders) — the
             // documents.folder_* / documents.tags.* keys + the flash keys for
@@ -5451,6 +5452,7 @@ public static class KnownTranslationKeys
             ["documents.detail.last_modified_by"] = "Zuletzt geändert von",
             ["documents.delete"]              = "Löschen",
             ["documents.flash_deleted"]       = "Dokument gelöscht.",
+            ["documents.delete_confirm"]      = "\"{0}\" löschen? Das Dokument verschwindet für alle und lässt sich in der App nicht wiederherstellen.",
 
             // Die "Dokumente organisieren"-Lane (Tags + Ordner) — die
             // documents.folder_* / documents.tags.*-Keys + die Flash-Keys der
@@ -8218,6 +8220,7 @@ public static class KnownTranslationKeys
             ["documents.detail.last_modified_by"] = "Dernière modification par",
             ["documents.delete"]              = "Supprimer",
             ["documents.flash_deleted"]       = "Document supprimé.",
+            ["documents.delete_confirm"]      = "Supprimer \"{0}\" ? Le document disparaît pour tout le monde et ne peut pas être restauré depuis l'application.",
 
             // La lane "organiser les documents" (tags + dossiers) — les clés
             // documents.folder_* / documents.tags.* + les clés flash des
@@ -10966,6 +10969,7 @@ public static class KnownTranslationKeys
             ["documents.detail.last_modified_by"] = "Senest ændret af",
             ["documents.delete"]              = "Slet",
             ["documents.flash_deleted"]       = "Dokument slettet.",
+            ["documents.delete_confirm"]      = "Slet \"{0}\"? Dokumentet forsvinder for alle og kan ikke gendannes fra appen.",
 
             // "Dokumenter organiseret"-lanen (tags + mapper) —
             // documents.folder_* / documents.tags.* nøgler + flash-nøglerne
