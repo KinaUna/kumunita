@@ -2942,6 +2942,44 @@ public static class KnownTranslationKeys
             ["pages.form.body_hint"]         =
                 "Optional — a folder node may have no body. Written in Markdown via the visual editor " +
                 "(the same one posts and announcements use).",
+            ["pages.form.new_title"] =
+                "New page",
+            ["pages.form.edit_title"] =
+                "Edit page",
+            ["pages.form.invalid_value"] =
+                "Invalid value.",
+            ["pages.form.title_hint"] =
+                "The page's title — the slug (its URL leaf) is derived from this.",
+            ["pages.form.parent_label"] =
+                "Parent page",
+            ["pages.form.parent_top_user"] =
+                "Top level — this becomes a new top-level blog page",
+            ["pages.form.parent_top_system"] =
+                "Top level — a top-level system page",
+            ["pages.form.parent_hint_user"] =
+                "A blog page may nest under your own blog pages only (or be a top-level blog page). The system namespace is not available to blog pages.",
+            ["pages.form.parent_hint_system"] =
+                "A system page may nest under another system page only (e.g. system/about). Blog pages cannot nest under a system page.",
+            ["pages.form.public_label"] =
+                "Public — visible to everyone (including visitors who aren't signed in)",
+            ["pages.form.public_hint"] =
+                "Off by default. When off, choose a scope below (all residents, a specific community, or individual grants).",
+            ["pages.form.scope_label"] =
+                "Who can see this page",
+            ["pages.form.scope_all"] =
+                "All residents",
+            ["pages.form.scope_individual"] =
+                "Individual access",
+            ["pages.form.scope_hint"] =
+                "All residents — every signed-in resident (default). A community — only members of that community. Individual access — explicit user/group grants.",
+            ["pages.form.mount_label"] =
+                "Mount point (optional)",
+            ["pages.form.audience_heading"] =
+                "Audience — who can see this page",
+            ["pages.form.submit_create"] =
+                "Create page",
+            ["pages.form.submit_save"] =
+                "Save changes",
             ["pages.reset_confirm"]          =
                 "Reset this page to the seeded text? Any edits you made to the body (English) and to its " +
                 "German / French / Danish translations will be overwritten with the seeded baseline. " +
@@ -5832,6 +5870,44 @@ public static class KnownTranslationKeys
             ["pages.form.body_hint"]         =
                 "Optional — ein Ordnerknoten kann ohne Text sein. Geschrieben in Markdown über den " +
                 "visuellen Editor (derselbe, den Beiträge und Ankündigungen nutzen).",
+            ["pages.form.new_title"] =
+                "Neue Seite",
+            ["pages.form.edit_title"] =
+                "Seite bearbeiten",
+            ["pages.form.invalid_value"] =
+                "Ungültiger Wert.",
+            ["pages.form.title_hint"] =
+                "Der Titel der Seite — daraus wird der Slug (das Ende der URL) abgeleitet.",
+            ["pages.form.parent_label"] =
+                "Übergeordnete Seite",
+            ["pages.form.parent_top_user"] =
+                "Oberste Ebene — das wird eine neue Blogseite auf oberster Ebene",
+            ["pages.form.parent_top_system"] =
+                "Oberste Ebene — eine Systemseite auf oberster Ebene",
+            ["pages.form.parent_hint_user"] =
+                "Eine Blogseite kann nur unter deinen eigenen Blogseiten liegen (oder eine Blogseite auf oberster Ebene sein). Der System-Namensraum steht Blogseiten nicht zur Verfügung.",
+            ["pages.form.parent_hint_system"] =
+                "Eine Systemseite kann nur unter einer anderen Systemseite liegen (z. B. system/about). Blogseiten können nicht unter einer Systemseite liegen.",
+            ["pages.form.public_label"] =
+                "Öffentlich — für alle sichtbar (auch für Besucher, die nicht angemeldet sind)",
+            ["pages.form.public_hint"] =
+                "Standardmäßig aus. Wenn aus, wähle unten einen Bereich (alle Bewohner, eine bestimmte Community oder einzelne Freigaben).",
+            ["pages.form.scope_label"] =
+                "Wer diese Seite sehen kann",
+            ["pages.form.scope_all"] =
+                "Alle Bewohner",
+            ["pages.form.scope_individual"] =
+                "Einzelzugriff",
+            ["pages.form.scope_hint"] =
+                "Alle Bewohner — jeder angemeldete Bewohner (Standard). Eine Community — nur Mitglieder dieser Community. Einzelzugriff — ausdrückliche Freigaben für Personen/Gruppen.",
+            ["pages.form.mount_label"] =
+                "Einhängepunkt (optional)",
+            ["pages.form.audience_heading"] =
+                "Zielgruppe — wer diese Seite sehen kann",
+            ["pages.form.submit_create"] =
+                "Seite erstellen",
+            ["pages.form.submit_save"] =
+                "Änderungen speichern",
             ["pages.reset_confirm"]          =
                 "Diese Seite auf den Seed-Text zurücksetzen? Alle Änderungen, die du am Text " +
                 "(Englisch) und an seinen deutschen / französischen / dänischen Übersetzungen " +
@@ -8633,6 +8709,44 @@ public static class KnownTranslationKeys
             ["pages.form.body_hint"]         =
                 "Facultatif — un nœud de dossier peut ne pas avoir de corps. Écrit en Markdown via " +
                 "l'éditeur visuel (le même que les publications et les annonces).",
+            ["pages.form.new_title"] =
+                "Nouvelle page",
+            ["pages.form.edit_title"] =
+                "Modifier la page",
+            ["pages.form.invalid_value"] =
+                "Valeur non valide.",
+            ["pages.form.title_hint"] =
+                "Le titre de la page — le slug (la fin de son URL) en est dérivé.",
+            ["pages.form.parent_label"] =
+                "Page parente",
+            ["pages.form.parent_top_user"] =
+                "Niveau supérieur — cela devient une nouvelle page de blog de premier niveau",
+            ["pages.form.parent_top_system"] =
+                "Niveau supérieur — une page système de premier niveau",
+            ["pages.form.parent_hint_user"] =
+                "Une page de blog ne peut être imbriquée que sous vos propres pages de blog (ou être une page de blog de premier niveau). L’espace de noms système n’est pas disponible pour les pages de blog.",
+            ["pages.form.parent_hint_system"] =
+                "Une page système ne peut être imbriquée que sous une autre page système (p. ex. system/about). Les pages de blog ne peuvent pas être imbriquées sous une page système.",
+            ["pages.form.public_label"] =
+                "Publique — visible par tous (y compris les visiteurs non connectés)",
+            ["pages.form.public_hint"] =
+                "Désactivé par défaut. Quand c’est désactivé, choisissez une portée ci-dessous (tous les résidents, une communauté précise ou des accès individuels).",
+            ["pages.form.scope_label"] =
+                "Qui peut voir cette page",
+            ["pages.form.scope_all"] =
+                "Tous les résidents",
+            ["pages.form.scope_individual"] =
+                "Accès individuel",
+            ["pages.form.scope_hint"] =
+                "Tous les résidents — chaque résident connecté (par défaut). Une communauté — seulement les membres de cette communauté. Accès individuel — autorisations explicites pour des personnes/groupes.",
+            ["pages.form.mount_label"] =
+                "Point de montage (facultatif)",
+            ["pages.form.audience_heading"] =
+                "Audience — qui peut voir cette page",
+            ["pages.form.submit_create"] =
+                "Créer la page",
+            ["pages.form.submit_save"] =
+                "Enregistrer les modifications",
             ["pages.reset_confirm"]          =
                 "Réinitialiser cette page au texte seedé ? Toutes les modifications que tu as " +
                 "apportées au corps (anglais) et à ses traductions allemandes / françaises / danoises " +
@@ -11410,6 +11524,44 @@ public static class KnownTranslationKeys
             ["pages.form.body_hint"]         =
                 "Valgfrit — en mappeknude kan være uden tekst. Skrevet i Markdown via den visuelle " +
                 "editor (den samme, indlæg og meddelelser bruger).",
+            ["pages.form.new_title"] =
+                "Ny side",
+            ["pages.form.edit_title"] =
+                "Rediger side",
+            ["pages.form.invalid_value"] =
+                "Ugyldig værdi.",
+            ["pages.form.title_hint"] =
+                "Sidens titel — sluggen (den sidste del af dens URL) udledes af den.",
+            ["pages.form.parent_label"] =
+                "Overordnet side",
+            ["pages.form.parent_top_user"] =
+                "Øverste niveau — det bliver en ny blogside på øverste niveau",
+            ["pages.form.parent_top_system"] =
+                "Øverste niveau — en systemside på øverste niveau",
+            ["pages.form.parent_hint_user"] =
+                "En blogside kan kun ligge under dine egne blogsider (eller være en blogside på øverste niveau). Systemnavnerummet er ikke tilgængeligt for blogsider.",
+            ["pages.form.parent_hint_system"] =
+                "En systemside kan kun ligge under en anden systemside (f.eks. system/about). Blogsider kan ikke ligge under en systemside.",
+            ["pages.form.public_label"] =
+                "Offentlig — synlig for alle (også besøgende, der ikke er logget ind)",
+            ["pages.form.public_hint"] =
+                "Slået fra som standard. Når den er slået fra, vælg en rækkevidde nedenfor (alle beboere, et bestemt fællesskab eller individuelle tilladelser).",
+            ["pages.form.scope_label"] =
+                "Hvem der kan se denne side",
+            ["pages.form.scope_all"] =
+                "Alle beboere",
+            ["pages.form.scope_individual"] =
+                "Individuel adgang",
+            ["pages.form.scope_hint"] =
+                "Alle beboere — enhver logget ind beboer (standard). Et fællesskab — kun medlemmer af det fællesskab. Individuel adgang — udtrykkelige tilladelser til brugere/grupper.",
+            ["pages.form.mount_label"] =
+                "Monteringspunkt (valgfrit)",
+            ["pages.form.audience_heading"] =
+                "Målgruppe — hvem der kan se denne side",
+            ["pages.form.submit_create"] =
+                "Opret side",
+            ["pages.form.submit_save"] =
+                "Gem ændringer",
             ["pages.reset_confirm"]          =
                 "Nulstil denne side til seedteksten? Alle ændringer, du har foretaget i teksten " +
                 "(engelsk) og i dens tyske / franske / danske oversættelser, bliver overskrevet af " +

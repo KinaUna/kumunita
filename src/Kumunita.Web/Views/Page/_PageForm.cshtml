@@ -21,6 +21,12 @@
     {
         confirmReset = await Translation.GetAsync("pages.reset_confirm", _kwL);
     }
+    var topUser = Translation is null
+        ? "Top level — this becomes a new top-level blog page"
+        : await Translation.GetAsync("pages.form.parent_top_user", _kwL);
+    var topSystem = Translation is null
+        ? "Top level — a top-level system page"
+        : await Translation.GetAsync("pages.form.parent_top_system", _kwL);
     var tagsExample = Translation is null
         ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["tags.pages_example"]
         : await Translation.GetAsync("tags.pages_example", _kwL);
@@ -28,7 +34,7 @@
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
-        <h1>@(isEdit ? "Edit page" : "New page")</h1>
+        <h1>@if (isEdit) { <kw-l key="pages.form.edit_title">Edit page</kw-l> } else { <kw-l key="pages.form.new_title">New page</kw-l> }</h1>
 
         @if (!ViewData.ModelState.IsValid)
         {
@@ -38,7 +44,7 @@
                     {
                         @foreach (var error in entry.Value.Errors)
                         {
-                            <li>@(string.IsNullOrEmpty(error.ErrorMessage) ? "Invalid value." : error.ErrorMessage)</li>
+                            <li>@if (string.IsNullOrEmpty(error.ErrorMessage)) { <kw-l key="pages.form.invalid_value">Invalid value.</kw-l> } else { <text>@error.ErrorMessage</text> }</li>
                         }
                     }
                 </ul>
@@ -61,15 +67,15 @@
                     cannot author a system page (the service denies it, C3) and a
                     blog page is always the actor's own. *@
                     <div class="kmb-form-field">
-                        <label class="form-label" for="title" style="font-weight:600;">Title</label>
+                        <label class="form-label" for="title" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></label>
                         <input class="form-control" type="text" id="title" name="Title"
                                maxlength="120" required value="@(Model.Title)" />
                         <div class="text-muted small mt-1">
-                            The page's title — the slug (its URL leaf) is derived from this.
+                            <kw-l key="pages.form.title_hint">The page's title — the slug (its URL leaf) is derived from this.</kw-l>
                         </div>
                     </div>
                     <div class="kmb-form-field">
-                        <label class="form-label" for="body" style="font-weight:600;">Body</label>
+                        <label class="form-label" for="body" style="font-weight:600;"><kw-l key="common.body">Body</kw-l></label>
                         <div class="rc-editor">
                             <div class="rc-editor-toolbar" data-rich-editor>
                                 <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
@@ -109,7 +115,7 @@
                     @if (Model.Kind == "User")
                     {
                         <div class="kmb-form-field">
-                            <label class="form-label" for="tags" style="font-weight:600;">Tags</label>
+                            <label class="form-label" for="tags" style="font-weight:600;"><kw-l key="nav.tags">Tags</kw-l></label>
                             <input class="form-control" type="text" id="tags"
                                    data-tag-suggest
                                    maxlength="64"
@@ -128,31 +134,33 @@
                     <div class="kmb-form-field">
                         <div class="row g-2">
                             <div class="col-md-6">
-                                <label class="form-label" for="parent" style="font-weight:600;">Parent page</label>
+                                <label class="form-label" for="parent" style="font-weight:600;"><kw-l key="pages.form.parent_label">Parent page</kw-l></label>
                                 <select class="form-control" id="parent" name="ParentId">
-                                    <option value="">@(Model.Kind == "User" ? "Top level — this becomes a new top-level blog page" : "Top level — a top-level system page")</option>
+                                    <option value="">@(Model.Kind == "User" ? topUser : topSystem)</option>
                                     @foreach (var (id, label) in Model.ParentPages)
                                     {
                                         <option value="@id" selected="@(id == Model.ParentId ? "selected" : null)">@label</option>
                                     }
                                 </select>
                                 <div class="text-muted small mt-1">
-                                    @(Model.Kind == "User"
-                                        ? "A blog page may nest under your own blog pages only (or be a top-level blog page). The system namespace is not available to blog pages."
-                                        : "A system page may nest under another system page only (e.g. <code>system/about</code>). Blog pages cannot nest under a system page.")
+                                    @if (Model.Kind == "User")
+                                    {
+                                        <kw-l key="pages.form.parent_hint_user">A blog page may nest under your own blog pages only (or be a top-level blog page). The system namespace is not available to blog pages.</kw-l>
+                                    }
+                                    else
+                                    {
+                                        <kw-l key="pages.form.parent_hint_system">A system page may nest under another system page only (e.g. system/about). Blog pages cannot nest under a system page.</kw-l>
+                                    }
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="language" style="font-weight:600;">Language</label>
+                                <label class="form-label" for="language" style="font-weight:600;"><kw-l key="common.language">Language</kw-l></label>
                                 <select class="form-control" id="language" name="LanguageCode">
                                     @foreach (var (languageCode, native) in Model.Languages)
                                     {
                                         <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">@native</option>
                                     }
                                 </select>
-                                <div class="text-muted small mt-1">
-                                    ADR 0018 — the language the author is writing this page in.
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -168,17 +176,17 @@
                                    name="IsPublic" id="is-public" value="true"
                                    @(Model.IsPublic ? "checked" : null) />
                             <label class="form-check-label fw-semibold" for="is-public">
-                                Public — visible to everyone (including visitors who aren't signed in)
+                                <kw-l key="pages.form.public_label">Public — visible to everyone (including visitors who aren't signed in)</kw-l>
                             </label>
                             <div class="text-muted small ms-4">
-                                Off by default. When off, choose a scope below (all residents, a specific community, or individual grants).
+                                <kw-l key="pages.form.public_hint">Off by default. When off, choose a scope below (all residents, a specific community, or individual grants).</kw-l>
                             </div>
                         </div>
                         @* ADR 0041 — the scope dropdown (hidden when Public is on) *@
                         <div id="page-scope-block" class="@(Model.IsPublic ? "d-none" : null)">
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <label class="form-label" for="scope" style="font-weight:600;">Who can see this page</label>
+                                    <label class="form-label" for="scope" style="font-weight:600;"><kw-l key="pages.form.scope_label">Who can see this page</kw-l></label>
                                     <select class="form-control" id="scope" name="Scope">
                                         <option value="AllResidents"
                                                 selected="@(Model.Scope == "AllResidents" ? "selected" : null)">
@@ -197,20 +205,17 @@
                                         </option>
                                     </select>
                                     <div class="text-muted small mt-1">
-                                        All residents — every signed-in resident (default). A community — only members of that community. Individual access — explicit user/group grants.
+                                        <kw-l key="pages.form.scope_hint">All residents — every signed-in resident (default). A community — only members of that community. Individual access — explicit user/group grants.</kw-l>
                                     </div>
                                 </div>
                                 @* ADR 0040 — MountPoint is a *system-page* concept *@
                                 @if (Model.Kind != "User")
                                 {
                                     <div class="col-md-6">
-                                        <label class="form-label" for="mount" style="font-weight:600;">Mount point (optional)</label>
+                                        <label class="form-label" for="mount" style="font-weight:600;"><kw-l key="pages.form.mount_label">Mount point (optional)</kw-l></label>
                                         <input class="form-control" type="text" id="mount" name="MountPoint"
                                                maxlength="64" value="@(Model.MountPoint)"
                                                placeholder="footer/community · help/account" />
-                                        <div class="text-muted small mt-1">
-                                            ADR 0039 §3.8 — a display slot the layout can surface a link from (system pages only). A display concern, not an access boundary.
-                                        </div>
                                     </div>
                                 }
                             </div>
@@ -219,7 +224,7 @@
                            Scope = "Individual" AND IsPublic is off *@
                         <div id="page-individual-block" class="@(Model.IsPublic || Model.Scope != "Individual" ? "d-none" : null)">
                             <hr class="my-3" />
-                            <div class="form-label" style="font-weight:600;">Audience — who can see this page</div>
+                            <div class="form-label" style="font-weight:600;"><kw-l key="pages.form.audience_heading">Audience — who can see this page</kw-l></div>
                             @foreach (var m in modes)
                             {
                                 var checkedMark = string.Equals(Model.Audience?.Mode, m, StringComparison.OrdinalIgnoreCase) ? "checked" : null;
@@ -228,9 +233,15 @@
                                            name="Audience.Mode" id="@($"aud-mode-{m}")"
                                            value="@m" @checkedMark required />
                                     <label class="form-check-label" for="@($"aud-mode-{m}")">
-                                        @m @(" — " + (m == "Any"
-                                            ? "a viewer matches if they're on any of the picks"
-                                            : "a viewer must be on every pick — an empty list denies everyone"))
+                                        @m
+                                        @if (m == "Any")
+                                        {
+                                            @(" — ")<kw-l key="events.audience_mode_any">a viewer matches if they're on any of the picks</kw-l>
+                                        }
+                                        else
+                                        {
+                                            @(" — ")<kw-l key="events.audience_mode_all">a viewer must be on every pick — an empty list denies everyone</kw-l>
+                                        }
                                     </label>
                                 </div>
                             }
@@ -249,7 +260,7 @@
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">
-                    @(isEdit ? "Save changes" : "Create page")
+                    @if (isEdit) { <kw-l key="pages.form.submit_save">Save changes</kw-l> } else { <kw-l key="pages.form.submit_create">Create page</kw-l> }
                 </button>
                 <a class="btn btn-outline-secondary" href="/pages"><kw-l key="common.cancel">Cancel</kw-l></a>
             </div>
