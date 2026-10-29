@@ -542,7 +542,7 @@ public sealed class PageController(
         var actorId = KumunitaPrincipal.SubjectId(User);
         if (string.IsNullOrEmpty(actorId))
         {
-            ModelState.AddModelError(string.Empty, "You must be signed in to create a page.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("pages.flash_signin_create", "You must be signed in to create a page."));
             await SeedComposeOptionsAsync(model, string.Empty).ConfigureAwait(false);
             return View(model);
         }
@@ -597,7 +597,7 @@ public sealed class PageController(
         try
         {
             await pages.CreateAsync(page, actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
-            TempData["info"] = "Page created.";
+            TempData["info"] = await this.FlashAsync("pages.flash_created", "Page created.");
             return RedirectToAction(nameof(Index));
         }
         catch (UnauthorizedAccessException)
@@ -712,7 +712,7 @@ public sealed class PageController(
         var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
         if (string.IsNullOrEmpty(actorId))
         {
-            ModelState.AddModelError(string.Empty, "You must be signed in to edit a page.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("pages.flash_signin_edit", "You must be signed in to edit a page."));
             await SeedComposeOptionsAsync(model, string.Empty).ConfigureAwait(false);
             return View(model);
         }
@@ -769,7 +769,7 @@ public sealed class PageController(
         try
         {
             await pages.UpdateAsync(updated, actorId, KumunitaPrincipal.RoleSet(User), session2).ConfigureAwait(false);
-            TempData["info"] = "Page updated.";
+            TempData["info"] = await this.FlashAsync("pages.flash_updated", "Page updated.");
             return RedirectToAction(nameof(Index));
         }
         catch (UnauthorizedAccessException)
@@ -811,7 +811,7 @@ public sealed class PageController(
         try
         {
             var page = await pages.PublishAsync(id, actorId, session).ConfigureAwait(false);
-            TempData["info"] = "Page published.";
+            TempData["info"] = await this.FlashAsync("pages.flash_published", "Page published.");
             var byId = (await pages.GetTreeAsync().ConfigureAwait(false)).ToDictionary(p => p.Id, StringComparer.Ordinal);
             return RedirectToAction(nameof(Show), new { path = PagePaths.Href(byId, page) });
         }
@@ -904,7 +904,7 @@ public sealed class PageController(
         try
         {
             await pages.ResetToSeededAsync(id, actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
-            TempData["info"] = "Page text reset to the seeded version.";
+            TempData["info"] = await this.FlashAsync("pages.flash_reset", "Page text reset to the seeded version.");
             return RedirectToAction(nameof(Edit), new { id });
         }
         catch (UnauthorizedAccessException)
@@ -950,7 +950,7 @@ public sealed class PageController(
         try
         {
             await pages.DeleteAsync(id, actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
-            TempData["info"] = "Page deleted.";
+            TempData["info"] = await this.FlashAsync("pages.flash_deleted", "Page deleted.");
             return RedirectToAction(nameof(Index));
         }
         catch (UnauthorizedAccessException)
@@ -995,7 +995,7 @@ public sealed class PageController(
                 string.IsNullOrWhiteSpace(newParentId) ? null : newParentId,
                 string.IsNullOrWhiteSpace(newSlug) ? null : Slugify(newSlug.Trim()),
                 actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
-            TempData["info"] = "Page moved.";
+            TempData["info"] = await this.FlashAsync("pages.flash_moved", "Page moved.");
             return RedirectToAction(nameof(Index));
         }
         catch (UnauthorizedAccessException)
@@ -1081,12 +1081,12 @@ public sealed class PageController(
         var path = await DerivePathAsync(page).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Show), new { path });
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return RedirectToAction(nameof(Show), new { path });
         }
 
@@ -1112,7 +1112,7 @@ public sealed class PageController(
         }
 
         var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return RedirectToAction(nameof(Show), new { path });
     }
 
@@ -1171,12 +1171,12 @@ public sealed class PageController(
         var path = await DerivePathAsync(page).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Show), new { path });
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return RedirectToAction(nameof(Show), new { path });
         }
 
@@ -1202,7 +1202,7 @@ public sealed class PageController(
         }
 
         var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return RedirectToAction(nameof(Show), new { path });
     }
 
@@ -1251,7 +1251,7 @@ public sealed class PageController(
         var path = await DerivePathAsync(page).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Show), new { path });
         }
 
@@ -1272,7 +1272,7 @@ public sealed class PageController(
         }
 
         var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return RedirectToAction(nameof(Show), new { path });
     }
 

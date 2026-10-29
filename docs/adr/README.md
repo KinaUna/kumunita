@@ -271,3 +271,4 @@ Decision / Consequences. New decisions take the next number.
 | 0260 | Guardian/Detail attendance rows show the real RSVP status (it was always "Wants to attend", the `kw-l` key hid the enum) via `events.rsvp_status_*`; "Requested/Attended {0}" lines localized; 3 new keys in en/de/fr/da. |
 | 0261 | `ControllerFlashExtensions.FlashAsync` resolves the translation provider from `HttpContext.RequestServices` (no ctor changes, English floor); Announcement, Event and Guardian flashes (62 messages) localized with 49 new keys in en/de/fr/da. |
 | 0262 | Posts controller: all 27 flash messages use `FlashAsync`; 9 new keys (`posts.flash_*`, `flash.report_submitted`) plus the shared `flash.translation_*` keys, en/de/fr/da. |
+| 0263 | Page controller: 14 flash messages and 2 sign-in model errors use `FlashAsync`; 8 new `pages.flash_*` keys in en/de/fr/da, shared `flash.translation_*` reused. |
