@@ -17,3 +17,7 @@ ReportTargets, SecuritySettings and Tag (UserPortability and AdminPortability al
 ## Not covered
 Not compiled or run (no .NET SDK here); de/fr/da text machine-written, review parked. Remaining literal user-facing English in controllers:
 91 `ModelState.AddModelError` messages and 8 `BadRequest("…")` bodies, plus service exception text surfaced via `ex.Message` (English at the source in Core).
+
+Compiled and run 2026-10-29 (build clean; `Kumunita.Web.Tests` 1156 tests, 0 failed).
+
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 12839 -> 12975 on 2026-10-29 for the 34 new keys x en/de/fr/da of this lane (the ADR 0265/0266 shipped-additions mechanism).
