@@ -115,7 +115,7 @@ public sealed class LanguagesController(
         try
         {
             await localization.AddLanguageAsync(code, nativeName, actor);
-            TempData["info"] = $"Language “{nativeName}” ({code}) added.";
+            TempData["info"] = await this.FlashAsync("languages.flash_added", "Language “{0}” ({1}) added.", nativeName, code);
         }
         catch (ArgumentException ex)
         {
@@ -131,7 +131,7 @@ public sealed class LanguagesController(
     {
         var actor = ActorId(User) ?? string.Empty;
         await localization.SetLanguageEnabledAsync(code, enabled: true, actor);
-        TempData["info"] = $"Language “{code}” enabled.";
+        TempData["info"] = await this.FlashAsync("languages.flash_enabled", "Language “{0}” enabled.", code);
         return RedirectToAction(nameof(Index));
     }
 
@@ -142,7 +142,7 @@ public sealed class LanguagesController(
     {
         var actor = ActorId(User) ?? string.Empty;
         await localization.SetLanguageEnabledAsync(code, enabled: false, actor);
-        TempData["info"] = $"Language “{code}” disabled.";
+        TempData["info"] = await this.FlashAsync("languages.flash_disabled", "Language “{0}” disabled.", code);
         return RedirectToAction(nameof(Index));
     }
 
@@ -154,7 +154,7 @@ public sealed class LanguagesController(
         var actor = ActorId(User) ?? string.Empty;
         if (codesInOrder is { Length: > 0 })
             await localization.ReorderLanguagesAsync(codesInOrder, actor);
-        TempData["info"] = "Language order updated.";
+        TempData["info"] = await this.FlashAsync("languages.flash_order_updated", "Language order updated.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -170,7 +170,7 @@ public sealed class LanguagesController(
         try
         {
             await localization.RemoveLanguageAsync(code, actor);
-            TempData["info"] = $"Language “{code}” removed (its page/translation rows are retained).";
+            TempData["info"] = await this.FlashAsync("languages.flash_removed", "Language “{0}” removed (its page/translation rows are retained).", code);
         }
         catch (InvalidOperationException ex)
         {
@@ -187,7 +187,7 @@ public sealed class LanguagesController(
     {
         var actor = ActorId(User) ?? string.Empty;
         await localization.SetDefaultLanguageAsync(code, actor);
-        TempData["info"] = $"Instance default language set to “{code}”.";
+        TempData["info"] = await this.FlashAsync("languages.flash_default_set", "Instance default language set to “{0}”.", code);
         return RedirectToAction(nameof(Index));
     }
 
@@ -244,7 +244,7 @@ public sealed class LanguagesController(
 
         var actor = ActorId(User) ?? string.Empty;
         await localization.UpsertTranslationAsync(key, code, text ?? string.Empty, actor);
-        TempData["info"] = $"Translation for “{key}” in “{code}” saved (visible on the next request).";
+        TempData["info"] = await this.FlashAsync("languages.flash_translation_saved", "Translation for “{0}” in “{1}” saved (visible on the next request).", key, code);
         return RedirectToAction(nameof(Index));
     }
 
@@ -399,7 +399,7 @@ public sealed class LanguagesController(
 
         if (bundle is null || bundle.Length == 0)
         {
-            TempData["error"] = "Import refused — the uploaded file is empty (the bundle must carry the marker row + a header + a non-empty body).";
+            TempData["error"] = await this.FlashAsync("languages.flash_import_empty", "Import refused — the uploaded file is empty (the bundle must carry the marker row + a header + a non-empty body).");
             return StatusCode(422);
         }
 

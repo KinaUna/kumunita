@@ -336,12 +336,12 @@ public sealed class TagController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/tags/{Uri.EscapeDataString(slug)}");
         }
         if (string.IsNullOrWhiteSpace(name))
         {
-            TempData["error"] = "A translation needs a non-empty display name.";
+            TempData["error"] = await this.FlashAsync("tags.flash_needs_name", "A translation needs a non-empty display name.");
             return Redirect($"/tags/{Uri.EscapeDataString(slug)}");
         }
 
@@ -372,7 +372,7 @@ public sealed class TagController(
             return new ForbidResult();
         }
 
-        TempData["info"] = "Translation saved.";
+        TempData["info"] = await this.FlashAsync("tags.flash_translation_saved", "Translation saved.");
         return Redirect($"/tags/{Uri.EscapeDataString(slug)}");
     }
 

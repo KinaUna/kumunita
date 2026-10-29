@@ -103,7 +103,7 @@ public sealed class ReportTargetsController(
             reason:      reason,
             session:     session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/events/{id}");
     }
 
@@ -153,7 +153,7 @@ public sealed class ReportTargetsController(
             reason:      reason,
             session:     session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/projects/{id}");
     }
 
@@ -205,7 +205,7 @@ public sealed class ReportTargetsController(
             reason:      reason,
             session:     session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -256,7 +256,7 @@ public sealed class ReportTargetsController(
             reason:      reason,
             session:     session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -306,7 +306,7 @@ public sealed class ReportTargetsController(
             reason:      reason,
             session:     session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/groups/{groupId}/posts/{postId}");
     }
 }

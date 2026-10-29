@@ -1,3 +1,4 @@
+using Kumunita.Web.Security;
 using Kumunita.Core.Identity;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -262,7 +263,7 @@ public sealed class AccountController(
         // security-stamp rotation already invalidates this account's other
         // sessions).
         await signInManager.SignOutAsync();
-        TempData["info"] = "Your password was changed. Sign in again with the new password.";
+        TempData["info"] = await this.FlashAsync("account.flash_password_changed", "Your password was changed. Sign in again with the new password.");
         return RedirectToAction(nameof(Login));
     }
 
@@ -420,7 +421,7 @@ public sealed class AccountController(
         // deleted — the cookie is now stale) and redirect to the login page
         // with a positive confirmation.
         await signInManager.SignOutAsync();
-        TempData["info"] = "Your account has been deleted. Your audit trail is preserved (pseudonymized) per the platform's privacy policy.";
+        TempData["info"] = await this.FlashAsync("account.flash_deleted", "Your account has been deleted. Your audit trail is preserved (pseudonymized) per the platform's privacy policy.");
         return RedirectToAction(nameof(Login));
     }
 
@@ -533,7 +534,7 @@ public sealed class AccountController(
             return View(model);
         }
 
-        TempData["info"] = "Account created. Check your inbox for the verification link.";
+        TempData["info"] = await this.FlashAsync("account.flash_created", "Account created. Check your inbox for the verification link.");
         return RedirectToAction(nameof(Login));
     }
 

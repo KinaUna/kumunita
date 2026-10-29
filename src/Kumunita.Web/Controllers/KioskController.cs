@@ -271,13 +271,13 @@ public sealed class KioskController : Controller
         // shape).
         if (!int.TryParse(Request.Form["ViewIntervalSeconds"], out var viewInterval) || viewInterval < 5)
         {
-            TempData["error"] = "The view-interval must be at least 5 seconds.";
+            TempData["error"] = await this.FlashAsync("kiosk.flash_view_interval", "The view-interval must be at least 5 seconds.");
             return RedirectToAction(nameof(SettingsGet));
         }
         if (!int.TryParse(Request.Form["RefreshIntervalSeconds"], out var refreshInterval)
             || refreshInterval < 2 || refreshInterval >= viewInterval)
         {
-            TempData["error"] = "The refresh-interval must be at least 2 seconds and less than the view-interval.";
+            TempData["error"] = await this.FlashAsync("kiosk.flash_refresh_interval", "The refresh-interval must be at least 2 seconds and less than the view-interval.");
             return RedirectToAction(nameof(SettingsGet));
         }
 
@@ -329,7 +329,7 @@ public sealed class KioskController : Controller
             // A test construction with no IDocumentStore — fail loudly (the
             // service's ArgumentNullException is the same contract; a real
             // deployment always carries the store).
-            TempData["error"] = "The document store is unavailable.";
+            TempData["error"] = await this.FlashAsync("kiosk.flash_store_unavailable", "The document store is unavailable.");
             return RedirectToAction(nameof(SettingsGet));
         }
 
@@ -347,7 +347,7 @@ public sealed class KioskController : Controller
             session,
             ct).ConfigureAwait(false);
 
-        TempData["info"] = "The kiosk playlist has been saved.";
+        TempData["info"] = await this.FlashAsync("kiosk.flash_saved", "The kiosk playlist has been saved.");
         return RedirectToAction(nameof(SettingsGet));
     }
 

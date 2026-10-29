@@ -381,7 +381,7 @@ public sealed class SecuritySettingsController(
         var verified = await userManager.VerifyTwoFactorTokenAsync(user, AuthenticatorProvider, model.Code);
         if (!verified)
         {
-            TempData["error"] = "The authenticator code was not valid. Enable two-factor authentication again.";
+            TempData["error"] = await this.FlashAsync("security.flash_totp_invalid_enable", "The authenticator code was not valid. Enable two-factor authentication again.");
             return RedirectToAction(nameof(Mfa));
         }
 
@@ -391,7 +391,7 @@ public sealed class SecuritySettingsController(
         await userManager.SetTwoFactorEnabledAsync(user, true);
         await RestampSessionAsync(user);
 
-        TempData["info"] = "Two-factor authentication is now enabled. Sign in with your authenticator app from now on.";
+        TempData["info"] = await this.FlashAsync("security.flash_2fa_enabled", "Two-factor authentication is now enabled. Sign in with your authenticator app from now on.");
         // The recovery codes were shown once at enrollment; redirect to the
         // count-only recovery page (never re-served here).
         return RedirectToAction(nameof(MfaRecovery));
@@ -459,7 +459,7 @@ public sealed class SecuritySettingsController(
 
         // Shape note: returns IEnumerable<string>? — .ToArray() + null-forgiving.
         var codes = (await userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, RecoveryCodeCount))!.ToArray();
-        TempData["info"] = "Your recovery codes have been rotated. Copy them now — they will not be shown again.";
+        TempData["info"] = await this.FlashAsync("security.flash_codes_rotated", "Your recovery codes have been rotated. Copy them now — they will not be shown again.");
         // Render the single Mfa view (the rotated codes shown once).
         return View("Mfa", new MfaSettingsViewModel
         {
@@ -514,7 +514,7 @@ public sealed class SecuritySettingsController(
         var verified = await userManager.VerifyTwoFactorTokenAsync(user, AuthenticatorProvider, model.Code);
         if (!verified)
         {
-            TempData["error"] = "The authenticator code was not valid. Two-factor authentication is still enabled.";
+            TempData["error"] = await this.FlashAsync("security.flash_totp_invalid_disable", "The authenticator code was not valid. Two-factor authentication is still enabled.");
             return RedirectToAction(nameof(Mfa));
         }
 
@@ -526,7 +526,7 @@ public sealed class SecuritySettingsController(
         await userManager.SetTwoFactorEnabledAsync(user, false);
         await userManager.ResetAuthenticatorKeyAsync(user);
         await RestampSessionAsync(user);
-        TempData["info"] = "Two-factor authentication has been disabled.";
+        TempData["info"] = await this.FlashAsync("security.flash_2fa_disabled", "Two-factor authentication has been disabled.");
         return RedirectToAction(nameof(Mfa));
     }
 

@@ -437,7 +437,7 @@ public sealed class InventoryController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Item updated.";
+        TempData["info"] = await this.FlashAsync("inventory.flash_item_updated", "Item updated.");
         return Redirect($"/inventory/{id}");
     }
 
@@ -467,7 +467,7 @@ public sealed class InventoryController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Item deleted.";
+        TempData["info"] = await this.FlashAsync("inventory.flash_item_deleted", "Item deleted.");
         return Redirect("/inventory");
     }
 
@@ -510,7 +510,7 @@ public sealed class InventoryController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Item checked out.";
+        TempData["info"] = await this.FlashAsync("inventory.flash_checked_out", "Item checked out.");
         return Redirect($"/inventory/{id}");
     }
 
@@ -542,7 +542,7 @@ public sealed class InventoryController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Item checked in.";
+        TempData["info"] = await this.FlashAsync("inventory.flash_checked_in", "Item checked in.");
         return Redirect($"/inventory/{id}");
     }
 

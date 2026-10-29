@@ -145,7 +145,7 @@ public sealed class MessagingSettingsController(
 
         if (profile?.MessagingRestricted == true)
         {
-            TempData["error"] = "Messaging has been restricted on your account by a guardian. Contact them to change it.";
+            TempData["error"] = await this.FlashAsync("messaging.flash_guardian_restricted", "Messaging has been restricted on your account by a guardian. Contact them to change it.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -158,7 +158,7 @@ public sealed class MessagingSettingsController(
         }
         catch (System.Collections.Generic.KeyNotFoundException)
         {
-            TempData["error"] = "Your profile could not be updated. Please try again.";
+            TempData["error"] = await this.FlashAsync("messaging.flash_profile_failed", "Your profile could not be updated. Please try again.");
         }
 
         return RedirectToAction(nameof(Index));

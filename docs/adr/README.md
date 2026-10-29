@@ -276,3 +276,4 @@ Decision / Consequences. New decisions take the next number.
 | 0265 | Projects controller: all 63 flash messages use `FlashAsync` in one batch (English floor byte-identical, exact-text tests unaffected); 46 new keys incl. translated direction words for "Lane/Card moved {0}". |
 | 0266 | Groups controller: all 60 flash messages use `FlashAsync`; 22 new `groups.flash_*` keys in en/de/fr/da, `posts.flash_*`/`events.flash_*`/`flash.translation_*` reused. |
 | 0267 | Admin controllers (9): 58 flash messages use `FlashAsync`; 41 new keys (`admin.flash_*`, `flash.translation_gone*`, `flash.choose_language_remove`) in en/de/fr/da; `admin.guests_saved` reused. |
+| 0268 | Last 49 literal flashes (Account, Inventory, Kiosk, Languages, Locale, MessagingSettings, Moderation, ReportTargets, SecuritySettings, Tag) use `FlashAsync`; 34 new keys in en/de/fr/da; no literal `TempData` English left outside the already-localized portability controllers. |
