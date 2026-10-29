@@ -1541,6 +1541,7 @@ html[data-kmb-palette] .kmb-pal-choice:has(.kmb-pal-radio:focus-visible) { outli
   .kmb-post-replies { min-height: 44px; }
 }
 #replies { scroll-margin-top: 4.5rem; }
+#announcement-comments { scroll-margin-top: 4.5rem; } /* ADR 0248: the card footer's comment link lands below the sticky navbar */
 
 /* ADR 0227 — feed card footer bookmark toggle (right end of the footer). */
 .airy-post-foot .kmb-post-bookmark { margin: 0 0 0 auto; }

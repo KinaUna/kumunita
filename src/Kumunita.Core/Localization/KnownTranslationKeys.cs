@@ -1755,6 +1755,9 @@ public static class KnownTranslationKeys
             // ── announcement comments (the Detail.cshtml comment lane;
             //    signed-in-only, admin-toggleable; ADR 0101) ──────────────────
             ["announcements.comments"] = "Comments",
+            ["announcements.comment_count_none"] = "No comments yet",
+            ["announcements.comment_count_one"] = "{0} comment",
+            ["announcements.comment_count_other"] = "{0} comments",
             ["announcements.comment_empty"] = "No comments yet. Be the first to say something.",
             ["announcements.comment_deleted"] = "This comment has been deleted by its author.",
             ["announcements.comment_delete"] = "Delete",
@@ -4703,6 +4706,9 @@ public static class KnownTranslationKeys
 
             // ── announcement comments (ADR 0101) ─────────────────────────────
             ["announcements.comments"] = "Kommentare",
+            ["announcements.comment_count_none"] = "Noch keine Kommentare",
+            ["announcements.comment_count_one"] = "{0} Kommentar",
+            ["announcements.comment_count_other"] = "{0} Kommentare",
             ["announcements.comment_empty"] = "Noch keine Kommentare. Schreib als Erster etwas.",
             ["announcements.comment_deleted"] = "Dieser Kommentar wurde von seiner Autorin bzw. seinem Autor gelöscht.",
             ["announcements.comment_delete"] = "Löschen",
@@ -7477,6 +7483,9 @@ public static class KnownTranslationKeys
 
             // ── announcement comments (ADR 0101) ─────────────────────────────
             ["announcements.comments"] = "Commentaires",
+            ["announcements.comment_count_none"] = "Aucun commentaire pour l'instant",
+            ["announcements.comment_count_one"] = "{0} commentaire",
+            ["announcements.comment_count_other"] = "{0} commentaires",
             ["announcements.comment_empty"] = "Pas encore de commentaires. Sois le premier à dire quelque chose.",
             ["announcements.comment_deleted"] = "Ce commentaire a été supprimé par son auteur.",
             ["announcements.comment_delete"] = "Supprimer",
@@ -10239,6 +10248,9 @@ public static class KnownTranslationKeys
 
             // ── announcement comments (ADR 0101) ─────────────────────────────
             ["announcements.comments"] = "Kommentarer",
+            ["announcements.comment_count_none"] = "Ingen kommentarer endnu",
+            ["announcements.comment_count_one"] = "{0} kommentar",
+            ["announcements.comment_count_other"] = "{0} kommentarer",
             ["announcements.comment_empty"] = "Ingen kommentarer endnu. Vær den første til at sige noget.",
             ["announcements.comment_deleted"] = "Denne kommentar er blevet slettet af dens forfatter.",
             ["announcements.comment_delete"] = "Slet",

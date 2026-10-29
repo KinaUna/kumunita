@@ -252,8 +252,16 @@ public sealed class AnnouncementController(
         foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
             filterParams[k] = v;
 
+        // ADR 0248 — the card footer's comment count. Same gate as the detail's comment
+        // list (ADR 0101): a signed-in viewer and the admin toggle on; otherwise null, and
+        // the card shows nothing. The ids are the page the list read already scope-gated.
+        IReadOnlyDictionary<string, int>? commentCounts = null;
+        if (!string.IsNullOrWhiteSpace(subjectId) && await announcements.AreAnnouncementCommentsEnabledAsync())
+            commentCounts = await announcements.CountAnnouncementCommentsAsync(visible.Select(a => a.Id).ToList());
+
         return View(new AnnouncementIndexViewModel(rows)
         {
+            CommentCounts = commentCounts,
             Pager = (hasMore || page > 1)
                 ? PagedViewModel.ForRoute("/announcements", page, pageSize, hasMore,
                     filterParams.Count > 0 ? filterParams : null)
