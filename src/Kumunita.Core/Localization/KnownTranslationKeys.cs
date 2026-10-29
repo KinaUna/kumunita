@@ -1173,6 +1173,46 @@ public static class KnownTranslationKeys
                 "Deleting the group removes it, its members, and any pending invitations. This cannot be undone.",
             ["groups.danger_delete_button"] = "Delete this group",
             ["groups.new_title"]      = "Post to this group",
+            ["groups.owned_by"] =
+                "Owned by",
+            ["groups.you_own"] =
+                "You own this group",
+            ["groups.private_chip"] =
+                "Private",
+            ["groups.pending_invitations_heading"] =
+                "Pending invitations",
+            ["groups.invite_cancel"] =
+                "Cancel invite",
+            ["groups.filter_residents_label"] =
+                "Filter residents",
+            ["groups.resident_label"] =
+                "Resident",
+            ["groups.invite_note"] =
+                "They get an invitation on their Groups page to accept or decline.",
+            ["groups.invite_submit"] =
+                "Invite",
+            ["groups.all_members_already"] =
+                "Every resident is already a member of this group.",
+            ["groups.add_member_heading"] =
+                "Add a member",
+            ["groups.add_member_note"] =
+                "They are added to the group immediately (no invitation).",
+            ["groups.post_why_heading"] =
+                "Why can I see this?",
+            ["groups.post_why_body"] =
+                "You can see this post because you are a current member of the group.",
+            ["groups.replies_empty"] =
+                "No replies yet. If you can see this post, you can reply to it.",
+            ["groups.reply_audience_note"] =
+                "Replies have no own audience — they are visible under this post's single group-membership decision. You are replying only where the post itself is visible.",
+            ["groups.index_empty_body"] =
+                "Groups organize residents, e.g. “Building 4”, “Volunteers”, “Bike owners”.",
+            ["groups.new_visibility_note"] =
+                "Your post will be visible to the current members of this group only.",
+            ["common.draft_tooltip"] =
+                "Only you can see this — it is not yet public",
+            ["common.range_to"] =
+                "to",
             ["groups.new_back"]       = "back to the group",
             ["groups.new_submit"]     = "Post to group",
             // ADR 0089 (GE) — the group-events lane: the feed section heading,
@@ -4212,6 +4252,46 @@ public static class KnownTranslationKeys
                 "Das Löschen der Gruppe entfernt sie, ihre Mitglieder und ausstehende Einladungen. Dies kann nicht rückgängig gemacht werden.",
             ["groups.danger_delete_button"] = "Diese Gruppe löschen",
             ["groups.new_title"]      = "Beitrag in dieser Gruppe",
+            ["groups.owned_by"] =
+                "Besitzer:",
+            ["groups.you_own"] =
+                "Du besitzt diese Gruppe",
+            ["groups.private_chip"] =
+                "Privat",
+            ["groups.pending_invitations_heading"] =
+                "Offene Einladungen",
+            ["groups.invite_cancel"] =
+                "Einladung zurückziehen",
+            ["groups.filter_residents_label"] =
+                "Bewohner filtern",
+            ["groups.resident_label"] =
+                "Bewohner",
+            ["groups.invite_note"] =
+                "Die Einladung erscheint auf der Seite „Gruppen“ der Person, wo sie sie annehmen oder ablehnen kann.",
+            ["groups.invite_submit"] =
+                "Einladen",
+            ["groups.all_members_already"] =
+                "Alle Bewohner sind bereits Mitglied dieser Gruppe.",
+            ["groups.add_member_heading"] =
+                "Mitglied hinzufügen",
+            ["groups.add_member_note"] =
+                "Die Person wird sofort zur Gruppe hinzugefügt (keine Einladung).",
+            ["groups.post_why_heading"] =
+                "Warum sehe ich das?",
+            ["groups.post_why_body"] =
+                "Du siehst diesen Beitrag, weil du aktuelles Mitglied der Gruppe bist.",
+            ["groups.replies_empty"] =
+                "Noch keine Antworten. Wenn du diesen Beitrag sehen kannst, kannst du darauf antworten.",
+            ["groups.reply_audience_note"] =
+                "Antworten haben keine eigene Zielgruppe — sie sind unter der einen Gruppenmitgliedschafts-Entscheidung dieses Beitrags sichtbar. Du antwortest nur dort, wo der Beitrag selbst sichtbar ist.",
+            ["groups.index_empty_body"] =
+                "Gruppen ordnen Bewohner, z. B. „Haus 4“, „Freiwillige“, „Fahrradbesitzer“.",
+            ["groups.new_visibility_note"] =
+                "Dein Beitrag ist nur für die aktuellen Mitglieder dieser Gruppe sichtbar.",
+            ["common.draft_tooltip"] =
+                "Nur du kannst das sehen — es ist noch nicht öffentlich",
+            ["common.range_to"] =
+                "bis",
             ["groups.new_back"]       = "zurück zur Gruppe",
             ["groups.new_submit"]     = "In die Gruppe posten",
             // ADR 0089 (GE) — the group-events lane (de).
@@ -7046,6 +7126,46 @@ public static class KnownTranslationKeys
                 "Supprimer le groupe le retire, ainsi que ses membres et toutes les invitations en attente. Cette action est irréversible.",
             ["groups.danger_delete_button"] = "Supprimer ce groupe",
             ["groups.new_title"]      = "Publier dans ce groupe",
+            ["groups.owned_by"] =
+                "Propriété de",
+            ["groups.you_own"] =
+                "Vous êtes propriétaire de ce groupe",
+            ["groups.private_chip"] =
+                "Privé",
+            ["groups.pending_invitations_heading"] =
+                "Invitations en attente",
+            ["groups.invite_cancel"] =
+                "Annuler l’invitation",
+            ["groups.filter_residents_label"] =
+                "Filtrer les résidents",
+            ["groups.resident_label"] =
+                "Résident",
+            ["groups.invite_note"] =
+                "La personne reçoit une invitation sur sa page Groupes, qu’elle peut accepter ou refuser.",
+            ["groups.invite_submit"] =
+                "Inviter",
+            ["groups.all_members_already"] =
+                "Tous les résidents sont déjà membres de ce groupe.",
+            ["groups.add_member_heading"] =
+                "Ajouter un membre",
+            ["groups.add_member_note"] =
+                "La personne est ajoutée immédiatement au groupe (sans invitation).",
+            ["groups.post_why_heading"] =
+                "Pourquoi puis-je voir ceci ?",
+            ["groups.post_why_body"] =
+                "Vous voyez cette publication parce que vous êtes membre actuel du groupe.",
+            ["groups.replies_empty"] =
+                "Pas encore de réponses. Si vous pouvez voir cette publication, vous pouvez y répondre.",
+            ["groups.reply_audience_note"] =
+                "Les réponses n’ont pas d’audience propre — elles sont visibles selon l’unique décision d’appartenance au groupe de cette publication. Vous ne répondez que là où la publication elle-même est visible.",
+            ["groups.index_empty_body"] =
+                "Les groupes organisent les résidents, p. ex. « Bâtiment 4 », « Bénévoles », « Propriétaires de vélos ».",
+            ["groups.new_visibility_note"] =
+                "Votre publication ne sera visible que pour les membres actuels de ce groupe.",
+            ["common.draft_tooltip"] =
+                "Vous seul pouvez voir ceci — ce n’est pas encore public",
+            ["common.range_to"] =
+                "à",
             ["groups.new_back"]       = "retour au groupe",
             ["groups.new_submit"]     = "Publier dans le groupe",
             // ADR 0089 (GE) — the group-events lane (fr).
@@ -9877,6 +9997,46 @@ public static class KnownTranslationKeys
                 "Sletning af gruppen fjerner den, dens medlemmer og eventuelle afventende invitationer. Dette kan ikke fortrydes.",
             ["groups.danger_delete_button"] = "Slet denne gruppe",
             ["groups.new_title"]      = "Skriv til denne gruppe",
+            ["groups.owned_by"] =
+                "Ejes af",
+            ["groups.you_own"] =
+                "Du ejer denne gruppe",
+            ["groups.private_chip"] =
+                "Privat",
+            ["groups.pending_invitations_heading"] =
+                "Afventende invitationer",
+            ["groups.invite_cancel"] =
+                "Annullér invitation",
+            ["groups.filter_residents_label"] =
+                "Filtrér beboere",
+            ["groups.resident_label"] =
+                "Beboer",
+            ["groups.invite_note"] =
+                "Personen får en invitation på sin Grupper-side, som de kan acceptere eller afvise.",
+            ["groups.invite_submit"] =
+                "Inviter",
+            ["groups.all_members_already"] =
+                "Alle beboere er allerede medlem af denne gruppe.",
+            ["groups.add_member_heading"] =
+                "Tilføj et medlem",
+            ["groups.add_member_note"] =
+                "Personen tilføjes til gruppen med det samme (ingen invitation).",
+            ["groups.post_why_heading"] =
+                "Hvorfor kan jeg se dette?",
+            ["groups.post_why_body"] =
+                "Du kan se dette indlæg, fordi du er nuværende medlem af gruppen.",
+            ["groups.replies_empty"] =
+                "Ingen svar endnu. Hvis du kan se dette indlæg, kan du svare på det.",
+            ["groups.reply_audience_note"] =
+                "Svar har ingen egen målgruppe — de er synlige under dette indlægs ene gruppemedlemskabsafgørelse. Du svarer kun, hvor selve indlægget er synligt.",
+            ["groups.index_empty_body"] =
+                "Grupper organiserer beboere, f.eks. “Blok 4”, “Frivillige”, “Cykelejere”.",
+            ["groups.new_visibility_note"] =
+                "Dit indlæg er kun synligt for gruppens nuværende medlemmer.",
+            ["common.draft_tooltip"] =
+                "Kun du kan se dette — det er endnu ikke offentligt",
+            ["common.range_to"] =
+                "til",
             ["groups.new_back"]       = "tilbage til gruppen",
             ["groups.new_submit"]     = "Skriv til gruppen",
             // ADR 0089 (GE) — the group-events lane (da).

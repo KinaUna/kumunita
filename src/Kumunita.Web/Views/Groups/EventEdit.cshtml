@@ -11,7 +11,13 @@
     string groupId = (string?)ViewContext.RouteData.Values["id"] ?? string.Empty;
     string eventId = (string?)ViewContext.RouteData.Values["eventId"] ?? string.Empty;
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
-    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
+    string ariaClose = "Close";
+    string optionalPlaceholder = "optional";
+    if (Translation is not null)
+    {
+        ariaClose         = await Translation.GetAsync("common.close", _kwL);
+        optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
+    }
 }
 
 <div class="row justify-content-center">
@@ -34,7 +40,7 @@
                         <li>@msg</li>
                     }
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
             </div>
         }
 
