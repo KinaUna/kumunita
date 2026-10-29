@@ -134,9 +134,16 @@ $aBaseline = @(
 # warm-backfill fix grew SampleDataSeeder.cs (2105 -> 2110) — the same
 # shipped-additions mechanism as above; the gate's ceiling now starts from
 # the 2026-10-29 baseline.
+# Re-baselined again 2026-10-29 (the ADR 0257 groups-pages localization
+# close): since the ADR 0251 baseline the pages-form lane (ADR 0254,
+# 19 pages.form.* keys) and the groups lane (ADR 0257, 20 keys) added
+# keys to KnownTranslationKeys.cs (11527 -> 11835); the ADR 0253
+# everyone-audience seeds grew ProjectsController.cs (5358 -> 5370) — the
+# same shipped-additions mechanism as above; the gate's ceiling now starts
+# from the 2026-10-29 baseline (again).
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11527
-  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5358
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11835
+  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
   'src/Kumunita.Core/UserInfo/UserInfoService.cs'          = 4286
