@@ -2036,6 +2036,44 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     }
 
     /// <summary>
+    /// The new to-do, goal and project forms open with the audience's
+    /// "Everyone" switch on (the copy promises "the default — everyone can see
+    /// it"). The seed must set <c>CommunityVisible</c> explicitly: the view's
+    /// <c>?? true</c> fallback never applies to a non-null model.
+    /// </summary>
+    [Fact]
+    public async Task NewForms_SeedCommunityVisibleAudience()
+    {
+        const string actor = "subj-new-forms-audience";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+            .Returns(new TodoPage([], false));
+        projects.ListPickerTodosAsync(
+                Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<int?>())
+            .Returns(new TodoPage([], false));
+        projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+            .Returns(new ProjectPage([], false));
+        projects.ListGoalsAsync(
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
+            .Returns(new GoalPage([], false));
+
+        var controller = Build(projects, subjectId: actor);
+
+        var todo = Assert.IsType<TodoEditorModel>(
+            Assert.IsType<ViewResult>(await controller.CreateGet()).ViewData.Model);
+        Assert.True(todo.Audience.CommunityVisible);
+
+        var goal = Assert.IsType<GoalComposerViewModel>(
+            Assert.IsType<ViewResult>(await controller.GoalNew()).ViewData.Model);
+        Assert.True(goal.Audience.CommunityVisible);
+
+        var project = Assert.IsType<ProjectComposerViewModel>(
+            Assert.IsType<ViewResult>(await controller.ProjectNew()).ViewData.Model);
+        Assert.True(project.Audience.CommunityVisible);
+    }
+
+    /// <summary>
     /// ADR 0087 D7 — <c>GET /projects/todos/new</c>: the create form seeds the
     /// **blocker picker** (the actor's readable, non-deleted to-dos from
     /// <c>ListPickerTodosAsync</c>, sorted by title — a display surface, never

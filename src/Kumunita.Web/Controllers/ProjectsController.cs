@@ -1098,6 +1098,10 @@ public sealed class ProjectsController : Controller
             {
                 Mode = "Any",
                 Grants = "[]",
+                // Seeded like the board composer: the view's "Everyone" switch
+                // renders from `Audience?.CommunityVisible ?? true`, which a
+                // non-null `false` would defeat (the form opened author-only).
+                CommunityVisible = true,
             },
             Languages = await SeedLanguagePickerAsync(),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
@@ -3903,6 +3907,10 @@ public sealed class ProjectsController : Controller
             {
                 Mode = "Any",
                 Grants = "[]",
+                // Seeded like the board composer: the view's "Everyone" switch
+                // renders from `Audience?.CommunityVisible ?? true`, which a
+                // non-null `false` would defeat (the form opened author-only).
+                CommunityVisible = true,
             },
             Languages = await SeedLanguagePickerAsync(),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
@@ -4292,6 +4300,10 @@ public sealed class ProjectsController : Controller
             {
                 Mode = "Any",
                 Grants = "[]",
+                // Seeded like the board composer: the view's "Everyone" switch
+                // renders from `Audience?.CommunityVisible ?? true`, which a
+                // non-null `false` would defeat (the form opened author-only).
+                CommunityVisible = true,
             },
             Languages = await SeedLanguagePickerAsync(),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
