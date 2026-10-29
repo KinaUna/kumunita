@@ -68,40 +68,38 @@
         <form method="post" action="/documents" enctype="multipart/form-data">
             @Html.AntiForgeryToken()
 
-            <div class="card mb-4">
+            <div class="card mb-4 kmb-form-section">
                 <div class="card-body">
-                    <label class="form-label" for="title" style="font-weight:600;">
-                        <kw-l key="common.title">Title</kw-l>
-                    </label>
-                    <input class="form-control" type="text" id="title" name="Title"
-                           maxlength="200" value="@Model?.Title" required />
+                    <h2 class="kmb-form-section-title"><kw-l key="form.section_details">Details</kw-l></h2>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="title" style="font-weight:600;">
+                            <kw-l key="common.title">Title</kw-l>
+                        </label>
+                        <input class="form-control" type="text" id="title" name="Title"
+                               maxlength="200" value="@Model?.Title" required />
+                    </div>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="summary" style="font-weight:600;">
+                            <kw-l key="documents.upload_summary">One-line description (optional)</kw-l>
+                        </label>
+                        <input class="form-control" type="text" id="summary" name="Summary"
+                               maxlength="280" value="@Model?.Summary" />
+                    </div>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="file" style="font-weight:600;">
+                            <kw-l key="documents.upload_file">File</kw-l>
+                        </label>
+                        <input class="form-control" type="file" id="file" name="File" required />
+                                            <kw-upload-limit></kw-upload-limit>
+                    </div>
                 </div>
             </div>
 
-            <div class="card mb-4">
+            <div class="card mb-4 audience-editor kmb-form-section">
                 <div class="card-body">
-                    <label class="form-label" for="summary" style="font-weight:600;">
-                        <kw-l key="documents.upload_summary">One-line description (optional)</kw-l>
-                    </label>
-                    <input class="form-control" type="text" id="summary" name="Summary"
-                           maxlength="280" value="@Model?.Summary" />
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-body">
-                    <label class="form-label" for="file" style="font-weight:600;">
-                        <kw-l key="documents.upload_file">File</kw-l>
-                    </label>
-                    <input class="form-control" type="file" id="file" name="File" required />
-                                        <kw-upload-limit></kw-upload-limit>                </div>
-            </div>
-
-            <div class="card mb-4 audience-editor">
-                <div class="card-body">
-                    <h6 class="card-title" style="font-weight:600;">
+                    <h2 class="kmb-form-section-title">
                         <kw-l key="documents.upload_audience">Who can see this document</kw-l>
-                    </h6>
+                    </h2>
 
                     @* ADR 0057 — "Everyone on the platform" (the AllResidents
                        flag) is rendered FIRST, above the granular block, exactly
@@ -179,42 +177,42 @@
                 </div>
             </div>
 
-            <div class="card mb-4">
+            <div class="card mb-4 kmb-form-section">
                 <div class="card-body">
-                    <label class="form-label" for="folder" style="font-weight:600;">
-                        <kw-l key="documents.folder">Folder</kw-l>
-                    </label>
-                    <select class="form-control" id="folder" name="FolderId">
-                        <option value=""><kw-l key="documents.folder_unfiled">Unfiled</kw-l></option>
-                    </select>
-                    <div class="text-muted small mt-1">
-                        <kw-l key="documents.folder_hint">File this document into a folder to keep the repository organized.</kw-l>
+                    <h2 class="kmb-form-section-title"><kw-l key="form.section_organization">Organization</kw-l></h2>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="folder" style="font-weight:600;">
+                            <kw-l key="documents.folder">Folder</kw-l>
+                        </label>
+                        <select class="form-control" id="folder" name="FolderId">
+                            <option value=""><kw-l key="documents.folder_unfiled">Unfiled</kw-l></option>
+                        </select>
+                        <div class="text-muted small mt-1">
+                            <kw-l key="documents.folder_hint">File this document into a folder to keep the repository organized.</kw-l>
+                        </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-body">
-                    <label class="form-label" for="tags" style="font-weight:600;">
-                        <kw-l key="documents.tags">Tags</kw-l>
-                    </label>
-                    @* The "documents organization" lane (TG) — the composer tag
-                       input (a free-text field + autocomplete dropdown). The
-                       `data-tag-suggest` self-wire selector (the
-                       Posts/New.cshtml + Posts/Edit.cshtml idiom) drives the
-                       client/lib/tag-suggest.ts module to create the chips,
-                       the dropdown, and the hidden TagIds submission field
-                       around this input. The filter (starts_with(displayName)
-                       OR starts_with(slug), ≤ 10) is server-side via
-                       POST /api/tags/suggest (the SuggestAsync seam, C-TG·2 /
-                       C-TG·4). A "[]" ⇒ no chips (new/untagged document
-                       behaves as before). *@
-                    <input class="form-control" type="text" id="tags"
-                           data-tag-suggest
-                           maxlength="64"
-                           placeholder="@await Translation.GetAsync("tags.pages_example", _kwL)" />
-                    <div class="text-muted small mt-1">
-                        <kw-l key="documents.tags_hint">Type to search existing tags, or start a new one.</kw-l>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="tags" style="font-weight:600;">
+                            <kw-l key="documents.tags">Tags</kw-l>
+                        </label>
+                        @* The "documents organization" lane (TG) — the composer tag
+                           input (a free-text field + autocomplete dropdown). The
+                           `data-tag-suggest` self-wire selector (the
+                           Posts/New.cshtml + Posts/Edit.cshtml idiom) drives the
+                           client/lib/tag-suggest.ts module to create the chips,
+                           the dropdown, and the hidden TagIds submission field
+                           around this input. The filter (starts_with(displayName)
+                           OR starts_with(slug), ≤ 10) is server-side via
+                           POST /api/tags/suggest (the SuggestAsync seam, C-TG·2 /
+                           C-TG·4). A "[]" ⇒ no chips (new/untagged document
+                           behaves as before). *@
+                        <input class="form-control" type="text" id="tags"
+                               data-tag-suggest
+                               maxlength="64"
+                               placeholder="@await Translation.GetAsync("tags.pages_example", _kwL)" />
+                        <div class="text-muted small mt-1">
+                            <kw-l key="documents.tags_hint">Type to search existing tags, or start a new one.</kw-l>
+                        </div>
                     </div>
                 </div>
             </div>

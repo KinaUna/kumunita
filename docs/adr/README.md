@@ -238,3 +238,4 @@ Decision / Consequences. New decisions take the next number.
 | 0227 | Feed card footer gets a bookmark toggle: batched `IBookmarkService.ListBookmarkedIdsAsync`, state read in the host views, existing `/bookmarks` form lanes (C#, Razor, CSS, ADR). |
 | 0228 | Housekeeping: palette tokens collapsed with `light-dark()` + `color-scheme`, shared detail classes renamed `kmb-detail-*`, `overflow-anchor: none` on the notice strip, Documents allow-list gains PowerPoint and raster images (CSS, Razor, C#, ADR). |
 | 0229 | Headed section cards for Group event New/Edit, Group Create, Inventory Create/Edit and Goal Edit (Razor, ADR). |
+| 0230 | Headed section cards for Document New/Edit, Goal New, Board New/Edit and Profile Edit; profile audience editor heading becomes h3; keys `form.section_organization`, `profile.about_heading` (Razor, ADR). |

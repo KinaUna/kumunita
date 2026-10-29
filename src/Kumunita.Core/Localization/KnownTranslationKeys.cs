@@ -1236,6 +1236,8 @@ public static class KnownTranslationKeys
                 "contact block below; leave empty to keep your number private " +
                 "to this profile.",
             ["profile.who_heading"] = "Who can see what",
+            ["profile.about_heading"] = "About you",
+            ["form.section_organization"] = "Organization",
             ["profile.optin_contact"] = "Share my contact info (address, email, phone)",
             ["profile.optin_contact_note"] =
                 "Leave this off if you'd rather keep your address, " +
@@ -4185,6 +4187,8 @@ public static class KnownTranslationKeys
                 "den Kontaktkasten aktiviert hast; leer lassen, um deine Nummer " +
                 "für dieses Profil privat zu halten.",
             ["profile.who_heading"] = "Wer was sehen kann",
+            ["profile.about_heading"] = "Über dich",
+            ["form.section_organization"] = "Organisation",
             ["profile.optin_contact"] = "Meine Kontaktdaten teilen (Adresse, E-Mail, Telefon)",
             ["profile.optin_contact_note"] =
                 "Lass dies aus, wenn du deine Adresse, " +
@@ -6929,6 +6933,8 @@ public static class KnownTranslationKeys
                 "activé le bloc contact ci-dessous ; laisser vide pour garder ton numéro " +
                 "privé pour ce profil.",
             ["profile.who_heading"] = "Qui peut voir quoi",
+            ["profile.about_heading"] = "À propos de vous",
+            ["form.section_organization"] = "Organisation",
             ["profile.optin_contact"] = "Partager mes coordonnées (adresse, e-mail, téléphone)",
             ["profile.optin_contact_note"] =
                 "Laisse désactivé si tu préfères garder ton adresse, " +
@@ -9669,6 +9675,8 @@ public static class KnownTranslationKeys
                 "kontaktfeltet nedenfor til; lad stå tom for at holde dit nummer " +
                 "privat for denne profil.",
             ["profile.who_heading"] = "Hvem kan se hvad",
+            ["profile.about_heading"] = "Om dig",
+            ["form.section_organization"] = "Organisering",
             ["profile.optin_contact"] = "Del mine kontaktoplysninger (adresse, e-mail, telefon)",
             ["profile.optin_contact_note"] =
                 "Lad stå slukket, hvis du hellere vil holde din adresse, " +
