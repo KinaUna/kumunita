@@ -1901,8 +1901,7 @@ public static class KnownTranslationKeys
                 "No readable posts or blog pages carry this tag.",
             ["tag.input.placeholder"] = "e.g. sanitation, budget, maple-street",
             ["tag.input.hint"] =
-                "Type to search existing tags, or start a new one — it attaches to " +
-                "this post.",
+                "Type to search existing tags, or start a new one.",
             ["tag.suggest.empty"] =
                 "No matching tags — keep typing or start a new one.",
             ["tag.translate.heading"] = "Translations",
@@ -4890,8 +4889,7 @@ public static class KnownTranslationKeys
                 "Keine lesbaren Beiträge oder Blogseiten tragen dieses Tag.",
             ["tag.input.placeholder"] = "z. B. sanitätsdienst, haushalt, maplestreet",
             ["tag.input.hint"] =
-                "Tippe, um bestehende Tags zu finden, oder starte ein neues — es wird " +
-                "diesem Beitrag zugewiesen.",
+                "Tippe, um bestehende Tags zu finden, oder starte ein neues.",
             ["tag.suggest.empty"] =
                 "Keine passenden Tags — weiter tippen oder ein neues starten.",
             ["tag.translate.heading"] = "Übersetzungen",
@@ -7727,8 +7725,7 @@ public static class KnownTranslationKeys
                 "Aucune publication ni page de blog lisible ne porte cette étiquette.",
             ["tag.input.placeholder"] = "p. ex. salubrité, budget, rue-érable",
             ["tag.input.hint"] =
-                "Écris pour chercher des étiquettes existantes, ou en créer une " +
-                "nouvelle — elle sera ajoutée à cette publication.",
+                "Écris pour chercher des étiquettes existantes, ou en créer une nouvelle.",
             ["tag.suggest.empty"] =
                 "Aucune étiquette correspondante — continue à écrire ou crée-en une.",
             ["tag.translate.heading"] = "Traductions",
@@ -10552,8 +10549,7 @@ public static class KnownTranslationKeys
                 "Ingen læsbare indlæg eller blogsider bærer dette tag.",
             ["tag.input.placeholder"] = "f.eks. renhold, budget, maplestreet",
             ["tag.input.hint"] =
-                "Skriv for at søge i eksisterende tags, eller start et nyt — " +
-                "det knyttes til dette indlæg.",
+                "Skriv for at søge i eksisterende tags, eller start et nyt.",
             ["tag.suggest.empty"] =
                 "Ingen matchende tags — fortsæt med at skrive eller start et nyt.",
             ["tag.translate.heading"] = "Oversættelser",
