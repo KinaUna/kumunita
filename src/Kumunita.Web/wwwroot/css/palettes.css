@@ -1585,3 +1585,37 @@ html[data-kmb-palette] .kmb-pal-choice:has(.kmb-pal-radio:focus-visible) { outli
   html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu)) > .nav-item { flex: 0 0 auto; }
   html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu)) .nav-link { white-space: nowrap; }
 }
+
+/* ------------------------------------------------------------------------------------
+   FAQ accordion (_FaqAccordion) — theme-aware (ADR 0232).
+   Bootstrap's accordion ships light-only colours (cream panels, #212529 chevron) and
+   site.css hard-coded the answer text, so in dark mode the panels stayed light and the
+   answer copy fell to ~2.2:1. Feed Bootstrap's own variables from the palette tokens and
+   draw the chevron as a currentColor mask so it follows text colour in every combination.
+   ------------------------------------------------------------------------------------ */
+html[data-kmb-palette] .accordion.kmb-faq {
+  --bs-accordion-bg: var(--kmb-surface);
+  --bs-accordion-color: var(--kmb-ink-soft);
+  --bs-accordion-border-color: var(--kmb-border);
+  --bs-accordion-active-bg: var(--kmb-tint-a);
+  --bs-accordion-active-color: var(--kmb-accent);
+  --bs-accordion-btn-color: var(--kmb-ink);
+  --bs-accordion-btn-bg: var(--kmb-surface);
+}
+html[data-kmb-palette] .accordion.kmb-faq .accordion-button:not(.collapsed) {
+  color: var(--kmb-accent);
+  background-color: var(--kmb-tint-a);
+}
+html[data-kmb-palette] .accordion.kmb-faq .accordion-body {
+  color: var(--kmb-ink-soft);
+}
+html[data-kmb-palette] .accordion.kmb-faq .accordion-button::after,
+html[data-kmb-palette] .accordion.kmb-faq .accordion-button:not(.collapsed)::after {
+  background-image: none;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round'><path d='M2 5L8 11L14 5'/></svg>") center / 1.25rem no-repeat;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round'><path d='M2 5L8 11L14 5'/></svg>") center / 1.25rem no-repeat;
+}
+html[data-kmb-palette] .accordion.kmb-faq .accordion-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--kmb-accent) !important;
+}
