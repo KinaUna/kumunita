@@ -3242,8 +3242,11 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
    grid scroll horizontally instead of crushing the columns (the ruler
    gutter stays pinned). The Day view (1-col) is unaffected. */
 @media (max-width: 767.98px) {
+  /* ADR 0246: the minimum goes on the day-column track, not on the grid. A min-width on the scroll
+     container itself made the grid wider than its box, so the whole page scrolled and the grid never
+     did. 3.5rem ruler + 40.5rem = the old 44rem (7 columns x ~6rem each, comfortable for a title). */
   .events-time-grid--week {
-    min-width: 44rem; /* 7 columns × ~6rem each, comfortable for a title */
+    grid-template-columns: 3.5rem minmax(40.5rem, 1fr);
   }
   .events-time-grid {
     overflow-x: auto;
