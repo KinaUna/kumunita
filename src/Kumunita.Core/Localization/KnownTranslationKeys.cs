@@ -1063,6 +1063,28 @@ public static class KnownTranslationKeys
                 "in the audience section below.",
             ["posts.new_submit"]   = "Post it",
             ["posts.edit_title"]   = "Edit post",
+            ["posts.edit_back_link"] =
+                "Back to the post",
+            ["posts.edit_lede"] =
+                "You are editing your own post. Only you can edit it. The community this post appears in is fixed — it cannot be changed after you post; only the title, body, language, and audience below are editable.",
+            ["posts.edit_no_feed"] =
+                "This post's community feed is no longer available. You can still edit the title, body, and audience below.",
+            ["posts.community_label_edit"] =
+                "Community (the feed this post appears in — fixed)",
+            ["posts.community_label_new"] =
+                "Community (the feed this post will appear in)",
+            ["posts.community_hint_edit"] =
+                "The community only decides which feed your post appears in — it does not decide who can see it, and it is fixed once posted.",
+            ["posts.audience_heading"] =
+                "Audience — who can see this post",
+            ["posts.audience_empty_label"] =
+                "Empty audience.",
+            ["posts.audience_empty_none"] =
+                "With no picks, no one matches, so no one else can see your post — only you (the author) can.",
+            ["posts.audience_empty_all"] =
+                "With All mode and no picks, no one matches, so no one else can see your post — only you (the author) can.",
+            ["posts.audience_empty_any"] =
+                "With Any mode and no picks, no one matches, so no one else can see your post — only you (the author) can.",
             ["posts.edit_save"]    = "Save changes",
             // ADR 0037 — draft mode: the composer's "save as draft" toggle.
             ["posts.save_as_draft"] =
@@ -4055,6 +4077,28 @@ public static class KnownTranslationKeys
                 "in der Publikums-Sektion unten aus.",
             ["posts.new_submit"]   = "Veröffentlichen",
             ["posts.edit_title"]   = "Beitrag bearbeiten",
+            ["posts.edit_back_link"] =
+                "Zurück zum Beitrag",
+            ["posts.edit_lede"] =
+                "Du bearbeitest deinen eigenen Beitrag. Nur du kannst ihn bearbeiten. Die Community, in der dieser Beitrag erscheint, steht fest — sie lässt sich nach dem Veröffentlichen nicht mehr ändern; nur Titel, Text, Sprache und Zielgruppe unten sind bearbeitbar.",
+            ["posts.edit_no_feed"] =
+                "Der Community-Feed dieses Beitrags ist nicht mehr verfügbar. Du kannst Titel, Text und Zielgruppe unten trotzdem bearbeiten.",
+            ["posts.community_label_edit"] =
+                "Community (der Feed, in dem dieser Beitrag erscheint — nicht änderbar)",
+            ["posts.community_label_new"] =
+                "Community (der Feed, in dem dieser Beitrag erscheinen wird)",
+            ["posts.community_hint_edit"] =
+                "Die Community bestimmt nur, in welchem Feed dein Beitrag erscheint — nicht, wer ihn sehen darf — und steht nach dem Veröffentlichen fest.",
+            ["posts.audience_heading"] =
+                "Zielgruppe — wer diesen Beitrag sehen kann",
+            ["posts.audience_empty_label"] =
+                "Leere Zielgruppe.",
+            ["posts.audience_empty_none"] =
+                "Ohne Auswahl trifft niemand zu, daher kann außer dir (der Autorin oder dem Autor) niemand deinen Beitrag sehen.",
+            ["posts.audience_empty_all"] =
+                "Im Modus „Alle“ ohne Auswahl trifft niemand zu, daher kann außer dir (der Autorin oder dem Autor) niemand deinen Beitrag sehen.",
+            ["posts.audience_empty_any"] =
+                "Im Modus „Beliebig“ ohne Auswahl trifft niemand zu, daher kann außer dir (der Autorin oder dem Autor) niemand deinen Beitrag sehen.",
             ["posts.edit_save"]    = "Änderungen speichern",
             ["posts.save_as_draft"] =
                 "Als Entwurf speichern",
@@ -6830,6 +6874,28 @@ public static class KnownTranslationKeys
                 "dans la section audience ci-dessous.",
             ["posts.new_submit"]   = "Publier",
             ["posts.edit_title"]   = "Modifier la publication",
+            ["posts.edit_back_link"] =
+                "Retour à la publication",
+            ["posts.edit_lede"] =
+                "Vous modifiez votre propre publication. Vous seul pouvez la modifier. La communauté dans laquelle elle apparaît est fixe — elle ne peut plus être changée après la publication ; seuls le titre, le texte, la langue et l’audience ci-dessous sont modifiables.",
+            ["posts.edit_no_feed"] =
+                "Le fil de la communauté de cette publication n’est plus disponible. Vous pouvez toujours modifier le titre, le texte et l’audience ci-dessous.",
+            ["posts.community_label_edit"] =
+                "Communauté (le fil où cette publication apparaît — fixe)",
+            ["posts.community_label_new"] =
+                "Communauté (le fil où cette publication apparaîtra)",
+            ["posts.community_hint_edit"] =
+                "La communauté détermine seulement dans quel fil votre publication apparaît — pas qui peut la voir — et elle est fixe une fois la publication faite.",
+            ["posts.audience_heading"] =
+                "Audience — qui peut voir cette publication",
+            ["posts.audience_empty_label"] =
+                "Audience vide.",
+            ["posts.audience_empty_none"] =
+                "Sans sélection, personne ne correspond : personne d’autre que vous (l’auteur) ne peut voir votre publication.",
+            ["posts.audience_empty_all"] =
+                "En mode « Tous » et sans sélection, personne ne correspond : personne d’autre que vous (l’auteur) ne peut voir votre publication.",
+            ["posts.audience_empty_any"] =
+                "En mode « N’importe lequel » et sans sélection, personne ne correspond : personne d’autre que vous (l’auteur) ne peut voir votre publication.",
             ["posts.edit_save"]    = "Enregistrer les modifications",
             ["posts.save_as_draft"] =
                 "Enregistrer en brouillon",
@@ -9603,6 +9669,28 @@ public static class KnownTranslationKeys
                 "fra i modtagerkreds-sektionen nedenfor.",
             ["posts.new_submit"]   = "Udgiv",
             ["posts.edit_title"]   = "Rediger indlæg",
+            ["posts.edit_back_link"] =
+                "Tilbage til indlægget",
+            ["posts.edit_lede"] =
+                "Du redigerer dit eget indlæg. Kun du kan redigere det. Fællesskabet, indlægget vises i, er fast — det kan ikke ændres efter opslaget; kun titel, tekst, sprog og målgruppe nedenfor kan redigeres.",
+            ["posts.edit_no_feed"] =
+                "Dette indlægs fællesskabsfeed er ikke længere tilgængeligt. Du kan stadig redigere titel, tekst og målgruppe nedenfor.",
+            ["posts.community_label_edit"] =
+                "Fællesskab (det feed, indlægget vises i — fast)",
+            ["posts.community_label_new"] =
+                "Fællesskab (det feed, indlægget kommer til at vises i)",
+            ["posts.community_hint_edit"] =
+                "Fællesskabet afgør kun, i hvilket feed dit indlæg vises — ikke hvem der kan se det — og det er fast, når indlægget er slået op.",
+            ["posts.audience_heading"] =
+                "Målgruppe — hvem der kan se dette indlæg",
+            ["posts.audience_empty_label"] =
+                "Tom målgruppe.",
+            ["posts.audience_empty_none"] =
+                "Uden valg passer ingen, så ingen andre end dig (forfatteren) kan se dit indlæg.",
+            ["posts.audience_empty_all"] =
+                "I tilstanden Alle og uden valg passer ingen, så ingen andre end dig (forfatteren) kan se dit indlæg.",
+            ["posts.audience_empty_any"] =
+                "I tilstanden Enhver og uden valg passer ingen, så ingen andre end dig (forfatteren) kan se dit indlæg.",
             ["posts.edit_save"]    = "Gem ændringer",
             ["posts.save_as_draft"] =
                 "Gem som udkast",

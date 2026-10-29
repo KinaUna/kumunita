@@ -3,32 +3,30 @@
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
-    ViewData["Title"] = "Edit post";
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
+    ViewData["Title"] = await Translation.GetAsync("posts.edit_title", _kwL);
     var tagsExample       = await Translation.GetAsync("tags.pages_example", _kwL);
 }
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
-        <a href="@($"/posts/{ViewContext.RouteData.Values["id"]}")" class="btn btn-link p-0">
-            &larr; Back to the post
-        </a>
+        <div class="mb-2">
+            <a href="@($"/posts/{ViewContext.RouteData.Values["id"]}")" class="btn btn-link p-0">
+                &larr; <kw-l key="posts.edit_back_link">Back to the post</kw-l>
+            </a>
+        </div>
 
         <h1 class="mt-2"><kw-l key="posts.edit_title">Edit post</kw-l></h1>
         <p class="text-muted">
-            You are editing your own post. Only you can edit it. The
-            <b>community</b> this post appears in is fixed — it cannot be
-            changed after you post; only the title, body, language, and
-            audience below are editable.
+            <kw-l key="posts.edit_lede">You are editing your own post. Only you can edit it. The community this post appears in is fixed — it cannot be changed after you post; only the title, body, language, and audience below are editable.</kw-l>
         </p>
 
         @if (Model.Components.Count == 0)
         {
             <div class="alert alert-warning">
-                This post's community feed is no longer available. You can
-                still edit the title, body, and audience below.
+                <kw-l key="posts.edit_no_feed">This post's community feed is no longer available. You can still edit the title, body, and audience below.</kw-l>
             </div>
         }
 
@@ -41,7 +39,7 @@
                     <h2 class="kmb-form-section-title"><kw-l key="form.section_details">Details</kw-l></h2>
                     <div class="kmb-form-field">
                         <label class="form-label" for="component" style="font-weight:600;">
-                            Community (the feed this post appears in — fixed)
+                            <kw-l key="posts.community_label_edit">Community (the feed this post appears in — fixed)</kw-l>
                         </label>
                         <select class="form-control" id="component" name="ComponentId" disabled>
                             @foreach (var (id, name) in Model.Components)
@@ -53,9 +51,7 @@
                         </select>
                         <input type="hidden" name="ComponentId" value="@Model.ComponentId" />
                         <div class="text-muted small mt-2">
-                            The community only decides which feed your post appears
-                            in — it does not decide who can see it, and it is fixed
-                            once posted.
+                            <kw-l key="posts.community_hint_edit">The community only decides which feed your post appears in — it does not decide who can see it, and it is fixed once posted.</kw-l>
                         </div>
                     </div>
                     <div class="kmb-form-field">
@@ -117,7 +113,7 @@
                         </div>
                     </div>
                     <div class="kmb-form-field">
-                        <label class="form-label" for="tags" style="font-weight:600;">Tags</label>
+                        <label class="form-label" for="tags" style="font-weight:600;"><kw-l key="nav.tags">Tags</kw-l></label>
                                             @* TG U8 — the composer tag input (a free-text field +
                                                autocomplete dropdown). `data-tag-suggest` is the
                                                self-wire selector for client/lib/tag-suggest.ts
@@ -156,7 +152,7 @@
                     <h2 class="kmb-form-section-title"><kw-l key="form.section_audience">Audience</kw-l></h2>
                     <div class="kmb-form-field">
                         <h3 class="h6 card-title" style="font-weight:600;">
-                                                Audience — who can see this post
+                                                <kw-l key="posts.audience_heading">Audience — who can see this post</kw-l>
                                             </h3>
 
                                             @* ADR 0036, refined by ADR 0102 — the "Everyone in this
@@ -249,11 +245,8 @@
                                                     && Model.Audience.IsEmpty)
                                                 {
                                                     <div class="alert alert-warning mt-2 mb-0">
-                                                        <b>Empty audience.</b>
-                                                        <text>With no picks, no one
-                                                        matches, so no one else can see your post — only
-                                                        you (the author) can.
-                                                        </text>
+                                                        <b><kw-l key="posts.audience_empty_label">Empty audience.</kw-l></b>
+                                                        <kw-l key="posts.audience_empty_none">With no picks, no one matches, so no one else can see your post — only you (the author) can.</kw-l>
                                                     </div>
                                                 }
 

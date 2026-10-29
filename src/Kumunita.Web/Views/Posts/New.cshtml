@@ -36,7 +36,7 @@
                     <h2 class="kmb-form-section-title"><kw-l key="form.section_details">Details</kw-l></h2>
                     <div class="kmb-form-field">
                         <label class="form-label" for="component" style="font-weight:600;">
-                            Community (the feed this post will appear in)
+                            <kw-l key="posts.community_label_new">Community (the feed this post will appear in)</kw-l>
                         </label>
                         <select class="form-control" id="component" name="ComponentId" required>
                             @foreach (var (id, name) in Model.Components)
@@ -109,7 +109,7 @@
                         </div>
                     </div>
                     <div class="kmb-form-field">
-                        <label class="form-label" for="tags" style="font-weight:600;">Tags</label>
+                        <label class="form-label" for="tags" style="font-weight:600;"><kw-l key="nav.tags">Tags</kw-l></label>
                                             @* TG U8 — the composer tag input (a free-text field +
                                                autocomplete dropdown). `data-tag-suggest` is the
                                                self-wire selector for client/lib/tag-suggest.ts
@@ -136,7 +136,7 @@
                     <h2 class="kmb-form-section-title"><kw-l key="form.section_audience_publishing">Audience and publishing</kw-l></h2>
                     <div class="kmb-form-field">
                         <h3 class="h6 card-title" style="font-weight:600;">
-                                                Audience — who can see this post
+                                                <kw-l key="posts.audience_heading">Audience — who can see this post</kw-l>
                                             </h3>
 
                                             @* ADR 0036 — the default is "everyone in this community":
@@ -227,20 +227,14 @@
                                                 && Model.Audience.IsEmpty)
                                             {
                                                 <div class="alert alert-warning mt-2 mb-0">
-                                                    <b>Empty audience.</b>
+                                                    <b><kw-l key="posts.audience_empty_label">Empty audience.</kw-l></b>
                                                     @if (string.Equals(Model.Audience.Mode, "All", StringComparison.OrdinalIgnoreCase))
                                                     {
-                                                        <text>With <b>All</b> mode and no picks, no one
-                                                        matches, so no one else can see your post — only
-                                                        you (the author) can.
-                                                        </text>
+                                                        <kw-l key="posts.audience_empty_all">With All mode and no picks, no one matches, so no one else can see your post — only you (the author) can.</kw-l>
                                                     }
                                                     else
                                                     {
-                                                        <text>With <b>Any</b> mode and no picks, no one
-                                                        matches, so no one else can see your post — only
-                                                        you (the author) can.
-                                                        </text>
+                                                        <kw-l key="posts.audience_empty_any">With Any mode and no picks, no one matches, so no one else can see your post — only you (the author) can.</kw-l>
                                                     }
                                                 </div>
                                             }
