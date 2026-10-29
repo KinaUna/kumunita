@@ -79,6 +79,22 @@ public sealed class DocumentController(
         return await translationProvider.GetAsync(key, lang);
     }
 
+    /// <summary>
+    /// A failed upload guard on a browser form post (ADR 0233): re-render the
+    /// form the person was on — typed fields kept — with a localized error
+    /// beside the file input and the guard's HTTP status (400 / 413 / 415) on
+    /// the response. Replaces the bare <see cref="StatusCodeResult"/> /
+    /// <see cref="BadRequestObjectResult"/>, which a browser shows as a blank
+    /// page. Still a guard: it runs before any byte is written.
+    /// </summary>
+    private async Task<IActionResult> RejectFormAsync(string viewName, object model, int statusCode, string field, string key)
+    {
+        ModelState.AddModelError(field, await T(key));
+        var view = View(viewName, model);
+        view.StatusCode = statusCode;
+        return view;
+    }
+
     // ── GET /documents — the repository feed (D4, C-M21·3) ────────────────
     [HttpGet("/documents")]
     [Authorize]
@@ -302,7 +318,7 @@ public sealed class DocumentController(
         }
 
         if (string.IsNullOrWhiteSpace(form.Title))
-            return BadRequest("A title is required.");
+            return await RejectFormAsync("Edit", form, StatusCodes.Status400BadRequest, "Title", "documents.err_title_required");
 
         // ADR 0125 D3 — the file is OPTIONAL on the edit lane: a present,
         // non-empty file is the new reference; a null / zero-byte file keeps the
@@ -327,10 +343,12 @@ public sealed class DocumentController(
             var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
             var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
             var reject = await uploadGate.CheckUpload(form.File.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
+            if (reject is StatusCodeResult gateStatus)
+                return await RejectFormAsync("Edit", form, gateStatus.StatusCode, "File", "documents.err_too_large");
             if (reject is not null) return reject;
 
             if (!mediaOpts.Value.IsDocumentAllowed(form.File.ContentType))
-                return StatusCode(StatusCodes.Status415UnsupportedMediaType);
+                return await RejectFormAsync("Edit", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
             using var stream = new MemoryStream();
             await form.File.CopyToAsync(stream).ConfigureAwait(false);
@@ -387,8 +405,12 @@ public sealed class DocumentController(
     // ── GET /documents/new — the compose form (D5) ─────────────────────────
     [HttpGet("/documents/new")]
     [Authorize]
-    public IActionResult New([Bind] DocumentUploadViewModel? form = null)
+    public IActionResult New()
     {
+        // ADR 0233 — no model parameter: a bound `DocumentUploadViewModel?` was
+        // validated on a plain GET, so the non-nullable `Audience.Mode` put a
+        // "The Mode field is required." alert on a fresh form. The view reads
+        // `Model?` and renders blank without one.
         // D5 — the upload standing gate (Web boundary). A non-eligible actor
         // gets 404 (not 403 — the form's existence is not leaked to a
         // non-privileged actor; the ADR 0017 compose-standing shape).
@@ -423,8 +445,10 @@ public sealed class DocumentController(
         // ordering): empty → 400, oversize → 413, disallowed type → 415 —
         // **no file written on any guard**.
         var file = form.File;
-        if (string.IsNullOrWhiteSpace(form.Title)) return BadRequest("A title is required.");
-        if (file is null || file.Length == 0) return BadRequest("Choose a file.");   // empty → 400 (untouched)
+        if (string.IsNullOrWhiteSpace(form.Title))
+            return await RejectFormAsync("New", form, StatusCodes.Status400BadRequest, "Title", "documents.err_title_required");
+        if (file is null || file.Length == 0)
+            return await RejectFormAsync("New", form, StatusCodes.Status400BadRequest, "File", "documents.err_file_required");   // empty → 400
         // M25 (U8) — the size/over-quota guard is now the Web-only
         // IUploadGate (C-UP·3): the single 413 producer, running the pure Core
         // StorageLimits.Decide over the admin doc + the subject's usage. Runs
@@ -435,9 +459,11 @@ public sealed class DocumentController(
         var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
         var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
         var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
-        if (reject is not null) return reject;                              // oversize/over-quota → 413 (the gate)
-        if (!mediaOpts.Value.IsDocumentAllowed(file.ContentType))
-            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type → 415 (untouched)
+        if (reject is StatusCodeResult gateStatus)                          // oversize/over-quota → 413 (the gate)
+            return await RejectFormAsync("New", form, gateStatus.StatusCode, "File", "documents.err_too_large");
+        if (reject is not null) return reject;
+        if (!mediaOpts.Value.IsDocumentAllowed(file.ContentType))           // disallowed type → 415
+            return await RejectFormAsync("New", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
         // D3 — store-first (orphan-safe, C-MED·7): the bytes land on the frozen
         // ADR 0011 volume before the catalog row references them.

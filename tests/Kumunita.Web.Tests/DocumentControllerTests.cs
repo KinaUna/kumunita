@@ -309,6 +309,21 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// ADR 0233 — a failed upload guard re-renders the form the person was on
+    /// (typed fields kept) with the guard's status and a ModelState error on
+    /// the offending field, instead of a bare status a browser shows as a blank
+    /// page. The status is the same 400 / 413 / 415 the guards always returned.
+    /// </summary>
+    private static void AssertFormRejected(IActionResult result, string view, int status, string field)
+    {
+        var v = Assert.IsType<ViewResult>(result);
+        Assert.Equal(view, v.ViewName);
+        Assert.Equal(status, v.StatusCode);
+        Assert.True(v.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0,
+            $"expected a ModelState error on '{field}'");
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // Upload allowlist (D3) — NSubstitute (guards-before-write, no Put)
     // ══════════════════════════════════════════════════════════════════════
@@ -326,12 +341,32 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         // A null file …
         var nullResult = await controller.Upload(ValidUploadForm(null));
-        Assert.IsType<BadRequestObjectResult>(nullResult);
+        AssertFormRejected(nullResult, "New", StatusCodes.Status400BadRequest, "File");
         // … and a zero-byte file (both 400).
         var emptyResult = await controller.Upload(ValidUploadForm(TestFile("empty.pdf", "application/pdf", Array.Empty<byte>())));
-        Assert.IsType<BadRequestObjectResult>(emptyResult);
+        AssertFormRejected(emptyResult, "New", StatusCodes.Status400BadRequest, "File");
 
         // D3: no file written on the empty guard (the guard fires before PutAsync).
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0233 — a blank title re-renders the form (400, error on <c>Title</c>),
+    /// keeps what the person typed, and writes nothing.
+    /// </summary>
+    [Fact]
+    public async Task Upload_BlankTitle_400_ReRendersForm_NoPut()
+    {
+        var (controller, media, _, _) = BuildUploadController(roles: new[] { "GlobalAdmin" });
+        var form = ValidUploadForm(TestFile("bylaws.pdf", "application/pdf", Pdf));
+        form.Title = "  ";
+        form.Summary = "kept on re-render";
+
+        var result = await controller.Upload(form);
+
+        AssertFormRejected(result, "New", StatusCodes.Status400BadRequest, "Title");
+        Assert.Same(form, ((ViewResult)result).Model);
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
@@ -350,8 +385,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
         // A 32-byte PDF payload (over the 16-byte cap):
         var result = await controller.Upload(ValidUploadForm(TestFile("big.pdf", "application/pdf", new byte[32])));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertFormRejected(result, "New", StatusCodes.Status413RequestEntityTooLarge, "File");
 
         // D3: no file written on the oversize guard.
         await media.DidNotReceiveWithAnyArgs().PutAsync(
@@ -377,8 +411,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var result = await controller.Upload(ValidUploadForm(TestFile("big.pdf", "application/pdf", new byte[32])));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertFormRejected(result, "New", StatusCodes.Status413RequestEntityTooLarge, "File");
         // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
@@ -404,8 +437,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var result = await controller.Upload(ValidUploadForm(TestFile("bylaws.pdf", "application/pdf", Pdf)));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertFormRejected(result, "New", StatusCodes.Status413RequestEntityTooLarge, "File");
         // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
@@ -431,10 +463,10 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
         var (controller, media, _, _) = BuildUploadController(roles: new[] { "GlobalAdmin" });
 
         var svg = await controller.Upload(ValidUploadForm(TestFile("logo.svg", "image/svg+xml", Pdf)));
-        Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(svg).StatusCode);
+        AssertFormRejected(svg, "New", StatusCodes.Status415UnsupportedMediaType, "File");
 
         var video = await controller.Upload(ValidUploadForm(TestFile("clip.mp4", "video/mp4", Pdf)));
-        Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(video).StatusCode);
+        AssertFormRejected(video, "New", StatusCodes.Status415UnsupportedMediaType, "File");
 
         // D3: no file written on the disallowed-type guard (either assert).
         await media.DidNotReceiveWithAnyArgs().PutAsync(
@@ -704,7 +736,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var result = await controller.Edit(DocId, ValidEditForm(TestFile("big.pdf", "application/pdf", new byte[32])));
 
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, Assert.IsType<StatusCodeResult>(result).StatusCode);
+        AssertFormRejected(result, "Edit", StatusCodes.Status413RequestEntityTooLarge, "File");
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
@@ -723,7 +755,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var result = await controller.Edit(DocId, ValidEditForm(TestFile("logo.svg", "image/svg+xml", Pdf)));
 
-        Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(result).StatusCode);
+        AssertFormRejected(result, "Edit", StatusCodes.Status415UnsupportedMediaType, "File");
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
