@@ -180,7 +180,7 @@ public sealed class AdminSurfaceLabelsController(
             Directory   = model.Directory,
             People      = model.People,
         }, actor);
-        TempData["info"] = "The surface labels have been saved.";
+        TempData["info"] = await this.FlashAsync("admin.flash_labels_saved", "The surface labels have been saved.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -212,12 +212,12 @@ public sealed class AdminSurfaceLabelsController(
     {
         if (string.IsNullOrWhiteSpace(form.LanguageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Index));
         }
         if (form.IsBlank())
         {
-            TempData["error"] = "A translation needs at least one surface label.";
+            TempData["error"] = await this.FlashAsync("admin.flash_translation_needs_label", "A translation needs at least one surface label.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -226,7 +226,7 @@ public sealed class AdminSurfaceLabelsController(
             form.LanguageCode, form.ToSurfaceLabelTranslation(), actor);
 
         var name = await LanguageName(form.LanguageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return RedirectToAction(nameof(Index));
     }
 
@@ -248,12 +248,12 @@ public sealed class AdminSurfaceLabelsController(
     {
         if (string.IsNullOrWhiteSpace(form.LanguageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Index));
         }
         if (form.IsBlank())
         {
-            TempData["error"] = "A translation needs at least one surface label.";
+            TempData["error"] = await this.FlashAsync("admin.flash_translation_needs_label", "A translation needs at least one surface label.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -265,12 +265,12 @@ public sealed class AdminSurfaceLabelsController(
         }
         catch (KeyNotFoundException)
         {
-            TempData["error"] = "That translation no longer exists; add it again.";
+            TempData["error"] = await this.FlashAsync("flash.translation_gone_add", "That translation no longer exists; add it again.");
             return RedirectToAction(nameof(Index));
         }
 
         var name = await LanguageName(form.LanguageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return RedirectToAction(nameof(Index));
     }
 
@@ -290,7 +290,7 @@ public sealed class AdminSurfaceLabelsController(
     {
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language to remove.";
+            TempData["error"] = await this.FlashAsync("flash.choose_language_remove", "Choose a language to remove.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -301,12 +301,12 @@ public sealed class AdminSurfaceLabelsController(
         }
         catch (KeyNotFoundException)
         {
-            TempData["error"] = "That translation no longer exists.";
+            TempData["error"] = await this.FlashAsync("flash.translation_gone", "That translation no longer exists.");
             return RedirectToAction(nameof(Index));
         }
 
         var name = await LanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return RedirectToAction(nameof(Index));
     }
 

@@ -129,7 +129,7 @@ public sealed class AdminStorageController(
         }
         else if (!long.TryParse(maxFileBytesInput, out var parsedMaxMiB) || parsedMaxMiB < 0)
         {
-            TempData["error"] = "The per-file limit must be a whole number of MiB, or left blank for the platform default.";
+            TempData["error"] = await this.FlashAsync("admin.flash_storage_file_limit", "The per-file limit must be a whole number of MiB, or left blank for the platform default.");
             return RedirectToAction(nameof(Index));
         }
         else
@@ -146,7 +146,7 @@ public sealed class AdminStorageController(
         }
         else if (!long.TryParse(perUserQuotaBytesInput, out var parsedQuotaMiB) || parsedQuotaMiB < 0)
         {
-            TempData["error"] = "The per-user quota must be a whole number of MiB (0 for unlimited).";
+            TempData["error"] = await this.FlashAsync("admin.flash_storage_user_quota", "The per-user quota must be a whole number of MiB (0 for unlimited).");
             return RedirectToAction(nameof(Index));
         }
         else
@@ -159,7 +159,7 @@ public sealed class AdminStorageController(
         await using var session = store.LightweightSession();
         await settings.SetAsync(maxFileBytes, quota, actor, session);
 
-        TempData["info"] = "Upload limits saved.";
+        TempData["info"] = await this.FlashAsync("admin.flash_storage_saved", "Upload limits saved.");
         return RedirectToAction(nameof(Index));
     }
 }

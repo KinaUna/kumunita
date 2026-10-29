@@ -101,7 +101,7 @@ public sealed class AdminGuestsController(IIdentityService identity) : Controlle
             },
             actor);
 
-        TempData["info"] = "Guest standing saved.";   // the U03 admin.guests_saved key's en value
+        TempData["info"] = await this.FlashAsync("admin.guests_saved", "Guest standing saved.");   // the U03 admin.guests_saved key's en value
         return RedirectToAction(nameof(Index), new { subjectId });
     }
 }

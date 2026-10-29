@@ -518,7 +518,7 @@ public sealed class AdminController(
             // Unreachable in practice (this page is [Authorize(Roles=GlobalAdmin)]
             // so RoleSet(User) carries GlobalAdmin), but the mandatory lane
             // re-checks standing in Core (thin token) — fail closed.
-            TempData["error"] = "You are not permitted to set a community as mandatory.";
+            TempData["error"] = await this.FlashAsync("admin.flash_mandatory_forbidden", "You are not permitted to set a community as mandatory.");
             return RedirectToAction(nameof(Communities));
         }
         catch (ArgumentException ex)
@@ -556,7 +556,7 @@ public sealed class AdminController(
                 moderatorAccess: null,
                 enabled: null,
                 actorId: admin);
-            TempData["info"] = $"Community “{model.Name}” updated.";
+            TempData["info"] = await this.FlashAsync("admin.flash_community_updated", "Community “{0}” updated.", model.Name);
         }
         catch (ArgumentException ex)
         {
@@ -621,7 +621,7 @@ public sealed class AdminController(
         {
             // Unreachable (page is GlobalAdmin-gated) but the Core lane
             // re-checks standing (thin token) — fail closed.
-            TempData["error"] = "You are not permitted to set a community's mandatory standing.";
+            TempData["error"] = await this.FlashAsync("admin.flash_mandatory_standing_forbidden", "You are not permitted to set a community's mandatory standing.");
             return RedirectToAction(nameof(Communities));
         }
         catch (ArgumentException)
@@ -664,11 +664,11 @@ public sealed class AdminController(
         try
         {
             await userInfo.AddCommunityMemberAsync(componentId, userId, admin, KumunitaPrincipal.RoleSet(User));
-            TempData["info"] = "User added to the community.";
+            TempData["info"] = await this.FlashAsync("admin.flash_community_user_added", "User added to the community.");
         }
         catch (UnauthorizedAccessException)
         {
-            TempData["error"] = "You are not permitted to add a community user.";
+            TempData["error"] = await this.FlashAsync("admin.flash_community_user_add_forbidden", "You are not permitted to add a community user.");
         }
         catch (InvalidOperationException ex)
         {
@@ -676,7 +676,7 @@ public sealed class AdminController(
         }
         catch (ArgumentException)
         {
-            TempData["error"] = "Unknown community or user.";
+            TempData["error"] = await this.FlashAsync("admin.flash_unknown_community_or_user", "Unknown community or user.");
         }
         return RedirectToAction(nameof(Communities));
     }
@@ -695,11 +695,11 @@ public sealed class AdminController(
         try
         {
             await userInfo.RemoveCommunityMemberAsync(componentId, userId, admin, KumunitaPrincipal.RoleSet(User));
-            TempData["info"] = "User removed from the community.";
+            TempData["info"] = await this.FlashAsync("admin.flash_community_user_removed", "User removed from the community.");
         }
         catch (UnauthorizedAccessException)
         {
-            TempData["error"] = "You are not permitted to remove a community user.";
+            TempData["error"] = await this.FlashAsync("admin.flash_community_user_remove_forbidden", "You are not permitted to remove a community user.");
         }
         catch (InvalidOperationException ex)
         {
@@ -707,7 +707,7 @@ public sealed class AdminController(
         }
         catch (ArgumentException)
         {
-            TempData["error"] = "Unknown community or user.";
+            TempData["error"] = await this.FlashAsync("admin.flash_unknown_community_or_user", "Unknown community or user.");
         }
         return RedirectToAction(nameof(Communities));
     }
@@ -732,11 +732,11 @@ public sealed class AdminController(
                 adminSubjectId: admin,
                 roles: model.RoleNames,
                 componentIds: model.ComponentIds);
-            TempData["info"] = "User is now a moderator of the community.";
+            TempData["info"] = await this.FlashAsync("admin.flash_moderator_set", "User is now a moderator of the community.");
         }
         catch (UnauthorizedAccessException)
         {
-            TempData["error"] = "You are not permitted to set a community moderator.";
+            TempData["error"] = await this.FlashAsync("admin.flash_moderator_set_forbidden", "You are not permitted to set a community moderator.");
         }
         catch (InvalidOperationException ex)
         {
@@ -760,11 +760,11 @@ public sealed class AdminController(
                 adminSubjectId: admin,
                 roles: model.RoleNames,
                 componentIds: model.ComponentIds);
-            TempData["info"] = "User no longer moderates the community.";
+            TempData["info"] = await this.FlashAsync("admin.flash_moderator_unset", "User no longer moderates the community.");
         }
         catch (UnauthorizedAccessException)
         {
-            TempData["error"] = "You are not permitted to unset a community moderator.";
+            TempData["error"] = await this.FlashAsync("admin.flash_moderator_unset_forbidden", "You are not permitted to unset a community moderator.");
         }
         catch (InvalidOperationException ex)
         {
@@ -819,7 +819,7 @@ public sealed class AdminController(
         {
             // Shouldn't be reachable (this page is already [Authorize(Roles=GlobalAdmin)]),
             // but Core's lane enforces it too as a second gate — map to a clean 403.
-            TempData["error"] = "You are not permitted to perform this action.";
+            TempData["error"] = await this.FlashAsync("admin.flash_not_permitted", "You are not permitted to perform this action.");
             return Redirect(back);
         }
         catch (InvalidOperationException ex)
@@ -828,7 +828,7 @@ public sealed class AdminController(
             return Redirect(back);
         }
 
-        TempData["info"] = "Roles updated.";
+        TempData["info"] = await this.FlashAsync("admin.flash_roles_updated", "Roles updated.");
         return Redirect(back);
     }
 
@@ -945,11 +945,11 @@ public sealed class AdminController(
         try
         {
             await identity.ManuallyVerifyAsync(targetSubjectId: subjectId, adminSubjectId: admin);
-            TempData["info"] = "Account verified. It can now sign in.";
+            TempData["info"] = await this.FlashAsync("admin.flash_account_verified", "Account verified. It can now sign in.");
         }
         catch (UnauthorizedAccessException)
         {
-            TempData["error"] = "You are not permitted to verify this account.";
+            TempData["error"] = await this.FlashAsync("admin.flash_verify_forbidden", "You are not permitted to verify this account.");
         }
         catch (InvalidOperationException ex)
         {
@@ -981,20 +981,20 @@ public sealed class AdminController(
         // so no Profile.Blocked flip / audit row / security-stamp rotation happens at all.
         if (!string.IsNullOrEmpty(subjectId) && string.Equals(subjectId, admin, StringComparison.Ordinal))
         {
-            TempData["error"] = "You cannot block your own account. Have another GlobalAdmin perform this, or use a different admin account.";
+            TempData["error"] = await this.FlashAsync("admin.flash_block_self", "You cannot block your own account. Have another GlobalAdmin perform this, or use a different admin account.");
             return RedirectToAction(nameof(Accounts));
         }
 
         try
         {
             await identity.BlockAsync(targetSubjectId: subjectId, adminSubjectId: admin);
-            TempData["info"] = "Account blocked. It has no standing until unblocked.";
+            TempData["info"] = await this.FlashAsync("admin.flash_account_blocked", "Account blocked. It has no standing until unblocked.");
         }
         catch (UnauthorizedAccessException)
         {
             // Shouldn't be reachable (this page is already [Authorize(Roles=GlobalAdmin)]),
             // but the Core lane enforces it too — map to a clean 403-style message.
-            TempData["error"] = "You are not permitted to block this account.";
+            TempData["error"] = await this.FlashAsync("admin.flash_block_forbidden", "You are not permitted to block this account.");
         }
         catch (InvalidOperationException ex)
         {
@@ -1011,11 +1011,11 @@ public sealed class AdminController(
         try
         {
             await identity.UnblockAsync(targetSubjectId: subjectId, adminSubjectId: admin);
-            TempData["info"] = "Account unblocked. Its standing is available again.";
+            TempData["info"] = await this.FlashAsync("admin.flash_account_unblocked", "Account unblocked. Its standing is available again.");
         }
         catch (UnauthorizedAccessException)
         {
-            TempData["error"] = "You are not permitted to unblock this account.";
+            TempData["error"] = await this.FlashAsync("admin.flash_unblock_forbidden", "You are not permitted to unblock this account.");
         }
         catch (InvalidOperationException ex)
         {
@@ -1049,7 +1049,7 @@ public sealed class AdminController(
         // Refuse before touching the Core lane (the Block self-guard shape).
         if (!string.IsNullOrEmpty(subjectId) && string.Equals(subjectId, admin, StringComparison.Ordinal))
         {
-            TempData["error"] = "You cannot delete your own account through this surface. Use your own Delete account settings page instead.";
+            TempData["error"] = await this.FlashAsync("admin.flash_delete_self", "You cannot delete your own account through this surface. Use your own Delete account settings page instead.");
             return RedirectToAction(nameof(Accounts));
         }
 
@@ -1058,11 +1058,11 @@ public sealed class AdminController(
             // The admin-initiated branch (actor ≠ target — the GlobalAdmin
             // gate is enforced in the Core seam, the fail-closed pin).
             await identity.DeleteAccountAsync(targetSubjectId: subjectId, adminSubjectId: admin);
-            TempData["info"] = "Account deleted. Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed.";
+            TempData["info"] = await this.FlashAsync("admin.flash_account_deleted", "Account deleted. Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed.");
         }
         catch (UnauthorizedAccessException)
         {
-            TempData["error"] = "You are not permitted to delete this account.";
+            TempData["error"] = await this.FlashAsync("admin.flash_delete_forbidden", "You are not permitted to delete this account.");
         }
         catch (InvalidOperationException ex)
         {
@@ -1151,7 +1151,7 @@ public sealed class AdminController(
         try
         {
             await identity.ConsumeBreakGlassAsync(subject, model.Token);
-            TempData["info"] = "Break-glass elevation activated. It lasts until its expiry; every privileged decision under it is audited with via:BreakGlass.";
+            TempData["info"] = await this.FlashAsync("admin.flash_breakglass", "Break-glass elevation activated. It lasts until its expiry; every privileged decision under it is audited with via:BreakGlass.");
         }
         catch (InvalidOperationException ex)
         {
