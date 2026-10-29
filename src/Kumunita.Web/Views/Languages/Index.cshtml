@@ -25,6 +25,9 @@
     var missingTemplate = Translation is null ? "{n} missing" : await Translation.GetAsync("languages.missing", effLang);
     // The download tooltip is a simple attribute (kw-l can't wrap one) —
     // server-resolved, plain copy (the old "§bundle CSV" internal term is gone).
+    // ADR 0249 — the stacked-card captions on phones (data-label is an attribute, so server-resolved).
+    var thEnabled = Translation is null ? "Enabled" : await Translation.GetAsync("languages.th_enabled", effLang);
+    var thUiStrings = Translation is null ? "UI strings" : await Translation.GetAsync("languages.th_ui_strings", effLang);
     var downloadTitle = Translation is null ? "Download this language's UI strings as a CSV file" :
         await Translation.GetAsync("translations.bulk.export_title", effLang);
 }
@@ -87,7 +90,8 @@
 }
 
 <div class="table-responsive">
-    <table class="table table-sm align-middle">
+    @* ADR 0249 — below 1200px the Actions buttons wrap (kmb-wrap-cells / kmb-actions); below 576px each row becomes a card (kmb-stack-table, data-label captions). *@
+    <table class="table table-sm align-middle kmb-stack-table kmb-wrap-cells">
         <thead>
             <tr>
                 <th><kw-l key="languages.th_code">Code</kw-l></th>
@@ -103,7 +107,7 @@
                 <tr>
                     <td><code>@row.Code</code></td>
                     <td>@row.NativeName</td>
-                    <td>
+                    <td data-label="@thEnabled">
                         @if (row.Enabled)
                         {
                             <span class="badge text-bg-success"><kw-l key="languages.enabled">enabled</kw-l></span>
@@ -113,14 +117,14 @@
                             <span class="badge text-bg-secondary"><kw-l key="languages.disabled">disabled</kw-l></span>
                         }
                     </td>
-                    <td>
+                    <td data-label="@thUiStrings">
                         <span class="text-success small">@presentTemplate.Replace("{n}", row.PresentKeys.Count.ToString())</span>
                         @if (row.MissingKeys.Count > 0)
                         {
                             <span class="text-warning small">· @missingTemplate.Replace("{n}", row.MissingKeys.Count.ToString())</span>
                         }
                     </td>
-                    <td class="text-nowrap">
+                    <td class="text-nowrap kmb-actions">
                         <div class="btn-group btn-group-sm" role="group">
                             @if (isGlobalAdmin)
                             {

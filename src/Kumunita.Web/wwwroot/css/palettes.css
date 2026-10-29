@@ -1644,3 +1644,25 @@ html[data-kmb-palette] .kmb-doc-main .airy-ann-meta > span { white-space: nowrap
   html[data-kmb-palette] .kmb-doc-main .airy-ann-meta { column-gap: 0.875rem; }
   html[data-kmb-palette] .kmb-doc-main .airy-ann-meta > span:nth-child(even) { display: none; }
 }
+
+/* ==========================================================================
+   ADR 0249 — Languages and UI-strings tables fit below 1200px
+   .kmb-wrap-cells tables stop forcing width: a .kmb-key-cell breaks long keys, a .kmb-actions cell lets its
+   button group wrap (the buttons keep their own pill shape instead of the joined-group corners), and a
+   .kmb-fixed-cols table (the 3-column UI-strings editor) uses fixed column widths so the value box keeps a
+   usable width. Together with .kmb-stack-table (ADR 0222) they become cards below 576px. Desktop (1200px
+   and up) is unchanged.
+   ========================================================================== */
+@media (max-width: 1199.98px) {
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-key-cell { white-space: normal !important; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-key-cell code { overflow-wrap: anywhere; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-actions { white-space: normal !important; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-actions .btn-group { flex-wrap: wrap; gap: 0.375rem; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-actions .btn-group > * { flex: 0 0 auto; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-actions .btn { border-radius: var(--kmb-radius-pill) !important; margin: 0; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td form.d-flex > input.form-control { flex: 1 1 8rem; min-width: 0; }
+  html[data-kmb-palette] .table.kmb-wrap-cells.kmb-fixed-cols { table-layout: fixed; width: 100%; }
+  html[data-kmb-palette] .table.kmb-fixed-cols > thead > tr > th:nth-child(1) { width: 28%; }
+  html[data-kmb-palette] .table.kmb-fixed-cols > thead > tr > th:nth-child(2) { width: 32%; }
+  html[data-kmb-palette] .table.kmb-fixed-cols > tbody > tr > td { overflow-wrap: anywhere; }
+}
