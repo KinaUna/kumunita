@@ -123,18 +123,29 @@ $aBaseline = @(
 # close): two new portability.import.keep_existing* keys x en/de/fr/da added
 # to KnownTranslationKeys.cs (11106 -> 11114) — the same shipped-additions
 # mechanism as above; the gate's ceiling starts from 11114 now.
+# Re-baselined again 2026-10-29 (the ADR 0251 post edit/new localization
+# close): since the ADR 0193 baseline the documents / announcements lanes
+# (ADR 0242 delete_confirm, ADR 0248 comment count) and this lane (ADR 0251,
+# eleven posts.* keys x en/de/fr/da) added keys to KnownTranslationKeys.cs
+# (11114 -> 11527); the board card edit modal (ADR 0195) grew
+# ProjectsController.cs (5257 -> 5358); the feed-footer reply-count / bookmark
+# lanes (the ADR 0175 / ADR 0226 / ADR 0227 TODOs) grew GroupsController.cs
+# (3032 -> 3035) and PostService.cs (2281 -> 2315); the ADR 0130
+# warm-backfill fix grew SampleDataSeeder.cs (2105 -> 2110) — the same
+# shipped-additions mechanism as above; the gate's ceiling now starts from
+# the 2026-10-29 baseline.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11114
-  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5257
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11527
+  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5358
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
   'src/Kumunita.Core/UserInfo/UserInfoService.cs'          = 4286
-  'src/Kumunita.Web/Controllers/GroupsController.cs'       = 3032
+  'src/Kumunita.Web/Controllers/GroupsController.cs'       = 3035
   'src/Kumunita.Core/Events/EventService.cs'               = 2226
   'src/Kumunita.Web/Controllers/EventController.cs'        = 2172
   'src/Kumunita.Web/Controllers/PostsController.cs'        = 2165
-  'src/Kumunita.Core/Posts/PostService.cs'                 = 2281
-  'src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs'        = 2105
+  'src/Kumunita.Core/Posts/PostService.cs'                 = 2315
+  'src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs'        = 2110
 }
 $aViolations = [System.Collections.Generic.List[string]]::new()
 $csFiles = Get-ChildItem -Path (Join-Path $repo 'src') -Recurse -Filter '*.cs' -File |
@@ -324,7 +335,14 @@ $fBaselineSizes = @{
   # additions) and TodoDetail grew from the ADR 0189 to-do restyle (status
   # chip / assignee meta line / overdue marker / detail+comment cards) — the
   # same shipped-additions mechanism as above (the M29 precedent).
-  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 816
+  # Re-baselined again 2026-10-29 (the ADR 0251 post edit/new localization
+  # close): _Layout crossed its 816 baseline from the ADR 0231 tab-strip
+  # phone audit (sub-nav strip scroll + edge fades, shipped additions), and
+  # Groups/Detail crossed the 800 ceiling outright from the feed-footer
+  # bookmark toggle lane (the ADR 0226 / ADR 0227 TODO, 814 lines) — the same
+  # shipped-additions mechanism as above (the M29 precedent).
+  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 833
+  'src/Kumunita.Web/Views/Groups/Detail.cshtml'        = 814
 }
 $fNew = [System.Collections.Generic.List[string]]::new()
 foreach ($v in $fViolations) {
