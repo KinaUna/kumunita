@@ -1001,7 +1001,7 @@ public sealed class PostsController(
         }
 
         var component = components.First(c => c.Id == model.ComponentId);
-        TempData["info"] = $"Post added to “{component.Name}”.";
+        TempData["info"] = await this.FlashAsync("posts.flash_added", "Post added to “{0}”.", component.Name);
         return Redirect($"/posts/{post.Id}");
     }
 
@@ -1198,7 +1198,7 @@ public sealed class PostsController(
                 // PostService.UpdatePostAsync). TagSlugs.Parse still normalizes
                 // (trim / dedup / drop-blank) the present case.
                 model.TagIds is null ? null : TagSlugs.Parse(model.TagIds));
-            TempData["info"] = "Post updated.";
+            TempData["info"] = await this.FlashAsync("posts.flash_updated", "Post updated.");
             return Redirect($"/posts/{id}");
         }
         catch (UnauthorizedAccessException)
@@ -1298,7 +1298,7 @@ public sealed class PostsController(
         {
             // A reply is a body-only write (C-M3·1: no own audience, no title).
             // Fail-closed to the detail page — the form is re-presented there.
-            TempData["error"] = "A reply needs some text.";
+            TempData["error"] = await this.FlashAsync("posts.flash_reply_needs_text", "A reply needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1318,7 +1318,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         await posts.CreateReplyAsync(id, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode, AttachmentIds.ExtractAttachmentIds(body)); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default. ATT U7 (C-ATT·4/8) — the reply's attachment ids, parsed server-side from the body (the deliberate asymmetry: the image reply lane does not persist ImageIds, C-ATT·9 — untouched).
 
-        TempData["info"] = "Reply added.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_added", "Reply added.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1360,7 +1360,7 @@ public sealed class PostsController(
         {
             // A reply is a body-only write (C-M3·1: no own audience, no title).
             // Fail-closed to the detail page — the form is re-presented there.
-            TempData["error"] = "A reply needs some text.";
+            TempData["error"] = await this.FlashAsync("posts.flash_reply_needs_text", "A reply needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1397,7 +1397,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        TempData["info"] = "Reply updated.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_updated", "Reply updated.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1452,7 +1452,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        TempData["info"] = "Post deleted.";
+        TempData["info"] = await this.FlashAsync("posts.flash_deleted", "Post deleted.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1509,7 +1509,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        TempData["info"] = "Post published.";
+        TempData["info"] = await this.FlashAsync("posts.flash_published", "Post published.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1562,7 +1562,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        TempData["info"] = "Reply deleted.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_deleted", "Reply deleted.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1611,12 +1611,12 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1648,7 +1648,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1676,12 +1676,12 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1715,7 +1715,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1749,12 +1749,12 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1785,7 +1785,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1812,7 +1812,7 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1836,7 +1836,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1862,12 +1862,12 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1893,7 +1893,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1918,7 +1918,7 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1944,7 +1944,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -2026,7 +2026,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         await moderation.FileReportAsync(id, actor, reason, session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/posts/{id}");
     }
 
@@ -2101,7 +2101,7 @@ public sealed class PostsController(
 
         await moderation.FileReplyReportAsync(replyId, actor, reason, session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/posts/{id}");
     }
 
