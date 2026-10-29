@@ -1,0 +1,68 @@
+@model Kumunita.Web.Models.DocumentDeletedViewModel
+@{
+    ViewData["Title"] = "Deleted documents";
+}
+
+@* ADR 0241 — the restore list. Titles and names only: no download link and no summary,
+   because restoring only puts a document back under the audience its owner chose. Each
+   row is a POST form to /documents/{id}/restore (antiforgery), no client script. *@
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p class="mb-2">
+            <a href="/documents" class="btn btn-link p-0"><kw-l key="documents.title">Documents</kw-l></a>
+        </p>
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="documents.deleted_title">Deleted documents</kw-l></h1>
+                    <p class="text-muted mb-0">
+                        @if (Model.IsAdminView)
+                        {
+                            <kw-l key="documents.deleted_lede_admin">Documents deleted by their owners. As an administrator you can restore any of them; a restored document goes back under the audience its owner chose.</kw-l>
+                        }
+                        else
+                        {
+                            <kw-l key="documents.deleted_lede_owner">Documents you deleted. Restoring a document puts it back exactly as it was.</kw-l>
+                        }
+                    </p>
+                </div>
+            </div>
+        </header>
+
+        <div class="airy-ann-list">
+            @if (Model.Rows.Count == 0)
+            {
+                <div class="p-4 text-muted">
+                    <kw-l key="documents.deleted_empty">No deleted documents.</kw-l>
+                </div>
+            }
+            @foreach (var row in Model.Rows)
+            {
+                var d = row.Document;
+                <div class="airy-ann-row">
+                    <div class="kmb-doc-main">
+                        <partial name="_FileTile" model="d.ContentType" />
+                        <div class="min-w-0">
+                            <h3 class="airy-ann-title">@d.Title</h3>
+                            <div class="airy-ann-meta">
+                                <span>@row.OwnerName</span>
+                                <span>·</span>
+                                <span><kw-l key="documents.deleted_at">Deleted</kw-l> <kw-dt dt="@(d.DeletedAt ?? d.Created)" format="g"></kw-dt></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="airy-ann-side">
+                        <div class="airy-ann-actions">
+                            <form method="post" action="/documents/@d.Id/restore">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                    <kw-l key="documents.restore">Restore</kw-l>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

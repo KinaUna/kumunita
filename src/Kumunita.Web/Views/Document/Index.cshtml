@@ -53,6 +53,10 @@
                 @if (Model.CanUpload)
                 {
                     <div class="d-flex gap-2">
+                        @* ADR 0241 — the restore list (owners are uploaders, so CanUpload also gates the link). *@
+                        <a class="btn btn-outline-secondary" href="/documents/deleted">
+                            <kw-l key="documents.deleted_title">Deleted documents</kw-l>
+                        </a>
                         <a class="btn btn-outline-primary" href="/documents/new">
                             <kw-l key="documents.upload">Upload a document</kw-l>
                         </a>

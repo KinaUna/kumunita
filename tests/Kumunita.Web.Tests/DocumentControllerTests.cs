@@ -873,6 +873,99 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
         Assert.IsType<NotFoundResult>(result); // 404, not 403 (D7 — no existence leak)
     }
 
+    // ══════════════════════════════════════════════════════
+    // ADR 0241 — the restore lane (POST /documents/{id}/restore) and the Undo toast
+    // ══════════════════════════════════════════════════════
+
+    /// <summary>Builds a controller whose write session holds a soft-deleted document.</summary>
+    private static DocumentController BuildRestoreController(string docOwner, string[] roles)
+    {
+        var doc = MakeDoc();
+        doc.OwnerId = docOwner;
+        doc.DeletedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        doc.DeletedById = docOwner;
+
+        var store = Substitute.For<IDocumentStore>();
+        var write = Substitute.For<IDocumentSession>();
+        write.LoadAsync<Document>(DocId).Returns(doc);
+        store.LightweightSession().Returns(write);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        var docs = new DocumentService(Substitute.For<IUserInfoService>(), authz, store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(),
+            Options.Create(new MediaOptions()), store);
+        var httpContext = PrincipalHttpContext(roles);
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
+        return controller;
+    }
+
+    /// <summary>ADR 0241 — the owner restores their own document: redirect to its detail page with the flash.</summary>
+    [Fact]
+    public async Task Restore_Owner_Redirects_To_Detail()
+    {
+        var controller = BuildRestoreController(docOwner: Actor, roles: Array.Empty<string>());
+
+        var result = await controller.Restore(DocId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/documents/{DocId}", redirect.Url);
+        Assert.Equal("documents.flash_restored", controller.TempData["info"]);
+    }
+
+    /// <summary>ADR 0241 — a GlobalAdmin may restore a document someone else deleted.</summary>
+    [Fact]
+    public async Task Restore_GlobalAdminNonOwner_Redirects_To_Detail()
+    {
+        var controller = BuildRestoreController(docOwner: "somebody-else", roles: new[] { "GlobalAdmin" });
+
+        var result = await controller.Restore(DocId);
+
+        Assert.IsType<RedirectResult>(result);
+    }
+
+    /// <summary>ADR 0241 — anyone else gets a 404, not a 403 (the route's existence is not leaked).</summary>
+    [Fact]
+    public async Task Restore_OtherResident_Returns_404_Not_403()
+    {
+        var controller = BuildRestoreController(docOwner: "somebody-else", roles: Array.Empty<string>());
+
+        var result = await controller.Restore(DocId);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    /// <summary>ADR 0241 — the delete flash carries an Undo action pointing at the restore route.</summary>
+    [Fact]
+    public async Task Delete_Owner_Flash_OffersUndo()
+    {
+        var doc = MakeDoc();
+        doc.OwnerId = Actor;
+
+        var store = Substitute.For<IDocumentStore>();
+        var read = Substitute.For<IQuerySession>();
+        read.LoadAsync<Document>(DocId).Returns(doc);
+        store.QuerySession().Returns(read);
+        var write = Substitute.For<IDocumentSession>();
+        write.LoadAsync<Document>(DocId).Returns(doc);
+        store.LightweightSession().Returns(write);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Actor, AccessAction.Read, Arg.Any<IAuditableResource>())
+            .Returns(Task.FromResult(new Decision(true, AccessVia.Owner, Actor)));
+        var docs = new DocumentService(Substitute.For<IUserInfoService>(), authz, store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(),
+            Options.Create(new MediaOptions()), store);
+        var httpContext = PrincipalHttpContext(Array.Empty<string>());
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
+
+        await controller.Delete(DocId);
+
+        Assert.Equal($"/documents/{DocId}/restore", controller.TempData["info_action_url"]);
+        Assert.Equal("documents.undo", controller.TempData["info_action_label"]); // raw key: no translation seam here
+    }
+
     /// <summary>
     /// ADR 0239 D3/D4/D5 — <c>POST /documents/{id}/delete</c> for the
     /// **owner** delegates to <see cref="DocumentService.DeleteAsync"/> (which

@@ -82,4 +82,14 @@ public sealed class Document
     /// 0004 §B.1.
     /// </summary>
     public string? DeletedById { get; set; }
+
+    /// <summary>
+    /// ADR 0241 — when the document was last **restored** after a soft delete
+    /// (<see cref="DeletedAt"/> cleared). <c>null</c> if it was never restored.
+    /// Traceability only; no read lane keys on it. Additive (ADR 0004 §B.1).
+    /// </summary>
+    public DateTimeOffset? RestoredAt { get; set; }
+
+    /// <summary>ADR 0241 — the actor who last restored the document (its owner or a GlobalAdmin).</summary>
+    public string? RestoredById { get; set; }
 }

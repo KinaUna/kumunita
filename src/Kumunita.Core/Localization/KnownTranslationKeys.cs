@@ -2590,6 +2590,14 @@ public static class KnownTranslationKeys
             ["documents.delete"]              = "Delete",
             ["documents.flash_deleted"]       = "Document deleted.",
             ["documents.delete_confirm"]      = "Delete \"{0}\"? It disappears for everyone and cannot be restored from the app.",
+            ["documents.undo"] = "Undo",
+            ["documents.restore"] = "Restore",
+            ["documents.flash_restored"] = "Document restored.",
+            ["documents.deleted_title"] = "Deleted documents",
+            ["documents.deleted_lede_owner"] = "Documents you deleted. Restoring a document puts it back exactly as it was.",
+            ["documents.deleted_lede_admin"] = "Documents deleted by their owners. As an administrator you can restore any of them; a restored document goes back under the audience its owner chose.",
+            ["documents.deleted_empty"] = "No deleted documents.",
+            ["documents.deleted_at"] = "Deleted",
 
             // The "documents organization" lane (tags + folders) — the
             // documents.folder_* / documents.tags.* keys + the flash keys for
@@ -5453,6 +5461,14 @@ public static class KnownTranslationKeys
             ["documents.delete"]              = "Löschen",
             ["documents.flash_deleted"]       = "Dokument gelöscht.",
             ["documents.delete_confirm"]      = "\"{0}\" löschen? Das Dokument verschwindet für alle und lässt sich in der App nicht wiederherstellen.",
+            ["documents.undo"] = "Rückgängig",
+            ["documents.restore"] = "Wiederherstellen",
+            ["documents.flash_restored"] = "Dokument wiederhergestellt.",
+            ["documents.deleted_title"] = "Gelöschte Dokumente",
+            ["documents.deleted_lede_owner"] = "Dokumente, die du gelöscht hast. Beim Wiederherstellen kommt ein Dokument genau so zurück, wie es war.",
+            ["documents.deleted_lede_admin"] = "Von ihren Eigentümern gelöschte Dokumente. Als Administrator kannst du jedes davon wiederherstellen; ein wiederhergestelltes Dokument gilt wieder für die Zielgruppe, die sein Eigentümer gewählt hat.",
+            ["documents.deleted_empty"] = "Keine gelöschten Dokumente.",
+            ["documents.deleted_at"] = "Gelöscht",
 
             // Die "Dokumente organisieren"-Lane (Tags + Ordner) — die
             // documents.folder_* / documents.tags.*-Keys + die Flash-Keys der
@@ -8221,6 +8237,14 @@ public static class KnownTranslationKeys
             ["documents.delete"]              = "Supprimer",
             ["documents.flash_deleted"]       = "Document supprimé.",
             ["documents.delete_confirm"]      = "Supprimer \"{0}\" ? Le document disparaît pour tout le monde et ne peut pas être restauré depuis l'application.",
+            ["documents.undo"] = "Annuler",
+            ["documents.restore"] = "Restaurer",
+            ["documents.flash_restored"] = "Document restauré.",
+            ["documents.deleted_title"] = "Documents supprimés",
+            ["documents.deleted_lede_owner"] = "Documents que vous avez supprimés. La restauration remet un document exactement comme il était.",
+            ["documents.deleted_lede_admin"] = "Documents supprimés par leurs propriétaires. En tant qu'administrateur, vous pouvez en restaurer n'importe lequel ; un document restauré retrouve l'audience choisie par son propriétaire.",
+            ["documents.deleted_empty"] = "Aucun document supprimé.",
+            ["documents.deleted_at"] = "Supprimé",
 
             // La lane "organiser les documents" (tags + dossiers) — les clés
             // documents.folder_* / documents.tags.* + les clés flash des
@@ -10970,6 +10994,14 @@ public static class KnownTranslationKeys
             ["documents.delete"]              = "Slet",
             ["documents.flash_deleted"]       = "Dokument slettet.",
             ["documents.delete_confirm"]      = "Slet \"{0}\"? Dokumentet forsvinder for alle og kan ikke gendannes fra appen.",
+            ["documents.undo"] = "Fortryd",
+            ["documents.restore"] = "Gendan",
+            ["documents.flash_restored"] = "Dokument gendannet.",
+            ["documents.deleted_title"] = "Slettede dokumenter",
+            ["documents.deleted_lede_owner"] = "Dokumenter, du har slettet. Når du gendanner et dokument, er det præcis som før.",
+            ["documents.deleted_lede_admin"] = "Dokumenter slettet af deres ejere. Som administrator kan du gendanne dem; et gendannet dokument får igen den målgruppe, som ejeren valgte.",
+            ["documents.deleted_empty"] = "Ingen slettede dokumenter.",
+            ["documents.deleted_at"] = "Slettet",
 
             // "Dokumenter organiseret"-lanen (tags + mapper) —
             // documents.folder_* / documents.tags.* nøgler + flash-nøglerne

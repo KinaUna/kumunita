@@ -516,7 +516,71 @@ public sealed class DocumentController(
         }
 
         TempData["info"] = await T("documents.flash_deleted");
+        // ADR 0241 — the toast offers Undo (a POST to the restore route).
+        TempData["info_action_url"] = $"/documents/{id}/restore";
+        TempData["info_action_label"] = await T("documents.undo");
         return Redirect("/documents");
+    }
+
+    // ── GET /documents/deleted — the restore list (ADR 0241) ─────────────────
+    //
+    // The viewer's own soft-deleted documents; every soft-deleted document for a
+    // GlobalAdmin. Titles and names only (no download, no content), so it needs no
+    // audience decision and writes no AccessAudit row.
+    [HttpGet("/documents/deleted")]
+    [Authorize]
+    public async Task<IActionResult> Deleted()
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null) return Unauthorized();
+        var isAdmin = KumunitaPrincipal.IsGlobalAdmin(User);
+
+        var docs = await documents.ListDeletedAsync(subject, isAdmin).ConfigureAwait(false);
+        var nameCache = new Dictionary<string, string>();
+        var rows = new List<DocumentDeletedRow>(docs.Count);
+        foreach (var d in docs)
+        {
+            if (!nameCache.TryGetValue(d.OwnerId, out var name))
+            {
+                var profile = userInfo is null ? null : await userInfo.GetProfileAsync(d.OwnerId);
+                name = profile?.DisplayName is { Length: > 0 } dn ? dn : d.OwnerId;
+                nameCache[d.OwnerId] = name;
+            }
+            rows.Add(new DocumentDeletedRow(d, name));
+        }
+        return View("Deleted", new DocumentDeletedViewModel(rows, isAdmin));
+    }
+
+    // ── POST /documents/{id}/restore — undo a soft delete (ADR 0241) ─────────
+    //
+    // The owner, or a GlobalAdmin, may restore. Anyone else gets a 404 (the ADR 0122 D7
+    // posture, as for delete). Idempotent. Lands on the restored document's detail page.
+    [HttpPost("/documents/{id}/restore")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Restore(string id)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null) return Unauthorized();
+        if (!IsValidDocId(id))
+            return BadRequest("A document id is required.");
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await documents.RestoreAsync(id, subject, KumunitaPrincipal.IsGlobalAdmin(User), session).ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound(); // not a 403 — the route's existence is not leaked
+        }
+
+        TempData["info"] = await T("documents.flash_restored");
+        return Redirect($"/documents/{id}");
     }
 
     // ── GET /documents/new — the compose form (D5) ─────────────────────────

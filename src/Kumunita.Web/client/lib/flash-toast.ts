@@ -48,6 +48,9 @@
     // failed save (an invalid Escalation endpoint, say) used to vanish after 5 s,
     // before it could be read or acted on. Info toasts keep the 5 s auto-hide.
     const isError = toast.getAttribute('role') === 'alert';
-    Toast.getOrCreateInstance(toast, { autohide: !isError, delay: 5000 }).show();
+    // ADR 0241 — a toast that carries an action (Undo) says how long it stays (data-kmb-toast-delay,
+    // 12 s) so there is time to use it; every other info toast keeps the 5 s default.
+    const delay = Number(toast.getAttribute('data-kmb-toast-delay')) || 5000;
+    Toast.getOrCreateInstance(toast, { autohide: !isError, delay }).show();
   }
 })();

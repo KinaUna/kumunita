@@ -379,4 +379,63 @@ public sealed class DocumentService
         session.Store(doc);
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// ADR 0241 — the soft-deleted documents the actor may restore: the actor's own
+    /// (<c>OwnerId == actorId</c>), or every soft-deleted document when
+    /// <paramref name="actorIsGlobalAdmin"/>. Newest deletion first, capped at
+    /// <paramref name="max"/>. This is a list of **titles and names for restoring**, not a
+    /// read of the content: no download, no audience decision (restoring only puts the
+    /// document back under the audience its owner already chose), and no
+    /// <see cref="AccessAudit"/> row (the ADR 0122 §1.a A2 write-lane convention).
+    /// </summary>
+    public async Task<IReadOnlyList<Document>> ListDeletedAsync(string actorId, bool actorIsGlobalAdmin, int max = 200)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An actor is required.", nameof(actorId));
+        if (max < 1) max = 1;
+
+        await using var session = _store.QuerySession();
+        IQueryable<Document> q = session.Query<Document>().Where(d => d.DeletedAt != null);
+        if (!actorIsGlobalAdmin)
+            q = q.Where(d => d.OwnerId == actorId);
+        return await q.OrderByDescending(d => d.DeletedAt).Take(max).ToListAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// ADR 0241 — the restore lane, the counterpart of <see cref="DeleteAsync"/> (ADR 0239 D4's
+    /// "a future restore lane could clear DeletedAt / DeletedById"). Clears
+    /// <see cref="Document.DeletedAt"/> / <see cref="Document.DeletedById"/> and stamps
+    /// <see cref="Document.RestoredAt"/> / <see cref="Document.RestoredById"/>; every other
+    /// field (audience, title, file, <see cref="Document.Modified"/>) is untouched, so the
+    /// document returns exactly as it was. Allowed for the owner, or for a GlobalAdmin
+    /// (<paramref name="actorIsGlobalAdmin"/>, decided at the Web boundary from the principal —
+    /// the only elevated standing on documents, and only for restore). **Idempotent**: a
+    /// document that is not deleted is left as it is.
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The document id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is neither the owner nor a GlobalAdmin.</exception>
+    public async Task RestoreAsync(string documentId, string actorId, bool actorIsGlobalAdmin, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(documentId)) throw new ArgumentException("A document id is required.", nameof(documentId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting subject is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var doc = await session.LoadAsync<Document>(documentId).ConfigureAwait(false);
+        if (doc is null)
+            throw new KeyNotFoundException($"Document '{documentId}' was not found in the session; nothing to restore.");
+
+        if (!actorIsGlobalAdmin && !string.Equals(doc.OwnerId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the owner of a document, or a GlobalAdmin, may restore it.");
+
+        if (doc.DeletedAt is null) return; // already live — idempotent, nothing written
+
+        doc.DeletedAt = null;
+        doc.DeletedById = null;
+        doc.RestoredAt = DateTimeOffset.UtcNow;
+        doc.RestoredById = actorId;
+
+        session.Store(doc);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
 }
