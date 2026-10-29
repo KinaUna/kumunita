@@ -231,16 +231,14 @@ public sealed class AccountController(
         var user = await userManager.FindByIdAsync(subject);
         if (user is null)
         {
-            ModelState.AddModelError(nameof(model.CurrentPassword),
-                "We could not find that account — sign in again.");
+            ModelState.AddModelError(nameof(model.CurrentPassword), await this.FlashAsync("validation.account_not_found", "We could not find that account — sign in again."));
             return View(model);
         }
 
         var currentOk = await userManager.CheckPasswordAsync(user, model.CurrentPassword);
         if (!currentOk)
         {
-            ModelState.AddModelError(nameof(model.CurrentPassword),
-                "Your current password is incorrect.");
+            ModelState.AddModelError(nameof(model.CurrentPassword), await this.FlashAsync("validation.current_password_wrong", "Your current password is incorrect."));
             return View(model);
         }
 
@@ -355,8 +353,7 @@ public sealed class AccountController(
         if (!model.Confirmed)
         {
             ModelState.AddModelError(
-                nameof(model.Confirmed),
-                "You must confirm that you understand your account will be permanently deleted.");
+                nameof(model.Confirmed), await this.FlashAsync("validation.confirm_deletion", "You must confirm that you understand your account will be permanently deleted."));
         }
 
         // Verify the current password (the self-serve lane proves it is really
@@ -365,16 +362,14 @@ public sealed class AccountController(
         var user = await userManager.FindByIdAsync(subject);
         if (user is null)
         {
-            ModelState.AddModelError(nameof(model.Password),
-                "We could not find that account — sign in again.");
+            ModelState.AddModelError(nameof(model.Password), await this.FlashAsync("validation.account_not_found", "We could not find that account — sign in again."));
         }
         else
         {
             var currentOk = await userManager.CheckPasswordAsync(user, model.Password);
             if (!currentOk)
             {
-                ModelState.AddModelError(nameof(model.Password),
-                    "Your password is incorrect.");
+                ModelState.AddModelError(nameof(model.Password), await this.FlashAsync("validation.password_wrong", "Your password is incorrect."));
             }
         }
 
@@ -402,10 +397,7 @@ public sealed class AccountController(
             // crafted POST reaches the Core seam directly). The resident is
             // not a GlobalAdmin, so the self-serve lane is unavailable for
             // them. Surface the notice (the ADR 0138 "locked" shape).
-            ModelState.AddModelError(string.Empty,
-                "The self-serve delete-account lane is only available to a " +
-                "GlobalAdmin. A non-GlobalAdmin resident cannot delete their " +
-                "own account — contact an administrator to remove the account.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.delete_admin_only", "The self-serve delete-account lane is only available to a GlobalAdmin. A non-GlobalAdmin resident cannot delete their own account — contact an administrator to remove the account."));
             return View(new DeleteAccountViewModel { SelfDeletionRefused = true });
         }
         catch (InvalidOperationException ex)
@@ -503,8 +495,7 @@ public sealed class AccountController(
             !await botChallengeVerifier.IsVerifiedAsync(model.BotChallengeToken))
         {
             model.BotChallengeFailed = true;
-            ModelState.AddModelError(string.Empty,
-                "The security check did not pass. Please try again.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("account.signup_bot_failed", "The security check did not pass. Please try again."));
             return View(model);
         }
 
@@ -522,8 +513,7 @@ public sealed class AccountController(
             // by it) and re-rendered with the `EmailDomainDisallowed` flag (the
             // `EmailAlreadyExists` precedent) — pin §3b.
             model.EmailDomainDisallowed = true;
-            ModelState.AddModelError(string.Empty,
-                $"The email domain '{ex.Domain}' is not accepted for new accounts.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.domain_not_accepted", "The email domain '{0}' is not accepted for new accounts.", ex.Domain));
             return View(model);
         }
         catch (InvalidOperationException ex)
@@ -792,7 +782,7 @@ public sealed class AccountController(
 
         if (user is null)
         {
-            ModelState.AddModelError(string.Empty, "Email or password is incorrect.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.login_failed", "Email or password is incorrect."));
             return View(model);
         }
 
@@ -862,8 +852,8 @@ public sealed class AccountController(
         {
             ModelState.AddModelError(string.Empty,
                 result.IsLockedOut
-                    ? "Account is temporarily locked. Try again in a few minutes."
-                    : "Email or password is incorrect.");
+                    ? await this.FlashAsync("validation.account_locked", "Account is temporarily locked. Try again in a few minutes.")
+                    : await this.FlashAsync("validation.login_failed", "Email or password is incorrect."));
             return View(model);
         }
 

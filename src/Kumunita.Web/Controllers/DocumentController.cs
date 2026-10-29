@@ -375,7 +375,7 @@ public sealed class DocumentController(
         // pin — the PostComposeViewModel / DocumentUpload precedents).
         if (form.Audience is null || !form.Audience.IsValid)
         {
-            ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
             form.DocumentId = id; // the form action needs the route id on re-render
             return View("Edit", form);
         }
@@ -618,7 +618,7 @@ public sealed class DocumentController(
         // (the M2 mode-required pin, the PostComposeViewModel precedent).
         if (form.Audience is null || !form.Audience.IsValid)
         {
-            ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
             return View("New", form);
         }
 

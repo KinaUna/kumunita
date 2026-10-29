@@ -232,7 +232,7 @@ public sealed class GroupsController(
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
         {
-            ModelState.AddModelError(nameof(GroupCreateModel.Name), "You must sign in to create a group.");
+            ModelState.AddModelError(nameof(GroupCreateModel.Name), await this.FlashAsync("validation.signin_group_create", "You must sign in to create a group."));
             return View(model);
         }
 
@@ -242,7 +242,7 @@ public sealed class GroupsController(
         var name = (model.Name ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(name))
         {
-            ModelState.AddModelError(nameof(GroupCreateModel.Name), "A group needs a name.");
+            ModelState.AddModelError(nameof(GroupCreateModel.Name), await this.FlashAsync("validation.group_needs_name", "A group needs a name."));
             return View(model);
         }
 
@@ -1718,7 +1718,7 @@ public sealed class GroupsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post", "You must sign in to post."));
             return View("New", model);
         }
 
@@ -1732,7 +1732,7 @@ public sealed class GroupsController(
         {
             // Re-render the standalone compose page, prefilled with what
             // the actor typed (the GET /groups/{id}/posts/new shape).
-            ModelState.AddModelError(nameof(model.Body), "A post needs some text.");
+            ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.post_needs_text", "A post needs some text."));
             return View("New", model);
         }
 
@@ -1858,7 +1858,7 @@ public sealed class GroupsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to edit.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_edit", "You must sign in to edit."));
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -1871,7 +1871,7 @@ public sealed class GroupsController(
             // Re-render the editor, prefilled with what the actor typed (the
             // GET /groups/{id}/posts/{postId}/edit shape).
             model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
-            ModelState.AddModelError(nameof(model.Body), "A post needs some text.");
+            ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.post_needs_text", "A post needs some text."));
             return View("Edit", model);
         }
 
@@ -2370,7 +2370,7 @@ public sealed class GroupsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to create an event.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_event_create", "You must sign in to create an event."));
             return View("EventNew", model);
         }
 
@@ -2385,11 +2385,11 @@ public sealed class GroupsController(
             // Re-render the standalone compose page, prefilled with what the
             // actor typed (the GET /groups/{id}/events/new shape).
             if (string.IsNullOrWhiteSpace(model.Body))
-                ModelState.AddModelError(nameof(model.Body), "An event needs some text.");
+                ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.event_needs_text", "An event needs some text."));
             if (model.Start == default || model.End == default)
-                ModelState.AddModelError(string.Empty, "An event needs a start and an end time.");
+                ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.event_needs_times", "An event needs a start and an end time."));
             if (model.End <= model.Start)
-                ModelState.AddModelError(nameof(model.End), "The end must be after the start.");
+                ModelState.AddModelError(nameof(model.End), await this.FlashAsync("validation.end_after_start_short", "The end must be after the start."));
             return View("EventNew", model);
         }
 
@@ -2508,7 +2508,7 @@ public sealed class GroupsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to edit.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_edit", "You must sign in to edit."));
             return Redirect($"/groups/{id}/events/{eventId}");
         }
 
@@ -2521,11 +2521,11 @@ public sealed class GroupsController(
             // Re-render the editor, prefilled with what the actor typed.
             model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
             if (string.IsNullOrWhiteSpace(model.Body))
-                ModelState.AddModelError(nameof(model.Body), "An event needs some text.");
+                ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.event_needs_text", "An event needs some text."));
             if (model.Start == default || model.End == default)
-                ModelState.AddModelError(string.Empty, "An event needs a start and an end time.");
+                ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.event_needs_times", "An event needs a start and an end time."));
             if (model.End <= model.Start)
-                ModelState.AddModelError(nameof(model.End), "The end must be after the start.");
+                ModelState.AddModelError(nameof(model.End), await this.FlashAsync("validation.end_after_start_short", "The end must be after the start."));
             return View("EventEdit", model);
         }
 

@@ -295,7 +295,7 @@ public sealed class ProfileController(
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to edit your profile.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_profile_edit", "You must sign in to edit your profile."));
             return View(model);
         }
 
@@ -306,15 +306,13 @@ public sealed class ProfileController(
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.DisplayName))
-                ModelState.AddModelError(nameof(model.DisplayName), "Display name is required.");
+                ModelState.AddModelError(nameof(model.DisplayName), await this.FlashAsync("validation.display_name_needed", "Display name is required."));
             if (string.IsNullOrWhiteSpace(model.Email))
-                ModelState.AddModelError(nameof(model.Email), "Email is required.");
+                ModelState.AddModelError(nameof(model.Email), await this.FlashAsync("validation.email_needed", "Email is required."));
             if (model.Visibility is null || !model.Visibility.IsValid)
-                ModelState.AddModelError("Visibility.Mode",
-                    "Visibility mode is required (Any or All).");
+                ModelState.AddModelError("Visibility.Mode", await this.FlashAsync("validation.visibility_mode", "Visibility mode is required (Any or All)."));
             if (model.ContactVisibility is not null && !model.ContactVisibility.IsValid)
-                ModelState.AddModelError("ContactVisibility.Mode",
-                    "Contact visibility mode is required (Any or All) when opted in.");
+                ModelState.AddModelError("ContactVisibility.Mode", await this.FlashAsync("validation.contact_visibility_mode", "Contact visibility mode is required (Any or All) when opted in."));
             return View(model);
         }
 

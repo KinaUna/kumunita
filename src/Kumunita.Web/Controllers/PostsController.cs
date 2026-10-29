@@ -892,7 +892,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post", "You must sign in to post."));
             return View(model);
         }
 
@@ -916,11 +916,11 @@ public sealed class PostsController(
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.ComponentId))
-                ModelState.AddModelError(nameof(model.ComponentId), "Choose a community.");
+                ModelState.AddModelError(nameof(model.ComponentId), await this.FlashAsync("validation.choose_community", "Choose a community."));
             if (string.IsNullOrWhiteSpace(model.Body))
-                ModelState.AddModelError(nameof(model.Body), "Body is required.");
+                ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.body_required", "Body is required."));
             if (model.Audience is null || !model.Audience.IsValid)
-                ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+                ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
             return View(model);
         }
 
@@ -931,8 +931,7 @@ public sealed class PostsController(
             // moderator scope on). The shape is a form error, not a 404 (a 404
             // on POST is a non-standard shape; the M2 <see
             // cref="GroupsController"/> "a form is a shape" precedent applies).
-            ModelState.AddModelError(nameof(model.ComponentId),
-                "That community is not enabled, or you do not have a posting right on it.");
+            ModelState.AddModelError(nameof(model.ComponentId), await this.FlashAsync("validation.community_not_enabled", "That community is not enabled, or you do not have a posting right on it."));
             return View(model);
         }
 
@@ -984,8 +983,7 @@ public sealed class PostsController(
         }
         catch (UnauthorizedAccessException)
         {
-            ModelState.AddModelError(nameof(model.ComponentId),
-                "You are not a member of this community yet. An admin can add you under /admin → Accounts.");
+            ModelState.AddModelError(nameof(model.ComponentId), await this.FlashAsync("validation.not_member_yet", "You are not a member of this community yet. An admin can add you under /admin → Accounts."));
             return View(model);
         }
         catch (ArgumentException ex) when (ex.ParamName == "input")
@@ -996,7 +994,7 @@ public sealed class PostsController(
             // The `when (ex.ParamName == "input")` guard scopes the catch to
             // the DeriveSlug throws (the `nameof(input)` is "input") and
             // lets any other `ArgumentException` (a real bug) propagate.
-            ModelState.AddModelError(nameof(model.TagIds), "A tag name is invalid (use letters, digits, hyphens, underscores).");
+            ModelState.AddModelError(nameof(model.TagIds), await this.FlashAsync("validation.tag_invalid", "A tag name is invalid (use letters, digits, hyphens, underscores)."));
             return View(model);
         }
 
@@ -1129,7 +1127,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to edit this post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post_edit", "You must sign in to edit this post."));
             return Forbid();
         }
 
@@ -1160,9 +1158,9 @@ public sealed class PostsController(
         model.ExistingTagSlugs = await SeedExistingTagSlugsAsync(post);
 
         if (string.IsNullOrWhiteSpace(model.Body))
-            ModelState.AddModelError(nameof(model.Body), "Body is required.");
+            ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.body_required", "Body is required."));
         if (model.Audience is null || !model.Audience.IsValid)
-            ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
 
         if (!ModelState.IsValid)
             return View(model);
@@ -1212,7 +1210,7 @@ public sealed class PostsController(
         {
             // TG (ADR 0044, U8b) — a bad tag slug (C-TG·4) → a form error on
             // the TagIds field (the M3 "a form is a shape" precedent).
-            ModelState.AddModelError(nameof(model.TagIds), "A tag name is invalid (use letters, digits, hyphens, underscores).");
+            ModelState.AddModelError(nameof(model.TagIds), await this.FlashAsync("validation.tag_invalid", "A tag name is invalid (use letters, digits, hyphens, underscores)."));
             return View(model);
         }
         catch (KeyNotFoundException)
@@ -1352,7 +1350,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to edit this reply.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_reply_edit", "You must sign in to edit this reply."));
             return Forbid();
         }
 
@@ -1425,7 +1423,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to delete this post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post_delete", "You must sign in to delete this post."));
             return Forbid();
         }
 
@@ -1482,7 +1480,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to publish this post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post_publish", "You must sign in to publish this post."));
             return Forbid();
         }
 
@@ -1533,7 +1531,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to delete this reply.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_reply_delete", "You must sign in to delete this reply."));
             return Forbid();
         }
 

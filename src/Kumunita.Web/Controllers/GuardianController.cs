@@ -1050,14 +1050,14 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to add a child account.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_child_add", "You must sign in to add a child account."));
             return View(form);
         }
 
         var displayName = (form.DisplayName ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(displayName))
         {
-            ModelState.AddModelError(nameof(AddChildForm.DisplayName), "A display name is required.");
+            ModelState.AddModelError(nameof(AddChildForm.DisplayName), await this.FlashAsync("validation.display_name_required", "A display name is required."));
             return View(form);
         }
 
@@ -1066,8 +1066,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         // the guardian confirms the child-account terms.
         if (!form.GuardianConsent)
         {
-            ModelState.AddModelError(nameof(AddChildForm.GuardianConsent),
-                "You must consent to the child-account terms before adding the account.");
+            ModelState.AddModelError(nameof(AddChildForm.GuardianConsent), await this.FlashAsync("validation.guardian_consent", "You must consent to the child-account terms before adding the account."));
             return View(form);
         }
 
@@ -1091,8 +1090,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // the `InvalidOperationException` catch (the dedicated type must not be
             // swallowed by it) and shown to the guardian on the add-a-child form
             // (pin §3b — mirrors this lane's existing error shape).
-            ModelState.AddModelError(string.Empty,
-                $"The email domain '{ex.Domain}' is not accepted for new accounts. Please use a permanent email address.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.domain_not_accepted_permanent", "The email domain '{0}' is not accepted for new accounts. Please use a permanent email address.", ex.Domain));
             return View(form);
         }
         catch (InvalidOperationException ex)
@@ -1152,7 +1150,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         var email = (form.Email ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(email))
         {
-            ModelState.AddModelError(nameof(AssignGuardianForm.Email), "An email is required.");
+            ModelState.AddModelError(nameof(AssignGuardianForm.Email), await this.FlashAsync("validation.email_required", "An email is required."));
             return View("Detail", new AssignGuardianForm { Email = email });
         }
 
@@ -1164,7 +1162,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         var assignedId = await identity.FindSubjectByEmailAsync(email);
         if (assignedId is null)
         {
-            ModelState.AddModelError(string.Empty, "No account with that email.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.no_account_email", "No account with that email."));
             return View("Detail", new AssignGuardianForm { Email = email });
         }
 
@@ -1174,7 +1172,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         // already idempotent for it — a no-op, not a useful act).
         if (assignedId == subject)
         {
-            ModelState.AddModelError(string.Empty, "You are already this child's guardian.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.already_guardian", "You are already this child's guardian."));
             return View("Detail", new AssignGuardianForm { Email = email });
         }
 

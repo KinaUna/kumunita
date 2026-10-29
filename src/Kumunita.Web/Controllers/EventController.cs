@@ -1130,17 +1130,17 @@ public sealed class EventController : Controller
         var actorId = SubjectId(User) ?? string.Empty;
         if (string.IsNullOrEmpty(actorId))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to add a to-do.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_todo_add", "You must sign in to add a to-do."));
             return View("Detail", id);
         }
         if (string.IsNullOrWhiteSpace(title))
         {
-            ModelState.AddModelError(string.Empty, "A title is required.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.title_required", "A title is required."));
             return View("Detail", id);
         }
         if (projects is null)
         {
-            ModelState.AddModelError(string.Empty, "To-dos are not available on this instance.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.todos_unavailable", "To-dos are not available on this instance."));
             return View("Detail", id);
         }
 
@@ -1176,7 +1176,7 @@ public sealed class EventController : Controller
         }
         catch (UnauthorizedAccessException)
         {
-            ModelState.AddModelError(string.Empty, "You do not have permission to add a to-do.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.permission_todo_add", "You do not have permission to add a to-do."));
             return View("Detail", id);
         }
 
@@ -1439,7 +1439,7 @@ public sealed class EventController : Controller
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to create an event.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_event_create", "You must sign in to create an event."));
             return View("Create", model);
         }
 
@@ -1464,22 +1464,21 @@ public sealed class EventController : Controller
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.Title))
-                ModelState.AddModelError(nameof(model.Title), "A title is required.");
+                ModelState.AddModelError(nameof(model.Title), await this.FlashAsync("validation.title_required", "A title is required."));
             if (string.IsNullOrWhiteSpace(model.Body))
-                ModelState.AddModelError(nameof(model.Body), "A body is required.");
+                ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.body_needed", "A body is required."));
             if (model.End < model.Start)
-                ModelState.AddModelError(nameof(model.End), "The end time must be after the start time.");
+                ModelState.AddModelError(nameof(model.End), await this.FlashAsync("validation.end_after_start", "The end time must be after the start time."));
             if (model.Audience is null || !model.Audience.IsValid)
-                ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+                ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
             // M18 (ADR 0119, D2 / D7) — the recurrence picker's shape errors.
             if (!string.IsNullOrWhiteSpace(model.Recurrence)
                 && !model.Recurrence.Equals("none", StringComparison.OrdinalIgnoreCase))
             {
                 if (model.RecurrenceInterval is < 1)
-                    ModelState.AddModelError(nameof(model.RecurrenceInterval), "The interval must be at least 1.");
+                    ModelState.AddModelError(nameof(model.RecurrenceInterval), await this.FlashAsync("validation.interval_min", "The interval must be at least 1."));
                 if (model.EndsAfterCount.HasValue == model.EndsOnDate.HasValue)
-                    ModelState.AddModelError(nameof(model.EndsAfterCount),
-                        "Pick exactly one end: \"Ends after\" a number of occurrences, or \"Ends on\" a date.");
+                    ModelState.AddModelError(nameof(model.EndsAfterCount), await this.FlashAsync("validation.pick_one_end", "Pick exactly one end: \"Ends after\" a number of occurrences, or \"Ends on\" a date."));
             }
             return View("Create", model);
         }
@@ -1526,15 +1525,14 @@ public sealed class EventController : Controller
         }
         catch (UnauthorizedAccessException)
         {
-            ModelState.AddModelError(string.Empty, "You do not have permission to create an event.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.permission_event_create", "You do not have permission to create an event."));
             return View("Create", model);
         }
         catch (ArgumentException ex) when (ex.ParamName == "input")
         {
             // A bad tag slug (TagService.DeriveSlug, C-TG·4) — mapped to a form
             // error on the TagIds field (the M3 "a form is a shape" precedent).
-            ModelState.AddModelError(nameof(model.TagIds),
-                "A tag name is invalid (use letters, digits, hyphens, underscores).");
+            ModelState.AddModelError(nameof(model.TagIds), await this.FlashAsync("validation.tag_invalid", "A tag name is invalid (use letters, digits, hyphens, underscores)."));
             return View("Create", model);
         }
 
@@ -1676,13 +1674,13 @@ public sealed class EventController : Controller
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.Title))
-                ModelState.AddModelError(nameof(model.Title), "A title is required.");
+                ModelState.AddModelError(nameof(model.Title), await this.FlashAsync("validation.title_required", "A title is required."));
             if (string.IsNullOrWhiteSpace(model.Body))
-                ModelState.AddModelError(nameof(model.Body), "A body is required.");
+                ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.body_needed", "A body is required."));
             if (model.End < model.Start)
-                ModelState.AddModelError(nameof(model.End), "The end time must be after the start time.");
+                ModelState.AddModelError(nameof(model.End), await this.FlashAsync("validation.end_after_start", "The end time must be after the start time."));
             if (model.Audience is null || !model.Audience.IsValid)
-                ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+                ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
             // M18 (ADR 0119, D2 / D7) — the recurrence picker's shape errors
             // (a head row only — a non-head row's picker is hidden, D3).
             if (!model.IsNonHeadOccurrence
@@ -1690,10 +1688,9 @@ public sealed class EventController : Controller
                 && !model.Recurrence.Equals("none", StringComparison.OrdinalIgnoreCase))
             {
                 if (model.RecurrenceInterval is < 1)
-                    ModelState.AddModelError(nameof(model.RecurrenceInterval), "The interval must be at least 1.");
+                    ModelState.AddModelError(nameof(model.RecurrenceInterval), await this.FlashAsync("validation.interval_min", "The interval must be at least 1."));
                 if (model.EndsAfterCount.HasValue == model.EndsOnDate.HasValue)
-                    ModelState.AddModelError(nameof(model.EndsAfterCount),
-                        "Pick exactly one end: \"Ends after\" a number of occurrences, or \"Ends on\" a date.");
+                    ModelState.AddModelError(nameof(model.EndsAfterCount), await this.FlashAsync("validation.pick_one_end", "Pick exactly one end: \"Ends after\" a number of occurrences, or \"Ends on\" a date."));
             }
             return View("Edit", model);
         }
@@ -1746,8 +1743,7 @@ public sealed class EventController : Controller
         }
         catch (ArgumentException ex) when (ex.ParamName == "input")
         {
-            ModelState.AddModelError(nameof(model.TagIds),
-                "A tag name is invalid (use letters, digits, hyphens, underscores).");
+            ModelState.AddModelError(nameof(model.TagIds), await this.FlashAsync("validation.tag_invalid", "A tag name is invalid (use letters, digits, hyphens, underscores)."));
             return View("Edit", model);
         }
 

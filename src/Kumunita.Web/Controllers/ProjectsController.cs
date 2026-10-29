@@ -4477,7 +4477,7 @@ public sealed class ProjectsController : Controller
         // (the BoardUpdateModel.IsValid shape).
         if (string.IsNullOrWhiteSpace(model.Title))
         {
-            ModelState.AddModelError(nameof(model.Title), "A title is required.");
+            ModelState.AddModelError(nameof(model.Title), await this.FlashAsync("validation.title_required", "A title is required."));
             return View("ProjectEdit", model);
         }
 

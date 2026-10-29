@@ -714,9 +714,9 @@ public sealed class AnnouncementController(
     public async Task<IActionResult> New(AnnouncementComposeViewModel model)
     {
         if (string.IsNullOrWhiteSpace(model.Body))
-            ModelState.AddModelError(nameof(model.Body), "Body is required.");
+            ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.body_required", "Body is required."));
         if (!Enum.TryParse<AnnouncementScope>(model.Scope, out var scope))
-            ModelState.AddModelError(nameof(model.Scope), "Scope is required.");
+            ModelState.AddModelError(nameof(model.Scope), await this.FlashAsync("validation.scope_required", "Scope is required."));
 
         if (!ModelState.IsValid)
         {
@@ -731,7 +731,7 @@ public sealed class AnnouncementController(
         var authorId = SubjectId(User) ?? string.Empty;
         if (string.IsNullOrEmpty(authorId))
         {
-            ModelState.AddModelError(string.Empty, "Not signed in.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("flash.not_signed_in", "Not signed in."));
             return View(model);
         }
 
@@ -880,9 +880,9 @@ public sealed class AnnouncementController(
         if (string.IsNullOrWhiteSpace(id))
             return NotFound();
         if (string.IsNullOrWhiteSpace(model.Body))
-            ModelState.AddModelError(nameof(model.Body), "Body is required.");
+            ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.body_required", "Body is required."));
         if (!Enum.TryParse<AnnouncementScope>(model.Scope, out var scope))
-            ModelState.AddModelError(nameof(model.Scope), "Scope is required.");
+            ModelState.AddModelError(nameof(model.Scope), await this.FlashAsync("validation.scope_required", "Scope is required."));
 
         if (!ModelState.IsValid)
         {
