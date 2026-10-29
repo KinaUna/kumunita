@@ -34,4 +34,7 @@ forms, headings), then the main ones were looked at in the browser pane.
 ## Not changed / open
 - The admin settings forms (Site, Quiet, Signup, Messaging, ...) were not restyled: they render as single cards with
   readable fields on a phone. If a headed-section pass is wanted for them it is a separate step.
-- Dark mode of the faded strips was not checked (the mask is colour-independent).
+- Dark mode, checked afterwards (follow-up, no code change): Forest and Ember x light and dark at 390px with the strip scrolled
+  to the middle show both edge fades and clipped tab text; tab text contrast is 10.4-11.7:1 inactive and 5.9-10.8:1 active
+  in all four combinations. The tab outline (1.2-1.5:1) is decorative and text-labelled, as in ADR 0208. A screenshot taken
+  right after switching theme showed pale tabs; it was a mid-transition frame (computed backgrounds were already dark).
