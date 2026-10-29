@@ -151,8 +151,12 @@ $aBaseline = @(
 # keys x en/de/fr/da added to KnownTranslationKeys.cs (11859 -> 12091) — the
 # same shipped-additions mechanism as above; the gate's ceiling starts from
 # 12091 now.
+# Re-baselined again 2026-10-29 (the ADR 0260 guardian-rsvp-rows close): the
+# three new guardian.eventrsvp.desired_with / requested_at / attended_at keys
+# x en/de/fr/da added to KnownTranslationKeys.cs (12091 -> 12103) — the same
+# shipped-additions mechanism as above; the gate's ceiling starts from 12103 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 12091
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 12103
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926

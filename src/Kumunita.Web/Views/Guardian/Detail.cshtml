@@ -326,12 +326,27 @@
             string confirmApprove = "Approve this child's attendance on this event?";
             string confirmDeny = "Deny this child's attendance on this event? They will not be attending.";
             string confirmVeto = "Remove this child's attendance on this event? Their RSVP will be deleted.";
+            string desiredWith = "Wants to attend: {0}";
+            string requestedAt = "Requested {0}";
+            string attendedAt = "Attended {0}";
+            var rsvpLabels = new Dictionary<string, string>
+            {
+                [Kumunita.Core.Events.RsvpStatus.Going.ToString()] = "Going",
+                [Kumunita.Core.Events.RsvpStatus.Maybe.ToString()] = "Maybe",
+                [Kumunita.Core.Events.RsvpStatus.No.ToString()] = "No"
+            };
             if (Translation is not null)
             {
                 var effLang2 = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
                 confirmApprove = await Translation.GetAsync("guardian.eventrsvp.approve_confirm", effLang2);
                 confirmDeny   = await Translation.GetAsync("guardian.eventrsvp.deny_confirm", effLang2);
                 confirmVeto   = await Translation.GetAsync("guardian.eventrsvp.veto_confirm", effLang2);
+                desiredWith = await Translation.GetAsync("guardian.eventrsvp.desired_with", effLang2);
+                requestedAt = await Translation.GetAsync("guardian.eventrsvp.requested_at", effLang2);
+                attendedAt = await Translation.GetAsync("guardian.eventrsvp.attended_at", effLang2);
+                rsvpLabels[Kumunita.Core.Events.RsvpStatus.Going.ToString()] = await Translation.GetAsync("events.rsvp_status_going", effLang2);
+                rsvpLabels[Kumunita.Core.Events.RsvpStatus.Maybe.ToString()] = await Translation.GetAsync("events.rsvp_status_maybe", effLang2);
+                rsvpLabels[Kumunita.Core.Events.RsvpStatus.No.ToString()] = await Translation.GetAsync("events.rsvp_status_no", effLang2);
             }
         }
         <h2 class="mt-4"><kw-l key="guardian.eventrsvp.title">Event attendance</kw-l></h2>
@@ -422,8 +437,8 @@
                     {
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
-                                <span class="fw-semibold"><kw-l key="guardian.eventrsvp.desired">@(req.DesiredStatus.ToString())</kw-l></span>
-                                <span class="text-muted small d-block">Requested @req.RequestedAt</span>
+                                <span class="fw-semibold">@string.Format(desiredWith, rsvpLabels.GetValueOrDefault(req.DesiredStatus.ToString(), req.DesiredStatus.ToString()))</span>
+                                <span class="text-muted small d-block">@string.Format(requestedAt, req.RequestedAt)</span>
                             </div>
                             <div class="d-flex gap-2">
                                 <form method="post" action="@Url.Action("ApproveEventRsvp", "Guardian", new { childId = Model.ChildId, eventId = req.EventId })" data-confirm="@confirmApprove">
@@ -458,8 +473,8 @@
                     {
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
-                                <span class="fw-semibold"><kw-l key="guardian.eventrsvp.desired">@(rsvp.Status.ToString())</kw-l></span>
-                                <span class="text-muted small d-block">Attended @rsvp.At</span>
+                                <span class="fw-semibold">@rsvpLabels.GetValueOrDefault(rsvp.Status.ToString(), rsvp.Status.ToString())</span>
+                                <span class="text-muted small d-block">@string.Format(attendedAt, rsvp.At)</span>
                             </div>
                             <form method="post" action="@Url.Action("VetoEventRsvp", "Guardian", new { childId = Model.ChildId, eventId = rsvp.EventId })" data-confirm="@confirmVeto">
                                 @Html.AntiForgeryToken()
