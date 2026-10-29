@@ -101,6 +101,20 @@
                         &middot; @FormatSize(Model.Document.SizeBytes)
                     </div>
                 </div>
+                @* ADR 0239 D1 — the uploader's name (the document is the
+                   uploader's **official** publication, the ADR 0125 D1
+                   owner-reading). A missing / blocked profile degrades to the
+                   raw owner id (the PostsController feed shape — the view
+                   model's <c>OwnerName</c> field already carries the resolved
+                   name or the raw id). *@
+                <div class="row g-2 mt-1">
+                    <div class="col-sm-3 col-md-2 kmb-meta-label">
+                        <kw-l key="documents.detail.uploaded_by">Uploaded by</kw-l>
+                    </div>
+                    <div class="col-sm-9 col-md-10">
+                        @Model.OwnerName
+                    </div>
+                </div>
                 <div class="row g-2 mt-1">
                     <div class="col-sm-3 col-md-2 kmb-meta-label">
                         <kw-l key="documents.detail.updated">Last updated</kw-l>
@@ -109,12 +123,32 @@
                         <kw-dt dt="@(Model.Document.Modified ?? Model.Document.Created)" format="g"></kw-dt>
                     </div>
                 </div>
+                @* ADR 0239 D2 — show **who** last changed the document. The
+                   controller resolves <c>Model.ModifiedByName</c> to the
+                   owner's name when <c>Document.ModifiedById</c> is null (a
+                   pre-ADR-0239 document that has never been edited — the
+                   owner is the implicit last modifier). When the modifier is
+                   the same as the uploader, the row is redundant with the
+                   "Uploaded by" row above; we still render it (the date + name
+                   pair is the ADR 0125 D4 "set on a future replace" field,
+                   now exercised — and the name is the new D1 content). *@
+                @if (Model.ModifiedByName is { } modifierName)
+                {
+                    <div class="row g-2 mt-1">
+                        <div class="col-sm-3 col-md-2 kmb-meta-label">
+                            <kw-l key="documents.detail.last_modified_by">Last modified by</kw-l>
+                        </div>
+                        <div class="col-sm-9 col-md-10">
+                            @modifierName
+                        </div>
+                    </div>
+                }
             </div>
         </div>
 
-        @if (Model.CanDownload || Model.CanEdit)
+        @if (Model.CanDownload || Model.CanEdit || Model.CanDelete)
         {
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
                 @if (Model.CanDownload)
                 {
                     <a class="btn btn-primary" href="@(Model.DownloadUrl)">
@@ -129,6 +163,23 @@
                     <a class="btn btn-outline-secondary" href="@(Model.EditUrl)">
                         <kw-l key="documents.edit">Edit</kw-l>
                     </a>
+                }
+                @* ADR 0239 D6 — the owner-only delete affordance. Rendered only
+                   when the actor is the document's owner (CanDelete — the ADR
+                   0125 CanEdit shape); a non-owner never sees it (the ADR 0122
+                   D7 posture: the route's existence is not leaked). A plain
+                   form POST — the Posts/Detail.cshtml author-delete button
+                   shape (no confirm dialog, the route 404s for a non-owner).
+                   On success the controller redirects to the feed — the
+                   document is gone from the detail page by construction (D4). *@
+                @if (Model.CanDelete)
+                {
+                    <form method="post" action="/documents/@Model.Document.Id/delete">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger">
+                            <kw-l key="documents.delete">Delete</kw-l>
+                        </button>
+                    </form>
                 }
             </div>
         }

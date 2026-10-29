@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Kumunita.Web.Models;
 
 /// <summary>
@@ -12,7 +14,16 @@ public sealed record DocumentIndexViewModel(
     IReadOnlyList<Kumunita.Core.Documents.Document> Visible,
     bool HasMore,
     int Page,
-    bool CanUpload)
+    bool CanUpload,
+    // ADR 0239 D1 — the uploader's display name for each visible document
+    // (key = the document's <c>Id</c>, value = the <c>Profile.DisplayName</c>
+    // resolved through the <c>IUserInfoService.GetProfileAsync</c> read lane
+    // — the <c>PostsController</c> feed shape). A <c>document.Id</c> that is
+    // not in the dictionary degrades to the raw owner id in the view (the
+    // <c>profile?.DisplayName ?? post.AuthorId</c> shape). Empty when the
+    // <c>IUserInfoService</c> seam is absent (a test-construction site — the
+    // view falls back to the raw owner id for every row).
+    IDictionary<string, string> OwnerNames)
 {
     /// <summary>M26 U13 (D-SORT·5) — the one shared sort control (the U10
     /// _Sort reference, reused verbatim — C-SORT·1): the closed documents

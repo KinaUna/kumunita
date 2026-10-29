@@ -2581,6 +2581,15 @@ public static class KnownTranslationKeys
             ["documents.edit.submit"]       = "Save changes",
             ["documents.flash_edited"]      = "Document updated.",
 
+            // ADR 0239 — uploader attribution + the owner-only delete lane.
+            // D1: the "Uploaded by" + "Last modified by" meta rows on the
+            // detail page (the feed row carries the uploader's name inline, no
+            // dedicated key). D5/D6: the "Delete" button + the flash.
+            ["documents.detail.uploaded_by"]   = "Uploaded by",
+            ["documents.detail.last_modified_by"] = "Last modified by",
+            ["documents.delete"]              = "Delete",
+            ["documents.flash_deleted"]       = "Document deleted.",
+
             // The "documents organization" lane (tags + folders) — the
             // documents.folder_* / documents.tags.* keys + the flash keys for
             // the DocumentFolderController routes (create / rename / move /
@@ -5433,6 +5442,16 @@ public static class KnownTranslationKeys
             ["documents.edit.submit"]       = "Änderungen speichern",
             ["documents.flash_edited"]      = "Dokument aktualisiert.",
 
+            // ADR 0239 — Uploader-Zuordnung + die nur-für-den-Besitzer-
+            // Lösch-Lane. D1: die „Hochgeladen von" + „Zuletzt geändert von"
+            // -Zeilen auf der Detailseite (die Feed-Zeile trägt den Namen des
+            // Uploaders inline, kein eigener Key). D5/D6: der "Löschen"-Button
+            // + der Flash.
+            ["documents.detail.uploaded_by"]   = "Hochgeladen von",
+            ["documents.detail.last_modified_by"] = "Zuletzt geändert von",
+            ["documents.delete"]              = "Löschen",
+            ["documents.flash_deleted"]       = "Dokument gelöscht.",
+
             // Die "Dokumente organisieren"-Lane (Tags + Ordner) — die
             // documents.folder_* / documents.tags.*-Keys + die Flash-Keys der
             // DocumentFolderController-Routen (create / rename / move / delete /
@@ -8190,6 +8209,16 @@ public static class KnownTranslationKeys
             ["documents.edit.submit"]       = "Enregistrer les modifications",
             ["documents.flash_edited"]      = "Document mis à jour.",
 
+            // ADR 0239 — attribution de l'uploader + lane de suppression
+            // réservée au propriétaire. D1 : les lignes « Téléversé par » +
+            // « Dernière modification par » sur la page de détail (la ligne du
+            // flux porte le nom de l'uploader en ligne, pas de clé dédiée).
+            // D5/D6 : le bouton « Supprimer » + le flash.
+            ["documents.detail.uploaded_by"]   = "Téléversé par",
+            ["documents.detail.last_modified_by"] = "Dernière modification par",
+            ["documents.delete"]              = "Supprimer",
+            ["documents.flash_deleted"]       = "Document supprimé.",
+
             // La lane "organiser les documents" (tags + dossiers) — les clés
             // documents.folder_* / documents.tags.* + les clés flash des
             // routes DocumentFolderController (create / rename / move / delete /
@@ -10928,6 +10957,15 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Hvem kan se dette dokument",
             ["documents.edit.submit"]       = "Gem ændringer",
             ["documents.flash_edited"]      = "Dokument opdateret.",
+
+            // ADR 0239 — uploader-tildeling + kun-ejer-slet-lanen. D1: de to
+            // linjer «Uploadet af» + «Senest ændret af» på detailsiden (feed-
+            // linen bærer uploaderens navn inline, ingen dedikeret nøgle).
+            // D5/D6: "Slet"-knappen + flash.
+            ["documents.detail.uploaded_by"]   = "Uploadet af",
+            ["documents.detail.last_modified_by"] = "Senest ændret af",
+            ["documents.delete"]              = "Slet",
+            ["documents.flash_deleted"]       = "Dokument slettet.",
 
             // "Dokumenter organiseret"-lanen (tags + mapper) —
             // documents.folder_* / documents.tags.* nøgler + flash-nøglerne

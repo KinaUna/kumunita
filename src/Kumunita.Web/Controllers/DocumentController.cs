@@ -119,13 +119,39 @@ public sealed class DocumentController(
         // C-M21·3 shape. The view model never carries the hidden count (F1:
         // the feed does not leak "how many you cannot see").
         var result = await documents.ListAsync(actorId, page, sort: feedSort, pageSize: pageSize);
+        // ADR 0239 D1 — resolve the uploader's display name per row (the
+        // PostsController feed shape: a *display* lookup, never an
+        // AccessAudit subject — the audience decision is already made by
+        // ListAsync). One GetProfileAsync per **distinct owner** (a
+        // neighborhood's documents are usually shared across a handful of
+        // owners — the batch is by owner id, not by row). A missing /
+        // blocked profile degrades to the raw owner id (the
+        // profile?.DisplayName ?? post.AuthorId shape); a null
+        // IUserInfoService (a test-construction site) leaves the dictionary
+        // empty and the view falls back to the raw id for every row.
+        var ownerNames = new Dictionary<string, string>();
+        if (userInfo is not null)
+        {
+            var nameCache = new Dictionary<string, string>();
+            foreach (var d in result.Visible)
+            {
+                if (!nameCache.TryGetValue(d.OwnerId, out var name))
+                {
+                    var profile = await userInfo.GetProfileAsync(d.OwnerId);
+                    name = profile?.DisplayName is { Length: > 0 } dn ? dn : d.OwnerId;
+                    nameCache[d.OwnerId] = name;
+                }
+                ownerNames[d.Id] = name;
+            }
+        }
         var vm = new DocumentIndexViewModel(
             Visible: result.Visible,
             HasMore: result.HasMore,
             Page: result.Page,
             // D5 — the upload standing, resolved once at the boundary (the
             // view (U04) shows/hides the "Upload" link without re-resolving).
-            CanUpload: KumunitaPrincipal.IsGlobalAdmin(User) || KumunitaPrincipal.IsModerator(User));
+            CanUpload: KumunitaPrincipal.IsGlobalAdmin(User) || KumunitaPrincipal.IsModerator(User),
+            OwnerNames: ownerNames);
 
         // M26 U13 (D-SORT·5) — the one shared sort control (the U10 _Sort
         // reference, reused verbatim — C-SORT·1): the closed documents
@@ -218,6 +244,39 @@ public sealed class DocumentController(
             folderName = folder?.Name;
         }
 
+        // ADR 0239 D1 — resolve the uploader's + last-modifier's display
+        // names (the PostsController feed shape: a *display* lookup, never an
+        // AccessAudit subject). The uploader is Document.OwnerId (a required
+        // field); the last modifier is Document.ModifiedById — a
+        // <c>null</c> ModifiedById (a pre-ADR-0239 document that has never
+        // been edited through a Modified-stamping lane) degrades to the
+        // uploader, the owner is the implicit last modifier (ADR 0239 D1).
+        // A missing / blocked profile degrades to the raw id; a null
+        // IUserInfoService (a test-construction site) degrades to the raw id
+        // for both. **<c>ModifiedByName</c> is null when the modifier is the
+        // same subject as the uploader** (or when there is no modifier at
+        // all) — the detail view's "Last modified by" row is redundant with
+        // the "Uploaded by" row in that case (the date is still shown by
+        // the "Last updated" row), so the row is hidden.
+        string ownerName = result.Document.OwnerId;
+        string? modifiedByName = null;
+        if (userInfo is not null)
+        {
+            var ownerProfile = await userInfo.GetProfileAsync(result.Document.OwnerId);
+            ownerName = ownerProfile?.DisplayName is { Length: > 0 } oname ? oname : result.Document.OwnerId;
+            // A distinct modifier (not null, not the uploader): resolve its
+            // name. A null modifier or a modifier == uploader: leave
+            // modifiedByName null (the detail row is redundant with the
+            // "Uploaded by" row — the date is still shown by the "Last
+            // updated" row).
+            if (result.Document.ModifiedById is { } modifierId
+                && !string.Equals(modifierId, result.Document.OwnerId, StringComparison.Ordinal))
+            {
+                var modifierProfile = await userInfo.GetProfileAsync(modifierId);
+                modifiedByName = modifierProfile?.DisplayName is { Length: > 0 } mname ? mname : modifierId;
+            }
+        }
+
         var vm = new DocumentDetailViewModel(
             Document: result.Document,
             // The GetAsync decision allowed — the download re-runs the same Read
@@ -230,7 +289,11 @@ public sealed class DocumentController(
             // Organization (the "documents organization" lane).
             Tags: tagRows,
             FolderName: folderName,
-            FolderId: result.Document.FolderId);
+            FolderId: result.Document.FolderId,
+            // ADR 0239 — attribution + delete.
+            OwnerName: ownerName,
+            ModifiedByName: modifiedByName,
+            CanDelete: isOwner);
         return View("Detail", vm);
     }
 
@@ -400,6 +463,60 @@ public sealed class DocumentController(
 
         TempData["info"] = await T("documents.flash_edited");
         return Redirect($"/documents/{id}");
+    }
+
+    // ── POST /documents/{id}/delete — the owner-only soft-delete lane (ADR 0239) ──
+    //
+    // ADR 0239 (D3/D4/D5) — the owner (the uploader — Document.OwnerId) may
+    // remove the document from the community's repository. The record is kept
+    // (never hard-deleted): Document.DeletedAt + Document.DeletedById are
+    // stamped, and every read surface (feed, detail, download, search, note
+    // targets) hides it (D4). The gate is owner-only (D3) — a non-owner
+    // (including a non-owner GlobalAdmin) gets a 404 (not a 403 — the ADR
+    // 0122 D7 posture: the route's existence is not leaked). A second delete
+    // is idempotent (D4 — the ADR 0024 pin). No AccessAudit row (the ADR 0122
+    // §1.a A2 write-lane convention). On success, flash the closed
+    // documents.flash_deleted key and redirect to the feed — the document is
+    // gone from the detail page by construction (D4), so there is no detail
+    // page to land on.
+    [HttpPost("/documents/{id}/delete")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null) return Unauthorized();
+        if (!IsValidDocId(id))
+            return BadRequest("A document id is required.");
+
+        // ADR 0125 D1 — owner gate (re-checked on the write; the owner branch
+        // of the Read path passes for the owner). A non-owner is a 404 (not a
+        // 403 — the ADR 0122 D7 posture).
+        var result = await documents.GetAsync(id, subject).ConfigureAwait(false);
+        if (result.Document is null)
+            return NotFound();
+        if (!string.Equals(result.Document.OwnerId, subject, StringComparison.Ordinal))
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await documents.DeleteAsync(id, subject, session).ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            // Concurrent state change — the doc is gone (the ADR 0122 D7 posture).
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Defense in depth (the Core gate is authoritative; the owner gate
+            // above should have caught this first) — a 404, not a 403.
+            return NotFound();
+        }
+
+        TempData["info"] = await T("documents.flash_deleted");
+        return Redirect("/documents");
     }
 
     // ── GET /documents/new — the compose form (D5) ─────────────────────────

@@ -791,6 +791,82 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     }
 
     // ══════════════════════════════════════════════════════════════════════
+    // ADR 0239 — the owner-only soft-delete lane (POST /documents/{id}/delete)
+    // ══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// ADR 0239 D3/D5 — <c>POST /documents/{id}/delete</c> for a **non-owner**
+    /// returns <b>404</b> (not 403 — the ADR 0122 D7 posture: the route's
+    /// existence is not leaked). The controller's owner gate
+    /// (result.Document.OwnerId == subject) fails before the Core lane is
+    /// reached; the defense-in-depth pin maps a Core-level
+    /// <see cref="UnauthorizedAccessException"/> to the same 404.
+    /// </summary>
+    [Fact]
+    public async Task Delete_NonOwner_Returns_404_Not_403()
+    {
+        var doc = MakeDoc();
+        doc.OwnerId = "somebody-else"; // the actor is **not** the owner
+
+        var store = Substitute.For<IDocumentStore>();
+        var read = Substitute.For<IQuerySession>();
+        read.LoadAsync<Document>(DocId).Returns(doc);
+        store.QuerySession().Returns(read);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Actor, AccessAction.Read, Arg.Any<IAuditableResource>())
+            .Returns(Task.FromResult(new Decision(true, AccessVia.Owner, Actor)));
+
+        var docs = new DocumentService(Substitute.For<IUserInfoService>(), authz, store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(),
+            Options.Create(new MediaOptions()), store);
+        controller.ControllerContext = new ControllerContext { HttpContext = PrincipalHttpContext(new[] { "GlobalAdmin" }) };
+
+        var result = await controller.Delete(DocId);
+        Assert.IsType<NotFoundResult>(result); // 404, not 403 (D7 — no existence leak)
+    }
+
+    /// <summary>
+    /// ADR 0239 D3/D4/D5 — <c>POST /documents/{id}/delete</c> for the
+    /// **owner** delegates to <see cref="DocumentService.DeleteAsync"/> (which
+    /// stamps <see cref="Document.DeletedAt"/> + <see cref="Document
+    /// .DeletedById"/>) and **redirects to the feed** (<c>/documents</c>)
+    /// — the document is gone from the detail page by construction (D4: a
+    /// soft-deleted doc is indistinguishable from a missing one on the read
+    /// surfaces), so the flash + feed is the natural landing spot.
+    /// </summary>
+    [Fact]
+    public async Task Delete_Owner_Redirects_To_Feed()
+    {
+        var doc = MakeDoc();
+        doc.OwnerId = Actor; // the actor is the owner (the ADR 0125 D1 shape)
+
+        var store = Substitute.For<IDocumentStore>();
+        var read = Substitute.For<IQuerySession>();
+        read.LoadAsync<Document>(DocId).Returns(doc);
+        store.QuerySession().Returns(read);
+
+        var write = Substitute.For<IDocumentSession>();
+        write.LoadAsync<Document>(DocId).Returns(doc);
+        store.LightweightSession().Returns(write);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Actor, AccessAction.Read, Arg.Any<IAuditableResource>())
+            .Returns(Task.FromResult(new Decision(true, AccessVia.Owner, Actor)));
+
+        var docs = new DocumentService(Substitute.For<IUserInfoService>(), authz, store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(),
+            Options.Create(new MediaOptions()), store);
+        controller.ControllerContext = new ControllerContext { HttpContext = PrincipalHttpContext(new[] { "GlobalAdmin" }) };
+
+        var result = await controller.Delete(DocId);
+
+        // Redirects to the feed (the detail page is gone by construction, D4).
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/documents", redirect.Url);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     // fixtures
     // ══════════════════════════════════════════════════════════════════════
 

@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.75.0 entry (Kanban board card edit modal — ADR 0195) — 0.74.0 (Sample-data MFA lock) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.76.0 entry (Documents — uploader attribution + delete lane — ADR 0239) — 0.75.0 (Kanban board card edit modal) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,62 +69,36 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The Security-tab + MFA-pairing-QR lane (ADR 0174,
-        // 2026-10-26 — the per-resident MFA enrollment surface at
-        // /settings/security/mfa is now reachable under a first-class
-        // Security tab on the settings strip, and the enroll screen renders
-        // a server-side QR code to pair an authenticator app, the setup key
-        // + otpauth URI remaining as the manual fallback) is now the newest
-        // shipped (the 0.72.0 entry), so it is the head; the
-        // Report-targets lane (ADR 0173, 2026-10-27 — the "Report this …"
-        // lane now reaches events, projects, boards, to-dos, and group
-        // posts, the same standing the post/reply lanes have) 0.71.0 entry
-        // slides one row back; the Kiosk conditional-refresh lane (ADR 0164
-        // amendment, 2026-10-25 — the /kiosk display now skips a slide's
-        // iframe reload on a refresh tick whose content fingerprint is
-        // unchanged, the "kiosk reload is too disruptive" fix) 0.70.0 entry
-        // slides two rows back; the Page-level notes lane (ADR 0167
-        // amendment, 2026-10-25 — the ten `page-*` kinds join the M37
-        // closed set, the D3 write-lane check re-runs the owning surface's
-        // own frozen read for the group / project page kinds) 0.69.0 entry
-        // slides three rows back; the Prod-hardening lane (F1–F22,
-        // 2026-10-25 — the 2026-10-22 production-readiness audit's FAIL
-        // rows, closed as a *named lane* reusing no milestone letter; ADR
-        // 0171 Accepted — the two-role split reconciling ADR 0004 §B's
-        // boot-ownership invariant with DB-18's least-privilege
-        // requirement) 0.68.0 entry slides four rows back; the
-        // Bookmark-and-note-inventory-and-directory lane (ADR 0118 amendment
-        // + ADR 0167 extension, 2026-10-16) 0.67.0 entry slides three rows
-        // back; the Bookmark-projects-boards lane (ADR 0118 amendment,
-        // 2026-10-16) 0.66.0 entry slides four rows back; the first-day-of-week
-        // lane (ADR 0169) 0.65.0 entry; the Kiosk display-mode lane
-        // (ADR 0164 amendment) 0.64.0 entry; the Kiosk per-resident move
-        // (ADR 0164 amendment) 0.63.0 entry; the Bookmark-folders lane
-        // (ADR 0168) 0.62.0 entry; the M37 Personal-notes milestone
-        // (ADR 0167) 0.61.0 entry; the Events↔boards lane 0.60.0 entry; the
-        // ONB onboarding walk-through lane 0.59.0 entry; the M36 @mentions
-        // milestone (ADR 0165) 0.58.0 entry; the M35 kiosk-mode milestone
-        // (ADR 0164) 0.57.0 entry; the home upcoming events & to-dos lane
-        // (ADR 0163) 0.56.0 entry; the M34 (analytics history) milestone
-        // (ADR 0162) 0.55.0 entry; the ADR 0161 page-translation-standing
-        // lane 0.54.0 entry; the NESTED nested-help-guides lane (ADR 0160)
-        // 0.53.0 entry; the ESC escalation-authorization lane (ADR 0159)
-        // 0.52.0 entry; the LBL-2 surface-label-translation lane (ADR 0158)
-        // 0.51.0 entry; the SITE-2 hero-translation lane (ADR 0157) 0.50.0
-        // entry; the M33 (storage metrics history) 0.49.0 entry; the M32
-        // (issue submission & escalation) 0.48.0 entry.
+        // slides down. The Documents-uploader-attribution + delete-lane lane
+        // (ADR 0239, 2026-10-29 — the feed shows who uploaded each document,
+        // the detail page shows who last changed it, and the owner may
+        // soft-delete it — the ADR 0024 Post.DeletedAt shape carried to
+        // documents) is now the newest shipped (the 0.76.0 entry), so it is
+        // the head; the Kanban-board-card-edit-modal lane (ADR 0195,
+        // 2026-10-27) 0.75.0 entry slides one row back; the
+        // Sample-data-MFA-lock lane (ADR 0194, 2026-10-27) 0.74.0 entry
+        // slides two rows back; the Portability-import-modes lane (ADR 0193,
+        // 2026-10-27) 0.73.0 entry slides three rows back; and so on.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.75.0" && head.Date == "2026-10-27",
-            "The Kanban-board-card-edit-modal 0.75.0 (2026-10-27) entry must be the head of the registry; got "
+            head.Version == "0.76.0" && head.Date == "2026-10-29",
+            "The Documents-uploader-attribution + delete-lane 0.76.0 (2026-10-29) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("board", StringComparison.OrdinalIgnoreCase)
+            head.Changes.Any(c => c.Contains("Documents", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("Uploaded by", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0239", StringComparison.OrdinalIgnoreCase)),
+            "The 0.76.0 head entry must name the Documents-uploader-attribution + delete-lane + the ADR 0239.");
+
+        // The Kanban-board-card-edit-modal entry (0.75.0) slides one row back.
+        var kanbanBoardModal = WhatsNew.All.Single(v => v.Version == "0.75.0");
+        Assert.True(
+            kanbanBoardModal.Changes.Any(c => c.Contains("board", StringComparison.OrdinalIgnoreCase)
                                  && c.Contains("modal", StringComparison.OrdinalIgnoreCase)
                                  && c.Contains("ADR 0195", StringComparison.OrdinalIgnoreCase)),
-            "The 0.75.0 head entry must name the Kanban-board-card-edit-modal lane + the ADR 0195.");
+            "The 0.75.0 entry must name the Kanban-board-card-edit-modal lane + the ADR 0195.");
 
-        // The Sample-data-MFA-lock entry (0.74.0) slides one row back.
+        // The Sample-data-MFA-lock entry (0.74.0) slides two rows back.
         var sampleMfaLock = WhatsNew.All.Single(v => v.Version == "0.74.0");
         Assert.True(
             sampleMfaLock.Changes.Any(c => c.Contains("MFA", StringComparison.OrdinalIgnoreCase)
@@ -133,7 +107,7 @@ public sealed class WhatsNewTests
                                  && c.Contains("ADR 0194", StringComparison.OrdinalIgnoreCase)),
             "The 0.74.0 entry must name the Sample-data-MFA-lock lane + the ADR 0194.");
 
-        // The Portability-import-modes entry (0.73.0) slides one row back.
+        // The Portability-import-modes entry (0.73.0) slides three rows back.
         var portabilityImport = WhatsNew.All.Single(v => v.Version == "0.73.0");
         Assert.True(
             portabilityImport.Changes.Any(c => c.Contains("portability import modes", StringComparison.OrdinalIgnoreCase)
@@ -141,7 +115,7 @@ public sealed class WhatsNewTests
                                  && c.Contains("ADR 0193", StringComparison.OrdinalIgnoreCase)),
             "The 0.73.0 entry must name the Portability-import-modes lane + the ADR 0193.");
 
-        // The Security-tab + MFA-pairing-QR entry (0.72.0) slides two rows back.
+        // The Security-tab + MFA-pairing-QR entry (0.72.0) slides four rows back.
         var securityTab = WhatsNew.All.Single(v => v.Version == "0.72.0");
         Assert.True(
             securityTab.Changes.Any(c => c.Contains("Security", StringComparison.OrdinalIgnoreCase)

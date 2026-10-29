@@ -79,8 +79,13 @@ public sealed class DocumentService
         int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
+        // ADR 0239 D4 — soft-deleted documents are hidden from the feed
+        // (the ADR 0024 Post.DeletedAt feed pin carried to documents): the
+        // candidate query excludes them at the database layer, so they are
+        // neither in <c>Visible</c>, <c>HiddenCount</c>, nor <c>Total</c>.
         IQueryable<Document> q = session
-            .Query<Document>();
+            .Query<Document>()
+            .Where(d => d.DeletedAt == null);
         // M26 U7 (design doc §2.2 row 12, closed allowlist
         // created/modified/title/size; size → the non-null SizeBytes long):
         // null keeps the pinned OrderByDescending(Created) byte-for-byte
@@ -106,9 +111,11 @@ public sealed class DocumentService
             return new DocumentListResult(
                 Visible: Array.Empty<Document>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
 
-        // Candidate-set count (pre-decision), one CountAsync over the same query.
+        // Candidate-set count (pre-decision), one CountAsync over the same
+        // live-only query (ADR 0239 D4 — the same DeletedAt == null filter).
         int candidateCount = await session
             .Query<Document>()
+            .Where(d => d.DeletedAt == null)
             .CountAsync()
             .ConfigureAwait(false);
 
@@ -147,7 +154,11 @@ public sealed class DocumentService
 
         await using var session = _store.QuerySession();
         var doc = await session.LoadAsync<Document>(documentId).ConfigureAwait(false);
-        if (doc is null)
+        // ADR 0239 D4 — a soft-deleted document is indistinguishable from a
+        // missing one (the ADR 0122 D7 posture: the missing + the denied +
+        // the deleted cases all collapse to the **same** 404; the delete does
+        // not leak "there was once a document here" to a non-owner).
+        if (doc is null || doc.DeletedAt is not null)
             return new DocumentDetailResult(Document: null);
 
         var decision = await _authz
@@ -280,6 +291,12 @@ public sealed class DocumentService
             doc.SizeBytes = edit.SizeBytes;
         }
         doc.Modified = DateTimeOffset.UtcNow;
+        // ADR 0239 D2 — stamp who last changed the document (the actor is the
+        // owner by construction — the gate above already passed; the detail
+        // view resolves this to a display name, the PostsController feed
+        // shape). Pre-ADR-0239 documents read back null → the view falls
+        // back to the uploader.
+        doc.ModifiedById = actorId;
 
         session.Store(doc);
         await session.SaveChangesAsync().ConfigureAwait(false);
@@ -308,5 +325,58 @@ public sealed class DocumentService
         }
 
         return doc;
+    }
+
+    /// <summary>
+    /// The owner-only soft-delete write lane (ADR 0239 D3/D4): the **owner**
+    /// (the uploader — <see cref="Document.OwnerId"/>) of a document may
+    /// remove it from the community's repository. The record is **kept**
+    /// (never hard-deleted): <see cref="Document.DeletedAt"/> is stamped
+    /// (the ADR 0024 <see cref="Kumunita.Core.Posts.Post.DeletedAt"/> shape
+    /// carried to documents) and <see cref="Document.DeletedById"/> records
+    /// the acting subject. Every read surface (feed, detail, download,
+    /// search, note targets) hides a <c>DeletedAt != null</c> document
+    /// (ADR 0239 D4). A non-owner (including a non-owner GlobalAdmin) is a
+    /// hard <see cref="UnauthorizedAccessException"/> (the Web boundary
+    /// 404s; the ADR 0122 D7 posture: the delete route's existence is not
+    /// leaked to a non-owner). **No <c>AccessAudit</c> row** (the ADR 0122
+    /// §1.a A2 write-lane convention: writes are authenticated, not audience-
+    /// restricted reads — the audit row is the frozen <c>Read</c>-decision
+    /// path's job, not the write lane's).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The document id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the
+    /// document's owner.</exception>
+    public async Task DeleteAsync(string documentId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(documentId)) throw new ArgumentException("A document id is required.", nameof(documentId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting owner is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var doc = await session.LoadAsync<Document>(documentId).ConfigureAwait(false);
+        if (doc is null)
+            throw new KeyNotFoundException($"Document '{documentId}' was not found in the session; nothing to delete.");
+
+        // ADR 0239 D4 — idempotent: a second delete just moves DeletedAt
+        // forward (the ADR 0024 pin). No error, no state change beyond the
+        // stamp; the audit surface is the read path's job.
+        // (A doc that is already soft-deleted is indistinguishable from a
+        // missing one to a non-owner — the ADR 0122 D7 posture — but to the
+        // **owner** the idempotent stamp is the correct outcome: the owner
+        // can re-confirm the delete without a 404.)
+
+        // Owner-only gate (the ADR 0239 D3 — the ADR 0125 owner-reading
+        // carried to delete): only the owner may delete. A non-owner (including
+        // a non-owner GlobalAdmin — the ADR 0125 D1 "owner" reading is the
+        // uploader, not an elevated standing) throws before anything is
+        // written.
+        if (!string.Equals(doc.OwnerId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the owner of a document may delete it.");
+
+        doc.DeletedAt = DateTimeOffset.UtcNow;
+        doc.DeletedById = actorId;
+
+        session.Store(doc);
+        await session.SaveChangesAsync().ConfigureAwait(false);
     }
 }

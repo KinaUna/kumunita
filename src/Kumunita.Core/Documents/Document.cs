@@ -44,4 +44,42 @@ public sealed class Document
     /// rewrites this column to move a document between folders.
     /// </summary>
     public string? FolderId { get; set; }
+
+    // ── Attribution + soft-delete (ADR 0239) ─────────────────────────────────
+    /// <summary>
+    /// ADR 0239 D2 — the actor who last **changed** this document. Set to the
+    /// acting subject's id on every owner write lane that already stamps
+    /// <see cref="Modified"/>: <see cref="DocumentService.UpdateAsync"/> (the
+    /// ADR 0125 edit lane) and
+    /// <see cref="DocumentFolderService.MoveDocumentAsync"/> (the re-file
+    /// lane). <c>null</c> while the document is as-uploaded (the ADR 0122
+    /// M21 default, the ADR 0024 <c>DeletedAt</c> null-while-live shape) — a
+    /// pre-ADR-0239 document that has never been edited through a
+    /// <c>Modified</c>-stamping lane reads back <c>null</c>, and the detail
+    /// view resolves that to the **uploader** (the owner is the implicit
+    /// last modifier). Additive — Marten's schema builder picks up the new
+    /// field on the existing doc-type surface (ADR 0004 §B.1); zero migration
+    /// risk, zero seed reset.
+    /// </summary>
+    public string? ModifiedById { get; set; }
+
+    /// <summary>
+    /// ADR 0239 D4 — stamped when the **owner** soft-deletes this document;
+    /// <c>null</c> while it is live. The record is kept (never hard-deleted)
+    /// and read lanes (feed, detail, download, search, note targets) hide it —
+    /// the ADR 0024 <see cref="Kumunita.Core.Posts.Post.DeletedAt"/> shape
+    /// carried to documents. Additive — the ADR 0004 §B.1
+    /// no-reseed pin.
+    /// </summary>
+    public DateTimeOffset? DeletedAt { get; set; }
+
+    /// <summary>
+    /// ADR 0239 D4 — the actor who soft-deleted this document. A belt-and-
+    /// suspenders audit field (the <see cref="Kumunita.Core.Authorization.
+    /// AccessAudit"/> row already names the actor); it is kept so a future
+    /// admin-restore lane (the ADR 0024 pin, deferred) can record *who* took
+    /// the document down without scanning the audit table. Additive — ADR
+    /// 0004 §B.1.
+    /// </summary>
+    public string? DeletedById { get; set; }
 }
