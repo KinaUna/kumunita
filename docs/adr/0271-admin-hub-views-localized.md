@@ -23,3 +23,5 @@ headers, buttons, empty states and confirm/tooltip attributes.
 ## Not covered
 Not compiled or run (no .NET SDK here); de/fr/da text machine-written, review parked. Remaining admin-area English: AdminSite, AdminStorage, AdminSurfaceLabels, AdminHelp,
 AdminGuests, AdminStorageMetrics, AdminSetup, AdminQuiet, AdminPortability (next patch); Mfa and Sessions; admin page titles.
+
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 13243 -> 13575 on 2026-10-29 for the 84 new keys x en/de/fr/da of this lane (the ADR 0265/0266 shipped-additions mechanism).

@@ -21,3 +21,7 @@ smaller settings views AdminStorage, AdminSurfaceLabels, AdminHelp, AdminGuests,
 ## Not covered
 Not compiled or run (no .NET SDK here); de/fr/da text machine-written, review parked. Admin `ViewData["Title"]`s (e.g. "Admin — Site content") remain English.
 Remaining: Mfa and Sessions settings views, a handful of leftovers (Portability pages, MyDrafts, Moderation/Resolve, StaticPages/About, Layout), and the page titles.
+
+Compiled and run 2026-10-29 (build clean, 0 errors; Kumunita.Web.Tests 1156/0 failed, Kumunita.Core.Tests 1621/0 failed).
+
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 13575 -> 13975 on 2026-10-29 for the 100 new keys x en/de/fr/da of this lane (the ADR 0265/0266 shipped-additions mechanism).

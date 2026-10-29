@@ -198,9 +198,22 @@ $aBaseline = @(
 # 4 new validation.* keys (validation.folder_name_required / choose_image /
 # choose_file / document_id_required) x en/de/fr/da added to
 # KnownTranslationKeys.cs (13227 -> 13243) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 13243 now.
+# mechanism as above.
+# Re-baselined again 2026-10-29 (the ADR 0271 Admin-hub-views close): the
+# 84 new admin.hub.* / admin.platform.* / admin.communities.* /
+# admin.accounts.* / admin.manage.* / admin.security.* / admin.audit.* /
+# admin.errorreport.* / admin.breakglass.* / admin.escalation.* / common.* keys
+# x en/de/fr/da added to KnownTranslationKeys.cs (13243 -> 13575) — the same
+# shipped-additions mechanism as above.
+# Re-baselined again 2026-10-29 (the ADR 0272 AdminSite + settings-views close):
+# the 100 new admin.site.* / admin.storage.* / admin.labels.* / admin.help.* /
+# admin.guests.* / admin.storagemetrics.* / admin.setup.* / admin.quiet.* /
+# admin.portability.* / admin.breakglass.explainer / admin.security.audit_desc
+# keys x en/de/fr/da added to KnownTranslationKeys.cs (13575 -> 13975) — the
+# same shipped-additions mechanism as above; the gate's ceiling starts from
+# 13975 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 13243
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 13975
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
