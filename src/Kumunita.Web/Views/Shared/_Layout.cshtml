@@ -741,6 +741,8 @@
     <!-- Notice strip (ADR 0176): must load AFTER the per-notice dismissal
          modules (pinned, onboarding, whatsnew) so it sees their hidden state. -->
     <script type="module" src="~/js/lib/notice-strip.js"></script>
+    <!-- Phone sub-nav strips (ADR 0231): keeps the active tab in view and drives the edge fades. -->
+    <script type="module" src="~/js/lib/tab-strip.js"></script>
     <!-- What's-new "show more" (the VN lane, ADR 0110; see About.cshtml):
          reveals the hidden earlier releases in batches of 10 on click.
          Self-guards: no-op if the list has ≤3 entries (no button). -->

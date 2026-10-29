@@ -127,13 +127,14 @@
    and, for the four Page-backed surfaces, an edit link (id-based,
    /pages/{id}/edit — only when the slug resolved to a page id; `about` is a
    view, not a seeded page (ADR 0043 D1), so it is preview-only). *@
-<h3>Platform pages</h3>
+<h2 class="h3">Platform pages</h2>
 <p class="text-muted">
     The five pages a fresh instance ships with. "Preview" opens the page as
     residents see it; "Edit" opens the page editor (admins only). "About" is
     the product story — preview only.
 </p>
-<table class="table table-sm align-middle mb-4">
+@* ADR 0231 — below 576px palettes.css stacks each row into a card (kmb-stack-table). *@
+<table class="table table-sm align-middle mb-4 kmb-stack-table">
     <thead>
         <tr>
             <th>Surface</th>
@@ -166,7 +167,7 @@
             string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
             <tr>
                 <td class="fw-semibold">@(platformLabels.TryGetValue(row.Slug, out var label) ? label : row.Slug)</td>
-                <td><code>@row.Route</code></td>
+                <td data-label="Route"><code>@row.Route</code></td>
                 <td class="text-end d-inline-flex align-items-center gap-2 justify-content-end flex-wrap">
                     <a href="@row.Route" class="btn btn-sm btn-outline-secondary">Preview</a>
                     @if (row.PageId is not null)

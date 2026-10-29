@@ -119,7 +119,7 @@ else
                        remove, and the add-picker (non-member accounts). *@
                     <div id="users-@c.Id" style="display:none" class="border-top bg-light">
                         <div class="p-3">
-                            <h6 class="small mb-2">Members @(c.Mandatory ? "(mandatory — everyone in the neighborhood is a member; removal is not offered)" : "")</h6>
+                            <h2 class="h6 small mb-2">Members @(c.Mandatory ? "(mandatory — everyone in the neighborhood is a member; removal is not offered)" : "")</h2>
                             @if (c.Members.Count == 0)
                             {
                                 <div class="text-muted small">No explicit members — add one below.</div>

@@ -1485,6 +1485,8 @@ html[data-kmb-palette][data-kmb-theme='dark'] .form-select {
     padding-top: 0.5rem;
   }
   html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td.text-end > * { margin: 0 !important; }
+  /* ADR 0231: an action cell that also carries justify-content-end (Platform pages) starts at the left like the rest. */
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td.text-end { justify-content: flex-start !important; }
 }
 
 /* ==========================================================================
@@ -1560,4 +1562,26 @@ html[data-kmb-palette] .kmb-pal-choice:has(.kmb-pal-radio:focus-visible) { outli
 .kmb-post-bookmark-btn.is-on { color: var(--kmb-accent, var(--bs-primary)); }
 @media (pointer: coarse) {
   .kmb-post-bookmark-btn { min-width: 44px; min-height: 44px; }
+}
+
+/* ==========================================================================
+   ADR 0231 — phone sub-nav strips scroll in one row
+   Under 768px the tab strips (.kmb-tab-under-navbar: Account, Admin, Projects, Events,
+   Locale settings) no longer wrap into 2-5 rows; they scroll sideways with edge fades
+   (client/lib/tab-strip.ts sets --kmb-fade-l/-r and scrolls the active tab into view).
+   A strip that holds a dropdown menu is excluded (overflow would clip the menu).
+   ========================================================================== */
+@media (max-width: 767.98px) {
+  html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu)) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--kmb-fade-l, 0px), #000 calc(100% - var(--kmb-fade-r, 0px)), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 var(--kmb-fade-l, 0px), #000 calc(100% - var(--kmb-fade-r, 0px)), transparent 100%);
+  }
+  html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu))::-webkit-scrollbar { display: none; }
+  html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu)) > .nav-item { flex: 0 0 auto; }
+  html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu)) .nav-link { white-space: nowrap; }
 }
