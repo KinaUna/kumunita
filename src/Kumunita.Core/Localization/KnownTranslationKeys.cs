@@ -3140,6 +3140,64 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Full page (fill the browser window)",
             ["kiosk.settings.display_mode.full_screen"] = "Full screen (the whole monitor)",
             ["kiosk.settings.display_mode.hint"] = "Full page fills your browser window; full screen also hides the browser's tabs and address bar (a user gesture is needed to enter it).",
+            ["kiosk.settings.page_title"] =
+                "Kiosk settings",
+            ["kiosk.settings.intro"] =
+                "Configure your kiosk display: the ordered list of views it cycles through (top to bottom), and the two auto-cycle / auto-refresh cadences. This is your playlist — it only shapes what your own kiosk shows. To add a slide, pick a view in an empty slot. To remove one, set its view to — and save. To reorder, move a slide to a different slot. Then use “Preview the kiosk” below (signed in as you) to see it run.",
+            ["kiosk.settings.display_heading"] =
+                "Display",
+            ["kiosk.settings.view_interval_hint"] =
+                "The slide-advance cadence (seconds, ≥ 5). Default 30.",
+            ["kiosk.settings.refresh_interval_hint"] =
+                "The content-refresh cadence (seconds, ≥ 2, and less than the view interval). Default 10.",
+            ["kiosk.settings.playlist_heading"] =
+                "Playlist (top to bottom)",
+            ["kiosk.settings.col_view"] =
+                "View",
+            ["kiosk.settings.col_community"] =
+                "Community",
+            ["kiosk.settings.col_label"] =
+                "Label (optional)",
+            ["kiosk.settings.kind_none"] =
+                "— (none)",
+            ["kiosk.settings.kind_board"] =
+                "Board",
+            ["kiosk.settings.kind_calendar"] =
+                "Calendar",
+            ["kiosk.settings.kind_todos"] =
+                "To-dos",
+            ["kiosk.settings.cal_day"] =
+                "Day",
+            ["kiosk.settings.cal_week"] =
+                "Week",
+            ["kiosk.settings.cal_month"] =
+                "Month",
+            ["kiosk.settings.community_placeholder"] =
+                "(blank = all)",
+            ["kiosk.settings.aria_slide_view"] =
+                "Slide {0} view",
+            ["kiosk.settings.aria_slide_board"] =
+                "Slide {0} board",
+            ["kiosk.settings.aria_slide_calendar"] =
+                "Slide {0} calendar view",
+            ["kiosk.settings.aria_slide_community"] =
+                "Slide {0} community",
+            ["kiosk.settings.aria_slide_label"] =
+                "Slide {0} label",
+            ["kiosk.settings.tip"] =
+                "Tip: only the View column decides which of the other columns a slide uses — the rest are ignored for that slide. A row set to — is left out of the cycle.",
+            ["kiosk.settings.save"] =
+                "Save playlist",
+            ["kiosk.settings.preview"] =
+                "Preview the kiosk",
+            ["account.signup_bot_failed"] =
+                "The security check did not pass. Please try again.",
+            ["account.signup_domain_disallowed"] =
+                "The email domain for that address is not accepted for new accounts. Please use a permanent email address.",
+            ["account.signup_resend_prompt"] =
+                "Never got the confirmation email?",
+            ["account.signup_resend_link"] =
+                "Resend the confirmation email",
         };
 
     // ─────────────────────────────────────────────────────────────────────
@@ -6103,6 +6161,64 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Vollseite (Browserfenster füllen)",
             ["kiosk.settings.display_mode.full_screen"] = "Vollbild (der ganze Monitor)",
             ["kiosk.settings.display_mode.hint"] = "Vollseite füllt dein Browserfenster; Vollbild blendet zusätzlich die Browser-Tabs und die Adressleiste aus (zum Betreten ist eine Benutzeraktion erforderlich).",
+            ["kiosk.settings.page_title"] =
+                "Kiosk-Einstellungen",
+            ["kiosk.settings.intro"] =
+                "Richte deine Kiosk-Anzeige ein: die geordnete Liste der Ansichten, durch die sie wechselt (von oben nach unten), und die beiden Takte für automatischen Wechsel und Aktualisierung. Das ist deine Playlist — sie bestimmt nur, was dein eigener Kiosk zeigt. Um eine Folie hinzuzufügen, wähle in einem leeren Platz eine Ansicht. Um eine zu entfernen, setze ihre Ansicht auf — und speichere. Zum Umsortieren verschiebe eine Folie auf einen anderen Platz. Mit „Kiosk-Vorschau“ unten (als du angemeldet) siehst du sie laufen.",
+            ["kiosk.settings.display_heading"] =
+                "Anzeige",
+            ["kiosk.settings.view_interval_hint"] =
+                "Takt des Folienwechsels (Sekunden, ≥ 5). Standard 30.",
+            ["kiosk.settings.refresh_interval_hint"] =
+                "Takt der Inhaltsaktualisierung (Sekunden, ≥ 2 und kleiner als das Ansichtsintervall). Standard 10.",
+            ["kiosk.settings.playlist_heading"] =
+                "Playlist (von oben nach unten)",
+            ["kiosk.settings.col_view"] =
+                "Ansicht",
+            ["kiosk.settings.col_community"] =
+                "Community",
+            ["kiosk.settings.col_label"] =
+                "Beschriftung (optional)",
+            ["kiosk.settings.kind_none"] =
+                "— (keine)",
+            ["kiosk.settings.kind_board"] =
+                "Tafel",
+            ["kiosk.settings.kind_calendar"] =
+                "Kalender",
+            ["kiosk.settings.kind_todos"] =
+                "Aufgaben",
+            ["kiosk.settings.cal_day"] =
+                "Tag",
+            ["kiosk.settings.cal_week"] =
+                "Woche",
+            ["kiosk.settings.cal_month"] =
+                "Monat",
+            ["kiosk.settings.community_placeholder"] =
+                "(leer = alle)",
+            ["kiosk.settings.aria_slide_view"] =
+                "Folie {0} Ansicht",
+            ["kiosk.settings.aria_slide_board"] =
+                "Folie {0} Tafel",
+            ["kiosk.settings.aria_slide_calendar"] =
+                "Folie {0} Kalenderansicht",
+            ["kiosk.settings.aria_slide_community"] =
+                "Folie {0} Community",
+            ["kiosk.settings.aria_slide_label"] =
+                "Folie {0} Beschriftung",
+            ["kiosk.settings.tip"] =
+                "Tipp: Nur die Spalte „Ansicht“ entscheidet, welche der anderen Spalten eine Folie verwendet — die übrigen werden für diese Folie ignoriert. Eine Zeile mit — wird im Wechsel ausgelassen.",
+            ["kiosk.settings.save"] =
+                "Playlist speichern",
+            ["kiosk.settings.preview"] =
+                "Kiosk-Vorschau",
+            ["account.signup_bot_failed"] =
+                "Die Sicherheitsprüfung wurde nicht bestanden. Bitte versuche es erneut.",
+            ["account.signup_domain_disallowed"] =
+                "Die E-Mail-Domain dieser Adresse wird für neue Konten nicht akzeptiert. Bitte verwende eine dauerhafte E-Mail-Adresse.",
+            ["account.signup_resend_prompt"] =
+                "Keine Bestätigungs-E-Mail erhalten?",
+            ["account.signup_resend_link"] =
+                "Bestätigungs-E-Mail erneut senden",
 
             // ADR 0173 — the new report-target surfaces (the en-parity
             // extension, the posts.*-set shape above).
@@ -8987,6 +9103,64 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Page entière (remplir la fenêtre du navigateur)",
             ["kiosk.settings.display_mode.full_screen"] = "Plein écran (tout le moniteur)",
             ["kiosk.settings.display_mode.hint"] = "Page entière remplit votre fenêtre de navigateur ; plein écran masque aussi les onglets et la barre d'adresse du navigateur (une action de l'utilisateur est nécessaire pour l'activer).",
+            ["kiosk.settings.page_title"] =
+                "Paramètres du kiosque",
+            ["kiosk.settings.intro"] =
+                "Configurez l’affichage de votre kiosque : la liste ordonnée des vues qu’il fait défiler (de haut en bas) et les deux cadences de défilement et d’actualisation automatiques. C’est votre propre liste de lecture — elle ne façonne que ce que votre kiosque affiche. Pour ajouter une diapositive, choisissez une vue dans un emplacement vide. Pour en retirer une, mettez sa vue sur — et enregistrez. Pour réordonner, déplacez une diapositive vers un autre emplacement. Utilisez ensuite « Aperçu du kiosque » ci-dessous (connecté en tant que vous) pour la voir tourner.",
+            ["kiosk.settings.display_heading"] =
+                "Affichage",
+            ["kiosk.settings.view_interval_hint"] =
+                "Cadence de changement de diapositive (secondes, ≥ 5). Par défaut 30.",
+            ["kiosk.settings.refresh_interval_hint"] =
+                "Cadence d’actualisation du contenu (secondes, ≥ 2 et inférieure à l’intervalle de vue). Par défaut 10.",
+            ["kiosk.settings.playlist_heading"] =
+                "Liste de lecture (de haut en bas)",
+            ["kiosk.settings.col_view"] =
+                "Vue",
+            ["kiosk.settings.col_community"] =
+                "Communauté",
+            ["kiosk.settings.col_label"] =
+                "Libellé (facultatif)",
+            ["kiosk.settings.kind_none"] =
+                "— (aucune)",
+            ["kiosk.settings.kind_board"] =
+                "Tableau",
+            ["kiosk.settings.kind_calendar"] =
+                "Calendrier",
+            ["kiosk.settings.kind_todos"] =
+                "Tâches",
+            ["kiosk.settings.cal_day"] =
+                "Jour",
+            ["kiosk.settings.cal_week"] =
+                "Semaine",
+            ["kiosk.settings.cal_month"] =
+                "Mois",
+            ["kiosk.settings.community_placeholder"] =
+                "(vide = toutes)",
+            ["kiosk.settings.aria_slide_view"] =
+                "Diapositive {0} vue",
+            ["kiosk.settings.aria_slide_board"] =
+                "Diapositive {0} tableau",
+            ["kiosk.settings.aria_slide_calendar"] =
+                "Diapositive {0} vue calendrier",
+            ["kiosk.settings.aria_slide_community"] =
+                "Diapositive {0} communauté",
+            ["kiosk.settings.aria_slide_label"] =
+                "Diapositive {0} libellé",
+            ["kiosk.settings.tip"] =
+                "Astuce : seule la colonne « Vue » détermine laquelle des autres colonnes une diapositive utilise — les autres sont ignorées pour cette diapositive. Une ligne réglée sur — est omise du cycle.",
+            ["kiosk.settings.save"] =
+                "Enregistrer la liste",
+            ["kiosk.settings.preview"] =
+                "Aperçu du kiosque",
+            ["account.signup_bot_failed"] =
+                "La vérification de sécurité a échoué. Veuillez réessayer.",
+            ["account.signup_domain_disallowed"] =
+                "Le domaine de cette adresse e-mail n’est pas accepté pour les nouveaux comptes. Veuillez utiliser une adresse e-mail permanente.",
+            ["account.signup_resend_prompt"] =
+                "Vous n’avez pas reçu l’e-mail de confirmation ?",
+            ["account.signup_resend_link"] =
+                "Renvoyer l’e-mail de confirmation",
 
             // ADR 0173 — the new report-target surfaces (the en-parity
             // extension, the posts.*-set shape above).
@@ -11843,6 +12017,64 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.full_page"] = "Hele siden (fyld browservinduet)",
             ["kiosk.settings.display_mode.full_screen"] = "Fuldskærm (hele monitoren)",
             ["kiosk.settings.display_mode.hint"] = "Hele siden fylder dit browservindue; fuldskærm skjuler også browserens faner og adressefelt (det kræver en brugerhandling at aktivere).",
+            ["kiosk.settings.page_title"] =
+                "Kiosk-indstillinger",
+            ["kiosk.settings.intro"] =
+                "Indstil din kiosk-visning: den ordnede liste over visninger, den skifter mellem (oppefra og ned), og de to takter for automatisk skift og opdatering. Det er din egen afspilningsliste — den former kun, hvad din egen kiosk viser. For at tilføje et slide skal du vælge en visning i en tom plads. For at fjerne et skal du sætte dets visning til — og gemme. For at omarrangere skal du flytte et slide til en anden plads. Brug derefter “Forhåndsvis kiosken” nedenfor (logget ind som dig) for at se den køre.",
+            ["kiosk.settings.display_heading"] =
+                "Visning",
+            ["kiosk.settings.view_interval_hint"] =
+                "Takt for skift af slide (sekunder, ≥ 5). Standard 30.",
+            ["kiosk.settings.refresh_interval_hint"] =
+                "Takt for opdatering af indhold (sekunder, ≥ 2 og mindre end visningsintervallet). Standard 10.",
+            ["kiosk.settings.playlist_heading"] =
+                "Afspilningsliste (oppefra og ned)",
+            ["kiosk.settings.col_view"] =
+                "Visning",
+            ["kiosk.settings.col_community"] =
+                "Fællesskab",
+            ["kiosk.settings.col_label"] =
+                "Etiket (valgfri)",
+            ["kiosk.settings.kind_none"] =
+                "— (ingen)",
+            ["kiosk.settings.kind_board"] =
+                "Tavle",
+            ["kiosk.settings.kind_calendar"] =
+                "Kalender",
+            ["kiosk.settings.kind_todos"] =
+                "Opgaver",
+            ["kiosk.settings.cal_day"] =
+                "Dag",
+            ["kiosk.settings.cal_week"] =
+                "Uge",
+            ["kiosk.settings.cal_month"] =
+                "Måned",
+            ["kiosk.settings.community_placeholder"] =
+                "(tom = alle)",
+            ["kiosk.settings.aria_slide_view"] =
+                "Slide {0} visning",
+            ["kiosk.settings.aria_slide_board"] =
+                "Slide {0} tavle",
+            ["kiosk.settings.aria_slide_calendar"] =
+                "Slide {0} kalendervisning",
+            ["kiosk.settings.aria_slide_community"] =
+                "Slide {0} fællesskab",
+            ["kiosk.settings.aria_slide_label"] =
+                "Slide {0} etiket",
+            ["kiosk.settings.tip"] =
+                "Tip: Kun kolonnen “Visning” afgør, hvilke af de andre kolonner et slide bruger — de øvrige ignoreres for det slide. En række sat til — springes over i cyklussen.",
+            ["kiosk.settings.save"] =
+                "Gem afspilningsliste",
+            ["kiosk.settings.preview"] =
+                "Forhåndsvis kiosken",
+            ["account.signup_bot_failed"] =
+                "Sikkerhedstjekket blev ikke bestået. Prøv igen.",
+            ["account.signup_domain_disallowed"] =
+                "E-mail-domænet for den adresse accepteres ikke til nye konti. Brug en permanent e-mail-adresse.",
+            ["account.signup_resend_prompt"] =
+                "Fik du ikke bekræftelsesmailen?",
+            ["account.signup_resend_link"] =
+                "Send bekræftelsesmailen igen",
 
             // ADR 0173 — the new report-target surfaces (the en-parity
             // extension, the posts.*-set shape above).

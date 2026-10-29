@@ -146,8 +146,13 @@ $aBaseline = @(
 # announcements.pinned_tooltip) x en/de/fr/da added to KnownTranslationKeys.cs
 # (11835 -> 11859) — the same shipped-additions mechanism as above; the
 # gate's ceiling starts from 11859 now.
+# Re-baselined again 2026-10-29 (the ADR 0259 kiosk-settings/signup
+# localization close): the twenty-nine new kiosk.settings.* / account.signup_*
+# keys x en/de/fr/da added to KnownTranslationKeys.cs (11859 -> 12091) — the
+# same shipped-additions mechanism as above; the gate's ceiling starts from
+# 12091 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11859
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 12091
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
