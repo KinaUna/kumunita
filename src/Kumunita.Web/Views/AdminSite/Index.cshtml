@@ -1,6 +1,12 @@
 @model Kumunita.Web.Controllers.AdminSiteController.AdminSiteViewModel
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
+@using Kumunita.Web.Security
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _actionsLabel = Translation is null ? "Translation actions" : await Translation.GetAsync("admin.site.translation_actions", _aL);
+    var _removeConfirm = Translation is null ? "Remove this translation?" : await Translation.GetAsync("admin.site.remove_confirm", _aL);
+}
 @{
     var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _closeLang);
@@ -11,28 +17,21 @@
 
 <div class="mb-2"><a href="/admin" class="btn btn-link p-0">&larr; <kw-l key="nav.admin">Admin</kw-l></a></div>
 
-<h1 class="mt-2">Site content</h1>
+<h1 class="mt-2"><kw-l key="admin.platform.site_title">Site content</kw-l></h1>
 
 <p class="text-muted">
-    The copy and sections of the two landing surfaces — the home page
-    (<code>/</code>) and the about page (<code>/about</code>). Change the
-    hero text, or hide a section on either page. Save each page separately;
-    saving one does not touch the other.
-</p>
+    <kw-l key="admin.site.lede">The copy and sections of the two landing surfaces — the home page (/) and the about page (/about). Change the hero text, or hide a section on either page. Save each page separately; saving one does not touch the other.</kw-l></p>
 
-<h2 class="h5 mt-4">Appearance</h2>
+<h2 class="h5 mt-4"><kw-l key="admin.site.appearance">Appearance</kw-l></h2>
 <p class="text-muted">
-    The platform's default colour palette. Members see it until they pick their
-    own from the account menu, and it helps people who belong to several
-    platforms tell this one apart. Light/dark mode stays each member's choice.
-</p>
+    <kw-l key="admin.site.appearance_desc">The platform's default colour palette. Members see it until they pick their own from the account menu, and it helps people who belong to several platforms tell this one apart. Light/dark mode stays each member's choice.</kw-l></p>
 <form method="post" action="/admin/site/save-palette">
     @Html.AntiForgeryToken()
     @* ADR 0225 — two selectable cards instead of a <select> (a native option can't show a
        swatch). Same posted field (DefaultPalette), so the controller and its tests are
        unchanged; the preview is decorative (aria-hidden), the label text names the choice. *@
     <fieldset class="mb-3">
-        <legend class="form-label fs-6">Default palette</legend>
+        <legend class="form-label fs-6"><kw-l key="admin.site.default_palette">Default palette</kw-l></legend>
         <div class="kmb-pal-choices">
             @foreach (var pal in Kumunita.Web.Security.PaletteCookie.All)
             {
@@ -56,39 +55,36 @@
                 </label>
             }
         </div>
-        <div class="form-text">Each card shows the palette in light (left) and dark (right).</div>
+        <div class="form-text"><kw-l key="admin.site.palette_hint">Each card shows the palette in light (left) and dark (right).</kw-l></div>
     </fieldset>
-    <button type="submit" class="btn btn-primary">Save appearance</button>
+    <button type="submit" class="btn btn-primary"><kw-l key="admin.site.save_appearance">Save appearance</kw-l></button>
 </form>
 
 <hr />
 
-<h2 class="h5 mt-4">Home page (<code>/</code>)</h2>
+<h2 class="h5 mt-4"><kw-l key="admin.site.home_heading">Home page (/)</kw-l></h2>
 <p class="text-muted">
-    The hero eyebrow and lead, and which of the home page's sections are
-    shown. A hidden section is removed from the page entirely — visitors
-    and screen readers never see it.
-</p>
+    <kw-l key="admin.site.home_desc">The hero eyebrow and lead, and which of the home page's sections are shown. A hidden section is removed from the page entirely — visitors and screen readers never see it.</kw-l></p>
 
 <form method="post" action="/admin/site/save-home">
     @Html.AntiForgeryToken()
     <div class="mb-3">
-        <label for="HomeHeroEyebrow" class="form-label">Hero eyebrow</label>
+        <label for="HomeHeroEyebrow" class="form-label"><kw-l key="admin.site.hero_eyebrow">Hero eyebrow</kw-l></label>
         <input class="form-control" type="text" name="HomeHeroEyebrow" id="HomeHeroEyebrow" value="@Model.Home.HomeHeroEyebrow" />
     </div>
     <div class="mb-3">
-        <label for="HomeHeroLead" class="form-label">Hero lead</label>
+        <label for="HomeHeroLead" class="form-label"><kw-l key="admin.site.hero_lead">Hero lead</kw-l></label>
         <textarea class="form-control" name="HomeHeroLead" id="HomeHeroLead" rows="3">@Model.Home.HomeHeroLead</textarea>
     </div>
     <div class="mb-3">
-        <label for="HomeHeroSub1" class="form-label">Hero sub — scope line</label>
+        <label for="HomeHeroSub1" class="form-label"><kw-l key="admin.site.hero_scope_line">Hero sub — scope line</kw-l></label>
         <textarea class="form-control" name="HomeHeroSub1" id="HomeHeroSub1" rows="2">@Model.Home.HomeHeroSub1</textarea>
-        <span class="form-text text-muted">The first supporting line under the hero lead ("Kumunita started out as…").</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.hero_scope_hint">The first supporting line under the hero lead ("Kumunita started out as…").</kw-l></span>
     </div>
     <div class="mb-3">
-        <label for="HomeHeroSub2" class="form-label">Hero sub — FIG line</label>
+        <label for="HomeHeroSub2" class="form-label"><kw-l key="admin.site.hero_fig_line">Hero sub — FIG line</kw-l></label>
         <textarea class="form-control" name="HomeHeroSub2" id="HomeHeroSub2" rows="2">@Model.Home.HomeHeroSub2</textarea>
-        <span class="form-text text-muted">The second supporting line under the hero lead ("It is built on the Fractal Integration Guidelines…").</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.hero_fig_hint">The second supporting line under the hero lead ("It is built on the Fractal Integration Guidelines…").</kw-l></span>
     </div>
     @* The checkboxes use the repo's proven convention (the
        AdminGuestsController / LocaleController shape): a single checkbox
@@ -100,70 +96,68 @@
     <div class="mb-3">
         <label for="HomeShowAboutButton" class="form-label d-block">"What it is &amp; how it works" button</label>
         <input class="form-check-input" type="checkbox" name="HomeShowAboutButton" id="HomeShowAboutButton" value="true" @(Model.Home.HomeShowAboutButton ? "checked" : null) />
-        <span class="form-text text-muted">Show the hero's link to the about page.</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_about_link">Show the hero's link to the about page.</kw-l></span>
     </div>
     <div class="mb-3">
-        <label for="HomeShowFeatures" class="form-label d-block">Intro sections</label>
+        <label for="HomeShowFeatures" class="form-label d-block"><kw-l key="admin.site.intro_sections">Intro sections</kw-l></label>
         <input class="form-check-input" type="checkbox" name="HomeShowFeatures" id="HomeShowFeatures" value="true" @(Model.Home.HomeShowFeatures ? "checked" : null) />
-        <span class="form-text text-muted">Show the hero band and the feature cards together. Hiding them also hides the hero's eyebrow and lead.</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_hero_cards">Show the hero band and the feature cards together. Hiding them also hides the hero's eyebrow and lead.</kw-l></span>
     </div>
     <div class="mb-3">
         <label for="HomeShowRoadmap" class="form-label d-block">"The plan" section</label>
         <input class="form-check-input" type="checkbox" name="HomeShowRoadmap" id="HomeShowRoadmap" value="true" @(Model.Home.HomeShowRoadmap ? "checked" : null) />
-        <span class="form-text text-muted">Show the roadmap of what the platform ships next.</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_roadmap">Show the roadmap of what the platform ships next.</kw-l></span>
     </div>
-    <button type="submit" class="btn btn-primary">Save home page</button>
+    <button type="submit" class="btn btn-primary"><kw-l key="admin.site.save_home">Save home page</kw-l></button>
 </form>
 
 <hr />
 
-<h2 class="h5 mt-4">About page (<code>/about</code>)</h2>
+<h2 class="h5 mt-4"><kw-l key="admin.site.about_heading">About page (/about)</kw-l></h2>
 <p class="text-muted">
-    The hero eyebrow and lead, and which of the about page's sections are
-    shown. A hidden section is removed from the page entirely.
-</p>
+    <kw-l key="admin.site.about_desc">The hero eyebrow and lead, and which of the about page's sections are shown. A hidden section is removed from the page entirely.</kw-l></p>
 
 <form method="post" action="/admin/site/save-about">
     @Html.AntiForgeryToken()
     <div class="mb-3">
-        <label for="AboutHeroEyebrow" class="form-label">Hero eyebrow</label>
+        <label for="AboutHeroEyebrow" class="form-label"><kw-l key="admin.site.hero_eyebrow">Hero eyebrow</kw-l></label>
         <input class="form-control" type="text" name="AboutHeroEyebrow" id="AboutHeroEyebrow" value="@Model.About.AboutHeroEyebrow" />
     </div>
     <div class="mb-3">
-        <label for="AboutHeroLead" class="form-label">Hero lead</label>
+        <label for="AboutHeroLead" class="form-label"><kw-l key="admin.site.hero_lead">Hero lead</kw-l></label>
         <textarea class="form-control" name="AboutHeroLead" id="AboutHeroLead" rows="3">@Model.About.AboutHeroLead</textarea>
     </div>
     <div class="mb-3">
-        <label for="AboutShowFeatures" class="form-label d-block">Feature cards</label>
+        <label for="AboutShowFeatures" class="form-label d-block"><kw-l key="admin.site.feature_cards">Feature cards</kw-l></label>
         <input class="form-check-input" type="checkbox" name="AboutShowFeatures" id="AboutShowFeatures" value="true" @(Model.About.AboutShowFeatures ? "checked" : null) />
-        <span class="form-text text-muted">Show the three cards describing what the platform is.</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_feature_cards">Show the three cards describing what the platform is.</kw-l></span>
     </div>
     <div class="mb-3">
-        <label for="AboutShowScope" class="form-label d-block">Scope band</label>
+        <label for="AboutShowScope" class="form-label d-block"><kw-l key="admin.site.scope_band">Scope band</kw-l></label>
         <input class="form-check-input" type="checkbox" name="AboutShowScope" id="AboutShowScope" value="true" @(Model.About.AboutShowScope ? "checked" : null) />
-        <span class="form-text text-muted">Show the "one neighborhood" scope band.</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_scope_band">Show the "one neighborhood" scope band.</kw-l></span>
     </div>
     <div class="mb-3">
-        <label for="AboutShowPhilosophy" class="form-label d-block">Philosophy band</label>
+        <label for="AboutShowPhilosophy" class="form-label d-block"><kw-l key="admin.site.philosophy_band">Philosophy band</kw-l></label>
         <input class="form-check-input" type="checkbox" name="AboutShowPhilosophy" id="AboutShowPhilosophy" value="true" @(Model.About.AboutShowPhilosophy ? "checked" : null) />
-        <span class="form-text text-muted">Show the FIG-philosophy band (Fair, Invisible, Generous).</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_philosophy_band">Show the FIG-philosophy band (Fair, Invisible, Generous).</kw-l></span>
     </div>
     <div class="mb-3">
-        <label for="AboutShowProject" class="form-label d-block">Code &amp; docs band</label>
+        <label for="AboutShowProject" class="form-label d-block"><kw-l key="admin.site.code_docs_band">Code & docs band</kw-l></label>
         <input class="form-check-input" type="checkbox" name="AboutShowProject" id="AboutShowProject" value="true" @(Model.About.AboutShowProject ? "checked" : null) />
-        <span class="form-text text-muted">Show the links to the project's code and documentation.</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_code_docs">Show the links to the project's code and documentation.</kw-l></span>
     </div>
     <div class="mb-3">
         <label for="AboutShowWhatsNew" class="form-label d-block">"What's new" changelog</label>
         <input class="form-check-input" type="checkbox" name="AboutShowWhatsNew" id="AboutShowWhatsNew" value="true" @(Model.About.AboutShowWhatsNew ? "checked" : null) />
-        <span class="form-text text-muted">Show the list of recent changes.</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_recent_changes">Show the list of recent changes.</kw-l></span>
     </div>
     <div class="mb-3">
-        <label for="AboutShowContactCta" class="form-label d-block">Contact band</label>
+        <label for="AboutShowContactCta" class="form-label d-block"><kw-l key="admin.site.contact_band">Contact band</kw-l></label>
         <input class="form-check-input" type="checkbox" name="AboutShowContactCta" id="AboutShowContactCta" value="true" @(Model.About.AboutShowContactCta ? "checked" : null) />
-        <span class="form-text text-muted">Show the "something missing?" contact call-to-action.</span>
+        <span class="form-text text-muted"><kw-l key="admin.site.show_contact">Show the "something missing?" contact call-to-action.</kw-l></span>
     </div>
-    <button type="submit" class="btn btn-primary">Save about page</button>
+    <button type="submit" class="btn btn-primary"><kw-l key="admin.site.save_about">Save about page</kw-l></button>
 </form>
 
 <hr />
@@ -175,16 +169,9 @@
    hero field left blank on a translation row. Mirrors the post-translation
    lane (ADR 0022 / ADR 0048) — add a language, edit the existing row for a
    language, or remove it. Only enabled languages are offered. *@
-<h2 class="h5 mt-4">Hero text translations</h2>
+<h2 class="h5 mt-4"><kw-l key="admin.site.translations_heading">Hero text translations</kw-l></h2>
 <p class="text-muted">
-    Translate the two heroes' eyebrow and lead — and the home hero's two
-    supporting lines — into a resident's language. Use the language chips to
-    preview each version, and the ⋮ menu to add a translation (if a language is
-    missing), edit one (if it exists), or remove it. A resident reading the
-    site in that language sees the translated text on <code>/</code> and
-    <code>/about</code>; any field left blank falls back to the English text
-    saved above.
-</p>
+    <kw-l key="admin.site.translations_desc">Translate the two heroes' eyebrow and lead — and the home hero's two supporting lines — into a resident's language. Use the language chips to preview each version, and the ⋮ menu to add a translation (if a language is missing), edit one (if it exists), or remove it. A resident reading the site in that language sees the translated text on / and /about; any field left blank falls back to the English text saved above.</kw-l></p>
 
 @{
     // The set of enabled languages that already have a translation row (the
@@ -204,21 +191,21 @@
 
 <div data-td-group="site-hero" class="card">
     <div class="card-header d-flex justify-content-between align-items-center gap-2">
-        <span class="fw-semibold">Hero preview</span>
+        <span class="fw-semibold"><kw-l key="admin.site.hero_preview">Hero preview</kw-l></span>
         @* The ⋮ action surface (the posts/announcements ADR 0082 shape): add a
            translation (per missing enabled language), edit (per existing
            row), remove (per existing row). Edit / add each open a Bootstrap
            modal; remove is a confirm form in the menu. *@
         <div class="dropdown">
             <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
-                    data-bs-toggle="dropdown" aria-expanded="false" aria-label="Translation actions">⋮</button>
+                    data-bs-toggle="dropdown" aria-expanded="false" aria-label="@_actionsLabel">⋮</button>
             <ul class="dropdown-menu dropdown-menu-end">
                 @foreach (var lang in addable)
                 {
                     <li>
                         <button type="button" class="dropdown-item text-dark"
                                 data-bs-toggle="modal" data-bs-target="@($"#site-trans-add-{lang.Code}")">
-                            Add — <b>@LangName(lang.Code)</b>
+                            <kw-l key="admin.site.menu_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                         </button>
                     </li>
                 }
@@ -227,7 +214,7 @@
                     <li>
                         <button type="button" class="dropdown-item text-dark"
                                 data-bs-toggle="modal" data-bs-target="@($"#site-trans-edit-{t.LanguageCode}")">
-                            Edit — <b>@LangName(t.LanguageCode)</b>
+                            <kw-l key="admin.site.menu_edit">Edit</kw-l> — <b>@LangName(t.LanguageCode)</b>
                         </button>
                     </li>
                 }
@@ -238,11 +225,11 @@
                     {
                         <li>
                             <form method="post" action="/admin/site/translations/remove"
-                                  data-confirm="Remove this translation?" style="margin:0;">
+                                  data-confirm="@_removeConfirm" style="margin:0;">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="languageCode" value="@t.LanguageCode" />
                                 <button type="submit" class="dropdown-item text-danger">
-                                    Remove — <b>@LangName(t.LanguageCode)</b>
+                                    <kw-l key="admin.site.menu_remove">Remove</kw-l> — <b>@LangName(t.LanguageCode)</b>
                                 </button>
                             </form>
                         </li>
@@ -257,7 +244,7 @@
            and hides the rest. With JS off the default stays visible and every
            variant is present in the DOM (progressive enhancement). *@
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-            <span class="text-muted small fw-semibold">Language</span>
+            <span class="text-muted small fw-semibold"><kw-l key="common.language">Language</kw-l></span>
             <button type="button" class="badge text-bg-light border"
                     data-translation-chip data-td-group="site-hero" data-td-variant="@DefaultLang">
                 @LangName(DefaultLang)
@@ -281,37 +268,37 @@
                    shows the "(falls back to the English text saved above)"
                    placeholder in italics. *@
                 <div>
-                    <div class="text-muted small">Home hero — eyebrow</div>
+                    <div class="text-muted small"><kw-l key="admin.site.home_eyebrow">Home hero — eyebrow</kw-l></div>
                     <div class="@(string.IsNullOrWhiteSpace(Model.Home.HomeHeroEyebrow) ? "text-muted fst-italic" : "") mt-0">
                         @(!string.IsNullOrWhiteSpace(Model.Home.HomeHeroEyebrow) ? Model.Home.HomeHeroEyebrow : "(falls back to the English text saved above)")
                     </div>
                 </div>
                 <div>
-                    <div class="text-muted small">Home hero — lead</div>
+                    <div class="text-muted small"><kw-l key="admin.site.home_lead">Home hero — lead</kw-l></div>
                     <div class="@(string.IsNullOrWhiteSpace(Model.Home.HomeHeroLead) ? "text-muted fst-italic" : "") mt-0">
                         @(!string.IsNullOrWhiteSpace(Model.Home.HomeHeroLead) ? Model.Home.HomeHeroLead : "(falls back to the English text saved above)")
                     </div>
                 </div>
                 <div>
-                    <div class="text-muted small">Home hero — scope line</div>
+                    <div class="text-muted small"><kw-l key="admin.site.home_scope">Home hero — scope line</kw-l></div>
                     <div class="@(string.IsNullOrWhiteSpace(Model.Home.HomeHeroSub1) ? "text-muted fst-italic" : "") mt-0">
                         @(!string.IsNullOrWhiteSpace(Model.Home.HomeHeroSub1) ? Model.Home.HomeHeroSub1 : "(falls back to the English text saved above)")
                     </div>
                 </div>
                 <div>
-                    <div class="text-muted small">Home hero — FIG line</div>
+                    <div class="text-muted small"><kw-l key="admin.site.home_fig">Home hero — FIG line</kw-l></div>
                     <div class="@(string.IsNullOrWhiteSpace(Model.Home.HomeHeroSub2) ? "text-muted fst-italic" : "") mt-0">
                         @(!string.IsNullOrWhiteSpace(Model.Home.HomeHeroSub2) ? Model.Home.HomeHeroSub2 : "(falls back to the English text saved above)")
                     </div>
                 </div>
                 <div>
-                    <div class="text-muted small">About hero — eyebrow</div>
+                    <div class="text-muted small"><kw-l key="admin.site.about_eyebrow">About hero — eyebrow</kw-l></div>
                     <div class="@(string.IsNullOrWhiteSpace(Model.About.AboutHeroEyebrow) ? "text-muted fst-italic" : "") mt-0">
                         @(!string.IsNullOrWhiteSpace(Model.About.AboutHeroEyebrow) ? Model.About.AboutHeroEyebrow : "(falls back to the English text saved above)")
                     </div>
                 </div>
                 <div>
-                    <div class="text-muted small">About hero — lead</div>
+                    <div class="text-muted small"><kw-l key="admin.site.about_lead">About hero — lead</kw-l></div>
                     <div class="@(string.IsNullOrWhiteSpace(Model.About.AboutHeroLead) ? "text-muted fst-italic" : "") mt-0">
                         @(!string.IsNullOrWhiteSpace(Model.About.AboutHeroLead) ? Model.About.AboutHeroLead : "(falls back to the English text saved above)")
                     </div>
@@ -327,37 +314,37 @@
             <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none;">
                 <div class="d-flex flex-column gap-2">
                     <div>
-                        <div class="text-muted small">Home hero — eyebrow</div>
+                        <div class="text-muted small"><kw-l key="admin.site.home_eyebrow">Home hero — eyebrow</kw-l></div>
                         <div class="@(string.IsNullOrWhiteSpace(t.HomeHeroEyebrow) ? "text-muted fst-italic" : "") mt-0">
                             @(!string.IsNullOrWhiteSpace(t.HomeHeroEyebrow) ? t.HomeHeroEyebrow : "(falls back to the English text saved above)")
                         </div>
                     </div>
                     <div>
-                        <div class="text-muted small">Home hero — lead</div>
+                        <div class="text-muted small"><kw-l key="admin.site.home_lead">Home hero — lead</kw-l></div>
                         <div class="@(string.IsNullOrWhiteSpace(t.HomeHeroLead) ? "text-muted fst-italic" : "") mt-0">
                             @(!string.IsNullOrWhiteSpace(t.HomeHeroLead) ? t.HomeHeroLead : "(falls back to the English text saved above)")
                         </div>
                     </div>
                     <div>
-                        <div class="text-muted small">Home hero — scope line</div>
+                        <div class="text-muted small"><kw-l key="admin.site.home_scope">Home hero — scope line</kw-l></div>
                         <div class="@(string.IsNullOrWhiteSpace(t.HomeHeroSub1) ? "text-muted fst-italic" : "") mt-0">
                             @(!string.IsNullOrWhiteSpace(t.HomeHeroSub1) ? t.HomeHeroSub1 : "(falls back to the English text saved above)")
                         </div>
                     </div>
                     <div>
-                        <div class="text-muted small">Home hero — FIG line</div>
+                        <div class="text-muted small"><kw-l key="admin.site.home_fig">Home hero — FIG line</kw-l></div>
                         <div class="@(string.IsNullOrWhiteSpace(t.HomeHeroSub2) ? "text-muted fst-italic" : "") mt-0">
                             @(!string.IsNullOrWhiteSpace(t.HomeHeroSub2) ? t.HomeHeroSub2 : "(falls back to the English text saved above)")
                         </div>
                     </div>
                     <div>
-                        <div class="text-muted small">About hero — eyebrow</div>
+                        <div class="text-muted small"><kw-l key="admin.site.about_eyebrow">About hero — eyebrow</kw-l></div>
                         <div class="@(string.IsNullOrWhiteSpace(t.AboutHeroEyebrow) ? "text-muted fst-italic" : "") mt-0">
                             @(!string.IsNullOrWhiteSpace(t.AboutHeroEyebrow) ? t.AboutHeroEyebrow : "(falls back to the English text saved above)")
                         </div>
                     </div>
                     <div>
-                        <div class="text-muted small">About hero — lead</div>
+                        <div class="text-muted small"><kw-l key="admin.site.about_lead">About hero — lead</kw-l></div>
                         <div class="@(string.IsNullOrWhiteSpace(t.AboutHeroLead) ? "text-muted fst-italic" : "") mt-0">
                             @(!string.IsNullOrWhiteSpace(t.AboutHeroLead) ? t.AboutHeroLead : "(falls back to the English text saved above)")
                         </div>
@@ -385,7 +372,7 @@
                     <input type="hidden" name="languageCode" value="@lang.Code" />
                     <div class="modal-header">
                         <h5 class="modal-title" id="@($"site-trans-add-label-{lang.Code}")">
-                            Add — <b>@LangName(lang.Code)</b>
+                            <kw-l key="admin.site.menu_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                     </div>
@@ -393,26 +380,24 @@
                         @* Six hero fields, each optional (a blank one falls back
                            to the English text). Prefilled from the English
                            singleton as a starting point. *@
-                        <label class="form-label">Home hero — eyebrow <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.home_eyebrow">Home hero — eyebrow</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="homeHeroEyebrow" rows="2">@Model.Home.HomeHeroEyebrow</textarea>
-                        <label class="form-label">Home hero — lead <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.home_lead">Home hero — lead</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="homeHeroLead" rows="3">@Model.Home.HomeHeroLead</textarea>
-                        <label class="form-label">Home hero — scope line <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.home_scope">Home hero — scope line</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="homeHeroSub1" rows="2">@Model.Home.HomeHeroSub1</textarea>
-                        <label class="form-label">Home hero — FIG line <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.home_fig">Home hero — FIG line</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="homeHeroSub2" rows="2">@Model.Home.HomeHeroSub2</textarea>
-                        <label class="form-label">About hero — eyebrow <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.about_eyebrow">About hero — eyebrow</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="aboutHeroEyebrow" rows="2">@Model.About.AboutHeroEyebrow</textarea>
-                        <label class="form-label">About hero — lead <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.about_lead">About hero — lead</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control" name="aboutHeroLead" rows="3">@Model.About.AboutHeroLead</textarea>
                         <p class="form-text text-muted mt-2 mb-0">
-                            Leave a field blank to keep that hero in the English text
-                            saved above. At least one field is required.
-                        </p>
+                            <kw-l key="admin.site.hint_add">Leave a field blank to keep that hero in the English text saved above. At least one field is required.</kw-l></p>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary" form="@($"site-trans-add-form-{lang.Code}")">Add translation</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><kw-l key="common.cancel">Cancel</kw-l></button>
+                        <button type="submit" class="btn btn-primary" form="@($"site-trans-add-form-{lang.Code}")"><kw-l key="admin.site.add_translation">Add translation</kw-l></button>
                     </div>
                 </form>
             </div>
@@ -432,7 +417,7 @@
                     <input type="hidden" name="languageCode" value="@t.LanguageCode" />
                     <div class="modal-header">
                         <h5 class="modal-title" id="@($"site-trans-edit-label-{t.LanguageCode}")">
-                            Edit — <b>@LangName(t.LanguageCode)</b>
+                            <kw-l key="admin.site.menu_edit">Edit</kw-l> — <b>@LangName(t.LanguageCode)</b>
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                     </div>
@@ -440,26 +425,24 @@
                         @* Six hero fields, each optional (a blank one clears that
                            override → the English text is the fallback again).
                            Pre-filled from the existing row. *@
-                        <label class="form-label">Home hero — eyebrow <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.home_eyebrow">Home hero — eyebrow</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="homeHeroEyebrow" rows="2">@t.HomeHeroEyebrow</textarea>
-                        <label class="form-label">Home hero — lead <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.home_lead">Home hero — lead</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="homeHeroLead" rows="3">@t.HomeHeroLead</textarea>
-                        <label class="form-label">Home hero — scope line <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.home_scope">Home hero — scope line</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="homeHeroSub1" rows="2">@t.HomeHeroSub1</textarea>
-                        <label class="form-label">Home hero — FIG line <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.home_fig">Home hero — FIG line</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="homeHeroSub2" rows="2">@t.HomeHeroSub2</textarea>
-                        <label class="form-label">About hero — eyebrow <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.about_eyebrow">About hero — eyebrow</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control mb-3" name="aboutHeroEyebrow" rows="2">@t.AboutHeroEyebrow</textarea>
-                        <label class="form-label">About hero — lead <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label"><kw-l key="admin.site.about_lead">About hero — lead</kw-l> <span class="text-muted small">(optional)</span></label>
                         <textarea class="form-control" name="aboutHeroLead" rows="3">@t.AboutHeroLead</textarea>
                         <p class="form-text text-muted mt-2 mb-0">
-                            Leave a field blank to revert that hero to the English
-                            text saved above. At least one field is required.
-                        </p>
+                            <kw-l key="admin.site.hint_edit">Leave a field blank to revert that hero to the English text saved above. At least one field is required.</kw-l></p>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary" form="@($"site-trans-edit-form-{t.LanguageCode}")">Save translation</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><kw-l key="common.cancel">Cancel</kw-l></button>
+                        <button type="submit" class="btn btn-primary" form="@($"site-trans-edit-form-{t.LanguageCode}")"><kw-l key="admin.site.save_translation">Save translation</kw-l></button>
                     </div>
                 </form>
             </div>

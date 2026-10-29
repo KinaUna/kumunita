@@ -8,10 +8,7 @@
 <h1 class="mt-2"><kw-l key="admin.guests_title">Guest accounts</kw-l></h1>
 
 <p class="text-muted">
-    The limited, time-bounded standing an admin settles for a guest (a consultant, coach,
-    teacher, speaker, or similar outside-the-resident-circle account). A guest is never a full
-    member: they see only the surfaces you allow, for the window you set.
-</p>
+    <kw-l key="admin.guests.lede">The limited, time-bounded standing an admin settles for a guest (a consultant, coach, teacher, speaker, or similar outside-the-resident-circle account). A guest is never a full member: they see only the surfaces you allow, for the window you set.</kw-l></p>
 
 @if (!Model.HasStanding)
 {
@@ -25,12 +22,11 @@
 
     <div class="row g-3 mb-3">
         <div class="col-sm-12">
-            <label for="subjectId" class="form-label">Guest subject id</label>
+            <label for="subjectId" class="form-label"><kw-l key="admin.guests.subject_label">Guest subject id</kw-l></label>
             <input type="text" class="form-control" name="subjectId" id="subjectId"
                    value="@Model.SubjectId" required />
             <div class="form-text">
-                The guest account's subject id (the <c>SubjectId</c> of the <c>Profile</c> / <c>User</c> row for the account the guest signs in with). One allowance document per guest account.
-            </div>
+                <kw-l key="admin.guests.subject_hint">The guest account's subject id (the SubjectId of the Profile / User row for the account the guest signs in with). One allowance document per guest account.</kw-l></div>
         </div>
     </div>
 
@@ -40,16 +36,16 @@
         </legend>
         <div class="row g-3">
             <div class="col-sm-6">
-                <label for="validFrom" class="form-label small">From (inclusive)</label>
+                <label for="validFrom" class="form-label small"><kw-l key="admin.guests.from">From (inclusive)</kw-l></label>
                 <input type="datetime-local" class="form-control" name="validFrom" id="validFrom"
                        value="@Model.ValidFrom.ToString("yyyy-MM-ddTHH:mm")" required />
             </div>
             <div class="col-sm-6">
-                <label for="validUntil" class="form-label small">Until (exclusive)</label>
+                <label for="validUntil" class="form-label small"><kw-l key="admin.guests.until">Until (exclusive)</kw-l></label>
                 <input type="datetime-local" class="form-control" name="validUntil" id="validUntil"
                        value="@Model.ValidUntil.ToString("yyyy-MM-ddTHH:mm")" required />
                 <div class="form-text">
-                    The standing is live while <c>now ≥ From</c> and <c>now &lt; Until</c> — a guest outside that window has no standing.
+                    <kw-l key="admin.guests.window_hint">The standing is live from the From time up to, but not including, the Until time — a guest outside that window has no standing.</kw-l>
                 </div>
             </div>
         </div>
@@ -94,7 +90,7 @@
         @if (!Model.HasSurfaces)
         {
             <div class="form-text">
-                No surfaces selected — the guest signs in to a shell with no gated content (the least-privileged floor, not an error).
+                <kw-l key="admin.guests.no_surfaces">No surfaces selected — the guest signs in to a shell with no gated content (the least-privileged floor, not an error).</kw-l>
             </div>
         }
     </fieldset>
