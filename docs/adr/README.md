@@ -253,3 +253,4 @@ Decision / Consequences. New decisions take the next number.
 | 0242 | The document delete confirmation text says the document can be restored from Deleted documents (it said it could not be restored); amends ADR 0240 (keys, ADR). |
 | 0243 | The admin Audit table keeps cells on one line below 768px (new reusable class kmb-nowrap in palettes.css), so 32-character ids no longer wrap per character: rows 236px to 51px at 375px, table scrolls sideways (CSS, Razor, ADR). |
 | 0244 | Section cards on the last flat full-page forms: To-do New/Edit (Details, Status and dates, Organization, Audience), Page New/Edit (Details, Organization, Publishing) and Kiosk settings (Display, Playlist); existing `form.section_*` keys, no new keys, field names and ids unchanged. |
+| 0245 | The document list meta row (uploader, size, date) wraps between items instead of inside them on phones (nowrap per item, dot separators hidden below 576px); CSS only, scoped to `.kmb-doc-main`. |

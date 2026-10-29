@@ -1630,3 +1630,16 @@ html[data-kmb-palette] .accordion.kmb-faq .accordion-button:focus-visible {
   html[data-kmb-palette] .table.kmb-nowrap > thead > tr > th,
   html[data-kmb-palette] .table.kmb-nowrap > tbody > tr > td { white-space: nowrap; }
 }
+
+/* ==========================================================================
+   ADR 0245 — document list meta keeps each item whole on phones
+   The row is a flex line of name · size · date. Without wrap the three spans shrank and broke inside
+   themselves ("Alex / Admin", "30 / B"). Now each item stays on one line and the row wraps between items;
+   below 576px the dot separators (the even children) are hidden, so no dot dangles at a line end.
+   ========================================================================== */
+html[data-kmb-palette] .kmb-doc-main .airy-ann-meta { flex-wrap: wrap; column-gap: 0.5rem; row-gap: 0.125rem; }
+html[data-kmb-palette] .kmb-doc-main .airy-ann-meta > span { white-space: nowrap; }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-doc-main .airy-ann-meta { column-gap: 0.875rem; }
+  html[data-kmb-palette] .kmb-doc-main .airy-ann-meta > span:nth-child(even) { display: none; }
+}
