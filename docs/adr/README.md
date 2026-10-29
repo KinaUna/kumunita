@@ -244,3 +244,4 @@ Decision / Consequences. New decisions take the next number.
 | 0233 | A rejected document upload (blank title, no file, too large or over quota, wrong type) re-renders New/Edit with the same status and a localized error instead of a blank page; fixes the false "Mode field is required" alert on GET /documents/new (Razor/C#, keys, tests, ADR). |
 | 0234 | Sign-in lands on Home instead of /profile/edit; a recovery-code sign-in lands on the MFA settings; sign-up/verify unchanged (C#, tests, e2e, ADR). |
 | 0235 | site.css colour tokens collapse into light-dark() (64 tokens); dark scopes keep only rgb triplets and two dark-only tokens; verified by an old-vs-new computed-style diff (0 of 10,170 differ) (CSS, ADR). |
+| 0236 | site.css component dark patches collapse into light-dark() (base rules edited in place, one unified Bootstrap-utility block, two new :root tokens); 3,920 lines from 4,317; oracle diff shows only palette-accent-now-wins changes (CSS, ADR). |

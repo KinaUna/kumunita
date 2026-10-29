@@ -338,7 +338,7 @@ html[data-kmb-palette='ember'] .kmb-hero {
 html[data-kmb-palette='ember'] .kmb-hero::before {
   background: linear-gradient(180deg, rgba(26, 18, 10, 0.4), rgba(26, 18, 10, 0.25));
 }
-html[data-kmb-palette='ember'] .kmb-features-band { background-color: #2a1c10; }
+html[data-kmb-palette='ember'] .kmb-features-band { background-color: light-dark(#2a1c10, var(--kmb-band)); }
 html[data-kmb-palette='ember'] .kmb-cta-band {
   background-color: #3a2819;
   background-image: linear-gradient(120deg, #4d3621 0%, #2a1c10 100%);
@@ -1310,7 +1310,7 @@ html[data-kmb-palette] .navbar .navbar-nav .nav-link:not(.active):is(:hover, :fo
 html[data-kmb-palette] .navbar .navbar-nav .nav-link.active,
 html[data-kmb-palette] .navbar .dropdown-menu .dropdown-item.active {
   color: var(--kmb-accent) !important;
-  background: color-mix(in srgb, var(--kmb-accent) 14%, transparent);
+  background: light-dark(color-mix(in srgb, var(--kmb-accent) 14%, transparent), var(--kmb-tint-a));
 }
 html[data-kmb-palette] :is(.kmb-footer a, .kmb-rail-btn, .kmb-rail-expander, .kmb-nav-folded .navbar-nav .dropdown-item):is(:hover, :focus-visible) {
   color: var(--kmb-accent);

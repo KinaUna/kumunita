@@ -208,6 +208,8 @@
   --kmb-radius-pill: 999px;    /* buttons, chips, filter pills */
   --kmb-radius-input: 12px;    /* form fields */
   --kmb-surface: light-dark(#ffffff, #16241c);      /* card fill (light); dark scopes + palettes override */
+  --kmb-surface-2: light-dark(var(--bs-light-bg-subtle, #faf9f5), #1b2d24); /* nested / raised panels */
+  --kmb-band: light-dark(#142e22, #0c1510);   /* the features band (dark green in light, deeper than canvas in dark) */
   --kmb-card-pad-y: 1.5rem;    /* ADR 0175: 24px card padding, 16px gap */
   --kmb-card-pad-x: 1.5rem;
   --kmb-feed-gap: 1rem;
@@ -309,9 +311,6 @@ html[data-kmb-theme='dark'] { color-scheme: dark; }
     --bs-border-color-rgb: 38, 56, 47;
     --bs-link-color-rgb: 134, 201, 163;
     --bs-link-hover-color-rgb: 167, 218, 185;
-    /* dark-only component tokens (no light counterpart) */
-    --kmb-surface-2: #1b2d24;
-    --kmb-band: #0c1510;
   }
 }
 html[data-kmb-theme='dark'] {
@@ -353,497 +352,98 @@ html[data-kmb-theme='dark'] {
   --bs-border-color-rgb: 38, 56, 47;
   --bs-link-color-rgb: 134, 201, 163;
   --bs-link-hover-color-rgb: 167, 218, 185;
-  /* dark-only component tokens (no light counterpart) */
-  --kmb-surface-2: #1b2d24;
-  --kmb-band: #0c1510;
 }
 
-/* ---- Forest dark patches (auto scope) ------------------------------------
-   Re-points the hardcoded light literals + resolves the !important text
-   utilities. The html attribute scope gives each rule higher specificity
-   than the base (0,1,0) rules (which are declared later in this file), so
-   with !important on both sides the dark rule still wins. Do not wrap the
-   scope in :where() — that would zero its specificity and lose the tie. */
+/* ---- Forest dark patches (what light-dark() cannot express) ----------------
+   ADR 0236: colour patches moved to light-dark() on the base rules (or the
+   unified block below). What stays here is non-colour (images, filters) or
+   not yet matched to a light value. The html attribute scope gives each rule
+   higher specificity than the base (0,1,0) rules; do not wrap it in :where(). */
 @media (prefers-color-scheme: dark) {
-  /* White card / surface fills → dark surface */
-  html:not([data-kmb-theme='light']) .kmb-feat-card,
-  html:not([data-kmb-theme='light']) .kmb-nested-card,
-  html:not([data-kmb-theme='light']) .airy-ann-list,
-  html:not([data-kmb-theme='light']) .airy-post-card,
-  html:not([data-kmb-theme='light']) .airy-group-card,
-  html:not([data-kmb-theme='light']) .airy-page-list,
-  html:not([data-kmb-theme='light']) .dir-card,
-  html:not([data-kmb-theme='light']) .events-calendar-day,
-  html:not([data-kmb-theme='light']) .events-time-grid,
-  html:not([data-kmb-theme='light']) .kanban-card,
-  html:not([data-kmb-theme='light']) .kmb-rail {
-    background: var(--kmb-surface) !important;
-  }
-  html:not([data-kmb-theme='light']) .kmb-nested-card {
-    background: var(--kmb-surface-2) !important;
-  }
-  /* Features band — one step deeper than the canvas */
-  html:not([data-kmb-theme='light']) .kmb-features-band {
-    background-color: var(--kmb-band) !important;
-  }
-  /* Footer */
-  html:not([data-kmb-theme='light']) .kmb-footer {
-    background-color: var(--kmb-surface) !important;
-    color: var(--kmb-ink-soft) !important;
-    border-top-color: var(--kmb-border) !important;
-  }
-  /* Navbar: the bg-white bar + the !important-pinned brand */
-  html:not([data-kmb-theme='light']) .navbar.bg-white,
-  html:not([data-kmb-theme='light']) .bg-white {
-    background-color: var(--kmb-surface) !important;
-  }
-  html:not([data-kmb-theme='light']) .navbar-brand {
-    color: var(--kmb-cream) !important;
-  }
-  /* Toggler icon: Bootstrap's .navbar-light sets it to a dark stroke; flip it
-     to the cream text colour so it reads against the dark surface. */
   html:not([data-kmb-theme='light']) .navbar {
     --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28242, 246, 242, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
   }
-  html:not([data-kmb-theme='light']) .navbar-light .nav-link:hover,
-  html:not([data-kmb-theme='light']) .navbar-light .nav-link:focus {
-    color: var(--bs-primary-text-emphasis) !important;
-  }
-  /* Nav active highlight: the base rule's deep-pine text (#1c4532) and
-     translucent wash are near-invisible on the dark bar — re-point the text
-     to the light pine and the fill to the dark tint (the dropdown-item
-     hover fill, the house read for a selected menu row). */
-  html:not([data-kmb-theme='light']) .navbar .navbar-nav .nav-link.active,
-  html:not([data-kmb-theme='light']) .navbar .dropdown-menu .dropdown-item.active {
-    color: var(--bs-primary-text-emphasis) !important;
-    background-color: var(--kmb-tint-a) !important;
-  }
-  html:not([data-kmb-theme='light']) .kmb-rail-btn.active {
-    background: var(--kmb-tint-a) !important;
-    color: var(--bs-primary-text-emphasis) !important;
-  }
-  /* Two-tier tab strip: the active tab's white merge into the navbar */
-  html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-link.active,
-  html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-item.show .nav-link {
-    border-top-color: var(--kmb-surface) !important;
-    background-color: var(--kmb-surface) !important;
-    color: var(--bs-primary-text-emphasis) !important;
-  }
-  html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-link:hover,
-  html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-link:focus {
-    color: var(--bs-primary-text-emphasis) !important;
-  }
-  /* Rail-mode tooltip: bg is --kmb-ink (light in dark), so flip the text */
-  html:not([data-kmb-theme='light']) .kmb-rail-tip {
-    color: var(--kmb-ink) !important;
-  }
-  /* Full-screen surfaces (board + calendar) + their close button */
-  html:not([data-kmb-theme='light']) .kanban-board:fullscreen,
-  html:not([data-kmb-theme='light']) #events-calendar:fullscreen {
-    background: var(--bs-body-bg) !important;
-  }
-  html:not([data-kmb-theme='light']) .kanban-fullscreen-close,
-  html:not([data-kmb-theme='light']) .calendar-fullscreen-close {
-    background: var(--kmb-surface) !important;
-  }
-  /* Buttons: re-point the --bs-btn-* literals to the dark reads */
-  html:not([data-kmb-theme='light']) .btn-primary {
-    --bs-btn-bg: #2f6b4a; --bs-btn-border-color: #2f6b4a;
-    --bs-btn-hover-bg: #3a7d59; --bs-btn-hover-border-color: #3a7d59;
-    --bs-btn-active-bg: #356e50; --bs-btn-active-border-color: #356e50;
-    --bs-btn-disabled-bg: #2f6b4a; --bs-btn-disabled-border-color: #2f6b4a;
-  }
-  html:not([data-kmb-theme='light']) .btn-outline-primary {
-    --bs-btn-color: #86c9a3; --bs-btn-border-color: #4a7a5f;
-    --bs-btn-hover-color: #f2f6f2; --bs-btn-hover-bg: #2f6b4a; --bs-btn-hover-border-color: #2f6b4a;
-    --bs-btn-active-color: #f2f6f2; --bs-btn-active-bg: #2f6b4a; --bs-btn-active-border-color: #2f6b4a;
-    --bs-btn-disabled-color: #86c9a3; --bs-btn-disabled-border-color: #4a7a5f;
-  }
-  html:not([data-kmb-theme='light']) .btn-outline-secondary {
-    --bs-btn-color: #f0c97e; --bs-btn-border-color: #b5842e;
-    --bs-btn-hover-color: #17251d; --bs-btn-hover-bg: #f59e0b; --bs-btn-hover-border-color: #f59e0b;
-    --bs-btn-active-color: #17251d; --bs-btn-active-bg: #d6901f; --bs-btn-active-border-color: #d6901f;
-    --bs-btn-disabled-color: #f0c97e; --bs-btn-disabled-border-color: #b5842e;
-  }
-  /* The !important-pinned text utilities (the amber AA guard, .text-dark) */
-  html:not([data-kmb-theme='light']) .text-secondary {
-    color: var(--kmb-ink-soft) !important;
-  }
-  html:not([data-kmb-theme='light']) .text-muted,
-  html:not([data-kmb-theme='light']) .text-body-secondary {
-    color: var(--kmb-ink-soft) !important;
-  }
-  html:not([data-kmb-theme='light']) .text-dark {
-    color: var(--kmb-ink) !important;
-  }
-  html:not([data-kmb-theme='light']) .badge.text-bg-light {
-    background-color: var(--kmb-tint-a) !important;
-    color: var(--kmb-ink) !important;
-  }
-  /* .badge.text-dark (the draft/pending chips on amber, "pending" on light):
-     the token flip re-points --bs-dark-rgb to near-white, so the dark ink
-     would render on the amber fill — unreadable. Restore the real dark ink. */
-  html:not([data-kmb-theme='light']) .badge.text-dark {
-    color: #17251d !important;
-  }
-  /* .badge.text-bg-light.text-dark (the home milestone-status chip and the
-     notification-type chips): the token flip makes the text-bg-light fill
-     dark, and the .badge.text-dark dark-ink patch above (higher-or-equal
-     specificity, declared after the .badge.text-bg-light color fix) would
-     then leave dark ink on a dark fill — unreadable. Restore the readable
-     light ink the plain .badge.text-bg-light patch uses (higher specificity
-     than .badge.text-dark, so it wins; bg-warning/bg-light text-dark chips
-     are untouched — they don't carry .text-bg-light). */
-  html:not([data-kmb-theme='light']) .badge.text-bg-light.text-dark {
-    color: var(--kmb-ink) !important;
-  }
-  /* .badge.bg-light.text-dark (the Inventory ownerKind chips, Shared /
-     Community / Private): the token flip re-points --bs-light to a dark
-     fill, so the .badge.text-dark dark ink above would sit on a dark
-     surface — dark on dark. Re-point the text to the light emphasis ink
-     (higher specificity than .badge.text-dark, so it wins; the amber
-     bg-warning text-dark chips are untouched — they don't carry .bg-light). */
-  html:not([data-kmb-theme='light']) .badge.bg-light.text-dark {
-    background-color: var(--kmb-tint-a) !important;
-    color: var(--kmb-ink) !important;
-    border-color: var(--kmb-border);
-  }
-  /* .card.text-bg-light (the admin dashboard's count cards): the fill
-     re-resolves to the dark surface via the --bs-light token, but the text
-     stays Bootstrap's hard-coded black — unreadable on the dark fill.
-     Flip the text to the light emphasis ink. */
-  html:not([data-kmb-theme='light']) .card.text-bg-light {
-    color: var(--bs-light-emphasis) !important;
-  }
-  /* .badge.text-bg-dark (the "mandatory" community chip): the token flip
-     makes it a near-white chip with white text — a glaring bright block in
-     dark mode. Re-point it to a subtle dark chip with light text, matching
-     the .badge.text-bg-light patch above. */
-  html:not([data-kmb-theme='light']) .badge.text-bg-dark,
-  html:not([data-kmb-theme='light']) .badge.bg-dark {
-    background-color: var(--kmb-tint-a) !important;
-    color: var(--kmb-ink) !important;
-    border-color: var(--kmb-border);
-  }
-  /* Section lead text + the milestone-ID chip (both pinned to light-mode
-     dark-on-light colours: #46534b and #1c4532) — re-point to readable dark. */
-  html:not([data-kmb-theme='light']) .kmb-section-lead {
-    color: var(--kmb-ink-soft) !important;
-  }
-  html:not([data-kmb-theme='light']) .kmb-milestone-id {
-    color: var(--kmb-cream) !important;
-    background-color: rgba(134, 201, 163, 0.14) !important;
-  }
-  /* Feature-card icon glyphs: the base pins them to the light-mode deep pine
-     (#1c4532) and amber-brown (#8a5a12) — on the dark tint discs these read
-     too dark. Re-point to the dark accent reads so the glyphs lift off the disc. */
-  html:not([data-kmb-theme='light']) .kmb-feat-icon {
-    color: var(--bs-primary-text-emphasis) !important;
-  }
-  html:not([data-kmb-theme='light']) .kmb-feat-icon.kmb-feat-icon-warm {
-    color: var(--bs-secondary-text-emphasis) !important;
-  }
-  /* Feature-card body text: the base pins the paragraph to the light-mode
-     muted ink #46534b — on the dark card surface it reads too dark. Re-point
-     to the soft-ink read (the same muted read .kmb-footer / .text-muted use). */
-  html:not([data-kmb-theme='light']) .kmb-feat-card p {
-    color: var(--kmb-ink-soft) !important;
-  }
-  /* Pinned-announcement links: the base rule pins them to the light-mode
-     deep pine #1c4532, which on the dark banner fill reads DARKER than its
-     own background — nearly invisible. Re-point to a light pine (the
-     platform's own link-hover read) so the links lift off the dark fill. */
-  html:not([data-kmb-theme='light']) .kumunita-pinned-announcement .btn-link {
-    color: #a7dab9 !important;
-  }
-  /* Disabled pagination page-links keep Bootstrap's near-white default
-     (rgb(233,236,239) bg + near-white text) — washed out on the dark surface.
-     Darken the background to the tint and dim the text so it reads as
-     "disabled but present". Normal/active page-links already resolve from the
-     dark tokens (bg body-bg, link green) and need no patch. */
-  html:not([data-kmb-theme='light']) .page-item.disabled .page-link {
-    background-color: var(--kmb-tint-a) !important;
-    color: var(--kmb-muted) !important;
-    border-color: var(--kmb-border) !important;
-  }
-  /* Dropdown menus (the account menu / language list ride bg-white) */
-  html:not([data-kmb-theme='light']) .dropdown-menu {
-    background-color: var(--kmb-surface-2) !important;
-    border-color: var(--kmb-border) !important;
-  }
-  html:not([data-kmb-theme='light']) .dropdown-item {
-    color: var(--kmb-ink) !important;
-  }
-  html:not([data-kmb-theme='light']) .dropdown-item:hover,
-  html:not([data-kmb-theme='light']) .dropdown-item:focus {
-    background-color: var(--kmb-tint-a) !important;
-    color: var(--kmb-ink) !important;
-  }
-  /* .btn-close is a black SVG glyph by default — invisible on the dark
-     banner / toasts. Invert it to light (Bootstrap's own .btn-close-white
-     technique), scoped to dark only so light mode keeps the black glyph. */
   html:not([data-kmb-theme='light']) .btn-close {
     filter: invert(1) grayscale(100%) brightness(200%) !important;
   }
-  /* .link-light is a "light text on a dark/colored surface" utility (the
-     whats-new toast link on the primary-green toast). The dark token flip
-     re-points --bs-light-rgb to a dark green (#182720), so the link would
-     render dark-on-green — lower contrast than the surrounding near-white
-     toast text. Pin it to white so it keeps its light-on-dark meaning and
-     reads as a link against the primary surface. */
-  html:not([data-kmb-theme='light']) .link-light,
-  html:not([data-kmb-theme='light']) .link-light:hover,
-  html:not([data-kmb-theme='light']) .link-light:focus {
-    color: #fff !important;
-    -webkit-text-decoration-color: #fff !important;
-    text-decoration-color: #fff !important;
-  }
-  /* Off-position form switches: the unchecked track falls back to the dark
-     body-bg (#0f1a14) with a near-black knob — nearly invisible on the canvas.
-     Give the off track a visible dark-green fill + edge and a light knob so
-     the "off" state reads clearly (mirrors Bootstrap's own data-bs-theme=dark
-     switch patch, which this app never triggers since it keys on kmb-theme). */
   html:not([data-kmb-theme='light']) .form-switch .form-check-input:not(:checked):not(:focus) {
-    --bs-form-check-bg: #2a3a30;
-    border-color: #3d4a42;
     --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
-  }
-  /* Unchecked checkboxes on the dark canvas: the light-mode mid green would
-     read as a washed-out outline against #0f1a14. Re-pin to a brighter
-     dark-green edge (~3:1) so the "off" box is clearly present. */
-  html:not([data-kmb-theme='light']) .form-check-input:not(:checked):not(:focus) {
-    border-color: #4e6357 !important;
   }
 }
 
-/* ---- Forest dark patches (explicit-dark scope) ----------------------------
-   Identical patch list, keyed on html[data-kmb-theme='dark'] so the override
-   wins even when the OS is in light mode. */
-html[data-kmb-theme='dark'] .kmb-feat-card,
-html[data-kmb-theme='dark'] .kmb-nested-card,
-html[data-kmb-theme='dark'] .airy-ann-list,
-html[data-kmb-theme='dark'] .airy-post-card,
-html[data-kmb-theme='dark'] .airy-group-card,
-html[data-kmb-theme='dark'] .airy-page-list,
-html[data-kmb-theme='dark'] .dir-card,
-html[data-kmb-theme='dark'] .events-calendar-day,
-html[data-kmb-theme='dark'] .events-time-grid,
-html[data-kmb-theme='dark'] .kanban-card,
-html[data-kmb-theme='dark'] .kmb-rail {
-  background: var(--kmb-surface) !important;
-}
-html[data-kmb-theme='dark'] .kmb-nested-card {
-  background: var(--kmb-surface-2) !important;
-}
-html[data-kmb-theme='dark'] .kmb-features-band {
-  background-color: var(--kmb-band) !important;
-}
-html[data-kmb-theme='dark'] .kmb-footer {
-  background-color: var(--kmb-surface) !important;
-  color: var(--kmb-ink-soft) !important;
-  border-top-color: var(--kmb-border) !important;
-}
-html[data-kmb-theme='dark'] .navbar.bg-white,
-html[data-kmb-theme='dark'] .bg-white {
-  background-color: var(--kmb-surface) !important;
-}
-html[data-kmb-theme='dark'] .navbar-brand {
-  color: var(--kmb-cream) !important;
-}
-/* Toggler icon: flip Bootstrap's dark .navbar-light stroke to cream so it
-   reads against the dark surface (same fix as the auto dark scope). */
 html[data-kmb-theme='dark'] .navbar {
   --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28242, 246, 242, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
 }
-html[data-kmb-theme='dark'] .navbar-light .nav-link:hover,
-html[data-kmb-theme='dark'] .navbar-light .nav-link:focus {
-  color: var(--bs-primary-text-emphasis) !important;
-}
-/* Nav active highlight (explicit-dark scope): the light-pine text + the
-   dark tint fill (the auto-scope twin above). */
-html[data-kmb-theme='dark'] .navbar .navbar-nav .nav-link.active,
-html[data-kmb-theme='dark'] .navbar .dropdown-menu .dropdown-item.active {
-  color: var(--bs-primary-text-emphasis) !important;
-  background-color: var(--kmb-tint-a) !important;
-}
-html[data-kmb-theme='dark'] .kmb-rail-btn.active {
-  background: var(--kmb-tint-a) !important;
-  color: var(--bs-primary-text-emphasis) !important;
-}
-html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-link.active,
-html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-item.show .nav-link {
-  border-top-color: var(--kmb-surface) !important;
-  background-color: var(--kmb-surface) !important;
-  color: var(--bs-primary-text-emphasis) !important;
-}
-html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-link:hover,
-html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-link:focus {
-  color: var(--bs-primary-text-emphasis) !important;
-}
-html[data-kmb-theme='dark'] .kmb-rail-tip {
-  color: var(--kmb-ink) !important;
-}
-html[data-kmb-theme='dark'] .kanban-board:fullscreen,
-html[data-kmb-theme='dark'] #events-calendar:fullscreen {
-  background: var(--bs-body-bg) !important;
-}
-html[data-kmb-theme='dark'] .kanban-fullscreen-close,
-html[data-kmb-theme='dark'] .calendar-fullscreen-close {
-  background: var(--kmb-surface) !important;
-}
-html[data-kmb-theme='dark'] .btn-primary {
-  --bs-btn-bg: #2f6b4a; --bs-btn-border-color: #2f6b4a;
-  --bs-btn-hover-bg: #3a7d59; --bs-btn-hover-border-color: #3a7d59;
-  --bs-btn-active-bg: #356e50; --bs-btn-active-border-color: #356e50;
-  --bs-btn-disabled-bg: #2f6b4a; --bs-btn-disabled-border-color: #2f6b4a;
-}
-html[data-kmb-theme='dark'] .btn-outline-primary {
-  --bs-btn-color: #86c9a3; --bs-btn-border-color: #4a7a5f;
-  --bs-btn-hover-color: #f2f6f2; --bs-btn-hover-bg: #2f6b4a; --bs-btn-hover-border-color: #2f6b4a;
-  --bs-btn-active-color: #f2f6f2; --bs-btn-active-bg: #2f6b4a; --bs-btn-active-border-color: #2f6b4a;
-  --bs-btn-disabled-color: #86c9a3; --bs-btn-disabled-border-color: #4a7a5f;
-}
-html[data-kmb-theme='dark'] .btn-outline-secondary {
-  --bs-btn-color: #f0c97e; --bs-btn-border-color: #b5842e;
-  --bs-btn-hover-color: #17251d; --bs-btn-hover-bg: #f59e0b; --bs-btn-hover-border-color: #f59e0b;
-  --bs-btn-active-color: #17251d; --bs-btn-active-bg: #d6901f; --bs-btn-active-border-color: #d6901f;
-  --bs-btn-disabled-color: #f0c97e; --bs-btn-disabled-border-color: #b5842e;
-}
-html[data-kmb-theme='dark'] .text-secondary {
-  color: var(--kmb-ink-soft) !important;
-}
-html[data-kmb-theme='dark'] .text-muted,
-html[data-kmb-theme='dark'] .text-body-secondary {
-  color: var(--kmb-ink-soft) !important;
-}
-html[data-kmb-theme='dark'] .text-dark {
-  color: var(--kmb-ink) !important;
-}
-html[data-kmb-theme='dark'] .badge.text-bg-light {
-  background-color: var(--kmb-tint-a) !important;
-  color: var(--kmb-ink) !important;
-}
-/* .badge.text-dark (the draft/pending chips on amber, "pending" on light):
-   the token flip re-points --bs-dark-rgb to near-white, so the dark ink
-   would render on the amber fill — unreadable. Restore the real dark ink. */
-html[data-kmb-theme='dark'] .badge.text-dark {
-  color: #17251d !important;
-}
-/* .badge.text-bg-light.text-dark (the home milestone-status chip and the
-   notification-type chips): the token flip makes the text-bg-light fill
-   dark, and the .badge.text-dark dark-ink patch above (higher-or-equal
-   specificity, declared after the .badge.text-bg-light color fix) would
-   then leave dark ink on a dark fill — unreadable. Restore the readable
-   light ink the plain .badge.text-bg-light patch uses (higher specificity
-   than .badge.text-dark, so it wins; bg-warning/bg-light text-dark chips
-   are untouched — they don't carry .text-bg-light). */
-html[data-kmb-theme='dark'] .badge.text-bg-light.text-dark {
-  color: var(--kmb-ink) !important;
-}
-/* .badge.bg-light.text-dark (the Inventory ownerKind chips, Shared /
-   Community / Private): the token flip re-points --bs-light to a dark
-   fill, so the .badge.text-dark dark ink above would sit on a dark
-   surface — dark on dark. Re-point the text to the light emphasis ink
-   (higher specificity than .badge.text-dark, so it wins; the amber
-   bg-warning text-dark chips are untouched — they don't carry .bg-light). */
-html[data-kmb-theme='dark'] .badge.bg-light.text-dark {
-  background-color: var(--kmb-tint-a) !important;
-  color: var(--kmb-ink) !important;
-  border-color: var(--kmb-border);
-}
-/* .card.text-bg-light (the admin dashboard's count cards): dark fill +
-   Bootstrap's hard-coded black text — flip the text to the light ink. */
-html[data-kmb-theme='dark'] .card.text-bg-light {
-  color: var(--bs-light-emphasis) !important;
-}
-/* .badge.text-bg-dark (the "mandatory" community chip): re-point the
-   near-white chip with white text to a subtle dark chip with light text. */
-html[data-kmb-theme='dark'] .badge.text-bg-dark,
-html[data-kmb-theme='dark'] .badge.bg-dark {
-  background-color: var(--kmb-tint-a) !important;
-  color: var(--kmb-ink) !important;
-  border-color: var(--kmb-border);
-}
-/* Section lead text + the milestone-ID chip (light-mode dark colours) —
-   re-point to readable dark. */
-html[data-kmb-theme='dark'] .kmb-section-lead {
-  color: var(--kmb-ink-soft) !important;
-}
-html[data-kmb-theme='dark'] .kmb-milestone-id {
-  color: var(--kmb-cream) !important;
-  background-color: rgba(134, 201, 163, 0.14) !important;
-}
-/* Feature-card icon glyphs: the base pins them to the light-mode deep pine
-   (#1c4532) and amber-brown (#8a5a12) — on the dark tint discs these read
-   too dark. Re-point to the dark accent reads so the glyphs lift off the disc. */
-html[data-kmb-theme='dark'] .kmb-feat-icon {
-  color: var(--bs-primary-text-emphasis) !important;
-}
-html[data-kmb-theme='dark'] .kmb-feat-icon.kmb-feat-icon-warm {
-  color: var(--bs-secondary-text-emphasis) !important;
-}
-/* Feature-card body text: the base pins the paragraph to the light-mode
-   muted ink #46534b — on the dark card surface it reads too dark. Re-point
-   to the soft-ink read (the same muted read .kmb-footer / .text-muted use). */
-html[data-kmb-theme='dark'] .kmb-feat-card p {
-  color: var(--kmb-ink-soft) !important;
-}
-/* Pinned-announcement links: the base rule pins them to the light-mode
-   deep pine #1c4532 — nearly invisible on the dark banner fill. Re-point
-   to a light pine (the platform's own link-hover read). */
-html[data-kmb-theme='dark'] .kumunita-pinned-announcement .btn-link {
-  color: #a7dab9 !important;
-}
-/* Disabled pagination page-links (Bootstrap's near-white default) — darken. */
-html[data-kmb-theme='dark'] .page-item.disabled .page-link {
-  background-color: var(--kmb-tint-a) !important;
-  color: var(--kmb-muted) !important;
-  border-color: var(--kmb-border) !important;
-}
-html[data-kmb-theme='dark'] .dropdown-menu {
-  background-color: var(--kmb-surface-2) !important;
-  border-color: var(--kmb-border) !important;
-}
-html[data-kmb-theme='dark'] .dropdown-item {
-  color: var(--kmb-ink) !important;
-}
-html[data-kmb-theme='dark'] .dropdown-item:hover,
-html[data-kmb-theme='dark'] .dropdown-item:focus {
-  background-color: var(--kmb-tint-a) !important;
-  color: var(--kmb-ink) !important;
-}
-/* .btn-close is a black SVG glyph by default — invisible on the dark banner /
-   toasts. Invert it to light (Bootstrap's .btn-close-white technique). */
 html[data-kmb-theme='dark'] .btn-close {
   filter: invert(1) grayscale(100%) brightness(200%) !important;
 }
-/* .link-light — the "light text on a dark/colored surface" link utility (the
-   whats-new toast link on the primary-green toast). The dark token flip
-   re-points --bs-light-rgb to a dark green, so pin it to white to keep its
-   light-on-dark meaning and read as a link against the primary surface. */
-html[data-kmb-theme='dark'] .link-light,
-html[data-kmb-theme='dark'] .link-light:hover,
-html[data-kmb-theme='dark'] .link-light:focus {
-  color: #fff !important;
-  -webkit-text-decoration-color: #fff !important;
-  text-decoration-color: #fff !important;
-}
-/* Off-position form switches: a visible dark-green track + light knob so the
-   "off" state reads clearly (Bootstrap's own data-bs-theme=dark switch patch,
-   which this app never triggers since it keys on data-kmb-theme). */
 html[data-kmb-theme='dark'] .form-switch .form-check-input:not(:checked):not(:focus) {
-  --bs-form-check-bg: #2a3a30;
-  border-color: #3d4a42;
   --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
 }
-/* Unchecked checkboxes on the dark canvas: re-pin the light-mode mid green
-   to a brighter dark-green edge (~3:1) so the "off" box reads clearly.
-   !important because the light rule below it in the file wins the tie. */
-html[data-kmb-theme='dark'] .form-check-input:not(:checked):not(:focus) {
-  border-color: #4e6357 !important;
-}
 
-/* --- Base ----------------------------------------------------------------- */
+/* Utilities with no base rule in this file (Bootstrap's own): light-dark(<Bootstrap's value>, <token>). Non-!important where Bootstrap's is not. */
+html .navbar.bg-white { background-color: light-dark(rgba(var(--bs-white-rgb), var(--bs-bg-opacity)), var(--kmb-surface)) !important; }
+html .bg-white { background-color: light-dark(rgba(var(--bs-white-rgb), var(--bs-bg-opacity)), var(--kmb-surface)) !important; }
+html .kanban-fullscreen-close { background: light-dark(transparent, var(--kmb-surface)) !important; }
+html .calendar-fullscreen-close { background: light-dark(transparent, var(--kmb-surface)) !important; }
+html .text-muted { color: light-dark(var(--bs-secondary-color), var(--kmb-ink-soft)) !important; }
+html .text-body-secondary { color: light-dark(var(--bs-secondary-color), var(--kmb-ink-soft)) !important; }
+html .text-dark { color: light-dark(rgba(var(--bs-dark-rgb), var(--bs-text-opacity)), var(--kmb-ink)) !important; }
+html .badge.text-bg-light {
+  background-color: light-dark(RGBA(var(--bs-light-rgb), var(--bs-bg-opacity, 1)), var(--kmb-tint-a)) !important;
+  color: light-dark(#000, var(--kmb-ink)) !important;
+}
+html .badge.text-dark { color: light-dark(rgba(var(--bs-dark-rgb), var(--bs-text-opacity)), #17251d) !important; }
+html .badge.text-bg-light.text-dark { color: light-dark(rgba(var(--bs-dark-rgb), var(--bs-text-opacity)), var(--kmb-ink)) !important; }
+html .badge.bg-light.text-dark {
+  background-color: light-dark(rgba(var(--bs-light-rgb), var(--bs-bg-opacity)), var(--kmb-tint-a)) !important;
+  color: light-dark(rgba(var(--bs-dark-rgb), var(--bs-text-opacity)), var(--kmb-ink)) !important;
+  border-color: light-dark(currentcolor, var(--kmb-border));
+}
+html .card.text-bg-light { color: light-dark(#000, var(--bs-light-emphasis)) !important; }
+html .badge.text-bg-dark {
+  background-color: light-dark(RGBA(var(--bs-dark-rgb), var(--bs-bg-opacity, 1)), var(--kmb-tint-a)) !important;
+  color: light-dark(#fff, var(--kmb-ink)) !important;
+  border-color: light-dark(currentcolor, var(--kmb-border));
+}
+html .badge.bg-dark {
+  background-color: light-dark(rgba(var(--bs-dark-rgb), var(--bs-bg-opacity)), var(--kmb-tint-a)) !important;
+  color: light-dark(var(--bs-badge-color), var(--kmb-ink));
+  border-color: light-dark(currentcolor, var(--kmb-border));
+}
+html .page-item.disabled .page-link {
+  background-color: light-dark(var(--bs-pagination-disabled-bg), var(--kmb-tint-a));
+  color: light-dark(var(--bs-pagination-disabled-color), var(--kmb-muted));
+  border-color: light-dark(var(--bs-pagination-disabled-border-color), var(--kmb-border));
+}
+html .dropdown-menu {
+  background-color: light-dark(var(--bs-dropdown-bg), var(--kmb-surface-2));
+  border-color: light-dark(var(--bs-dropdown-border-color), var(--kmb-border));
+}
+html .dropdown-item { color: light-dark(var(--bs-dropdown-link-color), var(--kmb-ink)); }
+html .dropdown-item:hover {
+  background-color: light-dark(var(--bs-dropdown-link-hover-bg), var(--kmb-tint-a));
+  color: light-dark(var(--bs-dropdown-link-hover-color), var(--kmb-ink));
+}
+html .dropdown-item:focus {
+  background-color: light-dark(var(--bs-dropdown-link-hover-bg), var(--kmb-tint-a));
+  color: light-dark(var(--bs-dropdown-link-hover-color), var(--kmb-ink));
+}
+html .link-light {
+  color: light-dark(RGBA(var(--bs-light-rgb), var(--bs-link-opacity, 1)), #fff) !important;
+  -webkit-text-decoration-color: light-dark(RGBA(var(--bs-light-rgb), var(--bs-link-underline-opacity, 1)), #fff) !important;
+  text-decoration-color: light-dark(RGBA(var(--bs-light-rgb), var(--bs-link-underline-opacity, 1)), #fff) !important;
+}
+html .link-light:hover {
+  color: light-dark(RGBA(249, 250, 251, var(--bs-link-opacity, 1)), #fff) !important;
+  -webkit-text-decoration-color: light-dark(RGBA(249, 250, 251, var(--bs-link-underline-opacity, 1)), #fff) !important;
+  text-decoration-color: light-dark(RGBA(249, 250, 251, var(--bs-link-underline-opacity, 1)), #fff) !important;
+}
+html .link-light:focus {
+  color: light-dark(RGBA(249, 250, 251, var(--bs-link-opacity, 1)), #fff) !important;
+  -webkit-text-decoration-color: light-dark(RGBA(249, 250, 251, var(--bs-link-underline-opacity, 1)), #fff) !important;
+  text-decoration-color: light-dark(RGBA(249, 250, 251, var(--bs-link-underline-opacity, 1)), #fff) !important;
+}
 html {
   position: relative;
   min-height: 100%;
@@ -1254,7 +854,7 @@ body.kmb-kiosk .head-row > .d-flex {
   color: #17251d !important;
 }
 .text-secondary {
-  color: #8a5a12 !important;
+  color: light-dark(#8a5a12, var(--kmb-ink-soft)) !important;
 }
 .text-primary,
 .text-warning,
@@ -1291,19 +891,19 @@ body.kmb-kiosk .head-row > .d-flex {
 
 .btn-primary {
   --bs-btn-color: #f7f6f2;
-  --bs-btn-bg: #1c4532;
-  --bs-btn-border-color: #1c4532;
+  --bs-btn-bg: light-dark(#1c4532, #2f6b4a);
+  --bs-btn-border-color: light-dark(#1c4532, #2f6b4a);
   --bs-btn-hover-color: #f7f6f2;
-  --bs-btn-hover-bg: #173a2c;
-  --bs-btn-hover-border-color: #173a2c;
+  --bs-btn-hover-bg: light-dark(#173a2c, #3a7d59);
+  --bs-btn-hover-border-color: light-dark(#173a2c, #3a7d59);
   --bs-btn-focus-shadow-rgb: 28, 69, 50;
   --bs-btn-active-color: #f7f6f2;
-  --bs-btn-active-bg: #122b20;
-  --bs-btn-active-border-color: #122b20;
+  --bs-btn-active-bg: light-dark(#122b20, #356e50);
+  --bs-btn-active-border-color: light-dark(#122b20, #356e50);
   --bs-btn-active-shadow: inset 0 3px 5px rgba(19, 32, 26, 0.3);
   --bs-btn-disabled-color: #f7f6f2;
-  --bs-btn-disabled-bg: #1c4532;
-  --bs-btn-disabled-border-color: #1c4532;
+  --bs-btn-disabled-bg: light-dark(#1c4532, #2f6b4a);
+  --bs-btn-disabled-border-color: light-dark(#1c4532, #2f6b4a);
 }
 
 /* Amber CTA: dark ink text is the AA pair (white on amber fails). */
@@ -1325,35 +925,35 @@ body.kmb-kiosk .head-row > .d-flex {
 }
 
 .btn-outline-primary {
-  --bs-btn-color: #1c4532;
-  --bs-btn-border-color: #1c4532;
-  --bs-btn-hover-color: #f7f6f2;
-  --bs-btn-hover-bg: #1c4532;
-  --bs-btn-hover-border-color: #1c4532;
+  --bs-btn-color: light-dark(#1c4532, #86c9a3);
+  --bs-btn-border-color: light-dark(#1c4532, #4a7a5f);
+  --bs-btn-hover-color: light-dark(#f7f6f2, #f2f6f2);
+  --bs-btn-hover-bg: light-dark(#1c4532, #2f6b4a);
+  --bs-btn-hover-border-color: light-dark(#1c4532, #2f6b4a);
   --bs-btn-focus-shadow-rgb: 28, 69, 50;
-  --bs-btn-active-color: #f7f6f2;
-  --bs-btn-active-bg: #122b20;
-  --bs-btn-active-border-color: #122b20;
+  --bs-btn-active-color: light-dark(#f7f6f2, #f2f6f2);
+  --bs-btn-active-bg: light-dark(#122b20, #2f6b4a);
+  --bs-btn-active-border-color: light-dark(#122b20, #2f6b4a);
   --bs-btn-active-shadow: inset 0 3px 5px rgba(19, 32, 26, 0.3);
-  --bs-btn-disabled-color: #1c4532;
+  --bs-btn-disabled-color: light-dark(#1c4532, #86c9a3);
   --bs-btn-disabled-bg: transparent;
-  --bs-btn-disabled-border-color: #1c4532;
+  --bs-btn-disabled-border-color: light-dark(#1c4532, #4a7a5f);
 }
 
 .btn-outline-secondary {
-  --bs-btn-color: #8a5a12;
-  --bs-btn-border-color: #c98a2e;
+  --bs-btn-color: light-dark(#8a5a12, #f0c97e);
+  --bs-btn-border-color: light-dark(#c98a2e, #b5842e);
   --bs-btn-hover-color: #17251d;
   --bs-btn-hover-bg: #f59e0b;
   --bs-btn-hover-border-color: #f59e0b;
   --bs-btn-focus-shadow-rgb: 245, 158, 11;
   --bs-btn-active-color: #17251d;
-  --bs-btn-active-bg: #b45309;
-  --bs-btn-active-border-color: #b45309;
+  --bs-btn-active-bg: light-dark(#b45309, #d6901f);
+  --bs-btn-active-border-color: light-dark(#b45309, #d6901f);
   --bs-btn-active-shadow: inset 0 3px 5px rgba(90, 54, 10, 0.3);
-  --bs-btn-disabled-color: #8a5a12;
+  --bs-btn-disabled-color: light-dark(#8a5a12, #f0c97e);
   --bs-btn-disabled-bg: transparent;
-  --bs-btn-disabled-border-color: #c98a2e;
+  --bs-btn-disabled-border-color: light-dark(#c98a2e, #b5842e);
 }
 
 /* Lead paragraphs: serif body at a slightly larger size, used in the hero,
@@ -1370,7 +970,7 @@ body.kmb-kiosk .head-row > .d-flex {
   opacity: 0.9;
 }
 .kmb-section-lead {
-  color: #46534b;
+  color: light-dark(#46534b, var(--kmb-ink-soft));
 }
 
 /* A ghost link that reads well only on the dark green bands: keep local,
@@ -1419,7 +1019,7 @@ body.kmb-kiosk .head-row > .d-flex {
 .kmb-nested-card {
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius);
-  background: var(--bs-light-bg-subtle, #faf9f5);
+  background: light-dark(var(--bs-light-bg-subtle, #faf9f5), var(--kmb-surface-2));
 }
 
 /* --- Navbar ------------------------------------------------------------------ */
@@ -1432,7 +1032,7 @@ body.kmb-kiosk .head-row > .d-flex {
   font-family: var(--bs-heading-font-family);
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #1c4532 !important;
+  color: light-dark(#1c4532, var(--kmb-cream)) !important;
 }
 .navbar-light .nav-link {
   color: var(--kmb-ink-soft);
@@ -1440,12 +1040,12 @@ body.kmb-kiosk .head-row > .d-flex {
 }
 .navbar-light .nav-link:hover,
 .navbar-light .nav-link:focus {
-  color: #1c4532;
+  color: light-dark(#1c4532, var(--bs-primary-text-emphasis));
 }
 .navbar-light .navbar-nav .nav-link.active,
 .navbar .navbar-nav .nav-link.active,
 .navbar .dropdown-menu .dropdown-item.active {
-  color: #1c4532;
+  color: light-dark(#1c4532, var(--bs-primary-text-emphasis));
   font-weight: 600;
   /* The active-section wash (the navbar's current-page highlight): a subtle
      pine tint so the section the page belongs to — e.g. Community on
@@ -1453,7 +1053,7 @@ body.kmb-kiosk .head-row > .d-flex {
      glance. Transparent-mix keeps it correct on the white bar AND the dark
      dropdown alike; the higher specificity also wins the tie with the
      hover rule above, so the active item never reverts on hover. */
-  background: color-mix(in srgb, #1c4532 8%, transparent);
+  background: light-dark(color-mix(in srgb, #1c4532 8%, transparent), var(--kmb-tint-a));
   border-radius: 8px;
 }
 /* Vertically center each nav item in the bar so an icon-only item (the
@@ -1524,7 +1124,7 @@ body.kmb-kiosk .head-row > .d-flex {
 }
 .kmb-tab-under-navbar .nav-link:hover,
 .kmb-tab-under-navbar .nav-link:focus {
-  color: #1c4532;
+  color: light-dark(#1c4532, var(--bs-primary-text-emphasis));
   /* Keep the same U outline on hover/focus (don't let Bootstrap's hover
      border repaint the top) — the only change is the label going pine. */
   border-color: var(--bs-border-color);
@@ -1532,7 +1132,7 @@ body.kmb-kiosk .head-row > .d-flex {
 }
 .kmb-tab-under-navbar .nav-link.active,
 .kmb-tab-under-navbar .nav-item.show .nav-link {
-  color: #1c4532;
+  color: light-dark(#1c4532, var(--bs-primary-text-emphasis));
   font-weight: 600;
   /* Re-assert the U outline: Bootstrap's own .nav-tabs .nav-link.active
      rule (same specificity as this one, but ours must win as the later
@@ -1543,8 +1143,8 @@ body.kmb-kiosk .head-row > .d-flex {
   /* Open the top edge into the navbar (its bg is white) and give the tab
      the same white surface, so the active tab reads as one surface with
      the nav bar above it. */
-  border-top-color: #fff;
-  background-color: #fff;
+  border-top-color: light-dark(#fff, var(--kmb-surface));
+  background-color: light-dark(#fff, var(--kmb-surface));
   /* Slightly raised over the other tabs (the soft "hover" shadow — the
      design system's only small shadow). z-index keeps the shadow from
      being overpainted by the neighbouring links' backgrounds. */
@@ -1568,7 +1168,7 @@ body.kmb-kiosk .head-row > .d-flex {
   padding-bottom: 0.5rem;
 }
 .kumunita-pinned-announcement .btn-link {
-  color: #1c4532;
+  color: light-dark(#1c4532, #a7dab9);
   font-weight: 600;
 }
 
@@ -1826,7 +1426,7 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
   position: fixed;
   top: 0; left: 0; bottom: 0;
   width: var(--kmb-rail-w, 68px);
-  background: var(--bs-light-bg-subtle, #faf9f5);
+  background: light-dark(var(--bs-light-bg-subtle, #faf9f5), var(--kmb-surface));
   border-right: 1px solid var(--kmb-border);
   display: flex;
   flex-direction: column;
@@ -1878,7 +1478,7 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
    page's icon keeps its highlight on hover. */
 .kmb-rail-btn.active {
   background: var(--kmb-tint-a);
-  color: #1c4532;
+  color: light-dark(#1c4532, var(--bs-primary-text-emphasis));
 }
 .kmb-rail-tip {
   display: none;
@@ -1891,7 +1491,7 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
   white-space: nowrap;
   z-index: 20;
   background: var(--kmb-ink, #1a1a1a);
-  color: #fff;
+  color: light-dark(#fff, var(--kmb-ink));
   font-family: var(--bs-font-sans-serif);
   font-size: 0.8125rem;
   padding: 0.3rem 0.6rem;
@@ -2197,7 +1797,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   position: relative;
 }
 .kmb-features-band {
-  background-color: #142e22;
+  background-color: light-dark(#142e22, var(--kmb-band));
   padding-top: var(--kmb-space-section-sm);
   padding-bottom: 0.625rem; /* small breathing room below the cards */
 }
@@ -2210,7 +1810,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 }
 
 .kmb-feat-card {
-  background-color: #ffffff;
+  background-color: light-dark(#ffffff, var(--kmb-surface));
   border: 1px solid var(--kmb-border);
   border-radius: var(--bs-border-radius);
   padding: 1.5rem 1.75rem;
@@ -2225,11 +1825,11 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   place-items: center;
   margin-bottom: 1rem;
   background-color: var(--kmb-tint-a);
-  color: #1c4532;
+  color: light-dark(#1c4532, var(--bs-primary-text-emphasis));
 }
 .kmb-feat-icon.kmb-feat-icon-warm {
   background-color: var(--kmb-tint-b);
-  color: #8a5a12;
+  color: light-dark(#8a5a12, var(--bs-secondary-text-emphasis));
 }
 .kmb-feat-icon svg {
   width: 1.5rem;
@@ -2242,7 +1842,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 }
 .kmb-feat-card p {
   margin-bottom: 0;
-  color: #46534b; /* muted ink, still AA on white */
+  color: light-dark(#46534b, var(--kmb-ink-soft)); /* muted ink, still AA on white */
 }
 
 /* --- Roadmap list (home) ----------------------------------------------------------- */
@@ -2270,8 +1870,8 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: #1c4532;
-  background-color: rgba(28, 69, 50, 0.12);
+  color: light-dark(#1c4532, var(--kmb-cream));
+  background-color: light-dark(rgba(28, 69, 50, 0.12), rgba(134, 201, 163, 0.14));
   border-radius: 0.5rem;
   padding: 0.25rem 0.6rem;
   line-height: 1;
@@ -2333,10 +1933,10 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 
 /* --- Footer ------------------------------------------------------------------------- */
 .kmb-footer {
-  background-color: #f4f3ee;
+  background-color: light-dark(#f4f3ee, var(--kmb-surface));
   border-top: 1px solid var(--kmb-border);
   padding-block: 3rem 2rem;
-  color: #46534b;
+  color: light-dark(#46534b, var(--kmb-ink-soft));
 }
 .kmb-footer .navbar-brand {
   color: #1c4532 !important;
@@ -2372,8 +1972,12 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
    (#dde3dd — ~1.2:1 against the #fbfaf7 canvas), which reads as almost
    invisible. Pin a mid green (the light .kmb-hover-border) so the "off"
    box has a visible edge in light mode (the dark theme re-pins it below). */
-html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
-  border-color: #a3b2a8;
+html .form-check-input:not(:checked):not(:focus) {
+  border-color: light-dark(#a3b2a8, #4e6357);
+}
+/* Switch: the unchecked track/edge (the thumb image stays in the dark scopes, below). */
+html .form-switch .form-check-input:not(:checked):not(:focus) {
+  --bs-form-check-bg: light-dark(var(--bs-body-bg), #2a3a30);
 }
 .form-check-input:focus {
   border-color: #1c4532;
@@ -2794,7 +2398,7 @@ html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
 
 /* A: the announcements ledger — one bordered container, generous rows. */
 .airy-ann-list {
-  background: #fff;
+  background: light-dark(#fff, var(--kmb-surface));
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius-lg);
   overflow: hidden;
@@ -3146,7 +2750,7 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
   list-style: none;
   margin: 0;
   padding: 0;
-  background: #fff;
+  background: light-dark(#fff, var(--kmb-surface));
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius-lg);
   overflow: hidden;
@@ -3238,7 +2842,7 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
   gap: 1rem;
 }
 .dir-card {
-  background: #fff;
+  background: light-dark(#fff, var(--kmb-surface));
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius);
   padding: 1.5rem 1.25rem 1.125rem;
@@ -3431,7 +3035,7 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
   border: 0;
   border-top: 1px solid var(--kmb-border-soft);
   border-right: 1px solid var(--kmb-border-soft);
-  background: #fff;
+  background: light-dark(#fff, var(--kmb-surface));
   min-height: 4.5rem;
   min-width: 0;
   padding: 0.375rem 0.5rem;
@@ -3476,7 +3080,7 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
   grid-auto-rows: minmax(3rem, 1fr);
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius);
-  background: #fff;
+  background: light-dark(#fff, var(--kmb-surface));
   overflow: hidden;
 }
 /* Day (1-column) and Week (7-column) differ only in the .events-time-
@@ -3882,7 +3486,7 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
    on :focus AND :focus-within (the title link / dropdown toggle are
    inside it, so focus can land on either). */
 .kanban-card {
-  background: #fff;
+  background: light-dark(#fff, var(--kmb-surface));
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius-chip);
   padding: 0.5rem 0.75rem;
@@ -4013,7 +3617,7 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
   height: 100%;
   min-height: 100vh;
   overflow: auto;
-  background: #fff;
+  background: light-dark(#fff, var(--bs-body-bg));
   padding: 1rem;
 }
 /* 3 classes beats .btn's 2 (bootstrap.css loads after this file, and
@@ -4066,7 +3670,7 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
   height: 100%;
   min-height: 100vh;
   overflow-y: auto;
-  background: #fff;
+  background: light-dark(#fff, var(--bs-body-bg));
   padding: 1.5rem;
 }
 #events-calendar:fullscreen .events-calendar-grid {
