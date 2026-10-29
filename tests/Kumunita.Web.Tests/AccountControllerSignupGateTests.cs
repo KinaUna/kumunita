@@ -106,9 +106,44 @@ public class AccountControllerSignupGateTests
         Assert.IsType<SignupViewModel>(view.ViewData.Model);
     }
 
+    // ── Already-signed-in bounce (ADR 0238) ───────────────────
+
+    /// <summary>
+    /// Someone who is already signed in and opens sign-up or a verify link is not a
+    /// new resident: all three bounces land on Home. (The real post-verification
+    /// landing for a new resident stays /profile/edit — ADR 0234.)
+    /// </summary>
+    [Fact]
+    public async Task Signup_GET_AlreadySignedIn_RedirectsHome()
+    {
+        var (controller, identity) = Build(isOpen: true, signedIn: true);
+
+        var redirect = Assert.IsType<RedirectResult>(await controller.Signup());
+        Assert.Equal("/", redirect.Url);
+        await identity.DidNotReceive().IsSignupOpenAsync();
+    }
+
+    [Fact]
+    public async Task Verify_GET_AlreadySignedIn_RedirectsHome()
+    {
+        var (controller, _) = Build(isOpen: true, signedIn: true);
+
+        var redirect = Assert.IsType<RedirectResult>(await controller.Verify("any-id"));
+        Assert.Equal("/", redirect.Url);
+    }
+
+    [Fact]
+    public async Task Verify_POST_AlreadySignedIn_RedirectsHome()
+    {
+        var (controller, _) = Build(isOpen: true, signedIn: true);
+
+        var redirect = Assert.IsType<RedirectResult>(await controller.Verify(new VerifyViewModel()));
+        Assert.Equal("/", redirect.Url);
+    }
+
     // ── Harness ──────────────────────────────────────────────────────────
 
-    private static (AccountController controller, IIdentityService identity) Build(bool isOpen)
+    private static (AccountController controller, IIdentityService identity) Build(bool isOpen, bool signedIn = false)
     {
         var identity = Substitute.For<IIdentityService>();
         identity.IsSignupOpenAsync().Returns(isOpen);
@@ -132,7 +167,13 @@ public class AccountControllerSignupGateTests
         // first and never reaches `User` on the closed branch.
         controller.ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal() },
+            HttpContext = new DefaultHttpContext
+            {
+                User = signedIn
+                    ? new ClaimsPrincipal(new ClaimsIdentity(
+                        new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, "resident-1") }, "test"))
+                    : new ClaimsPrincipal(),
+            },
         };
 
         return (controller, identity);

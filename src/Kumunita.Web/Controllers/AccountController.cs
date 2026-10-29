@@ -431,7 +431,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Signup()
     {
         if (User.Identity?.IsAuthenticated == true)
-            return Redirect("/profile/edit");
+            return Redirect("/");   // ADR 0238 — already signed in: Home, not the new-resident profile step
 
         // ADR 0050 — the sign-up gate (the admin-settled instance value, the
         // `false` floor — a fresh instance ships invitation-only). Closed → the
@@ -587,7 +587,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Verify([FromQuery] string id)
     {
         if (User.Identity?.IsAuthenticated == true)
-            return Redirect("/profile/edit");
+            return Redirect("/");   // ADR 0238 — already signed in: Home, not the new-resident profile step
 
         var (token, errorModel) = await LoadUsableVerifyTokenAsync(id);
         if (token is null)
@@ -610,7 +610,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Verify(VerifyViewModel model)
     {
         if (User.Identity?.IsAuthenticated == true)
-            return Redirect("/profile/edit");
+            return Redirect("/");   // ADR 0238 — already signed in: Home, not the new-resident profile step
 
         // The POST carries the token row id back in the model (the form's hidden
         // input) — the child lane re-submits to the same link.
