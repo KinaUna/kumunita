@@ -256,7 +256,7 @@ public sealed class GroupsController(
             description: description,
             isPrivate: model.IsPrivate);
 
-        TempData["info"] = $"Group “{group.Name}” created.";
+        TempData["info"] = await this.FlashAsync("groups.flash_created", "Group “{0}” created.", group.Name);
         return RedirectToAction(nameof(Index));
     }
 
@@ -649,7 +649,7 @@ public sealed class GroupsController(
             userId: subjectId!,
             addedBy: resolved.Actor);
 
-        TempData["info"] = $"Added a member to “{resolved.Group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_member_added", "Added a member to “{0}”.", resolved.Group.Name);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -705,7 +705,7 @@ public sealed class GroupsController(
             userId: subjectId!,
             removedBy: resolved.Actor);
 
-        TempData["info"] = $"Removed {subjectId} from “{resolved.Group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_member_removed", "Removed {0} from “{1}”.", subjectId, resolved.Group.Name);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -752,7 +752,7 @@ public sealed class GroupsController(
             userId: resolved.Actor,
             removedBy: resolved.Actor);
 
-        TempData["info"] = $"You have left “{resolved.Group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_left", "You have left “{0}”.", resolved.Group.Name);
         return RedirectToAction(nameof(Index));
     }
 
@@ -804,12 +804,12 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Detail), new { id });
         }
         if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
         {
-            TempData["error"] = "A translation needs a name and/or description.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_name_or_description", "A translation needs a name and/or description.");
             return RedirectToAction(nameof(Detail), new { id });
         }
 
@@ -843,7 +843,7 @@ public sealed class GroupsController(
 
         var catalog = await localization.ListLanguagesAsync();
         var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
-        TempData["info"] = $"Translation added ({langName}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", langName);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -877,12 +877,12 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Detail), new { id });
         }
         if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
         {
-            TempData["error"] = "A translation needs a name and/or description.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_name_or_description", "A translation needs a name and/or description.");
             return RedirectToAction(nameof(Detail), new { id });
         }
 
@@ -913,7 +913,7 @@ public sealed class GroupsController(
         }
 
         var name2 = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name2}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name2);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -939,7 +939,7 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Detail), new { id });
         }
 
@@ -963,7 +963,7 @@ public sealed class GroupsController(
         }
 
         var name2 = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name2}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name2);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1007,8 +1007,8 @@ public sealed class GroupsController(
             updatedBy: resolved.Actor);
 
         TempData["info"] = value is null
-            ? $"Cleared the description of “{resolved.Group.Name}”."
-            : $"Saved the description of “{resolved.Group.Name}”.";
+            ? await this.FlashAsync("groups.flash_description_cleared", "Cleared the description of “{0}”.", resolved.Group.Name)
+            : await this.FlashAsync("groups.flash_description_saved", "Saved the description of “{0}”.", resolved.Group.Name);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1050,8 +1050,8 @@ public sealed class GroupsController(
             updatedBy: resolved.Actor);
 
         TempData["info"] = isPrivate
-            ? $"“{resolved.Group.Name}” is now private."
-            : $"“{resolved.Group.Name}” is now public.";
+            ? await this.FlashAsync("groups.flash_now_private", "“{0}” is now private.", resolved.Group.Name)
+            : await this.FlashAsync("groups.flash_now_public", "“{0}” is now public.", resolved.Group.Name);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1094,7 +1094,7 @@ public sealed class GroupsController(
             groupId: resolved.Group.Id,
             deletedBy: resolved.Actor);
 
-        TempData["info"] = $"Group “{resolved.Group.Name}” deleted.";
+        TempData["info"] = await this.FlashAsync("groups.flash_deleted", "Group “{0}” deleted.", resolved.Group.Name);
         return RedirectToAction(nameof(Index));
     }
 
@@ -1168,7 +1168,7 @@ public sealed class GroupsController(
         // if no profile row exists, consistent with the invitations card's
         // <c>by?.DisplayName ?? inv.InvitedBy</c> shape).
         var invitee = await userInfo.GetProfileAsync(subjectId!);
-        TempData["info"] = $"Invited {invitee?.DisplayName ?? subjectId} to “{resolved.Group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_invited", "Invited {0} to “{1}”.", invitee?.DisplayName ?? subjectId, resolved.Group.Name);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1206,11 +1206,11 @@ public sealed class GroupsController(
         {
             // Resolved (or re-invited) in the gap between the click and this
             // commit — the Core's C-M2b·3 invalid-transition wall.
-            TempData["error"] = "That invitation is no longer pending.";
+            TempData["error"] = await this.FlashAsync("groups.flash_invite_not_pending", "That invitation is no longer pending.");
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["info"] = "Invitation accepted — you are now a member.";
+        TempData["info"] = await this.FlashAsync("groups.flash_invite_accepted", "Invitation accepted — you are now a member.");
         return RedirectToAction(nameof(Detail), new { id });
     }
 
@@ -1239,11 +1239,11 @@ public sealed class GroupsController(
         }
         catch (InvalidOperationException)
         {
-            TempData["error"] = "That invitation is no longer pending.";
+            TempData["error"] = await this.FlashAsync("groups.flash_invite_not_pending", "That invitation is no longer pending.");
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["info"] = "Invitation declined.";
+        TempData["info"] = await this.FlashAsync("groups.flash_invite_declined", "Invitation declined.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -1282,11 +1282,11 @@ public sealed class GroupsController(
         }
         catch (InvalidOperationException)
         {
-            TempData["error"] = "That invitation is no longer pending.";
+            TempData["error"] = await this.FlashAsync("groups.flash_invite_not_pending", "That invitation is no longer pending.");
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["info"] = "Invitation accepted — you are now a member.";
+        TempData["info"] = await this.FlashAsync("groups.flash_invite_accepted", "Invitation accepted — you are now a member.");
         return RedirectToAction(nameof(Detail), new { id });
     }
 
@@ -1316,11 +1316,11 @@ public sealed class GroupsController(
         }
         catch (InvalidOperationException)
         {
-            TempData["error"] = "That invitation is no longer pending.";
+            TempData["error"] = await this.FlashAsync("groups.flash_invite_not_pending", "That invitation is no longer pending.");
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["info"] = "Invitation declined.";
+        TempData["info"] = await this.FlashAsync("groups.flash_invite_declined", "Invitation declined.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -1353,11 +1353,11 @@ public sealed class GroupsController(
         }
         catch (InvalidOperationException)
         {
-            TempData["error"] = "That invitation is no longer pending.";
+            TempData["error"] = await this.FlashAsync("groups.flash_invite_not_pending", "That invitation is no longer pending.");
             return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
         }
 
-        TempData["info"] = $"Cancelled the invitation for {subjectId}.";
+        TempData["info"] = await this.FlashAsync("groups.flash_invite_cancelled", "Cancelled the invitation for {0}.", subjectId);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1407,11 +1407,11 @@ public sealed class GroupsController(
         }
         catch (InvalidOperationException)
         {
-            TempData["error"] = "Could not record that request.";
+            TempData["error"] = await this.FlashAsync("groups.flash_request_failed", "Could not record that request.");
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["info"] = $"Requested to join “{group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_requested", "Requested to join “{0}”.", group.Name);
         return RedirectToAction(nameof(Index));
     }
 
@@ -1445,11 +1445,11 @@ public sealed class GroupsController(
         {
             // Resolved (approved/declined) in the gap between the click and this
             // commit — the Core's invalid-transition wall.
-            TempData["error"] = "That request is no longer pending.";
+            TempData["error"] = await this.FlashAsync("groups.flash_request_not_pending", "That request is no longer pending.");
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["info"] = "Join request withdrawn.";
+        TempData["info"] = await this.FlashAsync("groups.flash_request_withdrawn", "Join request withdrawn.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -1484,11 +1484,11 @@ public sealed class GroupsController(
         }
         catch (InvalidOperationException)
         {
-            TempData["error"] = "That request is no longer pending.";
+            TempData["error"] = await this.FlashAsync("groups.flash_request_not_pending", "That request is no longer pending.");
             return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
         }
 
-        TempData["info"] = $"Approved {subjectId}'s request to join “{resolved.Group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_request_approved", "Approved {0}’s request to join “{1}”.", subjectId, resolved.Group.Name);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1520,11 +1520,11 @@ public sealed class GroupsController(
         }
         catch (InvalidOperationException)
         {
-            TempData["error"] = "That request is no longer pending.";
+            TempData["error"] = await this.FlashAsync("groups.flash_request_not_pending", "That request is no longer pending.");
             return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
         }
 
-        TempData["info"] = $"Declined {subjectId}'s request to join “{resolved.Group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_request_declined", "Declined {0}’s request to join “{1}”.", subjectId, resolved.Group.Name);
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1767,7 +1767,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = $"Post added to “{group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_post_added", "Post added to “{0}”.", group.Name);
         return Redirect($"/groups/{id}/posts/{post.Id}");
     }
 
@@ -1907,7 +1907,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = "Post updated.";
+        TempData["info"] = await this.FlashAsync("posts.flash_updated", "Post updated.");
         return Redirect($"/groups/{id}/posts/{post.Id}");
     }
 
@@ -1943,7 +1943,7 @@ public sealed class GroupsController(
             // A reply is a body-only write (G·7: no own audience, no
             // title). Fail-closed to the detail page — the form is
             // re-presented there.
-            TempData["error"] = "A reply needs some text.";
+            TempData["error"] = await this.FlashAsync("posts.flash_reply_needs_text", "A reply needs some text.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -1963,7 +1963,7 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         await posts.CreateReplyAsync(postId, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default.
 
-        TempData["info"] = "Reply added.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_added", "Reply added.");
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2000,7 +2000,7 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A reply needs some text.";
+            TempData["error"] = await this.FlashAsync("posts.flash_reply_needs_text", "A reply needs some text.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -2037,7 +2037,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = "Reply updated.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_updated", "Reply updated.");
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2093,7 +2093,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = "Post deleted.";
+        TempData["info"] = await this.FlashAsync("posts.flash_deleted", "Post deleted.");
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2144,7 +2144,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = "Post published.";
+        TempData["info"] = await this.FlashAsync("posts.flash_published", "Post published.");
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2194,7 +2194,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = "Reply deleted.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_deleted", "Reply deleted.");
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2432,7 +2432,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = $"Event added to “{group.Name}”.";
+        TempData["info"] = await this.FlashAsync("groups.flash_event_added", "Event added to “{0}”.", group.Name);
         return Redirect($"/groups/{id}/events/{@event.Id}");
     }
 
@@ -2568,7 +2568,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = "Event updated.";
+        TempData["info"] = await this.FlashAsync("events.flash_updated", "Event updated.");
         return Redirect($"/groups/{id}/events/{@event.Id}");
     }
 
@@ -2617,7 +2617,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = "Event published.";
+        TempData["info"] = await this.FlashAsync("events.flash_published", "Event published.");
         return Redirect($"/groups/{id}/events/{eventId}");
     }
 
@@ -2703,12 +2703,12 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -2742,7 +2742,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = $"Translation added ({await SeedLanguageName(languageCode)}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", await SeedLanguageName(languageCode));
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2769,12 +2769,12 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -2805,7 +2805,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = $"Translation added ({await SeedLanguageName(languageCode)}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", await SeedLanguageName(languageCode));
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2835,12 +2835,12 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -2866,7 +2866,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = $"Translation updated ({await SeedLanguageName(languageCode)}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", await SeedLanguageName(languageCode));
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2890,7 +2890,7 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -2913,7 +2913,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = $"Translation removed ({await SeedLanguageName(languageCode)}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", await SeedLanguageName(languageCode));
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2937,12 +2937,12 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -2967,7 +2967,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = $"Translation updated ({await SeedLanguageName(languageCode)}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", await SeedLanguageName(languageCode));
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 
@@ -2991,7 +2991,7 @@ public sealed class GroupsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
@@ -3016,7 +3016,7 @@ public sealed class GroupsController(
             return NotFound();
         }
 
-        TempData["info"] = $"Translation removed ({await SeedLanguageName(languageCode)}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", await SeedLanguageName(languageCode));
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 

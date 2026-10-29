@@ -274,3 +274,4 @@ Decision / Consequences. New decisions take the next number.
 | 0263 | Page controller: 14 flash messages and 2 sign-in model errors use `FlashAsync`; 8 new `pages.flash_*` keys in en/de/fr/da, shared `flash.translation_*` reused. |
 | 0264 | Community controller: 15 flash messages use `FlashAsync`; 9 new keys (`communities.flash_*`, `flash.translation_needs_name_or_description`) in en/de/fr/da; NRE-pinned tests unaffected. |
 | 0265 | Projects controller: all 63 flash messages use `FlashAsync` in one batch (English floor byte-identical, exact-text tests unaffected); 46 new keys incl. translated direction words for "Lane/Card moved {0}". |
+| 0266 | Groups controller: all 60 flash messages use `FlashAsync`; 22 new `groups.flash_*` keys in en/de/fr/da, `posts.flash_*`/`events.flash_*`/`flash.translation_*` reused. |
