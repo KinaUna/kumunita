@@ -316,7 +316,7 @@ public sealed class DocumentController(
         var subject = Kumunita.Web.Security.KumunitaPrincipal.SubjectId(User);
         if (subject is null) return Unauthorized();
         if (!IsValidDocId(id))
-            return BadRequest("A document id is required.");
+            return BadRequest(await this.FlashAsync("validation.document_id_required", "A document id is required."));
 
         // The Read path (audience) — the document must be visible to the actor;
         // the owner branch always passes for the owner. A missing doc is null.
@@ -360,7 +360,7 @@ public sealed class DocumentController(
         var subject = KumunitaPrincipal.SubjectId(User);
         if (subject is null) return Unauthorized();
         if (!IsValidDocId(id))
-            return BadRequest("A document id is required.");
+            return BadRequest(await this.FlashAsync("validation.document_id_required", "A document id is required."));
 
         // ADR 0125 D1 — owner gate (re-checked on the write; the owner branch of
         // the Read path passes for the owner). A non-owner is a 404 (not a 403
@@ -487,7 +487,7 @@ public sealed class DocumentController(
         var subject = KumunitaPrincipal.SubjectId(User);
         if (subject is null) return Unauthorized();
         if (!IsValidDocId(id))
-            return BadRequest("A document id is required.");
+            return BadRequest(await this.FlashAsync("validation.document_id_required", "A document id is required."));
 
         // ADR 0125 D1 — owner gate (re-checked on the write; the owner branch
         // of the Read path passes for the owner). A non-owner is a 404 (not a
@@ -563,7 +563,7 @@ public sealed class DocumentController(
         var subject = KumunitaPrincipal.SubjectId(User);
         if (subject is null) return Unauthorized();
         if (!IsValidDocId(id))
-            return BadRequest("A document id is required.");
+            return BadRequest(await this.FlashAsync("validation.document_id_required", "A document id is required."));
 
         await using var session = store.LightweightSession();
         try

@@ -278,3 +278,4 @@ Decision / Consequences. New decisions take the next number.
 | 0267 | Admin controllers (9): 58 flash messages use `FlashAsync`; 41 new keys (`admin.flash_*`, `flash.translation_gone*`, `flash.choose_language_remove`) in en/de/fr/da; `admin.guests_saved` reused. |
 | 0268 | Last 49 literal flashes (Account, Inventory, Kiosk, Languages, Locale, MessagingSettings, Moderation, ReportTargets, SecuritySettings, Tag) use `FlashAsync`; 34 new keys in en/de/fr/da; no literal `TempData` English left outside the already-localized portability controllers. |
 | 0269 | All 110 controller `ModelState.AddModelError` messages use `FlashAsync` (English floor identical); 63 new `validation.*` keys in en/de/fr/da, one key per distinct text, per-action sign-in/permission keys. |
+| 0270 | The 8 remaining `BadRequest("…")` bodies use `FlashAsync` (4 new `validation.*` keys); Core service exception text deliberately stays English (decision recorded, revisit trigger noted). |
