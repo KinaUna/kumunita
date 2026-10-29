@@ -3287,6 +3287,10 @@ a.kmb-chip:hover { color: var(--kmb-accent, var(--bs-primary)); text-decoration:
   min-height: 60vh;
   overflow-x: auto;
   padding-bottom: 0.25rem;
+  /* ADR 0247: a containing block for the absolutely positioned bits inside the lanes (the 1px
+     .visually-hidden labels). Without it they escaped the scroll box and, in the lanes scrolled out of
+     view, widened the page (907px of scroll on a 600px screen; the phone zoomed out to fit). */
+  position: relative;
 }
 
 /* A single lane column (the .events-calendar-day shape, reused): a
