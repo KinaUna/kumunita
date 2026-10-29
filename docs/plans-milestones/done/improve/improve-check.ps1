@@ -155,8 +155,13 @@ $aBaseline = @(
 # three new guardian.eventrsvp.desired_with / requested_at / attended_at keys
 # x en/de/fr/da added to KnownTranslationKeys.cs (12091 -> 12103) — the same
 # shipped-additions mechanism as above; the gate's ceiling starts from 12103 now.
+# Re-baselined again 2026-10-29 (the ADR 0261 shared-flash-extension close): the
+# forty-nine new flash.* / announcements.flash_* / events.flash_* /
+# guardian.flash_* keys x en/de/fr/da added to KnownTranslationKeys.cs
+# (12103 -> 12299) — the same shipped-additions mechanism as above; the gate's
+# ceiling starts from 12299 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 12103
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 12299
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926

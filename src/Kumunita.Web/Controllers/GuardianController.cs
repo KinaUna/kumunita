@@ -335,8 +335,8 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         {
             await userInfo.SetChildMessagingRestrictionAsync(childId, restricted, subject);
             TempData["info"] = restricted
-                ? "Messaging restricted for this child account."
-                : "Messaging allowed for this child account.";
+                ? await this.FlashAsync("guardian.flash_messaging_restricted", "Messaging restricted for this child account.")
+                : await this.FlashAsync("guardian.flash_messaging_allowed", "Messaging allowed for this child account.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -386,9 +386,9 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             await userInfo.SetChildEventRsvpModeAsync(childId, mode, subject);
             TempData["info"] = mode switch
             {
-                Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves => "You must approve or deny every event attendance for this child.",
-                Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies => "This child RSVPs freely; you are notified and can veto each attendance.",
-                _ => "This child decides their own event attendance."
+                Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves => await this.FlashAsync("guardian.flash_rsvp_mode_approves", "You must approve or deny every event attendance for this child."),
+                Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies => await this.FlashAsync("guardian.flash_rsvp_mode_notifies", "This child RSVPs freely; you are notified and can veto each attendance."),
+                _ => await this.FlashAsync("guardian.flash_rsvp_mode_child", "This child decides their own event attendance.")
             };
         }
         catch (UnauthorizedAccessException)
@@ -431,7 +431,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await _events.ApproveEventRsvpAsync(eventId, childId, subject);
-            TempData["info"] = "Attendance approved — the child's RSVP has been recorded.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_rsvp_approved", "Attendance approved — the child’s RSVP has been recorded.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -468,7 +468,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await _events.DenyEventRsvpAsync(eventId, childId, subject);
-            TempData["info"] = "Attendance denied — the child's request was not approved.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_rsvp_denied", "Attendance denied — the child’s request was not approved.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -506,7 +506,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await _events.VetoEventRsvpAsync(eventId, childId, subject);
-            TempData["info"] = "Attendance vetoed — the child's RSVP has been removed.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_rsvp_vetoed", "Attendance vetoed — the child’s RSVP has been removed.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -514,7 +514,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         }
         catch (KeyNotFoundException)
         {
-            TempData["error"] = "This child has no attendance to veto on that event.";
+            TempData["error"] = await this.FlashAsync("guardian.flash_rsvp_none_to_veto", "This child has no attendance to veto on that event.");
             return RedirectToAction(nameof(Detail), new { childId });
         }
         catch (InvalidOperationException ex)
@@ -541,7 +541,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await userInfo.SuspendChildAsync(childId, subject);
-            TempData["info"] = "Child account suspended.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_suspended", "Child account suspended.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -568,7 +568,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await userInfo.UnsuspendChildAsync(childId, subject);
-            TempData["info"] = "Child account un-suspended.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_unsuspended", "Child account un-suspended.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -627,9 +627,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
                 // row (the M20 SetQuietScheduleAsync "clear" idiom — the
                 // null-schedule = delete shape in the Core seam).
                 await userInfo.SetChildTimeLimitAsync(subject, childId, null);
-                TempData["info"] = Kumunita.Core.Localization.KnownTranslationKeys
-                    .EnValues.GetValueOrDefault("guardian.timelimit.flash_cleared")
-                    ?? "Time limits cleared";
+                TempData["info"] = await this.FlashAsync("guardian.timelimit.flash_cleared", "Time limits cleared");
             }
             else
             {
@@ -642,9 +640,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
                     DaysOfWeek = daysOfWeek ?? [],
                 };
                 await userInfo.SetChildTimeLimitAsync(subject, childId, schedule);
-                TempData["info"] = Kumunita.Core.Localization.KnownTranslationKeys
-                    .EnValues.GetValueOrDefault("guardian.timelimit.flash_saved")
-                    ?? "Time limits saved";
+                TempData["info"] = await this.FlashAsync("guardian.timelimit.flash_saved", "Time limits saved");
             }
         }
         catch (UnauthorizedAccessException)
@@ -681,8 +677,8 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             else
                 await userInfo.RemoveGroupMemberAsync(groupId, childId, subject);
             TempData["info"] = add
-                ? $"Added to group {groupId}."
-                : $"Removed from group {groupId}.";
+                ? await this.FlashAsync("guardian.flash_group_added", "Added to group {0}.", groupId)
+                : await this.FlashAsync("guardian.flash_group_removed", "Removed from group {0}.", groupId);
         }
         catch (UnauthorizedAccessException)
         {
@@ -735,8 +731,8 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         {
             await userInfo.SetChildCommunityBlockAsync(childId, communityId, blocked, subject);
             TempData["info"] = blocked
-                ? $"Community {communityId} is now blocked and hidden for this child."
-                : $"Access to community {communityId} is restored for this child.";
+                ? await this.FlashAsync("guardian.flash_community_blocked", "Community {0} is now blocked and hidden for this child.", communityId)
+                : await this.FlashAsync("guardian.flash_community_restored", "Access to community {0} is restored for this child.", communityId);
         }
         catch (UnauthorizedAccessException)
         {
@@ -768,7 +764,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await userInfo.ApproveGroupInvitationAsync(groupId, childId, subject);
-            TempData["info"] = $"Approved the invitation to group {groupId}.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_invite_approved", "Approved the invitation to group {0}.", groupId);
         }
         catch (UnauthorizedAccessException)
         {
@@ -802,7 +798,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await userInfo.RejectGroupInvitationAsync(groupId, childId, subject);
-            TempData["info"] = $"Rejected the invitation to group {groupId}.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_invite_rejected", "Rejected the invitation to group {0}.", groupId);
         }
         catch (UnauthorizedAccessException)
         {
@@ -837,7 +833,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await userInfo.ApproveCommunityMembershipRequestAsync(communityId, childId, subject);
-            TempData["info"] = $"Approved community {communityId} for this child.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_community_approved", "Approved community {0} for this child.", communityId);
         }
         catch (UnauthorizedAccessException)
         {
@@ -871,7 +867,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await userInfo.DeclineCommunityMembershipRequestAsync(communityId, childId, subject);
-            TempData["info"] = $"Rejected community {communityId} for this child.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_community_rejected", "Rejected community {0} for this child.", communityId);
         }
         catch (UnauthorizedAccessException)
         {
@@ -931,7 +927,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // guardian's standing over the child has ended; what happens
             // next (the child keeps it, or it is deleted) is a separate act
             // the guardian has not yet performed.
-            TempData["info"] = "Your guardianship over this account has ended.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_guardianship_ended", "Your guardianship over this account has ended.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -987,7 +983,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         // redirects, it does not re-render the form).
         if (!form.Confirmed)
         {
-            TempData["error"] = "You must confirm the deletion before it can proceed.";
+            TempData["error"] = await this.FlashAsync("guardian.flash_delete_confirm_required", "You must confirm the deletion before it can proceed.");
             return RedirectToAction(nameof(Detail), new { childId });
         }
 
@@ -1008,7 +1004,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // the Identity-account deletion, and — this lane only — the
             // GuardianLink dissolution, C·5).
             await identity.DeleteChildAccountAsync(childId, subject);
-            TempData["info"] = "Child account deleted. Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_child_deleted", "Child account deleted. Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -1113,7 +1109,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             return NotFound();
         }
 
-        TempData["info"] = "Child account created. Ask them to open the confirmation link in their email to set their password and sign in.";
+        TempData["info"] = await this.FlashAsync("guardian.flash_child_created", "Child account created. Ask them to open the confirmation link in their email to set their password and sign in.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -1199,7 +1195,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // "pending" badge next to the assigned guardian's name (the
             // ActiveGuardiansAsync helper now includes Pending rows).
             await userInfo.AssignGuardianLinkAsync(childId, assignedId, subject);
-            TempData["info"] = $"Guardian assigned — they will be asked to accept.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_guardian_assigned", "Guardian assigned — they will be asked to accept.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -1266,7 +1262,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         // card still showing the consent block.
         if (!form.GuardianConsent)
         {
-            TempData["error"] = "You must consent to the child-account terms before accepting.";
+            TempData["error"] = await this.FlashAsync("guardian.flash_consent_required", "You must consent to the child-account terms before accepting.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -1276,7 +1272,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // guardian.create + guardian.accept audit rows commit (C3). The
             // assignee's standing is live on the next read (G·2/C4).
             await userInfo.AcceptGuardianLinkAsync(childId, subject);
-            TempData["info"] = "You are now this child's guardian. Their account controls are available.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_now_guardian", "You are now this child’s guardian. Their account controls are available.");
         }
         catch (UnauthorizedAccessException)
         {
@@ -1336,7 +1332,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // GetPendingGuardianRequestsForAssigneeAsync filters on
             // Pending).
             await userInfo.DeclineGuardianLinkAsync(childId, subject);
-            TempData["info"] = "You declined the guardian request.";
+            TempData["info"] = await this.FlashAsync("guardian.flash_declined", "You declined the guardian request.");
         }
         catch (UnauthorizedAccessException)
         {

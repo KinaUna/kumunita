@@ -447,12 +447,12 @@ public sealed class AnnouncementController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction("Detail", "Announcement", new { id });
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return RedirectToAction("Detail", "Announcement", new { id });
         }
 
@@ -485,7 +485,7 @@ public sealed class AnnouncementController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return RedirectToAction("Detail", "Announcement", new { id });
     }
 
@@ -520,12 +520,12 @@ public sealed class AnnouncementController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction("Detail", "Announcement", new { id });
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return RedirectToAction("Detail", "Announcement", new { id });
         }
 
@@ -555,7 +555,7 @@ public sealed class AnnouncementController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return RedirectToAction("Detail", "Announcement", new { id });
     }
 
@@ -581,7 +581,7 @@ public sealed class AnnouncementController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction("Detail", "Announcement", new { id });
         }
 
@@ -605,7 +605,7 @@ public sealed class AnnouncementController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return RedirectToAction("Detail", "Announcement", new { id });
     }
 
@@ -791,11 +791,11 @@ public sealed class AnnouncementController(
                 // draft is reachable any time via "My drafts".
                 model.DraftId = result.Id;
                 await SeedComposeOptionsAsync(model, RoleSet(User));
-                TempData["info"] = "Saved as draft — it's hidden from everyone (including admins) until you publish it. Find it under “My drafts”.";
+                TempData["info"] = await this.FlashAsync("announcements.flash_draft_saved", "Saved as draft — it’s hidden from everyone (including admins) until you publish it. Find it under “My drafts”.");
                 return View(model);
             }
 
-            TempData["info"] = "Announcement created.";
+            TempData["info"] = await this.FlashAsync("announcements.flash_created", "Announcement created.");
             return RedirectToAction("Index");
         }
         catch (UnauthorizedAccessException ex)
@@ -899,7 +899,7 @@ public sealed class AnnouncementController(
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId))
         {
-            TempData["error"] = "Not signed in.";
+            TempData["error"] = await this.FlashAsync("flash.not_signed_in", "Not signed in.");
             return new UnauthorizedResult();
         }
 
@@ -924,7 +924,7 @@ public sealed class AnnouncementController(
                 actorId:    actorId,
                 actorRoles: RoleSet(User),
                 session);
-            TempData["info"] = "Announcement updated.";
+            TempData["info"] = await this.FlashAsync("announcements.flash_updated", "Announcement updated.");
             return RedirectToAction("Index");
         }
         catch (UnauthorizedAccessException)
@@ -955,7 +955,7 @@ public sealed class AnnouncementController(
         try
         {
             await announcements.DeleteAsync(id, session);
-            TempData["info"] = "Announcement deleted.";
+            TempData["info"] = await this.FlashAsync("announcements.flash_deleted", "Announcement deleted.");
             return RedirectToAction("Index");
         }
         catch (KeyNotFoundException)
@@ -1013,7 +1013,7 @@ public sealed class AnnouncementController(
             return NotFound();
         }
 
-        TempData["info"] = "Announcement published.";
+        TempData["info"] = await this.FlashAsync("announcements.flash_published", "Announcement published.");
         return RedirectToAction("Detail", new { id });
     }
 
@@ -1050,7 +1050,7 @@ public sealed class AnnouncementController(
 
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A comment needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.comment_needs_text", "A comment needs some text.");
             return RedirectToAction("Detail", "Announcement", new { id });
         }
 
@@ -1082,7 +1082,7 @@ public sealed class AnnouncementController(
             return NotFound();
         }
 
-        TempData["info"] = "Comment added.";
+        TempData["info"] = await this.FlashAsync("flash.comment_added", "Comment added.");
         return RedirectToAction("Detail", "Announcement", new { id });
     }
 
@@ -1120,7 +1120,7 @@ public sealed class AnnouncementController(
             return new ForbidResult();
         }
 
-        TempData["info"] = "Comment deleted.";
+        TempData["info"] = await this.FlashAsync("flash.comment_deleted", "Comment deleted.");
         return RedirectToAction("Detail", "Announcement", new { id });
     }
 }

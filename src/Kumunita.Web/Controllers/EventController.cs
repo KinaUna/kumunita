@@ -1205,7 +1205,7 @@ public sealed class EventController : Controller
             // (public), the association is not.
         }
 
-        TempData["info"] = "To-do added.";
+        TempData["info"] = await this.FlashAsync("events.flash_todo_added", "To-do added.");
         return Redirect($"/events/{id}");
     }
 
@@ -1539,8 +1539,8 @@ public sealed class EventController : Controller
         }
 
         TempData["info"] = model.SaveAsDraft
-            ? "Event saved as a draft. It is visible to you only until you publish it."
-            : "Event created.";
+            ? await this.FlashAsync("events.flash_draft_saved", "Event saved as a draft. It is visible to you only until you publish it.")
+            : await this.FlashAsync("events.flash_created", "Event created.");
         return Redirect($"/events/{ev.Id}");
     }
 
@@ -1751,7 +1751,7 @@ public sealed class EventController : Controller
             return View("Edit", model);
         }
 
-        TempData["info"] = "Event updated.";
+        TempData["info"] = await this.FlashAsync("events.flash_updated", "Event updated.");
         return Redirect($"/events/{id}");
     }
 
@@ -1778,7 +1778,7 @@ public sealed class EventController : Controller
         {
             return new ForbidResult();
         }
-        TempData["info"] = "Event published.";
+        TempData["info"] = await this.FlashAsync("events.flash_published", "Event published.");
         return Redirect($"/events/{id}");
     }
 
@@ -1832,7 +1832,7 @@ public sealed class EventController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Event deleted.";
+        TempData["info"] = await this.FlashAsync("events.flash_deleted", "Event deleted.");
         return Redirect("/events");
     }
 
@@ -1877,7 +1877,7 @@ public sealed class EventController : Controller
         {
             return new ForbidResult();
         }
-        TempData["info"] = "Occurrence skipped.";
+        TempData["info"] = await this.FlashAsync("events.flash_occurrence_skipped", "Occurrence skipped.");
         return Redirect($"/events/{id}");
     }
 
@@ -1908,7 +1908,7 @@ public sealed class EventController : Controller
         {
             return new ForbidResult();
         }
-        TempData["info"] = "Occurrence restored.";
+        TempData["info"] = await this.FlashAsync("events.flash_occurrence_restored", "Occurrence restored.");
         return Redirect($"/events/{id}");
     }
 
@@ -1994,12 +1994,12 @@ public sealed class EventController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/events/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/events/{id}");
         }
 
@@ -2038,7 +2038,7 @@ public sealed class EventController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return Redirect($"/events/{id}");
     }
 
@@ -2066,12 +2066,12 @@ public sealed class EventController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/events/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/events/{id}");
         }
 
@@ -2109,7 +2109,7 @@ public sealed class EventController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return Redirect($"/events/{id}");
     }
 
@@ -2135,7 +2135,7 @@ public sealed class EventController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/events/{id}");
         }
 
@@ -2166,7 +2166,7 @@ public sealed class EventController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return Redirect($"/events/{id}");
     }
 }
