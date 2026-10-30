@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.80.0 entry (portability restore locale + escalation — ADR 0276) — 0.79.0 (principal merge) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.81.0 entry (directory sort & filter — ADR 0277) — 0.80.0 (portability restore locale + escalation) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -76,44 +76,58 @@ public sealed class WhatsNewTests
         // /admin/escalation endpoint + enabled switch travel in the backup —
         // the forwarding token is structurally absent, re-entered after a
         // restore, the same "re-enter your credential" posture as passwords)
-        // is now the newest shipped (the 0.80.0 entry), so it is the head; the
+        // is now the newest shipped (the 0.81.0 entry), so it is the head; the
+        // portability-restore locale + escalation-config lane (ADR 0276,
+        // 2026-10-30) 0.80.0 entry slides one row back; the
         // portability-import principal-merge lane (ADR 0275, 2026-10-30)
-        // 0.79.0 entry slides one row back; the portability-import tag-merge
-        // lane (ADR 0274, 2026-10-30) 0.78.0 entry slides two rows back; the
+        // 0.79.0 entry slides two rows back; the portability-import tag-merge
+        // lane (ADR 0274, 2026-10-30) 0.78.0 entry slides three rows back; the
         // localization-of-the-remaining-surface lane (ADRs 0261–0273,
-        // 2026-10-30) 0.77.0 entry slides three rows back; the
+        // 2026-10-30) 0.77.0 entry slides four rows back; the
         // Documents-uploader-attribution + delete-lane lane (ADR 0239,
-        // 2026-10-29) 0.76.0 entry slides four rows back; and so on.
+        // 2026-10-29) 0.76.0 entry slides five rows back; and so on.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.80.0" && head.Date == "2026-10-30",
-            "The portability-restore locale + escalation 0.80.0 (2026-10-30) entry must be the head of the registry; got "
+            head.Version == "0.81.0" && head.Date == "2026-10-30",
+            "The directory sort & filter 0.81.0 (2026-10-30) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("time zone", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("escalation", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("ADR 0276", StringComparison.OrdinalIgnoreCase)),
-            "The 0.80.0 head entry must name the locale-restore + escalation lane + ADR 0276.");
-        // The previous head (the principal-merge lane, 0.79.0) slides one
-        // row back — pin it too so a copy-paste that drops it is caught.
+            head.Changes.Any(c => c.Contains("directory", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("Verified", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0277", StringComparison.OrdinalIgnoreCase)),
+            "The 0.81.0 head entry must name the directory sort/filter lane + ADR 0277.");
+        // The previous head (the locale-restore + escalation lane, 0.80.0)
+        // slides one row back — pin it too so a copy-paste that drops it is
+        // caught.
         var second = WhatsNew.All[1];
         Assert.True(
-            second.Version == "0.79.0" && second.Date == "2026-10-30",
-            "The portability-import principal-merge 0.79.0 (2026-10-30) entry must be the second entry; got "
+            second.Version == "0.80.0" && second.Date == "2026-10-30",
+            "The portability-restore locale + escalation 0.80.0 (2026-10-30) entry must be the second entry; got "
                 + second.Version + " / " + second.Date + ".");
         Assert.True(
-            second.Changes.Any(c => c.Contains("directory", StringComparison.OrdinalIgnoreCase)
+            second.Changes.Any(c => c.Contains("time zone", StringComparison.OrdinalIgnoreCase)
+                                   && c.Contains("escalation", StringComparison.OrdinalIgnoreCase)
+                                   && c.Contains("ADR 0276", StringComparison.OrdinalIgnoreCase)),
+            "The 0.80.0 entry must name the locale-restore + escalation lane + ADR 0276.");
+        // The principal-merge lane (0.79.0) slides two rows back — pin it too.
+        var third = WhatsNew.All[2];
+        Assert.True(
+            third.Version == "0.79.0" && third.Date == "2026-10-30",
+            "The portability-import principal-merge 0.79.0 (2026-10-30) entry must be the third entry; got "
+                + third.Version + " / " + third.Date + ".");
+        Assert.True(
+            third.Changes.Any(c => c.Contains("directory", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("ADR 0275", StringComparison.OrdinalIgnoreCase)),
             "The 0.79.0 entry must name the principal-merge lane + ADR 0275.");
-        // The tag-merge lane (0.78.0) slides two rows back — pin it too.
-        var third = WhatsNew.All[2];
+        // The tag-merge lane (0.78.0) slides three rows back.
+        var fourth = WhatsNew.All[3];
         Assert.True(
-            third.Version == "0.78.0" && third.Date == "2026-10-30",
-            "The portability-import tag-merge 0.78.0 (2026-10-30) entry must be the third entry; got "
-                + third.Version + " / " + third.Date + ".");
+            fourth.Version == "0.78.0" && fourth.Date == "2026-10-30",
+            "The portability-import tag-merge 0.78.0 (2026-10-30) entry must be the fourth entry; got "
+                + fourth.Version + " / " + fourth.Date + ".");
         Assert.True(
-            third.Changes.Any(c => c.Contains("tag", StringComparison.OrdinalIgnoreCase)
+            fourth.Changes.Any(c => c.Contains("tag", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("ADR 0274", StringComparison.OrdinalIgnoreCase)),
             "The 0.78.0 entry must name the tag-merge lane + ADR 0274.");
