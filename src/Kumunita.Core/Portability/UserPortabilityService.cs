@@ -1180,6 +1180,88 @@ public sealed class UserPortabilityService(
         // C-M27·4 no-auto-merge pin).
         var appliedCount = 0;
         var discardedCount = 0;
+        // SEC-lane H1 (U6): the resolve-time guard's rejections — rows hostile
+        // for the actor (a forged owner, an <c>Id</c> collision with another
+        // resident's row, or an access-granting row). Each rejected row is
+        // <em>skipped</em> (never stored, not counted in
+        // <c>AppliedCount</c>) and tallied here: the list is both the
+        // rejection count (<see cref="List{T}.Count"/>) and the result's
+        // message list — one <c>import.rejected:&lt;reason&gt;</c> entry per
+        // rejected row (the design doc §2.2 U6 contract; the reason is the
+        // guard's verbatim <see cref="ImportOwnershipGuard"/> code).
+        var rejectedReasons = new List<string>();
+
+        // ── SEC-lane H1 (U6): the ownership-guard inputs (derived, read-only) ──
+        // The exact shapes U5 derives in the classify loop (design doc §2.2 U6).
+        // The resolve-time guard re-runs <see cref="ImportOwnershipGuard.Check"/>
+        // immediately before <em>each</em> <c>session.Store(row)</c> so a plan
+        // tampered with between classify and apply (or a forged resolve form)
+        // cannot write a foreign row (invariant S-1).
+        //   (a) The <c>existingOwnerOf</c> probe: per-type map
+        //       <c>row.Id → owner</c>, where owner is the type's first
+        //       <c>OwnershipFields</c> value read off the target row (the
+        //       ownership anchor). A null result means "not owned by another"
+        //       to the probe, so the guard's collision check does not fire; the
+        //       ownership rules carry the H1 pin.
+        var ownerByIdByType = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var (t, entry) in UserScopeInventory.Entries)
+        {
+            var ownerField = entry.OwnershipFields.Count > 0 ? entry.OwnershipFields[0] : null;
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (ownerField is not null)
+            {
+                var targetRows = await QueryAllRowsAsync(
+                    documentStore.QuerySession(), nameToType[t], ct).ConfigureAwait(false);
+                foreach (var row in targetRows)
+                {
+                    if (ReadId(row) is string rowId && rowId.Length > 0
+                        && (string?)ReadFieldValue(row.GetType(), ownerField, row) is { Length: > 0 } owner)
+                        map[rowId] = owner;
+                }
+            }
+            ownerByIdByType[t] = map;
+        }
+
+        //   (b) The actor's conversation ids (the <c>Message</c> rule): the
+        //       union of the target's <c>Conversation</c> rows the actor holds
+        //       a seat in (<c>ParticipantA</c> ∪ <c>ParticipantB</c>) and the
+        //       archive's own <c>Conversation</c> rows the actor holds a seat
+        //       in (a <c>Message</c> whose conversation ships in the same
+        //       archive is the actor's own). Fail-closed: an empty union
+        //       rejects every <c>Message</c>.
+        var actorConversationIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var row in await QueryAllRowsAsync(
+                documentStore.QuerySession(), nameToType["Conversation"], ct).ConfigureAwait(false))
+            if (IsActorConversation(row, residentSubjectId))
+                if (ReadId(row) is string idT && idT.Length > 0)
+                    actorConversationIds.Add(idT);
+        if (data.Docs.TryGetValue("Conversation", out var convJsonGuard))
+        {
+            var convListType = typeof(List<>).MakeGenericType(nameToType["Conversation"]);
+            var guardJsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            if (JsonSerializer.Deserialize(convJsonGuard, convListType, guardJsonOpts)
+                    is System.Collections.IEnumerable archiveConversations)
+                foreach (var row in archiveConversations)
+                    if (row is not null && IsActorConversation(row, residentSubjectId))
+                        if (ReadId(row) is string idA && idA.Length > 0)
+                            actorConversationIds.Add(idA);
+        }
+
+        // The per-row guard decision (the U4 pure decision) — captured over the
+        // two derived inputs above; <c>Message</c> is the only type that uses
+        // the conversation set (all other types ignore it).
+        bool TryImportRow(string type, object row, out string? rejectionReason)
+        {
+            var ownerProbe = ownerByIdByType.GetValueOrDefault(type);
+            var verdict = ImportOwnershipGuard.Check(
+                type,
+                row,
+                residentSubjectId,
+                id => ownerProbe is not null ? ownerProbe.GetValueOrDefault(id) : null,
+                type == "Message" ? actorConversationIds : null);
+            rejectionReason = verdict.RejectionReason;
+            return verdict.Allowed;
+        }
 
         await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
         try
@@ -1205,6 +1287,17 @@ public sealed class UserPortabilityService(
                     // (1) clean → apply (the M11 import order, the §2.5 (1) rule).
                     if (cls.Status == UserPortabilityEntityStatus.Clean)
                     {
+                        // SEC-lane H1 (U6): the resolve-time ownership guard
+                        // (defense in depth — the plan's <c>Clean</c> mark was
+                        // computed at classify; a plan tampered with in between,
+                        // or a forged resolve form, must not be trusted). A
+                        // rejected row is <em>skipped</em> (never stored, S-1)
+                        // and recorded as <c>import.rejected:&lt;reason&gt;</c>.
+                        if (!TryImportRow(entry.Type, row, out string? cleanReason))
+                        {
+                            rejectedReasons.Add($"import.rejected:{cleanReason}");
+                            continue;
+                        }
                         session.Store(row);
                         appliedCount++;
                         continue;
@@ -1245,6 +1338,16 @@ public sealed class UserPortabilityService(
                                 res.AbsentRefField, BindingFlags.Public | BindingFlags.Instance);
                             if (prop is not null && prop.CanWrite)
                                 prop.SetValue(row, res.PickedTargetId);
+                        }
+                        // SEC-lane H1 (U6): the resolve-time ownership guard —
+                        // same defense-in-depth re-check as the <c>Clean</c>
+                        // site: a conflict row that is hostile for the actor
+                        // must not be written, even if the resident resolved
+                        // it (S-1).
+                        if (!TryImportRow(entry.Type, row, out string? addElseReason))
+                        {
+                            rejectedReasons.Add($"import.rejected:{addElseReason}");
+                            continue;
                         }
                         session.Store(row);
                         appliedCount++;
@@ -1302,7 +1405,18 @@ public sealed class UserPortabilityService(
         });
         await auditSession.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        return new UserPortabilityImportResult(true, appliedCount, discardedCount, []);
+        // SEC-lane H1 (U6): the resolve-time guard's rejections are surfaced
+        // in the result's message list (<see cref="UserPortabilityImportResult.Failures"/>)
+        // — one <c>import.rejected:&lt;reason&gt;</c> entry per rejected row,
+        // so the rejection is counted (the list's
+        // <see cref="List{T}.Count"/>) and the reason is recorded (the guard's
+        // verbatim code). The import is still <c>Ok</c> = <c>true</c> (the
+        // actor's genuine rows imported; the hostile rows were skipped, not
+        // written) — a partial rejection is not a fail-closed rollback (the
+        // C-M27·4 rollback is for a <em>mid-apply exception</em>, not for a
+        // guard rejection). An empty list (the genuine round-trip) renders as
+        // <c>[]</c>, preserving the M27 shape.
+        return new UserPortabilityImportResult(true, appliedCount, discardedCount, rejectedReasons);
     }
 
     // ── U06 (resolve) helpers — the resident standing check ─────────────
