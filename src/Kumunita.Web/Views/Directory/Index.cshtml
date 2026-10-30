@@ -27,6 +27,24 @@
             // A resolution failure must never blank the header (the kw-l floor).
         }
     }
+
+    // The search form's aria-label — a value-free a11y attribute, so it is
+    // resolved through the ITranslationProvider chain (the a11y.* exclusion in
+    // this codebase: the kw-l TagHelper can't wrap an attribute). Best-effort:
+    // a null/absent service degrades to the English floor.
+    string _searchLabel = "Search residents";
+    if (Translation is not null)
+    {
+        try
+        {
+            string a11yLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+            _searchLabel = await Translation.GetAsync("a11y.find_directory", a11yLang);
+        }
+        catch
+        {
+            // A resolution failure must never blank the a11y label (the floor).
+        }
+    }
 }
 
 <div class="row justify-content-center">
@@ -40,10 +58,80 @@
             </div>
         </header>
 
+        @* The viewer's own narrowing: a name search (q) + a verified-only
+           toggle (verified). Both are presentation filters over the already-
+           catalogued rows (the find-people "organizer, never a gate" posture) —
+           no CanAsync, no audit. The form GETs /directory so the active state
+           rides the URL (?q=&verified=), the _Sort partial carries it on sort
+           flips, and the "clear" link drops it. *@
+        <form method="get" action="/directory" class="d-flex flex-wrap align-items-end gap-2 mb-2"
+              role="search" aria-label="@_searchLabel">
+            @* min-w-0 (the Event/Detail + BoardDetail flex idiom): without it the
+               flex-grow-1 item's min-width:auto keeps the search input from
+               shrinking below its content width, so it overflows and slides
+               under the verified switch. min-w-0 lets it shrink to fit the
+               remaining row space. *@
+            <div class="flex-grow-1 min-w-0">
+                <label class="form-label small mb-1" for="directory-search">
+                    <kw-l key="directory.search">Search</kw-l>
+                </label>
+                <input class="form-control" type="search" name="q" id="directory-search"
+                       value="@Model.Query" placeholder="a name in the neighborhood…"
+                       autocomplete="off" />
+            </div>
+            @* Do NOT add ps-0 here: Bootstrap's .form-switch puts the track in a
+               left padding gutter (input margin-left:-2.5em offset by the
+               container's padding-left:2.5em). Stripping that padding with ps-0
+               leaves the -2.5em margin uncompensated, so the track slides under
+               the search input. Keep the gutter; align-items-end + mb-2 handle
+               the vertical offset against the taller search field. *@
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch" name="verified"
+                       id="directory-verified" value="true" @(Model.VerifiedOnly ? "checked" : null) />
+                <label class="form-check-label" for="directory-verified">
+                    <kw-l key="directory.verified_only">Verified only</kw-l>
+                </label>
+            </div>
+            @* The submit button makes both controls immediately actionable
+               (the verified toggle applies on click, the search on click or
+               Enter — the FindPeople explicit-submit pattern; no inline JS,
+               SECURITY.md §6). *@
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <kw-l key="directory.search">Search</kw-l>
+            </button>
+            @* The "clear" link only appears when a filter is active; it drops
+               q/verified and any sort, returning to the full catalog. *@
+            @if (Model.Query is not null || Model.VerifiedOnly)
+            {
+                <a class="btn btn-sm btn-outline-secondary" href="/directory">
+                    <kw-l key="directory.clear">Clear</kw-l>
+                </a>
+            }
+        </form>
+
+        @* The shared sort control (the _Sort partial, the FindPeople/Posts
+           reference reused): one closed key — name → DisplayName, asc. It sits
+           at the TOP of the list so the sort options are the first thing the
+           viewer sees; it renders nothing when the VM field is null. *@
+        @if (Model.Sort is not null)
+        {
+            <partial name="_Sort" model="Model.Sort" />
+        }
+
         @if (Model.Profiles.Count == 0)
         {
+            @* Two distinct empty shapes: no residents on the platform at all
+               (directory.empty) vs. residents exist but the viewer's search or
+               verified toggle narrowed them to zero (directory.no_results). *@
             <div class="alert alert-info">
-                <kw-l key="directory.empty">No residents on this neighborhood yet.</kw-l>
+                @if (Model.HasAnyResidents)
+                {
+                    <kw-l key="directory.no_results">No residents match your search.</kw-l>
+                }
+                else
+                {
+                    <kw-l key="directory.empty">No residents on this neighborhood yet.</kw-l>
+                }
             </div>
         }
         else

@@ -1927,6 +1927,10 @@ public static class KnownTranslationKeys
             ["directory.title"] = "Directory",
             ["directory.lead"]  = "Everyone in the neighborhood — every resident on the platform.",
             ["directory.empty"] = "No residents on this neighborhood yet.",
+            ["directory.no_results"] = "No residents match your search.",
+            ["directory.search"] = "Search",
+            ["directory.verified_only"] = "Verified only",
+            ["directory.clear"] = "Clear",
 
             // ── profile (page heading + primary action) ─────────────────────
             ["profile.title"]      = "Your profile",
@@ -3530,6 +3534,7 @@ public static class KnownTranslationKeys
             ["a11y.notifications"]             = "Notifications",
             ["a11y.find_tag"]                  = "Find by tag",
             ["a11y.find_bio"]                  = "Find by bio",
+            ["a11y.find_directory"]            = "Search residents",
             ["a11y.avatar"]                    = "Avatar image",
             ["a11y.board_actions"]             = "Board actions",
             ["a11y.calendar_view"]             = "Calendar view",
@@ -5718,6 +5723,10 @@ public static class KnownTranslationKeys
             ["directory.title"] = "Verzeichnis",
             ["directory.lead"]  = "Alle in der Nachbarschaft — jede:r Anwohner:in auf der Plattform.",
             ["directory.empty"] = "Noch keine Anwohner:innen in dieser Nachbarschaft.",
+            ["directory.no_results"] = "Keine Anwohner:innen entsprechen deiner Suche.",
+            ["directory.search"] = "Suchen",
+            ["directory.verified_only"] = "Nur verifizierte",
+            ["directory.clear"] = "Zurücksetzen",
 
             // ── profile (page heading + primary action) ─────────────────────
             ["profile.title"]      = "Dein Profil",
@@ -7209,6 +7218,7 @@ public static class KnownTranslationKeys
             ["a11y.notifications"]             = "Benachrichtigungen",
             ["a11y.find_tag"]                  = "Nach Tag finden",
             ["a11y.find_bio"]                  = "Nach Bio finden",
+            ["a11y.find_directory"]            = "Anwohner:innen durchsuchen",
             ["a11y.avatar"]                    = "Avatarbild",
             ["a11y.board_actions"]             = "Board-Aktionen",
             ["a11y.calendar_view"]             = "Kalenderansicht",
@@ -9305,6 +9315,10 @@ public static class KnownTranslationKeys
             ["directory.title"] = "Annuaire",
             ["directory.lead"]  = "Tout le monde dans le quartier — chaque habitant sur la plateforme.",
             ["directory.empty"] = "Pas encore d'habitants dans ce quartier.",
+            ["directory.no_results"] = "Aucun habitant ne correspond à votre recherche.",
+            ["directory.search"] = "Rechercher",
+            ["directory.verified_only"] = "Vérifiés uniquement",
+            ["directory.clear"] = "Effacer",
 
             // ── profile (page heading + primary action) ─────────────────────
             ["profile.title"]      = "Ton profil",
@@ -10797,6 +10811,7 @@ public static class KnownTranslationKeys
             ["a11y.notifications"]             = "Notifications",
             ["a11y.find_tag"]                  = "Chercher par étiquette",
             ["a11y.find_bio"]                  = "Chercher par bio",
+            ["a11y.find_directory"]            = "Rechercher des habitants",
             ["a11y.avatar"]                    = "Image du profil",
             ["a11y.board_actions"]             = "Actions du tableau",
             ["a11y.calendar_view"]             = "Vue calendrier",
@@ -12888,6 +12903,10 @@ public static class KnownTranslationKeys
             ["directory.title"] = "Kontaktliste",
             ["directory.lead"]  = "Alle i nabolaget — alle beboere på platformen.",
             ["directory.empty"] = "Ingen beboere i dette nabolag endnu.",
+            ["directory.no_results"] = "Ingen beboere matcher dit søgning.",
+            ["directory.search"] = "Søg",
+            ["directory.verified_only"] = "Kun verificerede",
+            ["directory.clear"] = "Ryd",
 
             // ── profile (page heading + primary action) ─────────────────────
             ["profile.title"]      = "Din profil",
@@ -14368,6 +14387,7 @@ public static class KnownTranslationKeys
             ["a11y.notifications"]             = "Notifikationer",
             ["a11y.find_tag"]                  = "Find med tag",
             ["a11y.find_bio"]                  = "Find med bio",
+            ["a11y.find_directory"]            = "Søg beboere",
             ["a11y.avatar"]                    = "Avatarbillede",
             ["a11y.board_actions"]             = "Bræt-handlinger",
             ["a11y.calendar_view"]             = "Kalendervisning",

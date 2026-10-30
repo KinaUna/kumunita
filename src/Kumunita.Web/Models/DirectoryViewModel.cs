@@ -26,6 +26,37 @@ public sealed class DirectoryViewModel
     public IReadOnlyList<VisibleProfile> Profiles { get; set; } = Array.Empty<VisibleProfile>();
 
     /// <summary>
+    /// The active name search (trimmed), <c>null</c> when no <c>?q=</c> filter
+    /// was requested. Echoed into the search box so a sort-toggle re-render keeps
+    /// the viewer's text. A <c>null</c> value is the pre-filter catalog (no search).
+    /// </summary>
+    public string? Query { get; set; }
+
+    /// <summary>Whether the <c>?verified=</c> (verified-residents-only) filter is active.</summary>
+    public bool VerifiedOnly { get; set; }
+
+    /// <summary>
+    /// The directory **sort** control (the shared <c>_Sort</c> partial, the
+    /// FindPeople/Posts reference reused): the closed allowlist (<c>name</c> →
+    /// <c>DisplayName</c>, asc — <c>Profile</c> has no <c>Created</c>, so this
+    /// surface offers exactly one key). <c>CarriedParams</c> carries the active
+    /// filters so a sort flip keeps the search + verified state. Null ⇒ no sort
+    /// control (the surface always offers one here, so it is non-null in the app).
+    /// </summary>
+    public Kumunita.Web.Models.SortViewModel? Sort { get; set; }
+
+    /// <summary>
+    /// Whether the neighbor directory has <b>any</b> non-blocked residents at
+    /// all (the full catalog, before the viewer's own filters). Distinguishes the
+    /// two empty shapes the view renders: <see cref="Profiles"/> empty because
+    /// there are no residents (the <c>directory.empty</c> "no residents on this
+    /// neighborhood yet") vs. empty because the viewer's search/verified filter
+    /// narrowed the non-empty catalog to zero (the <c>directory.no_results</c>
+    /// "no residents match your search"). <c>true</c> when the catalog is non-empty.
+    /// </summary>
+    public bool HasAnyResidents { get; set; }
+
+    /// <summary>
     /// The directory **detail** surface (M2, plan U8) — a single-row projection of
     /// <c>DirectoryService.DetailAsync</c>'s <see cref="Kumunita.Core.UserInfo.DirectoryDetail"/>.
     /// The detail route renders <see cref="Detail"/> directly (nested type, not a new property

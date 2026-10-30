@@ -222,8 +222,14 @@ $aBaseline = @(
 # keys x en/de/fr/da added to KnownTranslationKeys.cs (13975 -> 14687) — the
 # same shipped-additions mechanism as above; the gate's ceiling starts from
 # 14687 now.
+# Re-baselined again 2026-10-30 (the ADR 0277 directory sort/filter lane close):
+# the directory's search/verified/clear labels (directory.search /
+# directory.verified_only / directory.no_results / directory.clear) + the
+# a11y.find_directory aria-label, x en/de/fr/da, added to
+# KnownTranslationKeys.cs (14687 -> 14707) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 14707 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14687
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14707
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
