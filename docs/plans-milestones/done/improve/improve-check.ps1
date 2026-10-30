@@ -212,8 +212,18 @@ $aBaseline = @(
 # keys x en/de/fr/da added to KnownTranslationKeys.cs (13575 -> 13975) — the
 # same shipped-additions mechanism as above; the gate's ceiling starts from
 # 13975 now.
+# Re-baselined again 2026-10-30 (the ADR 0273 security-settings/leftovers/
+# page-titles close): the 178 new settings.mfa.* / settings.sessions.* /
+# account.delete_confirm_dialog / myportability.* / blog.draft_title /
+# inv.detail.note_placeholder / kiosk.exit / moderation.unlock_header /
+# moderation.unlock_desc / moderation.resolve_desc / pages.sibling_nav /
+# posts.mandatory_title / posts.no_feeds / profile.preview_visible_sentence /
+# profile.preview_hidden_sentence / sort.aria_label / about.cta.* / title.*
+# keys x en/de/fr/da added to KnownTranslationKeys.cs (13975 -> 14687) — the
+# same shipped-additions mechanism as above; the gate's ceiling starts from
+# 14687 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 13975
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14687
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
