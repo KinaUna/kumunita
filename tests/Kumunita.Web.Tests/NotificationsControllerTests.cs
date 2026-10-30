@@ -255,9 +255,21 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // asked you to become a co-guardian" nudge; ADR 0144 adds the two
         // guardian event-attendance kinds — guardian.event_request (the
         // child's RSVP was routed to the guardian) / guardian.event_rsvp
-        // (the child's own attendance stands, the guardian's veto window)).
+        // (child's own attendance stands, the guardian's veto window); the
+        // group-messaging lane adds the N:1 kinds — group.message.new
+        // (a group thread's body nudges every participant except the sender) /
+        // group.message.mention (the M36 mention posture, generalized to the
+        // group surface) / group.message.invite (the invitation flow, ADR
+        // 0278 amendment — a resident has been invited to join a group-message
+        // thread, they must accept or decline)).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(28, vm.AllKinds.Count);
+        // 28 → 30 (2026-10-30, the group-messaging lane close — the two new
+        // N:1 nudge kinds group.message.new / group.message.mention join the
+        // closed set; the same re-baseline-and-annotate doctrine as the
+        // improve-check gate pins / the site.css media-block pin).
+        // 30 → 31 (the group-messaging invitation flow, ADR 0278 amendment —
+        // group.message.invite joins the closed set).
+        Assert.Equal(31, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

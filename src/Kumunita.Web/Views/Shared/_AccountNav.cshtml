@@ -188,6 +188,12 @@
                      && navAvatarSubject is not null
                      && await Messaging.IsMessagingAllowedForAsync(navAvatarSubject))
                 {
+                    @* The group-messaging lane (the N:1 generalization of the
+                       M9 1:1 surface, ADR 0278) is no longer a separate
+                       account-menu entry — it lives as a tab beside the 1:1
+                       surface (the _MessagesTabs.cshtml strip on the
+                       /messages page), so the resident sees one "Messages"
+                       entry that differentiates Direct vs. Group. *@
                     <li class="nav-item">
                         <a class="dropdown-item text-dark" href="/messages"><kw-l key="message.nav">Messages</kw-l></a>
                     </li>

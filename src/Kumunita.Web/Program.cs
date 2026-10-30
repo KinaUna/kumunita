@@ -314,6 +314,19 @@ var marten = builder.Services.AddMarten(opts =>
     // KioskDocTypes lives in Kumunita.Core (like the other *DocTypes), so
     // the unqualified name resolves here unchanged.
     KioskDocTypes.Configure(opts);
+
+    // Group messaging lane (the N:1 generalization of the M9 1:1 Messaging
+    // context, ADR 0105): the GroupConversation + GroupMessage documents
+    // (ADR 0004 §B.1 — the Participants membership index on GroupConversation
+    // (the ListGroupsAsync participant-set query) and the
+    // (ConversationId, Created) thread-ordering index on GroupMessage, the
+    // M6/M9 feed-ordering index shape). Unlike the M9 Conversation there is
+    // no unique pair index — a group is not canonical (the same members may
+    // legitimately form two groups). Without this call the docs are
+    // invisible to Marten (the M3/Media/Page/Tag/M9/M16/M17 precedent). The
+    // dev-only ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap
+    // versioned boot both pick the surface up automatically.
+    GroupMessagingDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

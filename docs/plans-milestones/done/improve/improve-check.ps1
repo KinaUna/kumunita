@@ -228,8 +228,25 @@ $aBaseline = @(
 # a11y.find_directory aria-label, x en/de/fr/da, added to
 # KnownTranslationKeys.cs (14687 -> 14707) — the same shipped-additions
 # mechanism as above; the gate's ceiling starts from 14707 now.
+# Re-baselined again 2026-10-30 (the group-messaging lane close): the 15
+# group_message.* UI keys + the 8 group-messaging notification.* keys
+# (kind badge + preference label + subject + body for the two new kinds
+# group.message.new / group.message.mention) x en/de/fr/da added to
+# KnownTranslationKeys.cs (14707 -> 14815) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 14815 now.
+# Re-baselined again 2026-10-30 (the group-title + messages-tab amendment
+# to the group-messaging lane, ADR 0278): the two group_message.new.name*
+# keys (the new-group name field's label + placeholder) x en/de/fr/da added
+# to KnownTranslationKeys.cs (14815 -> 14823) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 14823 now.
+# Re-baselined again (the group-messaging invitation flow, ADR 0278
+# amendment): the seven new group_message.* UI keys (members / pending /
+# invite_sent / invite_accepted / invite_declined / invite_not_pending) +
+# the three notification.* group.message.invite keys x en/de/fr/da added to
+# KnownTranslationKeys.cs (14823 -> 14863) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 14863 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14707
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14863
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926

@@ -1,0 +1,146 @@
+@model Kumunita.Web.Controllers.GroupMessagesController.GroupMessagesIndexViewModel
+@using Kumunita.Core.Localization
+@using Kumunita.Core.GroupMessaging
+@using Kumunita.Web.Security
+@inject ITranslationProvider Translation
+@inject ILocalizationService Localization
+@{
+    ViewData["Title"] = "Group messages";
+    // A label needed inside an attribute (the unread badge's title) + the
+    // unnamed-participant fallback — the <kw-l> TagHelper can't sit inside an
+    // attribute, so resolve them server-side, once, up front (the ADR 0072 /
+    // Search/Index placeholder pattern, the M9 Messages/Index shape).
+    var lang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaResident = await Translation.GetAsync("a11y.resident", lang);
+    var unreadWord = await Translation.GetAsync("group_message.unread", lang);
+    var participantsWord = await Translation.GetAsync("group_message.participants", lang);
+    // The new-group title field's label + placeholder (the kw-l TagHelper
+    // can't sit inside an attribute), server-resolved once up front.
+    var groupNameWord = await Translation.GetAsync("group_message.new.name", lang);
+    var groupNamePlaceholder = await Translation.GetAsync("group_message.new.name.placeholder", lang);
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <h1><kw-l key="group_message.title">Group messages</kw-l></h1>
+        </header>
+
+        @* The Direct / Group tab strip (the _MessagesTabs.cshtml idiom — the
+           group-messaging lane, ADR 0278, lives beside the 1:1 surface
+           rather than in the account menu). Self-gates on the toggle +
+           per-actor standing. *@
+        <partial name="_MessagesTabs" />
+
+        @if (Model.Disabled || Model.Error)
+        {
+            @* F5 — the instance toggle is off (or an open attempt failed): the
+               disabled state, no list, no picker. The resident is told
+               nothing beyond the notice. *@
+            <div class="alert alert-secondary" role="status">
+                <kw-l key="group_message.disabled">Group messaging is turned off on this instance.</kw-l>
+            </div>
+            return;
+        }
+
+        <div class="row g-4">
+            @* ── The group list ─────────────────────────────────────────── *@
+            <div class="col-lg-8">
+                @if (Model.Groups.Count == 0)
+                {
+                    <div class="alert alert-secondary" role="status">
+                        <kw-l key="group_message.thread.empty">No messages yet — start the conversation.</kw-l>
+                    </div>
+                }
+                else
+                {
+                    <ul class="list-group messages-conv-list">
+                        @foreach (var g in Model.Groups)
+                        {
+                            @* The header label: the group's user-chosen title
+                               when it has one; otherwise the participant
+                               count (the stable identifier the list row
+                               carries — the M9 OtherDisplayName has no N:1
+                               analogue, so the count is the fallback). *@
+                            <li class="list-group-item d-flex align-items-start">
+                                <a class="text-dark text-decoration-none flex-grow-1" href="/group-messages/@g.Id">
+                                    <div class="fw-semibold">
+                                        @if (string.IsNullOrEmpty(g.Title))
+                                        {
+                                            @System.String.Format(System.Globalization.CultureInfo.InvariantCulture, participantsWord, g.ParticipantIds.Count)
+                                        }
+                                        else
+                                        {
+                                            @g.Title
+                                        }
+                                        @if (g.UnreadCount > 0)
+                                        {
+                                            <span class="badge text-bg-primary ms-2" title="@unreadWord">@g.UnreadCount</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(g.LastMessageBody))
+                                    {
+                                        <div class="small text-truncate text-secondary">@g.LastMessageBody</div>
+                                    }
+                                    @if (g.LastMessageAt is { } lastAt)
+                                    {
+                                        <div class="small text-secondary"><kw-dt dt="@lastAt" format="g"></kw-dt></div>
+                                    }
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                    @if (Model.Pager is not null)
+                    {
+                        <partial name="_Pager" model="Model.Pager" />
+                    }
+                }
+            </div>
+
+            @* ── New group picker (the multi-recipient selector) ───────── *@
+            <div class="col-lg-4">
+                <section>
+                    <h2 class="h5 mb-3"><kw-l key="group_message.new">New group</kw-l></h2>
+                    @if (Model.Candidates.Count < 1)
+                    {
+                        @* A group needs at least two distinct residents (the
+                           actor + one recipient), so zero candidates means
+                           the picker is unusable. *@
+                        <p class="text-secondary small">—</p>
+                    }
+                    else
+                    {
+                        <form method="post" action="/group-messages/open" class="mb-0">
+                            @Html.AntiForgeryToken()
+                            @* The optional group name (the thread's label).
+                               Left blank → the group is unnamed and the list
+                               row falls back to the participant count. The
+                               service trims + caps it (MaxTitleChars). *@
+                            <input type="text" class="form-control mb-2" name="title"
+                                   maxlength="120" placeholder="@groupNamePlaceholder"
+                                   aria-label="@groupNameWord">
+                            @* The multi-select: the form posts recipientIds[]
+                               (the bound array name the Open action reads).
+                               The required attribute on a multi-select is
+                               non-standard — the JS layer + the service's
+                               < 2-participants ArgumentException are the
+                               real gates. *@
+                            <select class="form-select mb-2" name="recipientIds"
+                                    multiple size="8" aria-label="@ariaResident">
+                                @foreach (var candidate in Model.Candidates)
+                                {
+                                    <option value="@candidate.SubjectId">@candidate.DisplayName</option>
+                                }
+                            </select>
+                            <div class="small text-secondary mb-2">
+                                <kw-l key="group_message.add_members">Add people</kw-l> —
+                                <span class="text-muted">(Ctrl/⌘-click to select several)</span>
+                            </div>
+                            <button type="submit" class="btn btn-primary"><kw-l key="group_message.new">New group</kw-l></button>
+                        </form>
+                    }
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
