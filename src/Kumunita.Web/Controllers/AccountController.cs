@@ -904,6 +904,14 @@ public sealed class AccountController(
             // signed in — the redirect to enrollment works. Signing out would
             // break the `[Authorize]` (auth challenge → redirect back to
             // /Account/Login → loop).
+            // SEC H2 (invariant S-2): this redirect is a **convenience only**,
+            // not the control. The server-side gate is
+            // `AdminTwoFactorMiddleware` (registered in Program.cs after
+            // UseAuthentication, before UseAuthorization), which enforces
+            // 2FA on every subsequent request for an un-enrolled GlobalAdmin
+            // and redirects any non-allow-listed route to enrolment. Even if
+            // this branch were skipped, the middleware is what keeps an
+            // un-enrolled admin out of the rest of the site.
             return RedirectToAction("Mfa", "SecuritySettings");
         }
 

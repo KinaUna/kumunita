@@ -1040,6 +1040,14 @@ app.UseMiddleware<BlockedAccountMiddleware>();
 // mechanism and the .NET 10.0.13 source grounding.
 app.UseMiddleware<RevocationStampMiddleware>();
 
+// SEC H2 (invariant S-2) — the GlobalAdmin 2FA gate: for an authenticated
+// GlobalAdmin whose 2FA is not enrolled (and who is not a sample-data
+// account), only the enrolment/logout/static routes are reachable; every
+// other route is 302-redirected to enrolment. Registered after
+// UseAuthentication (so HttpContext.User is populated) and before
+// UseAuthorization. Server-side control, not a redirect (veto 2).
+app.UseMiddleware<AdminTwoFactorMiddleware>();
+
 // M28 — guardian time-limit enforcement (ADR 0151, D5): a child whose
 // guardian-set schedule window says "not now" (evaluated in the child's ADR
 // 0019 effective zone) is signed out and lands on /Account/Login?error=time-limit

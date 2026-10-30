@@ -177,6 +177,12 @@ support, plus recovery codes.
 
 - **GlobalAdmin: required.** An admin account is total instance compromise (roles,
   standing moderator visibility, audit log); 2FA is the control, not optional.
+  Enforced server-side by `AdminTwoFactorMiddleware` (registered in `Program.cs`
+  after `UseAuthentication`, before `UseAuthorization`): an authenticated
+  GlobalAdmin without enrolled 2FA (and not a sample-data account) is limited
+  to the enrolment, logout and static routes; every other route is redirected
+  to enrolment. The login redirect in `AccountController` is a convenience only
+  — the middleware is the gate.
 - **Moderator: recommended, not required** — standing is component-scoped and their
   restricted reads are already audited.
 - **Member: none** — overkill at this scale; their content is protected by
