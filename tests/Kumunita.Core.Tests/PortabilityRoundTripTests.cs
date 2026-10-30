@@ -13,6 +13,7 @@ using Kumunita.Core.Pages;
 using Kumunita.Core.Portability;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Microsoft.AspNetCore.Identity;
@@ -1414,6 +1415,278 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
                 using var stream = await mediaStore.OpenReadAsync(
                     "pt-nonexistent-media-id", ct);
             });
+    }
+
+    // ADR 0274 D1 — the KeepExisting tag merge. A tag the archive carries that
+    // the target already holds — same slug AND same default-language display
+    // name — is NOT stored as a second tag (the existing one is kept intact,
+    // never overwritten); the archive's content's tag references are re-pointed
+    // at the existing tag, and the archive's TagTranslation rows fold in as
+    // translations of the existing tag (one row per language — a language the
+    // existing tag already has is left untouched, never overwritten; a new one
+    // is added). This closes the duplicate-tag failure a KeepExisting import
+    // produced over a live instance (the natural-identity skip cannot see the
+    // Tag/TagTranslation pair: Tag has no unique index — C-TG·4 — and the
+    // TagTranslation (TagId, LanguageCode) unique index is keyed on the
+    // surrogate TagId, so it silently doubles).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_MergesSameTagBySlugAndDefaultLanguageName()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes) + a tag (slug "recycling", base
+        // name "Recycling", default language en) + a TagTranslation (de) + the
+        // planted Post re-pointed at it.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var plantedA = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        const string aTagId = "a-tag-recycling";
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            // Add fr to the catalog (the validate gate's ref.dangling check
+            // resolves every TagTranslation LanguageCode against the
+            // archive's catalog languages — the plant seeds only en/de).
+            sa.Store(new LanguageCatalog { Id = "fr", NativeName = "Français", Enabled = true, SortOrder = 2 });
+            sa.Store(new Tag { Id = aTagId, Slug = "recycling", Name = "Recycling", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sa.Store(new TagTranslation { Id = "a-tagtr-de", TagId = aTagId, LanguageCode = "de", Name = "Recycling (A)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sa.Store(new TagTranslation { Id = "a-tagtr-fr", TagId = aTagId, LanguageCode = "fr", Name = "Recyclage (A)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            // A Post that references the tag (the archive's content — its
+            // TagIds must be re-pointed at B's existing tag on import).
+            sa.Store(new Post { Id = "a-post-tagged", ComponentId = "pt-component-001", AuthorId = "pt-resident-001", TagIds = [aTagId], Created = DateTimeOffset.UtcNow });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a MINIMAL target (the principals + the config + the SAME
+        // tag under B's OWN surrogate id — a cross-instance shape — with only
+        // the de translation; fr is new for B so the merge must add it). B does
+        // NOT re-plant A's content (the KeepExisting import adds A's content;
+        // B already holds the tag + its de translation).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        const string bTagId = "b-tag-recycling";
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Tag { Id = bTagId, Slug = "recycling", Name = "Recycling", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sb.Store(new TagTranslation { Id = "b-tagtr-de", TagId = bTagId, LanguageCode = "de", Name = "Recycling (B — kept)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // The tag is MERGED: exactly ONE "recycling" tag, and it is B's
+            // existing one (kept intact — never overwritten, never a second).
+            var recyclingTags = await q.Query<Tag>().Where(t => t.Slug == "recycling").ToListAsync(ct);
+            Assert.True(recyclingTags.Count == 1,
+                "the same tag (slug + default-language name) must appear ONCE — " +
+                $"got {recyclingTags.Count}");
+            Assert.Equal(bTagId, recyclingTags[0].Id);
+            Assert.Equal("Recycling", recyclingTags[0].Name);
+
+            // The archive's tagged Post's tag reference is re-pointed at B's
+            // existing tag (so the archive's content lands on B's tag — not a
+            // second one).
+            var importedPost = await q.LoadAsync<Post>("a-post-tagged", ct);
+            Assert.NotNull(importedPost);
+            Assert.True(importedPost!.TagIds.Contains(bTagId),
+                "the archive's Post's tag reference must be re-pointed at B's existing tag");
+            Assert.True(!importedPost.TagIds.Contains(aTagId),
+                "the archive's tag id must NOT appear on the imported Post — " +
+                "its reference must be re-pointed at B's existing tag");
+
+            // The archive's TagTranslation rows fold in as translations of the
+            // EXISTING tag: the de row (B already had it) is kept intact
+            // (never overwritten), the fr row (new for B) is added.
+            var translations = await q.Query<TagTranslation>()
+                .Where(t => t.TagId == bTagId).ToListAsync(ct);
+            var de = translations.FirstOrDefault(t => t.LanguageCode == "de");
+            var fr = translations.FirstOrDefault(t => t.LanguageCode == "fr");
+            Assert.NotNull(de);
+            Assert.Equal("b-tagtr-de", de!.Id);
+            Assert.Equal("Recycling (B — kept)", de.Name); // B's row kept intact
+            Assert.NotNull(fr);
+            Assert.Equal("Recyclage (A)", fr!.Name);       // archive's fr added
+            Assert.True(!translations.Any(t => t.TagId == aTagId),
+                "the archive's tag id must NOT appear as a TagTranslation parent — " +
+                "the translations must fold into B's existing tag");
+        }
+    }
+
+    // ADR 0274 D2 — the keep-vs-add boundary. A tag the archive carries that
+    // the target already holds — same slug but a DIFFERENT default-language
+    // display name — is a DIFFERENT tag (the ADR 0044 D3 design: two names,
+    // two tags). It is stored as its own new tag, NOT merged (no false merge).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_KepsTwoTagsWithSameSlugButDifferentDefaultLanguageName()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — a tag (slug "recycling", base name "Recycling — A").
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerA, roleManagerA,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new Tag { Id = "a-tag-recycling-x", Slug = "recycling", Name = "Recycling — A", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the same slug but a DIFFERENT default-language name
+        // ("Recycling — B").
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Tag { Id = "b-tag-recycling-x", Slug = "recycling", Name = "Recycling — B", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // Two tags (same slug, different default-language name) — the
+            // archive's is stored as its own new tag, NOT merged (no false
+            // merge; B's existing one is kept intact).
+            var recyclingTags = await q.Query<Tag>().Where(t => t.Slug == "recycling").ToListAsync(ct);
+            Assert.True(recyclingTags.Count == 2,
+                "same slug + different default-language name = two tags (ADR 0044 D3) — " +
+                $"got {recyclingTags.Count}");
+            Assert.True(recyclingTags.Any(t => t.Id == "b-tag-recycling-x" && t.Name == "Recycling — B"),
+                "B's existing tag (the different default-language name) must be kept intact");
+            Assert.True(recyclingTags.Any(t => t.Id == "a-tag-recycling-x" && t.Name == "Recycling — A"),
+                "the archive's tag (the different default-language name) must be stored as its own new tag — NOT merged");
+        }
+    }
+
+    // ADR 0275 — the KeepExisting principal merge. A principal the archive
+    // carries that the target already holds — same EMAIL (the cross-instance
+    // identity; the archive's account id and the target's account id are
+    // DIFFERENT, the sample-seeder's random-subject shape) — is NOT stored as
+    // a second account/Profile (the existing profile is kept intact, the
+    // directory is not doubled); the archive's content's principal references
+    // are re-pointed at the existing account's id (so the archive's content
+    // lands on the target's account — not a dangling foreign subject id).
+    // This closes the duplicate-directory failure a KeepExisting import
+    // produced over a live instance (the natural-identity skip cannot see the
+    // Profile/Principal pair: Profile has no unique index — its identity is
+    // SubjectId, a cross-instance random id — so the archive's Profile for the
+    // same person silently lands as a second /directory entry).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_MergesSamePrincipalByEmail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes) + a DISTINCT resident (a new
+        // principal with its own id + email + Profile + a Post they authored).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var plantedA = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        const string aResidentId = "pt-resident-002";
+        const string residentEmail = "resident-two@maplewood.example";
+        await EnsurePrincipalWithRolesAsync(userManagerA, roleManagerA,
+            aResidentId, "pt-resident-two", residentEmail, [Roles.Member], ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new Profile
+            {
+                SubjectId = aResidentId,
+                DisplayName = "PT Resident Two (A)",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+            });
+            // A Post authored by this principal (the archive's content — its
+            // AuthorId must be re-pointed at B's existing account on import).
+            sa.Store(new Post
+            {
+                Id = "a-post-merged-author",
+                ComponentId = "pt-component-001",
+                AuthorId = aResidentId,
+                Title = "PT ADR 0275 — authored by the merged resident",
+                Body = "PT ADR 0275 — the round-trip principal-merge author witness.",
+                Created = DateTimeOffset.UtcNow,
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the representative instance (so B already holds
+        // pt-admin-001 + pt-resident-001) + the SAME person as a DIFFERENT
+        // account (a new principal with a DIFFERENT id + the SAME email — the
+        // cross-instance sample-seeder shape — and B's OWN Profile for them).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        var plantedB = await PlantRepresentativeInstanceAsync(storeB, userManagerB, roleManagerB, mediaStoreB, ct);
+        const string bResidentId = "pt-resident-002-b";
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            bResidentId, "pt-resident-two", residentEmail, [Roles.Member], ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Profile
+            {
+                SubjectId = bResidentId,
+                DisplayName = "PT Resident Two (B — kept)",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // The person is NOT doubled on the directory: B's existing profile
+            // (kept intact — never overwritten, never a second one) is the
+            // profile for that email's person, and the archive's Profile row
+            // (a different SubjectId, same person) is NOT stored.
+            var bProfile = await q.LoadAsync<Profile>(bResidentId, ct);
+            Assert.NotNull(bProfile);
+            Assert.Equal("PT Resident Two (B — kept)", bProfile!.DisplayName);
+            Assert.True(!await q.Query<Profile>().AnyAsync(p => p.SubjectId == aResidentId, ct),
+                "the archive's Profile row for the merged person must NOT be stored — " +
+                "the directory must not be doubled (the existing profile is kept intact)");
+
+            // The archive's Post's author reference is re-pointed at B's
+            // existing account (so the archive's content lands on B's account
+            // — not a dangling foreign subject id).
+            var importedPost = await q.LoadAsync<Post>("a-post-merged-author", ct);
+            Assert.NotNull(importedPost);
+            Assert.Equal(bResidentId, importedPost!.AuthorId);
+            Assert.True(!importedPost.AuthorId.Equals(aResidentId, StringComparison.Ordinal),
+                "the archive's author id must NOT appear on the imported Post — " +
+                "its reference must be re-pointed at B's existing account");
+        }
     }
 
     // ── The stream helper — the MemoryStream → byte[] bridge (the export

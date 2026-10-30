@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.77.0 entry (localization of the remaining surface — ADRs 0261–0273) — 0.76.0 (Documents) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.79.0 entry (portability import principal merge — ADR 0275) — 0.78.0 (tag merge) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,26 +69,41 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The localization-of-the-remaining-surface lane
-        // (ADRs 0261–0273, 2026-10-30 — the admin hub + settings views,
-        // the validation / flash messages, the guardian RSVP statuses,
-        // the Kiosk + sign-up + page-form pages, and the page titles all
-        // resolve through the kw-l registry with the English floor
-        // inline) is now the newest shipped (the 0.77.0 entry), so it is
-        // the head; the Documents-uploader-attribution + delete-lane lane
-        // (ADR 0239, 2026-10-29) 0.76.0 entry slides one row back; the
-        // Kanban-board-card-edit-modal lane (ADR 0195, 2026-10-27)
-        // 0.75.0 entry slides two rows back; and so on.
+        // slides down. The portability-import principal-merge lane
+        // (ADR 0275, 2026-10-30 — a KeepExisting merge import no longer
+        // doubles a person the target already holds (same email, different
+        // cross-instance account id); the existing profile is kept intact —
+        // the /directory entry is not doubled — and the archive's content is
+        // re-pointed at the existing account's id) is now the newest shipped
+        // (the 0.79.0 entry), so it is the head; the
+        // portability-import tag-merge lane (ADR 0274, 2026-10-30) 0.78.0
+        // entry slides one row back; the
+        // localization-of-the-remaining-surface lane (ADRs 0261–0273,
+        // 2026-10-30) 0.77.0 entry slides two rows back; the
+        // Documents-uploader-attribution + delete-lane lane (ADR 0239,
+        // 2026-10-29) 0.76.0 entry slides three rows back; and so on.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.77.0" && head.Date == "2026-10-30",
-            "The localization-of-the-remaining-surface 0.77.0 (2026-10-30) entry must be the head of the registry; got "
+            head.Version == "0.79.0" && head.Date == "2026-10-30",
+            "The portability-import principal-merge 0.79.0 (2026-10-30) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("language", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("translation", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("ADR 0261", StringComparison.OrdinalIgnoreCase)),
-            "The 0.77.0 head entry must name the localization lane + the ADR 0261 seam.");
+            head.Changes.Any(c => c.Contains("directory", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0275", StringComparison.OrdinalIgnoreCase)),
+            "The 0.79.0 head entry must name the principal-merge lane + ADR 0275.");
+        // The previous head (the tag-merge lane, 0.78.0) slides one row
+        // back — pin it too so a copy-paste that drops it is caught.
+        var second = WhatsNew.All[1];
+        Assert.True(
+            second.Version == "0.78.0" && second.Date == "2026-10-30",
+            "The portability-import tag-merge 0.78.0 (2026-10-30) entry must be the second entry; got "
+                + second.Version + " / " + second.Date + ".");
+        Assert.True(
+            second.Changes.Any(c => c.Contains("tag", StringComparison.OrdinalIgnoreCase)
+                                   && c.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+                                   && c.Contains("ADR 0274", StringComparison.OrdinalIgnoreCase)),
+            "The 0.78.0 entry must name the tag-merge lane + ADR 0274.");
 
         // The Documents-uploader-attribution + delete-lane entry (0.76.0) slides one row back.
         var documentsLane = WhatsNew.All.Single(v => v.Version == "0.76.0");
