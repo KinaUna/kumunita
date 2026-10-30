@@ -20,12 +20,7 @@
         @if (Model.Components.Count == 0)
         {
             <div class="alert alert-warning">
-                No community feed is currently available to post to. Ask
-                a resident (or a global admin, if you have one) to enable
-                one — the common ones are <code>safety</code>,
-                <code>maintenance</code>, <code>social</code>, and
-                <code>governance</code>.
-            </div>
+                <kw-l key="posts.no_feeds">No community feed is currently available to post to. Ask a resident (or a global admin, if you have one) to enable one — the common ones are safety, maintenance, social, and governance.</kw-l></div>
         }
 
         <form id="new-post-form" method="post" action="/posts/new">

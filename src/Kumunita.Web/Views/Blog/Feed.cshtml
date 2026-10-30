@@ -1,4 +1,11 @@
 @model Kumunita.Web.Models.BlogViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _blogDraftTitle = Translation is null ? "A draft — only you can see it until you publish it." : await Translation.GetAsync("blog.draft_title", _aL);
+}
 @{
     var hasName = Model.AuthorDisplayName is string dn && !string.IsNullOrWhiteSpace(dn);
     var heading = hasName ? $"{Model.AuthorDisplayName}'s blog" : "Blog";
@@ -44,7 +51,7 @@
                             <a class="fw-semibold text-decoration-none" href="@post.Href">@post.Title</a>
                             @if (post.IsDraft && Model.IsOwner)
                             {
-                                <span class="badge bg-warning text-dark ms-2" title="A draft — only you can see it until you publish it.">
+                                <span class="badge bg-warning text-dark ms-2" title="@_blogDraftTitle">
                                     <kw-l key="blog.draft">Draft</kw-l>
                                 </span>
                             }

@@ -190,7 +190,7 @@
                                     <select class="form-control" id="scope" name="Scope">
                                         <option value="AllResidents"
                                                 selected="@(Model.Scope == "AllResidents" ? "selected" : null)">
-                                            All residents
+                                            <kw-l key="pages.form.scope_all">All residents</kw-l>
                                         </option>
                                         @foreach (var (id, name) in Model.Components)
                                         {
@@ -201,7 +201,7 @@
                                         }
                                         <option value="Individual"
                                                 selected="@(Model.Scope == "Individual" ? "selected" : null)">
-                                            Individual access
+                                            <kw-l key="pages.form.scope_individual">Individual access</kw-l>
                                         </option>
                                     </select>
                                     <div class="text-muted small mt-1">

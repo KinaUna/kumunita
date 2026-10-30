@@ -1,5 +1,11 @@
 @using Kumunita.Web.Security
 @model Kumunita.Web.Models.SessionSettingsViewModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _sessKillConfirm = Translation is null ? "Sign out of every session for this account? Your other devices and browsers will be signed out immediately." : await Translation.GetAsync("settings.sessions.kill_confirm", _aL);
+}
 @{
     ViewData["Title"] = "Settings — Security";
 }
@@ -24,23 +30,17 @@
 *@
 @await Html.PartialAsync("../Locale/_SettingsTabs.cshtml")
 
-<h1>Your settings</h1>
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
 
-<h2 class="mt-1">Security</h2>
+<h2 class="mt-1"><kw-l key="settings.security.title">Security</kw-l></h2>
 <p class="text-muted">
-    Manage your signed-in sessions. Signing out everywhere ends your other
-    active sessions immediately — any other browser or device that is signed
-    in to this account will be signed out on its next action.
-</p>
+    <kw-l key="settings.sessions.intro">Manage your signed-in sessions. Signing out everywhere ends your other active sessions immediately — any other browser or device that is signed in to this account will be signed out on its next action.</kw-l></p>
 
 <div class="card">
     <div class="card-body">
-        <h3 class="h5">This session</h3>
+        <h3 class="h5"><kw-l key="settings.sessions.this_heading">This session</kw-l></h3>
         <p class="text-muted mb-0">
-            You are currently signed in. Signing out everywhere below ends
-            this session as well as every other active session for this
-            account.
-        </p>
+            <kw-l key="settings.sessions.this_desc">You are currently signed in. Signing out everywhere below ends this session as well as every other active session for this account.</kw-l></p>
     </div>
 </div>
 
@@ -48,18 +48,14 @@
 
 <div class="card border-danger-subtle">
     <div class="card-body">
-        <h3 class="h5 text-danger">Sign out everywhere</h3>
+        <h3 class="h5 text-danger"><kw-l key="settings.sessions.kill_heading">Sign out everywhere</kw-l></h3>
         <p class="text-muted mb-2">
-            Use this if you have signed in on a shared or public device, or
-            if you believe another session may be compromised. Every other
-            active session for this account is revoked immediately, and this
-            browser is signed out.
-        </p>
+            <kw-l key="settings.sessions.kill_desc">Use this if you have signed in on a shared or public device, or if you believe another session may be compromised. Every other active session for this account is revoked immediately, and this browser is signed out.</kw-l></p>
         <form method="post" action="/settings/security/sessions/kill-all"
-              data-confirm="Sign out of every session for this account? Your other devices and browsers will be signed out immediately.">
+              data-confirm="@_sessKillConfirm">
             @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-outline-danger">
-                Sign out everywhere
+                <kw-l key="settings.sessions.kill_heading">Sign out everywhere</kw-l>
             </button>
         </form>
     </div>

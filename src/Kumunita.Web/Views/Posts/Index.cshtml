@@ -6,6 +6,10 @@
 @inject Kumunita.Core.Bookmarks.IBookmarkService Bookmarks
 @model Kumunita.Web.Models.FeedViewModel
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _postsMandatoryTitle = Translation is null ? "Everyone in the neighborhood is a member of this community — no one can be removed or leave it." : await Translation.GetAsync("posts.mandatory_title", _aL);
+}
+@{
     ViewData["Title"] = $"{Model.ComponentName}";
     // ADR 0227 — the viewer's bookmarked posts on this page: one batched personal
     // read (IBookmarkService.ListBookmarkedIdsAsync), never one query per card.
@@ -84,7 +88,7 @@
                        side-note is hidden, so this is its stand-in. *@
                     @if (Model.IsMandatory)
                     {
-                        <span class="badge bg-dark ms-2" title="Everyone in the neighborhood is a member of this community — no one can be removed or leave it.">
+                        <span class="badge bg-dark ms-2" title="@_postsMandatoryTitle">
                             <kw-l key="community.mandatory_badge">Everyone — mandatory</kw-l>
                         </span>
                     }
@@ -131,7 +135,7 @@
                           action="@Url.Action("Leave", "Community", new { componentId = Model.ComponentId })"
                           data-confirm="@confirmLeave.Replace("{0}", Model.ComponentName)">
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-outline-danger">Leave</button>
+                        <button type="submit" class="btn btn-outline-danger"><kw-l key="groups.member_leave">Leave</kw-l></button>
                     </form>
                 }
                 </div>

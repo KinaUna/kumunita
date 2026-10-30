@@ -4,6 +4,10 @@
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _invNotePh = Translation is null ? "Note (optional)" : await Translation.GetAsync("inv.detail.note_placeholder", _aL);
+}
+@{
     var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     string ariaCheckOutNote = await Translation.GetAsync("a11y.check_out_note", effLang);
     ViewData["Title"] = Model.Item.Name;
@@ -93,7 +97,7 @@
                 <form method="post" action="@($"/inventory/{Model.Item.Id}/checkout")" class="d-flex flex-wrap align-items-center gap-2" style="margin:0;">
                     @Html.AntiForgeryToken()
                     <input class="form-control form-control-sm" type="text" name="note" maxlength="200"
-                           placeholder="Note (optional)" aria-label="@ariaCheckOutNote" />
+                           placeholder="@_invNotePh" aria-label="@ariaCheckOutNote" />
                     <button type="submit" class="btn btn-primary btn-sm"><kw-l key="inv.detail.checkOut">Check out</kw-l></button>
                 </form>
             }

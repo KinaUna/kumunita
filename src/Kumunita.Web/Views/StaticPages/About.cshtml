@@ -275,25 +275,25 @@
 <section class="kmb-cta-band" aria-label="@ariaContact">
     <div class="container d-flex flex-column flex-md-row align-items-center justify-content-between gap-4">
         <div>
-            <h2 class="h4 text-white fw-semibold mb-1">Questions, feedback, or a bug?</h2>
+            <h2 class="h4 text-white fw-semibold mb-1"><kw-l key="about.cta.heading">Questions, feedback, or a bug?</kw-l></h2>
             @if (!string.IsNullOrWhiteSpace(Model.SupportEmail))
             {
                 <p class="kmb-hero-lead mx-0 mb-0">
-                    Write to <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a> —
-                    a person reads it.
+                    <kw-l key="about.cta.write_to">Write to</kw-l> <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a>
+                    <kw-l key="about.cta.person_reads">— a person reads it.</kw-l>
                 </p>
             }
             else
             {
                 <p class="kmb-hero-lead mx-0 mb-0">
-                    Open an issue on the repository — a person reads that too.
+                    <kw-l key="about.cta.issue">Open an issue on the repository — a person reads that too.</kw-l>
                 </p>
             }
         </div>
         @if (!string.IsNullOrWhiteSpace(Model.SupportEmail))
         {
             <a href="mailto:@Model.SupportEmail" class="btn btn-pill btn-primary flex-shrink-0">
-                Open a conversation
+                <kw-l key="about.cta.button">Open a conversation</kw-l>
             </a>
         }
     </div>

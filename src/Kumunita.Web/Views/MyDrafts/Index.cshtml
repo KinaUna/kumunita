@@ -23,7 +23,7 @@
 
         @if (Model.Posts.Count > 0)
         {
-            <h6 class="mt-4 fw-semibold">Posts</h6>
+            <h6 class="mt-4 fw-semibold"><kw-l key="search.section.posts">Posts</kw-l></h6>
             <ul class="list-group mb-4">
                 @foreach (var p in Model.Posts)
                 {
@@ -57,7 +57,7 @@
 
         @if (Model.Announcements.Count > 0)
         {
-            <h6 class="mt-4 fw-semibold">Announcements</h6>
+            <h6 class="mt-4 fw-semibold"><kw-l key="nav.announcements">Announcements</kw-l></h6>
             <ul class="list-group mb-4">
                 @foreach (var a in Model.Announcements)
                 {
@@ -84,7 +84,7 @@
            discoverability surface (ADR 0037); the detail lane offers Publish. *@
         @if (Model.Events.Count > 0)
         {
-            <h6 class="mt-4 fw-semibold">Events</h6>
+            <h6 class="mt-4 fw-semibold"><kw-l key="nav.events">Events</kw-l></h6>
             <ul class="list-group mb-4">
                 @foreach (var ev in Model.Events)
                 {

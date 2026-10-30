@@ -221,7 +221,27 @@
        bare token string in a model-less layout; the avatar lane never needed this because it
        form-POSTs, but the content-image upload is the first fetch-based consumer.) *@
     <meta name="anti-forgery-token" content="@Antiforgery.GetAndStoreTokens(Context!).RequestToken" />
-    <title>@ViewData["Title"] - Kumunita</title>
+    @* ADR 0273 — the tab title is looked up by its English text (PageTitleKeys) and
+       resolved with the effective language; an unmapped (data-built) title and every
+       failure pass through as the English the view set. *@
+    @{
+        var _pageTitle = ViewData["Title"] as string;
+        if (Translation is not null && PageTitleKeys.TryGetKey(_pageTitle, out var _pageTitleKey))
+        {
+            try
+            {
+                var _pageTitleLang = await EffectiveLanguageCode.ResolveAsync(
+                    HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+                var _pageTitleText = await Translation.GetAsync(_pageTitleKey, _pageTitleLang);
+                if (!string.IsNullOrWhiteSpace(_pageTitleText) && _pageTitleText != _pageTitleKey) _pageTitle = _pageTitleText;
+            }
+            catch
+            {
+                // The English title the view set is the floor.
+            }
+        }
+    }
+    <title>@(_pageTitle ?? ViewData["Title"]) - Kumunita</title>
     <link rel="icon" type="image/png" href="~/images/logo/kumunita_k_logo_64x64.png" />
     <link rel="apple-touch-icon" href="~/images/logo/kumunita_k_logo_64x64.png" />
     @* M10 (ADR 0107 D3) — the PWA web-app manifest: the installable app shell

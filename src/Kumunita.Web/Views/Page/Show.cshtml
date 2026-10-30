@@ -5,6 +5,11 @@
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _pageSubAria = Translation is null ? "Sub-pages" : await Translation.GetAsync("pages.children", _aL);
+    var _pageSiblingAria = Translation is null ? "Previous and next page in this section" : await Translation.GetAsync("pages.sibling_nav", _aL);
+}
+@{
     var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var draftTip = Translation is null ? "Only you can see this — it is not yet public" : await Translation.GetAsync("common.draft_tooltip", _closeLang);
     var draftPubTip = Translation is null ? "Only you can see this — it is not yet published" : await Translation.GetAsync("pages.draft_tooltip", _closeLang);
@@ -410,7 +415,7 @@
            reached by clicking into the child. *@
         @if (Model.SubPages.Count > 0)
         {
-            <section class="mt-4" aria-label="Sub-pages">
+            <section class="mt-4" aria-label="@_pageSubAria">
                 <h2 class="h5 mb-2 mt-1 kmb-section-title">
                     <kw-l key="pages.children">Sub-pages</kw-l>
                     <span class="text-muted fw-normal small ms-2" aria-hidden="true">
@@ -446,7 +451,7 @@
            own Read decision (the same 404/403 split this page passed). *@
         @if (Model.PrevSibling is not null || Model.NextSibling is not null)
         {
-            <nav class="mt-4 d-flex justify-content-between align-items-center gap-2" aria-label="Previous and next page in this section">
+            <nav class="mt-4 d-flex justify-content-between align-items-center gap-2" aria-label="@_pageSiblingAria">
                 @if (Model.PrevSibling is { } prev)
                 {
                     <a class="text-decoration-none" href="@prev.Href">

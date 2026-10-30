@@ -1,4 +1,11 @@
 @model Kumunita.Web.Models.DeleteAccountViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _deleteConfirm = Translation is null ? "Delete your account permanently? This cannot be undone." : await Translation.GetAsync("account.delete_confirm_dialog", _aL);
+}
 @{
     ViewData["Title"] = "Settings — Delete account";
 }
@@ -37,7 +44,7 @@
            the lede text (both kw-l-resolved) carry the localized
            confirmation; this dialog is a second, English-only layer. *@
         <form asp-action="Delete" method="post"
-              data-confirm="Delete your account permanently? This cannot be undone.">
+              data-confirm="@_deleteConfirm">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="All" class="text-danger"></div>
 

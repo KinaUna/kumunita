@@ -6,6 +6,10 @@
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _noteModifiedTitle = Translation is null ? "Modified" : await Translation.GetAsync("sort.modified", _aL);
+}
+@{
     ViewData["Title"] = "Notes";
 
     // M29 (ADR 0152) — the surface header label (the same M17 Bookmarks/Index
@@ -225,7 +229,7 @@
                                                            closed; no pn.note.modified key exists). *@
                                                         @if (row.Modified is not null)
                                                         {
-                                                            <span class="ms-2" title="Modified"><kw-dt dt="@row.Modified" format="g"></kw-dt></span>
+                                                            <span class="ms-2" title="@_noteModifiedTitle"><kw-dt dt="@row.Modified" format="g"></kw-dt></span>
                                                         }
                                                     </div>
                                                 </div>

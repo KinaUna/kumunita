@@ -1,5 +1,12 @@
 @model Kumunita.Web.Models.KioskDisplayViewModel
 @using Kumunita.Core.Kiosk
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _kioskExit = Translation is null ? "Exit kiosk" : await Translation.GetAsync("kiosk.exit", _aL);
+}
 @{
     ViewData["Title"] = "Kiosk";
 }
@@ -114,7 +121,7 @@
             <kw-l key="common.exit_fullscreen">Exit full screen</kw-l>
         </button>
     }
-    <a class="kmb-kiosk-exit" href="/" aria-label="Exit kiosk">&#10005;</a>
+    <a class="kmb-kiosk-exit" href="/" aria-label="@_kioskExit">&#10005;</a>
 
     @if (!Model.HasSlides)
     {
