@@ -92,23 +92,33 @@ public sealed record UserPortabilityImportPlan(
 /// <see cref="UserPortabilityEntityStatus"/> set) + the
 /// <see cref="AbsentReferences"/> report (<c>conflict</c> only) + the
 /// <see cref="DuplicateId"/> (<c>duplicate</c> only — the existing
-/// entity's id in the target).
+/// entity's id in the target) + the
+/// <see cref="RejectedReason"/> (<c>rejected</c> only — the SEC-lane H1
+/// <see cref="ImportOwnershipGuard"/> reason code: the row is hostile for
+/// this actor — forged ownership, an <c>Id</c> collision with a row another
+/// resident owns, or an access-granting row — so it is never importable).
 /// </summary>
 public sealed record UserPortabilityEntityClassification(
     string Kind,              // e.g. "Post", "Event", "Message"
     string EntityId,          // the id in the archive
     UserPortabilityEntityStatus Status,
     IReadOnlyList<UserPortabilityAbsentReference> AbsentReferences,
-    string? DuplicateId);     // for Duplicate: the existing entity's id in the target
+    string? DuplicateId,      // for Duplicate: the existing entity's id in the target
+    string? RejectedReason = null); // for Rejected: the ImportOwnershipGuard reason code (user-visible); null otherwise
 
 /// <summary>
 /// The closed classification status (the design doc §2.1 verbatim).
+/// <see cref="Rejected"/> is the SEC-lane (H1) append (2026-10-30): an
+/// archive row the <see cref="ImportOwnershipGuard"/> found hostile for the
+/// importing actor. Appended after <see cref="Conflict"/> — the three
+/// M27 members keep their order (no renumbering).
 /// </summary>
 public enum UserPortabilityEntityStatus
 {
     Clean,
     Duplicate,
-    Conflict
+    Conflict,
+    Rejected
 }
 
 /// <summary>
@@ -779,6 +789,56 @@ public sealed class UserPortabilityService(
             if (ReadId(row) is string lc && lc.Length > 0)
                 languageCodes.Add(lc);
 
+        // ── SEC-lane H1 (U5): the ownership-guard inputs (derived, read-only) ──
+        // (a) The <c>existingOwnerOf</c> probe (the U4 guard contract): for a
+        //     row <c>Id</c>, the owner subject id of the target row already
+        //     stored with that <c>Id</c> — read off the type's first
+        //     <c>OwnershipFields</c> entry (the ownership anchor:
+        //     <c>AuthorId</c> / <c>OwnerId</c> / <c>UserId</c> /
+        //     <c>SubjectId</c> / <c>CreatedBy</c>). A <c>null</c> result
+        //     (no row with that id, or the type has no direct ownership
+        //     field — <c>Message</c>) means "not owned by another" to the
+        //     probe, so the guard's collision check does not fire; the
+        //     ownership rules are what carry the H1 pin.
+        var ownerByIdByType = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var (t, entry) in UserScopeInventory.Entries)
+        {
+            var ownerField = entry.OwnershipFields.Count > 0 ? entry.OwnershipFields[0] : null;
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (ownerField is not null)
+            {
+                foreach (var row in targetRowsByType.GetValueOrDefault(t) ?? [])
+                {
+                    if (ReadId(row) is string rowId && rowId.Length > 0
+                        && (string?)ReadFieldValue(row.GetType(), ownerField, row) is { Length: > 0 } owner)
+                        map[rowId] = owner;
+                }
+            }
+            ownerByIdByType[t] = map;
+        }
+
+        // (b) The actor's conversation ids (the U4 <c>Message</c> rule): the
+        //     union of the target's <c>Conversation</c> rows the actor holds a
+        //     seat in (<c>ParticipantA</c> ∪ <c>ParticipantB</c>) and the
+        //     archive's own <c>Conversation</c> rows the actor holds a seat in
+        //     (a <c>Message</c> whose conversation ships in the same archive
+        //     is the actor's own). <c>fail-closed</c>: an empty union rejects
+        //     every <c>Message</c>.
+        var actorConversationIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var row in targetRowsByType.GetValueOrDefault("Conversation") ?? [])
+            if (IsActorConversation(row, residentSubjectId))
+                if (ReadId(row) is string idT && idT.Length > 0)
+                    actorConversationIds.Add(idT);
+        if (data.Docs.TryGetValue("Conversation", out var convJson))
+        {
+            var convListType = typeof(List<>).MakeGenericType(nameToType["Conversation"]);
+            if (JsonSerializer.Deserialize(convJson, convListType, jsonOpts) is System.Collections.IEnumerable archiveConversations)
+                foreach (var row in archiveConversations)
+                    if (row is not null && IsActorConversation(row, residentSubjectId))
+                        if (ReadId(row) is string idA && idA.Length > 0)
+                            actorConversationIds.Add(idA);
+        }
+
         // ── Classify each in-scope entity (the §2.4 contract) ─────────────
         var entities = new List<UserPortabilityEntityClassification>();
         foreach (var (type, _) in UserScopeInventory.Entries)
@@ -794,12 +854,47 @@ public sealed class UserPortabilityService(
             if (JsonSerializer.Deserialize(json, listType, jsonOpts) is not System.Collections.IEnumerable archiveRows)
                 continue;
 
+            // SEC-lane H1 (U5): the <c>Message</c> guard input is the union of
+            // the target's conversations the actor is in and this archive's
+            // own <c>Conversation</c> rows the actor holds a seat in (a
+            // <c>Message</c> whose conversation ships in the same archive is
+            var messageConversationIds = type == "Message" ? actorConversationIds : null;
+
             var targetRows = targetRowsByType[type];
             foreach (var archiveRow in archiveRows)
             {
                 if (archiveRow is null)
                     continue;
                 var entityId = ReadId(archiveRow) ?? "";
+
+                // (a) SEC-lane H1 (U5) — the ownership guard (the U4 pure
+                //     decision) runs BEFORE a row is marked importable: a
+                //     hostile row (forged ownership, an <c>Id</c> collision
+                //     with a row another resident owns, or an
+                //     access-granting row) is classified <c>Rejected</c> and
+                //     never reaches the <c>Clean</c>/<c>Duplicate</c>/
+                //     <c>Conflict</c> set (S-1 — an import never creates or
+                //     changes a row the actor does not own). The reason code
+                //     is the user-visible <c>RejectedReason</c> (U6 records
+                //     it as <c>import.rejected:&lt;reason&gt;</c>).
+                var ownerProbe = ownerByIdByType.GetValueOrDefault(type);
+                var verdict = ImportOwnershipGuard.Check(
+                    type,
+                    archiveRow,
+                    residentSubjectId,
+                    id => ownerProbe is not null ? ownerProbe.GetValueOrDefault(id) : null,
+                    type == "Message" ? messageConversationIds : null);
+                if (!verdict.Allowed)
+                {
+                    entities.Add(new UserPortabilityEntityClassification(
+                        Kind: type,
+                        EntityId: entityId,
+                        Status: UserPortabilityEntityStatus.Rejected,
+                        AbsentReferences: [],
+                        DuplicateId: null,
+                        RejectedReason: verdict.RejectionReason));
+                    continue;
+                }
 
                 // (b) duplicate — the U02 business-key match.
                 var duplicate = targetRows
@@ -974,6 +1069,19 @@ public sealed class UserPortabilityService(
         if (idProp.PropertyType == typeof(Guid))
             return (idProp.GetValue(row) as Guid?)?.ToString("N");
         return idProp.GetValue(row)?.ToString();
+    }
+
+    /// <summary>Does <paramref name="conversation"/> carry the actor in a
+    /// seat (<c>ParticipantA</c> or <c>ParticipantB</c>)? (The SEC-lane H1
+    /// <c>Message</c> guard input derivation — the U4
+    /// <see cref="ImportOwnershipGuard"/> <c>Conversation</c> rule.)</summary>
+    private static bool IsActorConversation(object conversation, string actorSubjectId)
+    {
+        var t = conversation.GetType();
+        var a = (string?)ReadFieldValue(t, "ParticipantA", conversation);
+        var b = (string?)ReadFieldValue(t, "ParticipantB", conversation);
+        return string.Equals(a, actorSubjectId, StringComparison.Ordinal)
+            || string.Equals(b, actorSubjectId, StringComparison.Ordinal);
     }
 
     /// <inheritdoc />
