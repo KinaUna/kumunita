@@ -12,6 +12,7 @@
     // placeholder="..." attribute — resolve server-side, the _GrantPickers / Profile/Edit
     // pattern). Same chain the <kw-l> TagHelper uses (M·5/M·8, ADR 0049).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
 
     // The delete post / reply + remove-translation forms' data-confirms (the
     // ADR 0072 attribute idiom — the confirm.js seam reads the attribute
@@ -81,7 +82,7 @@
             &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.CommunityDisplayName
         </a>
 
-        <div class="card kmb-detail-card kmb-ann-detail mt-2 mb-4">
+        <div class="card kmb-detail-card kmb-detail-page mt-2 mb-4">
             <div class="card-body">
                 @* Author-only edit + delete entry points (both lanes are
                    author-only at the Web layer — the non-author never sees the
@@ -141,11 +142,11 @@
                                    either way. *@
                                 <div class="td-variant td-variant-shared" data-td-variant="@Model.OriginalLanguageCode"
                                      @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                                    <h4 class="mb-0 kmb-ann-title">
+                                    <h1 class="mb-0 kmb-detail-title">
                                         @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                             ? Model.Post.Title
                                             : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
-                                    </h4>
+                                    </h1>
                                 </div>
                                 @* One dedicated title per user-added translation
                                    (only when it has one) — td-variant-title, shown
@@ -160,7 +161,7 @@
                                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                         <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
                                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                            <h4 class="mb-0 kmb-ann-title">@t.Title</h4>
+                                            <h1 class="mb-0 kmb-detail-title">@t.Title</h1>
                                         </div>
                                     }
                                 }
@@ -263,7 +264,7 @@
                            /profile/avatar/{subjectId}), monogram sibling on its
                            fail-closed 404. Not a .td-variant, so it stays put on a
                            translation swap. *@
-                        <div class="airy-post-head kmb-ann-byline">
+                        <div class="airy-post-head kmb-detail-byline">
                             <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial"
                                       mono-hue="@AvatarHue.For(Model.AuthorSubjectId)" />
                             <span class="airy-post-author">
@@ -403,7 +404,7 @@
                             <h5 class="modal-title" id="report-modal-label">
                                 <kw-l key="posts.report_button">Report this post</kw-l>
                             </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                         </div>
                         <div class="modal-body">
                             <label class="form-label" for="report-reason" style="font-weight:600;">
@@ -447,7 +448,7 @@
                                     <h5 class="modal-title" id="@($"post-trans-edit-label-{existing.LanguageCode}")">
                                         <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                     </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
                                     <label class="form-label mb-1">
@@ -506,7 +507,7 @@
                                     <h5 class="modal-title" id="@($"post-trans-add-label-{lang.Code}")">
                                         <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                     </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
                                     <label class="form-label mb-1">
@@ -550,9 +551,9 @@
             }
         }
 
-        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 id="replies" class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             <kw-l key="posts.replies_heading">Replies</kw-l> <span class="text-muted">(@Model.Replies.Count)</span>
-        </h5>
+        </h2>
 
         @if (Model.Replies.Count == 0)
         {
@@ -560,7 +561,7 @@
         }
         else
         {
-            <ul class="kmb-ann-comments list-unstyled p-0 mb-4">
+            <ul class="kmb-detail-comments list-unstyled p-0 mb-4">
                 @foreach (var r in Model.Replies)
                 {
                     <partial name="_PostReply" model="new PostReplyModel(r, postId, Model.Languages, defaultVariant, confirmRemoveTrans, confirmDeleteReply, ariaActionsFor, reportReasonPlaceholder)" />
@@ -569,7 +570,7 @@
             </ul>
         }
 
-        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             @if (Model.IsAuthor)
             {
                 <text><kw-l key="posts.reply_heading_author">Reply (you are the author of this post)</kw-l></text>
@@ -578,9 +579,9 @@
             {
                 <text><kw-l key="posts.reply_heading">Reply</kw-l></text>
             }
-        </h5>
+        </h2>
 
-        <div class="card kmb-detail-card kmb-ann-composer">
+        <div class="card kmb-detail-card kmb-detail-composer">
             <div class="card-body">
                 <form class="mb-0" method="post"
                       action="@($"/posts/{postId}/replies")">

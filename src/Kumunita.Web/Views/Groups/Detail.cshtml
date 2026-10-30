@@ -2,8 +2,25 @@
 @model Kumunita.Web.Models.GroupDetailViewModel
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Bookmarks.IBookmarkService Bookmarks
 @{
     ViewData["Title"] = Model.Name;
+    // ADR 0227 — the viewer's bookmarked posts on this page: one batched personal
+    // read (IBookmarkService.ListBookmarkedIdsAsync), never one query per card.
+    // Best-effort: a failed read degrades to "no bookmarks" rather than blanking the feed.
+    IReadOnlySet<string> _bookmarkedIds = new HashSet<string>();
+    var _feedReturnUrl = Context.Request.Path + Context.Request.QueryString;
+    try
+    {
+        var _viewer = KumunitaPrincipal.SubjectId(User);
+        if (!string.IsNullOrEmpty(_viewer))
+            _bookmarkedIds = await Bookmarks.ListBookmarkedIdsAsync(_viewer, "post", Model.GroupPosts.Select(x => x.Id).ToList());
+    }
+    catch
+    {
+        // keep the empty set
+    }
+
     // Render-time localization of the description + filter placeholders (the
     // <kw-l> TagHelper always emits a <kw-l> element, so it can't sit inside a
     // placeholder="..." attribute — resolve server-side, the _GrantPickers /
@@ -28,6 +45,7 @@
         confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
         ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
     }
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     var filterNamePlaceholder = Translation is null
         ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["common.filter_name"]
         : await Translation.GetAsync("common.filter_name", _kwL);
@@ -217,7 +235,7 @@
                                         <h5 class="modal-title" id="@($"group-trans-edit-label-{existing.LanguageCode}")">
                                             <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                         </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -265,7 +283,7 @@
                                         <h5 class="modal-title" id="@($"group-trans-add-label-{lang.Code}")">
                                             <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                         </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -303,14 +321,14 @@
         </div>
 
         <p class="kmb-group-owner">
-            Owned by <strong>@Model.OwnerDisplayName</strong>
+            <kw-l key="groups.owned_by">Owned by</kw-l> <strong>@Model.OwnerDisplayName</strong>
             @if (Model.IsOwner)
             {
-                <span class="kmb-chip kmb-chip-pinned">You own this group</span>
+                <span class="kmb-chip kmb-chip-pinned"><kw-l key="groups.you_own">You own this group</kw-l></span>
             }
             @if (Model.IsPrivate)
             {
-                <span class="kmb-chip kmb-chip-draft">Private</span>
+                <span class="kmb-chip kmb-chip-draft"><kw-l key="groups.private_chip">Private</kw-l></span>
             }
         </p>
 
@@ -386,6 +404,7 @@
                                     </a>
                                 </div>
                                 <p class="airy-post-preview mb-0">@p.BodyPreview</p>
+                                <partial name="_PostCardFoot" model="@(new PostCardFootModel($"/groups/{Model.GroupId}/posts/{p.Id}#replies", p.ReplyCount, p.Id, _bookmarkedIds.Contains(p.Id), _feedReturnUrl))" />
                             </div>
                         }
                     </div>
@@ -522,7 +541,7 @@
                                         @Html.AntiForgeryToken()
                                         <input name="subjectId" type="hidden" value="@m.SubjectId" />
                                         <button type="submit" class="btn btn-sm btn-outline-danger">
-                                            Remove
+                                            <kw-l key="common.remove">Remove</kw-l>
                                         </button>
                                     </form>
                                 }
@@ -549,7 +568,7 @@
                 *@
                 @if (Model.IsOwner && Model.PendingInvitations.Count > 0)
                 {
-                    <h2 class="mt-4">Pending invitations</h2>
+                    <h2 class="mt-4"><kw-l key="groups.pending_invitations_heading">Pending invitations</kw-l></h2>
                     <ul class="kmb-member-list mb-3">
                         @foreach (var p in Model.PendingInvitations)
                         {
@@ -558,7 +577,7 @@
                                 <form method="post"
                                       action="@Url.Action("CancelInvitation", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm btn-outline-warning">Cancel invite</button>
+                                    <button type="submit" class="btn btn-sm btn-outline-warning"><kw-l key="groups.invite_cancel">Cancel invite</kw-l></button>
                                 </form>
                             </li>
                         }
@@ -611,11 +630,11 @@
                               class="row g-2">
                             @Html.AntiForgeryToken()
                             <div class="col-sm-8">
-                                <label class="visually-hidden" for="invite-filter">Filter residents</label>
+                                <label class="visually-hidden" for="invite-filter"><kw-l key="groups.filter_residents_label">Filter residents</kw-l></label>
                                 <input type="text" class="form-control" id="invite-filter"
                                        data-name-filter="invite-subjectId"
                                        placeholder="@filterNamePlaceholder" autocomplete="off" />
-                                <label class="visually-hidden" for="invite-subjectId">Resident</label>
+                                <label class="visually-hidden" for="invite-subjectId"><kw-l key="groups.resident_label">Resident</kw-l></label>
                                 <select id="invite-subjectId" name="subjectId" class="form-select mt-2" required>
                                     @foreach (var r in Model.ResidentCandidates)
                                     {
@@ -623,13 +642,11 @@
                                     }
                                 </select>
                                 <div class="text-muted small">
-                                    They get an invitation on their
-                                    <a asp-controller="Groups" asp-action="Index">Groups</a>
-                                    page to accept or decline.
+                                    <kw-l key="groups.invite_note">They get an invitation on their Groups page to accept or decline.</kw-l>
                                 </div>
                             </div>
                             <div class="col-sm-auto align-self-end">
-                                <button type="submit" class="btn btn-primary">Invite</button>
+                                <button type="submit" class="btn btn-primary"><kw-l key="groups.invite_submit">Invite</kw-l></button>
                             </div>
                         </form>
                         @* Name filter handled by client/lib/name-filter.js
@@ -637,7 +654,7 @@
                     }
                     else
                     {
-                        <p class="text-muted">Every resident is already a member of this group.</p>
+                        <p class="text-muted"><kw-l key="groups.all_members_already">Every resident is already a member of this group.</kw-l></p>
                     }
                 }
 
@@ -649,17 +666,17 @@
                 *@
                 @if (canManage)
                 {
-                    <h2 class="mt-4">Add a member</h2>
+                    <h2 class="mt-4"><kw-l key="groups.add_member_heading">Add a member</kw-l></h2>
                     @if (Model.ResidentCandidates.Count > 0)
                     {
                         <form method="post" action="@addHref" class="row g-2">
                             @Html.AntiForgeryToken()
                             <div class="col-sm-8">
-                                <label class="visually-hidden" for="add-member-filter">Filter residents</label>
+                                <label class="visually-hidden" for="add-member-filter"><kw-l key="groups.filter_residents_label">Filter residents</kw-l></label>
                                 <input type="text" class="form-control" id="add-member-filter"
                                        data-name-filter="add-subjectId"
                                        placeholder="@filterNamePlaceholder" autocomplete="off" />
-                                <label class="visually-hidden" for="add-subjectId">Resident</label>
+                                <label class="visually-hidden" for="add-subjectId"><kw-l key="groups.resident_label">Resident</kw-l></label>
                                 <select id="add-subjectId" name="subjectId" class="form-select mt-2" required>
                                     @foreach (var r in Model.ResidentCandidates)
                                     {
@@ -667,11 +684,11 @@
                                     }
                                 </select>
                                 <div class="text-muted small">
-                                    They are added to the group immediately (no invitation).
+                                    <kw-l key="groups.add_member_note">They are added to the group immediately (no invitation).</kw-l>
                                 </div>
                             </div>
                             <div class="col-sm-auto align-self-end">
-                                <button type="submit" class="btn btn-primary">Add</button>
+                                <button type="submit" class="btn btn-primary"><kw-l key="common.add">Add</kw-l></button>
                             </div>
                         </form>
                         @* Name filter handled by client/lib/name-filter.js
@@ -679,7 +696,7 @@
                     }
                     else
                     {
-                        <p class="text-muted">Every resident is already a member of this group.</p>
+                        <p class="text-muted"><kw-l key="groups.all_members_already">Every resident is already a member of this group.</kw-l></p>
                     }
                 }
             </div>

@@ -1,10 +1,16 @@
 @model Kumunita.Web.Models.SignupViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
-    ViewData["Title"] = "Sign up";
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    ViewData["Title"] = Translation is null ? "Sign up" : await Translation.GetAsync("account.signup_title", _kwL);
 }
 
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
+        <div class="kmb-auth">
+            <span class="kmb-auth-logo" aria-hidden="true">K</span>
         <h1><kw-l key="account.signup_title">Sign up</kw-l></h1>
         <form asp-action="Signup" method="post">
             @Html.AntiForgeryToken()
@@ -55,29 +61,29 @@
         @if (Model is { BotChallengeFailed: true })
         {
             <p class="mt-3 text-danger">
-                The security check did not pass. Please try again.
+                <kw-l key="account.signup_bot_failed">The security check did not pass. Please try again.</kw-l>
             </p>
         }
 
         @if (Model is { EmailDomainDisallowed: true })
         {
             <p class="mt-3 text-info">
-                The email domain for that address is not accepted for new accounts.
-                Please use a permanent email address.
+                <kw-l key="account.signup_domain_disallowed">The email domain for that address is not accepted for new accounts. Please use a permanent email address.</kw-l>
             </p>
         }
 
         @if (Model is { EmailAlreadyExists: true })
         {
             <p class="mt-3 text-info">
-                Never got the confirmation email?
-                <a asp-action="ResendVerification" asp-route-email="@Model.Email">Resend the confirmation email</a>.
+                <kw-l key="account.signup_resend_prompt">Never got the confirmation email?</kw-l>
+                <a asp-action="ResendVerification" asp-route-email="@Model.Email"><kw-l key="account.signup_resend_link">Resend the confirmation email</kw-l></a>.
             </p>
         }
 
         <p class="mt-3 text-muted">
-            <kw-l key="account.signup_has_account">Already have an account?</kw-l> <a asp-action="Login">Sign in</a>.
+            <kw-l key="account.signup_has_account">Already have an account?</kw-l> <a asp-action="Login"><kw-l key="account.login_submit">Sign in</kw-l></a>.
         </p>
+        </div>
     </div>
 </div>
 

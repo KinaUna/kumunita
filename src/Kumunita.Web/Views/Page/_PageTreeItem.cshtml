@@ -1,3 +1,9 @@
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var draftPubTip = Translation is null ? "Only you can see this — it is not yet published" : await Translation.GetAsync("pages.draft_tooltip", _closeLang);
+}
 @* ADR 0039 §3.8 — the pages tree browse, recursive item (collapsible).
 
    A page with children renders as a native <details>/<summary> group:
@@ -18,7 +24,7 @@
         <a href="@Model.Path">@Model.Title</a>
         @if (Model.IsDraft)
         {
-            <span class="badge text-bg-warning ms-2" title="Only you can see this — it is not yet published">
+            <span class="kmb-chip kmb-chip-draft ms-2" title="@draftPubTip">
                 <kw-l key="posts.draft_badge">Draft</kw-l>
             </span>
         }
@@ -32,7 +38,7 @@ else
                 <a href="@Model.Path">@Model.Title</a>
                 @if (Model.IsDraft)
                 {
-                    <span class="badge text-bg-warning ms-2" title="Only you can see this — it is not yet published">
+                    <span class="kmb-chip kmb-chip-draft ms-2" title="@draftPubTip">
                         <kw-l key="posts.draft_badge">Draft</kw-l>
                     </span>
                 }

@@ -113,6 +113,21 @@ public sealed class ProfileController(
             await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider));
     }
 
+    /// <summary>
+    /// A rejected avatar upload (ADR 0237): re-render <c>Profile/Edit</c> with the
+    /// same status code the bare result carried and a localized message next to
+    /// the avatar field, instead of a blank page. The guards still run before any
+    /// <c>PutAsync</c>, so nothing was written.
+    /// </summary>
+    private async Task<IActionResult> RejectAvatarAsync(string subject, int statusCode, string key)
+    {
+        var model = await BuildEditModelAsync(subject);
+        ViewData["AvatarError"] = await FlashAsync(key);
+        var view = View("Edit", model);
+        view.StatusCode = statusCode;
+        return view;
+    }
+
     // ── Edit (GET + POST — the write lane) ─────────────────────────────────
 
     /// <summary>
@@ -137,6 +152,16 @@ public sealed class ProfileController(
         if (string.IsNullOrEmpty(subject))
             return View(new ProfileEditViewModel());
 
+        return View(await BuildEditModelAsync(subject));
+    }
+
+    /// <summary>
+    /// Seeds the editor model (and the grant-picker ViewBag lists) from the
+    /// saved profile. Shared by <c>GET /profile/edit</c> and the avatar lane's
+    /// reject re-render (ADR 0237), so a rejected upload shows the same page.
+    /// </summary>
+    private async Task<ProfileEditViewModel> BuildEditModelAsync(string subject)
+    {
         var savedProfile = await userInfo.GetProfileAsync(subject);
 
         var model = new ProfileEditViewModel
@@ -186,7 +211,7 @@ public sealed class ProfileController(
         // "media doc missing" cases into the same fail-closed answer that
         // the GET /profile/avatar/{subjectId} serving lane would 404 on —
         // so the browser never makes a request that will fail.
-        return View(model);
+        return model;
     }
 
     /// <summary>
@@ -270,7 +295,7 @@ public sealed class ProfileController(
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to edit your profile.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_profile_edit", "You must sign in to edit your profile."));
             return View(model);
         }
 
@@ -281,15 +306,13 @@ public sealed class ProfileController(
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.DisplayName))
-                ModelState.AddModelError(nameof(model.DisplayName), "Display name is required.");
+                ModelState.AddModelError(nameof(model.DisplayName), await this.FlashAsync("validation.display_name_needed", "Display name is required."));
             if (string.IsNullOrWhiteSpace(model.Email))
-                ModelState.AddModelError(nameof(model.Email), "Email is required.");
+                ModelState.AddModelError(nameof(model.Email), await this.FlashAsync("validation.email_needed", "Email is required."));
             if (model.Visibility is null || !model.Visibility.IsValid)
-                ModelState.AddModelError("Visibility.Mode",
-                    "Visibility mode is required (Any or All).");
+                ModelState.AddModelError("Visibility.Mode", await this.FlashAsync("validation.visibility_mode", "Visibility mode is required (Any or All)."));
             if (model.ContactVisibility is not null && !model.ContactVisibility.IsValid)
-                ModelState.AddModelError("ContactVisibility.Mode",
-                    "Contact visibility mode is required (Any or All) when opted in.");
+                ModelState.AddModelError("ContactVisibility.Mode", await this.FlashAsync("validation.contact_visibility_mode", "Contact visibility mode is required (Any or All) when opted in."));
             return View(model);
         }
 
@@ -422,7 +445,7 @@ public sealed class ProfileController(
         // oversize payload would write a volume file that must not exist:
         // C-MED·5 / guards-before-write C-UP·2):
         if (file is null || file.Length == 0)
-            return BadRequest("Choose an image.");                          // empty → 400 (untouched)
+            return await RejectAvatarAsync(subject, StatusCodes.Status400BadRequest, "profile.avatar_err_choose"); // empty → 400
         // M25 (U8) — the size/over-quota guard is now the Web-only
         // IUploadGate (C-UP·3): the single 413 producer, reading the admin
         // doc (get-or-created) + the subject's usage (the gate's C-SM·7 seam)
@@ -434,9 +457,11 @@ public sealed class ProfileController(
         var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
         var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
         var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
-        if (reject is not null) return reject;                              // oversize/over-quota → 413 (the gate)
-        if (!mediaOpts.Value.IsAllowed(file.ContentType))
-            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type (incl. SVG) → 415 (untouched)
+        if (reject is StatusCodeResult gateStatus)                          // oversize/over-quota → 413 (the gate)
+            return await RejectAvatarAsync(subject, gateStatus.StatusCode, "profile.avatar_err_too_large");
+        if (reject is not null) return reject;
+        if (!mediaOpts.Value.IsAllowed(file.ContentType))                   // disallowed type (incl. SVG) → 415
+            return await RejectAvatarAsync(subject, StatusCodes.Status415UnsupportedMediaType, "profile.avatar_err_type");
 
         // C-MED·6: the IFormFile never crosses into Core — copy to bytes, then
         // store-first, profile-second (orphan-safe order, C-MED·7):

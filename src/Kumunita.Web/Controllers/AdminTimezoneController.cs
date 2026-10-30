@@ -83,7 +83,7 @@ public sealed class AdminTimezoneController(
         try
         {
             await localization.SetDefaultTimezoneAsync(timezone, actor);
-            TempData["info"] = $"Platform default time zone set to “{timezone}”.";
+            TempData["info"] = await this.FlashAsync("admin.flash_timezone_set", "Platform default time zone set to “{0}”.", timezone);
             return RedirectToAction(nameof(Index));
         }
         catch (InvalidOperationException ex)

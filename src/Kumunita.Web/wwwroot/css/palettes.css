@@ -15,12 +15,11 @@
      ember  · light  → cream + amber.
      ember  · dark   → warm charcoal-brown + amber.
 
-   The two dark scopes mirror site.css (ADR 0133): (a) OS prefers dark AND
-   not forced light, (b) forced dark. CSS has no mixins, so each dark block is
-   written twice.
-   TODO (Phase 0): collapse both scopes with `color-scheme` + `light-dark()`
-   so every token is declared once; then this file shrinks to 2 palettes ×
-   1 block.
+   Colour tokens are declared once with light-dark() (ADR 0228, see the
+   COLOUR-SCHEME AXIS block below). Only the "r, g, b" triplet tokens and the
+   tokens that exist only in dark still need the two dark scopes of site.css
+   (ADR 0133): (a) OS prefers dark AND not forced light, (b) forced dark.
+   TODO: site.css's own dark scopes (:root tokens) are not collapsed yet.
 
    Contrast (WCAG AA, checked against the mockup values — re-run the
    validator on the final tokens before shipping):
@@ -40,162 +39,127 @@
 }
 
 /* ==========================================================================
-   FOREST · dark (warmed)
+   COLOUR-SCHEME AXIS (ADR 0228)
+   --------------------------------------------------------------------------
+   Every colour token that differs between light and dark is declared once with
+   light-dark(<light>, <dark>). light-dark() follows the computed color-scheme:
+   auto (default) = the OS preference, forced light / forced dark = the
+   data-kmb-theme attribute (the same three states as site.css ADR 0133).
+   What cannot use light-dark() stays in the small dark scopes below: the
+   "r, g, b" triplet tokens (not colours) and tokens that only exist in dark.
    ========================================================================== */
+:root { color-scheme: light dark; }
+html[data-kmb-theme='light'] { color-scheme: light; }
+html[data-kmb-theme='dark'] { color-scheme: dark; }
+
+/* FOREST (light values = site.css :root, dark = warmed Forest dark) */
+html[data-kmb-palette='forest'] {
+  --bs-body-bg: light-dark(#fbfaf7, #131b15);
+  --bs-body-color: light-dark(#1f2a25, #ece9e0);
+  --bs-emphasis-color: light-dark(#17251d, #f3f0e8);
+  --bs-tertiary-bg: light-dark(#f1efe9, #1c2620);
+  --bs-border-color: light-dark(#dde3dd, #2f3d34);
+  --bs-light-border-subtle: light-dark(#e6e4dd, #2a382e);
+  --kmb-ink: light-dark(#1f2a25, #ece9e0);
+  --kmb-ink-soft: light-dark(#33403a, #d5d3c8);
+  --kmb-muted: light-dark(#5c6b62, #a3ad9f);
+  --kmb-tint-a: light-dark(#eff3ef, #22302a);
+  --kmb-border: light-dark(#dde3dd, #2f3d34);
+  --kmb-border-soft: light-dark(#e6e4dd, #26332b);
+  --kmb-hover-border: light-dark(#c9d3ca, #44574b);
+  --kmb-hover-row: light-dark(#fdfdfb, #19231d);
+  --kmb-surface: light-dark(#ffffff, #1c2620);
+  --kmb-action-bg: light-dark(#1c4532, #3c7a58);
+  --kmb-action-bg-hover: light-dark(#173728, #4a8c67);
+  --kmb-action-ink: #ffffff;
+  --kmb-accent: light-dark(#1c4532, #9ad0ae);
+  --kmb-chip-selected-bg: light-dark(#e0ebe3, #2c4a37);
+  --kmb-chip-selected-ink: light-dark(#173728, #d6ecdc);
+  --kmb-logo-tile: #c8553d;
+}
+/* FOREST · dark-only remainder (rgb triplets + dark-only tokens) */
 @media (prefers-color-scheme: dark) {
   html:not([data-kmb-theme='light'])[data-kmb-palette='forest'] {
-    --bs-body-bg: #131b15;        --bs-body-bg-rgb: 19, 27, 21;
-    --bs-body-color: #ece9e0;     --bs-body-color-rgb: 236, 233, 224;
-    --bs-emphasis-color: #f3f0e8; --bs-emphasis-color-rgb: 243, 240, 232;
-    --bs-tertiary-bg: #1c2620;    --bs-tertiary-bg-rgb: 28, 38, 32;
-    --bs-border-color: #2f3d34;   --bs-border-color-rgb: 47, 61, 52;
-    --bs-light-border-subtle: #2a382e;
-
-    --kmb-ink: #ece9e0;
-    --kmb-ink-soft: #d5d3c8;
-    --kmb-muted: #a3ad9f;
-    --kmb-tint-a: #22302a;
-    --kmb-border: #2f3d34;
-    --kmb-border-soft: #26332b;
-    --kmb-hover-border: #44574b;
-    --kmb-hover-row: #19231d;
-    --kmb-surface: #1c2620;       /* card fill (lighter than canvas) */
+    --bs-body-bg-rgb: 19, 27, 21;
+    --bs-body-color-rgb: 236, 233, 224;
+    --bs-emphasis-color-rgb: 243, 240, 232;
+    --bs-tertiary-bg-rgb: 28, 38, 32;
+    --bs-border-color-rgb: 47, 61, 52;
     --kmb-surface-2: #232f28;
     --kmb-band: #101812;
-
-    --kmb-action-bg: #3c7a58;     --kmb-action-bg-hover: #4a8c67;
-    --kmb-action-ink: #ffffff;
-    --kmb-accent: #9ad0ae;
-    --kmb-chip-selected-bg: #2c4a37;
-    --kmb-chip-selected-ink: #d6ecdc;
-    --kmb-logo-tile: #c8553d;
   }
 }
 html[data-kmb-theme='dark'][data-kmb-palette='forest'] {
-  --bs-body-bg: #131b15;        --bs-body-bg-rgb: 19, 27, 21;
-  --bs-body-color: #ece9e0;     --bs-body-color-rgb: 236, 233, 224;
-  --bs-emphasis-color: #f3f0e8; --bs-emphasis-color-rgb: 243, 240, 232;
-  --bs-tertiary-bg: #1c2620;    --bs-tertiary-bg-rgb: 28, 38, 32;
-  --bs-border-color: #2f3d34;   --bs-border-color-rgb: 47, 61, 52;
-  --bs-light-border-subtle: #2a382e;
-
-  --kmb-ink: #ece9e0;
-  --kmb-ink-soft: #d5d3c8;
-  --kmb-muted: #a3ad9f;
-  --kmb-tint-a: #22302a;
-  --kmb-border: #2f3d34;
-  --kmb-border-soft: #26332b;
-  --kmb-hover-border: #44574b;
-  --kmb-hover-row: #19231d;
-  --kmb-surface: #1c2620;
+  --bs-body-bg-rgb: 19, 27, 21;
+  --bs-body-color-rgb: 236, 233, 224;
+  --bs-emphasis-color-rgb: 243, 240, 232;
+  --bs-tertiary-bg-rgb: 28, 38, 32;
+  --bs-border-color-rgb: 47, 61, 52;
   --kmb-surface-2: #232f28;
   --kmb-band: #101812;
-
-  --kmb-action-bg: #3c7a58;     --kmb-action-bg-hover: #4a8c67;
-  --kmb-action-ink: #ffffff;
-  --kmb-accent: #9ad0ae;
-  --kmb-chip-selected-bg: #2c4a37;
-  --kmb-chip-selected-ink: #d6ecdc;
-  --kmb-logo-tile: #c8553d;
 }
 
-/* ==========================================================================
-   EMBER · light
-   ========================================================================== */
+/* EMBER (cream + amber light, warm charcoal-brown dark) */
 html[data-kmb-palette='ember'] {
-  --bs-body-bg: #fbf6ee;        --bs-body-bg-rgb: 251, 246, 238;
-  --bs-body-color: #2a2118;     --bs-body-color-rgb: 42, 33, 24;
-  --bs-emphasis-color: #2a1c0a; --bs-emphasis-color-rgb: 42, 28, 10;
-  --bs-tertiary-bg: #f5ecdd;    --bs-tertiary-bg-rgb: 245, 236, 221;
-  --bs-border-color: #eadfce;   --bs-border-color-rgb: 234, 223, 206;
-  --bs-link-color: #8a5a12;     --bs-link-color-rgb: 138, 90, 18;
-  --bs-link-hover-color: #6b4710; --bs-link-hover-color-rgb: 107, 71, 16;
-
-  --kmb-ink: #2a2118;
-  --kmb-ink-soft: #3d3126;
-  --kmb-muted: #6f6050;
-  --kmb-tint-a: #f6e7cc;
-  --kmb-tint-b: #f5ecdd;
-  --kmb-border: #eadfce;
-  --kmb-border-soft: #f0e6d6;
-  --kmb-hover-border: #d9c9b0;
-  --kmb-hover-row: #fffaf0;
-  --kmb-surface: #fffdf8;
-  --kmb-surface-2: #fbf3e4;
-
-  --kmb-action-bg: #f0b45c;     --kmb-action-bg-hover: #e8a64a;
-  --kmb-action-ink: #2a1c0a;    /* dark ink on amber — never white */
-  --kmb-accent: #8a5a12;
-  --kmb-chip-selected-bg: #f6e7cc;
-  --kmb-chip-selected-ink: #6b4710;
+  --bs-body-bg: light-dark(#fbf6ee, #1a1613);
+  --bs-body-color: light-dark(#2a2118, #f1e9dc);
+  --bs-emphasis-color: light-dark(#2a1c0a, #f7f0e4);
+  --bs-tertiary-bg: light-dark(#f5ecdd, #262019);
+  --bs-border-color: light-dark(#eadfce, #352d26);
+  --bs-link-color: light-dark(#8a5a12, #f0b45c);
+  --bs-link-hover-color: light-dark(#6b4710, #f5c378);
+  --kmb-ink: light-dark(#2a2118, #f1e9dc);
+  --kmb-ink-soft: light-dark(#3d3126, #dccfbc);
+  --kmb-muted: light-dark(#6f6050, #b3a592);
+  --kmb-tint-a: light-dark(#f6e7cc, #3b3126);
+  --kmb-tint-b: light-dark(#f5ecdd, #2a2114);
+  --kmb-border: light-dark(#eadfce, #352d26);
+  --kmb-border-soft: light-dark(#f0e6d6, #2d261f);
+  --kmb-hover-border: light-dark(#d9c9b0, #4d4237);
+  --kmb-hover-row: light-dark(#fffaf0, #211b16);
+  --kmb-surface: light-dark(#fffdf8, #262019);
+  --kmb-surface-2: light-dark(#fbf3e4, #2d2721);
+  --kmb-action-bg: #f0b45c;
+  --kmb-action-bg-hover: light-dark(#e8a64a, #f5c378);
+  --kmb-action-ink: #2a1c0a;
+  --kmb-accent: light-dark(#8a5a12, #f0b45c);
+  --kmb-chip-selected-bg: light-dark(#f6e7cc, #3b3126);
+  --kmb-chip-selected-ink: light-dark(#6b4710, #f6dcae);
   --kmb-logo-tile: #d4694e;
+  --bs-body-bg-rgb: 251, 246, 238;
+  --bs-body-color-rgb: 42, 33, 24;
+  --bs-emphasis-color-rgb: 42, 28, 10;
+  --bs-tertiary-bg-rgb: 245, 236, 221;
+  --bs-border-color-rgb: 234, 223, 206;
+  --bs-link-color-rgb: 138, 90, 18;
+  --bs-link-hover-color-rgb: 107, 71, 16;
 }
-
-/* ==========================================================================
-   EMBER · dark
-   ========================================================================== */
+/* EMBER · dark-only remainder (rgb triplets + dark-only tokens) */
 @media (prefers-color-scheme: dark) {
   html:not([data-kmb-theme='light'])[data-kmb-palette='ember'] {
-    --bs-body-bg: #1a1613;        --bs-body-bg-rgb: 26, 22, 19;
-    --bs-body-color: #f1e9dc;     --bs-body-color-rgb: 241, 233, 220;
-    --bs-emphasis-color: #f7f0e4; --bs-emphasis-color-rgb: 247, 240, 228;
-    --bs-tertiary-bg: #262019;    --bs-tertiary-bg-rgb: 38, 32, 25;
-    --bs-border-color: #352d26;   --bs-border-color-rgb: 53, 45, 38;
+    --bs-body-bg-rgb: 26, 22, 19;
+    --bs-body-color-rgb: 241, 233, 220;
+    --bs-emphasis-color-rgb: 247, 240, 228;
+    --bs-tertiary-bg-rgb: 38, 32, 25;
+    --bs-border-color-rgb: 53, 45, 38;
     --bs-light-border-subtle: #352d26;
-    --bs-link-color: #f0b45c;     --bs-link-color-rgb: 240, 180, 92;
-    --bs-link-hover-color: #f5c378; --bs-link-hover-color-rgb: 245, 195, 120;
-
-    --kmb-ink: #f1e9dc;
-    --kmb-ink-soft: #dccfbc;
-    --kmb-muted: #b3a592;
-    --kmb-tint-a: #3b3126;
-    --kmb-tint-b: #2a2114;
-    --kmb-border: #352d26;
-    --kmb-border-soft: #2d261f;
-    --kmb-hover-border: #4d4237;
-    --kmb-hover-row: #211b16;
-    --kmb-surface: #262019;
-    --kmb-surface-2: #2d2721;
+    --bs-link-color-rgb: 240, 180, 92;
+    --bs-link-hover-color-rgb: 245, 195, 120;
     --kmb-band: #14100d;
-
-    --kmb-action-bg: #f0b45c;     --kmb-action-bg-hover: #f5c378;
-    --kmb-action-ink: #2a1c0a;
-    --kmb-accent: #f0b45c;
-    --kmb-chip-selected-bg: #3b3126;
-    --kmb-chip-selected-ink: #f6dcae;
-    --kmb-logo-tile: #d4694e;
   }
 }
 html[data-kmb-theme='dark'][data-kmb-palette='ember'] {
-  --bs-body-bg: #1a1613;        --bs-body-bg-rgb: 26, 22, 19;
-  --bs-body-color: #f1e9dc;     --bs-body-color-rgb: 241, 233, 220;
-  --bs-emphasis-color: #f7f0e4; --bs-emphasis-color-rgb: 247, 240, 228;
-  --bs-tertiary-bg: #262019;    --bs-tertiary-bg-rgb: 38, 32, 25;
-  --bs-border-color: #352d26;   --bs-border-color-rgb: 53, 45, 38;
+  --bs-body-bg-rgb: 26, 22, 19;
+  --bs-body-color-rgb: 241, 233, 220;
+  --bs-emphasis-color-rgb: 247, 240, 228;
+  --bs-tertiary-bg-rgb: 38, 32, 25;
+  --bs-border-color-rgb: 53, 45, 38;
   --bs-light-border-subtle: #352d26;
-  --bs-link-color: #f0b45c;     --bs-link-color-rgb: 240, 180, 92;
-  --bs-link-hover-color: #f5c378; --bs-link-hover-color-rgb: 245, 195, 120;
-
-  --kmb-ink: #f1e9dc;
-  --kmb-ink-soft: #dccfbc;
-  --kmb-muted: #b3a592;
-  --kmb-tint-a: #3b3126;
-  --kmb-tint-b: #2a2114;
-  --kmb-border: #352d26;
-  --kmb-border-soft: #2d261f;
-  --kmb-hover-border: #4d4237;
-  --kmb-hover-row: #211b16;
-  --kmb-surface: #262019;
-  --kmb-surface-2: #2d2721;
+  --bs-link-color-rgb: 240, 180, 92;
+  --bs-link-hover-color-rgb: 245, 195, 120;
   --kmb-band: #14100d;
-
-  --kmb-action-bg: #f0b45c;     --kmb-action-bg-hover: #f5c378;
-  --kmb-action-ink: #2a1c0a;
-  --kmb-accent: #f0b45c;
-  --kmb-chip-selected-bg: #3b3126;
-  --kmb-chip-selected-ink: #f6dcae;
-  --kmb-logo-tile: #d4694e;
 }
+
 
 /* ==========================================================================
    Palette-aware primary button + accent text
@@ -374,7 +338,7 @@ html[data-kmb-palette='ember'] .kmb-hero {
 html[data-kmb-palette='ember'] .kmb-hero::before {
   background: linear-gradient(180deg, rgba(26, 18, 10, 0.4), rgba(26, 18, 10, 0.25));
 }
-html[data-kmb-palette='ember'] .kmb-features-band { background-color: #2a1c10; }
+html[data-kmb-palette='ember'] .kmb-features-band { background-color: light-dark(#2a1c10, var(--kmb-band)); }
 html[data-kmb-palette='ember'] .kmb-cta-band {
   background-color: #3a2819;
   background-image: linear-gradient(120deg, #4d3621 0%, #2a1c10 100%);
@@ -605,14 +569,14 @@ html[data-kmb-palette] .kmb-ann-actions .link-quiet:hover { color: var(--kmb-acc
 }
 
 /* Announcement detail (ADR 0184) */
-.kmb-ann-detail .kmb-ann-title {
+.kmb-detail-page .kmb-detail-title {
   font-family: var(--bs-heading-font-family);
   font-size: 1.625rem;
   font-weight: 600;
   line-height: 1.25;
   color: var(--kmb-ink);
 }
-.kmb-ann-byline { margin-bottom: 1.25rem; }
+.kmb-detail-byline { margin-bottom: 1.25rem; }
 html[data-kmb-palette] .kmb-chip-draft {
   background: transparent;
   color: var(--kmb-ink-soft);
@@ -629,24 +593,24 @@ html[data-kmb-palette] .kmb-chip-btn[aria-pressed='true'] {
   color: var(--kmb-chip-selected-ink);
 }
 /* Comments: one quiet card per comment. */
-.kmb-ann-comments { display: flex; flex-direction: column; gap: 0.75rem; }
-html[data-kmb-palette] .kmb-ann-comment {
+.kmb-detail-comments { display: flex; flex-direction: column; gap: 0.75rem; }
+html[data-kmb-palette] .kmb-detail-comment {
   background: var(--kmb-surface);
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius);
   padding: 1rem 1.25rem;
 }
-html[data-kmb-palette] .kmb-ann-composer .form-control,
-html[data-kmb-palette] .kmb-ann-composer .form-select { border-radius: var(--kmb-radius-input); }
-html[data-kmb-palette] .kmb-ann-composer .form-label {
+html[data-kmb-palette] .kmb-detail-composer .form-control,
+html[data-kmb-palette] .kmb-detail-composer .form-select { border-radius: var(--kmb-radius-input); }
+html[data-kmb-palette] .kmb-detail-composer .form-label {
   font-family: var(--bs-heading-font-family);
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--kmb-ink);
 }
 @media (max-width: 575.98px) {
-  .kmb-ann-detail .kmb-ann-title { font-size: 1.375rem; }
-  html[data-kmb-palette] .kmb-ann-comment { padding: 0.875rem 1rem; }
+  .kmb-detail-page .kmb-detail-title { font-size: 1.375rem; }
+  html[data-kmb-palette] .kmb-detail-comment { padding: 0.875rem 1rem; }
 }
 
 /* Post detail (ADR 0185) — reuses the announcement detail classes (ADR 0184). */
@@ -656,10 +620,10 @@ html[data-kmb-palette] .kmb-section-title {
   color: var(--kmb-ink);
 }
 html[data-kmb-palette] .kmb-section-title .text-muted { color: var(--kmb-muted) !important; }
-.kmb-ann-byline .kmb-chip { margin-inline-start: auto; }
+.kmb-detail-byline .kmb-chip { margin-inline-start: auto; }
 @media (max-width: 575.98px) {
-  .kmb-ann-byline { flex-wrap: wrap; }
-  .kmb-ann-byline .kmb-chip { margin-inline-start: 0; }
+  .kmb-detail-byline { flex-wrap: wrap; }
+  .kmb-detail-byline .kmb-chip { margin-inline-start: 0; }
 }
 
 /* Group detail + group post (ADR 0186) */
@@ -952,4 +916,753 @@ html[data-kmb-palette] .kmb-meta-label {
 }
 @media (max-width: 575.98px) {
   html[data-kmb-palette] .kmb-file { width: 40px; height: 48px; font-size: 0.6875rem; }
+}
+
+/* Pages (ADR 0196) */
+/* Each tree section is one surface card of soft ledger rows. */
+html[data-kmb-palette] .airy-page-list {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  overflow: hidden;
+}
+html[data-kmb-palette] .airy-page-list li { border-bottom-color: var(--kmb-border-soft); }
+html[data-kmb-palette] .airy-page-list li:last-child { border-bottom: 0; }
+html[data-kmb-palette] .airy-page-list a { color: var(--kmb-ink); text-decoration: none; font-weight: 600; }
+html[data-kmb-palette] .airy-page-list li:hover > a,
+html[data-kmb-palette] .airy-page-list li > a:focus-visible,
+html[data-kmb-palette] .airy-page-list .kmb-page-branch > summary:hover a { color: var(--kmb-accent); }
+html[data-kmb-palette] .airy-page-list .kmb-page-branch > summary:hover { background: var(--kmb-tint-a); }
+/* Accent chevron; rotates when the branch is open. */
+html[data-kmb-palette] .airy-page-list .kmb-page-branch > summary::before { color: var(--kmb-accent); }
+/* Child count: a quiet chip. */
+html[data-kmb-palette] .kmb-page-branch-count {
+  background: var(--kmb-tint-a);
+  color: var(--kmb-ink-soft);
+  border-radius: var(--kmb-radius-pill);
+}
+/* Draft: outlined chip (shared with announcements). */
+html[data-kmb-palette] .airy-page-list .kmb-chip-draft { vertical-align: middle; }
+/* Pages on a phone (ADR 0216). Leaf rows: the whole row is the link (stretched), not just the text. */
+html[data-kmb-palette] .airy-page-list li:not(:has(> .kmb-page-branch)) { position: relative; }
+html[data-kmb-palette] .airy-page-list li:not(:has(> .kmb-page-branch)) > a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+@media (max-width: 575.98px) {
+  /* The "·" between "Back to the pages" and the breadcrumb dangled at a line end; the trail gets its own row. */
+  html[data-kmb-palette] .kmb-page-trail-sep { display: none; }
+  html[data-kmb-palette] .kmb-page-crumbs { flex: 1 0 100%; }
+}
+@media (pointer: coarse) {
+  /* Touch targets: back link, breadcrumb links and translation chips were 20-26px tall. */
+  html[data-kmb-palette] .kmb-page-back { display: inline-flex; align-items: center; min-height: 44px; }
+  html[data-kmb-palette] .kmb-page-crumbs .breadcrumb-item a { display: inline-block; padding: 0.5rem 0; }
+  html[data-kmb-palette] .kmb-chip-btn { min-height: 2.25rem; }
+}
+
+/* Profile / Directory (ADR 0197) */
+html[data-kmb-palette] .kmb-chip-verified {
+  background: var(--kmb-chip-selected-bg);
+  color: var(--kmb-chip-selected-ink);
+  border-color: transparent;
+}
+/* Directory cards: equal heights, surface tokens, message button pinned to the bottom. */
+html[data-kmb-palette] .dir-card {
+  background: var(--kmb-surface);
+  border-color: var(--kmb-border);
+  padding: 1.5rem 1.25rem 1.25rem;
+}
+html[data-kmb-palette] .dir-card:hover { border-color: var(--kmb-hover-border); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
+html[data-kmb-palette] .dir-card .dname { display: flex; flex-direction: column; align-items: center; gap: 0.375rem; font-family: var(--bs-heading-font-family); }
+html[data-kmb-palette] .dir-card .dname a:hover { color: var(--kmb-accent); }
+html[data-kmb-palette] .dir-card .dir-msg-form { margin-top: auto !important; padding-top: 0.5rem; }
+/* Member page: header card with avatar, name + chip, action on the right. */
+.kmb-member-id { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.kmb-member-name { flex: 1 1 12rem; min-width: 0; }
+.kmb-member-name h1 { font-size: 1.625rem; overflow-wrap: anywhere; }
+@media (max-width: 575.98px) {
+  .kmb-member-msg { width: 100%; }
+  .kmb-member-msg .btn { width: 100%; }
+}
+
+/* Account pages (ADR 0198) */
+/* The short auth/account pages: one centred surface card. */
+html[data-kmb-palette] .kmb-auth {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 2rem;
+  margin-top: 1rem;
+}
+html[data-kmb-palette] .kmb-auth h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+.kmb-auth-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  background: var(--kmb-logo-tile, var(--kmb-accent));
+  color: #fff;
+  font-family: var(--bs-heading-font-family);
+  font-weight: 700;
+  font-size: 1.375rem;
+}
+html[data-kmb-palette] .kmb-auth .form-label { font-family: var(--bs-heading-font-family); font-size: 0.875rem; font-weight: 600; color: var(--kmb-ink-soft); margin-bottom: 0.25rem; }
+html[data-kmb-palette] .kmb-auth .form-control { border-radius: var(--kmb-radius-input); border-color: var(--kmb-control-border); }
+html[data-kmb-palette] .kmb-auth .form-text,
+html[data-kmb-palette] .kmb-auth .text-muted { color: var(--kmb-muted) !important; }
+/* The submit is the page's one primary action: full width. */
+html[data-kmb-palette] .kmb-auth form > .btn-primary,
+html[data-kmb-palette] .kmb-auth form > .btn-danger { width: 100%; margin-top: 0.5rem; }
+html[data-kmb-palette] .kmb-auth .alert { border-radius: var(--kmb-radius-input); }
+/* Links and hints below the form: quiet, centred. */
+html[data-kmb-palette] .kmb-auth form + p,
+html[data-kmb-palette] .kmb-auth > p:last-child { text-align: center; }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-auth { padding: 1.25rem; }
+}
+/* My storage: stat tiles on the detail card look. */
+html[data-kmb-palette] .kmb-stat .fs-4 { font-family: var(--bs-heading-font-family); color: var(--kmb-ink); }
+
+/* Admin (ADR 0199) — shared look for the ~20 admin screens, CSS only. */
+/* Tables: a surface card, quiet small-caps header, hairline rows, hover tint, no stripes. */
+html[data-kmb-palette] .table-responsive {
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  /* Scroll shadows (ADR 0205): the two "local" layers cover the "scroll"
+     edge shadows at the scroll ends, so a fade shows only on a side that has
+     more content. Accent-tinted so it reads in light and dark. */
+  background:
+    linear-gradient(to right, var(--kmb-surface) 30%, transparent) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--kmb-surface) 30%, transparent) right center / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--kmb-accent) 45%, transparent), transparent) left center / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--kmb-accent) 45%, transparent), transparent) right center / 14px 100% no-repeat scroll,
+    var(--kmb-surface);
+}
+html[data-kmb-palette] .table {
+  --bs-table-bg: transparent;
+  --bs-table-striped-bg: transparent;
+  --bs-table-striped-color: var(--kmb-ink);
+  --bs-table-hover-bg: var(--kmb-tint-a);
+  --bs-table-color: var(--kmb-ink);
+  --bs-table-border-color: var(--kmb-border-soft);
+  margin-bottom: 0;
+}
+html[data-kmb-palette] .table > thead > tr > th {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--kmb-muted);
+  background: transparent;
+  border-bottom: 1px solid var(--kmb-border);
+  padding: 0.75rem 1rem;
+}
+html[data-kmb-palette] .table > tbody > tr > td { padding: 0.75rem 1rem; }
+html[data-kmb-palette] .table > tbody > tr:last-child > td { border-bottom: 0; }
+html[data-kmb-palette] .table > tbody > tr:hover > td { background: var(--kmb-tint-a); }
+/* Badges inside tables and admin lists become soft chips; the word still carries the meaning. */
+html[data-kmb-palette] :is(.table, .list-group) .badge {
+  border-radius: var(--kmb-radius-pill);
+  padding: 0.3125rem 0.625rem;
+  font-family: var(--bs-heading-font-family);
+  font-weight: 600;
+  color: var(--kmb-ink) !important;
+  background-color: color-mix(in srgb, var(--kmb-muted) 22%, var(--kmb-surface)) !important;
+}
+html[data-kmb-palette] :is(.table, .list-group) .badge.text-bg-warning { background-color: color-mix(in srgb, #f59e0b 30%, var(--kmb-surface)) !important; }
+html[data-kmb-palette] :is(.table, .list-group) .badge.text-bg-danger { background-color: color-mix(in srgb, #dc3545 30%, var(--kmb-surface)) !important; }
+html[data-kmb-palette] :is(.table, .list-group) .badge.text-bg-success { background-color: var(--kmb-chip-selected-bg) !important; color: var(--kmb-chip-selected-ink) !important; }
+/* Stat tiles and section cards on the dashboard. */
+html[data-kmb-palette] .card.text-bg-light {
+  background-color: var(--kmb-surface) !important;
+  color: var(--kmb-ink) !important;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+}
+html[data-kmb-palette] .card.text-bg-light .fs-4 { font-family: var(--bs-heading-font-family); }
+html[data-kmb-palette] a.card.text-decoration-none {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  color: var(--kmb-ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+html[data-kmb-palette] a.card.text-decoration-none:hover { border-color: var(--kmb-hover-border); box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); }
+html[data-kmb-palette] a.card.text-decoration-none .card-title,
+html[data-kmb-palette] a.card.text-decoration-none h2,
+html[data-kmb-palette] a.card.text-decoration-none h3 { font-family: var(--bs-heading-font-family); color: var(--kmb-ink); }
+/* List groups (admin settings lists, onboarding steps, notifications...): surface rows, hairlines, hover tint. */
+html[data-kmb-palette] .list-group { --bs-list-group-border-radius: var(--kmb-radius); --bs-list-group-bg: var(--kmb-surface); --bs-list-group-border-color: var(--kmb-border); --bs-list-group-color: var(--kmb-ink); --bs-list-group-action-color: var(--kmb-ink); --bs-list-group-action-hover-bg: var(--kmb-tint-a); --bs-list-group-action-hover-color: var(--kmb-ink); --bs-list-group-action-active-bg: var(--kmb-tint-b); }
+html[data-kmb-palette] .list-group-item { border-color: var(--kmb-border-soft); }
+html[data-kmb-palette] .list-group-item-action:hover,
+html[data-kmb-palette] .list-group-item-action:focus-visible { color: var(--kmb-accent); }
+
+/* Row-level destructive buttons (ADR 0196, follow-up): outline red inside tables, solid on hover/focus.
+   Solid btn-danger stays for confirmations and standalone pages (e.g. Delete account). */
+html[data-kmb-palette] .table .btn-danger {
+  --bs-btn-color: #dc3545;
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: #dc3545;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #dc3545;
+  --bs-btn-hover-border-color: #dc3545;
+  --bs-btn-focus-shadow-rgb: 220, 53, 69;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #b02a37;
+  --bs-btn-active-border-color: #b02a37;
+}
+html[data-kmb-theme='dark'] .table .btn-danger,
+html:not([data-kmb-theme='light']) .table .btn-danger { --bs-btn-color: #f08a94; }
+
+/* Follow-ups from the Forest / light-mode check (2026-10-28) */
+/* Forest light: site.css pins .text-secondary to amber-brown (Ember's accent); use the muted ink instead. */
+html[data-kmb-palette='forest'][data-kmb-theme='light'] .text-secondary { color: var(--kmb-muted) !important; }
+@media (prefers-color-scheme: light) {
+  html[data-kmb-palette='forest']:not([data-kmb-theme]) .text-secondary { color: var(--kmb-muted) !important; }
+}
+/* Verified chip: room between the check and the word. */
+html[data-kmb-palette] .kmb-chip-verified { gap: 0.25rem; }
+/* Kanban card meta line: status chip, assignee, start and due as wrapping items instead of running text. */
+html[data-kmb-palette] .kanban-card .flex-grow-1 > .text-muted.small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  line-height: 1.35;
+}
+html[data-kmb-palette] .kanban-card .flex-grow-1 > .text-muted.small > span.ms-1 { margin-left: 0 !important; }
+
+/* Selected state that survives Ember: there the selected fill equals the resting tint, so add an accent ring. */
+html[data-kmb-palette] .kmb-chip-btn[aria-pressed='true'],
+html[data-kmb-palette] button.badge.text-bg-light.border[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1.5px var(--kmb-accent);
+}
+html[data-kmb-palette] .kmb-sort-pill.is-active { border-color: var(--kmb-accent); }
+html[data-kmb-palette] .events-view-toggle.btn-group > .btn.active { box-shadow: inset 0 0 0 1.5px var(--kmb-accent); }
+
+/* Projects forms and board header (ADR 0200) */
+/* Board header: a surface card in the normal page width, above the board. */
+html[data-kmb-palette] .kmb-board-head {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+html[data-kmb-palette] .kmb-board-head h1 { font-size: 1.625rem; margin-bottom: 0.25rem; overflow-wrap: anywhere; }
+html[data-kmb-palette] .kmb-board-head .head-row { align-items: flex-start; }
+html[data-kmb-palette] .kmb-board-head .kmb-detail-byline .when { color: var(--kmb-muted); }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-board-head { padding: 1rem; }
+}
+/* Audience block: switch, label and hint aligned; the divider only shows with the restricted panel. */
+html[data-kmb-palette] form > .card .card-title {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  color: var(--kmb-ink-soft);
+  margin-bottom: 0.75rem;
+}
+html[data-kmb-palette] form > .card .form-switch > .text-muted.small { margin-left: 0 !important; margin-top: 0.125rem; }
+html[data-kmb-palette] form > .card hr { border-color: var(--kmb-border-soft); opacity: 1; }
+html[data-kmb-palette] form > .card .form-switch + hr:has(+ .audience-restricted.d-none) { display: none; }
+/* Headed form sections (ADR 0213): one card per group, a heading, fields spaced inside. */
+html[data-kmb-palette] .kmb-form-section-title {
+  font-family: var(--bs-heading-font-family);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  color: var(--kmb-ink);
+  margin: 0 0 1rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--kmb-border-soft);
+}
+html[data-kmb-palette] .kmb-form-field + .kmb-form-field { margin-top: 1.25rem; }
+/* Submit row: primary action and a quiet Cancel on one centred line. */
+html[data-kmb-palette] form > .d-flex.gap-2:has(> .btn-primary) { align-items: center; gap: 1rem !important; }
+html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link { color: var(--kmb-ink-soft); text-decoration: none; }
+html[data-kmb-palette] form > .d-flex.gap-2 > .btn-link:hover { color: var(--kmb-accent); text-decoration: underline; }
+
+/* Verification round 3 fixes (ADR 0201) */
+/* Board header byline: keep the avatar beside the name on phones. */
+html[data-kmb-palette] .kmb-board-head .kmb-detail-byline { flex-wrap: nowrap; }
+html[data-kmb-palette] .kmb-board-head .kmb-detail-byline .airy-post-author { min-width: 0; }
+/* Ember: outline-primary buttons follow the amber accent, not Bootstrap's green primary. */
+html[data-kmb-palette='ember'] .btn-outline-primary {
+  --bs-btn-color: var(--kmb-accent);
+  --bs-btn-border-color: color-mix(in srgb, var(--kmb-accent) 60%, transparent);
+  --bs-btn-hover-color: var(--kmb-action-ink);
+  --bs-btn-hover-bg: var(--kmb-action-bg);
+  --bs-btn-hover-border-color: var(--kmb-action-bg);
+  --bs-btn-active-color: var(--kmb-action-ink);
+  --bs-btn-active-bg: var(--kmb-action-bg-hover);
+  --bs-btn-active-border-color: var(--kmb-action-bg-hover);
+  --bs-btn-focus-shadow-rgb: 240, 180, 92;
+}
+/* Ember: checkboxes, radios and switches on warm tokens; checked = accent fill with a dark mark. */
+html[data-kmb-palette='ember'] .form-check-input:not(:checked) {
+  background-color: var(--kmb-surface-2);
+  border-color: var(--kmb-control-border);
+}
+html[data-kmb-palette='ember'] .form-check-input:checked {
+  background-color: var(--kmb-action-bg);
+  border-color: var(--kmb-action-bg);
+}
+html[data-kmb-palette='ember'] .form-check-input:checked[type='checkbox'] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%231a1613' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+}
+html[data-kmb-palette='ember'] .form-check-input:checked[type='radio'] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%231a1613'/%3e%3c/svg%3e");
+}
+html[data-kmb-palette='ember'] .form-switch .form-check-input:checked {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%231a1613'/%3e%3c/svg%3e");
+}
+
+/* Home milestone list on Ember (ADR 0201): the id chip and the Done pill follow the amber accent, not Forest green. */
+html[data-kmb-palette='ember'] .kmb-milestone-id {
+  color: var(--kmb-accent) !important;
+  background-color: color-mix(in srgb, var(--kmb-accent) 16%, transparent) !important;
+}
+html[data-kmb-palette='ember'] li[data-rm] .badge.text-bg-success {
+  color: var(--kmb-accent) !important;
+  background-color: color-mix(in srgb, var(--kmb-accent) 16%, transparent) !important;
+}
+
+/* ── Documents detail (ADR 0202) ─────────────────────────────────────────
+   Tile top-aligned beside the title so a long wrapped title on a phone does
+   not centre it mid-height; the tile stays put and the title gets the width. */
+.kmb-doc-head .kmb-file { flex: 0 0 auto; margin-top: .35rem; }
+.kmb-doc-head h1 { overflow-wrap: anywhere; }
+
+/* ── Error text contrast, dark (ADR 0203) ────────────────────────────────
+   Bootstrap's .text-danger (#c65a53) is 3.7:1 on the dark cards; this lighter
+   red is >= 6.5:1 on both dark palettes. Two dark scopes, as above. */
+@media (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme="light"]) .text-danger { color: #f28b82 !important; }
+}
+html[data-kmb-palette][data-kmb-theme="dark"] .text-danger { color: #f28b82 !important; }
+
+/* Board header link chips wrap (ADR 0206) ──────────────────────────────
+   A long project/event title made the chip row 670px wide in a 364px card on
+   a phone. The component/project/event chips flow as normal text (inline-flex
+   split label and title into shrinking items), wrap within the card, and break
+   an unbroken word only as a last resort. */
+html[data-kmb-palette] .kmb-board-links { min-width: 0; }
+html[data-kmb-palette] .kmb-board-links .kmb-chip {
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  border-radius: 1rem;
+  text-align: start;
+}
+
+/* Contrast pass (ADR 0208) */
+/* "Tertiary" text was Bootstrap's 50% alpha ink (3.0:1 light); use the palette's muted token instead. */
+html[data-kmb-palette] .text-body-tertiary { color: var(--kmb-muted) !important; }
+/* Row-level red buttons: darker red on light surfaces (>= 6:1), lighter on dark (>= 5.5:1). */
+html[data-kmb-palette] .table :is(.btn-danger, .btn-outline-danger) {
+  --bs-btn-color: #b02a37;
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: #b02a37;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #b02a37;
+  --bs-btn-hover-border-color: #b02a37;
+  --bs-btn-focus-shadow-rgb: 176, 42, 55;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #8f2230;
+  --bs-btn-active-border-color: #8f2230;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme="light"]) .table :is(.btn-danger, .btn-outline-danger) {
+    --bs-btn-color: #f08a94; --bs-btn-border-color: #f08a94;
+    --bs-btn-hover-color: #2a1015; --bs-btn-hover-bg: #f08a94; --bs-btn-hover-border-color: #f08a94;
+    --bs-btn-active-color: #2a1015; --bs-btn-active-bg: #f4a3ab; --bs-btn-active-border-color: #f4a3ab;
+  }
+}
+html[data-kmb-palette][data-kmb-theme="dark"] .table :is(.btn-danger, .btn-outline-danger) {
+  --bs-btn-color: #f08a94; --bs-btn-border-color: #f08a94;
+  --bs-btn-hover-color: #2a1015; --bs-btn-hover-bg: #f08a94; --bs-btn-hover-border-color: #f08a94;
+  --bs-btn-active-color: #2a1015; --bs-btn-active-bg: #f4a3ab; --bs-btn-active-border-color: #f4a3ab;
+}
+/* Ember milestone id chip and Done pill: the amber accent text is 3.9:1 on the light tint; use the soft ink in light. */
+@media not (prefers-color-scheme: dark) {
+  html[data-kmb-palette='ember']:not([data-kmb-theme="dark"]) :is(.kmb-milestone-id, li[data-rm] .badge.text-bg-success) { color: var(--kmb-ink-soft) !important; }
+}
+html[data-kmb-palette='ember'][data-kmb-theme="light"] :is(.kmb-milestone-id, li[data-rm] .badge.text-bg-success) { color: var(--kmb-ink-soft) !important; }
+
+/* ── Hover and active states pass (ADR 0210) ─────────────────────────────
+   Found by hovering in Ember light: the nav links carry Bootstrap's `text-dark`
+   (an !important #17251d), so the hover colour never applied and the nav text was
+   a green-black; the active pill was a hard-coded pine tint; footer, rail and
+   dropdown hovers were #1c4532 (Forest green); disabled/active pagination and the
+   active dropdown item fell back to Bootstrap grey/blue. All now follow the palette. */
+html[data-kmb-palette] .navbar .nav-link.text-dark { color: var(--kmb-ink-soft) !important; }
+html[data-kmb-palette] .navbar .navbar-nav .nav-link { border-radius: 8px; }
+html[data-kmb-palette] .navbar .navbar-nav .nav-link:not(.active):is(:hover, :focus-visible) {
+  color: var(--kmb-accent) !important;
+  background: color-mix(in srgb, var(--kmb-accent) 8%, transparent);
+}
+html[data-kmb-palette] .navbar .navbar-nav .nav-link.active,
+html[data-kmb-palette] .navbar .dropdown-menu .dropdown-item.active {
+  color: var(--kmb-accent) !important;
+  background: light-dark(color-mix(in srgb, var(--kmb-accent) 14%, transparent), var(--kmb-tint-a));
+}
+html[data-kmb-palette] :is(.kmb-footer a, .kmb-rail-btn, .kmb-rail-expander, .kmb-nav-folded .navbar-nav .dropdown-item):is(:hover, :focus-visible) {
+  color: var(--kmb-accent);
+}
+/* ADR 0218 — the More menu's items (the folded Community/Groups and the rest) carry Bootstrap's text-dark
+   (!important), which beat the accent hover above; same leak as the top-level nav links (ADR 0210). */
+html[data-kmb-palette] .navbar .dropdown-item.text-dark:not(.active):is(:hover, :focus-visible) {
+  color: var(--kmb-accent) !important;
+}
+html[data-kmb-palette] .pagination {
+  --bs-pagination-disabled-bg: var(--kmb-tint-a);
+  --bs-pagination-disabled-color: var(--kmb-muted);
+  --bs-pagination-disabled-border-color: var(--kmb-border-soft);
+  --bs-pagination-active-bg: var(--kmb-action-bg);
+  --bs-pagination-active-color: var(--kmb-action-ink);
+  --bs-pagination-active-border-color: var(--kmb-action-bg);
+}
+html[data-kmb-palette] .dropdown-menu {
+  --bs-dropdown-link-active-bg: color-mix(in srgb, var(--kmb-accent) 14%, transparent);
+  --bs-dropdown-link-active-color: var(--kmb-accent);
+}
+/* Ember light footer: the band, text and brand were Forest values (#f4f3ee, #46534b, #1c4532). */
+@media not (prefers-color-scheme: dark) {
+  html[data-kmb-palette='ember']:not([data-kmb-theme='dark']) .kmb-footer { background-color: var(--kmb-surface-2); color: var(--kmb-ink-soft); }
+  html[data-kmb-palette='ember']:not([data-kmb-theme='dark']) .kmb-footer .navbar-brand { color: var(--kmb-ink) !important; }
+}
+html[data-kmb-palette='ember'][data-kmb-theme='light'] .kmb-footer { background-color: var(--kmb-surface-2); color: var(--kmb-ink-soft); }
+html[data-kmb-palette='ember'][data-kmb-theme='light'] .kmb-footer .navbar-brand { color: var(--kmb-ink) !important; }
+
+/* ── Contrast pass, remaining pages (ADR 0211) ───────────────────────────
+   Found scanning admin pages, group pages, forms, the calendar and open modals. */
+/* Inline <code> was Bootstrap pink #d63384 (3.9-4.3:1); follow the palette accent. */
+html[data-kmb-palette] { --bs-code-color: var(--kmb-accent); }
+/* Outline danger buttons anywhere (the table rule above only covered rows): darker red on
+   light (>= 6:1), lighter on dark. Solid .btn-danger stays (white on #dc3545 is 4.5:1). */
+html[data-kmb-palette] .btn-outline-danger {
+  --bs-btn-color: #b02a37;
+  --bs-btn-border-color: #b02a37;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #b02a37;
+  --bs-btn-hover-border-color: #b02a37;
+  --bs-btn-focus-shadow-rgb: 176, 42, 55;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #8f2230;
+  --bs-btn-active-border-color: #8f2230;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme="light"]) .btn-outline-danger {
+    --bs-btn-color: #f08a94; --bs-btn-border-color: #f08a94;
+    --bs-btn-hover-color: #2a1015; --bs-btn-hover-bg: #f08a94; --bs-btn-hover-border-color: #f08a94;
+    --bs-btn-focus-shadow-rgb: 240, 138, 148;
+    --bs-btn-active-color: #2a1015; --bs-btn-active-bg: #f4a3ab; --bs-btn-active-border-color: #f4a3ab;
+  }
+}
+html[data-kmb-palette][data-kmb-theme="dark"] .btn-outline-danger {
+  --bs-btn-color: #f08a94; --bs-btn-border-color: #f08a94;
+  --bs-btn-hover-color: #2a1015; --bs-btn-hover-bg: #f08a94; --bs-btn-hover-border-color: #f08a94;
+  --bs-btn-focus-shadow-rgb: 240, 138, 148;
+  --bs-btn-active-color: #2a1015; --bs-btn-active-bg: #f4a3ab; --bs-btn-active-border-color: #f4a3ab;
+}
+/* Outline warning (admin "Make optional"): Bootstrap yellow #ffc107 on cream is 1.4:1 in light. */
+@media not (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme="dark"]) .btn-outline-warning {
+    --bs-btn-color: #7a5100; --bs-btn-border-color: #7a5100;
+    --bs-btn-hover-color: #fff; --bs-btn-hover-bg: #7a5100; --bs-btn-hover-border-color: #7a5100;
+    --bs-btn-active-color: #fff; --bs-btn-active-bg: #5f3f00; --bs-btn-active-border-color: #5f3f00;
+    --bs-btn-focus-shadow-rgb: 122, 81, 0;
+  }
+}
+html[data-kmb-palette][data-kmb-theme="light"] .btn-outline-warning {
+  --bs-btn-color: #7a5100; --bs-btn-border-color: #7a5100;
+  --bs-btn-hover-color: #fff; --bs-btn-hover-bg: #7a5100; --bs-btn-hover-border-color: #7a5100;
+  --bs-btn-active-color: #fff; --bs-btn-active-bg: #5f3f00; --bs-btn-active-border-color: #5f3f00;
+  --bs-btn-focus-shadow-rgb: 122, 81, 0;
+}
+
+/* ADR 0219 — the variant-B top row at ~576–767px. Links never wrap their icon above the label
+   (nowrap also gives nav-more-fold.ts a real overflow to fold on: it relies on an unbreakable
+   link refusing to shrink below its content), the search keeps a usable floor instead of
+   shrinking to ~50px, and the link labels (Home, Announcements, Community, Groups; More has no icon and keeps its text)
+   and the account name are visually hidden — they stay in the DOM for assistive tech. Measured
+   at 576px the row needed ~80px more than it had; this frees ~170px. */
+.kmb-nav-row .nav-link { white-space: nowrap; }
+.kmb-nav-row form[role="search"] { flex: 0 1 auto; min-width: 9rem; }
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .kmb-nav-row .kmb-acct-name,
+  .kmb-nav-row .navbar-nav > .nav-item > .nav-link > .kmb-nav-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  /* ADR 0220 — the hidden link label doubles as the tooltip: on hover / keyboard focus it is
+     un-clipped into a small bubble under the icon (same look as the rail tips). It is the same
+     element, so assistive tech hears the name once. */
+  .kmb-nav-row .navbar-nav > .nav-item > .nav-link { position: relative; }
+  .kmb-nav-row .navbar-nav > .nav-item > .nav-link:is(:hover, :focus-visible) > .kmb-nav-label {
+    top: calc(100% + 0.25rem); left: 50%; width: auto; height: auto; margin: 0;
+    padding: 0.3rem 0.6rem; clip: auto; overflow: visible;
+    transform: translateX(-50%); z-index: 1040; pointer-events: none;
+    font-size: 0.8125rem; line-height: 1.2; border-radius: 6px;
+    background: var(--kmb-ink); color: var(--kmb-surface);
+  }
+}
+
+/* ==========================================================================
+   ADR 0221 — non-text contrast (WCAG 1.4.11, 3:1) pass
+   Measured in all four palette/theme combinations. Unchecked checkbox/radio/switch
+   edges were 2.2-2.5:1 (older site.css pins #a3b2a8 / #4e6357 beat the control-border
+   token; Ember even borrowed Forest's green-grey), the checked Ember box in light mode
+   was amber on cream (1.8:1), and the select chevron was Bootstrap's #343a40 on the dark
+   field (~1.6:1). Text-labelled buttons, chips and cards keep their quiet borders
+   (decorative or identified by their label, not required by 1.4.11).
+   ========================================================================== */
+html[data-kmb-palette] .form-check-input:not(:checked):not(:focus) {
+  border-color: var(--kmb-control-border) !important;
+}
+@media not (prefers-color-scheme: dark) {
+  html[data-kmb-palette='ember']:not([data-kmb-theme='dark']) .form-check-input:checked {
+    border-color: var(--kmb-control-border);
+  }
+}
+html[data-kmb-palette='ember'][data-kmb-theme='light'] .form-check-input:checked {
+  border-color: var(--kmb-control-border);
+}
+@media (prefers-color-scheme: dark) {
+  html[data-kmb-palette]:not([data-kmb-theme='light']) .form-select {
+    --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23d5d3c8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  }
+}
+html[data-kmb-palette][data-kmb-theme='dark'] .form-select {
+  --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23d5d3c8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+
+/* ==========================================================================
+   ADR 0222 — stacked table rows on phones (admin Accounts)
+   Below 576px a .kmb-stack-table row becomes a card: the header row is visually hidden, each cell
+   with data-label shows that label above its value, an empty cell (.kmb-cell-empty) disappears,
+   and the action cell wraps its buttons. Desktop and tablet are unchanged.
+   ========================================================================== */
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .table.kmb-stack-table,
+  html[data-kmb-palette] .table.kmb-stack-table > tbody,
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr,
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td { display: block; width: 100%; }
+  html[data-kmb-palette] .table.kmb-stack-table > thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--kmb-border-soft);
+  }
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr:last-child { border-bottom: 0; }
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td {
+    padding: 0.25rem 0;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td.kmb-cell-empty { display: none; }
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--kmb-muted);
+  }
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td.text-end {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    text-align: start !important;
+    padding-top: 0.5rem;
+  }
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td.text-end > * { margin: 0 !important; }
+  /* ADR 0231: an action cell that also carries justify-content-end (Platform pages) starts at the left like the rest. */
+  html[data-kmb-palette] .table.kmb-stack-table > tbody > tr > td.text-end { justify-content: flex-start !important; }
+}
+
+/* ==========================================================================
+   ADR 0225 — palette choice cards (admin Appearance form)
+   The preview uses literal colours (not the page tokens, which follow whichever palette is
+   active): left half = light, right half = dark, each a mini canvas with a card, an ink line,
+   an accent line and an action button.
+   ========================================================================== */
+.kmb-pal-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 18rem)); gap: 1rem; }
+html[data-kmb-palette] .kmb-pal-choice {
+  display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'radio text' 'preview preview';
+  align-items: center; gap: 0.5rem 0.625rem;
+  padding: 0.75rem; cursor: pointer;
+  background: var(--kmb-surface); border: 1px solid var(--kmb-border); border-radius: var(--kmb-radius, 16px);
+}
+html[data-kmb-palette] .kmb-pal-choice:hover { border-color: var(--kmb-hover-border, var(--kmb-border)); }
+html[data-kmb-palette] .kmb-pal-choice:has(.kmb-pal-radio:checked) {
+  border-color: var(--kmb-accent); box-shadow: 0 0 0 1px var(--kmb-accent);
+}
+html[data-kmb-palette] .kmb-pal-choice:has(.kmb-pal-radio:focus-visible) { outline: 2px solid var(--kmb-accent); outline-offset: 2px; }
+.kmb-pal-radio { grid-area: radio; margin: 0; }
+.kmb-pal-text { grid-area: text; display: flex; flex-direction: column; line-height: 1.25; }
+.kmb-pal-preview {
+  grid-area: preview; display: grid; grid-template-columns: 1fr 1fr;
+  border-radius: 10px; overflow: hidden; border: 1px solid rgba(128, 128, 128, 0.35);
+}
+.kmb-pal-half { display: block; padding: 0.5rem; background: var(--p-canvas); }
+.kmb-pal-card {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  padding: 0.45rem; border-radius: 7px;
+  background: var(--p-surface); border: 1px solid var(--p-border);
+}
+.kmb-pal-line { display: block; height: 5px; width: 75%; border-radius: 3px; background: var(--p-ink); opacity: 0.85; }
+.kmb-pal-line--accent { width: 45%; background: var(--p-accent); opacity: 1; }
+.kmb-pal-btn { display: block; height: 11px; width: 36px; margin-top: 0.15rem; border-radius: 6px; background: var(--p-action); }
+.kmb-pal-preview--forest .kmb-pal-half--light { --p-canvas: #fbfaf7; --p-surface: #ffffff; --p-border: #dde3dd; --p-ink: #1f2a25; --p-accent: #1c4532; --p-action: #1c4532; }
+.kmb-pal-preview--forest .kmb-pal-half--dark  { --p-canvas: #131b15; --p-surface: #1c2620; --p-border: #2f3d34; --p-ink: #ece9e0; --p-accent: #9ad0ae; --p-action: #3c7a58; }
+.kmb-pal-preview--ember  .kmb-pal-half--light { --p-canvas: #fbf6ee; --p-surface: #fffdf8; --p-border: #eadfce; --p-ink: #2a2118; --p-accent: #8a5a12; --p-action: #f0b45c; }
+.kmb-pal-preview--ember  .kmb-pal-half--dark  { --p-canvas: #1a1613; --p-surface: #262019; --p-border: #352d26; --p-ink: #f1e9dc; --p-accent: #f0b45c; --p-action: #f0b45c; }
+
+/* ADR 0226 — feed card footer reply-count link. */
+.kmb-post-replies {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: inherit;
+  text-decoration: none;
+}
+.kmb-post-replies:hover,
+.kmb-post-replies:focus-visible { color: var(--kmb-accent, var(--bs-primary)); }
+@media (pointer: coarse) {
+  .kmb-post-replies { min-height: 44px; }
+}
+#replies { scroll-margin-top: 4.5rem; }
+#announcement-comments { scroll-margin-top: 4.5rem; } /* ADR 0248: the card footer's comment link lands below the sticky navbar */
+
+/* ADR 0227 — feed card footer bookmark toggle (right end of the footer). */
+.airy-post-foot .kmb-post-bookmark { margin: 0 0 0 auto; }
+.kmb-post-bookmark-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: var(--kmb-radius, 12px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.kmb-post-bookmark-btn:hover,
+.kmb-post-bookmark-btn:focus-visible { color: var(--kmb-accent, var(--bs-primary)); }
+.kmb-post-bookmark-btn.is-on { color: var(--kmb-accent, var(--bs-primary)); }
+@media (pointer: coarse) {
+  .kmb-post-bookmark-btn { min-width: 44px; min-height: 44px; }
+}
+
+/* ==========================================================================
+   ADR 0231 — phone sub-nav strips scroll in one row
+   Under 768px the tab strips (.kmb-tab-under-navbar: Account, Admin, Projects, Events,
+   Locale settings) no longer wrap into 2-5 rows; they scroll sideways with edge fades
+   (client/lib/tab-strip.ts sets --kmb-fade-l/-r and scrolls the active tab into view).
+   A strip that holds a dropdown menu is excluded (overflow would clip the menu).
+   ========================================================================== */
+@media (max-width: 767.98px) {
+  html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu)) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--kmb-fade-l, 0px), #000 calc(100% - var(--kmb-fade-r, 0px)), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 var(--kmb-fade-l, 0px), #000 calc(100% - var(--kmb-fade-r, 0px)), transparent 100%);
+  }
+  html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu))::-webkit-scrollbar { display: none; }
+  html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu)) > .nav-item { flex: 0 0 auto; }
+  html[data-kmb-palette] .kmb-tab-under-navbar:not(:has(.dropdown-menu)) .nav-link { white-space: nowrap; }
+}
+
+/* ------------------------------------------------------------------------------------
+   FAQ accordion (_FaqAccordion) — theme-aware (ADR 0232).
+   Bootstrap's accordion ships light-only colours (cream panels, #212529 chevron) and
+   site.css hard-coded the answer text, so in dark mode the panels stayed light and the
+   answer copy fell to ~2.2:1. Feed Bootstrap's own variables from the palette tokens and
+   draw the chevron as a currentColor mask so it follows text colour in every combination.
+   ------------------------------------------------------------------------------------ */
+html[data-kmb-palette] .accordion.kmb-faq {
+  --bs-accordion-bg: var(--kmb-surface);
+  --bs-accordion-color: var(--kmb-ink-soft);
+  --bs-accordion-border-color: var(--kmb-border);
+  --bs-accordion-active-bg: var(--kmb-tint-a);
+  --bs-accordion-active-color: var(--kmb-accent);
+  --bs-accordion-btn-color: var(--kmb-ink);
+  --bs-accordion-btn-bg: var(--kmb-surface);
+}
+html[data-kmb-palette] .accordion.kmb-faq .accordion-button:not(.collapsed) {
+  color: var(--kmb-accent);
+  background-color: var(--kmb-tint-a);
+}
+html[data-kmb-palette] .accordion.kmb-faq .accordion-body {
+  color: var(--kmb-ink-soft);
+}
+html[data-kmb-palette] .accordion.kmb-faq .accordion-button::after,
+html[data-kmb-palette] .accordion.kmb-faq .accordion-button:not(.collapsed)::after {
+  background-image: none;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round'><path d='M2 5L8 11L14 5'/></svg>") center / 1.25rem no-repeat;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round'><path d='M2 5L8 11L14 5'/></svg>") center / 1.25rem no-repeat;
+}
+html[data-kmb-palette] .accordion.kmb-faq .accordion-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--kmb-accent) !important;
+}
+
+/* ==========================================================================
+   ADR 0243 — one-line cells on small screens (admin Audit)
+   A table with .kmb-nowrap keeps every cell on one line below 768px. Long ids and timestamps used to
+   wrap one character per line (rows 236px tall on a phone); now rows stay one line tall and the
+   .table-responsive wrapper scrolls sideways (with the edge fades above). Desktop is unchanged.
+   ========================================================================== */
+@media (max-width: 767.98px) {
+  html[data-kmb-palette] .table.kmb-nowrap > thead > tr > th,
+  html[data-kmb-palette] .table.kmb-nowrap > tbody > tr > td { white-space: nowrap; }
+}
+
+/* ==========================================================================
+   ADR 0245 — document list meta keeps each item whole on phones
+   The row is a flex line of name · size · date. Without wrap the three spans shrank and broke inside
+   themselves ("Alex / Admin", "30 / B"). Now each item stays on one line and the row wraps between items;
+   below 576px the dot separators (the even children) are hidden, so no dot dangles at a line end.
+   ========================================================================== */
+html[data-kmb-palette] .kmb-doc-main .airy-ann-meta { flex-wrap: wrap; column-gap: 0.5rem; row-gap: 0.125rem; }
+html[data-kmb-palette] .kmb-doc-main .airy-ann-meta > span { white-space: nowrap; }
+@media (max-width: 575.98px) {
+  html[data-kmb-palette] .kmb-doc-main .airy-ann-meta { column-gap: 0.875rem; }
+  html[data-kmb-palette] .kmb-doc-main .airy-ann-meta > span:nth-child(even) { display: none; }
+}
+
+/* ==========================================================================
+   ADR 0249 — Languages and UI-strings tables fit below 1200px
+   .kmb-wrap-cells tables stop forcing width: a .kmb-key-cell breaks long keys, a .kmb-actions cell lets its
+   button group wrap (the buttons keep their own pill shape instead of the joined-group corners), and a
+   .kmb-fixed-cols table (the 3-column UI-strings editor) uses fixed column widths so the value box keeps a
+   usable width. Together with .kmb-stack-table (ADR 0222) they become cards below 576px. Desktop (1200px
+   and up) is unchanged.
+   ========================================================================== */
+@media (max-width: 1199.98px) {
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-key-cell { white-space: normal !important; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-key-cell code { overflow-wrap: anywhere; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-actions { white-space: normal !important; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-actions .btn-group { flex-wrap: wrap; gap: 0.375rem; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-actions .btn-group > * { flex: 0 0 auto; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td.kmb-actions .btn { border-radius: var(--kmb-radius-pill) !important; margin: 0; }
+  html[data-kmb-palette] .table.kmb-wrap-cells td form.d-flex > input.form-control { flex: 1 1 8rem; min-width: 0; }
+  html[data-kmb-palette] .table.kmb-wrap-cells.kmb-fixed-cols { table-layout: fixed; width: 100%; }
+  html[data-kmb-palette] .table.kmb-fixed-cols > thead > tr > th:nth-child(1) { width: 28%; }
+  html[data-kmb-palette] .table.kmb-fixed-cols > thead > tr > th:nth-child(2) { width: 32%; }
+  html[data-kmb-palette] .table.kmb-fixed-cols > tbody > tr > td { overflow-wrap: anywhere; }
 }

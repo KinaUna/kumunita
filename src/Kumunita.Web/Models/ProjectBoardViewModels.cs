@@ -225,7 +225,16 @@ public sealed record BoardDetailViewModel(
     // shape). A "read, not a decision" surface: the board's single Read
     // decision already ran; a dangling TagId simply drops (renders as
     // nothing, not a 404). Empty = no chips.
-    IReadOnlyList<(string Slug, string DisplayedName)>? Tags = null);
+    IReadOnlyList<(string Slug, string DisplayedName)>? Tags = null,
+    // ADR 0195 — the card click / "Edit" modal surface: the per-card prefill
+    // (each visible card's stored values, keyed by the card's TodoId) + the
+    // board-level picker seed (the option lists shared by every card's
+    // modal). A "read, not a decision" surface (C-M5·3 — the card's own
+    // Read decision already ran in GetBoardAsync); the standing write gate
+    // (creator ∪ assignee ∪ GlobalAdmin) is the service's on the
+    // POST /projects/todos/{id} lane.
+    IReadOnlyDictionary<string, CardEditPrefill>? CardEditPrefills = null,
+    CardEditPicker? CardEditPicker = null);
 
 /// <summary>
 /// The **event picker** affordance on the board detail (ADR 0115 D3, the M14
@@ -488,3 +497,98 @@ public sealed class LaneEditorModel
     /// order — the <see cref="KanbanLane.Order"/> row).</summary>
     public int? Order { get; set; }
 }
+
+/// <summary>
+/// The per-card prefill for the board card's <b>edit modal</b> (ADR 0195 —
+/// the card click / "Edit" dropdown item opens the to-do's full edit form
+/// as a Bootstrap modal on the board page, instead of navigating to
+/// <c>GET /projects/todos/{id}/edit</c>).
+/// <para>
+/// One instance per visible card, keyed by the card's <see cref="TodoCardRow.TodoId"/>
+/// in <see cref="BoardDetailViewModel.CardEditPrefills"/>. It carries only the
+/// **values** the modal's form fields prefill with — the to-do's stored Title /
+/// Body / Status / AssigneeId / ParentId / BlockedByTodoId / StartAt / DueAt
+/// (converted to the actor's effective wall-clock zone, the
+/// <see cref="Kumunita.Web.Controllers.ProjectsController"/>
+/// <c>TodoEditGet</c> idiom) / ComponentId / LanguageCode + the current tag
+/// **slugs** (the <c>data-tag-suggest-initial</c> prefill shape).
+/// </para>
+/// <para>
+/// The **picker option lists** (parent / blocker / community / language /
+/// grant-picker users+groups) are the same for every card on a board — they
+/// are the board-level <see cref="BoardDetailViewModel.CardEditPicker"/> seed
+/// (seeded once, not per card). The standing decision (creator ∪ assignee ∪
+/// GlobalAdmin) is the service's on the <c>POST /projects/todos/{id}</c>
+/// write lane — the prefill is a read surface, never a gate (C3: the read
+/// already ran in <c>GetBoardAsync</c>'s two-level decision, C-M5·3).
+/// </para>
+/// </summary>
+public sealed record CardEditPrefill(
+    string TodoId,
+    string Title,
+    string? Body,
+    string? Status,
+    string? AssigneeId,
+    string? ParentId,
+    string? BlockedByTodoId,
+    // ADR 0079 / ADR 0019 — the optional dates as wall-clock instants in the
+    // actor's effective zone (the <c>TodoEditGet</c> idiom: the browser's
+    // <c>datetime-local</c> posts a wall-clock string with no offset; a blank
+    // field on POST is the clear intent — the <c>UpdateTodoRequest</c>
+    // partial-update shape). `null` = no date.
+    DateTimeOffset? StartAt,
+    DateTimeOffset? DueAt,
+    string? ComponentId,
+    string LanguageCode,
+    // ADR 0044 / 0147 — the to-do's **current** tag slugs (the
+    // <c>tag-suggest.ts</c> <c>data-tag-suggest-initial</c> prefill — each
+    // removable; re-saving with fewer chips detaches). A display affordance,
+    // never a gate.
+    IReadOnlyList<string> TagSlugs);
+
+/// <summary>
+/// The board card edit modal's **shared** picker seed (ADR 0195) — the option
+/// lists every card's edit modal reads (the same options for every card on a
+/// board, seeded once on the <c>GET /projects/boards/{id}</c> action).
+/// <para>
+/// **<see cref="ParentOptions"/>** — the actor's **visible** top-level to-dos
+/// (the <see cref="Kumunita.Web.Controllers.ProjectsController"/>
+/// <c>ReSeedParentOptionsAsync</c> shape: a subtask is a full to-do, and
+/// picking a parent never mutates the parent — C-M5·7).
+/// **<see cref="BlockerOptions"/>** — the actor's **readable, non-deleted**
+/// to-dos (the ADR 0087 C-TBD·4 display surface; the cycle guard is the
+/// service's, C-TBD·3).
+/// **<see cref="Components"/>** — the instance's enabled components (the
+/// feed-organizer picker, C-M3·2: a filter, never a gate).
+/// **<see cref="Languages"/>** — the instance's enabled language catalog
+/// (ADR 0018).
+/// **<see cref="GrantUsers"/> / <see cref="GrantGroups"/>** — the
+/// grant-picker option lists for the modal's audience editor (the
+/// <c>_GrantPickers</c> shape; the hidden <c>Audience.Grants</c> textarea is
+/// the only form-bound grant field — the single-source pin).
+/// </para>
+/// All display surfaces, never a gate (C3 — the standing decision is the
+/// service's on the write lane).
+/// </summary>
+public sealed record CardEditPicker(
+    IReadOnlyList<(string Id, string Title)> ParentOptions,
+    IReadOnlyList<(string Id, string Title)> BlockerOptions,
+    IReadOnlyList<(string Id, string Name)> Components,
+    IReadOnlyList<(string Code, string NativeName)> Languages,
+    IReadOnlyList<GrantOption> GrantUsers,
+    IReadOnlyList<GrantOption> GrantGroups);
+
+/// <summary>
+/// The <c>_BoardCardEditModal</c> partial's model (ADR 0195): the shared
+/// picker seed every card's edit modal reads (the <see cref="CardEditPicker"/>
+/// — parent / blocker / community / language / grant-picker option lists).
+/// <para>
+/// Rendered ONCE per board page (not per card): the partial's audience
+/// editor (the <c>_GrantPickers</c> partial, a single-instance editor keyed
+/// on <c>EditorName</c>) + the rich editor + the tag-suggest input are
+/// single-instance surfaces that the client populates per card from the
+/// <c>card-edit-prefills</c> JSON data block before opening the modal.
+/// </para>
+/// </summary>
+public sealed record BoardCardEditModalModel(
+    CardEditPicker Picker);

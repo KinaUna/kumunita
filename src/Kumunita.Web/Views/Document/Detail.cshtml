@@ -1,7 +1,34 @@
 @model Kumunita.Web.Models.DocumentDetailViewModel
 @using Kumunita.Core.Documents
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Document.Title) ? "Document" : Model.Document.Title;
+
+    // ADR 0240 — the delete confirmation text, resolved server-side in the viewer's
+    // language (the kw-l TagHelper cannot wrap an attribute) and carried on the form's
+    // data-confirm attribute (client/lib/confirm.ts, the house confirm-before-submit).
+    var kwlLang = await EffectiveLanguageCode.ResolveAsync(
+        ViewContext.HttpContext?.Request, Localization, Translation);
+    var deleteConfirm = (await Translation.GetAsync("documents.delete_confirm", kwlLang))
+        .Replace("{0}", string.IsNullOrWhiteSpace(Model.Document.Title) ? "?" : Model.Document.Title);
+
+    // ADR 0202 — a friendly file-kind name for the meta row; unknown types fall
+    // back to the raw content type. TODO: localise via kw-l keys.
+    string FriendlyType(string contentType)
+    {
+        var ct = (contentType ?? string.Empty).Trim().ToLowerInvariant();
+        if (ct == "application/pdf") return "PDF document";
+        if (ct.Contains("wordprocessingml") || ct == "application/msword" || ct.Contains("opendocument.text")) return "Word document";
+        if (ct == "text/csv") return "CSV file";
+        if (ct.Contains("spreadsheetml") || ct.Contains("ms-excel") || ct.Contains("opendocument.spreadsheet")) return "Spreadsheet";
+        if (ct.Contains("presentationml") || ct.Contains("ms-powerpoint") || ct.Contains("opendocument.presentation")) return "Presentation";
+        if (ct.StartsWith("image/")) return "Image";
+        if (ct.StartsWith("text/")) return "Text file";
+        if (ct.Contains("zip") || ct.Contains("compressed") || ct.Contains("tar")) return "ZIP archive";
+        return contentType ?? string.Empty;
+    }
 
     // Human-readable byte size (the detail meta block).
     string FormatSize(long bytes)
@@ -34,7 +61,7 @@
             </a>
         </p>
 
-        <div class="d-flex align-items-center gap-3 mb-2">
+        <div class="kmb-doc-head d-flex align-items-start gap-3 mb-2">
             <partial name="_FileTile" model="Model.Document.ContentType" />
             <h1 class="mb-0 min-w-0">@Model.Document.Title</h1>
         </div>
@@ -81,8 +108,22 @@
                         <kw-l key="documents.detail.type_size">File type / size</kw-l>
                     </div>
                     <div class="col-sm-9 col-md-10">
-                        @Model.Document.ContentType
+                        <span title="@Model.Document.ContentType">@FriendlyType(Model.Document.ContentType)</span>
                         &middot; @FormatSize(Model.Document.SizeBytes)
+                    </div>
+                </div>
+                @* ADR 0239 D1 — the uploader's name (the document is the
+                   uploader's **official** publication, the ADR 0125 D1
+                   owner-reading). A missing / blocked profile degrades to the
+                   raw owner id (the PostsController feed shape — the view
+                   model's <c>OwnerName</c> field already carries the resolved
+                   name or the raw id). *@
+                <div class="row g-2 mt-1">
+                    <div class="col-sm-3 col-md-2 kmb-meta-label">
+                        <kw-l key="documents.detail.uploaded_by">Uploaded by</kw-l>
+                    </div>
+                    <div class="col-sm-9 col-md-10">
+                        @Model.OwnerName
                     </div>
                 </div>
                 <div class="row g-2 mt-1">
@@ -93,12 +134,29 @@
                         <kw-dt dt="@(Model.Document.Modified ?? Model.Document.Created)" format="g"></kw-dt>
                     </div>
                 </div>
+                @* ADR 0239 D1 / ADR 0240 — show **who** last changed the document, but only
+                   when that is someone other than the uploader. The controller leaves
+                   <c>Model.ModifiedByName</c> null when the last modifier is the uploader (or
+                   there is none): the row would repeat "Uploaded by", and the date is
+                   already in "Last updated". Edit and delete are owner-only today, so the
+                   row appears once another lane can change a document. *@
+                @if (Model.ModifiedByName is { } modifierName)
+                {
+                    <div class="row g-2 mt-1">
+                        <div class="col-sm-3 col-md-2 kmb-meta-label">
+                            <kw-l key="documents.detail.last_modified_by">Last modified by</kw-l>
+                        </div>
+                        <div class="col-sm-9 col-md-10">
+                            @modifierName
+                        </div>
+                    </div>
+                }
             </div>
         </div>
 
-        @if (Model.CanDownload || Model.CanEdit)
+        @if (Model.CanDownload || Model.CanEdit || Model.CanDelete)
         {
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
                 @if (Model.CanDownload)
                 {
                     <a class="btn btn-primary" href="@(Model.DownloadUrl)">
@@ -113,6 +171,23 @@
                     <a class="btn btn-outline-secondary" href="@(Model.EditUrl)">
                         <kw-l key="documents.edit">Edit</kw-l>
                     </a>
+                }
+                @* ADR 0239 D6 — the owner-only delete affordance. Rendered only
+                   when the actor is the document's owner (CanDelete — the ADR
+                   0125 CanEdit shape); a non-owner never sees it (the ADR 0122
+                   D7 posture: the route's existence is not leaked). A form POST
+                   behind the house confirm-before-submit (data-confirm, ADR 0240),
+                   since there is no restore lane yet. On success the controller
+                   redirects to the feed — the document is gone from the detail
+                   page by construction (D4). *@
+                @if (Model.CanDelete)
+                {
+                    <form method="post" action="/documents/@Model.Document.Id/delete" data-confirm="@deleteConfirm">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger">
+                            <kw-l key="documents.delete">Delete</kw-l>
+                        </button>
+                    </form>
                 }
             </div>
         }

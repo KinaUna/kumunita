@@ -1,4 +1,10 @@
 @model Kumunita.Web.Models.InventoryEditorModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _closeLang);
+}
 @{
     ViewData["Title"] = "New item";
 }
@@ -18,51 +24,50 @@
                         <li>@msg</li>
                     }
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@ariaClose"></button>
             </div>
         }
 
         <form id="new-inventory-item-form" method="post" action="/inventory">
             @Html.AntiForgeryToken()
 
-            <div class="card mb-4">
+            <div class="card mb-4 kmb-form-section">
                 <div class="card-body">
-                    <label class="form-label" for="name" style="font-weight:600;"><kw-l key="inv.create.name">Name</kw-l></label>
-                    <input class="form-control" type="text" id="name" name="Name"
-                           maxlength="120" required value="@Model.Name" />
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-body">
-                    <label class="form-label" for="ownerKind" style="font-weight:600;"><kw-l key="inv.create.ownerKind">Type</kw-l></label>
-                    <select class="form-select" id="ownerKind" name="OwnerKind">
-                        <option value="shared" selected="@(Model.OwnerKind == "shared" ? "selected" : null)"><kw-l key="inv.list.ownerKind.shared">Shared</kw-l></option>
-                        <option value="community" selected="@(Model.OwnerKind == "community" ? "selected" : null)"><kw-l key="inv.list.ownerKind.community">Community</kw-l></option>
-                        <option value="private" selected="@(Model.OwnerKind == "private" ? "selected" : null)"><kw-l key="inv.list.ownerKind.private">Private</kw-l></option>
-                    </select>
-                    <div class="text-muted small mt-1">
-                        @* D3 — a string label (a *filter* + the write-standing breadth,
-                           NEVER a read gate — C-M16·1 / C-M16·5): shared / community
-                           items can be checked out by any member who can see them
-                           (the M5 broad-standing precedent), private items by the
-                           owner ∪ GlobalAdmin only (the standing probe, U03). *@
-                        <kw-l key="common.optional">optional</kw-l> — a private item is only checked out by you (or a global admin).
+                    <h2 class="kmb-form-section-title"><kw-l key="form.section_details">Details</kw-l></h2>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="name" style="font-weight:600;"><kw-l key="inv.create.name">Name</kw-l></label>
+                        <input class="form-control" type="text" id="name" name="Name"
+                               maxlength="120" required value="@Model.Name" />
+                    </div>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="description" style="font-weight:600;"><kw-l key="inv.create.description">Description</kw-l></label>
+                        <textarea class="form-control" id="description" name="Description" rows="4">@Model.Description</textarea>
                     </div>
                 </div>
             </div>
 
-            <div class="card mb-4">
+            <div class="card mb-4 kmb-form-section">
                 <div class="card-body">
-                    <label class="form-label" for="description" style="font-weight:600;"><kw-l key="inv.create.description">Description</kw-l></label>
-                    <textarea class="form-control" id="description" name="Description" rows="4">@Model.Description</textarea>
-                </div>
-            </div>
-
-            @if (Model.Components.Count > 0)
-            {
-                <div class="card mb-4">
-                    <div class="card-body">
+                    <h2 class="kmb-form-section-title"><kw-l key="form.section_audience">Audience</kw-l></h2>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="ownerKind" style="font-weight:600;"><kw-l key="inv.create.ownerKind">Type</kw-l></label>
+                        <select class="form-select" id="ownerKind" name="OwnerKind">
+                            <option value="shared" selected="@(Model.OwnerKind == "shared" ? "selected" : null)"><kw-l key="inv.list.ownerKind.shared">Shared</kw-l></option>
+                            <option value="community" selected="@(Model.OwnerKind == "community" ? "selected" : null)"><kw-l key="inv.list.ownerKind.community">Community</kw-l></option>
+                            <option value="private" selected="@(Model.OwnerKind == "private" ? "selected" : null)"><kw-l key="inv.list.ownerKind.private">Private</kw-l></option>
+                        </select>
+                        <div class="text-muted small mt-1">
+                            @* D3 — a string label (a *filter* + the write-standing breadth,
+                               NEVER a read gate — C-M16·1 / C-M16·5): shared / community
+                               items can be checked out by any member who can see them
+                               (the M5 broad-standing precedent), private items by the
+                               owner ∪ GlobalAdmin only (the standing probe, U03). *@
+                            <kw-l key="common.optional">optional</kw-l> — a private item is only checked out by you (or a global admin).
+                        </div>
+                    </div>
+                    @if (Model.Components.Count > 0)
+                    {
+                        <div class="kmb-form-field">
                         <label class="form-label" for="componentId" style="font-weight:600;"><kw-l key="inv.create.component">Section</kw-l></label>
                         <select class="form-select" id="componentId" name="ComponentId">
                             <option value="" selected="@(string.IsNullOrWhiteSpace(Model.ComponentId))">—</option>
@@ -74,9 +79,10 @@
                         <div class="text-muted small mt-1">
                             <kw-l key="common.optional">optional</kw-l> — a feed filter (never a gate).
                         </div>
-                    </div>
+                        </div>
+                    }
                 </div>
-            }
+            </div>
 
             <button type="submit" class="btn btn-primary"><kw-l key="inv.create.submit">Create item</kw-l></button>
             <a class="btn btn-outline-secondary ms-2" href="/inventory"><kw-l key="common.cancel">Cancel</kw-l></a>

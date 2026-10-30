@@ -198,11 +198,11 @@ test('resident signs up, verifies via the Mailpit link, logs in, and publishes o
   }
   // waitForResponse resolves on the 302, before the browser finishes navigating
   // — wait for the final URL so the assertion is deterministic.
-  await page.waitForURL(/\/profile\/edit/, { timeout: 10_000 });
+  await page.waitForURL((url) => url.pathname === '/', { timeout: 10_000 });
   expect(
-    page.url(),
-    'after login, the browser should be on /profile/edit (the controller\'s Redirect("/profile/edit"))',
-  ).toContain('/profile/edit');
+    new URL(page.url()).pathname,
+    'after login, the browser should be on Home (ADR 0234: the controller\'s Redirect("/"))',
+  ).toBe('/');
 
   // ── §2.1 step 5: One write (the flow's terminal assertion) ──
   // Navigate to /posts/new, fill Title + Body (run-unique strings), submit,

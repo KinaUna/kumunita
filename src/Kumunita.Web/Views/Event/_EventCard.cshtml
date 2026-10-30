@@ -13,6 +13,11 @@
 @{
     var row = Model.Row;
     bool hasEnd = row.End > row.Start;
+    // ADR 0212 — a multi-day event printed "Fri 18:00–14:00" (the end day was
+    // dropped); when the end falls on another calendar day, show the weekday
+    // for both ends. Compared on the stored (UTC) date: close enough for a
+    // card label, an overnight event in a far zone just gains a weekday.
+    bool multiDay = hasEnd && row.End.Date != row.Start.Date;
 }
 <article class="kmb-event-card" @(Model.Hidden ? "hidden" : null)>
     <div class="kmb-event-date" aria-hidden="true">
@@ -33,7 +38,7 @@
             <span class="kmb-event-when">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                 <kw-dt dt="@row.Start" format="weekday"></kw-dt>
-                <kw-dt dt="@row.Start" format="timeonly"></kw-dt>@if (hasEnd){<text>–<kw-dt dt="@row.End" format="timeonly"></kw-dt></text>}
+                <kw-dt dt="@row.Start" format="timeonly"></kw-dt>@if (multiDay){<text> – <kw-dt dt="@row.End" format="weekday"></kw-dt> <kw-dt dt="@row.End" format="timeonly"></kw-dt></text>}else if (hasEnd){<text>–<kw-dt dt="@row.End" format="timeonly"></kw-dt></text>}
             </span>
             @if (!string.IsNullOrWhiteSpace(row.Location))
             {

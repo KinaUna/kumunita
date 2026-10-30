@@ -53,12 +53,9 @@
    absolutely, the same shape as AdminAnalytics/Index.cshtml. *@
 @await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
 
-<h1>Storage</h1>
+<h1><kw-l key="admin.hub.storage_title">Storage</kw-l></h1>
 <p class="text-muted">
-    A read-only view of the media byte store: how full the volume is, how much is
-    resident content, and the space used per user. A point-in-time snapshot — no
-    history, and no export in this version. Read-only: this page writes nothing.
-</p>
+    <kw-l key="admin.storagemetrics.lede">A read-only view of the media byte store: how full the volume is, how much is resident content, and the space used per user. A point-in-time snapshot — no history, and no export in this version. Read-only: this page writes nothing.</kw-l></p>
 
 @* The copy throughout is plain English: the admin shell's local convention
    (the /admin hub + Platform are mostly non-kw-l English), which keeps this
@@ -123,20 +120,20 @@
    service orders it), one "unknown / not captured" bucket row when present.
    The created-by id is rendered raw: this is the operator's admin surface (the
    M13 analytics view likewise shows raw ids). *@
-<h2 class="h5">Space used per user</h2>
+<h2 class="h5"><kw-l key="admin.storagemetrics.per_user">Space used per user</kw-l></h2>
 <div class="table-responsive">
     <table class="table table-sm table-striped align-middle">
         <thead>
             <tr>
-                <th>User</th>
-                <th class="text-end">Bytes</th>
-                <th class="text-end">Files</th>
+                <th><kw-l key="admin.storagemetrics.col_user">User</kw-l></th>
+                <th class="text-end"><kw-l key="admin.storagemetrics.col_bytes">Bytes</kw-l></th>
+                <th class="text-end"><kw-l key="admin.storagemetrics.col_files">Files</kw-l></th>
             </tr>
         </thead>
         <tbody>
             @if (Model.Items.Count == 0)
             {
-                <tr><td colspan="3" class="text-muted">No user content captured yet.</td></tr>
+                <tr><td colspan="3" class="text-muted"><kw-l key="admin.storagemetrics.none">No user content captured yet.</kw-l></td></tr>
             }
             @foreach (var r in Model.Items)
             {
@@ -171,7 +168,7 @@
     }
     @if (Model.HasMore)
     {
-        <a class="btn btn-outline-primary btn-sm" href="/admin/storage?page=@(Model.Page + 1)">Next &rarr;</a>
+        <a class="btn btn-outline-primary btn-sm" href="/admin/storage?page=@(Model.Page + 1)"><kw-l key="admin.storagemetrics.next">Next →</kw-l></a>
     }
 </nav>
 

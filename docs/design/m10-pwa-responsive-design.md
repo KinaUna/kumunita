@@ -950,6 +950,42 @@ carries the per-unit entries):
   `PwaManifestTests.Site_Css_Media_Block_Boundary_Pinned` and
   `NavMoreFoldTests.Site_Css_Styles_Fold_State_Outside_Media_Block` both
   pin the new total in step.
+- **ADR 0179 (2026-10-26) — the event card adds one recorded
+  `@media (max-width: 575.98px)` block.** ADR 0179 ("Event card with date
+  tile") ships a third 575.98px block (the date tile + the title/meta
+  phone rule) at the same Bootstrap `navbar-expand-sm` breakpoint. This
+  is a **recorded** drift entry (frozen pin #7), not a drive-by. The
+  pinned total moves from 4 width + 2 collapsed + 1 motion + 2 dark =
+  **9** to 4 width + 3 collapsed + 1 motion + 2 dark = **10** `@media`
+  blocks; the two media pins above move in step.
+- **ADR 0180 (2026-10-26) — the event detail adds one recorded
+  `@media (max-width: 575.98px)` block.** ADR 0180 ("Event detail: rich
+  header") ships the fourth 575.98px block (the phone tile rule). This
+  is a **recorded** drift entry (frozen pin #7), not a drive-by. The
+  pinned total moves from 4 width + 3 collapsed + 1 motion + 2 dark =
+  **10** to 4 width + 4 collapsed + 1 motion + 2 dark = **11** `@media`
+  blocks; the two media pins above move in step.
+- **Pages-tree touch target (2026-10-28) — the `.airy-page-list` touch
+  row adds one recorded `@media (pointer: coarse)` block.** The pages
+  tree (the ADR 0160 nested-guide surface) applies the ADR 0107 Floor A
+  a11y floor (the 44×44 px touch-target floor the M10 responsive pass set
+  for the navbar / toasts / `.action-glyph-btn`) to the page branch rows:
+  on a touch device the 44 px tall `<summary>` + the enlarged chevron are
+  scoped by `@media (pointer: coarse)` so pointer devices keep the compact
+  rows (commit `5efade9b`, "feat(pages): page tree — bigger touch target
+  on touch devices (pointer: coarse)…(ADR 0107 Floor A)"). This is a
+  **recorded** drift entry (frozen pin #7), not a drive-by. The pinned
+  total moves from 4 width + 4 collapsed + 1 motion + 2 dark = **11** to
+  4 width + 4 collapsed + 1 motion + **1 pointer:coarse** + 2 dark =
+  **12** `@media` blocks. The two media pins above move in step, and —
+  because the new block's own documentation comment contains the literal
+  word "@media" (a naive substring count would read **13**) — they now
+  count the real at-rules (`@media` + its query + an open brace) rather
+  than the bare substring, so a doc-comment mention is not mistaken for a
+  boundary. The fold-state pin (`Site_Css_Styles_Fold_State_Outside_Media_`
+  `Block`) still holds: the `.kmb-nav-folded` rule is a top-level
+  non-`@media` rule, and the `pointer: coarse` block is a different
+  at-rule, not a width/dark/motion boundary the fold rule depends on.
 
 ## §the three acceptance tests (template)
 

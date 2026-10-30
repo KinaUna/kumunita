@@ -1098,6 +1098,10 @@ public sealed class ProjectsController : Controller
             {
                 Mode = "Any",
                 Grants = "[]",
+                // Seeded like the board composer: the view's "Everyone" switch
+                // renders from `Audience?.CommunityVisible ?? true`, which a
+                // non-null `false` would defeat (the form opened author-only).
+                CommunityVisible = true,
             },
             Languages = await SeedLanguagePickerAsync(),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
@@ -1246,7 +1250,7 @@ public sealed class ProjectsController : Controller
             }
         }
 
-        TempData["info"] = "To-do created.";
+        TempData["info"] = await this.FlashAsync("projects.flash_todo_created", "To-do created.");
         return Redirect($"/projects/todos/{todo.Id}");
     }
 
@@ -1300,6 +1304,43 @@ public sealed class ProjectsController : Controller
         model.ParentOptions = candidates
             .Where(t => t.ParentId is null)
             .Select(t => (Id: t.Id, Title: t.Title))
+            .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Seeds the **parent picker** options (the actor's visible top-level
+    /// to-dos — the F9 pin: a subtask is a full to-do, and picking a parent
+    /// never mutates the parent). A read, never a decision (the service's
+    /// <c>CanSeeAsync(Read)</c> already gates the rows).
+    /// </summary>
+    private async Task<IReadOnlyList<(string Id, string Title)>> SeedTodoParentOptionsAsync(string actorId)
+    {
+        if (actorId.Length == 0)
+            return [];
+        // ADR 0195 — a **display surface, never a gate** (C3): a denied seam
+        // (UnauthorizedAccessException) or a seam that returns no page (a
+        // test-harness substitute / a missing read) is a display no-op — the
+        // picker offers an empty option set (the F10-hides-the-picker rule
+        // the BoardEdit / BoardNew views apply), never an error on the board
+        // read itself.
+        IReadOnlyList<TodoItem> candidates;
+        try
+        {
+            var page = await projects.ListTodosAsync(null, null, actorId, page: 1, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3
+            candidates = page?.Items ?? [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
+        catch (KeyNotFoundException)
+        {
+            return [];
+        }
+        return candidates
+            .Where(t => t is not null && t.ParentId is null)
+            .Select(t => (Id: t.Id, Title: string.IsNullOrWhiteSpace(t.Title) ? t.Id : t.Title))
             .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -1420,7 +1461,7 @@ public sealed class ProjectsController : Controller
             return View("Edit", model);
         }
 
-        TempData["info"] = "To-do updated.";
+        TempData["info"] = await this.FlashAsync("projects.flash_todo_updated", "To-do updated.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -1457,7 +1498,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = string.IsNullOrWhiteSpace(assigneeId) ? "Assignee removed." : "To-do assigned.";
+        TempData["info"] = string.IsNullOrWhiteSpace(assigneeId) ? await this.FlashAsync("projects.flash_assignee_removed", "Assignee removed.") : await this.FlashAsync("projects.flash_todo_assigned", "To-do assigned.");
         // ADR 0074 — when the caller came from a board (the card's "Assign
         // to…" modal) and posted a same-site returnUrl, go back there;
         // otherwise the to-do's detail (the lane's original target). A
@@ -1509,7 +1550,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = string.IsNullOrWhiteSpace(status) ? "Status cleared." : "Status updated.";
+        TempData["info"] = string.IsNullOrWhiteSpace(status) ? await this.FlashAsync("projects.flash_status_cleared", "Status cleared.") : await this.FlashAsync("projects.flash_status_updated", "Status updated.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -1551,8 +1592,8 @@ public sealed class ProjectsController : Controller
         }
 
         TempData["info"] = string.IsNullOrWhiteSpace(projectId)
-            ? "Project cleared."
-            : "Project set.";
+            ? await this.FlashAsync("projects.flash_project_cleared", "Project cleared.")
+            : await this.FlashAsync("projects.flash_project_set", "Project set.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -1599,8 +1640,8 @@ public sealed class ProjectsController : Controller
         }
 
         TempData["info"] = string.IsNullOrWhiteSpace(eventId)
-            ? "Event link cleared."
-            : "Event linked.";
+            ? await this.FlashAsync("projects.flash_event_link_cleared", "Event link cleared.")
+            : await this.FlashAsync("projects.flash_event_linked", "Event linked.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -1663,7 +1704,7 @@ public sealed class ProjectsController : Controller
         var actorId = SubjectId(User) ?? string.Empty;
         if (string.IsNullOrEmpty(actorId))
         {
-            TempData["error"] = "You must sign in to create an event.";
+            TempData["error"] = await this.FlashAsync("projects.flash_event_signin", "You must sign in to create an event.");
             return Redirect($"/projects/todos/{id}");
         }
 
@@ -1674,13 +1715,13 @@ public sealed class ProjectsController : Controller
         // simple modal shape, C-M14·4 posture).
         if (string.IsNullOrWhiteSpace(Title) || End < Start)
         {
-            TempData["error"] = "A title is required and the end time must be after the start time.";
+            TempData["error"] = await this.FlashAsync("projects.flash_event_title_time", "A title is required and the end time must be after the start time.");
             return Redirect($"/projects/todos/{id}");
         }
 
         if (events is null)
         {
-            TempData["error"] = "Event creation is unavailable on this deployment.";
+            TempData["error"] = await this.FlashAsync("projects.flash_event_unavailable", "Event creation is unavailable on this deployment.");
             return Redirect($"/projects/todos/{id}");
         }
 
@@ -1744,7 +1785,7 @@ public sealed class ProjectsController : Controller
         }
         catch (UnauthorizedAccessException)
         {
-            TempData["error"] = "You do not have permission to create an event.";
+            TempData["error"] = await this.FlashAsync("projects.flash_event_forbidden", "You do not have permission to create an event.");
             return Redirect($"/projects/todos/{id}");
         }
         catch (ArgumentException)
@@ -1752,7 +1793,7 @@ public sealed class ProjectsController : Controller
             // A bad shape the service rejected (the service's own guard —
             // e.g. a malformed audience) — surfaced as a flash (the modal
             // re-renders with the same defaults).
-            TempData["error"] = "The event could not be created.";
+            TempData["error"] = await this.FlashAsync("projects.flash_event_failed", "The event could not be created.");
             return Redirect($"/projects/todos/{id}");
         }
 
@@ -1775,7 +1816,7 @@ public sealed class ProjectsController : Controller
             // The to-do disappeared (concurrent delete) — the event was
             // created and stays (the draft, the author can review it);
             // the link is just not set.
-            TempData["error"] = "The event was created, but the to-do could not be updated to link it (it may have been deleted).";
+            TempData["error"] = await this.FlashAsync("projects.flash_event_link_failed", "The event was created, but the to-do could not be updated to link it (it may have been deleted).");
             return Redirect($"/projects/todos/{id}");
         }
         catch (UnauthorizedAccessException)
@@ -1783,11 +1824,11 @@ public sealed class ProjectsController : Controller
             // The actor has no standing on the to-do (creator ∪ assignee ∪
             // GlobalAdmin) — the event was created and stays (the draft);
             // the link is just not set.
-            TempData["error"] = "The event was created, but you do not have permission to link it to this to-do.";
+            TempData["error"] = await this.FlashAsync("projects.flash_event_link_forbidden", "The event was created, but you do not have permission to link it to this to-do.");
             return Redirect($"/projects/todos/{id}");
         }
 
-        TempData["info"] = "Event created and linked to this to-do (saved as a draft).";
+        TempData["info"] = await this.FlashAsync("projects.flash_event_created_linked", "Event created and linked to this to-do (saved as a draft).");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -1966,7 +2007,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "You claimed this to-do.";
+        TempData["info"] = await this.FlashAsync("projects.flash_todo_claimed", "You claimed this to-do.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -2016,7 +2057,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Subtask added.";
+        TempData["info"] = await this.FlashAsync("projects.flash_subtask_added", "Subtask added.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -2047,7 +2088,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "To-do deleted.";
+        TempData["info"] = await this.FlashAsync("projects.flash_todo_deleted", "To-do deleted.");
         return Redirect("/projects/todos");
     }
 
@@ -2095,7 +2136,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Comment added.";
+        TempData["info"] = await this.FlashAsync("flash.comment_added", "Comment added.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -2127,7 +2168,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Comment deleted.";
+        TempData["info"] = await this.FlashAsync("flash.comment_deleted", "Comment deleted.");
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -2525,6 +2566,64 @@ public sealed class ProjectsController : Controller
             .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
         ViewData["Assign_Communities"] = communityOptions;
+
+        // ADR 0195 — the card edit-modal surface. Two read surfaces (both
+        // "a read, never a decision" — C-M5·3: every card's own Read decision
+        // already ran in GetBoardAsync's two-level decision; the standing
+        // write gate is the service's on the POST /projects/todos/{id} lane):
+        //   (a) per-card prefill — each card's stored values (Title / Body /
+        //       Status / AssigneeId / ParentId / BlockedByTodoId / StartAt /
+        //       DueAt (wall-clock in the actor's zone, the TodoEditGet idiom)
+        //       / ComponentId / LanguageCode + the current tag slugs, the
+        //       data-tag-suggest-initial prefill shape);
+        //   (b) board-level picker — the option lists shared by every card's
+        //       modal (parent / blocker / community / language + the
+        //       grant-picker users + groups seeded into ViewData above).
+        // Both are display conveniences: a missing / unreadable value simply
+        // yields an empty picker option (the same F10-hides-the-picker
+        // rule the BoardEdit / BoardNew views apply).
+        var actorId0 = SubjectId(User) ?? string.Empty;
+        var zone0 = await ResolveZoneAsync();
+        var prefills = new Dictionary<string, CardEditPrefill>(StringComparer.Ordinal);
+        if (actorId0.Length > 0)
+        {
+            foreach (var laneDetail in result.Lanes)
+            {
+                foreach (var card in laneDetail.Cards)
+                {
+                    // ADR 0079 / ADR 0019 — the stored StartAt / DueAt are UTC
+                    // instants; convert to wall-clock in the actor's effective
+                    // zone so the modal's <c>datetime-local</c> shows the local
+                    // time the author chose (a blank field on POST is the clear
+                    // intent — the UpdateTodoRequest partial shape).
+                    var slugs = await SeedExistingTagSlugsAsync(card.TagIds);
+                    prefills[card.Id] = new CardEditPrefill(
+                        TodoId: card.Id,
+                        Title: card.Title,
+                        Body: card.Body,
+                        Status: card.Status,
+                        AssigneeId: card.AssigneeId,
+                        ParentId: card.ParentId,
+                        BlockedByTodoId: card.BlockedByTodoId,
+                        StartAt: card.StartAt is not null ? TimeZoneInfo.ConvertTime(card.StartAt.Value, zone0) : null,
+                        DueAt:   card.DueAt   is not null ? TimeZoneInfo.ConvertTime(card.DueAt.Value,   zone0) : null,
+                        ComponentId: card.ComponentId,
+                        LanguageCode: card.LanguageCode ?? string.Empty,
+                        TagSlugs: slugs);
+                }
+            }
+        }
+        vm = vm with
+        {
+            CardEditPrefills = prefills,
+            CardEditPicker = new CardEditPicker(
+                ParentOptions: await SeedTodoParentOptionsAsync(actorId0),
+                BlockerOptions: await SeedBlockerPickerAsync(),
+                Components: await SeedComponentPickerAsync(),
+                Languages: await SeedLanguagePickerAsync(),
+                GrantUsers: (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>(),
+                GrantGroups: (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>()),
+        };
         return View("BoardDetail", vm);
     }
 
@@ -2688,7 +2787,7 @@ public sealed class ProjectsController : Controller
             return View("BoardEdit", model);
         }
 
-        TempData["info"] = "Board updated.";
+        TempData["info"] = await this.FlashAsync("projects.flash_board_updated", "Board updated.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -2730,8 +2829,8 @@ public sealed class ProjectsController : Controller
         }
 
         TempData["info"] = string.IsNullOrWhiteSpace(projectId)
-            ? "Project cleared."
-            : "Project set.";
+            ? await this.FlashAsync("projects.flash_project_cleared", "Project cleared.")
+            : await this.FlashAsync("projects.flash_project_set", "Project set.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -2777,8 +2876,8 @@ public sealed class ProjectsController : Controller
         }
 
         TempData["info"] = string.IsNullOrWhiteSpace(eventId)
-            ? "Event link cleared."
-            : "Event linked.";
+            ? await this.FlashAsync("projects.flash_event_link_cleared", "Event link cleared.")
+            : await this.FlashAsync("projects.flash_event_linked", "Event linked.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -2944,7 +3043,7 @@ public sealed class ProjectsController : Controller
             }
         }
 
-        TempData["info"] = "Board created.";
+        TempData["info"] = await this.FlashAsync("projects.flash_board_created", "Board created.");
         return Redirect($"/projects/boards/{board.Id}");
     }
 
@@ -2968,7 +3067,7 @@ public sealed class ProjectsController : Controller
             // The board Razor views land in U10 (no dedicated lane-edit view
             // in U08) — a malformed shape redirects back to the board with a
             // message (the M4 "a form is a shape" precedent).
-            TempData["error"] = "A lane title is required.";
+            TempData["error"] = await this.FlashAsync("projects.flash_lane_title_required", "A lane title is required.");
             return Redirect($"/projects/boards/{id}");
         }
 
@@ -2993,7 +3092,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Lane updated.";
+        TempData["info"] = await this.FlashAsync("projects.flash_lane_updated", "Lane updated.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -3046,7 +3145,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = $"Lane moved {direction}.";
+        TempData["info"] = await this.FlashAsync("projects.flash_lane_moved_dir", "Lane moved {0}.", await this.FlashAsync("projects.dir_" + direction, direction));
         return Redirect($"/projects/boards/{boardId}");
     }
 
@@ -3067,7 +3166,7 @@ public sealed class ProjectsController : Controller
         var actorId = SubjectId(User) ?? string.Empty;
         if (string.IsNullOrWhiteSpace(Title))
         {
-            TempData["error"] = "A lane title is required.";
+            TempData["error"] = await this.FlashAsync("projects.flash_lane_title_required", "A lane title is required.");
             return Redirect($"/projects/boards/{id}");
         }
 
@@ -3090,7 +3189,7 @@ public sealed class ProjectsController : Controller
             return Redirect($"/projects/boards/{id}");
         }
 
-        TempData["info"] = "Lane added.";
+        TempData["info"] = await this.FlashAsync("projects.flash_lane_added", "Lane added.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -3121,7 +3220,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Lane moved.";
+        TempData["info"] = await this.FlashAsync("projects.flash_lane_moved", "Lane moved.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -3153,7 +3252,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Lane deleted.";
+        TempData["info"] = await this.FlashAsync("projects.flash_lane_deleted", "Lane deleted.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -3199,7 +3298,7 @@ public sealed class ProjectsController : Controller
             return Redirect($"/projects/boards/{id}");
         }
 
-        TempData["info"] = "To-do added.";
+        TempData["info"] = await this.FlashAsync("events.flash_todo_added", "To-do added.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -3231,7 +3330,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Board deleted.";
+        TempData["info"] = await this.FlashAsync("projects.flash_board_deleted", "Board deleted.");
         return Redirect("/projects/boards");
     }
 
@@ -3321,7 +3420,7 @@ public sealed class ProjectsController : Controller
             return Redirect($"/projects/boards/{boardId}");
         }
 
-        TempData["info"] = $"Card moved {direction}.";
+        TempData["info"] = await this.FlashAsync("projects.flash_card_moved_dir", "Card moved {0}.", await this.FlashAsync("projects.dir_" + direction, direction));
         return Redirect($"/projects/boards/{boardId}");
     }
 
@@ -3354,7 +3453,7 @@ public sealed class ProjectsController : Controller
             return Redirect($"/projects/boards/{boardId}");
         }
 
-        TempData["info"] = $"Card moved {direction}.";
+        TempData["info"] = await this.FlashAsync("projects.flash_card_moved_dir", "Card moved {0}.", await this.FlashAsync("projects.dir_" + direction, direction));
         return Redirect($"/projects/boards/{boardId}");
     }
 
@@ -3395,7 +3494,7 @@ public sealed class ProjectsController : Controller
             return Redirect($"/projects/boards/{id}");
         }
 
-        TempData["info"] = "Card moved.";
+        TempData["info"] = await this.FlashAsync("projects.flash_card_moved", "Card moved.");
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -3417,7 +3516,7 @@ public sealed class ProjectsController : Controller
         var actorId = SubjectId(User) ?? string.Empty;
         if (string.IsNullOrWhiteSpace(targetBoardId))
         {
-            TempData["error"] = "Choose a target board.";
+            TempData["error"] = await this.FlashAsync("projects.flash_target_board", "Choose a target board.");
             return Redirect($"/projects/todos/{id}");
         }
 
@@ -3441,7 +3540,7 @@ public sealed class ProjectsController : Controller
             return Redirect($"/projects/boards/{targetBoardId}");
         }
 
-        TempData["info"] = "To-do copied to board.";
+        TempData["info"] = await this.FlashAsync("projects.flash_todo_copied", "To-do copied to board.");
         return Redirect($"/projects/boards/{targetBoardId}");
     }
 
@@ -3462,7 +3561,7 @@ public sealed class ProjectsController : Controller
         var actorId = SubjectId(User) ?? string.Empty;
         if (string.IsNullOrWhiteSpace(targetBoardId))
         {
-            TempData["error"] = "Choose a target board.";
+            TempData["error"] = await this.FlashAsync("projects.flash_target_board", "Choose a target board.");
             return Redirect($"/projects/todos/{id}");
         }
 
@@ -3486,7 +3585,7 @@ public sealed class ProjectsController : Controller
             return Redirect($"/projects/boards/{targetBoardId}");
         }
 
-        TempData["info"] = "To-do moved to board.";
+        TempData["info"] = await this.FlashAsync("projects.flash_todo_moved_board", "To-do moved to board.");
         return Redirect($"/projects/boards/{targetBoardId}");
     }
 
@@ -3808,6 +3907,10 @@ public sealed class ProjectsController : Controller
             {
                 Mode = "Any",
                 Grants = "[]",
+                // Seeded like the board composer: the view's "Everyone" switch
+                // renders from `Audience?.CommunityVisible ?? true`, which a
+                // non-null `false` would defeat (the form opened author-only).
+                CommunityVisible = true,
             },
             Languages = await SeedLanguagePickerAsync(),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
@@ -3882,7 +3985,7 @@ public sealed class ProjectsController : Controller
             return NotFound();
         }
 
-        TempData["info"] = "Goal created.";
+        TempData["info"] = await this.FlashAsync("projects.flash_goal_created", "Goal created.");
         return Redirect($"/projects/goals/{goal.Id}");
     }
 
@@ -3980,7 +4083,7 @@ public sealed class ProjectsController : Controller
             return View("GoalEdit", model);
         }
 
-        TempData["info"] = "Goal updated.";
+        TempData["info"] = await this.FlashAsync("projects.flash_goal_updated", "Goal updated.");
         return Redirect($"/projects/goals/{id}");
     }
 
@@ -4197,6 +4300,10 @@ public sealed class ProjectsController : Controller
             {
                 Mode = "Any",
                 Grants = "[]",
+                // Seeded like the board composer: the view's "Everyone" switch
+                // renders from `Audience?.CommunityVisible ?? true`, which a
+                // non-null `false` would defeat (the form opened author-only).
+                CommunityVisible = true,
             },
             Languages = await SeedLanguagePickerAsync(),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
@@ -4282,7 +4389,7 @@ public sealed class ProjectsController : Controller
             return NotFound();
         }
 
-        TempData["info"] = "Project created.";
+        TempData["info"] = await this.FlashAsync("projects.flash_project_created", "Project created.");
         return Redirect($"/projects/projects/{created.Id}");
     }
 
@@ -4370,7 +4477,7 @@ public sealed class ProjectsController : Controller
         // (the BoardUpdateModel.IsValid shape).
         if (string.IsNullOrWhiteSpace(model.Title))
         {
-            ModelState.AddModelError(nameof(model.Title), "A title is required.");
+            ModelState.AddModelError(nameof(model.Title), await this.FlashAsync("validation.title_required", "A title is required."));
             return View("ProjectEdit", model);
         }
 
@@ -4409,7 +4516,7 @@ public sealed class ProjectsController : Controller
             return View("ProjectEdit", model);
         }
 
-        TempData["info"] = "Project updated.";
+        TempData["info"] = await this.FlashAsync("projects.flash_project_updated", "Project updated.");
         return Redirect($"/projects/projects/{id}");
     }
 
@@ -4445,7 +4552,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Goal deleted.";
+        TempData["info"] = await this.FlashAsync("projects.flash_goal_deleted", "Goal deleted.");
         return Redirect("/projects");
     }
 
@@ -4480,7 +4587,7 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Project deleted.";
+        TempData["info"] = await this.FlashAsync("projects.flash_project_deleted", "Project deleted.");
         return Redirect("/projects");
     }
 
@@ -4612,10 +4719,15 @@ public sealed class ProjectsController : Controller
     private async Task<IReadOnlyList<(string Id, string Title)>> SeedBlockerPickerAsync()
     {
         var actorId = SubjectId(User) ?? string.Empty;
+        // ADR 0195 — null-tolerant (a test-harness substitute that does not
+        // stub `ListPickerTodosAsync` returns null; the existing
+        // `SeedTodoParentOptionsAsync` idiom — a **display surface, never a
+        // gate** (C3): an unstubbed seam is a display no-op, not an error).
         IReadOnlyList<Kumunita.Core.Projects.TodoItem> list;
         try
         {
-            list = (await projects.ListPickerTodosAsync(actorId, 1, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3
+            var page = await projects.ListPickerTodosAsync(actorId, 1, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3
+            list = page?.Items ?? [];
         }
         catch (KeyNotFoundException)
         {
@@ -4627,6 +4739,7 @@ public sealed class ProjectsController : Controller
         }
 
         return (list ?? [])
+            .Where(t => t is not null)
             .Select(t => (Id: t.Id, Title: string.IsNullOrWhiteSpace(t.Title) ? t.Id : t.Title))
             .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -4682,12 +4795,12 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/todos/{id}");
         }
         if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs a title or some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_title_or_text", "A translation needs a title or some text.");
             return Redirect($"/projects/todos/{id}");
         }
 
@@ -4722,7 +4835,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -4750,12 +4863,12 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/todos/{id}");
         }
         if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs a title or some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_title_or_text", "A translation needs a title or some text.");
             return Redirect($"/projects/todos/{id}");
         }
 
@@ -4790,7 +4903,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -4817,7 +4930,7 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/todos/{id}");
         }
 
@@ -4848,7 +4961,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -4882,12 +4995,12 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/boards/{id}");
         }
         if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs a title or some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_title_or_text", "A translation needs a title or some text.");
             return Redirect($"/projects/boards/{id}");
         }
 
@@ -4922,7 +5035,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -4951,12 +5064,12 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/boards/{id}");
         }
         if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs a title or some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_title_or_text", "A translation needs a title or some text.");
             return Redirect($"/projects/boards/{id}");
         }
 
@@ -4991,7 +5104,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -5018,7 +5131,7 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/boards/{id}");
         }
 
@@ -5049,7 +5162,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -5084,12 +5197,12 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/projects/{id}");
         }
         if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs a title or some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_title_or_text", "A translation needs a title or some text.");
             return Redirect($"/projects/projects/{id}");
         }
 
@@ -5124,7 +5237,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return Redirect($"/projects/projects/{id}");
     }
 
@@ -5153,12 +5266,12 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/projects/{id}");
         }
         if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs a title or some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_title_or_text", "A translation needs a title or some text.");
             return Redirect($"/projects/projects/{id}");
         }
 
@@ -5193,7 +5306,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return Redirect($"/projects/projects/{id}");
     }
 
@@ -5220,7 +5333,7 @@ public sealed class ProjectsController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/projects/projects/{id}");
         }
 
@@ -5251,7 +5364,7 @@ public sealed class ProjectsController : Controller
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return Redirect($"/projects/projects/{id}");
     }
 }

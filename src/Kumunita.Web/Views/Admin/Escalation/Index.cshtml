@@ -91,10 +91,6 @@
 @* The validation error flash (the M32·4 / M31·6 no-op shape — a blank or
    invalid Endpoint when Enabled is true). Server-resolved by the controller
    (the AdminOnboardingController.FlashAsync idiom). *@
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
 
 @* The outbound-config form (the ESC·4 pin — the Endpoint + Token + Enabled
    fields). A [ValidateAntiForgeryToken] POST to /admin/escalation (the

@@ -304,7 +304,7 @@ public sealed class InventoryController : Controller
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to create an item.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_item_create", "You must sign in to create an item."));
             model.Components = await SeedComponentsAsync();
             return View("Create", model);
         }
@@ -312,9 +312,9 @@ public sealed class InventoryController : Controller
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.Name))
-                ModelState.AddModelError(nameof(model.Name), "A name is required.");
+                ModelState.AddModelError(nameof(model.Name), await this.FlashAsync("validation.name_required", "A name is required."));
             if (model.OwnerKind is not ("shared" or "community" or "private"))
-                ModelState.AddModelError(nameof(model.OwnerKind), "The type must be shared, community, or private.");
+                ModelState.AddModelError(nameof(model.OwnerKind), await this.FlashAsync("validation.owner_kind", "The type must be shared, community, or private."));
             model.Components = await SeedComponentsAsync();
             return View("Create", model);
         }
@@ -334,7 +334,7 @@ public sealed class InventoryController : Controller
         }
         catch (UnauthorizedAccessException)
         {
-            ModelState.AddModelError(string.Empty, "You do not have permission to create an item.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.permission_item_create", "You do not have permission to create an item."));
             model.Components = await SeedComponentsAsync();
             return View("Create", model);
         }
@@ -409,9 +409,9 @@ public sealed class InventoryController : Controller
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.Name))
-                ModelState.AddModelError(nameof(model.Name), "A name is required.");
+                ModelState.AddModelError(nameof(model.Name), await this.FlashAsync("validation.name_required", "A name is required."));
             if (model.OwnerKind is not ("shared" or "community" or "private"))
-                ModelState.AddModelError(nameof(model.OwnerKind), "The type must be shared, community, or private.");
+                ModelState.AddModelError(nameof(model.OwnerKind), await this.FlashAsync("validation.owner_kind", "The type must be shared, community, or private."));
             model.Components = await SeedComponentsAsync();
             return View("Edit", model);
         }
@@ -437,7 +437,7 @@ public sealed class InventoryController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Item updated.";
+        TempData["info"] = await this.FlashAsync("inventory.flash_item_updated", "Item updated.");
         return Redirect($"/inventory/{id}");
     }
 
@@ -467,7 +467,7 @@ public sealed class InventoryController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Item deleted.";
+        TempData["info"] = await this.FlashAsync("inventory.flash_item_deleted", "Item deleted.");
         return Redirect("/inventory");
     }
 
@@ -510,7 +510,7 @@ public sealed class InventoryController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Item checked out.";
+        TempData["info"] = await this.FlashAsync("inventory.flash_checked_out", "Item checked out.");
         return Redirect($"/inventory/{id}");
     }
 
@@ -542,7 +542,7 @@ public sealed class InventoryController : Controller
             return new ForbidResult();
         }
 
-        TempData["info"] = "Item checked in.";
+        TempData["info"] = await this.FlashAsync("inventory.flash_checked_in", "Item checked in.");
         return Redirect($"/inventory/{id}");
     }
 

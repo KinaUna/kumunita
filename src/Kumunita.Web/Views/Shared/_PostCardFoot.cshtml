@@ -1,0 +1,66 @@
+@model Kumunita.Web.Models.PostCardFootModel
+@* ADR 0226 — the feed card footer: the reply count as a link to the post's
+   replies. Shared by the community feed and the group feed. The bookmark button
+   (ADR 0227) posts to the existing /bookmarks lanes — toggle when not bookmarked,
+   remove when bookmarked — with the feed's own URL as returnUrl; the host view
+   passes the viewer's state from one batched IBookmarkService read per page.
+   Plural keys follow the groups.member_count_* precedent: {0} replaced here;
+   English literals are the floor so a missing key never blanks the card. *@
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    string bmAdd = "Bookmark", bmRemove = "Remove";
+    string none = "No replies yet", one = "{0} reply", other = "{0} replies";
+    try
+    {
+        string lang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(
+            HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        bmAdd = await Translation.GetAsync("bm.button.bookmark", lang);
+        bmRemove = await Translation.GetAsync("bm.list.unbookmark", lang);
+        none = await Translation.GetAsync("posts.reply_count_none", lang);
+        one = await Translation.GetAsync("posts.reply_count_one", lang);
+        other = await Translation.GetAsync("posts.reply_count_other", lang);
+    }
+    catch
+    {
+        // Never blank the card: keep the English floor.
+    }
+    var n = Model.ReplyCount;
+    var label = n == 0 ? none : (n == 1 ? one : other).Replace("{0}", n.ToString());
+}
+<div class="airy-post-foot">
+    <a class="kmb-post-replies" href="@Model.RepliesHref">
+        <svg class="kmb-post-replies-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
+        </svg>
+        <span>@label</span>
+    </a>
+    @if (Model.IsBookmarked)
+    {
+        <form method="post" action="@($"/bookmarks/post/{Model.PostId}/remove")" class="kmb-post-bookmark">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <button type="submit" class="kmb-post-bookmark-btn is-on" aria-pressed="true" title="@bmRemove">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1.3"
+                     stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 2.5h8v11l-4-3-4 3z" /></svg>
+                <span class="visually-hidden">@bmRemove</span>
+            </button>
+        </form>
+    }
+    else
+    {
+        <form method="post" action="/bookmarks/toggle" class="kmb-post-bookmark">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="kind" value="post" />
+            <input type="hidden" name="id" value="@Model.PostId" />
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <button type="submit" class="kmb-post-bookmark-btn" aria-pressed="false" title="@bmAdd">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"
+                     stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 2.5h8v11l-4-3-4 3z" /></svg>
+                <span class="visually-hidden">@bmAdd</span>
+            </button>
+        </form>
+    }
+</div>

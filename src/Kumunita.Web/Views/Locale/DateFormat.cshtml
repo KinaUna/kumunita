@@ -4,6 +4,10 @@
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _firstDayAria = Translation is null ? "First day of week" : await Translation.GetAsync("settings.dateformat_firstday_label", _aL);
+}
+@{
     ViewData["Title"] = "Settings — Date & time format";
     // The reset form's data-confirm (the ADR 0072 attribute idiom — the
     // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
@@ -59,7 +63,7 @@
         <div class="row g-2 align-items-end mb-3">
             <div class="col-sm-8">
                 <span class="form-label"><kw-l key="settings.dateformat_firstday_label">First day of week</kw-l></span>
-                <div class="d-flex flex-wrap gap-3" role="radiogroup" aria-label="First day of week">
+                <div class="d-flex flex-wrap gap-3" role="radiogroup" aria-label="@_firstDayAria">
                     @foreach (var d in Kumunita.Core.Query.WeekAnchor.OrderDays(Model.FirstDayOfWeek))
                     {
                         <div class="form-check m-0">

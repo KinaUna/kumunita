@@ -560,7 +560,7 @@ public sealed class ModerationController(
         if (string.IsNullOrEmpty(id)) return NotFound();
         if (string.IsNullOrEmpty(assignedToModeratorId))
         {
-            TempData["error"] = "Choose a moderator to assign.";
+            TempData["error"] = await this.FlashAsync("moderation.flash_choose_moderator", "Choose a moderator to assign.");
             return Redirect($"/moderation/{id}");
         }
 
@@ -593,7 +593,7 @@ public sealed class ModerationController(
                 .ConfigureAwait(false);
             if (!valid)
             {
-                TempData["error"] = "That account is not a standing moderator on this report's component. (The form may be out of sync — refresh.)";
+                TempData["error"] = await this.FlashAsync("moderation.flash_not_moderator", "That account is not a standing moderator on this report's component. (The form may be out of sync — refresh.)");
                 return Redirect($"/moderation/{id}");
             }
         }
@@ -615,7 +615,7 @@ public sealed class ModerationController(
                 globalAdminId:         admin,
                 session:               session)
                 .ConfigureAwait(false);
-            TempData["info"] = "Report assigned.";
+            TempData["info"] = await this.FlashAsync("moderation.flash_assigned", "Report assigned.");
         }
         catch (KeyNotFoundException)
         {
@@ -658,7 +658,7 @@ public sealed class ModerationController(
                 globalAdminId: admin,
                 session:       session)
                 .ConfigureAwait(false);
-            TempData["info"] = "Report unlocked (C5 activated on the component).";
+            TempData["info"] = await this.FlashAsync("moderation.flash_unlocked", "Report unlocked (C5 activated on the component).");
         }
         catch (KeyNotFoundException)
         {
@@ -701,7 +701,7 @@ public sealed class ModerationController(
                 globalAdminId: admin,
                 session:       session)
                 .ConfigureAwait(false);
-            TempData["info"] = "Report resolved.";
+            TempData["info"] = await this.FlashAsync("moderation.flash_resolved", "Report resolved.");
         }
         catch (KeyNotFoundException)
         {

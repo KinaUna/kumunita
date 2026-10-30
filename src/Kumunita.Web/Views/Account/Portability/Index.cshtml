@@ -1,3 +1,10 @@
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _deleteConfirm = Translation is null ? "Delete your account permanently? This cannot be undone." : await Translation.GetAsync("account.delete_confirm_dialog", _aL);
+}
 @{
     ViewData["Title"] = "My data";
     // The status area (the myportability.status line) is a TempData string the
@@ -15,12 +22,7 @@
 <h1 class="mt-2"><kw-l key="myportability.index.title">My data</kw-l></h1>
 
 <p class="text-muted">
-    Your own authored content — the posts, events, projects, documents, pages,
-    messages, and media you created — as one portable <code>*.kumunita</code>
-    archive. Export it as a file, or import one of your archives back into this
-    community. Nothing here ever carries your password, and only your own rows
-    travel.
-</p>
+    <kw-l key="myportability.index.lede">Your own authored content — the posts, events, projects, documents, pages, messages, and media you created — as one portable *.kumunita archive. Export it as a file, or import one of your archives back into this community. Nothing here ever carries your password, and only your own rows travel.</kw-l></p>
 
 @* Export — the resident downloads their own, resident-scoped archive
    (the loop closes out of the platform at the resident's scale — F1). A
@@ -31,9 +33,7 @@
         <div>
             <div class="fw-semibold"><kw-l key="myportability.export">Export</kw-l></div>
             <small class="text-muted">
-                One <code>*.kumunita</code> archive — your own authored content
-                and media (never your password, and only your rows).
-            </small>
+                <kw-l key="myportability.export_desc">One *.kumunita archive — your own authored content and media (never your password, and only your rows).</kw-l></small>
         </div>
         <a class="btn btn-primary" href="~/account/portability/export">
             <kw-l key="myportability.export">Export</kw-l>
@@ -50,10 +50,7 @@
     <div class="card-body">
         <div class="fw-semibold mb-2"><kw-l key="myportability.import">Import</kw-l></div>
         <small class="text-muted d-block mb-3">
-            Bring one of your <code>*.kumunita</code> archives back. We'll check
-            what fits this community and what needs your call — you decide, item
-            by item, where each piece goes.
-        </small>
+            <kw-l key="myportability.import_desc">Bring one of your *.kumunita archives back. We'll check what fits this community and what needs your call — you decide, item by item, where each piece goes.</kw-l></small>
         <form method="post" action="/account/portability/import" enctype="multipart/form-data">
             @Html.AntiForgeryToken()
             <div class="row g-2 align-items-end">
@@ -107,7 +104,7 @@
                 <kw-l key="account.delete_lede">Deleting your account removes your sign-in, your profile, and your group and community memberships. Your past actions in the platform's audit trail are preserved with your identity replaced by a placeholder (the platform's privacy policy, OPS.md §9). This cannot be undone.</kw-l>
             </p>
             <form method="post" action="/account/delete"
-                  data-confirm="Delete your account permanently? This cannot be undone.">
+                  data-confirm="@_deleteConfirm">
                 @Html.AntiForgeryToken()
                 <div class="mb-3">
                     <label for="delete-password" class="form-label">

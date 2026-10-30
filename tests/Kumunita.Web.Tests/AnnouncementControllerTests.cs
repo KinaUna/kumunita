@@ -142,6 +142,68 @@ public class AnnouncementControllerTests
         Assert.Equal(author, model.Announcements[0].AuthorSubjectId); // the avatar lane's subject
     }
 
+    // ── ADR 0248 — the card footer's comment count ──
+
+    private static IAnnouncementService OneAnnouncementList(string actor)
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.ListVisiblePagedAsync( actor, Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() ).Returns(new AnnouncementPage(Items: new List<Announcement>
+        {
+            new()
+            {
+                Id = "ann-1", Scope = AnnouncementScope.Public, Title = "Notice", Body = "Body",
+                AuthorId = "subj-author", Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+            },
+        }, HasMore: false));
+        return announcements;
+    }
+
+    /// <summary>A signed-in viewer with the admin comments toggle on gets the batched counts for exactly the page's ids.</summary>
+    [Fact]
+    public async Task Index_SignedIn_CommentsOn_FillsCommentCounts()
+    {
+        var announcements = OneAnnouncementList("subj-resident-001");
+        announcements.AreAnnouncementCommentsEnabledAsync().Returns(true);
+        announcements.CountAnnouncementCommentsAsync(Arg.Any<IReadOnlyCollection<string>>())
+            .Returns(new Dictionary<string, int> { ["ann-1"] = 3 });
+        var controller = Build(announcements, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+        var model = ((await controller.Index()) as ViewResult)!.ViewData.Model as AnnouncementIndexViewModel;
+
+        Assert.NotNull(model!.CommentCounts);
+        Assert.Equal(3, model.CommentCounts!["ann-1"]);
+        await announcements.Received(1).CountAnnouncementCommentsAsync(
+            Arg.Is<IReadOnlyCollection<string>>(ids => ids.Count == 1 && ids.Contains("ann-1")));
+    }
+
+    /// <summary>With the toggle off nothing is counted and the model carries no counts (the card shows no link).</summary>
+    [Fact]
+    public async Task Index_SignedIn_CommentsOff_HasNoCommentCounts_AndDoesNotQuery()
+    {
+        var announcements = OneAnnouncementList("subj-resident-001");
+        announcements.AreAnnouncementCommentsEnabledAsync().Returns(false);
+        var controller = Build(announcements, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+        var model = ((await controller.Index()) as ViewResult)!.ViewData.Model as AnnouncementIndexViewModel;
+
+        Assert.Null(model!.CommentCounts);
+        await announcements.DidNotReceive().CountAnnouncementCommentsAsync(Arg.Any<IReadOnlyCollection<string>>());
+    }
+
+    /// <summary>A visitor never sees comments (ADR 0101), so no counts, even with the toggle on.</summary>
+    [Fact]
+    public async Task Index_Anonymous_CommentsOn_HasNoCommentCounts_AndDoesNotQuery()
+    {
+        var announcements = OneAnnouncementList(null!);
+        announcements.AreAnnouncementCommentsEnabledAsync().Returns(true);
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var model = ((await controller.Index()) as ViewResult)!.ViewData.Model as AnnouncementIndexViewModel;
+
+        Assert.Null(model!.CommentCounts);
+        await announcements.DidNotReceive().CountAnnouncementCommentsAsync(Arg.Any<IReadOnlyCollection<string>>());
+    }
+
     /// <summary>
     /// The happy path: a known author's profile row exists and the
     /// <see cref="Profile.DisplayName"/> field is non-trivial. The

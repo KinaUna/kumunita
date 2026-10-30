@@ -9,6 +9,7 @@
     // ADR 0187 — RsvpStatus -> display label (the enum value must not render
     // verbatim); the same server-resolved keys as Event/Detail.cshtml.
     var rsvpLang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var draftTip = Translation is null ? "Only you can see this — it is not yet public" : await Translation.GetAsync("common.draft_tooltip", rsvpLang);
     var rsvpStatusLabels = new Dictionary<string, string>();
     if (Translation is not null)
     {
@@ -41,7 +42,7 @@
                act on it (the author). *@
             @if (Model.Event.IsDraft)
             {
-                <span class="kmb-chip kmb-chip-draft" title="Only you can see this — it is not yet public"><kw-l key="events.draft">Draft</kw-l></span>
+                <span class="kmb-chip kmb-chip-draft" title="@draftTip"><kw-l key="events.draft">Draft</kw-l></span>
                 @if (Model.IsAuthor)
                 {
                     <form class="d-inline" method="post" action="/groups/@Model.GroupId/events/@Model.Event.Id/publish">
@@ -95,7 +96,7 @@
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                         <span>
                             <strong><kw-dt dt="@Model.Event.Start" format="weekday"></kw-dt></strong>
-                            <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to
+                            <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> <kw-l key="common.range_to">to</kw-l>
                             <kw-dt dt="@Model.Event.End" format="g"></kw-dt>
                         </span>
                     </div>

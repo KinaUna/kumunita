@@ -305,12 +305,14 @@ public class PwaManifestTests
     /// + the ADR 0179 event-card phone block + the ADR 0180 event-detail
     /// phone tile block — all at Bootstrap's narrower-than-767.98px
     /// sm-collapsed breakpoint) + <b>one</b>
-    /// <c>@media (prefers-reduced-motion: reduce)</c> block, for a total of
-    /// <b>eleven</b> <c>@media</c> occurrences (thirteen counting the two ADR
-    /// 0133 dark blocks below). Every 575.98px block is a recorded
-    /// drift-guard entry (ADR 0111, ADR 0175, ADR 0179, ADR 0180), so it is
-    /// expected here. Any OTHER count change without a recorded entry is a
-    /// breach (the design doc §drift-guard frozen pin #7).
+    /// <c>@media (prefers-reduced-motion: reduce)</c> block + <b>one</b>
+    /// <c>@media (pointer: coarse)</c> block (the pages-tree touch-target
+    /// rule, ADR 0107 Floor A — recorded in the design doc drift log) + the
+    /// two ADR 0133 dark blocks below, for a total of <b>twelve</b> real
+    /// <c>@media</c> blocks. Every block is a recorded drift-guard entry
+    /// (ADR 0111, ADR 0175, ADR 0179, ADR 0180, ADR 0107, ADR 0133), so it
+    /// is expected here. Any OTHER count change without a recorded entry is
+    /// a breach (the design doc §drift-guard frozen pin #7).
     /// </summary>
     [Fact(DisplayName = "M10 U06: site.css media-block boundary pinned (D6)")]
     public void Site_Css_Media_Block_Boundary_Pinned()
@@ -347,14 +349,19 @@ public class PwaManifestTests
         Assert.True(darkBlocks.Count == 2,
             $"Expected exactly 2 '@media (prefers-color-scheme: dark)' blocks (ADR 0133 Forest theme); found {darkBlocks.Count}.");
 
-        // The total @media count is eleven (4 width + 4 collapsed + 1 motion
-        // + 2 dark) — the "no new boundary without a record" witness (the
-        // design doc §drift-guard frozen pin #7: "a count change without a
-        // recorded entry is a breach"). The fourth collapsed block is the ADR
-        // 0180 event-detail phone rule.
-        var allMedia = Regex.Matches(css, @"@media");
-        Assert.True(allMedia.Count == 11,
-            $"Expected exactly 11 '@media' occurrences total (4 width + 4 collapsed (ADR 0111 + ADR 0175 D4 + ADR 0179 + ADR 0180) + 1 reduced-motion + 2 dark / ADR 0133); found {allMedia.Count}.");
+        // The total real @media block count is twelve (4 width + 4 collapsed
+        // + 1 motion + 1 pointer:coarse + 2 dark) — the "no new boundary
+        // without a record" witness (the design doc §drift-guard frozen pin
+        // #7: "a count change without a recorded entry is a breach"). The
+        // fourth collapsed block is the ADR 0180 event-detail phone rule;
+        // the pointer:coarse block is the pages-tree touch-target rule
+        // (ADR 0107 Floor A). Counting the real at-rules (@media + its query
+        // + an open brace) rather than the bare substring keeps the pin
+        // honest: a doc-comment that merely mentions "@media" (the
+        // pointer:coarse block's comment does) is not a new boundary.
+        var allMedia = Regex.Matches(css, @"@media\s*\([^)]*\)\s*\{");
+        Assert.True(allMedia.Count == 12,
+            $"Expected exactly 12 '@media' blocks total (4 width + 4 collapsed (ADR 0111 + ADR 0175 D4 + ADR 0179 + ADR 0180) + 1 reduced-motion + 1 pointer:coarse (ADR 0107 Floor A) + 2 dark / ADR 0133); found {allMedia.Count}.");
     }
 
     // ── shared helper ───────────────────────────────────────────────────────

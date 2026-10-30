@@ -3,6 +3,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Media;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
+using Kumunita.Web.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -107,8 +108,7 @@ public class ProfileAvatarUploadTests
         var result = await controller.AvatarUpload(
             TestFile("big.png", "image/png", new byte[32]));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertRejectedForm(result, StatusCodes.Status413RequestEntityTooLarge, "too large");
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
@@ -125,8 +125,7 @@ public class ProfileAvatarUploadTests
         var result = await controller.AvatarUpload(
             TestFile("logo.svg", "image/svg+xml", Png)); // the bytes don't matter — the type does
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status415UnsupportedMediaType, status.StatusCode);
+        AssertRejectedForm(result, StatusCodes.Status415UnsupportedMediaType, "not allowed");
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
@@ -154,8 +153,7 @@ public class ProfileAvatarUploadTests
         var result = await controller.AvatarUpload(
             TestFile("big.png", "image/png", new byte[32]));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertRejectedForm(result, StatusCodes.Status413RequestEntityTooLarge, "too large");
         // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
@@ -186,8 +184,7 @@ public class ProfileAvatarUploadTests
         var result = await controller.AvatarUpload(
             TestFile("pixel.png", "image/png", Png));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertRejectedForm(result, StatusCodes.Status413RequestEntityTooLarge, "too large");
         // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
@@ -205,23 +202,30 @@ public class ProfileAvatarUploadTests
         var result = await controller.AvatarUpload(
             TestFile("empty.png", "image/png", Array.Empty<byte>()));
 
-        // Note: the §2.4 pin names the client-facing message ("Choose an image."),
-        // but ASP.NET Core's `BadRequest(object? error)` does not surface that
-        // string on the result object — the message is a source-level pin on the
-        // action, so the test can only pin the 400 status (plus the "no writes"
-        // half) from this harness.
-        // `BadRequest(string)` (unlike the 413/415 `StatusCode(int)` above) produces
-        // a `BadRequestObjectResult : ObjectResult` — a *sibling* branch of the
-        // `ActionResult` hierarchy, not a `StatusCodeResult` — so the exact type
-        // must be `BadRequestObjectResult`; the `StatusCode` property is still
-        // the shared status-code surface to pin 400.
-        var bad = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal(StatusCodes.Status400BadRequest, bad.StatusCode);
+        // ADR 0237: the 400 is now the re-rendered Profile/Edit with the localized
+        // "choose an image" message (it was a bare BadRequest string before).
+        AssertRejectedForm(result, StatusCodes.Status400BadRequest, "Choose an image");
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
 
     // ── fixtures
+
+    /// <summary>
+    /// ADR 0237 — a rejected avatar upload re-renders <c>Profile/Edit</c>: a
+    /// <see cref="ViewResult"/> for the "Edit" view carrying the guard's status code, the
+    /// editor model, and the localized message in <c>ViewData["AvatarError"]</c>
+    /// (English floor here: the test controller has no translation seam).
+    /// </summary>
+    private static void AssertRejectedForm(IActionResult result, int statusCode, string messageFragment)
+    {
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Edit", view.ViewName);
+        Assert.Equal(statusCode, view.StatusCode);
+        Assert.IsType<ProfileEditViewModel>(view.Model);
+        var message = Assert.IsType<string>(view.ViewData["AvatarError"]);
+        Assert.Contains(messageFragment, message);
+    }
 
     /// <summary>
     /// A minimal <see cref="IFormFile"/> carrier backed by a byte array: the
@@ -298,6 +302,9 @@ public class ProfileAvatarUploadTests
         Kumunita.Core.Usage.CommunityStorageSettings? settings = null,
         long currentUsageBytes = 0)
     {
+        // The reject re-render seeds the editor (ADR 0237): empty option lists suffice.
+        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
+        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
         var controller = new ProfileController(
             userInfo,
             new DirectoryService(userInfo, authz),

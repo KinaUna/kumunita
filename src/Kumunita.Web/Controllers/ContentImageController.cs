@@ -175,7 +175,7 @@ public sealed class ContentImageController(
         // a Put with a disallowed type or an oversize payload would write a
         // volume file that must not exist; M25 C-UP·2 guards-before-write):
         if (file is null || file.Length == 0)
-            return BadRequest("Choose an image.");                          // empty → 400 (untouched)
+            return BadRequest(await this.FlashAsync("validation.choose_image", "Choose an image."));                          // empty → 400 (untouched)
         // M25 (U8) — the size/over-quota guard is now the Web-only
         // IUploadGate (C-UP·3): the single 413 producer, running the pure Core
         // StorageLimits.Decide over the admin doc + the subject's usage. Runs

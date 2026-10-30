@@ -1635,6 +1635,40 @@ public sealed class PostService
     }
 
     /// <summary>
+    /// The **read** seam for the feed cards' reply counts (ADR 0226): for each
+    /// post id in <paramref name="postIds"/> that has at least one reply, the
+    /// number of <see cref="PostReply"/> documents. One query for the whole page
+    /// (the "one query per surface" preference, like
+    /// <see cref="GetReplyTranslationsAsync"/>); a post with no replies is simply
+    /// absent from the result (callers read it as 0). A soft-deleted reply
+    /// (ADR 0024) still counts — the parent's reply count stays honest, the same
+    /// number the post detail's "Replies (N)" heading shows. Owns its
+    /// <c>QuerySession</c> (C3 read lane); **not** an authorization surface and
+    /// writes **no** audit row (C-M3·1 — a reply inherits the parent post's single
+    /// <c>Read</c> decision, already made by the feed).
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, int>> CountRepliesAsync(IReadOnlyCollection<string> postIds)
+    {
+        ArgumentNullException.ThrowIfNull(postIds);
+        if (postIds.Count == 0)
+            return new Dictionary<string, int>();
+
+        await using var session = _store.QuerySession();
+        // TODO (ADR 0226): if a page ever carries many replies, move the grouping
+        // into the query; for a feed page (<= PageSize posts) one projected column is fine.
+        var owners = await session
+            .Query<PostReply>()
+            .Where(r => postIds.Contains(r.PostId))
+            .Select(r => r.PostId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        return owners
+            .GroupBy(id => id, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+    }
+
+    /// <summary>
     /// The **read** seam for a set of replies' user-added translations (ADR
     /// 0022): every <see cref="ReplyTranslation"/> whose
     /// <see cref="ReplyTranslation.ReplyId"/> is in <paramref name="replyIds"/>.

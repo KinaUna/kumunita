@@ -5,6 +5,17 @@
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _pageSubAria = Translation is null ? "Sub-pages" : await Translation.GetAsync("pages.children", _aL);
+    var _pageSiblingAria = Translation is null ? "Previous and next page in this section" : await Translation.GetAsync("pages.sibling_nav", _aL);
+}
+@{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var draftTip = Translation is null ? "Only you can see this — it is not yet public" : await Translation.GetAsync("common.draft_tooltip", _closeLang);
+    var draftPubTip = Translation is null ? "Only you can see this — it is not yet published" : await Translation.GetAsync("pages.draft_tooltip", _closeLang);
+    var scopedTip = Translation is null ? "Scoped to a community" : await Translation.GetAsync("pages.scoped_tooltip", _closeLang);
+}
+@{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Page" : Model.Title;
 
     // The remove-translation + delete-page forms' data-confirms (the ADR 0072
@@ -18,13 +29,29 @@
     // attribute, and can't substitute). The en floor is the server fallback
     // (a null provider — a non-HTTP render — degrades to en).
     string ariaActionsFor = "Actions for {0}";
+    string ariaBreadcrumb = "Breadcrumb";
     if (Translation is not null)
     {
         var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
         confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", effLang);
         confirmDeletePage  = await Translation.GetAsync("pages.delete_confirm", effLang);
         ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", effLang);
+        ariaBreadcrumb     = await Translation.GetAsync("a11y.breadcrumb", effLang);
     }
+
+    // Hierarchy navigation (the parent / sibling / child aids):
+    //   · Breadcrumb — the ancestor chain, root-first. Each entry is a
+    //     link; the current page is the active (non-link) item. Rendered
+    //     only when the page has at least one ancestor (a root page has no
+    //     breadcrumb — the "← Back to the pages" link above is its home).
+    //   · SubPages — the page's direct children (one level down). Rendered
+    //     only when the list is non-empty (a leaf page has none, so the
+    //     section is omitted — no empty card).
+    // Both are read projections (the controller already ran the C6
+    // CanSeeAsync(Read) aggregate + the author-only draft gate over the
+    // sub-pages; the breadcrumb is the page's own ancestor chain, which
+    // the caller can already read — visiting an ancestor is the page's
+    // own Read decision, the same split the current page passed).
 
     // ADR 0027 chip-swap (TD): the authored-in language is the first
     // default-visible variant; each added translation is a hidden variant;
@@ -74,17 +101,44 @@
             @{ var _pn = ("page", Model.Id, Model.Path); }
             <partial name="_NoteButton" model="@_pn" />
         </div>
-        <p>
-            <a href="/pages" class="btn btn-link p-0">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-2 kmb-page-trail">
+            <a href="/pages" class="btn btn-link p-0 kmb-page-back">
                 <kw-l key="pages.back">← Back to the pages</kw-l>
             </a>
-        </p>
+            @* Hierarchy navigation — the breadcrumb (parent half). Rendered
+               only when the page has at least one visible ancestor (a root
+               page has no breadcrumb; the "← Back to the pages" link above
+               is its home). The current page is the active (non-link) item;
+               each ancestor is a link. The chain is display-only: the
+               controller already passed the current page's Read decision,
+               and visiting an ancestor resolves through its own Read
+               decision (the same page-specific 404/403 split the current
+               page passed). Siblings are surfaced when the resident visits
+               the parent (the parent's SubPages list). *@
+            @if (Model.Breadcrumb.Count > 0)
+            {
+                <span class="text-muted kmb-page-trail-sep" aria-hidden="true">·</span>
+                <nav aria-label="@ariaBreadcrumb" class="min-w-0 kmb-page-crumbs">
+                    <ol class="breadcrumb small mb-0">
+                        @foreach (var crumb in Model.Breadcrumb)
+                        {
+                            <li class="breadcrumb-item"><a href="@crumb.Href">@crumb.Title</a></li>
+                        }
+                        <li class="breadcrumb-item active" aria-current="page">
+                            @(string.IsNullOrWhiteSpace(Model.Title)
+                                ? "Untitled page"
+                                : Model.Title)
+                        </li>
+                    </ol>
+                </nav>
+            }
+        </div>
 
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
             @* ADR 0037 — draft surface: visible to the author only. *@
             @if (Model.IsDraft && Model.IsAuthor)
             {
-                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public">
+                <span class="kmb-chip kmb-chip-draft" title="@draftTip">
                     <kw-l key="posts.draft_badge">Draft</kw-l>
                 </span>
                 <form class="d-inline" method="post" action="/pages/@Model.Id/publish">
@@ -97,7 +151,7 @@
 
             @if (Model.CommunityDisplayName is not null)
             {
-                <span class="badge text-bg-primary" title="Scoped to a community">
+                <span class="kmb-chip" title="@scopedTip">
                     @Model.CommunityDisplayName
                 </span>
             }
@@ -151,7 +205,7 @@
                 }
         </div>
 
-        <div class="card">
+        <div class="card kmb-detail-card">
             <div class="card-body">
                 <div data-td-group="page">
                     @* Title row — the title (the shared fallback heading,
@@ -321,16 +375,18 @@
                             <span class="text-muted small fw-semibold">
                                 <kw-l key="posts.translations_label">Translations</kw-l>
                             </span>
-                            <button type="button" class="badge text-bg-light border"
+                            <button type="button" class="kmb-chip kmb-chip-btn"
                                     data-translation-chip data-td-group="page"
-                                    data-td-variant="@Model.OriginalLanguageCode">
+                                    data-td-variant="@Model.OriginalLanguageCode"
+                                    aria-pressed="@(originalHidden ? "false" : "true")">
                                 @LangName(Model.OriginalLanguageCode)
                             </button>
                             @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
                             {
-                                <button type="button" class="badge text-bg-light border"
+                                <button type="button" class="kmb-chip kmb-chip-btn"
                                         data-translation-chip data-td-group="page"
-                                        data-td-variant="@t.LanguageCode">
+                                        data-td-variant="@t.LanguageCode"
+                                        aria-pressed="@(String.Equals(t.LanguageCode, Model.DefaultVariant, StringComparison.OrdinalIgnoreCase) && originalHidden ? "true" : "false")">
                                     @LangName(t.LanguageCode)
                                 </button>
                             }
@@ -344,6 +400,82 @@
                 </div>
             </div>
         </div>
+
+        @* Hierarchy navigation — the sub-pages (child half). Rendered only
+           when the page has at least one visible direct child (a leaf page
+           has none, so the section is omitted — no empty card). Each child
+           is a link to its own page; the draft badge is shown only for a
+           child the viewer authored (a non-author never sees a draft child
+           at all — it is filtered out by the controller's C6
+           CanSeeAsync(Read) aggregate + author-only draft gate). The list
+           is display-only: the controller already ran the read filter, and
+           visiting a child resolves through its own Read decision (the
+           same page-specific 404/403 split). The list is the direct-
+           children level only (one level down); deeper descendants are
+           reached by clicking into the child. *@
+        @if (Model.SubPages.Count > 0)
+        {
+            <section class="mt-4" aria-label="@_pageSubAria">
+                <h2 class="h5 mb-2 mt-1 kmb-section-title">
+                    <kw-l key="pages.children">Sub-pages</kw-l>
+                    <span class="text-muted fw-normal small ms-2" aria-hidden="true">
+                        · @Model.SubPages.Count
+                    </span>
+                </h2>
+                <ul class="airy-page-list list-unstyled mb-0">
+                    @foreach (var child in Model.SubPages)
+                    {
+                        <li style="--kmb-page-depth: 1">
+                            <a href="@child.Href">@child.Title</a>
+                            @if (child.IsDraft)
+                            {
+                                <span class="kmb-chip kmb-chip-draft ms-2" title="@draftPubTip">
+                                    <kw-l key="posts.draft_badge">Draft</kw-l>
+                                </span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
+        @* Sibling navigation (the prev/next half of the hierarchy aids).
+           Rendered only when the page sits inside a parent's child list and
+           has a visible neighbour on that side (a root page, or the
+           first / last VISIBLE child, has null on that side — a child the
+           viewer may not read is absent from the navigation, not a broken
+           link, so the link jumps to the nearest visible neighbour). Both
+           hrefs derive from the real ancestor chain (the controller ran
+           the same draft gate + C6 CanSeeAsync(Read) aggregate the
+           SubPages list uses); visiting a sibling resolves through its
+           own Read decision (the same 404/403 split this page passed). *@
+        @if (Model.PrevSibling is not null || Model.NextSibling is not null)
+        {
+            <nav class="mt-4 d-flex justify-content-between align-items-center gap-2" aria-label="@_pageSiblingAria">
+                @if (Model.PrevSibling is { } prev)
+                {
+                    <a class="text-decoration-none" href="@prev.Href">
+                        <kw-l key="pages.prev">← Previous</kw-l>
+                        <span class="d-block small text-truncate">
+                            @(string.IsNullOrWhiteSpace(prev.Title) ? "Untitled page" : prev.Title)
+                        </span>
+                    </a>
+                }
+                else
+                {
+                    <span aria-hidden="true"></span>
+                }
+                @if (Model.NextSibling is { } next)
+                {
+                    <a class="text-decoration-none text-end" href="@next.Href">
+                        <kw-l key="pages.next">Next →</kw-l>
+                        <span class="d-block small text-truncate">
+                            @(string.IsNullOrWhiteSpace(next.Title) ? "Untitled page" : next.Title)
+                        </span>
+                    </a>
+                }
+            </nav>
+        }
     </div>
 </div>
 

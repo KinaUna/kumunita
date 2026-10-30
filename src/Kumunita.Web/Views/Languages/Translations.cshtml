@@ -14,6 +14,7 @@
     string thValueRaw = "Value in {0}";
     string valueAriaTemplate = "Value for {0} in {1}";
     string modeLabel = "Editor mode";
+    string thKey = "Key", thEn = "English reference"; // ADR 0249 — the stacked-card captions on phones
     if (Translation is not null)
     {
         editorTitleRaw = await Translation.GetAsync("translations.editor.title", effLang);
@@ -21,6 +22,8 @@
         thValueRaw = await Translation.GetAsync("translations.editor.th_value", effLang);
         valueAriaTemplate = await Translation.GetAsync("translations.editor.value_aria", effLang);
         modeLabel = await Translation.GetAsync("translations.editor.mode_label", effLang);
+        thKey = await Translation.GetAsync("translations.editor.th_key", effLang);
+        thEn = await Translation.GetAsync("translations.editor.th_en_reference", effLang);
     }
     var editorTitle = editorTitleRaw.Replace("{0}", Model.Code);
     var editorLede = editorLedeRaw.Replace("{0}", Model.Code);
@@ -76,7 +79,7 @@
             <form method="post" action="/admin/languages/@Model.Code/translations/save-all">
                 @Html.AntiForgeryToken()
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle">
+                    <table class="table table-sm align-middle kmb-stack-table kmb-wrap-cells kmb-fixed-cols">
                         <thead>
                             <tr>
                                 <th><kw-l key="translations.editor.th_key">Key</kw-l></th>
@@ -88,9 +91,9 @@
                             @foreach (var row in Model.Rows)
                             {
                                 <tr>
-                                    <td class="text-nowrap"><code>@row.Key</code></td>
-                                    <td>@row.EnReference</td>
-                                    <td>
+                                    <td class="text-nowrap kmb-key-cell" data-label="@thKey"><code>@row.Key</code></td>
+                                    <td data-label="@thEn">@row.EnReference</td>
+                                    <td data-label="@thValue">
                                         <input type="text" class="form-control form-control-sm"
                                                name="@row.Key" value="@row.CurrentValue" maxlength="512"
                                                aria-label="@valueAriaTemplate.Replace("{0}", row.Key).Replace("{1}", Model.Code)" />
@@ -141,7 +144,7 @@
 </div>
 
 <div class="table-responsive">
-    <table class="table table-sm align-middle">
+    <table class="table table-sm align-middle kmb-stack-table kmb-wrap-cells kmb-fixed-cols">
         <thead>
             <tr>
                 <th><kw-l key="translations.editor.th_key">Key</kw-l></th>
@@ -153,9 +156,9 @@
             @foreach (var row in Model.Rows)
             {
                 <tr>
-                    <td class="text-nowrap"><code>@row.Key</code></td>
-                    <td>@row.EnReference</td>
-                    <td>
+                    <td class="text-nowrap kmb-key-cell" data-label="@thKey"><code>@row.Key</code></td>
+                    <td data-label="@thEn">@row.EnReference</td>
+                    <td data-label="@thValue">
                         <form method="post" action="/admin/languages/@Model.Code/translations" class="d-flex gap-2">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="key" value="@row.Key" />

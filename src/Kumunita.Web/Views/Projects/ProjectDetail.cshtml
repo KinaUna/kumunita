@@ -16,6 +16,7 @@
     // authored-in language (the ADR 0027 floor) — the ADR 0049 originalHidden
     // flag (the Event / Announcement detail idiom).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
     bool _originalHidden = Model.Translations is { Count: > 0 }
         && Model.Translations.Any(t => String.Equals(t.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase));
 
@@ -337,7 +338,7 @@
                                                     <h5 class="modal-title" id="@($"proj-trans-edit-label-{existing.LanguageCode}")">
                                                         <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                                     </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">
@@ -382,7 +383,7 @@
                                                     <h5 class="modal-title" id="@($"proj-trans-add-label-{lang.Code}")">
                                                         <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                                     </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">

@@ -32,12 +32,9 @@
    treatment, site.css). *@
 @await Html.PartialAsync("_AdminNav.cshtml")
 
-<h1>Platform</h1>
+<h1><kw-l key="admin.hub.platform_title">Platform</kw-l></h1>
 <p class="text-muted">
-    Instance-wide management — the platform's languages and translated UI strings,
-    the default time zone and date &amp; time format, the sign-up gate, the
-    notification-flush cadence, the access audit log, and the break-glass
-    elevation path.
+    <kw-l key="admin.platform.lede">Instance-wide management — the platform's languages and translated UI strings, the default time zone and date & time format, the sign-up gate, the notification-flush cadence, the access audit log, and the break-glass elevation path.</kw-l>
 </p>
 
 @* Each surface is a list-group item with a title + one-line description, so an
@@ -45,20 +42,20 @@
    this view's local convention (the admin shell is mostly non-kw-l English). *@
 <div class="list-group mb-4">
     <a href="/admin/languages" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Languages</div>
-        <small class="text-muted">Which languages the platform supports, and the translated UI strings and static pages.</small>
+        <div class="fw-semibold"><kw-l key="admin.platform.languages_title">Languages</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.languages_desc">Which languages the platform supports, and the translated UI strings and static pages.</kw-l></small>
     </a>
     <a href="/admin/timezone" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Time zone</div>
-        <small class="text-muted">The platform-default time zone residents' timestamps fall back to when they set no preference.</small>
+        <div class="fw-semibold"><kw-l key="settings.timezone_title">Time zone</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.timezone_desc">The platform-default time zone residents' timestamps fall back to when they set no preference.</kw-l></small>
     </a>
     <a href="/admin/dateformat" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Date &amp; time format</div>
-        <small class="text-muted">The platform-default date &amp; time format for residents' timestamps.</small>
+        <div class="fw-semibold"><kw-l key="settings.dateformat_title">Date & time format</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.dateformat_desc">The platform-default date & time format for residents' timestamps.</kw-l></small>
     </a>
     <a href="/admin/signup" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Sign-up</div>
-        <small class="text-muted">Whether new residents may create an account on their own — close it for invitation-only sign-up.</small>
+        <div class="fw-semibold"><kw-l key="admin.signup_title">Sign-up</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.signup_desc">Whether new residents may create an account on their own — close it for invitation-only sign-up.</kw-l></small>
     </a>
     @* ADR 0150 (SITE lane) — the /admin/site surface: the GlobalAdmin's edit
        page for the two landing surfaces (/home + /about) — the hero text and
@@ -67,8 +64,8 @@
        interpolated kw-l key would break the KwLRegistryConsistencyTests
        static key scan). *@
     <a href="/admin/site" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Site content</div>
-        <small class="text-muted">Edit the landing surfaces' hero text and choose which sections are shown on the home and about pages.</small>
+        <div class="fw-semibold"><kw-l key="admin.platform.site_title">Site content</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.site_desc">Edit the landing surfaces' hero text and choose which sections are shown on the home and about pages.</kw-l></small>
     </a>
     @* ADR 0152 (M29 — admin surface labels) — the /admin/labels surface: the
        GlobalAdmin's edit page for the 13 top-navigation surfaces' display
@@ -77,8 +74,8 @@
        so an interpolated kw-l key would break the KwLRegistryConsistencyTests
        static key scan). *@
     <a href="/admin/labels" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Surface labels</div>
-        <small class="text-muted">Rename the top-navigation surfaces (Home, Announcements, Community, Groups, and the "More" menu items) — the nav and each surface's page header follow the choice. A blank field keeps the default label.</small>
+        <div class="fw-semibold"><kw-l key="labels.title">Surface labels</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.labels_desc">Rename the top-navigation surfaces (Home, Announcements, Community, Groups, and the "More" menu items) — the nav and each surface's page header follow the choice. A blank field keeps the default label.</kw-l></small>
     </a>
     @* ADR 0164 (M35 — kiosk mode) — the /settings/kiosk surface (ADR 0164
        amendment): the per-resident playlist editor, moved out of /admin so
@@ -87,24 +84,24 @@
        is plain text (the admin view's local convention — non-kw-l English).
        The display itself is /kiosk (signed-in). *@
     <a href="/settings/kiosk" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Kiosk display</div>
-        <small class="text-muted">Every signed-in resident configures their own kiosk display at /settings/kiosk (the ordered list of views it cycles through and the two auto-cycle / auto-refresh cadences). The display is /kiosk (signed-in on the TV).</small>
+        <div class="fw-semibold"><kw-l key="admin.platform.kiosk_title">Kiosk display</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.kiosk_desc">Every signed-in resident configures their own kiosk display at /settings/kiosk (the ordered list of views it cycles through and the two auto-cycle / auto-refresh cadences). The display is /kiosk (signed-in on the TV).</kw-l></small>
     </a>
     <a href="/admin/help" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Help pages</div>
-        <small class="text-muted">Reset the seeded platform help pages — per page, or every page at once — back to their shipped text.</small>
+        <div class="fw-semibold"><kw-l key="admin.platform.help_title">Help pages</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.help_desc">Reset the seeded platform help pages — per page, or every page at once — back to their shipped text.</kw-l></small>
     </a>
     <a href="/admin/quiet" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Quiet-time cadence</div>
-        <small class="text-muted">How often held notification emails are re-checked and delivered — residents set their own quiet window on /settings/quiet.</small>
+        <div class="fw-semibold"><kw-l key="admin.quiet.title">Quiet-time cadence</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.quiet_desc">How often held notification emails are re-checked and delivered — residents set their own quiet window on /settings/quiet.</kw-l></small>
     </a>
     <a asp-action="Audit" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Access audit log</div>
+        <div class="fw-semibold"><kw-l key="admin.platform.audit_title">Access audit log</kw-l></div>
         <small class="text-muted">A record of who was allowed or denied access to restricted content, plus admin actions.</small>
     </a>
     <a asp-action="BreakGlass" class="list-group-item list-group-item-action">
-        <div class="fw-semibold">Break-glass</div>
-        <small class="text-muted">The one-time elevation path for emergencies.</small>
+        <div class="fw-semibold"><kw-l key="admin.platform.breakglass_title">Break-glass</kw-l></div>
+        <small class="text-muted"><kw-l key="admin.platform.breakglass_desc">The one-time elevation path for emergencies.</kw-l></small>
     </a>
     @* ADR 0138 — the sample-data surface (the change-password lock toggle),
        rendered only on a SampleData__Enabled instance (the "unreachable by
@@ -116,8 +113,8 @@
     @if (Model.ShowSampleData)
     {
         <a href="/admin/sample" class="list-group-item list-group-item-action">
-            <div class="fw-semibold">Sample data</div>
-            <small class="text-muted">This instance runs the demo neighborhood. Lock the sample accounts out of changing their own password so visitors can test features without breaking the shared credentials.</small>
+            <div class="fw-semibold"><kw-l key="admin.platform.sample_title">Sample data</kw-l></div>
+            <small class="text-muted"><kw-l key="admin.platform.sample_desc">This instance runs the demo neighborhood. Lock the sample accounts out of changing their own password so visitors can test features without breaking the shared credentials.</kw-l></small>
         </a>
     }
 </div>
@@ -127,17 +124,16 @@
    and, for the four Page-backed surfaces, an edit link (id-based,
    /pages/{id}/edit — only when the slug resolved to a page id; `about` is a
    view, not a seeded page (ADR 0043 D1), so it is preview-only). *@
-<h3>Platform pages</h3>
+<h2 class="h3"><kw-l key="admin.platform.pages_title">Platform pages</kw-l></h2>
 <p class="text-muted">
-    The five pages a fresh instance ships with. "Preview" opens the page as
-    residents see it; "Edit" opens the page editor (admins only). "About" is
-    the product story — preview only.
+    <kw-l key="admin.platform.pages_desc">The five pages a fresh instance ships with. "Preview" opens the page as residents see it; "Edit" opens the page editor (admins only). "About" is the product story — preview only.</kw-l>
 </p>
-<table class="table table-sm align-middle mb-4">
+@* ADR 0231 — below 576px palettes.css stacks each row into a card (kmb-stack-table). *@
+<table class="table table-sm align-middle mb-4 kmb-stack-table">
     <thead>
         <tr>
-            <th>Surface</th>
-            <th>Route</th>
+            <th><kw-l key="admin.platform.col_surface">Surface</kw-l></th>
+            <th><kw-l key="admin.platform.col_route">Route</kw-l></th>
             <th></th>
         </tr>
     </thead>
@@ -166,12 +162,12 @@
             string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
             <tr>
                 <td class="fw-semibold">@(platformLabels.TryGetValue(row.Slug, out var label) ? label : row.Slug)</td>
-                <td><code>@row.Route</code></td>
+                <td data-label="Route"><code>@row.Route</code></td>
                 <td class="text-end d-inline-flex align-items-center gap-2 justify-content-end flex-wrap">
-                    <a href="@row.Route" class="btn btn-sm btn-outline-secondary">Preview</a>
+                    <a href="@row.Route" class="btn btn-sm btn-outline-secondary"><kw-l key="common.preview">Preview</kw-l></a>
                     @if (row.PageId is not null)
                     {
-                        <a href="/pages/@row.PageId/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <a href="/pages/@row.PageId/edit" class="btn btn-sm btn-outline-secondary"><kw-l key="common.edit">Edit</kw-l></a>
                     }
 
                     @* ADR 0161 — the per-page translations dropdown (the

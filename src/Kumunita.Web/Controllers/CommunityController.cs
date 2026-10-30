@@ -122,12 +122,12 @@ public sealed class CommunityController : Controller
         {
             await userInfo.SetCommunityMandatoryAsync(componentId, Mandatory, actorId, KumunitaPrincipal.RoleSet(User));
             TempData["info"] = Mandatory
-                ? "Marked mandatory — everyone in the neighborhood is a member."
-                : "Marked optional.";
+                ? await this.FlashAsync("communities.flash_mandatory", "Marked mandatory — everyone in the neighborhood is a member.")
+                : await this.FlashAsync("communities.flash_optional", "Marked optional.");
         }
         catch (InvalidOperationException)
         {
-            TempData["error"] = "That community no longer exists.";
+            TempData["error"] = await this.FlashAsync("communities.flash_gone", "That community no longer exists.");
         }
         return RedirectToAction(nameof(Manage), new { componentId });
     }
@@ -144,7 +144,7 @@ public sealed class CommunityController : Controller
         {
             // Standing() above implies actorId is non-null (fail-closed null check).
             await userInfo.AddCommunityMemberAsync(componentId, UserId, actorId!, KumunitaPrincipal.RoleSet(User));
-            TempData["info"] = "Member added.";
+            TempData["info"] = await this.FlashAsync("communities.flash_member_added", "Member added.");
         }
         catch (InvalidOperationException ex)
         {
@@ -166,7 +166,7 @@ public sealed class CommunityController : Controller
         {
             // Leaving as a member is the /leave route (audited as the member
             // acting, not a moderator removing themself).
-            TempData["info"] = "To leave as a member, use the Leave button on the community feed.";
+            TempData["info"] = await this.FlashAsync("communities.flash_use_leave", "To leave as a member, use the Leave button on the community feed.");
             return RedirectToAction(nameof(Manage), new { componentId });
         }
 
@@ -174,7 +174,7 @@ public sealed class CommunityController : Controller
         {
             // Standing() above implies actorId is non-null (fail-closed null check).
             await userInfo.RemoveCommunityMemberAsync(componentId, UserId, actorId!, KumunitaPrincipal.RoleSet(User));
-            TempData["info"] = "Member removed.";
+            TempData["info"] = await this.FlashAsync("communities.flash_member_removed", "Member removed.");
         }
         catch (InvalidOperationException ex)
         {
@@ -208,12 +208,12 @@ public sealed class CommunityController : Controller
             return NotFound();
         if (component.Mandatory)
         {
-            TempData["error"] = $"You're a member of {component.Name} because it's mandatory for everyone — you can't leave it.";
+            TempData["error"] = await this.FlashAsync("communities.flash_cannot_leave", "You’re a member of {0} because it’s mandatory for everyone — you can’t leave it.", component.Name);
             return Redirect("/community");
         }
 
         await userInfo.ClearCommunityMembershipAsync(componentId, actorId, actorId);
-        TempData["info"] = $"You've left {component.Name}.";
+        TempData["info"] = await this.FlashAsync("communities.flash_left", "You’ve left {0}.", component.Name);
         return Redirect("/community");
     }
 
@@ -293,12 +293,12 @@ public sealed class CommunityController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Translations), new { componentId });
         }
         if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
         {
-            TempData["error"] = "A translation needs a name and/or description.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_name_or_description", "A translation needs a name and/or description.");
             return RedirectToAction(nameof(Translations), new { componentId });
         }
 
@@ -326,7 +326,7 @@ public sealed class CommunityController : Controller
 
         var catalog = await localization.ListLanguagesAsync();
         var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
-        TempData["info"] = $"Translation added ({langName}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", langName);
         return RedirectToAction(nameof(Translations), new { componentId });
     }
 
@@ -354,12 +354,12 @@ public sealed class CommunityController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Translations), new { componentId });
         }
         if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
         {
-            TempData["error"] = "A translation needs a name and/or description.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_name_or_description", "A translation needs a name and/or description.");
             return RedirectToAction(nameof(Translations), new { componentId });
         }
 
@@ -387,7 +387,7 @@ public sealed class CommunityController : Controller
 
         var catalog = await localization.ListLanguagesAsync();
         var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
-        TempData["info"] = $"Translation updated ({langName}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", langName);
         return RedirectToAction(nameof(Translations), new { componentId });
     }
 
@@ -410,7 +410,7 @@ public sealed class CommunityController : Controller
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Translations), new { componentId });
         }
 
@@ -431,7 +431,7 @@ public sealed class CommunityController : Controller
 
         var catalog = await localization.ListLanguagesAsync();
         var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
-        TempData["info"] = $"Translation removed ({langName}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", langName);
         return RedirectToAction(nameof(Translations), new { componentId });
     }
 }

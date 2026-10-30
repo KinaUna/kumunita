@@ -46,7 +46,7 @@
 
 <div class="audience-editor card mb-4">
     <div class="card-body">
-        <h6 class="card-title" style="font-weight:600;">
+        <h3 class="h6 card-title" style="font-weight:600;">
             @if (string.Equals(editorName, "Visibility", StringComparison.OrdinalIgnoreCase))
             {
                 <text><kw-l key="profile.audience_visibility">Who can see your profile</kw-l></text>
@@ -55,7 +55,7 @@
             {
                 <text><kw-l key="profile.audience_contact">Who can see your contact details</kw-l></text>
             }
-        </h6>
+        </h3>
 
         @if (visuallyOff && string.Equals(editorName, "ContactVisibility", StringComparison.OrdinalIgnoreCase))
         {

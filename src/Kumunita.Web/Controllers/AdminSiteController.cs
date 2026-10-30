@@ -183,7 +183,7 @@ public sealed class AdminSiteController(
             AboutShowContactCta = current.AboutShowContactCta,
             DefaultPalette      = current.DefaultPalette, // ADR 0175: unchanged (the save is partial)
         }, actor);
-        TempData["info"] = "The home page's hero text and section toggles have been saved.";
+        TempData["info"] = await this.FlashAsync("admin.flash_site_home_saved", "The home page's hero text and section toggles have been saved.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -222,7 +222,7 @@ public sealed class AdminSiteController(
             HomeShowRoadmap     = current.HomeShowRoadmap,
             DefaultPalette      = current.DefaultPalette, // ADR 0175: unchanged (the save is partial)
         }, actor);
-        TempData["info"] = "The about page's hero text and section toggles have been saved.";
+        TempData["info"] = await this.FlashAsync("admin.flash_site_about_saved", "The about page's hero text and section toggles have been saved.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -244,7 +244,7 @@ public sealed class AdminSiteController(
         current.DefaultPalette = Kumunita.Web.Security.PaletteCookie.Normalize(appearance.DefaultPalette);
         await site.SaveAsync(current, actor); // SaveAsync copies the full field set, DefaultPalette included
         palette?.Invalidate();
-        TempData["info"] = "The platform's default palette has been saved.";
+        TempData["info"] = await this.FlashAsync("admin.flash_site_palette_saved", "The platform's default palette has been saved.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -281,7 +281,7 @@ public sealed class AdminSiteController(
     {
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Index));
         }
         if (string.IsNullOrWhiteSpace(homeHeroEyebrow) &&
@@ -291,7 +291,7 @@ public sealed class AdminSiteController(
             string.IsNullOrWhiteSpace(aboutHeroEyebrow) &&
             string.IsNullOrWhiteSpace(aboutHeroLead))
         {
-            TempData["error"] = "A translation needs at least one hero field.";
+            TempData["error"] = await this.FlashAsync("admin.flash_translation_needs_hero", "A translation needs at least one hero field.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -302,7 +302,7 @@ public sealed class AdminSiteController(
             aboutHeroEyebrow, aboutHeroLead, actor);
 
         var name = await LanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return RedirectToAction(nameof(Index));
     }
 
@@ -330,7 +330,7 @@ public sealed class AdminSiteController(
     {
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Index));
         }
         if (string.IsNullOrWhiteSpace(homeHeroEyebrow) &&
@@ -340,7 +340,7 @@ public sealed class AdminSiteController(
             string.IsNullOrWhiteSpace(aboutHeroEyebrow) &&
             string.IsNullOrWhiteSpace(aboutHeroLead))
         {
-            TempData["error"] = "A translation needs at least one hero field.";
+            TempData["error"] = await this.FlashAsync("admin.flash_translation_needs_hero", "A translation needs at least one hero field.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -354,12 +354,12 @@ public sealed class AdminSiteController(
         }
         catch (KeyNotFoundException)
         {
-            TempData["error"] = "That translation no longer exists; add it again.";
+            TempData["error"] = await this.FlashAsync("flash.translation_gone_add", "That translation no longer exists; add it again.");
             return RedirectToAction(nameof(Index));
         }
 
         var name = await LanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return RedirectToAction(nameof(Index));
     }
 
@@ -379,7 +379,7 @@ public sealed class AdminSiteController(
     {
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language to remove.";
+            TempData["error"] = await this.FlashAsync("flash.choose_language_remove", "Choose a language to remove.");
             return RedirectToAction(nameof(Index));
         }
 
@@ -390,12 +390,12 @@ public sealed class AdminSiteController(
         }
         catch (KeyNotFoundException)
         {
-            TempData["error"] = "That translation no longer exists.";
+            TempData["error"] = await this.FlashAsync("flash.translation_gone", "That translation no longer exists.");
             return RedirectToAction(nameof(Index));
         }
 
         var name = await LanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return RedirectToAction(nameof(Index));
     }
 

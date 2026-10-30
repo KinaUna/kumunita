@@ -802,7 +802,12 @@ public sealed class PersonalNoteService : IPersonalNoteService
             case "document":
             {
                 var doc = await s.LoadAsync<Document>(targetId).ConfigureAwait(false);
-                if (doc is null)
+                // ADR 0239 D4 — a soft-deleted document is dangling (the note's
+                // "document" reference is gone — the same shape the post /
+                // project / board / page / todo / announcement targets already
+                // use when their record is <c>IsDeleted</c> /
+                // <c>DeletedAt != null</c>).
+                if (doc is null || doc.DeletedAt is not null)
                     return (null, null);
                 return (doc.Title, $"/documents/{targetId}");
             }
@@ -1038,7 +1043,11 @@ public sealed class PersonalNoteService : IPersonalNoteService
             {
                 await using var s = _store.QuerySession();
                 var doc = await s.LoadAsync<Document>(targetId).ConfigureAwait(false);
-                if (doc is null)
+                // ADR 0239 D4 — a soft-deleted document is dangling (the
+                // note's "document" reference is gone); the decision below
+                // does not run (a missing record is indistinguishable from
+                // a denied one — the ADR 0122 D7 posture).
+                if (doc is null || doc.DeletedAt is not null)
                     return (false, null, null);
                 var decision = await _authz.CanAsync(
                     actorId, AccessAction.Read, new DocumentToAuditableResource(doc))

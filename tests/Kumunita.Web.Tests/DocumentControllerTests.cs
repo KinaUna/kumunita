@@ -135,6 +135,53 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     }
 
     /// <summary>
+    /// ADR 0240 — the detail page names the last modifier only when it is someone
+    /// other than the uploader: a modifier who differs resolves to a display name.
+    /// </summary>
+    [Fact]
+    public async Task Detail_ModifiedByAnotherResident_ShowsModifierName()
+    {
+        var doc = MakeDoc();
+        doc.Modified = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero);
+        doc.ModifiedById = "subj-someone-else";
+        var names = Substitute.For<IUserInfoService>();
+        names.GetProfileAsync(Actor).Returns(new Profile { SubjectId = Actor, DisplayName = "Uma Uploader" });
+        names.GetProfileAsync("subj-someone-else").Returns(new Profile { SubjectId = "subj-someone-else", DisplayName = "Eli Editor" });
+        var (controller, _) = BuildDetailController(allow: true, shaped: doc, names: names);
+
+        var view = Assert.IsType<ViewResult>(await controller.Detail(DocId));
+        var vm = Assert.IsType<DocumentDetailViewModel>(view.ViewData.Model);
+        Assert.Equal("Uma Uploader", vm.OwnerName);
+        Assert.Equal("Eli Editor", vm.ModifiedByName);
+    }
+
+    /// <summary>
+    /// ADR 0240 — an edit by the uploader (the only editor today), or a document that
+    /// was never edited, leaves <c>ModifiedByName</c> null: the row would repeat
+    /// "Uploaded by".
+    /// </summary>
+    [Theory]
+    [InlineData(true)]   // edited by the uploader
+    [InlineData(false)]  // never edited
+    public async Task Detail_ModifiedByUploaderOrNobody_HidesModifierName(bool editedByUploader)
+    {
+        var doc = MakeDoc();
+        if (editedByUploader)
+        {
+            doc.Modified = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero);
+            doc.ModifiedById = Actor;
+        }
+        var names = Substitute.For<IUserInfoService>();
+        names.GetProfileAsync(Actor).Returns(new Profile { SubjectId = Actor, DisplayName = "Uma Uploader" });
+        var (controller, _) = BuildDetailController(allow: true, shaped: doc, names: names);
+
+        var view = Assert.IsType<ViewResult>(await controller.Detail(DocId));
+        var vm = Assert.IsType<DocumentDetailViewModel>(view.ViewData.Model);
+        Assert.Equal("Uma Uploader", vm.OwnerName);
+        Assert.Null(vm.ModifiedByName);
+    }
+
+    /// <summary>
     /// GATE-2 / D7 — <c>GET /documents/{id}</c> for a **missing** document
     /// returns 404. <see cref="DocumentService.GetAsync"/> loads null →
     /// <c>Document = null</c> (no decision ran, no audit row — the M2 detail
@@ -309,6 +356,21 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// ADR 0233 — a failed upload guard re-renders the form the person was on
+    /// (typed fields kept) with the guard's status and a ModelState error on
+    /// the offending field, instead of a bare status a browser shows as a blank
+    /// page. The status is the same 400 / 413 / 415 the guards always returned.
+    /// </summary>
+    private static void AssertFormRejected(IActionResult result, string view, int status, string field)
+    {
+        var v = Assert.IsType<ViewResult>(result);
+        Assert.Equal(view, v.ViewName);
+        Assert.Equal(status, v.StatusCode);
+        Assert.True(v.ViewData.ModelState.TryGetValue(field, out var entry) && entry.Errors.Count > 0,
+            $"expected a ModelState error on '{field}'");
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // Upload allowlist (D3) — NSubstitute (guards-before-write, no Put)
     // ══════════════════════════════════════════════════════════════════════
@@ -326,12 +388,32 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         // A null file …
         var nullResult = await controller.Upload(ValidUploadForm(null));
-        Assert.IsType<BadRequestObjectResult>(nullResult);
+        AssertFormRejected(nullResult, "New", StatusCodes.Status400BadRequest, "File");
         // … and a zero-byte file (both 400).
         var emptyResult = await controller.Upload(ValidUploadForm(TestFile("empty.pdf", "application/pdf", Array.Empty<byte>())));
-        Assert.IsType<BadRequestObjectResult>(emptyResult);
+        AssertFormRejected(emptyResult, "New", StatusCodes.Status400BadRequest, "File");
 
         // D3: no file written on the empty guard (the guard fires before PutAsync).
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0233 — a blank title re-renders the form (400, error on <c>Title</c>),
+    /// keeps what the person typed, and writes nothing.
+    /// </summary>
+    [Fact]
+    public async Task Upload_BlankTitle_400_ReRendersForm_NoPut()
+    {
+        var (controller, media, _, _) = BuildUploadController(roles: new[] { "GlobalAdmin" });
+        var form = ValidUploadForm(TestFile("bylaws.pdf", "application/pdf", Pdf));
+        form.Title = "  ";
+        form.Summary = "kept on re-render";
+
+        var result = await controller.Upload(form);
+
+        AssertFormRejected(result, "New", StatusCodes.Status400BadRequest, "Title");
+        Assert.Same(form, ((ViewResult)result).Model);
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
@@ -350,8 +432,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
         // A 32-byte PDF payload (over the 16-byte cap):
         var result = await controller.Upload(ValidUploadForm(TestFile("big.pdf", "application/pdf", new byte[32])));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertFormRejected(result, "New", StatusCodes.Status413RequestEntityTooLarge, "File");
 
         // D3: no file written on the oversize guard.
         await media.DidNotReceiveWithAnyArgs().PutAsync(
@@ -377,8 +458,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var result = await controller.Upload(ValidUploadForm(TestFile("big.pdf", "application/pdf", new byte[32])));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertFormRejected(result, "New", StatusCodes.Status413RequestEntityTooLarge, "File");
         // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
@@ -404,8 +484,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var result = await controller.Upload(ValidUploadForm(TestFile("bylaws.pdf", "application/pdf", Pdf)));
 
-        var status = Assert.IsType<StatusCodeResult>(result);
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        AssertFormRejected(result, "New", StatusCodes.Status413RequestEntityTooLarge, "File");
         // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
@@ -431,10 +510,10 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
         var (controller, media, _, _) = BuildUploadController(roles: new[] { "GlobalAdmin" });
 
         var svg = await controller.Upload(ValidUploadForm(TestFile("logo.svg", "image/svg+xml", Pdf)));
-        Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(svg).StatusCode);
+        AssertFormRejected(svg, "New", StatusCodes.Status415UnsupportedMediaType, "File");
 
         var video = await controller.Upload(ValidUploadForm(TestFile("clip.mp4", "video/mp4", Pdf)));
-        Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(video).StatusCode);
+        AssertFormRejected(video, "New", StatusCodes.Status415UnsupportedMediaType, "File");
 
         // D3: no file written on the disallowed-type guard (either assert).
         await media.DidNotReceiveWithAnyArgs().PutAsync(
@@ -704,7 +783,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var result = await controller.Edit(DocId, ValidEditForm(TestFile("big.pdf", "application/pdf", new byte[32])));
 
-        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, Assert.IsType<StatusCodeResult>(result).StatusCode);
+        AssertFormRejected(result, "Edit", StatusCodes.Status413RequestEntityTooLarge, "File");
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
@@ -723,7 +802,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var result = await controller.Edit(DocId, ValidEditForm(TestFile("logo.svg", "image/svg+xml", Pdf)));
 
-        Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(result).StatusCode);
+        AssertFormRejected(result, "Edit", StatusCodes.Status415UnsupportedMediaType, "File");
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
@@ -756,6 +835,175 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
         await media.DidNotReceiveWithAnyArgs().PutAsync(
             Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ADR 0239 — the owner-only soft-delete lane (POST /documents/{id}/delete)
+    // ══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// ADR 0239 D3/D5 — <c>POST /documents/{id}/delete</c> for a **non-owner**
+    /// returns <b>404</b> (not 403 — the ADR 0122 D7 posture: the route's
+    /// existence is not leaked). The controller's owner gate
+    /// (result.Document.OwnerId == subject) fails before the Core lane is
+    /// reached; the defense-in-depth pin maps a Core-level
+    /// <see cref="UnauthorizedAccessException"/> to the same 404.
+    /// </summary>
+    [Fact]
+    public async Task Delete_NonOwner_Returns_404_Not_403()
+    {
+        var doc = MakeDoc();
+        doc.OwnerId = "somebody-else"; // the actor is **not** the owner
+
+        var store = Substitute.For<IDocumentStore>();
+        var read = Substitute.For<IQuerySession>();
+        read.LoadAsync<Document>(DocId).Returns(doc);
+        store.QuerySession().Returns(read);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Actor, AccessAction.Read, Arg.Any<IAuditableResource>())
+            .Returns(Task.FromResult(new Decision(true, AccessVia.Owner, Actor)));
+
+        var docs = new DocumentService(Substitute.For<IUserInfoService>(), authz, store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(),
+            Options.Create(new MediaOptions()), store);
+        controller.ControllerContext = new ControllerContext { HttpContext = PrincipalHttpContext(new[] { "GlobalAdmin" }) };
+
+        var result = await controller.Delete(DocId);
+        Assert.IsType<NotFoundResult>(result); // 404, not 403 (D7 — no existence leak)
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ADR 0241 — the restore lane (POST /documents/{id}/restore) and the Undo toast
+    // ══════════════════════════════════════════════════════
+
+    /// <summary>Builds a controller whose write session holds a soft-deleted document.</summary>
+    private static DocumentController BuildRestoreController(string docOwner, string[] roles)
+    {
+        var doc = MakeDoc();
+        doc.OwnerId = docOwner;
+        doc.DeletedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        doc.DeletedById = docOwner;
+
+        var store = Substitute.For<IDocumentStore>();
+        var write = Substitute.For<IDocumentSession>();
+        write.LoadAsync<Document>(DocId).Returns(doc);
+        store.LightweightSession().Returns(write);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        var docs = new DocumentService(Substitute.For<IUserInfoService>(), authz, store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(),
+            Options.Create(new MediaOptions()), store);
+        var httpContext = PrincipalHttpContext(roles);
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
+        return controller;
+    }
+
+    /// <summary>ADR 0241 — the owner restores their own document: redirect to its detail page with the flash.</summary>
+    [Fact]
+    public async Task Restore_Owner_Redirects_To_Detail()
+    {
+        var controller = BuildRestoreController(docOwner: Actor, roles: Array.Empty<string>());
+
+        var result = await controller.Restore(DocId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/documents/{DocId}", redirect.Url);
+        Assert.Equal("documents.flash_restored", controller.TempData["info"]);
+    }
+
+    /// <summary>ADR 0241 — a GlobalAdmin may restore a document someone else deleted.</summary>
+    [Fact]
+    public async Task Restore_GlobalAdminNonOwner_Redirects_To_Detail()
+    {
+        var controller = BuildRestoreController(docOwner: "somebody-else", roles: new[] { "GlobalAdmin" });
+
+        var result = await controller.Restore(DocId);
+
+        Assert.IsType<RedirectResult>(result);
+    }
+
+    /// <summary>ADR 0241 — anyone else gets a 404, not a 403 (the route's existence is not leaked).</summary>
+    [Fact]
+    public async Task Restore_OtherResident_Returns_404_Not_403()
+    {
+        var controller = BuildRestoreController(docOwner: "somebody-else", roles: Array.Empty<string>());
+
+        var result = await controller.Restore(DocId);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    /// <summary>ADR 0241 — the delete flash carries an Undo action pointing at the restore route.</summary>
+    [Fact]
+    public async Task Delete_Owner_Flash_OffersUndo()
+    {
+        var doc = MakeDoc();
+        doc.OwnerId = Actor;
+
+        var store = Substitute.For<IDocumentStore>();
+        var read = Substitute.For<IQuerySession>();
+        read.LoadAsync<Document>(DocId).Returns(doc);
+        store.QuerySession().Returns(read);
+        var write = Substitute.For<IDocumentSession>();
+        write.LoadAsync<Document>(DocId).Returns(doc);
+        store.LightweightSession().Returns(write);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Actor, AccessAction.Read, Arg.Any<IAuditableResource>())
+            .Returns(Task.FromResult(new Decision(true, AccessVia.Owner, Actor)));
+        var docs = new DocumentService(Substitute.For<IUserInfoService>(), authz, store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(),
+            Options.Create(new MediaOptions()), store);
+        var httpContext = PrincipalHttpContext(Array.Empty<string>());
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
+
+        await controller.Delete(DocId);
+
+        Assert.Equal($"/documents/{DocId}/restore", controller.TempData["info_action_url"]);
+        Assert.Equal("documents.undo", controller.TempData["info_action_label"]); // raw key: no translation seam here
+    }
+
+    /// <summary>
+    /// ADR 0239 D3/D4/D5 — <c>POST /documents/{id}/delete</c> for the
+    /// **owner** delegates to <see cref="DocumentService.DeleteAsync"/> (which
+    /// stamps <see cref="Document.DeletedAt"/> + <see cref="Document
+    /// .DeletedById"/>) and **redirects to the feed** (<c>/documents</c>)
+    /// — the document is gone from the detail page by construction (D4: a
+    /// soft-deleted doc is indistinguishable from a missing one on the read
+    /// surfaces), so the flash + feed is the natural landing spot.
+    /// </summary>
+    [Fact]
+    public async Task Delete_Owner_Redirects_To_Feed()
+    {
+        var doc = MakeDoc();
+        doc.OwnerId = Actor; // the actor is the owner (the ADR 0125 D1 shape)
+
+        var store = Substitute.For<IDocumentStore>();
+        var read = Substitute.For<IQuerySession>();
+        read.LoadAsync<Document>(DocId).Returns(doc);
+        store.QuerySession().Returns(read);
+
+        var write = Substitute.For<IDocumentSession>();
+        write.LoadAsync<Document>(DocId).Returns(doc);
+        store.LightweightSession().Returns(write);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Actor, AccessAction.Read, Arg.Any<IAuditableResource>())
+            .Returns(Task.FromResult(new Decision(true, AccessVia.Owner, Actor)));
+
+        var docs = new DocumentService(Substitute.For<IUserInfoService>(), authz, store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(),
+            Options.Create(new MediaOptions()), store);
+        controller.ControllerContext = new ControllerContext { HttpContext = PrincipalHttpContext(new[] { "GlobalAdmin" }) };
+
+        var result = await controller.Delete(DocId);
+
+        // Redirects to the feed (the detail page is gone by construction, D4).
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/documents", redirect.Url);
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -905,9 +1153,9 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     /// <c>LoadAsync</c> seam, directly stubbable).
     /// </summary>
     private static (DocumentController Controller, IAuthorizationService Authz) BuildDetailController(
-        bool allow, bool missing = false)
+        bool allow, bool missing = false, Document? shaped = null, IUserInfoService? names = null)
     {
-        var doc = MakeDoc();
+        var doc = shaped ?? MakeDoc();
 
         var store = Substitute.For<IDocumentStore>();
         var readSession = Substitute.For<IQuerySession>();
@@ -924,7 +1172,8 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var docs = new DocumentService(
             Substitute.For<IUserInfoService>(), authz, store);
-        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(), Options.Create(new MediaOptions()), store);
+        var controller = new DocumentController(docs, Substitute.For<IMediaStore>(), Options.Create(new MediaOptions()), store,
+            userInfo: names);
         controller.ControllerContext = new ControllerContext { HttpContext = PrincipalHttpContext(new[] { "GlobalAdmin" }) };
         return (controller, authz);
     }

@@ -1,3 +1,4 @@
+using Kumunita.Web.Security;
 using Kumunita.Core.Identity;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -37,6 +38,32 @@ public sealed class AccountController(
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
+
+    // ADR 0215 — the MFA challenge's model errors are localized from the registry
+    // (account.mfa.error.*), resolved from the request scope like LocalizeValidationAsync;
+    // the English text is the floor when there is no provider (unit-test harness) or
+    // the lookup fails.
+    private async Task<string> MfaTextAsync(string key, string english)
+    {
+        var services = HttpContext?.RequestServices;
+        var provider = services?.GetService<Kumunita.Core.Localization.ITranslationProvider>();
+        if (services is null || provider is null)
+        {
+            return english;
+        }
+        try
+        {
+            var localization = services.GetService<Kumunita.Core.Localization.ILocalizationService>();
+            var lang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(
+                HttpContext?.Request, localization, provider);
+            var text = await provider.GetAsync(key, lang);
+            return string.IsNullOrWhiteSpace(text) ? english : text;
+        }
+        catch
+        {
+            return english;
+        }
+    }
 
     // P1-5 (translation audit) — localize the four Account forms' DataAnnotations
     // messages. The platform's closed translation surface is the KnownTranslationKeys
@@ -204,16 +231,14 @@ public sealed class AccountController(
         var user = await userManager.FindByIdAsync(subject);
         if (user is null)
         {
-            ModelState.AddModelError(nameof(model.CurrentPassword),
-                "We could not find that account — sign in again.");
+            ModelState.AddModelError(nameof(model.CurrentPassword), await this.FlashAsync("validation.account_not_found", "We could not find that account — sign in again."));
             return View(model);
         }
 
         var currentOk = await userManager.CheckPasswordAsync(user, model.CurrentPassword);
         if (!currentOk)
         {
-            ModelState.AddModelError(nameof(model.CurrentPassword),
-                "Your current password is incorrect.");
+            ModelState.AddModelError(nameof(model.CurrentPassword), await this.FlashAsync("validation.current_password_wrong", "Your current password is incorrect."));
             return View(model);
         }
 
@@ -236,7 +261,7 @@ public sealed class AccountController(
         // security-stamp rotation already invalidates this account's other
         // sessions).
         await signInManager.SignOutAsync();
-        TempData["info"] = "Your password was changed. Sign in again with the new password.";
+        TempData["info"] = await this.FlashAsync("account.flash_password_changed", "Your password was changed. Sign in again with the new password.");
         return RedirectToAction(nameof(Login));
     }
 
@@ -328,8 +353,7 @@ public sealed class AccountController(
         if (!model.Confirmed)
         {
             ModelState.AddModelError(
-                nameof(model.Confirmed),
-                "You must confirm that you understand your account will be permanently deleted.");
+                nameof(model.Confirmed), await this.FlashAsync("validation.confirm_deletion", "You must confirm that you understand your account will be permanently deleted."));
         }
 
         // Verify the current password (the self-serve lane proves it is really
@@ -338,16 +362,14 @@ public sealed class AccountController(
         var user = await userManager.FindByIdAsync(subject);
         if (user is null)
         {
-            ModelState.AddModelError(nameof(model.Password),
-                "We could not find that account — sign in again.");
+            ModelState.AddModelError(nameof(model.Password), await this.FlashAsync("validation.account_not_found", "We could not find that account — sign in again."));
         }
         else
         {
             var currentOk = await userManager.CheckPasswordAsync(user, model.Password);
             if (!currentOk)
             {
-                ModelState.AddModelError(nameof(model.Password),
-                    "Your password is incorrect.");
+                ModelState.AddModelError(nameof(model.Password), await this.FlashAsync("validation.password_wrong", "Your password is incorrect."));
             }
         }
 
@@ -375,10 +397,7 @@ public sealed class AccountController(
             // crafted POST reaches the Core seam directly). The resident is
             // not a GlobalAdmin, so the self-serve lane is unavailable for
             // them. Surface the notice (the ADR 0138 "locked" shape).
-            ModelState.AddModelError(string.Empty,
-                "The self-serve delete-account lane is only available to a " +
-                "GlobalAdmin. A non-GlobalAdmin resident cannot delete their " +
-                "own account — contact an administrator to remove the account.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.delete_admin_only", "The self-serve delete-account lane is only available to a GlobalAdmin. A non-GlobalAdmin resident cannot delete their own account — contact an administrator to remove the account."));
             return View(new DeleteAccountViewModel { SelfDeletionRefused = true });
         }
         catch (InvalidOperationException ex)
@@ -394,7 +413,7 @@ public sealed class AccountController(
         // deleted — the cookie is now stale) and redirect to the login page
         // with a positive confirmation.
         await signInManager.SignOutAsync();
-        TempData["info"] = "Your account has been deleted. Your audit trail is preserved (pseudonymized) per the platform's privacy policy.";
+        TempData["info"] = await this.FlashAsync("account.flash_deleted", "Your account has been deleted. Your audit trail is preserved (pseudonymized) per the platform's privacy policy.");
         return RedirectToAction(nameof(Login));
     }
 
@@ -405,7 +424,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Signup()
     {
         if (User.Identity?.IsAuthenticated == true)
-            return Redirect("/profile/edit");
+            return Redirect("/");   // ADR 0238 — already signed in: Home, not the new-resident profile step
 
         // ADR 0050 — the sign-up gate (the admin-settled instance value, the
         // `false` floor — a fresh instance ships invitation-only). Closed → the
@@ -476,8 +495,7 @@ public sealed class AccountController(
             !await botChallengeVerifier.IsVerifiedAsync(model.BotChallengeToken))
         {
             model.BotChallengeFailed = true;
-            ModelState.AddModelError(string.Empty,
-                "The security check did not pass. Please try again.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("account.signup_bot_failed", "The security check did not pass. Please try again."));
             return View(model);
         }
 
@@ -495,8 +513,7 @@ public sealed class AccountController(
             // by it) and re-rendered with the `EmailDomainDisallowed` flag (the
             // `EmailAlreadyExists` precedent) — pin §3b.
             model.EmailDomainDisallowed = true;
-            ModelState.AddModelError(string.Empty,
-                $"The email domain '{ex.Domain}' is not accepted for new accounts.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.domain_not_accepted", "The email domain '{0}' is not accepted for new accounts.", ex.Domain));
             return View(model);
         }
         catch (InvalidOperationException ex)
@@ -507,7 +524,7 @@ public sealed class AccountController(
             return View(model);
         }
 
-        TempData["info"] = "Account created. Check your inbox for the verification link.";
+        TempData["info"] = await this.FlashAsync("account.flash_created", "Account created. Check your inbox for the verification link.");
         return RedirectToAction(nameof(Login));
     }
 
@@ -561,7 +578,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Verify([FromQuery] string id)
     {
         if (User.Identity?.IsAuthenticated == true)
-            return Redirect("/profile/edit");
+            return Redirect("/");   // ADR 0238 — already signed in: Home, not the new-resident profile step
 
         var (token, errorModel) = await LoadUsableVerifyTokenAsync(id);
         if (token is null)
@@ -584,7 +601,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Verify(VerifyViewModel model)
     {
         if (User.Identity?.IsAuthenticated == true)
-            return Redirect("/profile/edit");
+            return Redirect("/");   // ADR 0238 — already signed in: Home, not the new-resident profile step
 
         // The POST carries the token row id back in the model (the form's hidden
         // input) — the child lane re-submits to the same link.
@@ -714,7 +731,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Login([FromQuery] string? returnUrl = null, [FromQuery] string? error = null)
     {
         if (User.Identity?.IsAuthenticated == true)
-            return Redirect("/profile/edit");
+            return Redirect("/");   // ADR 0234 — sign-in lands on Home
 
         // `error` arrives as a short code (not the message text) — the query string is
         // user-visible and may be bookmarked/shared, so keep it token-like. The
@@ -765,7 +782,7 @@ public sealed class AccountController(
 
         if (user is null)
         {
-            ModelState.AddModelError(string.Empty, "Email or password is incorrect.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.login_failed", "Email or password is incorrect."));
             return View(model);
         }
 
@@ -835,8 +852,8 @@ public sealed class AccountController(
         {
             ModelState.AddModelError(string.Empty,
                 result.IsLockedOut
-                    ? "Account is temporarily locked. Try again in a few minutes."
-                    : "Email or password is incorrect.");
+                    ? await this.FlashAsync("validation.account_locked", "Account is temporarily locked. Try again in a few minutes.")
+                    : await this.FlashAsync("validation.login_failed", "Email or password is incorrect."));
             return View(model);
         }
 
@@ -853,13 +870,29 @@ public sealed class AccountController(
         // (user, true)` + issues recovery codes via F3.U3's `MfaEnable`
         // action) the resident re-signs-in and leg 1.5 now returns
         // `TwoFactorRequired`, completing via the leg-2 challenge.
+        // ADR 0194 — the sample-admin exemption: a sample account (a member of
+        // the closed SampleAccountEmails set, on a SampleData__Enabled
+        // instance) is EXEMPT from this forced enrollment. Without this
+        // exemption, a locked demo instance (the admin has locked MFA for the
+        // sample accounts so a visitor can't break the shared credential)
+        // would redirect the sample GlobalAdmin to /settings/security/mfa on
+        // every sign-in — but that page is itself locked for the sample
+        // accounts (IsMfaLockedForAsync), so the admin could never sign in
+        // with the shared password. The exemption reads the two-conjunct
+        // IsSampleDataAccountAsync seam (conjuncts 1+3 only — the admin-toggle
+        // gate is NOT consulted, so a locked instance still lets its admin
+        // through; the GlobalAdmin check is NOT applied either, since the
+        // exemption the login path needs is *precisely for* the sample
+        // GlobalAdmin). A real (non-sample) account and the non-sample
+        // GlobalAdmin are unaffected — this leg still forces them to enroll.
         // Use `UserManager.GetRolesAsync` (the repo's verified pattern —
         // `AccountController.cs:281`) + `Kumunita.Core.Identity.Roles.GlobalAdmin`
         // (NOT `ClaimsPrincipal.IsInRole`, which does not see the custom
         // `Kumunita.Role` claim type).
         var userRoles = await userManager.GetRolesAsync(user);
         if (userRoles.Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)
-            && !await signInManager.IsTwoFactorEnabledAsync(user))
+            && !await signInManager.IsTwoFactorEnabledAsync(user)
+            && !(user.Id is not null && await identity.IsSampleDataAccountAsync(user.Id)))
         {
             // **Do NOT sign out here.** The `SecuritySettingsController`
             // (F3.U3) is `[Authorize]`, so the resident must be signed in to
@@ -902,7 +935,7 @@ public sealed class AccountController(
 
         return Url.IsLocalUrl(model.ReturnUrl)
             ? Redirect(model.ReturnUrl)
-            : Redirect("/profile/edit");
+            : Redirect("/");   // ADR 0234 — sign-in lands on Home
     }
 
     // ── MFA challenge leg (F3.U4, the pin §5 leg 2) ──────────────────────────────────
@@ -1005,7 +1038,8 @@ public sealed class AccountController(
                         // the current stamp.
                         await signInManager.SignOutAsync();
                         ModelState.AddModelError(string.Empty,
-                            "This sign-in was revoked. Please enter your password again.");
+                            await MfaTextAsync("account.mfa.error.revoked",
+                    "This sign-in was revoked. Please enter your password again."));
                         model.MfaPending = true;
                         return View("Login", model);
                     }
@@ -1019,7 +1053,8 @@ public sealed class AccountController(
             && string.IsNullOrWhiteSpace(model.MfaRecoveryCode))
         {
             ModelState.AddModelError(string.Empty,
-                "Enter a code from your authenticator app, or a recovery code.");
+                await MfaTextAsync("account.mfa.error.empty",
+                    "Enter a code from your authenticator app, or a recovery code."));
             model.MfaPending = true;
             return View("Login", model);
         }
@@ -1075,14 +1110,36 @@ public sealed class AccountController(
 
         if (!result.Succeeded)
         {
-            // On a wrong code → fail (no persistent cookie minted); the temp
-            // sign-in is discarded by the next request / sign-out (the pin §5
-            // leg 2). Sign out the temp cookie (clears the
-            // `TwoFactorUserIdScheme` + the app scheme) and re-render the
-            // challenge form with the resident's prior input preserved.
-            await signInManager.SignOutAsync();
+            // ADR 0214 — a wrong code used to SignOutAsync here, which discards the
+            // pending `TwoFactorUserId` cookie: the challenge re-rendered with
+            // "Try again", but the retry could never succeed (no pending sign-in
+            // left), so every typo forced the resident back to the password leg.
+            // Identity already counts each failed TOTP / recovery code towards
+            // lockout (AccessFailedAsync inside the leg-2 methods), so the pending
+            // cookie is kept for another try and only a lockout ends the challenge.
+            if (result.IsLockedOut)
+            {
+                await signInManager.SignOutAsync();
+                ModelState.AddModelError(string.Empty,
+                    await MfaTextAsync("account.mfa.error.locked",
+                    "Too many incorrect codes. This account is temporarily locked; try again later."));
+                model.MfaPending = false;
+                model.MfaCode = null;
+                model.MfaRecoveryCode = null;
+                ModelState.Remove(nameof(model.MfaCode));
+                ModelState.Remove(nameof(model.MfaRecoveryCode));
+                return View("Login", model);
+            }
+
             ModelState.AddModelError(string.Empty,
-                "The code was not valid. Try again, or use a recovery code.");
+                await MfaTextAsync("account.mfa.error.invalid",
+                    "The code was not valid. Try again, or use a recovery code."));
+            // Re-render with the wrong code cleared (the tag helper prefers ModelState
+            // over the model, so the ModelState entries are removed too).
+            model.MfaCode = null;
+            model.MfaRecoveryCode = null;
+            ModelState.Remove(nameof(model.MfaCode));
+            ModelState.Remove(nameof(model.MfaRecoveryCode));
             model.MfaPending = true;
             return View("Login", model);
         }
@@ -1091,9 +1148,16 @@ public sealed class AccountController(
         // "complete the sign-in and mint the auth cookie on success"). The
         // cookie was minted by the leg-2 sign-in method above (via
         // `DoTwoFactorSignInAsync` → `SignInWithClaimsAsync`).
+        //
+        // ADR 0234 — a recovery-code sign-in means the second factor is lost or
+        // suspect: send the person to the MFA settings to re-enroll or rotate the
+        // remaining codes. It wins over a ReturnUrl (the code was just spent).
+        if (!string.IsNullOrWhiteSpace(model.MfaRecoveryCode))
+            return Redirect("/settings/security/mfa");
+
         return Url.IsLocalUrl(model.ReturnUrl)
             ? Redirect(model.ReturnUrl)
-            : Redirect("/profile/edit");
+            : Redirect("/");   // ADR 0234 — Home, not the profile editor
     }
 
     // ── Sign-out ────────────────────────────────────────────────────────────────────────

@@ -302,6 +302,19 @@ public interface IAnnouncementService
         string announcementId, string? actorId, IReadOnlySet<string> actorRoles);
 
     /// <summary>
+    /// The batched comment counts behind the announcement list card's footer
+    /// (ADR 0248): one query for a whole page of announcement ids, keyed by
+    /// announcement id; an announcement with no comments is absent (read it as 0).
+    /// Soft-deleted comments count, like the detail list that shows them as
+    /// placeholders (the PostService.CountRepliesAsync precedent, ADR 0226).
+    /// <b>No authorization here:</b> the caller passes ids the list read already
+    /// scope-gated, and only calls this for a signed-in viewer when the comments
+    /// toggle is on (the same gate the detail's comment list uses). No audit row.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, int>> CountAnnouncementCommentsAsync(
+        IReadOnlyCollection<string> announcementIds);
+
+    /// <summary>
     /// **Adds a comment** on an announcement in the <b>caller's</b> in-flight
     /// session (ADR 0101, invariant C3). **Standing:** the actor must be
     /// **signed in** (an anonymous actor is a hard

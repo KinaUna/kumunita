@@ -30,6 +30,14 @@
 @{
     string? info = TempData["info"]   as string;
     string? err  = TempData["error"]  as string;
+    // ADR 0241 — an optional action on the info toast (Undo after a document delete): a POST to
+    // a same-site path. Only a path starting with a single "/" is honoured, so a value can never
+    // point the form at another origin.
+    string? actionUrl   = TempData["info_action_url"]   as string;
+    string? actionLabel = TempData["info_action_label"] as string;
+    bool hasAction = info is not null
+        && !string.IsNullOrWhiteSpace(actionLabel)
+        && actionUrl is { Length: > 1 } && actionUrl[0] == '/' && actionUrl[1] != '/' && actionUrl[1] != '\\';
     // The toast's accessible names are server-resolved (the kw-l TagHelper
     // can't wrap an attribute); the a11y.* floor is the closed set. A null
     // provider (a non-HTTP render) degrades to the en floor.
@@ -49,9 +57,17 @@
         @if (info is not null)
         {
             <div class="toast align-items-center text-bg-success border-0 show"
-                 role="status" aria-live="polite" aria-atomic="true">
+                 role="status" aria-live="polite" aria-atomic="true"
+                 data-kmb-toast-delay="@(hasAction ? 12000 : 5000)">
                 <div class="d-flex">
                     <div class="toast-body">@info</div>
+                    @if (hasAction)
+                    {
+                        <form method="post" action="@actionUrl" class="m-auto me-1">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-light">@actionLabel</button>
+                        </form>
+                    }
                     <button type="button" class="btn-close btn-close-white me-2 m-auto"
                             data-bs-dismiss="toast" aria-label="@ariaClose"></button>
                 </div>

@@ -1,6 +1,15 @@
 @using Kumunita.Web.Models
+@using Kumunita.Core.UserInfo
 @using Kumunita.Web.Security
+@inject IUserInfoService UserInfo
 @model ProfilePreviewViewModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _pvVisible = Translation is null ? "As {0}, you would see this contact block in the neighbor directory." : await Translation.GetAsync("profile.preview_visible_sentence", _aL);
+    var _pvHidden = Translation is null ? "As {0}, you would not see a contact block. Your name (and verified badge, if you have one) still shows in the directory — only the contact details are hidden." : await Translation.GetAsync("profile.preview_hidden_sentence", _aL);
+}
 @{
     ViewData["Title"] = "Preview — how I appear";
 }
@@ -30,12 +39,23 @@
         *@
         @{
             string? avatarSubject = KumunitaPrincipal.SubjectId(User);
+            // ADR 0204 — the author's own initial + hue (the Directory pattern),
+            // so the no-photo fallback is a monogram, not a blank circle. Falls
+            // back to the empty circle when no display name is set.
+            string avatarInitial = string.Empty;
+            if (!string.IsNullOrEmpty(avatarSubject))
+            {
+                var ownProfile = await UserInfo.GetProfileAsync(avatarSubject);
+                avatarInitial = !string.IsNullOrWhiteSpace(ownProfile?.DisplayName)
+                    ? char.ToUpperInvariant(ownProfile.DisplayName.TrimStart()[0]).ToString()
+                    : string.Empty;
+            }
         }
         @if (!string.IsNullOrEmpty(avatarSubject))
         {
             <div class="d-flex align-items-center gap-3">
                 <span class="d-inline-flex align-items-center">
-                    <kw-avatar subject="@avatarSubject" mono="" size="lg" />
+                    <kw-avatar subject="@avatarSubject" mono="@avatarInitial" size="lg" mono-hue="@AvatarHue.For(avatarSubject)" />
                 </span>
                 <span class="text-muted small">
                     <kw-l key="profile.preview_avatar_note">Your avatar, as it appears next to your name in the neighbor directory.</kw-l>
@@ -53,9 +73,9 @@
         @if (Model.ShowContactBlock)
         {
             <div class="alert alert-success">
-                <b><kw-l key="profile.preview_visible_badge">Visible.</kw-l></b> As <b>@Model.AsDisplayName</b>, <kw-l key="profile.preview_visible_tail">you would see this contact block in the neighbor directory.</kw-l>
+                <b><kw-l key="profile.preview_visible_badge">Visible.</kw-l></b> @Html.Raw(string.Format(System.Globalization.CultureInfo.InvariantCulture, System.Net.WebUtility.HtmlEncode(_pvVisible), "<b>" + System.Net.WebUtility.HtmlEncode(Model.AsDisplayName) + "</b>"))
             </div>
-            <dl class="row mt-3">
+            <div class="card kmb-detail-card"><div class="card-body"><dl class="row mb-0">
                 @if (!string.IsNullOrEmpty(Model.Address))
                 {
                     <dt class="col-sm-3"><kw-l key="profile.contact_address">Address</kw-l></dt>
@@ -71,13 +91,12 @@
                     <dt class="col-sm-3"><kw-l key="profile.contact_phone">Phone</kw-l></dt>
                     <dd class="col-sm-9">@Model.Phone</dd>
                 }
-            </dl>
+            </dl></div></div>
         }
         else
         {
             <div class="alert alert-secondary">
-                <b><kw-l key="profile.preview_hidden_badge">Contact hidden.</kw-l></b> As <b>@Model.AsDisplayName</b>, you
-                <b><kw-l key="profile.preview_hidden_tail">would not see a contact block. Your name (and verified badge, if you have one) still shows in the directory — only the contact details are hidden.</kw-l></b>
+                <b><kw-l key="profile.preview_hidden_badge">Contact hidden.</kw-l></b> @Html.Raw(string.Format(System.Globalization.CultureInfo.InvariantCulture, System.Net.WebUtility.HtmlEncode(_pvHidden), "<b>" + System.Net.WebUtility.HtmlEncode(Model.AsDisplayName) + "</b>"))
             </div>
         }
 

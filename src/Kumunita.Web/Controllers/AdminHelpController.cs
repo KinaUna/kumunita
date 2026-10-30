@@ -75,7 +75,7 @@ public sealed class AdminHelpController(
         {
             using var session = store.LightweightSession();
             await pages.ResetToSeededAsync(pageId, actor, roles, session);
-            TempData["info"] = "Page reset to its seeded text.";
+            TempData["info"] = await this.FlashAsync("admin.flash_help_reset", "Page reset to its seeded text.");
         }
         catch (InvalidOperationException ex)
         {

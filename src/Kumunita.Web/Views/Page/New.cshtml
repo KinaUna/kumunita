@@ -1,6 +1,10 @@
 @model Kumunita.Web.Models.PageComposeViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
-    ViewData["Title"] = "New page";
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    ViewData["Title"] = await Translation.GetAsync("pages.form.new_title", _kwL);
 }
 <partial name="_PageForm" model="Model" />
 

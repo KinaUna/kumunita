@@ -82,7 +82,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
 
         var mfaModel = new LoginViewModel { MfaCode = "123456" };
         var redirect = Assert.IsType<RedirectResult>(await h.Controller.LoginMfa(mfaModel));
-        Assert.Equal("/profile/edit", redirect.Url);
+        Assert.Equal("/", redirect.Url);   // ADR 0234 — Home
     }
 
     // ── Pin §7 test 2 (§6) ─────────────────────────────────────────────────
@@ -109,7 +109,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
 
         var firstAction = await h.Controller.LoginMfa(new LoginViewModel { MfaRecoveryCode = firstCode });
         var firstRedirect = Assert.IsType<RedirectResult>(firstAction);
-        Assert.Equal("/profile/edit", firstRedirect.Url);
+        Assert.Equal("/settings/security/mfa", firstRedirect.Url);   // ADR 0234 — recovery → MFA settings
 
         // The "redeem under the hood" (the real <c>SignInManager</c> calls
         // <c>UserManager.RedeemTwoFactorRecoveryCodeAsync</c> internally, pin
@@ -127,6 +127,50 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
 
         // The count is unchanged (the code was already consumed).
         Assert.Equal(9, await h.UserManager.CountRecoveryCodesAsync(h.User!));
+    }
+
+    // ── ADR 0214 — a wrong code keeps the pending sign-in ──────────────────
+
+    /// <summary>
+    /// A wrong authenticator code re-renders the challenge **without** signing out:
+    /// the pending <c>TwoFactorUserId</c> cookie must survive so a retry can succeed
+    /// (the old <c>SignOutAsync</c> made every retry fail). The typed code is cleared.
+    /// </summary>
+    [Fact]
+    public async Task WrongTotpCode_KeepsPendingSignIn_AndClearsTheField()
+    {
+        var h = await BuildAsync(globalAdmin: true, mfaEnabled: true);
+        h.SignInManager
+            .TwoFactorAuthenticatorSignInAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>())
+            .Returns(Microsoft.AspNetCore.Identity.SignInResult.Failed);
+
+        var action = await h.Controller.LoginMfa(new LoginViewModel { MfaCode = "000000" });
+
+        var view = Assert.IsType<ViewResult>(action);
+        var model = Assert.IsType<LoginViewModel>(view.ViewData.Model);
+        Assert.True(model.MfaPending);
+        Assert.Null(model.MfaCode);
+        await h.SignInManager.DidNotReceive().SignOutAsync();
+    }
+
+    /// <summary>
+    /// A lockout ends the challenge: the pending cookie is cleared and the password
+    /// form (not the code form) is shown with a lockout message.
+    /// </summary>
+    [Fact]
+    public async Task LockedOutTotpCode_SignsOut_AndReturnsToThePasswordForm()
+    {
+        var h = await BuildAsync(globalAdmin: true, mfaEnabled: true);
+        h.SignInManager
+            .TwoFactorAuthenticatorSignInAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<bool>())
+            .Returns(Microsoft.AspNetCore.Identity.SignInResult.LockedOut);
+
+        var action = await h.Controller.LoginMfa(new LoginViewModel { MfaCode = "000000" });
+
+        var view = Assert.IsType<ViewResult>(action);
+        var model = Assert.IsType<LoginViewModel>(view.ViewData.Model);
+        Assert.False(model.MfaPending);
+        await h.SignInManager.Received(1).SignOutAsync();
     }
 
     // ── Pin §7 test 3 (§5 Leg 1.5c) ────────────────────────────────────────
@@ -159,7 +203,86 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
         // Sign-in completes **directly** (a redirect, no challenge) —
         // MFA is optional for a non-GlobalAdmin (proves §5 Leg 1.5c).
         var redirect = Assert.IsType<RedirectResult>(action);
-        Assert.Equal("/profile/edit", redirect.Url);
+        Assert.Equal("/", redirect.Url);   // ADR 0234 — Home
+    }
+
+    // ── ADR 0194 — the sample-admin login-enrollment exemption ─────────────
+
+    /// <summary>
+    /// ADR 0194 — the sample-admin login-exemption (leg 1.5b). A
+    /// <c>GlobalAdmin</c> whose account is a sample account (a member of the
+    /// closed <c>SampleAccountEmails</c> set, on a <c>SampleData__Enabled</c>
+    /// instance) with <c>TwoFactorEnabled == false</c> posts a correct
+    /// password to <see cref="AccountController.Login"/>. Asserts the
+    /// response is a <b>direct sign-in</b> (a <see cref="RedirectResult"/>
+    /// to <c>/</c> (Home), the leg 1.5c path) — NOT the enrollment
+    /// redirect to <c>/settings/security/mfa</c> (leg 1.5b). The exemption
+    /// reads the <c>IsSampleDataAccountAsync</c> seam (conjuncts 1+3 only —
+    /// the admin-toggle gate is NOT consulted, so a locked instance still
+    /// lets its admin sign in). Proves the ADR 0194 login-exemption.
+    /// </summary>
+    [Fact]
+    public async Task SampleAdminLogin_SkipsForcedMfaEnrollment()
+    {
+        var h = await BuildAsync(globalAdmin: true, mfaEnabled: false, sampleDataAccount: true);
+
+        // Leg 1 — MFA-off: the password leg returns Success
+        // (Succeeded=true, RequiresTwoFactor=false — the pin §7 state).
+        h.SignInManager
+            .PasswordSignInAsync(h.User!, Password, isPersistent: false, lockoutOnFailure: true)
+            .Returns(Microsoft.AspNetCore.Identity.SignInResult.Success);
+
+        // Leg 1.5c — the persistent sign-in also returns Success.
+        h.SignInManager
+            .PasswordSignInAsync(h.User!, Password, isPersistent: true, lockoutOnFailure: true)
+            .Returns(Microsoft.AspNetCore.Identity.SignInResult.Success);
+
+        var model = new LoginViewModel { Email = AdminEmail, Password = Password };
+        var action = await h.Controller.Login(model);
+
+        // Sign-in completes **directly** (a redirect to Home, the
+        // leg 1.5c path) — NOT the enrollment redirect to /settings/security/mfa
+        // (leg 1.5b is skipped by the ADR 0194 exemption).
+        var redirect = Assert.IsType<RedirectResult>(action);
+        Assert.Equal("/", redirect.Url);   // ADR 0234 — Home
+
+        // The IsSampleDataAccountAsync seam was consulted (the exemption read).
+        await h.Identity
+            .Received(1)
+            .IsSampleDataAccountAsync(Arg.Any<string>());
+    }
+
+    /// <summary>
+    /// ADR 0194 — the control: a <b>non-sample</b> <c>GlobalAdmin</c> with
+    /// <c>TwoFactorEnabled == false</c> posts a correct password. Asserts
+    /// the response is the <b>enrollment redirect</b> (a
+    /// <see cref="RedirectToActionResult"/> to the <c>Mfa</c> action of
+    /// <c>SecuritySettings</c>, the leg 1.5b path) — the ADR 0194 exemption
+    /// does NOT fire for a non-sample account. Proves the exemption is
+    /// scoped to sample accounts only (a real GlobalAdmin still must enroll).
+    /// </summary>
+    [Fact]
+    public async Task NonSampleGlobalAdminLogin_StillForcedToMfaEnrollment()
+    {
+        var h = await BuildAsync(globalAdmin: true, mfaEnabled: false, sampleDataAccount: false);
+
+        // Leg 1 — MFA-off: the password leg returns Success.
+        h.SignInManager
+            .PasswordSignInAsync(h.User!, Password, isPersistent: false, lockoutOnFailure: true)
+            .Returns(Microsoft.AspNetCore.Identity.SignInResult.Success);
+
+        var model = new LoginViewModel { Email = AdminEmail, Password = Password };
+        var action = await h.Controller.Login(model);
+
+        // The enrollment redirect (leg 1.5b fires — the exemption is false).
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal("Mfa", redirect.ActionName);
+        Assert.Equal("SecuritySettings", redirect.ControllerName);
+
+        // The IsSampleDataAccountAsync seam was consulted (and returned false).
+        await h.Identity
+            .Received(1)
+            .IsSampleDataAccountAsync(Arg.Any<string>());
     }
 
     // ── Harness ─────────────────────────────────────────────────────────────
@@ -169,12 +292,13 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
         public required AccountController   Controller  { get; init; }
         public required UserManager<User>   UserManager { get; init; }
         public required SignInManager<User> SignInManager { get; init; }
+        public required IIdentityService    Identity    { get; init; }
         public required DbContextOptions<AppDbContext> DbOptions { get; init; }
         public required User?               User        { get; init; }
         public string?                      RecoveryCode { get; init; }
     }
 
-    private async Task<Harness> BuildAsync(bool globalAdmin, bool mfaEnabled)
+    private async Task<Harness> BuildAsync(bool globalAdmin, bool mfaEnabled, bool sampleDataAccount = false)
     {
         var ct   = TestContext.Current.CancellationToken;
         var conn = await fixture.NewDatabaseAsync(ct);
@@ -246,10 +370,17 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
             Substitute.For<IUserConfirmation<User>>());
 
         // Controller (the 5-arg ctor — the F3.U4 seam).
+        // ADR 0194 — the IsSampleDataAccountAsync seam is scripted per the
+        // sampleDataAccount parameter (the login-exemption read). The
+        // default NSubstitute return (false) is the non-sample control; the
+        // sample-admin test flips it to true.
+        var identity = Substitute.For<IIdentityService>();
+        identity.IsSampleDataAccountAsync(Arg.Any<string>()).Returns(sampleDataAccount);
+
         var controller = new AccountController(
             signInManager: signInManager,
             userManager:   userManager,
-            identity:      Substitute.For<IIdentityService>(),
+            identity:      identity,
             userInfo:      Substitute.For<IUserInfoService>(),
             store:         Substitute.For<IDocumentStore>());
 
@@ -266,6 +397,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
             Controller   = controller,
             UserManager  = userManager,
             SignInManager = signInManager,
+            Identity     = identity,
             DbOptions    = dbOptions,
             User         = user,
             RecoveryCode = recoveryCode,
@@ -291,7 +423,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
     /// the success-path <c>Url.IsLocalUrl(...)</c>) resolves in the
     /// direct-construction harness (the <c>KioskControllerTests</c> idiom).
     /// <c>IsLocalUrl</c> returns <c>false</c> so the controller takes the
-    /// <c>Redirect("/profile/edit")</c> branch (the assertions' target).
+    /// <c>Redirect("/")</c> branch (the assertions' target).
     /// </summary>
     private sealed class StubUrlHelper : IUrlHelper
     {

@@ -33,10 +33,12 @@ namespace Kumunita.Web.Tests;
 /// allowlist wins over the U12 brief's <c>due/priority/status</c> wording).</item>
 /// <item><c>sort.label</c> / <c>sort.asc</c> / <c>sort.desc</c> — the
 /// U16 brief's <i>e.g.</i> list names them, but the shipped <c>_Sort</c>
-/// partial renders per-option links (no direction toggles) and its group
-/// <c>aria-label</c> stays hardcoded (the value-free-attribute kw-l
-/// exclusion, the <c>a11y.*</c> precedent). Registering keys no view
-/// emits would make the registry a lie (the registry's own doc).</item>
+/// partial renders per-option links (no direction toggles). Registering
+/// keys no view emits would make the registry a lie (the registry's own
+/// doc). The partial's group <c>aria-label</c> was hardcoded under the
+/// value-free-attribute <c>a11y.*</c> exclusion until ADR 0273 localized
+/// it as <c>sort.aria_label</c> — a separate a11y label in the sort
+/// namespace, not one of the eight option labels (see the test body).</item>
 /// </list>
 ///
 /// No database, no Testcontainers — a pure registry-shape test.
@@ -60,7 +62,7 @@ public class SortKwL_En_De_Fr_Da
         "sort.status",
     };
 
-    [Fact(DisplayName = "F12 — the closed sort.* set is exactly 8 keys (no priority/label/asc/desc)")]
+    [Fact(DisplayName = "F12 — the closed sort.* set is exactly 8 option keys (no priority/label/asc/desc) + the ADR 0273 aria-label")]
     public void ClosedSet_Has_Exactly_8_Keys()
     {
         Assert.Equal(8, ClosedSet.Length);
@@ -76,8 +78,16 @@ public class SortKwL_En_De_Fr_Da
         Assert.DoesNotContain("sort.label", sortKeysInRegistry);
         Assert.DoesNotContain("sort.asc", sortKeysInRegistry);
         Assert.DoesNotContain("sort.desc", sortKeysInRegistry);
+
+        // ADR 0273 localized the _Sort group's aria-label as sort.aria_label
+        // (overturning the earlier "stays hardcoded" note) — a separate a11y
+        // label in the sort namespace, not one of the eight option labels the
+        // surfaces' allowlists offer. Pin its presence and exclude it from the
+        // option closed set.
+        Assert.Contains("sort.aria_label", sortKeysInRegistry);
+        var sortOptionKeys = sortKeysInRegistry.Where(k => k != "sort.aria_label").ToList();
         Assert.Equal(ClosedSet.OrderBy(k => k).ToList(),
-            sortKeysInRegistry.OrderBy(k => k).ToList());
+            sortOptionKeys.OrderBy(k => k).ToList());
     }
 
     [Fact(DisplayName = "F12 — every closed sort.* label resolves in en/de/fr/da (no blank, no missing key)")]

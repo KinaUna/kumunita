@@ -24,6 +24,9 @@
     // authored-in language (the ADR 0027 floor). The ADR 0027 click-to-swap +
     // return path are untouched — only *which* variant shows first changes.
     var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", defaultVariant);
+    var draftTip = Translation is null ? "Only you can see this — it is not yet public" : await Translation.GetAsync("common.draft_tooltip", defaultVariant);
+    var pinnedTip = Translation is null ? "Shown as a banner at the top of every page" : await Translation.GetAsync("announcements.pinned_tooltip", defaultVariant);
 
     // The remove-translation form's data-confirm (the ADR 0072 attribute
     // idiom — the confirm.js seam reads the attribute verbatim; the kw-l
@@ -66,7 +69,7 @@
             </a>
         </p>
 
-        <div class="d-flex align-items-center flex-wrap gap-2 mb-3 kmb-ann-detail-chips">
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-3 kmb-detail-chips">
             <span class="kmb-chip">
                 @if (Model.Scope == AnnouncementScope.Public)
                 {
@@ -83,7 +86,7 @@
             </span>
             @if (Model.Pinned)
             {
-                <span class="kmb-chip kmb-chip-pinned" title="Shown as a banner at the top of every page">
+                <span class="kmb-chip kmb-chip-pinned" title="@pinnedTip">
                     <kw-l key="announcements.pinned_badge">pinned</kw-l>
                 </span>
             }
@@ -93,7 +96,7 @@
                that clears the flag (the author-only lane). *@
             @if (Model.IsDraft && Model.IsAuthor)
             {
-                <span class="kmb-chip kmb-chip-draft" title="Only you can see this — it is not yet public">
+                <span class="kmb-chip kmb-chip-draft" title="@draftTip">
                     <kw-l key="posts.draft_badge">Draft</kw-l>
                 </span>
                 <form class="d-inline" method="post" action="/announcements/@Model.Id/publish">
@@ -125,7 +128,7 @@
                                                 <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                    aria-label="Close"></button>
+                                                    aria-label="@ariaClose"></button>
                                         </div>
                                         <div class="modal-body">
                                             <div class="mb-3">
@@ -194,7 +197,7 @@
                                                 <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                    aria-label="Close"></button>
+                                                    aria-label="@ariaClose"></button>
                                         </div>
                                         <div class="modal-body">
                                             <div class="mb-3">
@@ -247,7 +250,7 @@
                 }
         </div>
 
-        <div class="card kmb-detail-card kmb-ann-detail">
+        <div class="card kmb-detail-card kmb-detail-page">
             <div class="card-body">
                 @* TD (ADR 0027) — the authored-in language is the first,
                    default-visible variant; each added translation is a hidden
@@ -274,7 +277,7 @@
                                way. *@
                             <div class="td-variant td-variant-shared" data-td-variant="@Model.OriginalLanguageCode"
                                  @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                                <h4 class="mb-0 kmb-ann-title">
+                                <h1 class="mb-0 kmb-detail-title">
                                     @if (string.IsNullOrWhiteSpace(Model.Title))
                                     {
                                         <span class="text-body-tertiary"><kw-l key="announcements.detail_untitled">Untitled announcement</kw-l></span>
@@ -283,7 +286,7 @@
                                     {
                                         @Model.Title
                                     }
-                                </h4>
+                                </h1>
                             </div>
                             @* One dedicated title per user-added translation
                                (only when it has one) — td-variant-title, shown in
@@ -298,7 +301,7 @@
                                     bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                     <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
                                          @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                        <h4 class="mb-0 kmb-ann-title">@t.Title</h4>
+                                        <h1 class="mb-0 kmb-detail-title">@t.Title</h1>
                                     </div>
                                 }
                             }
@@ -381,7 +384,7 @@
                             ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
                             : string.Empty;
                     }
-                    <div class="airy-post-head kmb-ann-byline">
+                    <div class="airy-post-head kmb-detail-byline">
                         <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial"
                                   mono-hue="@AvatarHue.For(Model.AuthorSubjectId)" />
                         <span class="airy-post-author">
@@ -489,15 +492,15 @@
                 }
                 else
                 {
-                    <div class="kmb-ann-comments mb-3">
+                    <div class="kmb-detail-comments mb-3">
                         @foreach (var c in Model.Comments)
                         {
-                            <div class="kmb-ann-comment">
+                            <div class="kmb-detail-comment">
                                 <div class="d-flex justify-content-between align-items-start">
-                                    <div class="d-inline-flex align-items-center me-2">
-                                        <kw-avatar subject="@c.AuthorId" size="sm" />
+                                    <div class="d-inline-flex align-items-center flex-shrink-0 me-2">
+                                        <kw-avatar subject="@c.AuthorId" mono="@(string.IsNullOrWhiteSpace(c.AuthorDisplayName) ? string.Empty : char.ToUpperInvariant(c.AuthorDisplayName.TrimStart()[0]).ToString())" size="sm" mono-hue="@AvatarHue.For(c.AuthorId)" />
                                     </div>
-                                    <div>
+                                    <div class="flex-grow-1" style="min-width:0;">
                                         <div class="d-flex align-items-center gap-1">
                                             <span class="fw-semibold">@c.AuthorDisplayName</span>
                                             <span class="text-muted small"><kw-dt dt="@c.Created" format="g"></kw-dt></span>
@@ -528,7 +531,7 @@
 
                 @* The composer (the M3 / to-do reply-form shape: rc-editor +
                    language picker — ADR 0018 the authored-in tag). *@
-                <div class="card kmb-detail-card kmb-ann-composer">
+                <div class="card kmb-detail-card kmb-detail-composer">
                     <div class="card-body">
                         <form class="mb-0" method="post" action="@($"/announcements/{Model.Id}/comments")">
                             @Html.AntiForgeryToken()

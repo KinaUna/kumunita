@@ -1,7 +1,22 @@
 @model Kumunita.Web.Models.KioskSettingsViewModel
 @using Kumunita.Core.Kiosk
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
-    ViewData["Title"] = "Kiosk settings";
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    // Attribute / title texts can't use the kw-l TagHelper — resolved here, English floor when
+    // there is no provider (a non-HTTP render).
+    async Task<string> Tr(string key, string en) => Translation is null ? en : await Translation.GetAsync(key, _kwL);
+    ViewData["Title"] = await Tr("kiosk.settings.page_title", "Kiosk settings");
+    var ariaDisplayMode  = await Tr("kiosk.settings.display_mode", "Display mode");
+    var kindNone         = await Tr("kiosk.settings.kind_none", "— (none)");
+    var communityPh      = await Tr("kiosk.settings.community_placeholder", "(blank = all)");
+    var ariaSlideView    = await Tr("kiosk.settings.aria_slide_view", "Slide {0} view");
+    var ariaSlideBoard   = await Tr("kiosk.settings.aria_slide_board", "Slide {0} board");
+    var ariaSlideCal     = await Tr("kiosk.settings.aria_slide_calendar", "Slide {0} calendar view");
+    var ariaSlideComm    = await Tr("kiosk.settings.aria_slide_community", "Slide {0} community");
+    var ariaSlideLabel   = await Tr("kiosk.settings.aria_slide_label", "Slide {0} label");
 
     // M35 (ADR 0164) — the kiosk playlist is a **fixed** set of slide slots
     // (the register's example is exactly 5: board, calendar week, board,
@@ -45,14 +60,7 @@
     <kw-l key="kiosk.settings.title">Kiosk display</kw-l>
 </h1>
 <p class="text-muted">
-    Configure your kiosk display: the ordered list of views it cycles
-    through (top to bottom), and the two auto-cycle / auto-refresh cadences.
-    This is <em>your</em> playlist — it only shapes what your own
-    <a href="/kiosk" target="_blank" rel="noopener">/kiosk</a> shows. To add a
-    slide, pick a view in an empty slot. To remove one, set its view to
-    <em>&mdash;</em> and save. To reorder, move a slide to a different slot.
-    Then open <a href="/kiosk" target="_blank" rel="noopener">/kiosk</a> (signed
-    in as you) to see it run.
+    <kw-l key="kiosk.settings.intro">Configure your kiosk display: the ordered list of views it cycles through (top to bottom), and the two auto-cycle / auto-refresh cadences. This is your playlist — it only shapes what your own kiosk shows. To add a slide, pick a view in an empty slot. To remove one, set its view to — and save. To reorder, move a slide to a different slot. Then use “Preview the kiosk” below (signed in as you) to see it run.</kw-l>
 </p>
 
 <form method="post" action="/settings/kiosk">
@@ -60,13 +68,15 @@
 
     @* ── The display mode + the two interval pickers (M35·4 — display-only,
          never an access input) ── *@
-    <h2 class="h5">Display</h2>
-    <div class="row g-3 mb-4">
+    <div class="card mb-4 kmb-form-section">
+    <div class="card-body">
+    <h2 class="kmb-form-section-title"><kw-l key="kiosk.settings.display_heading">Display</kw-l></h2>
+    <div class="row g-3">
         <div class="col-sm-6 col-md-4">
             <label for="DisplayMode" class="form-label">
                 <kw-l key="kiosk.settings.display_mode">Display mode</kw-l>
             </label>
-            <select class="form-select" id="DisplayMode" name="DisplayMode" aria-label="Display mode">
+            <select class="form-select" id="DisplayMode" name="DisplayMode" aria-label="@ariaDisplayMode">
                 <option value="FullPage" selected="@(Model.DisplayMode == KioskDisplayMode.FullPage ? "selected" : null)">
                     <kw-l key="kiosk.settings.display_mode.full_page">Full page (fill the browser window)</kw-l>
                 </option>
@@ -85,7 +95,7 @@
             <input type="number" min="5" step="1" class="form-control"
                    id="ViewIntervalSeconds" name="ViewIntervalSeconds"
                    value="@Model.ViewIntervalSeconds" />
-            <div class="form-text">The slide-advance cadence (seconds, &ge; 5). Default 30.</div>
+            <div class="form-text"><kw-l key="kiosk.settings.view_interval_hint">The slide-advance cadence (seconds, ≥ 5). Default 30.</kw-l></div>
         </div>
         <div class="col-sm-6 col-md-4">
             <label for="RefreshIntervalSeconds" class="form-label">
@@ -94,12 +104,16 @@
             <input type="number" min="2" step="1" class="form-control"
                    id="RefreshIntervalSeconds" name="RefreshIntervalSeconds"
                    value="@Model.RefreshIntervalSeconds" />
-            <div class="form-text">The content-refresh cadence (seconds, &ge; 2, and less than the view interval). Default 10.</div>
+            <div class="form-text"><kw-l key="kiosk.settings.refresh_interval_hint">The content-refresh cadence (seconds, ≥ 2, and less than the view interval). Default 10.</kw-l></div>
         </div>
+    </div>
+    </div>
     </div>
 
     @* ── The playlist editor (a fixed set of MaxSlides slots, top to bottom) ── *@
-    <h2 class="h5">Playlist (top to bottom)</h2>
+    <div class="card mb-4 kmb-form-section">
+    <div class="card-body">
+    <h2 class="kmb-form-section-title"><kw-l key="kiosk.settings.playlist_heading">Playlist (top to bottom)</kw-l></h2>
     @* A slot is "configured" when its index is within Model.Views.Count (the
        stored slides, in order). Each row renders all three kind-conditional
        fields (named Views[<i>].BoardId / .CalendarView / .ComponentId) so a
@@ -112,11 +126,11 @@
             <thead>
                 <tr>
                     <th scope="col" class="w-1">#</th>
-                    <th scope="col">View</th>
-                    <th scope="col">Board</th>
-                    <th scope="col">Calendar</th>
-                    <th scope="col">Community</th>
-                    <th scope="col">Label (optional)</th>
+                    <th scope="col"><kw-l key="kiosk.settings.col_view">View</kw-l></th>
+                    <th scope="col"><kw-l key="kiosk.settings.kind_board">Board</kw-l></th>
+                    <th scope="col"><kw-l key="kiosk.settings.kind_calendar">Calendar</kw-l></th>
+                    <th scope="col"><kw-l key="kiosk.settings.col_community">Community</kw-l></th>
+                    <th scope="col"><kw-l key="kiosk.settings.col_label">Label (optional)</kw-l></th>
                 </tr>
             </thead>
             <tbody>
@@ -131,20 +145,20 @@
                            slot whose kind is blank / "—"). *@
                         <td>
                             <select class="form-select" name="Views[@i].Kind"
-                                    data-kiosk-kind="@(i)" aria-label="Slide @((i + 1)) view">
+                                    data-kiosk-kind="@(i)" aria-label="@string.Format(ariaSlideView, i + 1)">
                                 <option value="" selected="@(v is null ? "selected" : null)" disabled>
-                                    &mdash; (none)
+                                    @kindNone
                                 </option>
-                                <option value="Board" selected="@(kind == KioskViewKind.Board && v is not null ? "selected" : null)">Board</option>
-                                <option value="Calendar" selected="@(kind == KioskViewKind.Calendar ? "selected" : null)">Calendar</option>
-                                <option value="Todos" selected="@(kind == KioskViewKind.Todos ? "selected" : null)">To-dos</option>
+                                <option value="Board" selected="@(kind == KioskViewKind.Board && v is not null ? "selected" : null)"><kw-l key="kiosk.settings.kind_board">Board</kw-l></option>
+                                <option value="Calendar" selected="@(kind == KioskViewKind.Calendar ? "selected" : null)"><kw-l key="kiosk.settings.kind_calendar">Calendar</kw-l></option>
+                                <option value="Todos" selected="@(kind == KioskViewKind.Todos ? "selected" : null)"><kw-l key="kiosk.settings.kind_todos">To-dos</kw-l></option>
                             </select>
                         </td>
 
                         @* Board id (Board rows; blank = no board chosen). *@
                         <td>
                             <select class="form-select" name="Views[@i].BoardId"
-                                    data-kiosk-board="@(i)" aria-label="Slide @((i + 1)) board">
+                                    data-kiosk-board="@(i)" aria-label="@string.Format(ariaSlideBoard, i + 1)">
                                 <option value="" selected="@(v is null or { BoardId: null } ? "selected" : null)">&mdash;</option>
                                 @foreach (var (id, title) in Model.Boards)
                                 {
@@ -156,10 +170,10 @@
                         @* Calendar view (Calendar rows; default week). *@
                         <td>
                             <select class="form-select" name="Views[@i].CalendarView"
-                                    data-kiosk-cal="@(i)" aria-label="Slide @((i + 1)) calendar view">
-                                <option value="day" selected="@(v is { CalendarView: "day" } ? "selected" : null)">Day</option>
-                                <option value="week" selected="@(v is null or { CalendarView: "week" or null } ? "selected" : null)">Week</option>
-                                <option value="month" selected="@(v is { CalendarView: "month" } ? "selected" : null)">Month</option>
+                                    data-kiosk-cal="@(i)" aria-label="@string.Format(ariaSlideCal, i + 1)">
+                                <option value="day" selected="@(v is { CalendarView: "day" } ? "selected" : null)"><kw-l key="kiosk.settings.cal_day">Day</kw-l></option>
+                                <option value="week" selected="@(v is null or { CalendarView: "week" or null } ? "selected" : null)"><kw-l key="kiosk.settings.cal_week">Week</kw-l></option>
+                                <option value="month" selected="@(v is { CalendarView: "month" } ? "selected" : null)"><kw-l key="kiosk.settings.cal_month">Month</kw-l></option>
                             </select>
                         </td>
 
@@ -167,15 +181,15 @@
                         <td>
                             <input type="text" class="form-control" name="Views[@i].ComponentId"
                                    value="@(v?.ComponentId ?? "")"
-                                   placeholder="(blank = all)"
-                                   data-kiosk-comp="@(i)" aria-label="Slide @((i + 1)) community" />
+                                   placeholder="@communityPh"
+                                   data-kiosk-comp="@(i)" aria-label="@string.Format(ariaSlideComm, i + 1)" />
                         </td>
 
                         @* The optional per-slide label. *@
                         <td>
                             <input type="text" class="form-control" name="Views[@i].Label"
                                    value="@(v?.Label ?? "")"
-                                   data-kiosk-label="@(i)" aria-label="Slide @((i + 1)) label" />
+                                   data-kiosk-label="@(i)" aria-label="@string.Format(ariaSlideLabel, i + 1)" />
                         </td>
                     </tr>
                 }
@@ -183,14 +197,14 @@
         </table>
     </div>
 
-    <p class="text-muted small">
-        Tip: only the <em>View</em> column decides which of the other columns a
-        slide uses — the rest are ignored for that slide. A row set to
-        <em>&mdash;</em> is left out of the cycle.
+    <p class="text-muted small mt-3 mb-0">
+        <kw-l key="kiosk.settings.tip">Tip: only the View column decides which of the other columns a slide uses — the rest are ignored for that slide. A row set to — is left out of the cycle.</kw-l>
     </p>
+    </div>
+    </div>
 
     <div class="mt-3">
-        <button type="submit" class="btn btn-primary">Save playlist</button>
-        <a class="btn btn-link ms-2" href="/kiosk" target="_blank" rel="noopener">Preview the kiosk</a>
+        <button type="submit" class="btn btn-primary"><kw-l key="kiosk.settings.save">Save playlist</kw-l></button>
+        <a class="btn btn-link ms-2" href="/kiosk" target="_blank" rel="noopener"><kw-l key="kiosk.settings.preview">Preview the kiosk</kw-l></a>
     </div>
 </form>

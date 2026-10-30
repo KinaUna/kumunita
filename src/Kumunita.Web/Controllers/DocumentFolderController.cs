@@ -1,3 +1,4 @@
+using Kumunita.Web.Security;
 using Kumunita.Core.Documents;
 using Kumunita.Web.Models;
 using Marten;
@@ -89,7 +90,7 @@ public sealed class DocumentFolderController(
         if (!IsElevated(User)) return NotFound();
 
         if (string.IsNullOrWhiteSpace(form.Name))
-            return BadRequest("A folder name is required.");
+            return BadRequest(await this.FlashAsync("validation.folder_name_required", "A folder name is required."));
 
         await using var session = store.LightweightSession();
         try
@@ -118,7 +119,7 @@ public sealed class DocumentFolderController(
             ;
 
         if (string.IsNullOrWhiteSpace(form.Name))
-            return BadRequest("A folder name is required.");
+            return BadRequest(await this.FlashAsync("validation.folder_name_required", "A folder name is required."));
 
         await using var session = store.LightweightSession();
         try
