@@ -29,5 +29,31 @@ the last 1–2 sections it names as `Needs`.
 - **Network-dependent pins (L5 digests/SHAs):** not resolved here (that is U25's step, per its own unit text; not recorded in U3). No values invented.
 - **Postgres-backed Core classes (Docker needed; all present here):** `PostgresFixture` (base, `PostgreSqlBuilder`) + consumers incl. `UserPortabilityClassifyTests`, `UserPortabilityResolveTests`, `PortabilityRoundTripTests`, `UserPortabilityAcceptanceTests`, `IdentityServiceTokenHashTests`, `IdentityServiceSignupPolicyTests`, `IdentityServiceSamplePasswordLockTests`, `IdentityServiceSampleMfaLockTests`, `ContentImageOwnershipTests`, `BookmarkServiceTests`, `PersonalNoteServiceTests`, `UsageAnalyticsServiceTests`, `Usage/*` (6 classes), `Kiosk/KioskServiceTests`, `F22_AppRoleCannotDropSchemaTests`, `EventRecurrenceExpanderTests`, `IcsWriterTests`, `TodoIcsWriterTests`, `LoggingTests`, `KnownTranslationKeys*` (3), `SurfaceKeyTests`, `UsageCapturePolicyTests`, `ClaimShapingInvariantBTests`, `TranslationBulk*` (3), `Search/SearchSortTests`, `LS_U04_SeederTests`, `ErrorReport*` (2). All SEC-lane Core units (U4–U6, U13, U14, U23) sit on `PostgresFixture` — they **can** run in this environment.
 - **Warnings for later units:** (1) `Kumunita.Web.Tests` is ~21 s here (AGENTS.md's "under a second" is stale). (2) The sync terminal channel wedged twice this unit; the file-logged `> .tmp/u3-*.log 2>&1` + async pattern is the reliable path. (3) `tests/` contains stale scratch files (`coretest.out`, `coretest2.out`, `webtest.out`, `parity.out`) — do not read them as evidence; the logs in `.tmp/u3-*.log` are this unit's.
+## U4 — guard
+- **Files changed:** `src/Kumunita.Core/Portability/ImportOwnershipGuard.cs` (new), `tests/Kumunita.Core.Tests/ImportOwnershipGuardTests.cs` (new). No product code elsewhere.
+- **Public API (U5/U6 call this, verbatim):**
+  ```csharp
+  public sealed record ImportRowVerdict(bool Allowed, string? RejectionReason);
+  public static class ImportOwnershipGuard
+  {
+      public static ImportRowVerdict Check(
+          string type,
+          object row,
+          string actorSubjectId,
+          Func<string, string?> existingOwnerOf,
+          IReadOnlySet<string>? actorConversationIds = null);
+  }
+  ```
+- **Reason constants (these become user-visible codes — U5 surfaces them as `RejectedReason` on the per-entity plan, U6 records them as `import.rejected:<reason>` in the apply result):**
+  - `ImportOwnershipGuard.ReasonAccessGranting` = `"access-granting row"` (GroupMembership / GroupInvitation / GroupJoinRequest — always rejected)
+  - `ImportOwnershipGuard.ReasonIdCollision` = `"id collision"` (`existingOwnerOf(row.Id)` returned a non-null owner ≠ actor)
+  - `ImportOwnershipGuard.ReasonNotOwned` = `"not-owned"` (any `OwnershipFields` value ≠ actor; also used for the `Group` `OwnerId != actor` case)
+  - `ImportOwnershipGuard.ReasonConversationNotActor` = `"conversation-not-actor"` (Conversation: actor not `ParticipantA`/`ParticipantB`; Message: `ConversationId` not in `actorConversationIds` or `actorConversationIds` is null)
+  - `ImportOwnershipGuard.ReasonTypeNotInScope` = `"type-not-in-scope"` (type not in `UserScopeInventory.Entries`)
+- **Rule summary (matches design doc §2.2 H1 policy):** type must be in `UserScopeInventory.Entries`; `GroupMembership`/`GroupInvitation`/`GroupJoinRequest` → always `Rejected(ReasonAccessGranting)`; `Group` → `OwnerId == actor` (member seat not importable); `Conversation` → actor is `ParticipantA` or `ParticipantB`; `Message` → `ConversationId` ∈ `actorConversationIds` (null set = fail-closed reject); all other `Entries` types → every `OwnershipFields` value must equal actor; then `existingOwnerOf(row.Id)` returning non-null owner ≠ actor → `Rejected(ReasonIdCollision)`.
+- **Tests:** 10/10 pass (`dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll -class "Kumunita.Core.Tests.ImportOwnershipGuardTests"`). Baseline U3: 0 pre-existing failures, so no regressions.
+- **U5 must know:** the row is read by **public property name** (the `OwnershipFields` names verbatim — `AuthorId`/`OwnerId`/`UserId`/`SubjectId`/`CreatedBy`/`ParticipantA`/`ParticipantB`/`OwnerId`), so the classify loop can pass the deserialized Marten document straight in (no `IReadOnlyDictionary` indirection needed). `Id` and `ConversationId` are also read by name. Nullable ownership fields (e.g. `PostTranslation.AuthorId`) → null is `Rejected(ReasonNotOwned)` (fail-closed: operator-managed translations, not the actor's user-added ones). `actorConversationIds` is `null`-safe: null/empty set rejects every `Message` row.
+- **Drift check:** U2's register entry `UserScopeInventory.cs` `Entries :66` / `IsInScope :158` still matches (entries table at line 66, `IsInScope` at 158). The U4 grep anchor `grep -n "Entries\|IsInScope"` resolves at the same lines. No drift pause.
 ## Noticed
 - (U3) `tests/Kumunita.Core.Tests/` holds four stray `*.out` scratch files (see warning 3). Unrelated to SEC; left untouched.
+- (U4) None — the U4 guard surface is clean; no unrelated observations.
