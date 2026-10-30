@@ -429,7 +429,13 @@ $fBaselineSizes = @{
   # Groups/Detail crossed the 800 ceiling outright from the feed-footer
   # bookmark toggle lane (the ADR 0226 / ADR 0227 TODO, 814 lines) — the same
   # shipped-additions mechanism as above (the M29 precedent).
-  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 833
+  # Re-baselined again 2026-10-30 (the ADR 0273 security-settings / page-titles
+  # localization close): _Layout crossed its 833 baseline from the ADR 0273
+  # central page-title map (Security/PageTitleKeys lookup + effective-language
+  # resolution + English fallback in the <title> pass, 21 insertions / 1
+  # deletion) — the same shipped-additions mechanism as above (the M29
+  # precedent).
+  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 853
   'src/Kumunita.Web/Views/Groups/Detail.cshtml'        = 814
 }
 $fNew = [System.Collections.Generic.List[string]]::new()
