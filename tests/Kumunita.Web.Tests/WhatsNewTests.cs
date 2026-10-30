@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.76.0 entry (Documents — uploader attribution + delete lane — ADR 0239) — 0.75.0 (Kanban board card edit modal) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.77.0 entry (localization of the remaining surface — ADRs 0261–0273) — 0.76.0 (Documents) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,28 +69,36 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The Documents-uploader-attribution + delete-lane lane
-        // (ADR 0239, 2026-10-29 — the feed shows who uploaded each document,
-        // the detail page shows who last changed it, and the owner may
-        // soft-delete it — the ADR 0024 Post.DeletedAt shape carried to
-        // documents) is now the newest shipped (the 0.76.0 entry), so it is
-        // the head; the Kanban-board-card-edit-modal lane (ADR 0195,
-        // 2026-10-27) 0.75.0 entry slides one row back; the
-        // Sample-data-MFA-lock lane (ADR 0194, 2026-10-27) 0.74.0 entry
-        // slides two rows back; the Portability-import-modes lane (ADR 0193,
-        // 2026-10-27) 0.73.0 entry slides three rows back; and so on.
+        // slides down. The localization-of-the-remaining-surface lane
+        // (ADRs 0261–0273, 2026-10-30 — the admin hub + settings views,
+        // the validation / flash messages, the guardian RSVP statuses,
+        // the Kiosk + sign-up + page-form pages, and the page titles all
+        // resolve through the kw-l registry with the English floor
+        // inline) is now the newest shipped (the 0.77.0 entry), so it is
+        // the head; the Documents-uploader-attribution + delete-lane lane
+        // (ADR 0239, 2026-10-29) 0.76.0 entry slides one row back; the
+        // Kanban-board-card-edit-modal lane (ADR 0195, 2026-10-27)
+        // 0.75.0 entry slides two rows back; and so on.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.76.0" && head.Date == "2026-10-29",
-            "The Documents-uploader-attribution + delete-lane 0.76.0 (2026-10-29) entry must be the head of the registry; got "
+            head.Version == "0.77.0" && head.Date == "2026-10-30",
+            "The localization-of-the-remaining-surface 0.77.0 (2026-10-30) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("Documents", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("Uploaded by", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("ADR 0239", StringComparison.OrdinalIgnoreCase)),
-            "The 0.76.0 head entry must name the Documents-uploader-attribution + delete-lane + the ADR 0239.");
+            head.Changes.Any(c => c.Contains("language", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("translation", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADR 0261", StringComparison.OrdinalIgnoreCase)),
+            "The 0.77.0 head entry must name the localization lane + the ADR 0261 seam.");
 
-        // The Kanban-board-card-edit-modal entry (0.75.0) slides one row back.
+        // The Documents-uploader-attribution + delete-lane entry (0.76.0) slides one row back.
+        var documentsLane = WhatsNew.All.Single(v => v.Version == "0.76.0");
+        Assert.True(
+            documentsLane.Changes.Any(c => c.Contains("Documents", StringComparison.OrdinalIgnoreCase)
+                                          && c.Contains("Uploaded by", StringComparison.OrdinalIgnoreCase)
+                                          && c.Contains("ADR 0239", StringComparison.OrdinalIgnoreCase)),
+            "The 0.76.0 entry must name the Documents-uploader-attribution + delete-lane + the ADR 0239.");
+
+        // The Kanban-board-card-edit-modal entry (0.75.0) slides two rows back.
         var kanbanBoardModal = WhatsNew.All.Single(v => v.Version == "0.75.0");
         Assert.True(
             kanbanBoardModal.Changes.Any(c => c.Contains("board", StringComparison.OrdinalIgnoreCase)
