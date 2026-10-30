@@ -1,5 +1,16 @@
 @using Kumunita.Web.Security
 @model Kumunita.Web.Models.MfaSettingsViewModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _mfaOne = Translation is null ? "You have {0} unused recovery code remaining." : await Translation.GetAsync("settings.mfa.codes_remaining_one", _aL);
+    var _mfaMany = Translation is null ? "You have {0} unused recovery codes remaining." : await Translation.GetAsync("settings.mfa.codes_remaining_other", _aL);
+    var _mfaRotateConfirm = Translation is null ? "Replace your 10 recovery codes with a fresh set? The current codes stop working immediately." : await Translation.GetAsync("settings.mfa.rotate_confirm", _aL);
+    var _mfaDisableConfirm = Translation is null ? "Turn off two-factor authentication? If you are the only GlobalAdmin on this instance, you will lose your last defense against a stolen password." : await Translation.GetAsync("settings.mfa.disable_confirm", _aL);
+    var _mfaCodesAria = Translation is null ? "Recovery codes" : await Translation.GetAsync("settings.mfa.recovery_heading", _aL);
+    var _mfaQrAlt = Translation is null ? "QR code to pair your authenticator app" : await Translation.GetAsync("settings.mfa.qr_alt", _aL);
+}
 @{
     ViewData["Title"] = "Settings — Security";
 }
@@ -26,14 +37,16 @@
 *@
 @await Html.PartialAsync("../Locale/_SettingsTabs.cshtml")
 
-<h1>Your settings</h1>
+@{
+    var _mfaRemaining = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+        Model.RemainingRecoveryCodes == 1 ? _mfaOne : _mfaMany, Model.RemainingRecoveryCodes);
+}
 
-<h2 class="mt-1">Security</h2>
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+
+<h2 class="mt-1"><kw-l key="settings.security.title">Security</kw-l></h2>
 <p class="text-muted">
-    Add two-factor authentication (an authenticator app) to your account. A
-    GlobalAdmin must have this on before signing in; for everyone else it is
-    optional.
-</p>
+    <kw-l key="settings.mfa.intro">Add two-factor authentication (an authenticator app) to your account. A GlobalAdmin must have this on before signing in; for everyone else it is optional.</kw-l></p>
 
 @* ---- Enabled + count-only steady state -------------------------------- * @*
    When MFA is on and no one-time secrets are present (Model.RecoveryCodes is
@@ -43,25 +56,22 @@
 @if (Model.Enabled && Model.RecoveryCodes is null)
 {
     <div class="alert alert-info">
-        Two-factor authentication is <b>enabled</b> on this account. You have
-        <b>@Model.RemainingRecoveryCodes</b> unused recovery code
-        @(Model.RemainingRecoveryCodes == 1 ? "" : "s") remaining.
+        <kw-l key="settings.mfa.enabled_status">Two-factor authentication is enabled on this account.</kw-l>
+        @_mfaRemaining
     </div>
 
     <div class="card">
         <div class="card-body">
-            <h3 class="h5">Recovery codes</h3>
+            <h3 class="h5"><kw-l key="settings.mfa.recovery_heading">Recovery codes</kw-l></h3>
             <p class="text-muted mb-2">
-                If you lose your authenticator app, a recovery code lets you
-                sign in once and reset your second factor. You have
-                @Model.RemainingRecoveryCodes unused code
-                @(Model.RemainingRecoveryCodes == 1 ? "" : "s").
+                <kw-l key="settings.mfa.recovery_desc">If you lose your authenticator app, a recovery code lets you sign in once and reset your second factor.</kw-l>
+                @_mfaRemaining
             </p>
             <form method="post" action="/settings/security/mfa/recovery"
-                  data-confirm="Replace your 10 recovery codes with a fresh set? The current codes stop working immediately.">
+                  data-confirm="@_mfaRotateConfirm">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="btn btn-outline-secondary">
-                    Rotate recovery codes
+                    <kw-l key="settings.mfa.rotate_button">Rotate recovery codes</kw-l>
                 </button>
             </form>
         </div>
@@ -71,19 +81,16 @@
 
     <div class="card border-danger-subtle">
         <div class="card-body">
-            <h3 class="h5 text-danger">Turn off two-factor authentication</h3>
+            <h3 class="h5 text-danger"><kw-l key="settings.mfa.disable_heading">Turn off two-factor authentication</kw-l></h3>
             <p class="text-muted mb-2">
-                Disabling removes your second factor. If you are the only
-                GlobalAdmin on this instance, doing so removes your last
-                defense against a stolen password.
-            </p>
+                <kw-l key="settings.mfa.disable_desc">Disabling removes your second factor. If you are the only GlobalAdmin on this instance, doing so removes your last defense against a stolen password.</kw-l></p>
             <form method="post" action="/settings/security/mfa/disable"
-                  data-confirm="Turn off two-factor authentication? If you are the only GlobalAdmin on this instance, you will lose your last defense against a stolen password.">
+                  data-confirm="@_mfaDisableConfirm">
                 @Html.AntiForgeryToken()
                 <div class="row g-2 align-items-end">
                     <div class="col-sm-8">
                         <label for="disableCode" class="form-label">
-                            Enter the current code from your authenticator app to confirm
+                            <kw-l key="settings.mfa.disable_code_label">Enter the current code from your authenticator app to confirm</kw-l>
                         </label>
                         <input type="text" class="form-control" id="disableCode"
                                name="Code" inputmode="numeric" autocomplete="one-time-code"
@@ -91,7 +98,7 @@
                     </div>
                     <div class="col-sm-4">
                         <button type="submit" class="btn btn-outline-danger">
-                            Disable two-factor authentication
+                            <kw-l key="settings.mfa.disable_button">Disable two-factor authentication</kw-l>
                         </button>
                     </div>
                 </div>
@@ -113,13 +120,10 @@ else
     {
         <div class="card border-warning-subtle">
             <div class="card-body">
-                <h3 class="h5">Your recovery codes — copy them now</h3>
+                <h3 class="h5"><kw-l key="settings.mfa.codes_heading">Your recovery codes — copy them now</kw-l></h3>
                 <p class="text-muted">
-                    These 10 codes let you sign in if you lose your
-                    authenticator app. They are shown <b>once</b> and cannot
-                    be recovered later.
-                </p>
-                <ol class="recovery-codes" aria-label="Recovery codes">
+                    <kw-l key="settings.mfa.codes_desc">These 10 codes let you sign in if you lose your authenticator app. They are shown once and cannot be recovered later.</kw-l></p>
+                <ol class="recovery-codes" aria-label="@_mfaCodesAria">
                     @foreach (var code in Model.RecoveryCodes)
                     {
                         <li><code>@code</code></li>
@@ -135,12 +139,9 @@ else
     {
         <div class="card">
             <div class="card-body">
-                <h3 class="h5">Pair your authenticator app</h3>
+                <h3 class="h5"><kw-l key="settings.mfa.pair_heading">Pair your authenticator app</kw-l></h3>
                 <p class="text-muted">
-                    Add this account to your authenticator app (Google
-                    Authenticator, 1Password, Authy, or any TOTP app). Scan
-                    the QR code below, or enter the setup key manually.
-                </p>
+                    <kw-l key="settings.mfa.pair_desc">Add this account to your authenticator app (Google Authenticator, 1Password, Authy, or any TOTP app). Scan the QR code below, or enter the setup key manually.</kw-l></p>
                 @* ADR 0174 — the pairing QR. Server-side QR encode (QRCoder,
                    ADR 0174) embedded as a data: URI, so the resident can scan
                    an image with no client JS — the page works with scripts
@@ -149,7 +150,7 @@ else
                 @if (!string.IsNullOrEmpty(Model.QrDataUri))
                 {
                     <div class="d-flex justify-content-center mb-3">
-                        <img src="@Model.QrDataUri" alt="QR code to pair your authenticator app"
+                        <img src="@Model.QrDataUri" alt="@_mfaQrAlt"
                              class="rounded border" style="width:220px;height:220px;" />
                     </div>
                 }
@@ -159,7 +160,7 @@ else
                            value="@Model.OtpAuthUrl" readonly />
                 </div>
                 <div class="mb-2">
-                    <label for="setupKey" class="form-label d-block">Setup key</label>
+                    <label for="setupKey" class="form-label d-block"><kw-l key="settings.mfa.setup_key">Setup key</kw-l></label>
                     <input type="text" class="form-control font-monospace" id="setupKey"
                            value="@Model.SetupKey" readonly />
                 </div>
@@ -174,23 +175,21 @@ else
     {
         <div class="card">
             <div class="card-body">
-                <h3 class="h5">Enable two-factor authentication</h3>
+                <h3 class="h5"><kw-l key="settings.mfa.enable">Enable two-factor authentication</kw-l></h3>
                 <p class="text-muted">
-                    Enter the 6-digit code your authenticator app is showing
-                    to confirm and turn on your second factor.
-                </p>
+                    <kw-l key="settings.mfa.enable_desc">Enter the 6-digit code your authenticator app is showing to confirm and turn on your second factor.</kw-l></p>
                 <form method="post" action="/settings/security/mfa">
                     @Html.AntiForgeryToken()
                     <div class="row g-2 align-items-end">
                         <div class="col-sm-8">
-                            <label for="enableCode" class="form-label">Current code from your authenticator app</label>
+                            <label for="enableCode" class="form-label"><kw-l key="settings.mfa.enable_code_label">Current code from your authenticator app</kw-l></label>
                             <input type="text" class="form-control" id="enableCode"
                                    name="Code" inputmode="numeric" autocomplete="one-time-code"
                                    pattern="[0-9]{6}" required />
                         </div>
                         <div class="col-sm-4">
                             <button type="submit" class="btn btn-primary">
-                                Enable two-factor authentication
+                                <kw-l key="settings.mfa.enable">Enable two-factor authentication</kw-l>
                             </button>
                         </div>
                     </div>

@@ -3,9 +3,30 @@
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
+@inject Kumunita.Core.Bookmarks.IBookmarkService Bookmarks
 @model Kumunita.Web.Models.FeedViewModel
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _postsMandatoryTitle = Translation is null ? "Everyone in the neighborhood is a member of this community — no one can be removed or leave it." : await Translation.GetAsync("posts.mandatory_title", _aL);
+}
+@{
     ViewData["Title"] = $"{Model.ComponentName}";
+    // ADR 0227 — the viewer's bookmarked posts on this page: one batched personal
+    // read (IBookmarkService.ListBookmarkedIdsAsync), never one query per card.
+    // Best-effort: a failed read degrades to "no bookmarks" rather than blanking the feed.
+    IReadOnlySet<string> _bookmarkedIds = new HashSet<string>();
+    var _feedReturnUrl = Context.Request.Path + Context.Request.QueryString;
+    try
+    {
+        var _viewer = KumunitaPrincipal.SubjectId(User);
+        if (!string.IsNullOrEmpty(_viewer))
+            _bookmarkedIds = await Bookmarks.ListBookmarkedIdsAsync(_viewer, "post", Model.Items.Select(x => x.Id).ToList());
+    }
+    catch
+    {
+        // keep the empty set
+    }
+
 
     // M29 (ADR 0152) — the "Community" surface header label (M29·1: the same
     // value the nav item resolves — one resolver, one value, so a rename is
@@ -67,7 +88,7 @@
                        side-note is hidden, so this is its stand-in. *@
                     @if (Model.IsMandatory)
                     {
-                        <span class="badge bg-dark ms-2" title="Everyone in the neighborhood is a member of this community — no one can be removed or leave it.">
+                        <span class="badge bg-dark ms-2" title="@_postsMandatoryTitle">
                             <kw-l key="community.mandatory_badge">Everyone — mandatory</kw-l>
                         </span>
                     }
@@ -114,7 +135,7 @@
                           action="@Url.Action("Leave", "Community", new { componentId = Model.ComponentId })"
                           data-confirm="@confirmLeave.Replace("{0}", Model.ComponentName)">
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-outline-danger">Leave</button>
+                        <button type="submit" class="btn btn-outline-danger"><kw-l key="groups.member_leave">Leave</kw-l></button>
                     </form>
                 }
                 </div>
@@ -247,8 +268,7 @@
                             </a>
                         </div>
                         <p class="airy-post-preview mb-0">@p.BodyPreview</p>
-                        @* TODO (ADR 0175): <div class="airy-post-foot"> with the reply count
-                           and the bookmark button once PostListItem carries the reply count. *@
+                        <partial name="_PostCardFoot" model="@(new PostCardFootModel(Url.Action("Detail","Posts", new { id = p.Id }) + "#replies", p.ReplyCount, p.Id, _bookmarkedIds.Contains(p.Id), _feedReturnUrl))" />
                     </div>
                 }
             </div>

@@ -53,6 +53,10 @@
                 @if (Model.CanUpload)
                 {
                     <div class="d-flex gap-2">
+                        @* ADR 0241 — the restore list (owners are uploaders, so CanUpload also gates the link). *@
+                        <a class="btn btn-outline-secondary" href="/documents/deleted">
+                            <kw-l key="documents.deleted_title">Deleted documents</kw-l>
+                        </a>
                         <a class="btn btn-outline-primary" href="/documents/new">
                             <kw-l key="documents.upload">Upload a document</kw-l>
                         </a>
@@ -110,6 +114,15 @@
                                 <p class="airy-ann-preview mb-2">@d.Summary</p>
                             }
                             <div class="airy-ann-meta">
+                                @* ADR 0239 D1 — the uploader's name (resolved
+                                   server-side in the controller — the
+                                   PostsController feed shape); degrades to the
+                                   raw owner id when the profile is missing /
+                                   blocked. The "Uploaded by" label is on the
+                                   detail page (the feed row is a one-line meta,
+                                   the name is the primary content). *@
+                                <span>@(Model.OwnerNames.TryGetValue(d.Id, out var ownerName) ? ownerName : d.OwnerId)</span>
+                                <span>·</span>
                                 <span>@FormatSize(d.SizeBytes)</span>
                                 <span>·</span>
                                 <span><kw-dt dt="@d.Created" format="g"></kw-dt></span>

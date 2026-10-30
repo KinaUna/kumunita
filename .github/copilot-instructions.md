@@ -7,12 +7,9 @@ version-pinned Critter Stack (Marten/Wolverine/Weasel) notes.
 
 ## Shared doctrine (defined once, in `AGENTS.md`)
 
-The following sections are **defined in [`AGENTS.md`](../AGENTS.md)** — the
-source of truth read by every agent framework (Copilot, Claude, Cursor, etc.).
-This file no longer duplicates them; it links to each section. Update the
-content in `AGENTS.md`, not here. (De-duplicated by `U03`, IMPROVE lane —
-the previous file carried full copies of each section below; the two had
-drifted in subtle ways.)
+These are defined in [`AGENTS.md`](../AGENTS.md) — the single source of
+truth, read by every agent framework (Copilot, Claude, Cursor, etc.). This
+file only points to each section; edit the content in `AGENTS.md`, not here.
 
 - **Running terminal commands safely (WSL2 / Linux agents)** — including the
   `$variables`-don't-survive-between-terminal-calls gotcha and the
@@ -32,13 +29,22 @@ drifted in subtle ways.)
 - **Don't pause mid-task to check in** — stop only on a real blocker, not to
   announce the next step. See
   [AGENTS.md § Don't pause mid-task to check in](../AGENTS.md#dont-pause-mid-task-to-check-in).
+- **CI known-failure cheatsheet** — the four environmental CI gotchas
+  (`actions/setup-dotnet` owner, Playwright browser install, `libnss3`
+  local deps, Node 20 deprecation). See
+  [AGENTS.md § CI known-failure cheatsheet](../AGENTS.md#ci-known-failure-cheatsheet).
+- **CI gates and anti-regression pins** — the `improve-check.ps1`
+  god-file gate and the `@media` block-count pin, both by-design
+  anti-regression guards that fail for documented reasons. See
+  [AGENTS.md § CI gates and anti-regression pins](../AGENTS.md#ci-gates-and-anti-regression-pins-dont-rediscover-them).
+- **Postgres diagnostic conventions** — `mt_doc_` table naming, the
+  `postgres` vs `kumunita` database gotcha, and the `/admin/setup`
+  404-is-success rule. See
+  [AGENTS.md § Postgres diagnostic conventions](../AGENTS.md#postgres-diagnostic-conventions-live-server).
 
-## This file's unique content (VS Code / Copilot specific)
+## VS Code / Copilot-specific content
 
-The pointer list above is the *whole* of the shared doctrine; everything else
-a reader of this file needs is already covered by `AGENTS.md`. If a future
-lane adds a new VS Code- or Copilot-specific rule (e.g. a new
-integrated-browser quirk, a new `.tmp/` harness file, a new task-runner
-convention), add it **here**, in this section, not in `AGENTS.md` (which is
-read by frameworks that may not have VS Code). Keep it to the VS-Code surface
-— general doctrine belongs in `AGENTS.md`.
+Add VS Code- or Copilot-specific rules **here** (e.g. a new
+integrated-browser quirk, a `.tmp/` harness file, a task-runner convention) —
+not in `AGENTS.md`, which is read by frameworks that may not have VS Code.
+Keep it to the VS Code surface; general doctrine belongs in `AGENTS.md`.

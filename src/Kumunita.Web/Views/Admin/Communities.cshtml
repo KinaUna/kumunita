@@ -1,4 +1,12 @@
 @model Kumunita.Web.Models.AdminCommunitiesViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _mandatoryTip = Translation is null ? "Everyone in the neighborhood is a member — no one can be removed or leave it." : await Translation.GetAsync("admin.communities.mandatory_tip", _aL);
+    var _modScopeTip = Translation is null ? "Standing moderator scope is ON for this community." : await Translation.GetAsync("admin.communities.moderator_scope_tip", _aL);
+}
 @{
     ViewData["Title"] = "Admin — Communities";
 }
@@ -8,7 +16,7 @@
    treatment, site.css). *@
 @await Html.PartialAsync("_AdminNav.cshtml")
 
-<h1>Communities</h1>
+<h1><kw-l key="admin.hub.communities_title">Communities</kw-l></h1>
 <p class="text-muted">
     @Model.Communities.Count community(ies), @Model.DisabledCommunityCount disabled.
     Adding a community creates a new <code>/community/{id}</code> feed. Disabling one
@@ -32,7 +40,7 @@
                 <div class="col-md-2 d-flex align-items-center ps-2">
                     <input class="form-check-input" type="checkbox" id="addMandatory" name="Mandatory" value="true" />
                     <label class="form-check-label ms-1 small text-nowrap" for="addMandatory"
-                           title="Everyone in the neighborhood is a member — no one can be removed or leave it."><kw-l key="admin.community_mandatory">Mandatory</kw-l></label>
+                           title="@_mandatoryTip"><kw-l key="admin.community_mandatory">Mandatory</kw-l></label>
                 </div>
                 <div class="col-md-3 text-end">
                     <button class="btn btn-primary btn-sm" type="submit"><kw-l key="admin.add_community">Add community</kw-l></button>
@@ -44,7 +52,7 @@
 
 @if (Model.Communities.Count == 0)
 {
-    <div class="text-muted small">No communities yet. Use the form above to add the first one.</div>
+    <div class="text-muted small"><kw-l key="admin.communities.empty">No communities yet. Use the form above to add the first one.</kw-l></div>
 }
 else
 {
@@ -66,15 +74,15 @@ else
                             }
                             @if (c.Mandatory)
                             {
-                                <span class="badge text-bg-dark ms-1" title="Everyone in the neighborhood is a member — no one can be removed or leave it.">mandatory</span>
+                                <span class="badge text-bg-dark ms-1" title="@_mandatoryTip">mandatory</span>
                             }
                             @if (c.ModeratorAccess)
                             {
-                                <span class="badge text-bg-secondary ms-1" title="Standing moderator scope is ON for this community.">mod scope</span>
+                                <span class="badge text-bg-secondary ms-1" title="@_modScopeTip">mod scope</span>
                             }
                         </div>
-                        <a href="#" data-edit-toggle="#users-@c.Id" class="btn btn-sm btn-outline-secondary">Users</a>
-                        <a href="#" data-edit-toggle="#edit-@c.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                        <a href="#" data-edit-toggle="#users-@c.Id" class="btn btn-sm btn-outline-secondary"><kw-l key="admin.communities.users">Users</kw-l></a>
+                        <a href="#" data-edit-toggle="#edit-@c.Id" class="btn btn-sm btn-outline-secondary"><kw-l key="common.edit">Edit</kw-l></a>
                     </div>
                     <div class="card-body py-2">
                         @if (!string.IsNullOrWhiteSpace(c.Description))
@@ -83,7 +91,7 @@ else
                         }
                         else
                         {
-                            <div class="text-muted small fst-italic">No description.</div>
+                            <div class="text-muted small fst-italic"><kw-l key="admin.communities.no_description">No description.</kw-l></div>
                         }
                         <div class="text-muted small mt-1">Sort: @c.SortOrder</div>
                     </div>
@@ -119,10 +127,10 @@ else
                        remove, and the add-picker (non-member accounts). *@
                     <div id="users-@c.Id" style="display:none" class="border-top bg-light">
                         <div class="p-3">
-                            <h6 class="small mb-2">Members @(c.Mandatory ? "(mandatory — everyone in the neighborhood is a member; removal is not offered)" : "")</h6>
+                            <h2 class="h6 small mb-2">Members @(c.Mandatory ? "(mandatory — everyone in the neighborhood is a member; removal is not offered)" : "")</h2>
                             @if (c.Members.Count == 0)
                             {
-                                <div class="text-muted small">No explicit members — add one below.</div>
+                                <div class="text-muted small"><kw-l key="admin.communities.no_members">No explicit members — add one below.</kw-l></div>
                             }
                             <ul class="list-group mb-2">
                                 @foreach (var m in c.Members)
@@ -167,7 +175,7 @@ else
                                                     {
                                                         <input type="hidden" name="componentIds" value="@s" />
                                                     }
-                                                    <button class="btn btn-sm btn-outline-secondary" type="submit">Un-moderate</button>
+                                                    <button class="btn btn-sm btn-outline-secondary" type="submit"><kw-l key="admin.communities.unmoderate">Un-moderate</kw-l></button>
                                                 </form>
                                             }
                                             else
@@ -184,7 +192,7 @@ else
                                                     {
                                                         <input type="hidden" name="componentIds" value="@s" />
                                                     }
-                                                    <button class="btn btn-sm btn-outline-primary" type="submit">Make moderator</button>
+                                                    <button class="btn btn-sm btn-outline-primary" type="submit"><kw-l key="admin.communities.make_moderator">Make moderator</kw-l></button>
                                                 </form>
                                             }
                                             @if (!c.Mandatory)
@@ -193,7 +201,7 @@ else
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="componentId" value="@c.Id" />
                                                     <input type="hidden" name="userId" value="@m.UserId" />
-                                                    <button class="btn btn-sm btn-outline-danger" type="submit" title="Remove @(m.DisplayName ?? m.UserId) from the community">Remove</button>
+                                                    <button class="btn btn-sm btn-outline-danger" type="submit" title="Remove @(m.DisplayName ?? m.UserId) from the community"><kw-l key="common.remove">Remove</kw-l></button>
                                                 </form>
                                             }
                                         </span>
@@ -206,16 +214,16 @@ else
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="componentId" value="@c.Id" />
                                     <div class="flex-grow-1">
-                                        <label class="form-label small mb-1" for="add-user-@c.Id">Add a member</label>
+                                        <label class="form-label small mb-1" for="add-user-@c.Id"><kw-l key="admin.communities.add_member">Add a member</kw-l></label>
                                         <select name="userId" id="add-user-@c.Id" class="form-select form-select-sm" required>
-                                            <option value="" disabled selected>Pick a resident…</option>
+                                            <option value="" disabled selected><kw-l key="admin.communities.pick_resident">Pick a resident…</kw-l></option>
                                             @foreach (var cand in c.Candidates)
                                             {
                                                 <option value="@cand.UserId">@(cand.DisplayName ?? cand.UserId)</option>
                                             }
                                         </select>
                                     </div>
-                                    <button class="btn btn-sm btn-primary" type="submit">Add</button>
+                                    <button class="btn btn-sm btn-primary" type="submit"><kw-l key="common.add">Add</kw-l></button>
                                 </form>
                             }
                         </div>
@@ -229,19 +237,19 @@ else
                                 <input type="hidden" name="ComponentId" value="@c.Id" />
                                 <div class="row g-2 align-items-end">
                                     <div class="col-4">
-                                        <label class="form-label small mb-1">Name</label>
+                                        <label class="form-label small mb-1"><kw-l key="common.name">Name</kw-l></label>
                                         <input type="text" name="Name" value="@c.Name" class="form-control form-control-sm" maxlength="100" required />
                                     </div>
                                     <div class="col-4">
-                                        <label class="form-label small mb-1">Description</label>
+                                        <label class="form-label small mb-1"><kw-l key="admin.communities.col_description">Description</kw-l></label>
                                         <input type="text" name="Description" value="@c.Description" class="form-control form-control-sm" maxlength="500" />
                                     </div>
                                     <div class="col-2">
-                                        <label class="form-label small mb-1">Sort</label>
+                                        <label class="form-label small mb-1"><kw-l key="admin.communities.col_sort">Sort</kw-l></label>
                                         <input type="number" name="SortOrder" value="@c.SortOrder" class="form-control form-control-sm" min="0" step="1" />
                                     </div>
                                     <div class="col-2">
-                                        <button class="btn btn-sm btn-primary w-100" type="submit">Save</button>
+                                        <button class="btn btn-sm btn-primary w-100" type="submit"><kw-l key="common.save">Save</kw-l></button>
                                     </div>
                                 </div>
                             </form>

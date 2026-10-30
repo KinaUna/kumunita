@@ -132,7 +132,7 @@ public sealed class AdminQuietController(
             // the registered admin.quiet.flash_saved kw-l key above). The
             // Web boundary adds no second audit (the one-audit-row pin
             // lives in Core.Tests, U04's GATE-6).
-            TempData["error"] = "The cadence must be between 5 and 1440 minutes.";
+            TempData["error"] = await ControllerFlashExtensions.FlashAsync(this, "admin.flash_quiet_range", "The cadence must be between 5 and 1440 minutes.");
         }
         return RedirectToAction(nameof(Index));
     }

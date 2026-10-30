@@ -322,6 +322,29 @@ public sealed class BookmarkService : IBookmarkService
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlySet<string>> ListBookmarkedIdsAsync(
+        string ownerId, string targetKind, IReadOnlyCollection<string> targetIds)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetKind);
+        ArgumentNullException.ThrowIfNull(targetIds);
+
+        // ADR 0227 — same gates as IsBookmarkedAsync: no owner / unknown kind /
+        // nothing asked ⇒ empty, no query.
+        if (string.IsNullOrWhiteSpace(ownerId)
+            || !ClosedTargetKinds.Contains(targetKind)
+            || targetIds.Count == 0)
+            return new HashSet<string>(StringComparer.Ordinal);
+
+        await using var q = _store.QuerySession();
+        var ids = await q.Query<Bookmark>()
+            .Where(b => b.OwnerId == ownerId && b.TargetKind == targetKind && targetIds.Contains(b.TargetId))
+            .Select(b => b.TargetId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        return new HashSet<string>(ids, StringComparer.Ordinal);
+    }
+
     // ── Folder-tree methods (ADR 0168 D2 — the M37 folder-tree shape
     //    re-applied to the bookmark surface) ─────────────────────────────
     //

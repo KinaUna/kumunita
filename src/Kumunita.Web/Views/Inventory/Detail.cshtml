@@ -4,6 +4,10 @@
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _invNotePh = Translation is null ? "Note (optional)" : await Translation.GetAsync("inv.detail.note_placeholder", _aL);
+}
+@{
     var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     string ariaCheckOutNote = await Translation.GetAsync("a11y.check_out_note", effLang);
     ViewData["Title"] = Model.Item.Name;
@@ -74,8 +78,10 @@
                         <dd class="col-sm-9">@Model.CurrentHolderName</dd>
                     }
 
-                    <dt class="col-sm-3"><kw-dt dt="@Model.Item.Created" format="g"></kw-dt></dt>
-                    <dd class="col-sm-9">@Model.Item.Created</dd>
+                    @* ADR 0212 — the dt was the formatted date and the dd the raw DateTime (the date
+                       twice, no label); a "Created" label and one formatted date. *@
+                    <dt class="col-sm-3"><kw-l key="events.created">Created</kw-l></dt>
+                    <dd class="col-sm-9"><kw-dt dt="@Model.Item.Created" format="g"></kw-dt></dd>
                 </dl>
             </div>
         </div>
@@ -91,7 +97,7 @@
                 <form method="post" action="@($"/inventory/{Model.Item.Id}/checkout")" class="d-flex flex-wrap align-items-center gap-2" style="margin:0;">
                     @Html.AntiForgeryToken()
                     <input class="form-control form-control-sm" type="text" name="note" maxlength="200"
-                           placeholder="Note (optional)" aria-label="@ariaCheckOutNote" />
+                           placeholder="@_invNotePh" aria-label="@ariaCheckOutNote" />
                     <button type="submit" class="btn btn-primary btn-sm"><kw-l key="inv.detail.checkOut">Check out</kw-l></button>
                 </form>
             }
@@ -124,11 +130,11 @@
             }
             else
             {
-                <ul class="kmb-ann-comments list-unstyled p-0">
+                <ul class="kmb-detail-comments list-unstyled p-0">
                     @foreach (var row in Model.History)
                     {
                         var checkout = row.Checkout;
-                        <li class="kmb-ann-comment">
+                        <li class="kmb-detail-comment">
                             <span class="fw-semibold">@row.BorrowerName</span>
                             <span class="text-muted small ms-2">
                                 · <kw-l key="inv.detail.checkOut">Check out</kw-l> <kw-dt dt="@checkout.CheckedOutAt" format="g"></kw-dt>

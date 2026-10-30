@@ -231,6 +231,8 @@ public sealed class PostsController(
                 c.Id,
                 effLang is not null ? await ResolveCommunityNameAsync(c.Id, c.Name, effLang) : c.Name));
 
+        // ADR 0226 — one batched read for the page's reply counts (the feed card footer).
+        var replyCounts = await posts.CountRepliesAsync(feed.Visible.Select(p => p.Id).ToList());
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
@@ -251,7 +253,8 @@ public sealed class PostsController(
                 preview,
                 post.Created,
                 profile?.DisplayName ?? post.AuthorId,
-                post.AuthorId));
+                post.AuthorId,
+                ReplyCount: replyCounts.GetValueOrDefault(post.Id)));
         }
 
         return View(new FeedViewModel
@@ -420,6 +423,8 @@ public sealed class PostsController(
                 c.Id,
                 effLang is not null ? await ResolveCommunityNameAsync(c.Id, c.Name, effLang) : c.Name));
 
+        // ADR 0226 — one batched read for the page's reply counts (the feed card footer).
+        var replyCounts = await posts.CountRepliesAsync(feed.Visible.Select(p => p.Id).ToList());
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
@@ -433,7 +438,8 @@ public sealed class PostsController(
                 profile?.DisplayName ?? post.AuthorId,
                 post.AuthorId,
                 nameByComponentId.TryGetValue(post.ComponentId, out var name) ? name : null,
-                post.ComponentId));
+                post.ComponentId,
+                replyCounts.GetValueOrDefault(post.Id)));
         }
 
         return View("Index", new FeedViewModel
@@ -886,7 +892,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post", "You must sign in to post."));
             return View(model);
         }
 
@@ -910,11 +916,11 @@ public sealed class PostsController(
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.ComponentId))
-                ModelState.AddModelError(nameof(model.ComponentId), "Choose a community.");
+                ModelState.AddModelError(nameof(model.ComponentId), await this.FlashAsync("validation.choose_community", "Choose a community."));
             if (string.IsNullOrWhiteSpace(model.Body))
-                ModelState.AddModelError(nameof(model.Body), "Body is required.");
+                ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.body_required", "Body is required."));
             if (model.Audience is null || !model.Audience.IsValid)
-                ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+                ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
             return View(model);
         }
 
@@ -925,8 +931,7 @@ public sealed class PostsController(
             // moderator scope on). The shape is a form error, not a 404 (a 404
             // on POST is a non-standard shape; the M2 <see
             // cref="GroupsController"/> "a form is a shape" precedent applies).
-            ModelState.AddModelError(nameof(model.ComponentId),
-                "That community is not enabled, or you do not have a posting right on it.");
+            ModelState.AddModelError(nameof(model.ComponentId), await this.FlashAsync("validation.community_not_enabled", "That community is not enabled, or you do not have a posting right on it."));
             return View(model);
         }
 
@@ -978,8 +983,7 @@ public sealed class PostsController(
         }
         catch (UnauthorizedAccessException)
         {
-            ModelState.AddModelError(nameof(model.ComponentId),
-                "You are not a member of this community yet. An admin can add you under /admin → Accounts.");
+            ModelState.AddModelError(nameof(model.ComponentId), await this.FlashAsync("validation.not_member_yet", "You are not a member of this community yet. An admin can add you under /admin → Accounts."));
             return View(model);
         }
         catch (ArgumentException ex) when (ex.ParamName == "input")
@@ -990,12 +994,12 @@ public sealed class PostsController(
             // The `when (ex.ParamName == "input")` guard scopes the catch to
             // the DeriveSlug throws (the `nameof(input)` is "input") and
             // lets any other `ArgumentException` (a real bug) propagate.
-            ModelState.AddModelError(nameof(model.TagIds), "A tag name is invalid (use letters, digits, hyphens, underscores).");
+            ModelState.AddModelError(nameof(model.TagIds), await this.FlashAsync("validation.tag_invalid", "A tag name is invalid (use letters, digits, hyphens, underscores)."));
             return View(model);
         }
 
         var component = components.First(c => c.Id == model.ComponentId);
-        TempData["info"] = $"Post added to “{component.Name}”.";
+        TempData["info"] = await this.FlashAsync("posts.flash_added", "Post added to “{0}”.", component.Name);
         return Redirect($"/posts/{post.Id}");
     }
 
@@ -1123,7 +1127,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to edit this post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post_edit", "You must sign in to edit this post."));
             return Forbid();
         }
 
@@ -1154,9 +1158,9 @@ public sealed class PostsController(
         model.ExistingTagSlugs = await SeedExistingTagSlugsAsync(post);
 
         if (string.IsNullOrWhiteSpace(model.Body))
-            ModelState.AddModelError(nameof(model.Body), "Body is required.");
+            ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.body_required", "Body is required."));
         if (model.Audience is null || !model.Audience.IsValid)
-            ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
 
         if (!ModelState.IsValid)
             return View(model);
@@ -1192,7 +1196,7 @@ public sealed class PostsController(
                 // PostService.UpdatePostAsync). TagSlugs.Parse still normalizes
                 // (trim / dedup / drop-blank) the present case.
                 model.TagIds is null ? null : TagSlugs.Parse(model.TagIds));
-            TempData["info"] = "Post updated.";
+            TempData["info"] = await this.FlashAsync("posts.flash_updated", "Post updated.");
             return Redirect($"/posts/{id}");
         }
         catch (UnauthorizedAccessException)
@@ -1206,7 +1210,7 @@ public sealed class PostsController(
         {
             // TG (ADR 0044, U8b) — a bad tag slug (C-TG·4) → a form error on
             // the TagIds field (the M3 "a form is a shape" precedent).
-            ModelState.AddModelError(nameof(model.TagIds), "A tag name is invalid (use letters, digits, hyphens, underscores).");
+            ModelState.AddModelError(nameof(model.TagIds), await this.FlashAsync("validation.tag_invalid", "A tag name is invalid (use letters, digits, hyphens, underscores)."));
             return View(model);
         }
         catch (KeyNotFoundException)
@@ -1292,7 +1296,7 @@ public sealed class PostsController(
         {
             // A reply is a body-only write (C-M3·1: no own audience, no title).
             // Fail-closed to the detail page — the form is re-presented there.
-            TempData["error"] = "A reply needs some text.";
+            TempData["error"] = await this.FlashAsync("posts.flash_reply_needs_text", "A reply needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1312,7 +1316,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         await posts.CreateReplyAsync(id, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode, AttachmentIds.ExtractAttachmentIds(body)); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default. ATT U7 (C-ATT·4/8) — the reply's attachment ids, parsed server-side from the body (the deliberate asymmetry: the image reply lane does not persist ImageIds, C-ATT·9 — untouched).
 
-        TempData["info"] = "Reply added.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_added", "Reply added.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1346,7 +1350,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to edit this reply.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_reply_edit", "You must sign in to edit this reply."));
             return Forbid();
         }
 
@@ -1354,7 +1358,7 @@ public sealed class PostsController(
         {
             // A reply is a body-only write (C-M3·1: no own audience, no title).
             // Fail-closed to the detail page — the form is re-presented there.
-            TempData["error"] = "A reply needs some text.";
+            TempData["error"] = await this.FlashAsync("posts.flash_reply_needs_text", "A reply needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1391,7 +1395,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        TempData["info"] = "Reply updated.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_updated", "Reply updated.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1419,7 +1423,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to delete this post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post_delete", "You must sign in to delete this post."));
             return Forbid();
         }
 
@@ -1446,7 +1450,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        TempData["info"] = "Post deleted.";
+        TempData["info"] = await this.FlashAsync("posts.flash_deleted", "Post deleted.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1476,7 +1480,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to publish this post.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_post_publish", "You must sign in to publish this post."));
             return Forbid();
         }
 
@@ -1503,7 +1507,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        TempData["info"] = "Post published.";
+        TempData["info"] = await this.FlashAsync("posts.flash_published", "Post published.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1527,7 +1531,7 @@ public sealed class PostsController(
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
         {
-            ModelState.AddModelError(string.Empty, "You must sign in to delete this reply.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.signin_reply_delete", "You must sign in to delete this reply."));
             return Forbid();
         }
 
@@ -1556,7 +1560,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        TempData["info"] = "Reply deleted.";
+        TempData["info"] = await this.FlashAsync("posts.flash_reply_deleted", "Reply deleted.");
         return Redirect($"/posts/{id}");
     }
 
@@ -1605,12 +1609,12 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1642,7 +1646,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1670,12 +1674,12 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1709,7 +1713,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1743,12 +1747,12 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1779,7 +1783,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1806,7 +1810,7 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1830,7 +1834,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1856,12 +1860,12 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1887,7 +1891,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -1912,7 +1916,7 @@ public sealed class PostsController(
 
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return Redirect($"/posts/{id}");
         }
 
@@ -1938,7 +1942,7 @@ public sealed class PostsController(
         }
 
         var name = await SeedLanguageName(languageCode);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return Redirect($"/posts/{id}");
     }
 
@@ -2020,7 +2024,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         await moderation.FileReportAsync(id, actor, reason, session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/posts/{id}");
     }
 
@@ -2095,7 +2099,7 @@ public sealed class PostsController(
 
         await moderation.FileReplyReportAsync(replyId, actor, reason, session);
 
-        TempData["info"] = "Report submitted. A moderator may review it.";
+        TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/posts/{id}");
     }
 

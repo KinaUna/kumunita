@@ -617,39 +617,168 @@ public sealed class IdentityService(
         // ADR 0138 decision seam: the single place the "is this account locked
         // out of changing its own password?" rule lives, so the resident
         // /account/password surface and the ChangePasswordAsync enforcement
-        // guard below agree. Four conjuncts:
+        // guard below agree. Four conjuncts (1)+(2) are this method's, (3)+(4)
+        // are shared with the ADR 0194 MFA lock via IsSampleNonAdminAsync
+        // (the two locks cannot drift):
         //   (1) the instance carries the closed set (SampleData__Enabled);
         //   (2) the admin opted the instance in (the locale gate);
-        //   (3) the subject is a sample account (a member of the closed
-        //       SampleAccountEmails set, by its profile e-mail);
+        //   (3) the subject is a sample account (closed set, by profile e-mail);
         //   (4) the subject is NOT a GlobalAdmin (the sample admin is exempt).
-        // Any real (non-sample) account, or the sample admin, is never locked
-        // (short-circuit on (3)/(4)) — only a non-admin sample account on an
-        // opted-in demo instance is.
         if (!await IsSampleDataEnabledAsync())
             return false;
         if (!await IsSamplePasswordChangeLockedAsync())
             return false;
+        return await IsSampleNonAdminAsync(subjectId);
+    }
 
-        // (3) sample-account membership by profile e-mail (the ADR 0078 closed
-        // set the notification-suppression gate compares against — the same
-        // single source of truth, so the lock and the suppression cannot drift).
+    /// <summary>
+    /// Conjunct (3) of the ADR 0138 / 0194 decision: is the subject a sample
+    /// account (a member of the closed
+    /// <see cref="Bootstrap.SampleDataSeeder.SampleAccountEmails"/> set, by its
+    /// profile e-mail)? The ADR 0078 / ADR 0129 single source of truth the
+    /// notification-suppression gate compares against — the same set, so the
+    /// locks and the suppression cannot drift. A read (no audit row).
+    /// </summary>
+    private async Task<bool> IsSampleAccountAsync(string subjectId)
+    {
         var profile = await userInfo.GetProfileAsync(subjectId);
         var email = profile?.Email;
-        if (string.IsNullOrWhiteSpace(email)
-            || !Kumunita.Core.Bootstrap.SampleDataSeeder.SampleAccountEmails.Contains(email.Trim()))
+        if (string.IsNullOrWhiteSpace(email))
             return false;
+        return Kumunita.Core.Bootstrap.SampleDataSeeder
+            .SampleAccountEmails.Contains(email.Trim());
+    }
 
-        // (4) the sample admin is exempt — a sample account holding GlobalAdmin
-        // (the seed admin) may still change its own password, by construction.
+    /// <summary>
+    /// Conjuncts (3)+(4) of the ADR 0138 / 0194 decision: is the subject a
+    /// sample account (conjunct 3) <b>AND NOT</b> a
+    /// <see cref="Roles.GlobalAdmin"/> (conjunct 4 — the sample admin is
+    /// exempt, keeping its own password + MFA lane by construction)? The
+    /// shared rule both locks combine with their own admin-toggle gate, so
+    /// the ADR 0138 password lock and the ADR 0194 MFA lock cannot drift.
+    /// A read (no audit row).
+    /// </summary>
+    private async Task<bool> IsSampleNonAdminAsync(string subjectId)
+    {
+        if (!await IsSampleAccountAsync(subjectId))
+            return false;
         var user = await userManager.FindByIdAsync(subjectId);
         if (user is null)
             return false;   // no account → not a lockable sample account
         var roles = await userManager.GetRolesAsync(user);
-        if (roles.Contains(Roles.GlobalAdmin))
-            return false;
+        return !roles.Contains(Roles.GlobalAdmin);
+    }
 
-        return true;
+    // ── Sample-data MFA lock (ADR 0194 — amends ADR 0138) ────────────────
+    // The MFA (two-factor) settings surface is the MFA analog of the
+    // change-password surface. Same four-conjunct decision as ADR 0138
+    // (conjugates (1)+(3)+(4) shared via IsSampleNonAdminAsync /
+    // IsSampleAccountAsync; (2) is this lane's own admin-toggle gate,
+    // LocaleSettings.SampleMfaLocked), plus the IsSampleDataAccountAsync
+    // read the login path (leg 1.5b) uses to exempt the sample admin from
+    // the forced-MFA enrollment redirect.
+
+    /// <inheritdoc />
+    public async Task<bool> IsSampleMfaLockedAsync()
+    {
+        // ADR 0194 read seam: the instance gate (LocaleSettings.SampleMfaLocked)
+        // with the `false` floor — a missing singleton or an unset value both
+        // yield `false`, so a fresh or real instance never blocks MFA (the exact
+        // IsSamplePasswordChangeLockedAsync shape, re-applied to the MFA
+        // surface). A read (no audit row); the SampleData__Enabled flag is NOT
+        // consulted here — the lock is a pure instance value, and
+        // IsMfaLockedForAsync combines it with the sample-account membership.
+        using var session = documentStore.QuerySession();
+        var settings = await session.LoadAsync<Localization.LocaleSettings>(
+            Localization.LocaleSettings.SingletonId, CancellationToken.None);
+
+        // `false` floor: a null settings row keeps MFA open; only an explicit
+        // `true` locks sample accounts out of the MFA surface.
+        return settings is not null && settings.SampleMfaLocked;
+    }
+
+    /// <inheritdoc />
+    public async Task SetSampleMfaLockedAsync(bool locked, string adminSubjectId)
+    {
+        // ADR 0194 write seam: the admin-settled instance gate (LocaleSettings
+        // singleton, the same doc the password lock reads and writes) + exactly
+        // one audit row (via: Admin, action "sample.set-mfa-lock", target
+        // "sample") in the same session (C3 — no silent, unaudited access).
+        // The same single-target singleton-toggle shape as
+        // SetSamplePasswordChangeLockedAsync.
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton and set the gate; the other singleton
+        // fields (including SamplePasswordChangeLocked) are untouched.
+        var settings = await session
+            .LoadAsync<Localization.LocaleSettings>(
+                Localization.LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new Localization.LocaleSettings { SampleMfaLocked = locked };
+        }
+        else
+        {
+            settings.SampleMfaLocked = locked;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "sample.set-mfa-lock",
+            TargetKind = "sample",
+            TargetId = "sample",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsMfaLockedForAsync(string subjectId)
+    {
+        // ADR 0194 decision seam: the single place the "is this account locked
+        // out of the MFA settings surface?" rule lives, so the resident
+        // /settings/security/mfa surface and the MfaEnable / MfaRotateRecovery
+        // / MfaDisable enforcement guards agree. The same four conjuncts as
+        // IsChangePasswordLockedForAsync (conjugates (1)+(3)+(4) shared via
+        // IsSampleNonAdminAsync; (2) is this lane's own admin-toggle gate):
+        //   (1) the instance carries the closed set (SampleData__Enabled);
+        //   (2) the admin opted the instance in (the MFA locale gate);
+        //   (3) the subject is a sample account (closed set, by profile e-mail);
+        //   (4) the subject is NOT a GlobalAdmin (the sample admin is exempt).
+        if (!await IsSampleDataEnabledAsync())
+            return false;
+        if (!await IsSampleMfaLockedAsync())
+            return false;
+        return await IsSampleNonAdminAsync(subjectId);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsSampleDataAccountAsync(string subjectId)
+    {
+        // ADR 0194 login-exemption seam: conjunct (1) + (3) only — the instance
+        // carries the closed set AND the subject is a member of it (by profile
+        // e-mail). Deliberately does NOT consult the admin-toggle gate (a
+        // locked instance still lets its admin sign in — that is the point of
+        // the exemption) and does NOT apply the GlobalAdmin exemption (the
+        // exemption the login path needs is *precisely for* the sample
+        // GlobalAdmin — a non-admin sample account never reaches leg 1.5b,
+        // since that leg is GlobalAdmin-only). A read (no audit row); the
+        // SampleData__Enabled conjunct makes this unreachable by construction
+        // on a real instance (the ADR 0056 shape).
+        if (!await IsSampleDataEnabledAsync())
+            return false;
+        return await IsSampleAccountAsync(subjectId);
     }
 
     // ── Admin account notifications (ADR 0077 — the account.signup /

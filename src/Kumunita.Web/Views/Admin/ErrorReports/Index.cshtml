@@ -76,10 +76,6 @@
    shape: TempData["info"] is a server-resolved string (the controller's
    FlashAsync, the AdminOnboardingController.FlashAsync idiom). A no-op
    (an already-triaged report, M31·6) sets no flash → no alert. *@
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
 
 @if (Model.Reports.Count == 0)
 {
@@ -215,7 +211,7 @@ else
                        M32·9 closed set — the en source text is the floor,
                        ADR 0015 D1). *@
                     <a href="/admin/error-reports/@r.Id" class="btn btn-sm btn-outline-secondary text-nowrap ms-2 me-0">
-                        View
+                        <kw-l key="admin.errorreport.view">View</kw-l>
                     </a>
                     @* The "Mark as triaged" button (visible only when
                        TriageStatus == "new" — the register's U05 pin,

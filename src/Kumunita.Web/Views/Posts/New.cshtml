@@ -20,253 +20,238 @@
         @if (Model.Components.Count == 0)
         {
             <div class="alert alert-warning">
-                No community feed is currently available to post to. Ask
-                a resident (or a global admin, if you have one) to enable
-                one — the common ones are <code>safety</code>,
-                <code>maintenance</code>, <code>social</code>, and
-                <code>governance</code>.
-            </div>
+                <kw-l key="posts.no_feeds">No community feed is currently available to post to. Ask a resident (or a global admin, if you have one) to enable one — the common ones are safety, maintenance, social, and governance.</kw-l></div>
         }
 
         <form id="new-post-form" method="post" action="/posts/new">
             @Html.AntiForgeryToken()
 
-            <div class="card mb-4">
+            <div class="card mb-4 kmb-form-section">
                 <div class="card-body">
-                    <label class="form-label" for="component" style="font-weight:600;">
-                        Community (the feed this post will appear in)
-                    </label>
-                    <select class="form-control" id="component" name="ComponentId" required>
-                        @foreach (var (id, name) in Model.Components)
-                        {
-                            <option value="@id" selected="@(id == Model.ComponentId ? "selected" : null)">
-                                @name
-                            </option>
-                        }
-                    </select>
-                    <div class="text-muted small mt-2">
-                        <kw-l key="posts.community_hint">The community decides which feed your post appears in — and, by default, who can see it (every member of that community). To narrow the audience, turn off “Everyone in this community” in the audience section below.</kw-l>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-body">
-                    <div class="row g-2 mb-2">
-                        <div class="col">
-                            <label class="form-label" for="title" style="font-weight:600;">
-                                <kw-l key="common.title">Title</kw-l>
-                            </label>
-                            <input class="form-control" type="text" id="title" name="Title"
-                                   maxlength="120"
-                                   placeholder="@optionalPlaceholder" />
-                            <div class="text-muted small mt-1">
-                                <kw-l key="posts.title_hint">A short headline (up to 120 characters). Leave blank for a body-only post — the list will show your first line of the body instead.</kw-l>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row g-2">
-                        <div class="col">
-                            <label class="form-label" for="body" style="font-weight:600;">
-                                <kw-l key="common.body">Body</kw-l>
-                            </label>
-                            <div class="rc-editor">
-                                <div class="rc-editor-toolbar" data-rich-editor>
-                                    <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                                    <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                                    <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                                    <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
-                                    <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
-                                    <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
-                                    <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                                    <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                                    <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
-                                    <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
-                                    <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
-                                    <partial name="_RichEditorToggle" />
-                                </div>
-                                <textarea class="form-control" id="body" name="Body" rows="6" required
-                                          placeholder="…" data-rich-editor></textarea>
-                                <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-body">
-                    <label class="form-label" for="language" style="font-weight:600;">
-                        <kw-l key="common.language">Language</kw-l>
-                    </label>
-                    <select class="form-control" id="language" name="LanguageCode">
-                        @foreach (var (languageCode, nativeName) in Model.Languages)
-                        {
-                            <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
-                                @nativeName
-                            </option>
-                        }
-                    </select>
-                    <div class="text-muted small mt-2">
-                        <kw-l key="posts.language_hint">The language you're writing this post in. This is only a tag — it is not translated — and it keeps the text findable later and lets a reader add their own language version if they want.</kw-l>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-body">                    <label class="form-label" for="tags" style="font-weight:600;">Tags</label>
-                    @* TG U8 — the composer tag input (a free-text field +
-                       autocomplete dropdown). `data-tag-suggest` is the
-                       self-wire selector for client/lib/tag-suggest.ts
-                       (tsc-only, no editor dependency — RE·3); the module
-                       creates the chips, the dropdown, and the hidden
-                       `TagIds` submission field around this input. The
-                       filter (starts_with(displayName) OR starts_with(slug),
-                       ≤ 10) is **server-side** via POST /api/tags/suggest
-                       (the SuggestAsync seam, C-TG·2 / C-TG·4); this input
-                       only commits the author's typed text. *@
-                    <input class="form-control" type="text" id="tags"
-                           data-tag-suggest
-                           maxlength="64"
-                           placeholder="@tagsExample" />
-                    <div class="text-muted small mt-1">
-                        <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this post.</kw-l>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mb-4">
-                <div class="card-body">                    <h6 class="card-title" style="font-weight:600;">
-                        Audience — who can see this post
-                    </h6>
-
-                    @* ADR 0036 — the default is "everyone in this community":
-                       the checkbox below is bound (Audience.CommunityVisible)
-                       and seeded <c>true</c> by the composer. The granular
-                       picker block (mode radios + "Who to grant to") stays
-                       hidden until the poster opts in to a narrower
-                       audience with the toggle — the audience written on
-                       POST is still the composer's verbatim choice
-                       (ADR 0001-B: one <c>Audience</c>, the writer's shape). *@
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox"
-                               name="Audience.CommunityVisible"
-                               id="aud-community" data-audience-toggle
-                               value="true"
-                               @(Model.Audience?.CommunityVisible ?? true ? "checked" : null) />
-                        <label class="form-check-label fw-semibold" for="aud-community">
-                            <kw-l key="posts.audience_all_members">Everyone in this community</kw-l>
+                    <h2 class="kmb-form-section-title"><kw-l key="form.section_details">Details</kw-l></h2>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="component" style="font-weight:600;">
+                            <kw-l key="posts.community_label_new">Community (the feed this post will appear in)</kw-l>
                         </label>
-                        <div class="text-muted small ms-4">
-                            <kw-l key="posts.audience_all_members_hint">The default — every member of the community above can see this post. Turn it off only if you want to narrow who can see it.</kw-l>
-                        </div>
-                    </div>
-
-                    <hr class="my-3" />
-
-                    @* ADR 0102 — the granular audience block (mode radios + "Who to grant
-                       to") is hidden while "Everyone in this community" is
-                       on (the checkbox above drives the show/hide;
-                       client/lib/audience-toggle.js reacts to changes) and
-                       shown when the author opts in to a narrower audience.
-                       The hidden <c>Grants</c> textarea inside _GrantPickers
-                       stays the ONLY form-bound grant field (the U11 / F13
-                       single-source pin) regardless of visibility. *@
-                    <div id="audience-restricted" data-audience-panel
-                         class="audience-restricted @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)">
-                        <div class="form-label mt-2" style="font-weight:600;">
-                            <kw-l key="posts.audience_combine">How the picks combine</kw-l>
-                        </div>
-                        @foreach (var m in modes)
-                        {
-                            var checkedMark =
-                                string.Equals(Model.Audience?.Mode, m, StringComparison.OrdinalIgnoreCase)
-                                    ? "checked"
-                                    : null;
-                            <div class="form-check" style="margin-left:0.5rem;">
-                                <input class="form-check-input" type="radio"
-                                       name="Audience.Mode" id="@($"aud-mode-{m}")"
-                                       value="@m" @checkedMark required />
-                                <label class="form-check-label" for="@($"aud-mode-{m}")">
-                                    <kw-l key="@(m == "Any" ? "profile.audience_mode_any_word" : "profile.audience_mode_all_word")">@(m == "Any" ? "Any" : "All")</kw-l>
-                                    @(" — " + (m == "Any"
-                                        ? "a viewer matches if they're on any of the picks"
-                                        : "a viewer must be on every pick — an empty list denies everyone"))
-                                </label>
-                            </div>
-                        }
-
+                        <select class="form-control" id="component" name="ComponentId" required>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.ComponentId ? "selected" : null)">
+                                    @name
+                                </option>
+                            }
+                        </select>
                         <div class="text-muted small mt-2">
-                            <kw-l key="posts.audience_restrict_hint">These picks are ADDITIONAL — “Everyone in this community” stays on unless you turn it off, so the post is visible to the whole community and the picks you make here.</kw-l>
+                            <kw-l key="posts.community_hint">The community decides which feed your post appears in — and, by default, who can see it (every member of that community). To narrow the audience, turn off “Everyone in this community” in the audience section below.</kw-l>
+                        </div>
+                    </div>
+                    <div class="kmb-form-field">
+                        <div class="row g-2 mb-2">
+                            <div class="col">
+                                <label class="form-label" for="title" style="font-weight:600;">
+                                    <kw-l key="common.title">Title</kw-l>
+                                </label>
+                                <input class="form-control" type="text" id="title" name="Title"
+                                       maxlength="120"
+                                       placeholder="@optionalPlaceholder" />
+                                <div class="text-muted small mt-1">
+                                    <kw-l key="posts.title_hint">A short headline (up to 120 characters). Leave blank for a body-only post — the list will show your first line of the body instead.</kw-l>
+                                </div>
+                            </div>
                         </div>
 
-                    @* "Who to grant to" — the shared picker partial
-                       (Views/Shared/_GrantPickers.cshtml, the same
-                       "Who to grant to" UX the Profile/Edit audience
-                       editors use; extracted from
-                       Views/Profile/_AudienceEditor.cshtml for this).
-                       Checkboxes are display-only (no name=) — the
-                       hidden <c>Grants</c> textarea the partial renders
-                       is the only form-bound grant field, posting as
-                       <c>Audience.Grants</c>; the
-                       <c>_GrantPickerScripts</c> partial (in
-                       @section Scripts below) keeps the textarea in
-                       two-way sync with the selection. *@
-                    <partial name="_GrantPickers" model="@(new GrantPickersModel
-                    {
-                        EditorName = "Audience",
-                        // A null/absent bound editor renders the
-                        // well-formed-but-empty shape (the M2 off-shape
-                        // fallback pattern from _AudienceEditor).
-                        Editor     = Model.Audience
-                                    ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty },
-                        Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
-                        Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
-                    })" />
-
-                    @if (Model.Audience is not null
-                        && Model.Audience.IsEmpty)
-                    {
-                        <div class="alert alert-warning mt-2 mb-0">
-                            <b>Empty audience.</b>
-                            @if (string.Equals(Model.Audience.Mode, "All", StringComparison.OrdinalIgnoreCase))
-                            {
-                                <text>With <b>All</b> mode and no picks, no one
-                                matches, so no one else can see your post — only
-                                you (the author) can.
-                                </text>
-                            }
-                            else
-                            {
-                                <text>With <b>Any</b> mode and no picks, no one
-                                matches, so no one else can see your post — only
-                                you (the author) can.
-                                </text>
-                            }
+                        <div class="row g-2">
+                            <div class="col">
+                                <label class="form-label" for="body" style="font-weight:600;">
+                                    <kw-l key="common.body">Body</kw-l>
+                                </label>
+                                <div class="rc-editor">
+                                    <div class="rc-editor-toolbar" data-rich-editor>
+                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                        <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                        <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                        <partial name="_RichEditorToggle" />
+                                    </div>
+                                    <textarea class="form-control" id="body" name="Body" rows="6" required
+                                              placeholder="…" data-rich-editor></textarea>
+                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                </div>
+                            </div>
                         </div>
-                    }
-
-                    <small class="text-muted d-block mt-2">
-                        <kw-l key="posts.audience_only_picks">Whatever you pick here becomes the post's audience — nothing above or below this form is added to it. An empty pick (with “Everyone in this community” off) means only you can see the post.</kw-l>
-                    </small>
-                    </div><!-- /#audience-restricted -->
+                    </div>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="language" style="font-weight:600;">
+                            <kw-l key="common.language">Language</kw-l>
+                        </label>
+                        <select class="form-control" id="language" name="LanguageCode">
+                            @foreach (var (languageCode, nativeName) in Model.Languages)
+                            {
+                                <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
+                                    @nativeName
+                                </option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="posts.language_hint">The language you're writing this post in. This is only a tag — it is not translated — and it keeps the text findable later and lets a reader add their own language version if they want.</kw-l>
+                        </div>
+                    </div>
+                    <div class="kmb-form-field">
+                        <label class="form-label" for="tags" style="font-weight:600;"><kw-l key="nav.tags">Tags</kw-l></label>
+                                            @* TG U8 — the composer tag input (a free-text field +
+                                               autocomplete dropdown). `data-tag-suggest` is the
+                                               self-wire selector for client/lib/tag-suggest.ts
+                                               (tsc-only, no editor dependency — RE·3); the module
+                                               creates the chips, the dropdown, and the hidden
+                                               `TagIds` submission field around this input. The
+                                               filter (starts_with(displayName) OR starts_with(slug),
+                                               ≤ 10) is **server-side** via POST /api/tags/suggest
+                                               (the SuggestAsync seam, C-TG·2 / C-TG·4); this input
+                                               only commits the author's typed text. *@
+                                            <input class="form-control" type="text" id="tags"
+                                                   data-tag-suggest
+                                                   maxlength="64"
+                                                   placeholder="@tagsExample" />
+                                            <div class="text-muted small mt-1">
+                                                <kw-l key="tag.input.hint">Type to search existing tags, or start a new one.</kw-l>
+                                            </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="card mb-4">
+            <div class="card mb-4 kmb-form-section">
                 <div class="card-body">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox"
-                               name="SaveAsDraft"
-                               id="save-as-draft"
-                               value="true"
-                               @(Model.SaveAsDraft ? "checked" : null) />
-                        <label class="form-check-label fw-semibold" for="save-as-draft">
-                            <kw-l key="posts.save_as_draft">Save as draft</kw-l>
-                        </label>
-                        <div class="text-muted small ms-4">
-                            <kw-l key="posts.save_as_draft_hint">A draft is saved but visible to no one — not even admins — until you publish it. You can find it under “My drafts”.</kw-l>
+                    <h2 class="kmb-form-section-title"><kw-l key="form.section_audience_publishing">Audience and publishing</kw-l></h2>
+                    <div class="kmb-form-field">
+                        <h3 class="h6 card-title" style="font-weight:600;">
+                                                <kw-l key="posts.audience_heading">Audience — who can see this post</kw-l>
+                                            </h3>
+
+                                            @* ADR 0036 — the default is "everyone in this community":
+                                               the checkbox below is bound (Audience.CommunityVisible)
+                                               and seeded <c>true</c> by the composer. The granular
+                                               picker block (mode radios + "Who to grant to") stays
+                                               hidden until the poster opts in to a narrower
+                                               audience with the toggle — the audience written on
+                                               POST is still the composer's verbatim choice
+                                               (ADR 0001-B: one <c>Audience</c>, the writer's shape). *@
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox"
+                                                       name="Audience.CommunityVisible"
+                                                       id="aud-community" data-audience-toggle
+                                                       value="true"
+                                                       @(Model.Audience?.CommunityVisible ?? true ? "checked" : null) />
+                                                <label class="form-check-label fw-semibold" for="aud-community">
+                                                    <kw-l key="posts.audience_all_members">Everyone in this community</kw-l>
+                                                </label>
+                                                <div class="text-muted small ms-4">
+                                                    <kw-l key="posts.audience_all_members_hint">The default — every member of the community above can see this post. Turn it off only if you want to narrow who can see it.</kw-l>
+                                                </div>
+                                            </div>
+
+                                            <hr class="my-3" />
+
+                                            @* ADR 0102 — the granular audience block (mode radios + "Who to grant
+                                               to") is hidden while "Everyone in this community" is
+                                               on (the checkbox above drives the show/hide;
+                                               client/lib/audience-toggle.js reacts to changes) and
+                                               shown when the author opts in to a narrower audience.
+                                               The hidden <c>Grants</c> textarea inside _GrantPickers
+                                               stays the ONLY form-bound grant field (the U11 / F13
+                                               single-source pin) regardless of visibility. *@
+                                            <div id="audience-restricted" data-audience-panel
+                                                 class="audience-restricted @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)">
+                                                <div class="form-label mt-2" style="font-weight:600;">
+                                                    <kw-l key="posts.audience_combine">How the picks combine</kw-l>
+                                                </div>
+                                                @foreach (var m in modes)
+                                                {
+                                                    var checkedMark =
+                                                        string.Equals(Model.Audience?.Mode, m, StringComparison.OrdinalIgnoreCase)
+                                                            ? "checked"
+                                                            : null;
+                                                    <div class="form-check" style="margin-left:0.5rem;">
+                                                        <input class="form-check-input" type="radio"
+                                                               name="Audience.Mode" id="@($"aud-mode-{m}")"
+                                                               value="@m" @checkedMark required />
+                                                        <label class="form-check-label" for="@($"aud-mode-{m}")">
+                                                            <kw-l key="@(m == "Any" ? "profile.audience_mode_any_word" : "profile.audience_mode_all_word")">@(m == "Any" ? "Any" : "All")</kw-l>
+                                                            @(" — " + (m == "Any"
+                                                                ? "a viewer matches if they're on any of the picks"
+                                                                : "a viewer must be on every pick — an empty list denies everyone"))
+                                                        </label>
+                                                    </div>
+                                                }
+
+                                                <div class="text-muted small mt-2">
+                                                    <kw-l key="posts.audience_restrict_hint">These picks are ADDITIONAL — “Everyone in this community” stays on unless you turn it off, so the post is visible to the whole community and the picks you make here.</kw-l>
+                                                </div>
+
+                                            @* "Who to grant to" — the shared picker partial
+                                               (Views/Shared/_GrantPickers.cshtml, the same
+                                               "Who to grant to" UX the Profile/Edit audience
+                                               editors use; extracted from
+                                               Views/Profile/_AudienceEditor.cshtml for this).
+                                               Checkboxes are display-only (no name=) — the
+                                               hidden <c>Grants</c> textarea the partial renders
+                                               is the only form-bound grant field, posting as
+                                               <c>Audience.Grants</c>; the
+                                               <c>_GrantPickerScripts</c> partial (in
+                                               @section Scripts below) keeps the textarea in
+                                               two-way sync with the selection. *@
+                                            <partial name="_GrantPickers" model="@(new GrantPickersModel
+                                            {
+                                                EditorName = "Audience",
+                                                // A null/absent bound editor renders the
+                                                // well-formed-but-empty shape (the M2 off-shape
+                                                // fallback pattern from _AudienceEditor).
+                                                Editor     = Model.Audience
+                                                            ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty },
+                                                Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
+                                                Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
+                                            })" />
+
+                                            @if (Model.Audience is not null
+                                                && Model.Audience.IsEmpty)
+                                            {
+                                                <div class="alert alert-warning mt-2 mb-0">
+                                                    <b><kw-l key="posts.audience_empty_label">Empty audience.</kw-l></b>
+                                                    @if (string.Equals(Model.Audience.Mode, "All", StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <kw-l key="posts.audience_empty_all">With All mode and no picks, no one matches, so no one else can see your post — only you (the author) can.</kw-l>
+                                                    }
+                                                    else
+                                                    {
+                                                        <kw-l key="posts.audience_empty_any">With Any mode and no picks, no one matches, so no one else can see your post — only you (the author) can.</kw-l>
+                                                    }
+                                                </div>
+                                            }
+
+                                            <small class="text-muted d-block mt-2">
+                                                <kw-l key="posts.audience_only_picks">Whatever you pick here becomes the post's audience — nothing above or below this form is added to it. An empty pick (with “Everyone in this community” off) means only you can see the post.</kw-l>
+                                            </small>
+                                            </div><!-- /#audience-restricted -->
+                    </div>
+                    <div class="kmb-form-field">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   name="SaveAsDraft"
+                                   id="save-as-draft"
+                                   value="true"
+                                   @(Model.SaveAsDraft ? "checked" : null) />
+                            <label class="form-check-label fw-semibold" for="save-as-draft">
+                                <kw-l key="posts.save_as_draft">Save as draft</kw-l>
+                            </label>
+                            <div class="text-muted small ms-4">
+                                <kw-l key="posts.save_as_draft_hint">A draft is saved but visible to no one — not even admins — until you publish it. You can find it under “My drafts”.</kw-l>
+                            </div>
                         </div>
                     </div>
                 </div>

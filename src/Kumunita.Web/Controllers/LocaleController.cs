@@ -484,7 +484,7 @@ public sealed class LocaleController(
             // A pre-bootstrap edge (no profile row). Fail closed + surface the
             // error; the lane never load-or-creates (the SetProfileAvatarAsync
             // pin), so nothing is half-written.
-            TempData["error"] = "Your profile is not available — sign out and back in.";
+            TempData["error"] = await FlashAsync("settings.profile_unavailable");
         }
 
         return RedirectToAction(nameof(SettingsTimezone));
@@ -553,7 +553,7 @@ public sealed class LocaleController(
             // A pre-bootstrap edge (no profile row). Fail closed + surface the
             // error; the lane never load-or-creates (the SetProfileTimezoneAsync
             // pin), so nothing is half-written.
-            TempData["error"] = "Your profile is not available — sign out and back in.";
+            TempData["error"] = await FlashAsync("settings.profile_unavailable");
         }
 
         return RedirectToAction(nameof(SettingsDateFormat));
@@ -603,7 +603,7 @@ public sealed class LocaleController(
             // A pre-bootstrap edge (no profile row). Fail closed + surface the
             // error; the lane never load-or-creates (the
             // SetProfileTimezoneAsync pin), so nothing is half-written.
-            TempData["error"] = "Your profile is not available — sign out and back in.";
+            TempData["error"] = await FlashAsync("settings.profile_unavailable");
         }
 
         return RedirectToAction(nameof(SettingsPageSize));
@@ -658,7 +658,7 @@ public sealed class LocaleController(
             // A pre-bootstrap edge (no profile row). Fail closed + surface the
             // error; the lane never load-or-creates (the
             // SetProfileTimezoneAsync pin), so nothing is half-written.
-            TempData["error"] = "Your profile is not available — sign out and back in.";
+            TempData["error"] = await FlashAsync("settings.profile_unavailable");
         }
 
         return RedirectToAction(nameof(SettingsHome));
@@ -704,7 +704,7 @@ public sealed class LocaleController(
             // A pre-bootstrap edge (no profile row). Fail closed + surface the
             // error; the lane never load-or-creates (the
             // SetProfileDateFormatAsync pin), so nothing is half-written.
-            TempData["error"] = "Your profile is not available — sign out and back in.";
+            TempData["error"] = await FlashAsync("settings.profile_unavailable");
         }
 
         return RedirectToAction(nameof(Index));

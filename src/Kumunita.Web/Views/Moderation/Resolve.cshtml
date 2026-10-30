@@ -164,15 +164,11 @@
 {
     <div class="card mb-4">
         <div class="card-header">
-            Unlock (turn on moderation access for this community)
+            <kw-l key="moderation.unlock_header">Unlock (turn on moderation access for this community)</kw-l>
         </div>
         <div class="card-body">
             <p class="text-muted">
-                This turns on <b>moderation access</b> for the community
-                this report is about and marks the report
-                <code>unlocked</code>. A moderator can then act on its
-                content. Everything you do here is written to the audit log.
-            </p>
+                <kw-l key="moderation.unlock_desc">This turns on moderation access for the community this report is about and marks the report unlocked. A moderator can then act on its content. Everything you do here is written to the audit log.</kw-l></p>
             <form method="post" action="/moderation/@Model.ReportId/unlock">
                 @Html.AntiForgeryToken()
                 <button class="btn btn-warning" type="submit"><kw-l key="moderation.unlock_submit">Unlock</kw-l></button>
@@ -188,10 +184,7 @@
         <div class="card-header"><kw-l key="moderation.resolve_header">Resolve (close this report)</kw-l></div>
         <div class="card-body">
             <p class="text-muted">
-                This closes the report — it is marked as
-                <code>resolved</code>, which is its final state.
-                Everything you do here is written to the audit log.
-            </p>
+                <kw-l key="moderation.resolve_desc">This closes the report — it is marked as resolved, which is its final state. Everything you do here is written to the audit log.</kw-l></p>
             <form method="post" action="/moderation/@Model.ReportId/resolve">
                 @Html.AntiForgeryToken()
                 <button class="btn btn-success" type="submit"><kw-l key="moderation.resolve_submit">Resolve</kw-l></button>

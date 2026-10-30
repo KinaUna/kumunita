@@ -1,3 +1,9 @@
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _closeLang);
+}
 @*
     _PageTranslationModals — the shared Bootstrap modals for the
     page-translation add / edit lanes (the ADR 0027 / ADR 0071 rich-editor
@@ -52,7 +58,7 @@
                         <h5 class="modal-title" id="@labelId">
                             <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(languageCode)</b>
                         </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
@@ -122,7 +128,7 @@
                         <h5 class="modal-title" id="@labelId">
                             <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(langCode)</b>
                         </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">

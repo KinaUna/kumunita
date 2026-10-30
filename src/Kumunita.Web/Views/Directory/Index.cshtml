@@ -72,29 +72,22 @@
                         : string.Empty;
                     <div class="dir-card">
                         <span class="d-inline-flex align-items-center justify-content-center">
-                            <kw-avatar subject="@p.SubjectId" mono="@avatarInitial" size="lg" />
+                            <kw-avatar subject="@p.SubjectId" mono="@avatarInitial" size="lg" mono-hue="@AvatarHue.For(p.SubjectId)" />
                         </span>
                         <span class="dname">
                             <a href="@Url.Action("Detail", "Directory", new { subjectId = p.SubjectId })">@p.DisplayName</a>
+                            @if (p.Verified)
+                            {
+                                <span class="kmb-chip kmb-chip-verified"><span aria-hidden="true">&#10003;</span> <kw-l key="directory.detail_verified">Verified</kw-l></span>
+                            }
                         </span>
                         @if (!string.IsNullOrEmpty(p.Address))
                         {
                             <span class="daddr">@p.Address</span>
                         }
-                        @*
-                          M9 amendment (ADR 0139) — the "Send a message" button:
-                          rendered only when p.CanMessage is true (the two-sided
-                          gate the DirectoryController computed — instance on ∧
-                          viewer opted in ∧ not guardian-restricted ∧ recipient's
-                          own standing on; a self-view is never flagged). The form
-                          POSTs to the existing /messages/open seam (the idempotent
-                          F1 pair-unique lane the Messages surface already uses);
-                          it opens (or returns) the 1:1 and redirects to the
-                          thread. The whole-card click→nav handler
-                          (client/lib/directory-card.js) skips clicks that land on
-                          this form/button, so a tap on it submits the form
-                          instead of navigating to the detail page.
-                        *@
+                        @* M9 amendment (ADR 0139) — "Send a message", pinned to the card
+                           bottom (ADR 0197) so cards with and without it keep equal height.
+                           Rendered only when p.CanMessage; same POST seam as before. *@
                         @if (p.CanMessage)
                         {
                             <form method="post" action="/messages/open" class="dir-msg-form m-0">
@@ -105,12 +98,6 @@
                                 </button>
                             </form>
                         }
-                        <span class="dfoot">
-                            @if (p.Verified)
-                            {
-                                <span class="badge text-bg-success">Verified</span>
-                            }
-                        </span>
                     </div>
                 }
             </div>

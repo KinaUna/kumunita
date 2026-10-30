@@ -1,4 +1,12 @@
 @model Kumunita.Web.Controllers.UserPortabilityController.ResolveReviewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _trSummaryCounts = Translation is null ? "Rows that fit and will be imported: {0}. Duplicates that already exist and will be skipped: {1}." : await Translation.GetAsync("myportability.resolve.summary_counts", _aL);
+    var _trReason = Translation is null ? "This {0} references {1} {2}, which does not exist here." : await Translation.GetAsync("myportability.resolve.reason", _aL);
+}
 @{
     ViewData["Title"] = "Resolve my import";
     // The two closed decision kinds (the UserPortabilityResolutionKind value
@@ -11,20 +19,15 @@
 <h1 class="mt-2"><kw-l key="myportability.index.title">My data</kw-l></h1>
 
 <p class="text-muted">
-    Your archive was checked against this community. <b>@Model.CleanCount</b>
-    row@(Model.CleanCount == 1 ? "" : "s") fit and will be imported;
-    <b>@Model.DuplicateCount</b>
-    duplicate@(Model.DuplicateCount == 1 ? "" : "s") already exist and will be
-    skipped. The ones below reference a group that does not exist here — you
-    decide, one by one, where each goes.
+    <kw-l key="myportability.resolve.summary_lead">Your archive was checked against this community.</kw-l>
+    @string.Format(System.Globalization.CultureInfo.InvariantCulture, _trSummaryCounts, Model.CleanCount, Model.DuplicateCount)
+    <kw-l key="myportability.resolve.summary_tail">The ones below reference a group that does not exist here — you decide, one by one, where each goes.</kw-l>
 </p>
 
 @if (Model.Conflicts.Count == 0)
 {
     <div class="alert alert-success">
-        Nothing to resolve — every row in your archive fits this community or
-        already exists.
-    </div>
+        <kw-l key="myportability.resolve.nothing">Nothing to resolve — every row in your archive fits this community or already exists.</kw-l></div>
 }
 
 <form method="post" action="/account/portability/import/resolve" enctype="multipart/form-data">
@@ -37,13 +40,11 @@
     <div class="card mb-4">
         <div class="card-body">
             <div class="form-label" style="font-weight:600;">
-                Your <code>*.kumunita</code> archive
+                <kw-l key="myportability.resolve.archive_label">Your *.kumunita archive</kw-l>
             </div>
             <input type="file" name="archive" id="archive" class="form-control" accept=".kumunita" required />
             <small class="text-muted d-block mt-1">
-                The same archive you imported above — your choices are applied
-                to its contents.
-            </small>
+                <kw-l key="myportability.resolve.archive_hint">The same archive you imported above — your choices are applied to its contents.</kw-l></small>
         </div>
     </div>
 
@@ -67,15 +68,16 @@
                 @if (!string.IsNullOrEmpty(conflict.AbsentKind) && !string.IsNullOrEmpty(conflict.AbsentValue))
                 {
                     <div class="text-muted">
-                        This @conflict.Kind.ToLowerInvariant() references
-                        @conflict.AbsentKind.ToLowerInvariant()
-                        <code>@conflict.AbsentValue</code>, which does not
-                        exist here.
+                        @Html.Raw(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                            System.Net.WebUtility.HtmlEncode(_trReason),
+                            System.Net.WebUtility.HtmlEncode(conflict.Kind.ToLowerInvariant()),
+                            System.Net.WebUtility.HtmlEncode(conflict.AbsentKind.ToLowerInvariant()),
+                            "<code>" + System.Net.WebUtility.HtmlEncode(conflict.AbsentValue) + "</code>"))
                     </div>
                 }
                 else
                 {
-                    <div class="text-muted">A reference this row points to does not exist here.</div>
+                    <div class="text-muted"><kw-l key="myportability.resolve.reason_unknown">A reference this row points to does not exist here.</kw-l></div>
                 }
 
                 <hr class="my-3" />
@@ -119,10 +121,10 @@
                         <input type="hidden" name="Conflicts[@i].AbsentKind" value="@(conflict.AbsentKind ?? "")" />
                         <input type="hidden" name="Conflicts[@i].AbsentField" value="@(conflict.AbsentField ?? "")" />
                         <label class="form-label d-block" for="target-@i">
-                            <span class="text-muted">Target group (for "Add elsewhere")</span>
+                            <span class="text-muted"><kw-l key="myportability.resolve.target_label">Target group (for “Add elsewhere”)</kw-l></span>
                         </label>
                         <select id="target-@i" name="Conflicts[@i].PickedTargetId" class="form-select">
-                            <option value="">— choose a group —</option>
+                            <option value=""><kw-l key="myportability.resolve.choose_group">— choose a group —</kw-l></option>
                             @foreach (var target in Model.Targets)
                             {
                                 <option value="@target.Id">@target.Label</option>
@@ -131,9 +133,7 @@
                         @if (Model.Targets.Count == 0)
                         {
                             <small class="text-muted d-block mt-1">
-                                You have no member-of groups here — you can
-                                discard this row.
-                            </small>
+                                <kw-l key="myportability.resolve.no_groups">You have no member-of groups here — you can discard this row.</kw-l></small>
                         }
                     </div>
                 </div>

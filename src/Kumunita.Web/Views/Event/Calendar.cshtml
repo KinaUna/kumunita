@@ -5,6 +5,7 @@
 @inject ILocalizationService Localization
 @{
     var _ncKwL = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor?.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _ncKwL);
     var _ncOptionalPlaceholder = await Translation.GetAsync("common.optional", _ncKwL);
     // The view-toggle group's aria-label (server-resolved) — the a11y.calendar_view key.
     var ariaCalendarView = await Translation.GetAsync("a11y.calendar_view", _ncKwL);
@@ -363,7 +364,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="event-detail-modal-title"></h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                     </div>
                     <div class="modal-body">
                         <div class="text-muted small mb-3" id="event-detail-modal-when"></div>
@@ -417,7 +418,7 @@
 
                         <div class="modal-header">
                             <h5 class="modal-title"><kw-l key="events.new_event">New event</kw-l></h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">

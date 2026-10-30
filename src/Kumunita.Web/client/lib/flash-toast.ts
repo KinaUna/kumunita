@@ -26,6 +26,8 @@
  * config carries the delay (a no-op re-show: the class is already on
  * the element, only the timer + transition state matter).
  *
+ * Errors (role="alert") do not auto-hide (ADR 0223): they stay until closed.
+ *
  * Loaded once in `_Layout.cshtml` as an ES module (tsc-built, no
  * bundler — the repo's plain-TypeScript convention), so every page
  * gets the behavior with no per-page script.
@@ -42,6 +44,13 @@
                       // the close button still works (data-bs-dismiss),
                       // just without the auto-hide timer.
   for (const toast of container.querySelectorAll<HTMLElement>('.toast')) {
-    Toast.getOrCreateInstance(toast, { autohide: true, delay: 5000 }).show();
+    // ADR 0223 — an error (role="alert") stays until the resident closes it: a
+    // failed save (an invalid Escalation endpoint, say) used to vanish after 5 s,
+    // before it could be read or acted on. Info toasts keep the 5 s auto-hide.
+    const isError = toast.getAttribute('role') === 'alert';
+    // ADR 0241 — a toast that carries an action (Undo) says how long it stays (data-kmb-toast-delay,
+    // 12 s) so there is time to use it; every other info toast keeps the 5 s default.
+    const delay = Number(toast.getAttribute('data-kmb-toast-delay')) || 5000;
+    Toast.getOrCreateInstance(toast, { autohide: !isError, delay }).show();
   }
 })();

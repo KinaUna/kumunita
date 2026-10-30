@@ -167,4 +167,29 @@ public sealed class LocaleSettings
     /// when <c>SampleData__Enabled</c> is set).
     /// </summary>
     public bool SamplePasswordChangeLocked { get; set; } = false;
+
+    /// <summary>
+    /// Whether <b>sample accounts</b> (the closed
+    /// <see cref="Kumunita.Core.Bootstrap.SampleDataSeeder.SampleAccountEmails"/>
+    /// set, except the sample <c>GlobalAdmin</c>) are <b>locked out of the MFA
+    /// (two-factor) settings surface</b> (ADR 0194, amending ADR 0138). The
+    /// <see cref="Kumunita.Web.Controllers.SecuritySettingsController"/>
+    /// MFA enrollment + disable + recovery-rotation surface is the one that
+    /// enforces this: when <c>true</c> (and the <c>SampleData__Enabled</c>
+    /// instance carries the closed set), a non-admin sample account is denied
+    /// MFA enrollment / rotation / disable so a visitor testing the demo can't
+    /// mint a TOTP secret or recovery codes that would break the shared
+    /// credential for the everyone else who signs in with the sample account;
+    /// the sample <c>GlobalAdmin</c> and every real (non-sample) account are
+    /// unaffected (they keep their own MFA lane). A *deliberate* <b>inverse</b>
+    /// of the codebase <c>true</c>-floor convention, exactly the
+    /// <see cref="SamplePasswordChangeLocked"/> shape: the default is
+    /// <c>false</c> (locked-out is <b>off</b> — a fresh or real instance never
+    /// blocks MFA), so a missing settings row reads as <b>not locked</b> (the
+    /// <c>false</c> floor, ADR 0194 D1). A GlobalAdmin opts a demo instance
+    /// into the lock at <c>/admin/sample</c> (which itself is surfaced only
+    /// when <c>SampleData__Enabled</c> is set) — the same admin-settled
+    /// toggle as the password lock, one more column on the same page.
+    /// </summary>
+    public bool SampleMfaLocked { get; set; } = false;
 }

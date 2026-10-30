@@ -24,6 +24,8 @@
     // (the ADR 0027 floor). The ADR 0027 click-to-swap + return path are
     // untouched — only *which* variant shows first changes.
     var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", defaultVariant);
+    var draftTip = Translation is null ? "Only you can see this — it is not yet public" : await Translation.GetAsync("common.draft_tooltip", defaultVariant);
     bool originalHidden = Model.Translations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
 
     // RsvpStatus → display label (the enum value must not render verbatim).
@@ -92,7 +94,7 @@
                clears the flag (the author-only lane). *@
             @if (Model.Event.IsDraft)
             {
-                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public"><kw-l key="events.draft">Draft</kw-l></span>
+                <span class="badge text-bg-warning" title="@draftTip"><kw-l key="events.draft">Draft</kw-l></span>
                 @if (Model.CanPublish)
                 {
                     <form class="d-inline" method="post" action="/events/@Model.Event.Id/publish">
@@ -391,16 +393,18 @@
                             <span class="text-muted small fw-semibold">
                                 <kw-l key="posts.translations_label">Translations</kw-l>
                             </span>
-                            <button type="button" class="badge text-bg-light border"
+                            <button type="button" class="kmb-chip kmb-chip-btn"
                                     data-translation-chip data-td-group="event"
-                                    data-td-variant="@originalCode">
+                                    data-td-variant="@originalCode"
+                                    aria-pressed="@(originalHidden ? "false" : "true")">
                                 @LangName(originalCode)
                             </button>
                             @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
                             {
-                                <button type="button" class="badge text-bg-light border"
+                                <button type="button" class="kmb-chip kmb-chip-btn"
                                         data-translation-chip data-td-group="event"
-                                        data-td-variant="@t.LanguageCode">
+                                        data-td-variant="@t.LanguageCode"
+                                        aria-pressed="@(String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">
                                     @LangName(t.LanguageCode)
                                 </button>
                             }
@@ -467,7 +471,7 @@
                                     <h5 class="modal-title" id="@($"event-trans-edit-label-{existing.LanguageCode}")">
                                         <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                     </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-3">
@@ -511,7 +515,7 @@
                                     <h5 class="modal-title" id="@($"event-trans-add-label-{lang.Code}")">
                                         <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                     </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-3">

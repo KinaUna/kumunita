@@ -388,18 +388,26 @@ next first boot (it is idempotent: keyed by e-mail, and the pristine gate keeps 
 ever re-running its content on a warm database — the only warm-boot write is the
 create-if-missing sample-event translation backfill, ADR 0060).
 
-**Locking sample-account password changes (ADR 0138).** A demo site's sample accounts are
-*shared* credentials — anyone who signs in as "Anna" signs in as the *same* account — so a
-visitor testing the demo could change one of those passwords and break the credential for the
-everyone else who uses it. On a `SampleData__Enabled` instance (and **only** there — a real
-deployment never carries the flag, so this surface is unreachable by construction), a
-`GlobalAdmin` can turn on a **change-password lock** at `/admin/platform` → **Sample data**
-→ `/admin/sample`: the demo accounts (the closed sample set) are then locked out of the
-resident self-serve "Change password" surface, **except the sample `GlobalAdmin`**, whose
-own credential the admin must still be able to set/recover. Real (non-sample) accounts are
-never affected. The lock is a `GlobalAdmin`-settled instance value (audited,
-`sample.set-password-lock`) and a plain read decision (`IsChangePasswordLockedForAsync`), so
-the resident form, the locked notice, and the write-path guard agree by construction.
+**Locking sample-account password changes (ADR 0138) and two-factor (MFA) (ADR 0194).** A
+demo site's sample accounts are *shared* credentials — anyone who signs in as "Anna" signs in
+as the *same* account — so a visitor testing the demo could change one of those passwords (or
+enable two-factor, minting a TOTP secret + recovery codes that break the shared credential)
+and break the credential for the everyone else who uses it. On a `SampleData__Enabled`
+instance (and **only** there — a real deployment never carries the flag, so this surface is
+unreachable by construction), a `GlobalAdmin` can turn on a **change-password lock** (ADR
+0138) and a **two-factor (MFA) lock** (ADR 0194) at `/admin/platform` → **Sample data** →
+`/admin/sample`: the demo accounts (the closed sample set) are then locked out of the
+resident self-serve "Change password" surface and the MFA settings surface
+(`/settings/security/mfa` — enrollment / recovery-rotation / disable), **except the sample
+`GlobalAdmin`**, whose own credential and MFA lane the admin must still be able to keep
+(ADR 0138 / 0194 sample-admin exemption). Real (non-sample) accounts are never affected. The
+two locks are independent `GlobalAdmin`-settled instance values (audited,
+`sample.set-password-lock` + `sample.set-mfa-lock`) and plain read decisions
+(`IsChangePasswordLockedForAsync` + `IsMfaLockedForAsync`), so the resident form, the locked
+notice, and the write-path guards agree by construction. The sample `GlobalAdmin` is also
+exempt from the login leg 1.5b forced-MFA enrollment redirect (the
+`IsSampleDataAccountAsync` seam) so a locked instance still lets the demo admin sign in with
+the shared password (a real, non-sample `GlobalAdmin` is still forced to enroll MFA).
 
 *Dev (no app container):* `docker compose up -d db`,
 `npm run build` in `src/Kumunita.Web/`, copy

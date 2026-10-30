@@ -310,6 +310,87 @@ public interface IIdentityService
     /// </summary>
     Task<bool> IsChangePasswordLockedForAsync(string subjectId);
 
+    // ── Sample-data MFA lock (ADR 0194 — amends ADR 0138) ────────────────
+    // The MFA (two-factor) settings surface is the MFA analog of the
+    // change-password surface: a shared demo credential should never let one
+    // visitor mint a TOTP secret / recovery codes that break the credential
+    // for everyone else who signs in with the sample account. The same
+    // four-conjunct decision as ADR 0138 (the `false` floor on the admin
+    // gate, the closed set, the sample-admin exemption) is re-applied to
+    // the MFA surface, with one extra seam the login path needs:
+    // <see cref="IsSampleDataAccountAsync"/> (the sample-admin login-
+    // enrollment exemption — conjuncts (1)+(3) only, so a locked instance
+    // still lets the sample admin sign in with the shared password).
+
+    /// <summary>
+    /// Whether sample accounts are currently <b>locked out of the MFA
+    /// (two-factor) settings surface</b> (ADR 0194). The <c>false</c> floor —
+    /// a missing singleton or an unset value both yield <c>false</c>, so a
+    /// fresh or real instance never blocks MFA (the exact ADR 0138
+    /// <see cref="IsSamplePasswordChangeLockedAsync"/> shape, re-applied to
+    /// the MFA surface). A read (no audit row); the
+    /// <see cref="IsSampleDataEnabledAsync"/> flag is NOT consulted here —
+    /// the lock is a pure instance value, and the
+    /// <see cref="IsMfaLockedForAsync"/> decision combines it with the
+    /// sample-account membership.
+    /// </summary>
+    Task<bool> IsSampleMfaLockedAsync();
+
+    /// <summary>
+    /// Set whether sample accounts are locked out of the MFA (two-factor)
+    /// settings surface (ADR 0194): a GlobalAdmin flips the instance-wide
+    /// gate at <c>/admin/sample</c> (the same page as the ADR 0138 password
+    /// lock) — <c>true</c> locks the non-admin sample accounts out of MFA
+    /// enrollment / recovery-rotation / disable (so a demo visitor can't
+    /// mint a TOTP secret or recovery codes that break the shared
+    /// credentials), <c>false</c> unlocks them. Writes the
+    /// <see cref="Kumunita.Core.Localization.LocaleSettings.SampleMfaLocked"/>
+    /// singleton and appends exactly one <c>AccessAudit</c> row
+    /// (<c>via: Admin</c>, action <c>"sample.set-mfa-lock"</c>, target
+    /// "sample") in the same session (C3 — no silent, unaudited access).
+    /// Only a GlobalAdmin may call this; the Web's
+    /// <c>AdminSampleDataController</c> enforces the gate (and 404s when
+    /// <c>SampleData__Enabled</c> is unset).
+    /// </summary>
+    Task SetSampleMfaLockedAsync(bool locked, string adminSubjectId);
+
+    /// <summary>
+    /// Whether the given <paramref name="subjectId"/>'s MFA (two-factor)
+    /// settings surface is currently <b>locked</b> (ADR 0194). Combines the
+    /// same four conditions as <see cref="IsChangePasswordLockedForAsync"/>
+    /// into one decision (the single place the rule lives, so the resident
+    /// <c>/settings/security/mfa</c> surface and the MFA enrollment/rotation/
+    /// disable enforcement guards agree):
+    /// <see cref="IsSampleDataEnabledAsync"/> (the instance carries the
+    /// closed set) <b>AND</b> <see cref="IsSampleMfaLockedAsync"/> (the
+    /// admin opted in) <b>AND</b> the subject is a member of
+    /// <see cref="Bootstrap.SampleDataSeeder.SampleAccountEmails"/> (a sample
+    /// account) <b>AND NOT</b> a <c>GlobalAdmin</c> (the sample admin is
+    /// exempt — it keeps its own MFA lane, exactly as it keeps its own
+    /// password lane under ADR 0138). Returns <c>false</c> for every real
+    /// account and for the sample admin regardless of the gate.
+    /// </summary>
+    Task<bool> IsMfaLockedForAsync(string subjectId);
+
+    /// <summary>
+    /// Whether the given <paramref name="subjectId"/> is a <b>sample account
+    /// on a sample-data instance</b> (ADR 0194) — the two-conjunct read the
+    /// login path (leg 1.5b) needs to exempt the sample admin from the
+    /// forced-MFA enrollment redirect. Conjuncts: (1) the instance carries
+    /// the <see cref="IsSampleDataEnabledAsync"/> flag AND (2) the subject's
+    /// profile e-mail is a member of the closed
+    /// <see cref="Bootstrap.SampleDataSeeder.SampleAccountEmails"/> set.
+    /// <b>Deliberately</b> does NOT consult the admin-toggle gate (a locked
+    /// instance still lets its admin sign in — that is the point of the
+    /// exemption) and does NOT apply the GlobalAdmin exemption (the
+    /// exemption the login path needs is *precisely for* the sample
+    /// GlobalAdmin — a non-admin sample account never reaches leg 1.5b,
+    /// since that leg is GlobalAdmin-only). Returns <c>false</c> for every
+    /// real account and on every non-sample-data instance (the ADR 0056
+    /// "unreachable by construction" shape). A read (no audit row).
+    /// </summary>
+    Task<bool> IsSampleDataAccountAsync(string subjectId);
+
     // ── Admin account notifications (ADR 0077 — the admin-lane signup/verify
     //    notify gate) ──
 

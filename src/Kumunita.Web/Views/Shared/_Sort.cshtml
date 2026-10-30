@@ -1,5 +1,12 @@
 @model Kumunita.Web.Models.SortViewModel
 @using System.Text
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var _sortAria = Translation is null ? "Sort order" : await Translation.GetAsync("sort.aria_label", _aL);
+}
 @functions {
     // The link shape mirrors _Pager's PagerLink exactly (M7 D7, C-SORT·8):
     // BaseUrl + carried filter pairs (page, existing filters) + the toggled
@@ -27,7 +34,7 @@
         return sb.ToString();
     }
 }
-<div class="sort-control d-flex flex-wrap align-items-center gap-1 mt-2" role="group" aria-label="Sort order">
+<div class="sort-control d-flex flex-wrap align-items-center gap-1 mt-2" role="group" aria-label="@_sortAria">
     @foreach (var (key, defaultDir) in Model.Options)
     {
         // Toggle design (one badge per criterion): the active criterion is the

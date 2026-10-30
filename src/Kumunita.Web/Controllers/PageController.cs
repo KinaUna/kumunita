@@ -266,6 +266,128 @@ public sealed class PageController(
         var byId = tree.ToDictionary(p => p.Id, StringComparer.Ordinal);
         var isAuthor = string.Equals(page.AuthorId, actorId ?? string.Empty, StringComparison.Ordinal);
 
+        // ── Hierarchy navigation: breadcrumb (ancestors, root-first) +
+        //    sub-pages (direct children, one level down) ─────────────
+        // Both are read projections over the same tree already loaded
+        // (GetTreeAsync) — no extra store read. The sub-pages list is
+        // filtered with the same C6 CanSeeAsync(Read) aggregate the
+        // /pages Index uses (one bulk decision, not one per child) and
+        // the author-only draft gate (a non-author never sees a draft
+        // child). A child that is denied or is a draft the caller did
+        // not author is ABSENT (not blanked) — the C6 idiom.
+        //
+        // Breadcrumb: walk page → parent → grandparent → … (root-first),
+        // excluding the current page itself (the view renders it as the
+        // active item). Each ancestor's href is its derived path
+        // (PagePaths). The chain is display-only; visiting an ancestor
+        // resolves through the page's own Read decision (the same split
+        // the current page passed).
+        var breadcrumb = new List<PageBreadcrumbItem>();
+        {
+            Page? ancestor = page.ParentId is { } pid && byId.TryGetValue(pid, out var ap) ? ap : null;
+            int guard = 0;
+            while (ancestor is not null && ++guard <= 64)
+            {
+                breadcrumb.Insert(0, new PageBreadcrumbItem(ancestor.Title, PagePaths.Href(byId, ancestor)));
+                ancestor = ancestor.ParentId is { } apid && byId.TryGetValue(apid, out var aap) ? aap : null;
+            }
+        }
+
+        var subPages = new List<PageSubPageItem>();
+        {
+            // Direct children of the current page in the live tree.
+            var candidates = tree
+                .Where(c => string.Equals(c.ParentId, page.Id, StringComparison.Ordinal))
+                .ToList();
+
+            // (1) author-only draft gate: a non-author never sees a draft child.
+            var visible = candidates
+                .Where(c => !(c.IsDraft && !string.Equals(c.AuthorId, actorId ?? string.Empty, StringComparison.Ordinal)))
+                .ToList();
+
+            // (2) the C6 CanSeeAsync(Read) aggregate (one bulk decision over
+            //     the whole candidate set — same idiom as Index, which runs
+            //     the aggregate even for anonymous viewers so a non-public
+            //     child is absent to them, not a free pass).
+            if (visible.Count > 0)
+            {
+                var visibleIds = (await authz.CanSeeAsync(
+                        actorId ?? string.Empty, Authorization.AccessAction.Read,
+                        visible.Select(c => new PageToAuditableResource(c)))
+                    .ConfigureAwait(false)).Visible
+                    .Select(v => v.Id)
+                    .ToHashSet(StringComparer.Ordinal);
+                visible = visible.Where(c => visibleIds.Contains(c.Id)).ToList();
+            }
+
+            foreach (var c in visible
+                         .OrderBy(c => c.Created)
+                         .ThenBy(c => c.Slug, StringComparer.Ordinal))
+            {
+                subPages.Add(new PageSubPageItem(c.Title, PagePaths.Href(byId, c), c.IsDraft));
+            }
+        }
+
+        // ── Sibling navigation: prev/next within the parent's child list ──
+        // The page's siblings are the parent's children (the same sibling
+        // list the parent's Show surfaces as its SubPages), in the same
+        // stable order (Created, then Slug). The prev/next links jump to
+        // the nearest visible predecessor / successor: the candidate set is
+        // read-filtered exactly like SubPages above (author-only draft gate
+        // first, then ONE C6 CanSeeAsync(Read) aggregate over the whole set
+        // — the denied / foreign-draft sibling is ABSENT from the
+        // navigation, not blanked), so for a viewer the ordering is "what
+        // they can see" and the prev/next pair skips over what they
+        // cannot. A root page has no parent, hence no sibling list — both
+        // are null. Display-only: the hrefs derive from the real ancestor
+        // chain; visiting a sibling resolves through its own Read decision
+        // (the same 404/403 split the current page passed).
+        PageBreadcrumbItem? prevSibling = null, nextSibling = null;
+        // The parent must itself be in the live tree to enumerate its
+        // children (a page whose parent was soft-deleted / is not in the
+        // tree has no knowable sibling list — both links stay null).
+        if (page.ParentId is { } parentId && byId.TryGetValue(parentId, out _))
+        {
+            var siblings = tree
+                .Where(s => string.Equals(s.ParentId, parentId, StringComparison.Ordinal))
+                // (1) the author-only draft gate (a non-author never sees a
+                //     draft sibling — the same pin as SubPages above).
+                .Where(s => !(s.IsDraft && !string.Equals(s.AuthorId, actorId ?? string.Empty, StringComparison.Ordinal)))
+                .ToList();
+
+            // (2) the C6 CanSeeAsync(Read) aggregate (one bulk decision over
+            //     the whole candidate set — same idiom as Index / SubPages;
+            //     runs even for anonymous viewers so a non-public sibling
+            //     is absent to them, not a free pass).
+            if (siblings.Count > 0)
+            {
+                // A null aggregate (an unstubbed test seam) degrades to
+                // "no visibility decided" — the siblings stay as the
+                // candidate set; the live service always returns a set.
+                var result = await authz.CanSeeAsync(
+                        actorId ?? string.Empty, Authorization.AccessAction.Read,
+                        siblings.Select(s => new PageToAuditableResource(s)))
+                    .ConfigureAwait(false);
+                if (result is not null)
+                {
+                    var visibleIds = result.Visible
+                        .Select(v => v.Id)
+                        .ToHashSet(StringComparer.Ordinal);
+                    siblings = siblings.Where(s => visibleIds.Contains(s.Id)).ToList();
+                }
+            }
+
+            var ordered = siblings
+                .OrderBy(s => s.Created)
+                .ThenBy(s => s.Slug, StringComparer.Ordinal)
+                .ToList();
+            var idx = ordered.FindIndex(s => string.Equals(s.Id, page.Id, StringComparison.Ordinal));
+            if (idx > 0)
+                prevSibling = new PageBreadcrumbItem(ordered[idx - 1].Title, PagePaths.Href(byId, ordered[idx - 1]));
+            if (idx >= 0 && idx < ordered.Count - 1)
+                nextSibling = new PageBreadcrumbItem(ordered[idx + 1].Title, PagePaths.Href(byId, ordered[idx + 1]));
+        }
+
         // The ADR 0027 chip-swap language set: the enabled catalog, marking
         // which have a stored PageTranslation row (the original is always
         // available — it IS the page's own language).
@@ -340,7 +462,11 @@ public sealed class PageController(
             communityName,
             canTranslate,
             defaultVariant,
-            subscribed
+            subscribed,
+            breadcrumb,
+            subPages,
+            prevSibling,
+            nextSibling
         ));
     }
 
@@ -416,7 +542,7 @@ public sealed class PageController(
         var actorId = KumunitaPrincipal.SubjectId(User);
         if (string.IsNullOrEmpty(actorId))
         {
-            ModelState.AddModelError(string.Empty, "You must be signed in to create a page.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("pages.flash_signin_create", "You must be signed in to create a page."));
             await SeedComposeOptionsAsync(model, string.Empty).ConfigureAwait(false);
             return View(model);
         }
@@ -471,7 +597,7 @@ public sealed class PageController(
         try
         {
             await pages.CreateAsync(page, actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
-            TempData["info"] = "Page created.";
+            TempData["info"] = await this.FlashAsync("pages.flash_created", "Page created.");
             return RedirectToAction(nameof(Index));
         }
         catch (UnauthorizedAccessException)
@@ -586,7 +712,7 @@ public sealed class PageController(
         var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
         if (string.IsNullOrEmpty(actorId))
         {
-            ModelState.AddModelError(string.Empty, "You must be signed in to edit a page.");
+            ModelState.AddModelError(string.Empty, await this.FlashAsync("pages.flash_signin_edit", "You must be signed in to edit a page."));
             await SeedComposeOptionsAsync(model, string.Empty).ConfigureAwait(false);
             return View(model);
         }
@@ -643,7 +769,7 @@ public sealed class PageController(
         try
         {
             await pages.UpdateAsync(updated, actorId, KumunitaPrincipal.RoleSet(User), session2).ConfigureAwait(false);
-            TempData["info"] = "Page updated.";
+            TempData["info"] = await this.FlashAsync("pages.flash_updated", "Page updated.");
             return RedirectToAction(nameof(Index));
         }
         catch (UnauthorizedAccessException)
@@ -685,7 +811,7 @@ public sealed class PageController(
         try
         {
             var page = await pages.PublishAsync(id, actorId, session).ConfigureAwait(false);
-            TempData["info"] = "Page published.";
+            TempData["info"] = await this.FlashAsync("pages.flash_published", "Page published.");
             var byId = (await pages.GetTreeAsync().ConfigureAwait(false)).ToDictionary(p => p.Id, StringComparer.Ordinal);
             return RedirectToAction(nameof(Show), new { path = PagePaths.Href(byId, page) });
         }
@@ -778,7 +904,7 @@ public sealed class PageController(
         try
         {
             await pages.ResetToSeededAsync(id, actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
-            TempData["info"] = "Page text reset to the seeded version.";
+            TempData["info"] = await this.FlashAsync("pages.flash_reset", "Page text reset to the seeded version.");
             return RedirectToAction(nameof(Edit), new { id });
         }
         catch (UnauthorizedAccessException)
@@ -824,7 +950,7 @@ public sealed class PageController(
         try
         {
             await pages.DeleteAsync(id, actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
-            TempData["info"] = "Page deleted.";
+            TempData["info"] = await this.FlashAsync("pages.flash_deleted", "Page deleted.");
             return RedirectToAction(nameof(Index));
         }
         catch (UnauthorizedAccessException)
@@ -869,7 +995,7 @@ public sealed class PageController(
                 string.IsNullOrWhiteSpace(newParentId) ? null : newParentId,
                 string.IsNullOrWhiteSpace(newSlug) ? null : Slugify(newSlug.Trim()),
                 actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
-            TempData["info"] = "Page moved.";
+            TempData["info"] = await this.FlashAsync("pages.flash_moved", "Page moved.");
             return RedirectToAction(nameof(Index));
         }
         catch (UnauthorizedAccessException)
@@ -955,12 +1081,12 @@ public sealed class PageController(
         var path = await DerivePathAsync(page).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Show), new { path });
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return RedirectToAction(nameof(Show), new { path });
         }
 
@@ -986,7 +1112,7 @@ public sealed class PageController(
         }
 
         var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
-        TempData["info"] = $"Translation added ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_added", "Translation added ({0}).", name);
         return RedirectToAction(nameof(Show), new { path });
     }
 
@@ -1045,12 +1171,12 @@ public sealed class PageController(
         var path = await DerivePathAsync(page).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Show), new { path });
         }
         if (string.IsNullOrWhiteSpace(body))
         {
-            TempData["error"] = "A translation needs some text.";
+            TempData["error"] = await this.FlashAsync("flash.translation_needs_text", "A translation needs some text.");
             return RedirectToAction(nameof(Show), new { path });
         }
 
@@ -1076,7 +1202,7 @@ public sealed class PageController(
         }
 
         var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
-        TempData["info"] = $"Translation updated ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_updated", "Translation updated ({0}).", name);
         return RedirectToAction(nameof(Show), new { path });
     }
 
@@ -1125,7 +1251,7 @@ public sealed class PageController(
         var path = await DerivePathAsync(page).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            TempData["error"] = "Choose a language for the translation.";
+            TempData["error"] = await this.FlashAsync("flash.translation_choose_language", "Choose a language for the translation.");
             return RedirectToAction(nameof(Show), new { path });
         }
 
@@ -1146,7 +1272,7 @@ public sealed class PageController(
         }
 
         var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
-        TempData["info"] = $"Translation removed ({name}).";
+        TempData["info"] = await this.FlashAsync("flash.translation_removed", "Translation removed ({0}).", name);
         return RedirectToAction(nameof(Show), new { path });
     }
 

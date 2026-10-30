@@ -78,49 +78,45 @@ public static class PortabilityApplyDocuments
             var listType = typeof(List<>).MakeGenericType(docType);
             var rows = (System.Collections.IList)JsonSerializer.Deserialize(json, listType, JsonOpts)!;
 
-            // KeepExisting (ADR 0193) — the existing-row skip. The id
-            // property is the type's identity field (the U05 loop's
-            // convention: <c>Id</c>, except <c>Profile</c> whose identity
-            // is <c>SubjectId</c>). The existing rows are read via a
-            // generic helper (the Marten 9 <c>IQuerySession.Query&lt;T&gt;()</c>
-            // seam, invoked with <c>MakeGenericMethod</c> since the type
-            // is only known at runtime), then the id set is extracted
-            // via reflection (the same id-property convention the U05
-            // <see cref="PortabilityValidate"/> integrity loop uses).
-            HashSet<string>? existingIds = null;
+            // KeepExisting (ADR 0193) — the existing-row skip, keyed on the
+            // type's <b>natural identity</b>, NOT just the surrogate id.
+            // A document's unique business-key index (e.g. TranslationResource
+            // (Key, LanguageCode), GroupMembership (GroupId, UserId), the
+            // *Translation (ParentId, LanguageCode) rows) is the real
+            // identity, and it is the DB-enforced uniqueness. The archive's
+            // row and the target's row for the same logical entity carry
+            // <b>different</b> surrogate ids (two independent instances), so an
+            // id-only skip misses them and the Store collides on the unique
+            // index (23505). The skip key is therefore the union of the
+            // surrogate id + every unique index's member set, derived from the
+            // Marten mapping (the single source of truth for the index) so the
+            // skip key always matches the actual constraint.
+            HashSet<string>? existingSkipKeys = null;
+            List<string[]>? keySets = null;
             if (mode == PortabilityImportMode.KeepExisting)
             {
-                var idProp = docType.GetProperty("Id") ?? docType.GetProperty("SubjectId");
-                existingIds = new HashSet<string>(StringComparer.Ordinal);
-                if (idProp is not null)
-                {
-                    var queryAll = typeof(PortabilityApplyDocuments)
-                        .GetMethod(nameof(QueryAllAsync),
-                            System.Reflection.BindingFlags.NonPublic
-                            | System.Reflection.BindingFlags.Static)!
-                        .MakeGenericMethod(docType);
-                    var existing = (System.Collections.IEnumerable)
-                        (await (Task<object>)queryAll.Invoke(null, [documentStore, (object)ct])!)!;
-                    foreach (var exRow in existing)
-                    {
-                        var v = idProp.GetValue(exRow);
-                        if (v is string s && !string.IsNullOrEmpty(s))
-                            existingIds.Add(s);
-                    }
-                }
+                keySets = GetIdentityKeySets(documentStore, docType);
+                existingSkipKeys = new HashSet<string>(StringComparer.Ordinal);
+                var queryAll = typeof(PortabilityApplyDocuments)
+                    .GetMethod(nameof(QueryAllAsync),
+                        System.Reflection.BindingFlags.NonPublic
+                        | System.Reflection.BindingFlags.Static)!
+                    .MakeGenericMethod(docType);
+                var existing = (System.Collections.IEnumerable)
+                    (await (Task<object>)queryAll.Invoke(null, [documentStore, (object)ct])!)!;
+                foreach (var exRow in existing)
+                    AddSkipKeys(exRow, docType.Name, keySets, existingSkipKeys);
             }
 
             foreach (var row in rows)
             {
-                // KeepExisting — skip the row the target already holds
-                // (the existing content is kept intact, never overwritten).
-                if (existingIds is not null)
-                {
-                    var idProp = row.GetType().GetProperty("Id") ?? row.GetType().GetProperty("SubjectId");
-                    var idValue = idProp?.GetValue(row);
-                    if (idValue is string s && !string.IsNullOrEmpty(s) && existingIds.Contains(s))
-                        continue;
-                }
+                // KeepExisting — skip the row the target already holds (the
+                // existing content is kept intact, never overwritten). The
+                // check is on the natural identity (surrogate id + business-
+                // key member set), not just the surrogate id.
+                if (existingSkipKeys is not null && keySets is not null
+                    && IsSkipped(row, docType.Name, keySets, existingSkipKeys))
+                    continue;
 
                 session.Store(row); // the non-generic Store(object) —
                                     // the same seam U04's ExportAsync
@@ -135,6 +131,129 @@ public static class PortabilityApplyDocuments
         // documented restore path, never a silently-accepted
         // half-import).
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // ── The KeepExisting natural-identity skip helpers (ADR 0193) ────────────
+    // A row's natural identity is its surrogate id PLUS the member set of
+    // every unique index on its table (the DB-enforced business key). The
+    // member names are read from the Marten mapping so the skip key is always
+    // in sync with the actual unique constraint; a business-key index whose
+    // columns are not POCO members (a stored / duplicated column) is skipped
+    // for the skip key and the surrogate id remains the guard (no worse than
+    // the pre-fix behaviour).
+
+    /// <summary>
+    /// The type's identity key sets: the surrogate id first (<c>Id</c>, or
+    /// <c>SubjectId</c> for the <c>Profile</c> shape), then one entry per
+    /// unique index whose columns are all POCO members. Each entry is the
+    /// closed member-name tuple that constitutes that identity.
+    /// </summary>
+    private static List<string[]> GetIdentityKeySets(
+        Marten.IDocumentStore store, Type docType)
+    {
+        var sets = new List<string[]>();
+        var idProp = docType.GetProperty("Id") ?? docType.GetProperty("SubjectId");
+        if (idProp is not null)
+            sets.Add(new[] { idProp.Name });
+
+        var idType = store.Options.FindOrResolveDocumentType(docType);
+        if (idType is null)
+            return sets; // an unknown type has no business-key indexes —
+                         // the surrogate-id key set above is the guard.
+        var indexes = idType.Indexes;
+        if (indexes is null)
+            return sets;
+        foreach (var index in indexes)
+        {
+            if (index is null || !index.IsUnique)
+                continue;
+            var columns = index.Columns;
+            if (columns is null)
+                continue;
+            var members = new List<string>();
+            var allMembers = true;
+            foreach (var column in columns)
+            {
+                var member = ExtractMember(column);
+                if (member is null) { allMembers = false; break; }
+                members.Add(member);
+            }
+            if (allMembers && members.Count > 0)
+                sets.Add(members.ToArray());
+        }
+        return sets;
+    }
+
+    /// <summary>
+    /// Adds every computable identity signature of <paramref name="row"/>
+    /// to <paramref name="sink"/>. A signature that cannot be built (a null
+    /// member — nulls are distinct in a unique index, so never a duplicate;
+    /// or a non-member column) is omitted, never a false positive.
+    /// </summary>
+    private static void AddSkipKeys(
+        object row, string typeName, List<string[]> keySets, HashSet<string> sink)
+    {
+        for (var i = 0; i < keySets.Count; i++)
+        {
+            var signature = IdentitySignature(row.GetType(), keySets[i], row, typeName + "#" + i);
+            if (signature is not null)
+                sink.Add(signature);
+        }
+    }
+
+    /// <summary>
+    /// <c>true</c> iff <paramref name="row"/> shares any identity with an
+    /// already-existing row (its surrogate id or a business-key member set
+    /// matches) — i.e. the target already holds this logical entity.
+    /// </summary>
+    private static bool IsSkipped(
+        object row, string typeName, List<string[]> keySets, HashSet<string> existing)
+    {
+        for (var i = 0; i < keySets.Count; i++)
+        {
+            var signature = IdentitySignature(row.GetType(), keySets[i], row, typeName + "#" + i);
+            if (signature is not null && existing.Contains(signature))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// A canonical signature of <paramref name="row"/> over one key set
+    /// (the type name + key-set ordinal + the member values). Returns
+    /// <c>null</c> when any member is null (nulls are distinct in a unique
+    /// index — not a duplicate) or when a member cannot be resolved.
+    /// </summary>
+    private static string? IdentitySignature(
+        Type type, string[] members, object row, string prefix)
+    {
+        var sb = new System.Text.StringBuilder(prefix);
+        sb.Append('\u0001');
+        foreach (var member in members)
+        {
+            var value = type.GetProperty(member)?.GetValue(row);
+            if (value is null)
+                return null;
+            sb.Append(value.ToString()).Append('\u0001');
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Extracts the POCO member name from a Marten index column. A POCO-member
+    /// index column is rendered as <c>(data --&gt; 'MemberName')</c>; any other
+    /// shape (a stored / duplicated column, an expression) is not reflectable
+    /// here and returns <c>null</c>.
+    /// </summary>
+    private static string? ExtractMember(string? columnSql)
+    {
+        if (string.IsNullOrEmpty(columnSql))
+            return null;
+        const string prefix = "(data ->> '";
+        if (columnSql.StartsWith(prefix, StringComparison.Ordinal)
+            && columnSql.EndsWith("')", StringComparison.Ordinal))
+            return columnSql.Substring(prefix.Length, columnSql.Length - prefix.Length - 2);
+        return null;
     }
 
     /// <summary>

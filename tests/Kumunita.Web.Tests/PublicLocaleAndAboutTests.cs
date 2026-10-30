@@ -338,19 +338,25 @@ public class PublicLocaleAndAboutTests
     /// the view's <c>&lt;kw-l&gt;</c> set.
     /// </para>
     /// </summary>
-    [Fact(DisplayName = "About.cshtml wraps the ADR 0042 D5 about.* keys it renders (11 after the SITE lane override)")]
+    [Fact(DisplayName = "About.cshtml wraps the ADR 0042 D5 + ADR 0273 about.* keys it renders (16 after the SITE lane override)")]
     public void About_View_Wraps_All_D5_Keys()
     {
         var aboutView = ResolveAboutView();
         var text = File.ReadAllText(aboutView);
 
-        // The closed D5 key list — exactly these 13, in order (ADR 0042 D5).
+        // The closed about.* key list — the 13 ADR 0042 D5 keys plus the five
+        // ADR 0273 contact-band keys (about.cta.*) the About view now wraps.
         var d5Keys = new[]
         {
             "about.eyebrow",
             "about.lead",
             "about.cta_feed",
             "about.cta_notes",
+            "about.cta.heading",
+            "about.cta.write_to",
+            "about.cta.person_reads",
+            "about.cta.issue",
+            "about.cta.button",
             "about.features.one.title",
             "about.features.one.body",
             "about.features.groups.title",
@@ -362,8 +368,8 @@ public class PublicLocaleAndAboutTests
             "about.project.lead",
         };
 
-        Assert.True(d5Keys.Length == 13,
-            "The D5 list length changed — update this test to match ADR 0042 D5.");
+        Assert.True(d5Keys.Length == 18,
+            "The about.* list length changed — update this test to match ADR 0042 D5 + ADR 0273.");
 
         // The SITE lane (ADR 0150 / U06) intentionally replaced the
         // about.eyebrow / about.lead kw-l wraps with the server-resolved

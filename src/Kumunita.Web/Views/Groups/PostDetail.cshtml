@@ -28,6 +28,7 @@
     // reply block below (in scope for both). The ADR 0027 click-to-swap +
     // return path are untouched — only *which* variant shows first changes.
     var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", defaultVariant);
     bool originalHidden = Model.PostTranslations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
 
     // The delete post / reply + remove-translation forms' data-confirms (the
@@ -71,7 +72,7 @@
             &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.GroupDisplayName
         </a>
 
-        <div class="card kmb-detail-card kmb-ann-detail mt-2 mb-4">
+        <div class="card kmb-detail-card kmb-detail-page mt-2 mb-4">
             <div class="card-body">
                 @* Author-only edit entry point (ADR 0016 — the edit lane is
                    author-only at the Web layer, so a non-author never sees
@@ -218,7 +219,7 @@
                                                     <h5 class="modal-title" id="@($"post-trans-edit-label-{existing.LanguageCode}")">
                                                         <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                                     </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">
@@ -263,7 +264,7 @@
                                                     <h5 class="modal-title" id="@($"post-trans-add-label-{lang.Code}")">
                                                         <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                                     </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">
@@ -332,7 +333,7 @@
                        header, as in the post detail ADR 0185): 44px avatar with
                        per-resident hue, name, date, edited. Outside the
                        data-td-group wrapper, so it stays put on a swap. *@
-                    <div class="airy-post-head kmb-ann-byline">
+                    <div class="airy-post-head kmb-detail-byline">
                         <kw-avatar subject="@Model.AuthorSubjectId" mono="@authorAvatarInitial"
                                   mono-hue="@AvatarHue.For(Model.AuthorSubjectId)" />
                         <span class="airy-post-author">
@@ -353,11 +354,11 @@
                            (ADR 0027) are unchanged either way. *@
                         <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
                              @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                            <h4 class="kmb-ann-title">
+                            <h1 class="kmb-detail-title">
                                 @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                     ? Model.Post.Title
                                     : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
-                            </h4>
+                            </h1>
                             <div class="mb-3 rc-body">
                                 <partial name="_MentionRenderer" model="new MentionBodyModel(Model.Post.Body, Model.AuthorSubjectId)" />
                             </div>
@@ -374,7 +375,7 @@
                                  @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                                 @if (!string.IsNullOrWhiteSpace(t.Title))
                                 {
-                                    <h4 class="kmb-ann-title">@t.Title</h4>
+                                    <h1 class="kmb-detail-title">@t.Title</h1>
                                 }
                                 <div class="mb-3 rc-body">
                                     <partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" />
@@ -435,33 +436,32 @@
                    break-glass is explicitly *unavailable*, G·4 — not a
                    deferral). *@
                 <details class="kw-audience-disclosure mb-0">
-                    <summary>Why can I see this?</summary>
+                    <summary><kw-l key="groups.post_why_heading">Why can I see this?</kw-l></summary>
                     <div class="text-muted small">
-                        You can see this post because you are a current member of
-                        the group.
+                        <kw-l key="groups.post_why_body">You can see this post because you are a current member of the group.</kw-l>
                     </div>
                 </details>
             </div>
 
         </div>
 
-        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
-            Replies <span class="text-muted">(@Model.Replies.Count)</span>
-        </h5>
+        <h2 class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+            <kw-l key="posts.replies_heading">Replies</kw-l> <span class="text-muted">(@Model.Replies.Count)</span>
+        </h2>
 
         @if (Model.Replies.Count == 0)
         {
-            <p class="text-muted">No replies yet. If you can see this post, you can reply to it.</p>
+            <p class="text-muted"><kw-l key="groups.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l></p>
         }
         else
         {
-            <ul class="kmb-ann-comments list-unstyled p-0 mb-4">
+            <ul class="kmb-detail-comments list-unstyled p-0 mb-4">
                 @foreach (var r in Model.Replies)
                 {
                     string replyAvatarInitial = !string.IsNullOrWhiteSpace(r.AuthorDisplayName)
                         ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
                         : string.Empty;
-                    <li class="kmb-ann-comment">
+                    <li class="kmb-detail-comment">
                         @* TD (ADR 0027) — the reply's authored-in language is the
                            first, default-visible variant; each added translation
                            is a hidden variant; the chip row is a selector that
@@ -626,7 +626,7 @@
                                     @if (r.IsAuthor && r.DeletedAt is null)
                                     {
                                         <details class="d-inline-block">
-                                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">Edit</summary>
+                                            <summary class="btn btn-sm btn-link p-0 text-decoration-none"><kw-l key="posts.reply_edit">Edit</kw-l></summary>
                                             <form class="mt-2 text-start" method="post"
                                                   action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/edit")">
                                                 @Html.AntiForgeryToken()
@@ -650,14 +650,14 @@
                                                               required placeholder="…" data-rich-editor>@r.Body</textarea>
                                                     <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                                                 </div>
-                                                <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="posts.reply_save">Save</kw-l></button>
                                             </form>
                                         </details>
                                         <form class="d-inline" method="post"
                                               action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/delete")"
                                               data-confirm="@confirmDeleteReply">
                                             @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-sm btn-link p-0 text-danger text-decoration-none">Delete</button>
+                                            <button type="submit" class="btn btn-sm btn-link p-0 text-danger text-decoration-none"><kw-l key="posts.reply_delete">Delete</kw-l></button>
                                         </form>
                                     }
                                 </div>
@@ -681,24 +681,24 @@
             group-lane decision; there is no per-reply audience. The route
             re-runs the parent's group-lane decision before the write (C4).
         *@
-        <h5 class="mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
             @if (Model.IsAuthor)
             {
-                <text>Reply (you are the author of this post)</text>
+                <kw-l key="posts.reply_heading_author">Reply (you are the author of this post)</kw-l>
             }
             else
             {
-                <text>Reply</text>
+                <kw-l key="posts.reply_heading">Reply</kw-l>
             }
-        </h5>
+        </h2>
 
-        <div class="card kmb-detail-card kmb-ann-composer">
+        <div class="card kmb-detail-card kmb-detail-composer">
             <div class="card-body">
                 <form class="mb-0" method="post"
                       action="@($"/groups/{Model.GroupId}/posts/{postId}/replies")">
                     @Html.AntiForgeryToken()
                     <label class="form-label" for="reply-body" style="font-weight:600;">
-                        Reply
+                        <kw-l key="posts.reply_label">Reply</kw-l>
                     </label>
                     @* RE U06 — image OFF (same RC reply-image gap). *@
                     <div class="rc-editor">
@@ -727,7 +727,7 @@
                     }
                     <div class="mb-3">
                         <label class="form-label" for="reply-language" style="font-weight:600;">
-                            Language
+                            <kw-l key="posts.reply_language_label">Language</kw-l>
                         </label>
                         <select class="form-control" id="reply-language" name="languageCode">
                             @foreach (var (languageCode, nativeName) in replyLanguages)
@@ -737,19 +737,16 @@
                             }
                         </select>
                         <div class="text-muted small mt-1">
-                            The language you're replying in — a tag, not a
-                            translation.
+                            <kw-l key="posts.reply_language_note">The language you're replying in — a tag, not a translation.</kw-l>
                         </div>
                     </div>
                     <details class="kw-audience-disclosure mb-3">
-                        <summary>Who can see replies?</summary>
+                        <summary><kw-l key="posts.reply_audience_note_label">Who can see replies?</kw-l></summary>
                         <div class="text-muted small">
-                            Replies have no own audience — they are visible under
-                            this post's single group-membership decision. You are
-                            replying only where the post itself is visible.
+                            <kw-l key="groups.reply_audience_note">Replies have no own audience — they are visible under this post's single group-membership decision. You are replying only where the post itself is visible.</kw-l>
                         </div>
                     </details>
-                    <button type="submit" class="btn btn-primary">Reply</button>
+                    <button type="submit" class="btn btn-primary"><kw-l key="posts.reply_submit">Reply</kw-l></button>
                 </form>
             </div>
         </div>

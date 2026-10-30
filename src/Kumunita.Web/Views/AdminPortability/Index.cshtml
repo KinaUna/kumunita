@@ -15,16 +15,12 @@
     var keepExistingHint = await Translation.GetAsync("portability.import.keep_existing_hint", _kwL);
 }
 
-<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+<div class="mb-2"><a href="/admin" class="btn btn-link p-0">&larr; <kw-l key="nav.admin">Admin</kw-l></a></div>
 
 <h1 class="mt-2"><kw-l key="portability.index.title">Portability</kw-l></h1>
 
 <p class="text-muted">
-    The whole instance as one portable archive — the content, the media, the
-    identity graph (without the credential material), and the settings. Export
-    it as a <code>*.kumunita</code> file, or restore an existing archive into
-    this instance.
-</p>
+    <kw-l key="admin.portability.lede">The whole instance as one portable archive — the content, the media, the identity graph (without the credential material), and the settings. Export it as a *.kumunita file, or restore an existing archive into this instance.</kw-l></p>
 
 @* Export — the operator downloads the one complete, versioned archive
    (the loop closes out of the platform — F1). A plain link (no form): the
@@ -34,10 +30,7 @@
         <div>
             <div class="fw-semibold"><kw-l key="portability.export">Export</kw-l></div>
             <small class="text-muted">
-                One <code>*.kumunita</code> archive — the content, the media,
-                the identity graph (never the credential material), and the
-                instance settings.
-            </small>
+                <kw-l key="admin.portability.export_desc">One *.kumunita archive — the content, the media, the identity graph (never the credential material), and the instance settings.</kw-l></small>
         </div>
         <a class="btn btn-primary" href="~/admin/portability/export">
             <kw-l key="portability.export">Export</kw-l>
@@ -53,12 +46,7 @@
     <div class="card-body">
         <div class="fw-semibold mb-2"><kw-l key="portability.import">Import</kw-l></div>
         <small class="text-muted d-block mb-3">
-            Restore a <code>*.kumunita</code> archive into this instance.
-            By default the import <b>replaces</b> this instance's state —
-            keep a pre-import backup; residents re-authenticate after the
-            restore (passwords are reset). Tick the option below to keep the
-            existing accounts and content and only add what is new.
-        </small>
+            <kw-l key="admin.portability.import_desc">Restore a *.kumunita archive into this instance. By default the import replaces this instance's state — keep a pre-import backup; residents re-authenticate after the restore (passwords are reset). Tick the option below to keep the existing accounts and content and only add what is new.</kw-l></small>
         <form method="post" action="/admin/portability/import" enctype="multipart/form-data"
               data-confirm="@importConfirm">
             @Html.AntiForgeryToken()

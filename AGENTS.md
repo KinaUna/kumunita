@@ -79,6 +79,17 @@ rather than retrying it a third time. In VS Code, note the workspace's
 from its default of 25, since that cap alone can force a stop mid-task even
 when you intend to keep going.
 
+**The flip side — long-running things in flight.** When a known-long
+test suite, build, or server startup is running in the background
+(`Kumunita.Core.Tests` ~20 s, `Kumunita.Web.Tests` ~1 min, a
+`docker compose up` ~8 s), say so *proactively* in the same turn: name
+the expected duration and that you'll report on completion. The user
+has repeatedly had to poll "Is it done?" / "Are the tests done?" 2–6
+times per session while the agent stayed silent — that churn is the
+cost of not stating the expectation up front. This does not conflict
+with the rule above (which is about *stopping to confirm before acting*);
+it's about *communicating status while waiting*.
+
 ## Keeping the docs in sync with the code
 
 This repo is deliberate about doc ↔ code parity, so keep these pairs together
@@ -164,6 +175,22 @@ the source file** — and the user's report outranks your source reading.
     `<a href>` links into POST forms and dropping the `{…}` braces). Grep the
     whole codebase with `grep -rnoE '@\(\$"[^"]*@[A-Za-z_]' src/Kumunita.Web/Views/`
     — any hit is this bug.
+  - **A bare `@expr` inside a `<script>` block IS HTML-encoded in .NET 10** —
+    a `<script type="application/json" id="x">@myJson</script>` block does
+    **not** carry raw JSON: the `"` becomes `&quot;`, so the client's
+    `JSON.parse(el.textContent)` fails ("Expected property name at position
+    1"). Emit the value via `@Html.Raw(json)` (outputs as-is); if a value can
+    contain a literal `</script>`, neutralize it first:
+    `@Html.Raw(json.Replace("</", "<\\/"))` (`<\/` is a valid JSON escape that
+    cannot close the script). **Fixed 2026-10-27:** the `_Layout.cshtml`
+    `#kumunita-strings` block (the P0-6 client strings bundle) used to wrap
+    its JSON in `HttpUtility.HtmlEncode` — under this rule that
+    **double-encoded** it (served bytes showed `&amp;quot;`), so every
+    client module (`rich-editor.ts`, `tag-suggest.ts`, `kiosk.ts`,
+    `note-modal.ts`, `onboarding-modal.ts`, `notifications-bell.ts`,
+    `image-editor.ts`) was silently falling back to the English floor
+    strings. It now uses the correct `@Html.Raw(...)` form. The ADR 0195
+    `#card-edit-prefills` block uses the same form.
 - A URL or link that shows a **literal `@Model.X`** (404s, `/groups/@Model.GroupId/posts`)
 is the same class of bug — an uninterpolated Razor attribute value, not a
   routing problem. Fix the markup; don't debug the route.
@@ -205,6 +232,107 @@ dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
 `Kumunita.Web.Tests` runs in well under a second; `Kumunita.Core.Tests` takes ~20 s
 because it starts `postgres:18` via Testcontainers (and leaves Docker containers
 behind if the process is killed — clean up with `docker container prune`).
+
+## CI known-failure cheatsheet
+
+The e2e + test GitHub Actions jobs have a small set of known, repeatable
+failure modes that are *environmental*, not code bugs. When a CI run
+fails with any of the following, apply the named fix instead of guessing
+from the log:
+
+- **`dotnet/setup-dotnet` "repository not found"** — the action lives
+  under the `actions` org, not the `dotnet` org. Use
+  `actions/setup-dotnet@v4` with `version: '10.0.400'` +
+  `roll-forward: latestfeature` (matching `global.json`).
+- **`browserType.launch: Executable doesn't exist at .../chromium_headless_shell-...`** —
+  the e2e job is missing the browser. Add
+  `playwright install --with-deps chromium` as a step before
+  `npm --prefix e2e run test`.
+- **Local Playwright: `libnss3` / `libnspr4` / `libasound2t64` not found** —
+  the agent terminal cannot `sudo`. Hand the user this exact command in
+  their own shell and stop:
+  ```bash
+  sudo apt-get install -y libnss3 libnspr4 libasound2t64
+  ```
+  Do not retry `playwright install` or try `--force` variants — the
+  missing system libraries are the cause, and only the user can install
+  them.
+- **`Node.js 20 is deprecated` / `Unexpected input(s)` warnings** — pin
+  `actions/checkout@v4`, `actions/setup-node@v4`,
+  `actions/setup-dotnet@v4` and target `node20` (or the current LTS)
+  explicitly. The runner's default Node is EOL; CI warns unless you pin.
+
+## CI gates and anti-regression pins (don't rediscover them)
+
+A few CI gates fail for *designed* reasons and the agent tends to
+misread them as code regressions. The two that recur in this repo:
+
+- **`improve-check.ps1` — the IMPROVE-lane close gate.** It is a
+  god-file / doc-size *grandfathering* guard: it pins specific files to
+  a known line count (currently `KnownTranslationKeys.cs`, frozen at
+  the IMPROVE close) and fails the run if the file has grown past the
+  baseline without a matching ADR amendment. It **self-skips locally**
+  when `pwsh` is not on PATH (it needs PowerShell 7, which CI has), so
+  a local `dotnet exec` of the test suite won't catch it — only CI
+  will. When it fails in CI:
+  1. Read the gate output — it names the exact file + line count it's
+     pinning and the expected-vs-actual.
+  2. If the growth is legitimate (a new translation key added by a real
+     change), **re-baseline the count** in `improve-check.ps1` *and*
+     annotate the ADR that drove the growth (one line: "count re-based
+     to N on <date> by ADR 0xxx"). Both in the same commit.
+  3. Do *not* delete the gate, do *not* force-skip it, do *not* trim
+     the pinned file to fit the baseline — the pin is the point.
+- **`PwaManifestTests.Site_Css_Media_Block_Boundary_...` — the `@media`
+  block-count pin.** It counts the `@media` blocks in `site.css` and
+  compares to a frozen number (historically "six", now "twelve" as of
+  the M10 drift-guard). Adding a new `@media (…)` block to `site.css`
+  will trip it. When a new block is genuinely needed:
+  1. Update the pin in `PwaManifestTests` to the new count.
+  2. Annotate the ADR that introduced the block with the new total
+     (same commit).
+  3. If you're *investigating* a pin failure, the test failure message
+     tells you the expected vs. actual count — trust that over grepping
+     `site.css` by eye.
+
+These two gates are **by design** — they exist so a future lane can't
+silently bloat `KnownTranslationKeys.cs` or `site.css` without a
+documented reason. The fix is always "re-baseline + annotate", never
+"loosen the gate".
+
+## Postgres diagnostic conventions (live server)
+
+When debugging against the live docker-compose Postgres, three specific
+errors recur because the conventions are non-obvious:
+
+- **`ERROR: relation "mt.IdentityToken" does not exist`** (or similar) —
+  the table name is wrong. The Marten convention in this repo is
+  **`mt_doc_` + lowercase class name** (e.g. `mt_doc_identitytoken`,
+  `mt_doc_bookmark`, `mt_doc_personalnote`). The class name is
+  lowercased and the `mt_doc_` prefix is required. Querying
+  `mt.IdentityToken` (Pascal case, no `mt_doc_` prefix) is the failure
+  mode.
+- **`ERROR: relation "..." does not exist`** on the *correct* table
+  name — you're connected to the **`postgres`** database, not
+  **`kumunita`**. The docker-compose stack creates the `kumunita` DB
+  (see `dev-db-init/` + `docker-compose.yml`); the `postgres` database
+  is the default and has none of the app's schemas. The `postgres=#`
+  prompt in the psql banner is the tell — re-run with
+  `psql -h localhost -U kumunita -d kumunita`.
+- **`function digest(unknown, unknown) does not exist`** — Postgres's
+  built-in `digest()` is in the `pgcrypto` extension, which is *not*
+  enabled on the app DB. For hashing a password to verify against
+  `identity."AspNetUsers".PasswordHash`, use `crypt()` from `pgcrypto`
+  (if available) or just `SELECT "PasswordHash"` and compare in the app
+  — don't try to re-derive the hash in SQL.
+
+Also: the **`/admin/setup`** flow returns a uniform **`404 NotFound`**
+on submit by design (the controller deliberately collapses several
+distinct causes into one response so an anonymous caller can't
+distinguish "already set up" from "wrong token"). **A 404 on submit of
+a valid token + password is success, not failure** — the setup lane is
+permanently closed after a successful POST. Do not chase this as a bug;
+the report "I set the password and got a 404" is the expected outcome.
 
 ## Git state gotcha
 

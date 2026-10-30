@@ -36,12 +36,33 @@
     }
 
     <nav aria-label="@ariaPagination" class="mt-3">
-        <ul class="pagination">
+        <ul class="pagination flex-wrap">
             <li class="page-item @(Model.HasPrevious ? "" : "disabled")">
                 <a class="page-link"
                    href="@(Model.HasPrevious ? PagerLink(Model.CurrentPage - 1) : "#")"
                    rel="prev"><kw-l key="pagination.prev">Newer</kw-l></a>
             </li>
+            @* ADR 0219 — numbered pages, count-free (ADR 0090 D1 stays: there is no
+               TotalPages). Window: 1 … (current-1) [current] (current+1, only when the
+               seam says there is a next page). The numerals are self-describing, so no
+               new translation keys; the ellipsis is decorative (aria-hidden). *@
+            @if (Model.CurrentPage > 2)
+            {
+                <li class="page-item"><a class="page-link" href="@PagerLink(1)">1</a></li>
+            }
+            @if (Model.CurrentPage > 3)
+            {
+                <li class="page-item disabled" aria-hidden="true"><span class="page-link">…</span></li>
+            }
+            @if (Model.CurrentPage > 1)
+            {
+                <li class="page-item"><a class="page-link" href="@PagerLink(Model.CurrentPage - 1)">@(Model.CurrentPage - 1)</a></li>
+            }
+            <li class="page-item active" aria-current="page"><span class="page-link">@Model.CurrentPage</span></li>
+            @if (Model.HasNext)
+            {
+                <li class="page-item"><a class="page-link" href="@PagerLink(Model.CurrentPage + 1)">@(Model.CurrentPage + 1)</a></li>
+            }
             <li class="page-item @(Model.HasNext ? "" : "disabled")">
                 <a class="page-link"
                    href="@(Model.HasNext ? PagerLink(Model.CurrentPage + 1) : "#")"

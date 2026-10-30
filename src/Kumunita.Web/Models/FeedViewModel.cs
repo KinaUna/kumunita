@@ -166,4 +166,18 @@ public sealed record PostListItem(
     /// gate + audit run on the endpoint, never on this field).</summary>
     string AuthorSubjectId,
     string? ComponentName = null,
-    string? ComponentId = null);
+    string? ComponentId = null,
+    /// <summary>The post's reply count (ADR 0226) — soft-deleted replies still
+    /// count (ADR 0024), the same number the detail's "Replies (N)" shows. A
+    /// display convenience read per feed page via
+    /// <c>PostService.CountRepliesAsync</c>; <c>0</c> where a surface does not
+    /// load it (drafts, tests).</summary>
+    int ReplyCount = 0);
+
+/// <summary>
+/// Model of the shared <c>_PostCardFoot</c> partial (ADR 0226): where the card's
+/// "N replies" link goes (already ending in <c>#replies</c>), the count, the post
+/// id, whether the viewer has bookmarked it (ADR 0227, one batched read per page
+/// in the host view) and where the bookmark forms return to (the current feed URL).
+/// </summary>
+public sealed record PostCardFootModel(string RepliesHref, int ReplyCount, string PostId, bool IsBookmarked, string ReturnUrl);

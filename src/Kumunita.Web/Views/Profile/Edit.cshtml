@@ -29,9 +29,9 @@
             <kw-l key="profile.edit_lede">This is where you decide what other residents can see about you. Whatever you choose here is exactly what the neighbor directory shows — no surprises.</kw-l>
         </p>
 
-        <div class="card mb-4">
-            <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.avatar_heading">Your avatar</kw-l></span></div>
+        <div class="card kmb-detail-card mb-4 kmb-form-section">
             <div class="card-body">
+            <h2 class="kmb-form-section-title"><kw-l key="profile.avatar_heading">Your avatar</kw-l></h2>
             @*
           U8 of the media feature (design doc §2.4; C-MED·5/6/8): the avatar
           upload is its OWN write lane (U6's AvatarUpload — POST /profile/avatar,
@@ -76,6 +76,10 @@
                            class="form-control form-control-sm">
                     <button type="submit" class="btn btn-primary" disabled><kw-l key="profile.save_avatar">Save avatar</kw-l></button>
                 </div>
+                @if (ViewData["AvatarError"] is string avatarError)
+                {
+                    <div class="text-danger small mt-1" role="alert">@avatarError</div>
+                }
                 <div class="form-text small">
                     <kw-l key="profile.avatar_hint">                    JPEG, PNG, WebP or GIF. Saving replaces the avatar currently shown in the directory.</kw-l>
                 </div>
@@ -89,9 +93,9 @@
             @Html.AntiForgeryToken()
             <div asp-validation-summary="All" class="text-danger"></div>
 
-            <div class="card mb-4">
-            <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.name_email_heading">Your name + email</kw-l></span></div>
-            <div class="card-body">
+            <div class="card mb-4 kmb-form-section">
+                <div class="card-body">
+                <h2 class="kmb-form-section-title"><kw-l key="profile.name_email_heading">Your name + email</kw-l></h2>
             <div class="row g-2">
                 <div class="col-sm-6">
                     <label for="DisplayName" class="form-label"><kw-l key="profile.display_name_label">Display name</kw-l></label>
@@ -107,8 +111,9 @@
             </div>
         </div>
 
-        <div class="card mb-4">
+        <div class="card mb-4 kmb-form-section">
             <div class="card-body">
+            <h2 class="kmb-form-section-title"><kw-l key="profile.about_heading">About you</kw-l></h2>
             @*
               M23 (ADR 0123 D5) — the extended-profile editor surface: a bio
               (rich content — the WYSIWYG bindRichEditor on edit, the
@@ -156,9 +161,9 @@
             </div>
         </div>
 
-        <div class="card mb-4">
-            <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.address_heading">Your address + phone (optional)</kw-l></span></div>
+        <div class="card mb-4 kmb-form-section">
             <div class="card-body">
+            <h2 class="kmb-form-section-title"><kw-l key="profile.address_heading">Your address + phone (optional)</kw-l></h2>
             <div class="row g-2">
                 <div class="col-sm-6">
                     <label for="Address" class="form-label"><kw-l key="profile.address_label">Address (the street you live at)</kw-l></label>
@@ -209,9 +214,9 @@
             </div>
         </div>
 
-        <div class="card mb-4">
-            <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.who_heading">Who can see what</kw-l></span></div>
+        <div class="card mb-4 kmb-form-section">
             <div class="card-body">
+            <h2 class="kmb-form-section-title"><kw-l key="profile.who_heading">Who can see what</kw-l></h2>
             @* The two audience editors share ONE partial (the U11 "only one
                _AudienceEditor.cshtml exists" pin). Each invocation is
                discriminated by ViewData["EditorName"] — the partial's form

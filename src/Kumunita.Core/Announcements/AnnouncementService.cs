@@ -1296,6 +1296,28 @@ public sealed class AnnouncementService : IAnnouncementService
             .ConfigureAwait(false)).ToList();
     }
 
+    public async Task<IReadOnlyDictionary<string, int>> CountAnnouncementCommentsAsync(
+        IReadOnlyCollection<string> announcementIds)
+    {
+        ArgumentNullException.ThrowIfNull(announcementIds);
+        if (announcementIds.Count == 0)
+            return new Dictionary<string, int>();
+
+        using var session = _store.QuerySession();
+        // TODO (ADR 0248): a list page holds at most PageSize announcements, so one projected
+        // column is fine; move the grouping into the query if a page ever carries many comments.
+        var owners = await session
+            .Query<AnnouncementComment>()
+            .Where(c => announcementIds.Contains(c.AnnouncementId))
+            .Select(c => c.AnnouncementId)
+            .ToListAsync(CancellationToken.None)
+            .ConfigureAwait(false);
+
+        return owners
+            .GroupBy(id => id, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+    }
+
     public async Task<AnnouncementComment> CreateAnnouncementCommentAsync(
         string announcementId,
         string actorId,

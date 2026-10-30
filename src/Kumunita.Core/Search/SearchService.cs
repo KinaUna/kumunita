@@ -559,7 +559,8 @@ public sealed class SearchService : ISearchService
 
     /// <summary>
     /// Documents (ADR 0124 — the <see cref="Documents.DocumentService"/> canonical predicate
-    /// (no <c>IsDeleted</c> field); <c>Title</c> + <c>Summary</c> match, no TagIds).
+    /// (ADR 0239 D4 adds the <c>DeletedAt == null</c> soft-delete filter);
+    /// <c>Title</c> + <c>Summary</c> match, no TagIds).
     /// Signed-in: <c>CanSeeAsync</c> + <c>"search:documents"</c> row. Anonymous: <c>[]</c>
     /// (<see cref="Documents.DocumentService.ListAsync"/> throws for a null actor — the
     /// Web layer enforces <c>[Authorize]</c>; search degrades to zero, not a refusal).
@@ -569,6 +570,7 @@ public sealed class SearchService : ISearchService
         if (string.IsNullOrWhiteSpace(actorId)) return [];
 
         var candidates = await session.Query<Document>()
+            .Where(d => d.DeletedAt == null)   // ADR 0239 D4 — soft-deleted documents are hidden from search (the ADR 0024 feed pin carried to search)
             .OrderByDescending(d => d.Created)
             .ToListAsync(ct);
 

@@ -6,6 +6,10 @@
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
 @{
+    var _closeLang = await Kumunita.Web.Security.EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var pinnedTip = Translation is null ? "Shown as a banner at the top of every page" : await Translation.GetAsync("announcements.pinned_tooltip", _closeLang);
+}
+@{
     ViewData["Title"] = "Announcements";
     bool isGlobalAdmin = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
     bool isModerator = User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.Moderator) ?? false;
@@ -37,10 +41,19 @@
     // wrap an attribute). The en floor is the server fallback (a null provider
     // — a non-HTTP render — degrades to en).
     string confirmDelete = "Delete this announcement? This cannot be undone.";
+    // ADR 0248 — the card footer's comment count (plural keys, English floor, the
+    // posts.reply_count_* shape). Model.CommentCounts is null = show nothing.
+    string cNone = "No comments yet", cOne = "{0} comment", cOther = "{0} comments";
     if (Translation is not null)
     {
         var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
         confirmDelete = await Translation.GetAsync("announcements.delete_confirm", effLang);
+        if (Model.CommentCounts is not null)
+        {
+            cNone = await Translation.GetAsync("announcements.comment_count_none", effLang);
+            cOne = await Translation.GetAsync("announcements.comment_count_one", effLang);
+            cOther = await Translation.GetAsync("announcements.comment_count_other", effLang);
+        }
     }
 }
 
@@ -123,7 +136,7 @@
                         <span class="kmb-ann-chips">
                             @if (a.Pinned)
                             {
-                                <span class="kmb-chip kmb-chip-pinned" title="Shown as a banner at the top of every page">
+                                <span class="kmb-chip kmb-chip-pinned" title="@pinnedTip">
                                     <kw-l key="announcements.pinned_badge">pinned</kw-l>
                                 </span>
                             }
@@ -150,13 +163,30 @@
                         @MarkdownRenderer.PlainTextPreview(a.Body, 250)
                         <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })"><kw-l key="announcements.read_more">Read more…</kw-l></a>
                     </p>
-                    @if (canEdit || isGlobalAdmin)
+                    @{
+                        int? commentCount = null;
+                        if (Model.CommentCounts is not null)
+                            commentCount = Model.CommentCounts.GetValueOrDefault(a.Id);
+                    }
+                    @if (canEdit || isGlobalAdmin || commentCount is not null)
                     {
                         @* Edit / Delete stay in different places (ADR 0017 edit
                            lane + the admin delete lane): Edit at the start of
                            the row, Delete at the end, so a misclick on one
                            can't hit the other. *@
                         <div class="airy-post-foot kmb-ann-actions">
+                            @if (commentCount is { } cc)
+                            {
+                                @* ADR 0248 — links to the detail's comment section; shown only to a
+                                   signed-in viewer when the admin comments toggle is on. *@
+                                <a class="kmb-post-replies" href="@Url.Action("Detail", "Announcement", new { id = a.Id })#announcement-comments">
+                                    <svg class="kmb-post-replies-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                         stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                        <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
+                                    </svg>
+                                    <span>@(cc == 0 ? cNone : (cc == 1 ? cOne : cOther).Replace("{0}", cc.ToString()))</span>
+                                </a>
+                            }
                             @if (canEdit)
                             {
                                 <a class="link-quiet small text-decoration-none" href="/announcements/@a.Id/edit">

@@ -64,20 +64,25 @@ public class KnownTranslationKeys_ParityTests
         }
     }
 
-    // ── LS U01 — the about.* contract (ADR 0042 D5) is registered ──
+    // ── LS U01 — the about.* contract (ADR 0042 D5 + ADR 0273 contact band) is registered ──
 
-    [Fact(DisplayName = "about.* the ADR 0042 D5 contract is fully registered with non-empty en values")]
+    [Fact(DisplayName = "about.* the ADR 0042 D5 + ADR 0273 about.* contract is fully registered with non-empty en values (18 keys)")]
     public void About_Keys_From_Adr_0042_D5_Are_Registered_NonEmpty()
     {
-        // The D5 closed contract — 13 keys (the stable names U02 / U03
-        // translate against and U05 wraps the view against). The four
-        // about.stats.* keys were removed with the stats band on 2026-09-22.
+        // The closed about.* contract — the 13 ADR 0042 D5 keys plus the five
+        // ADR 0273 contact-band keys (about.cta.*) the About view now wraps.
+        // The four about.stats.* keys were removed with the stats band on 2026-09-22.
         var d5Keys = new[]
         {
             "about.eyebrow",
             "about.lead",
             "about.cta_feed",
             "about.cta_notes",
+            "about.cta.heading",
+            "about.cta.write_to",
+            "about.cta.person_reads",
+            "about.cta.issue",
+            "about.cta.button",
             "about.features.one.title",
             "about.features.one.body",
             "about.features.groups.title",
@@ -89,7 +94,7 @@ public class KnownTranslationKeys_ParityTests
             "about.project.lead",
         };
 
-        Assert.Equal(13, d5Keys.Length);
+        Assert.Equal(18, d5Keys.Length);
 
         foreach (var key in d5Keys)
         {

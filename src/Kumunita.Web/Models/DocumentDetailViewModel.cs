@@ -32,7 +32,23 @@ public sealed record DocumentDetailViewModel(
     // = "Unfiled" (the root).
     string? FolderName,
     // The document's folder id (used by the view to link to the folder).
-    string? FolderId);
+    string? FolderId,
+    // ── Attribution + soft-delete (ADR 0239) ────────────────────────────────
+    // The uploader's display name (the <c>Document.OwnerId</c> resolved to the
+    // <c>Profile.DisplayName</c> through the <c>IUserInfoService.GetProfileAsync</c>
+    // read lane — the <c>PostsController</c> feed shape; a missing / blocked
+    // profile degrades to the raw owner id).
+    string OwnerName,
+    // The name of the actor who last changed the document (the
+    // <c>Document.ModifiedById</c> resolved to a display name). <c>null</c> when
+    // there is no modifier or the modifier is the uploader (ADR 0240: the detail
+    // row is shown only when it adds a name other than "Uploaded by").
+    string? ModifiedByName,
+    // ADR 0239 D6 — true iff the actor is the document's owner (the ADR 0125
+    // <c>CanEdit</c> shape); the view renders the Delete button only when this
+    // is true (a non-owner never sees the affordance — the ADR 0122 D7
+    // posture).
+    bool CanDelete);
 
 /// <summary>
 /// A tag row on a document's detail view (the "documents organization" lane):

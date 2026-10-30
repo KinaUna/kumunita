@@ -79,6 +79,22 @@ public sealed class DocumentController(
         return await translationProvider.GetAsync(key, lang);
     }
 
+    /// <summary>
+    /// A failed upload guard on a browser form post (ADR 0233): re-render the
+    /// form the person was on — typed fields kept — with a localized error
+    /// beside the file input and the guard's HTTP status (400 / 413 / 415) on
+    /// the response. Replaces the bare <see cref="StatusCodeResult"/> /
+    /// <see cref="BadRequestObjectResult"/>, which a browser shows as a blank
+    /// page. Still a guard: it runs before any byte is written.
+    /// </summary>
+    private async Task<IActionResult> RejectFormAsync(string viewName, object model, int statusCode, string field, string key)
+    {
+        ModelState.AddModelError(field, await T(key));
+        var view = View(viewName, model);
+        view.StatusCode = statusCode;
+        return view;
+    }
+
     // ── GET /documents — the repository feed (D4, C-M21·3) ────────────────
     [HttpGet("/documents")]
     [Authorize]
@@ -103,13 +119,39 @@ public sealed class DocumentController(
         // C-M21·3 shape. The view model never carries the hidden count (F1:
         // the feed does not leak "how many you cannot see").
         var result = await documents.ListAsync(actorId, page, sort: feedSort, pageSize: pageSize);
+        // ADR 0239 D1 — resolve the uploader's display name per row (the
+        // PostsController feed shape: a *display* lookup, never an
+        // AccessAudit subject — the audience decision is already made by
+        // ListAsync). One GetProfileAsync per **distinct owner** (a
+        // neighborhood's documents are usually shared across a handful of
+        // owners — the batch is by owner id, not by row). A missing /
+        // blocked profile degrades to the raw owner id (the
+        // profile?.DisplayName ?? post.AuthorId shape); a null
+        // IUserInfoService (a test-construction site) leaves the dictionary
+        // empty and the view falls back to the raw id for every row.
+        var ownerNames = new Dictionary<string, string>();
+        if (userInfo is not null)
+        {
+            var nameCache = new Dictionary<string, string>();
+            foreach (var d in result.Visible)
+            {
+                if (!nameCache.TryGetValue(d.OwnerId, out var name))
+                {
+                    var profile = await userInfo.GetProfileAsync(d.OwnerId);
+                    name = profile?.DisplayName is { Length: > 0 } dn ? dn : d.OwnerId;
+                    nameCache[d.OwnerId] = name;
+                }
+                ownerNames[d.Id] = name;
+            }
+        }
         var vm = new DocumentIndexViewModel(
             Visible: result.Visible,
             HasMore: result.HasMore,
             Page: result.Page,
             // D5 — the upload standing, resolved once at the boundary (the
             // view (U04) shows/hides the "Upload" link without re-resolving).
-            CanUpload: KumunitaPrincipal.IsGlobalAdmin(User) || KumunitaPrincipal.IsModerator(User));
+            CanUpload: KumunitaPrincipal.IsGlobalAdmin(User) || KumunitaPrincipal.IsModerator(User),
+            OwnerNames: ownerNames);
 
         // M26 U13 (D-SORT·5) — the one shared sort control (the U10 _Sort
         // reference, reused verbatim — C-SORT·1): the closed documents
@@ -202,6 +244,39 @@ public sealed class DocumentController(
             folderName = folder?.Name;
         }
 
+        // ADR 0239 D1 — resolve the uploader's + last-modifier's display
+        // names (the PostsController feed shape: a *display* lookup, never an
+        // AccessAudit subject). The uploader is Document.OwnerId (a required
+        // field); the last modifier is Document.ModifiedById — a
+        // <c>null</c> ModifiedById (a pre-ADR-0239 document that has never
+        // been edited through a Modified-stamping lane) degrades to the
+        // uploader, the owner is the implicit last modifier (ADR 0239 D1).
+        // A missing / blocked profile degrades to the raw id; a null
+        // IUserInfoService (a test-construction site) degrades to the raw id
+        // for both. **<c>ModifiedByName</c> is null when the modifier is the
+        // same subject as the uploader** (or when there is no modifier at
+        // all) — the detail view's "Last modified by" row is redundant with
+        // the "Uploaded by" row in that case (the date is still shown by
+        // the "Last updated" row), so the row is hidden.
+        string ownerName = result.Document.OwnerId;
+        string? modifiedByName = null;
+        if (userInfo is not null)
+        {
+            var ownerProfile = await userInfo.GetProfileAsync(result.Document.OwnerId);
+            ownerName = ownerProfile?.DisplayName is { Length: > 0 } oname ? oname : result.Document.OwnerId;
+            // A distinct modifier (not null, not the uploader): resolve its
+            // name. A null modifier or a modifier == uploader: leave
+            // modifiedByName null (the detail row is redundant with the
+            // "Uploaded by" row — the date is still shown by the "Last
+            // updated" row).
+            if (result.Document.ModifiedById is { } modifierId
+                && !string.Equals(modifierId, result.Document.OwnerId, StringComparison.Ordinal))
+            {
+                var modifierProfile = await userInfo.GetProfileAsync(modifierId);
+                modifiedByName = modifierProfile?.DisplayName is { Length: > 0 } mname ? mname : modifierId;
+            }
+        }
+
         var vm = new DocumentDetailViewModel(
             Document: result.Document,
             // The GetAsync decision allowed — the download re-runs the same Read
@@ -214,7 +289,11 @@ public sealed class DocumentController(
             // Organization (the "documents organization" lane).
             Tags: tagRows,
             FolderName: folderName,
-            FolderId: result.Document.FolderId);
+            FolderId: result.Document.FolderId,
+            // ADR 0239 — attribution + delete.
+            OwnerName: ownerName,
+            ModifiedByName: modifiedByName,
+            CanDelete: isOwner);
         return View("Detail", vm);
     }
 
@@ -237,7 +316,7 @@ public sealed class DocumentController(
         var subject = Kumunita.Web.Security.KumunitaPrincipal.SubjectId(User);
         if (subject is null) return Unauthorized();
         if (!IsValidDocId(id))
-            return BadRequest("A document id is required.");
+            return BadRequest(await this.FlashAsync("validation.document_id_required", "A document id is required."));
 
         // The Read path (audience) — the document must be visible to the actor;
         // the owner branch always passes for the owner. A missing doc is null.
@@ -281,7 +360,7 @@ public sealed class DocumentController(
         var subject = KumunitaPrincipal.SubjectId(User);
         if (subject is null) return Unauthorized();
         if (!IsValidDocId(id))
-            return BadRequest("A document id is required.");
+            return BadRequest(await this.FlashAsync("validation.document_id_required", "A document id is required."));
 
         // ADR 0125 D1 — owner gate (re-checked on the write; the owner branch of
         // the Read path passes for the owner). A non-owner is a 404 (not a 403
@@ -296,13 +375,13 @@ public sealed class DocumentController(
         // pin — the PostComposeViewModel / DocumentUpload precedents).
         if (form.Audience is null || !form.Audience.IsValid)
         {
-            ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
             form.DocumentId = id; // the form action needs the route id on re-render
             return View("Edit", form);
         }
 
         if (string.IsNullOrWhiteSpace(form.Title))
-            return BadRequest("A title is required.");
+            return await RejectFormAsync("Edit", form, StatusCodes.Status400BadRequest, "Title", "documents.err_title_required");
 
         // ADR 0125 D3 — the file is OPTIONAL on the edit lane: a present,
         // non-empty file is the new reference; a null / zero-byte file keeps the
@@ -327,10 +406,12 @@ public sealed class DocumentController(
             var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
             var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
             var reject = await uploadGate.CheckUpload(form.File.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
+            if (reject is StatusCodeResult gateStatus)
+                return await RejectFormAsync("Edit", form, gateStatus.StatusCode, "File", "documents.err_too_large");
             if (reject is not null) return reject;
 
             if (!mediaOpts.Value.IsDocumentAllowed(form.File.ContentType))
-                return StatusCode(StatusCodes.Status415UnsupportedMediaType);
+                return await RejectFormAsync("Edit", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
             using var stream = new MemoryStream();
             await form.File.CopyToAsync(stream).ConfigureAwait(false);
@@ -384,11 +465,133 @@ public sealed class DocumentController(
         return Redirect($"/documents/{id}");
     }
 
+    // ── POST /documents/{id}/delete — the owner-only soft-delete lane (ADR 0239) ──
+    //
+    // ADR 0239 (D3/D4/D5) — the owner (the uploader — Document.OwnerId) may
+    // remove the document from the community's repository. The record is kept
+    // (never hard-deleted): Document.DeletedAt + Document.DeletedById are
+    // stamped, and every read surface (feed, detail, download, search, note
+    // targets) hides it (D4). The gate is owner-only (D3) — a non-owner
+    // (including a non-owner GlobalAdmin) gets a 404 (not a 403 — the ADR
+    // 0122 D7 posture: the route's existence is not leaked). A second delete
+    // is idempotent (D4 — the ADR 0024 pin). No AccessAudit row (the ADR 0122
+    // §1.a A2 write-lane convention). On success, flash the closed
+    // documents.flash_deleted key and redirect to the feed — the document is
+    // gone from the detail page by construction (D4), so there is no detail
+    // page to land on.
+    [HttpPost("/documents/{id}/delete")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null) return Unauthorized();
+        if (!IsValidDocId(id))
+            return BadRequest(await this.FlashAsync("validation.document_id_required", "A document id is required."));
+
+        // ADR 0125 D1 — owner gate (re-checked on the write; the owner branch
+        // of the Read path passes for the owner). A non-owner is a 404 (not a
+        // 403 — the ADR 0122 D7 posture).
+        var result = await documents.GetAsync(id, subject).ConfigureAwait(false);
+        if (result.Document is null)
+            return NotFound();
+        if (!string.Equals(result.Document.OwnerId, subject, StringComparison.Ordinal))
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await documents.DeleteAsync(id, subject, session).ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            // Concurrent state change — the doc is gone (the ADR 0122 D7 posture).
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Defense in depth (the Core gate is authoritative; the owner gate
+            // above should have caught this first) — a 404, not a 403.
+            return NotFound();
+        }
+
+        TempData["info"] = await T("documents.flash_deleted");
+        // ADR 0241 — the toast offers Undo (a POST to the restore route).
+        TempData["info_action_url"] = $"/documents/{id}/restore";
+        TempData["info_action_label"] = await T("documents.undo");
+        return Redirect("/documents");
+    }
+
+    // ── GET /documents/deleted — the restore list (ADR 0241) ─────────────────
+    //
+    // The viewer's own soft-deleted documents; every soft-deleted document for a
+    // GlobalAdmin. Titles and names only (no download, no content), so it needs no
+    // audience decision and writes no AccessAudit row.
+    [HttpGet("/documents/deleted")]
+    [Authorize]
+    public async Task<IActionResult> Deleted()
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null) return Unauthorized();
+        var isAdmin = KumunitaPrincipal.IsGlobalAdmin(User);
+
+        var docs = await documents.ListDeletedAsync(subject, isAdmin).ConfigureAwait(false);
+        var nameCache = new Dictionary<string, string>();
+        var rows = new List<DocumentDeletedRow>(docs.Count);
+        foreach (var d in docs)
+        {
+            if (!nameCache.TryGetValue(d.OwnerId, out var name))
+            {
+                var profile = userInfo is null ? null : await userInfo.GetProfileAsync(d.OwnerId);
+                name = profile?.DisplayName is { Length: > 0 } dn ? dn : d.OwnerId;
+                nameCache[d.OwnerId] = name;
+            }
+            rows.Add(new DocumentDeletedRow(d, name));
+        }
+        return View("Deleted", new DocumentDeletedViewModel(rows, isAdmin));
+    }
+
+    // ── POST /documents/{id}/restore — undo a soft delete (ADR 0241) ─────────
+    //
+    // The owner, or a GlobalAdmin, may restore. Anyone else gets a 404 (the ADR 0122 D7
+    // posture, as for delete). Idempotent. Lands on the restored document's detail page.
+    [HttpPost("/documents/{id}/restore")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Restore(string id)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null) return Unauthorized();
+        if (!IsValidDocId(id))
+            return BadRequest(await this.FlashAsync("validation.document_id_required", "A document id is required."));
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await documents.RestoreAsync(id, subject, KumunitaPrincipal.IsGlobalAdmin(User), session).ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound(); // not a 403 — the route's existence is not leaked
+        }
+
+        TempData["info"] = await T("documents.flash_restored");
+        return Redirect($"/documents/{id}");
+    }
+
     // ── GET /documents/new — the compose form (D5) ─────────────────────────
     [HttpGet("/documents/new")]
     [Authorize]
-    public IActionResult New([Bind] DocumentUploadViewModel? form = null)
+    public IActionResult New()
     {
+        // ADR 0233 — no model parameter: a bound `DocumentUploadViewModel?` was
+        // validated on a plain GET, so the non-nullable `Audience.Mode` put a
+        // "The Mode field is required." alert on a fresh form. The view reads
+        // `Model?` and renders blank without one.
         // D5 — the upload standing gate (Web boundary). A non-eligible actor
         // gets 404 (not 403 — the form's existence is not leaked to a
         // non-privileged actor; the ADR 0017 compose-standing shape).
@@ -415,7 +618,7 @@ public sealed class DocumentController(
         // (the M2 mode-required pin, the PostComposeViewModel precedent).
         if (form.Audience is null || !form.Audience.IsValid)
         {
-            ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            ModelState.AddModelError("Audience.Mode", await this.FlashAsync("validation.audience_mode", "Audience mode is required (Any or All)."));
             return View("New", form);
         }
 
@@ -423,8 +626,10 @@ public sealed class DocumentController(
         // ordering): empty → 400, oversize → 413, disallowed type → 415 —
         // **no file written on any guard**.
         var file = form.File;
-        if (string.IsNullOrWhiteSpace(form.Title)) return BadRequest("A title is required.");
-        if (file is null || file.Length == 0) return BadRequest("Choose a file.");   // empty → 400 (untouched)
+        if (string.IsNullOrWhiteSpace(form.Title))
+            return await RejectFormAsync("New", form, StatusCodes.Status400BadRequest, "Title", "documents.err_title_required");
+        if (file is null || file.Length == 0)
+            return await RejectFormAsync("New", form, StatusCodes.Status400BadRequest, "File", "documents.err_file_required");   // empty → 400
         // M25 (U8) — the size/over-quota guard is now the Web-only
         // IUploadGate (C-UP·3): the single 413 producer, running the pure Core
         // StorageLimits.Decide over the admin doc + the subject's usage. Runs
@@ -435,9 +640,11 @@ public sealed class DocumentController(
         var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
         var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
         var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
-        if (reject is not null) return reject;                              // oversize/over-quota → 413 (the gate)
-        if (!mediaOpts.Value.IsDocumentAllowed(file.ContentType))
-            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type → 415 (untouched)
+        if (reject is StatusCodeResult gateStatus)                          // oversize/over-quota → 413 (the gate)
+            return await RejectFormAsync("New", form, gateStatus.StatusCode, "File", "documents.err_too_large");
+        if (reject is not null) return reject;
+        if (!mediaOpts.Value.IsDocumentAllowed(file.ContentType))           // disallowed type → 415
+            return await RejectFormAsync("New", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
         // D3 — store-first (orphan-safe, C-MED·7): the bytes land on the frozen
         // ADR 0011 volume before the catalog row references them.

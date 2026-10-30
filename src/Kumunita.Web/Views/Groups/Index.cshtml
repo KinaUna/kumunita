@@ -13,6 +13,23 @@
 @{
     ViewData["Title"] = "Groups";
 
+    // ADR 0212 — the member count was hard-coded English ("member"/"members");
+    // two plural keys ({0} = the count), the English floor if resolution fails.
+    string memberCountOne = "{0} member";
+    string memberCountOther = "{0} members";
+    try
+    {
+        string memberLang = await EffectiveLanguageCode.ResolveAsync(
+            HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        memberCountOne = await Translation.GetAsync("groups.member_count_one", memberLang);
+        memberCountOther = await Translation.GetAsync("groups.member_count_other", memberLang);
+    }
+    catch
+    {
+        // Never blank the card: keep the English floor.
+    }
+    string MemberCountLabel(int n) => (n == 1 ? memberCountOne : memberCountOther).Replace("{0}", n.ToString());
+
     // M29 (ADR 0152) — the surface header label (M29·1: the same value the nav
     // item resolves — one resolver, one value, so a rename is never "nav says
     // X, header says Y"). A non-blank admin label wins; otherwise the nav.groups
@@ -127,9 +144,9 @@
             <div class="kmb-empty">
                 <p class="kmb-empty-title"><kw-l key="groups.empty">No groups yet.</kw-l></p>
                 <p class="kmb-empty-body">
-                    Groups organize residents, e.g. "Building 4", "Volunteers", "Bike owners".
+                    <kw-l key="groups.index_empty_body">Groups organize residents, e.g. “Building 4”, “Volunteers”, “Bike owners”.</kw-l>
                 </p>
-                <a href="@Url.Action("Create", "Groups")" class="btn btn-primary">Create a group</a>
+                <a href="@Url.Action("Create", "Groups")" class="btn btn-primary"><kw-l key="groups.create">Create a group</kw-l></a>
             </div>
         }
         else
@@ -147,8 +164,7 @@
                                 <a class="stretched-link" href="@Url.Action("Detail", "Groups", new { id = g.Id })">@g.Name</a>
                             </span>
                             <span class="gcount">
-                                @g.MemberCount
-                                member@(g.MemberCount == 1 ? "" : "s")
+                                @MemberCountLabel(g.MemberCount)
                             </span>
                         </span>
                     </div>
@@ -176,8 +192,7 @@
                         <span class="gtext">
                             <span class="gname">@g.Name</span>
                             <span class="gcount">
-                                @g.MemberCount
-                                member@(g.MemberCount == 1 ? "" : "s")
+                                @MemberCountLabel(g.MemberCount)
                             </span>
                         </span>
                         <span class="row-actions">

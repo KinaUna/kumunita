@@ -123,18 +123,117 @@ $aBaseline = @(
 # close): two new portability.import.keep_existing* keys x en/de/fr/da added
 # to KnownTranslationKeys.cs (11106 -> 11114) — the same shipped-additions
 # mechanism as above; the gate's ceiling starts from 11114 now.
+# Re-baselined again 2026-10-29 (the ADR 0251 post edit/new localization
+# close): since the ADR 0193 baseline the documents / announcements lanes
+# (ADR 0242 delete_confirm, ADR 0248 comment count) and this lane (ADR 0251,
+# eleven posts.* keys x en/de/fr/da) added keys to KnownTranslationKeys.cs
+# (11114 -> 11527); the board card edit modal (ADR 0195) grew
+# ProjectsController.cs (5257 -> 5358); the feed-footer reply-count / bookmark
+# lanes (the ADR 0175 / ADR 0226 / ADR 0227 TODOs) grew GroupsController.cs
+# (3032 -> 3035) and PostService.cs (2281 -> 2315); the ADR 0130
+# warm-backfill fix grew SampleDataSeeder.cs (2105 -> 2110) — the same
+# shipped-additions mechanism as above; the gate's ceiling now starts from
+# the 2026-10-29 baseline.
+# Re-baselined again 2026-10-29 (the ADR 0257 groups-pages localization
+# close): since the ADR 0251 baseline the pages-form lane (ADR 0254,
+# 19 pages.form.* keys) and the groups lane (ADR 0257, 20 keys) added
+# keys to KnownTranslationKeys.cs (11527 -> 11835); the ADR 0253
+# everyone-audience seeds grew ProjectsController.cs (5358 -> 5370) — the
+# same shipped-additions mechanism as above; the gate's ceiling now starts
+# from the 2026-10-29 baseline (again).
+# Re-baselined again 2026-10-29 (the ADR 0258 shared-close/tooltips close):
+# the three new tooltip keys (pages.draft_tooltip, pages.scoped_tooltip,
+# announcements.pinned_tooltip) x en/de/fr/da added to KnownTranslationKeys.cs
+# (11835 -> 11859) — the same shipped-additions mechanism as above; the
+# gate's ceiling starts from 11859 now.
+# Re-baselined again 2026-10-29 (the ADR 0259 kiosk-settings/signup
+# localization close): the twenty-nine new kiosk.settings.* / account.signup_*
+# keys x en/de/fr/da added to KnownTranslationKeys.cs (11859 -> 12091) — the
+# same shipped-additions mechanism as above; the gate's ceiling starts from
+# 12091 now.
+# Re-baselined again 2026-10-29 (the ADR 0260 guardian-rsvp-rows close): the
+# three new guardian.eventrsvp.desired_with / requested_at / attended_at keys
+# x en/de/fr/da added to KnownTranslationKeys.cs (12091 -> 12103) — the same
+# shipped-additions mechanism as above; the gate's ceiling starts from 12103 now.
+# Re-baselined again 2026-10-29 (the ADR 0261 shared-flash-extension close): the
+# forty-nine new flash.* / announcements.flash_* / events.flash_* /
+# guardian.flash_* keys x en/de/fr/da added to KnownTranslationKeys.cs
+# (12103 -> 12299) — the same shipped-additions mechanism as above; the gate's
+# ceiling starts from 12299 now.
+# Re-baselined again 2026-10-29 (the ADR 0262 posts-flash close): the nine new
+# posts.flash_* / flash.report_submitted keys x en/de/fr/da added to
+# KnownTranslationKeys.cs (12299 -> 12335) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 12335 now.
+# Re-baselined again 2026-10-29 (the ADR 0263 page-flash close): the eight new
+# pages.flash_* keys x en/de/fr/da added to KnownTranslationKeys.cs
+# (12335 -> 12367) — the same shipped-additions mechanism as above; the gate's
+# ceiling starts from 12367 now.
+# Re-baselined again 2026-10-29 (the ADR 0264 community-flash close): the nine
+# new communities.flash_* / flash.translation_needs_name_or_description keys
+# x en/de/fr/da added to KnownTranslationKeys.cs (12367 -> 12403) — the same
+# shipped-additions mechanism as above; the gate's ceiling starts from 12403 now.
+# Re-baselined again 2026-10-29 (the ADR 0265 projects-flash close): the 46 new
+# projects.flash_* / flash.translation_needs_title_or_text / projects.dir_* keys
+# x en/de/fr/da added to KnownTranslationKeys.cs (12403 -> 12587) — the same
+# shipped-additions mechanism as above; the gate's ceiling starts from 12587 now.
+# Re-baselined again 2026-10-29 (the ADR 0266 groups-flash close): the 22 new
+# groups.flash_* keys x en/de/fr/da added to KnownTranslationKeys.cs
+# (12587 -> 12675) — the same shipped-additions mechanism as above; the gate's
+# ceiling starts from 12675 now.
+# Re-baselined again 2026-10-29 (the ADR 0267 admin-flash close): the 41 new
+# admin.flash_* / flash.translation_gone_add / flash.translation_gone /
+# flash.choose_language_remove keys x en/de/fr/da added to
+# KnownTranslationKeys.cs (12675 -> 12839) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 12839 now.
+# Re-baselined again 2026-10-29 (the ADR 0268 remaining-flash close): the 34 new
+# account.flash_* / inventory.flash_* / kiosk.flash_* / languages.flash_* /
+# settings.profile_unavailable / messaging.flash_* / moderation.flash_* /
+# security.flash_* / tags.flash_* keys x en/de/fr/da added to
+# KnownTranslationKeys.cs (12839 -> 12975) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 12975 now.
+# Re-baselined again 2026-10-29 (the ADR 0269 ModelState close): the 63 new
+# validation.* keys x en/de/fr/da added to KnownTranslationKeys.cs
+# (12975 -> 13227) — the same shipped-additions mechanism as above.
+# Re-baselined again 2026-10-29 (the ADR 0270 BadRequest-bodies close): the
+# 4 new validation.* keys (validation.folder_name_required / choose_image /
+# choose_file / document_id_required) x en/de/fr/da added to
+# KnownTranslationKeys.cs (13227 -> 13243) — the same shipped-additions
+# mechanism as above.
+# Re-baselined again 2026-10-29 (the ADR 0271 Admin-hub-views close): the
+# 84 new admin.hub.* / admin.platform.* / admin.communities.* /
+# admin.accounts.* / admin.manage.* / admin.security.* / admin.audit.* /
+# admin.errorreport.* / admin.breakglass.* / admin.escalation.* / common.* keys
+# x en/de/fr/da added to KnownTranslationKeys.cs (13243 -> 13575) — the same
+# shipped-additions mechanism as above.
+# Re-baselined again 2026-10-29 (the ADR 0272 AdminSite + settings-views close):
+# the 100 new admin.site.* / admin.storage.* / admin.labels.* / admin.help.* /
+# admin.guests.* / admin.storagemetrics.* / admin.setup.* / admin.quiet.* /
+# admin.portability.* / admin.breakglass.explainer / admin.security.audit_desc
+# keys x en/de/fr/da added to KnownTranslationKeys.cs (13575 -> 13975) — the
+# same shipped-additions mechanism as above; the gate's ceiling starts from
+# 13975 now.
+# Re-baselined again 2026-10-30 (the ADR 0273 security-settings/leftovers/
+# page-titles close): the 178 new settings.mfa.* / settings.sessions.* /
+# account.delete_confirm_dialog / myportability.* / blog.draft_title /
+# inv.detail.note_placeholder / kiosk.exit / moderation.unlock_header /
+# moderation.unlock_desc / moderation.resolve_desc / pages.sibling_nav /
+# posts.mandatory_title / posts.no_feeds / profile.preview_visible_sentence /
+# profile.preview_hidden_sentence / sort.aria_label / about.cta.* / title.*
+# keys x en/de/fr/da added to KnownTranslationKeys.cs (13975 -> 14687) — the
+# same shipped-additions mechanism as above; the gate's ceiling starts from
+# 14687 now.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 11114
-  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5257
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14687
+  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
   'src/Kumunita.Core/UserInfo/UserInfoService.cs'          = 4286
-  'src/Kumunita.Web/Controllers/GroupsController.cs'       = 3032
+  'src/Kumunita.Web/Controllers/GroupsController.cs'       = 3035
   'src/Kumunita.Core/Events/EventService.cs'               = 2226
   'src/Kumunita.Web/Controllers/EventController.cs'        = 2172
   'src/Kumunita.Web/Controllers/PostsController.cs'        = 2165
-  'src/Kumunita.Core/Posts/PostService.cs'                 = 2281
-  'src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs'        = 2105
+  'src/Kumunita.Core/Posts/PostService.cs'                 = 2315
+  'src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs'        = 2110
 }
 $aViolations = [System.Collections.Generic.List[string]]::new()
 $csFiles = Get-ChildItem -Path (Join-Path $repo 'src') -Recurse -Filter '*.cs' -File |
@@ -324,7 +423,20 @@ $fBaselineSizes = @{
   # additions) and TodoDetail grew from the ADR 0189 to-do restyle (status
   # chip / assignee meta line / overdue marker / detail+comment cards) — the
   # same shipped-additions mechanism as above (the M29 precedent).
-  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 816
+  # Re-baselined again 2026-10-29 (the ADR 0251 post edit/new localization
+  # close): _Layout crossed its 816 baseline from the ADR 0231 tab-strip
+  # phone audit (sub-nav strip scroll + edge fades, shipped additions), and
+  # Groups/Detail crossed the 800 ceiling outright from the feed-footer
+  # bookmark toggle lane (the ADR 0226 / ADR 0227 TODO, 814 lines) — the same
+  # shipped-additions mechanism as above (the M29 precedent).
+  # Re-baselined again 2026-10-30 (the ADR 0273 security-settings / page-titles
+  # localization close): _Layout crossed its 833 baseline from the ADR 0273
+  # central page-title map (Security/PageTitleKeys lookup + effective-language
+  # resolution + English fallback in the <title> pass, 21 insertions / 1
+  # deletion) — the same shipped-additions mechanism as above (the M29
+  # precedent).
+  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 853
+  'src/Kumunita.Web/Views/Groups/Detail.cshtml'        = 814
 }
 $fNew = [System.Collections.Generic.List[string]]::new()
 foreach ($v in $fViolations) {

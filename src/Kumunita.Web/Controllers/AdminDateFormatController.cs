@@ -107,7 +107,7 @@ public sealed class AdminDateFormatController(
         try
         {
             await localization.SetDefaultDateFormatAsync(chosen, actor);
-            TempData["info"] = $"Platform default date & time format set to “{chosen}”.";
+            TempData["info"] = await this.FlashAsync("admin.flash_date_format_set", "Platform default date & time format set to “{0}”.", chosen);
             return RedirectToAction(nameof(Index));
         }
         catch (InvalidOperationException ex)

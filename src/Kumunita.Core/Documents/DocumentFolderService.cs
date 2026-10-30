@@ -205,6 +205,11 @@ public sealed class DocumentFolderService
 
         doc.FolderId = newFolderId;
         doc.Modified = DateTimeOffset.UtcNow;
+        // ADR 0239 D2 — stamp who last changed the document (the actor is the
+        // owner by construction — the gate above already passed). The detail
+        // view resolves this to a display name, the PostsController feed
+        // shape.
+        doc.ModifiedById = actorId;
 
         var now = DateTimeOffset.UtcNow;
         var audit = new Authorization.AccessAudit

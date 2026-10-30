@@ -108,6 +108,18 @@ public interface IBookmarkService
     /// </summary>
     Task<bool> IsBookmarkedAsync(string ownerId, string targetKind, string targetId);
 
+    /// <summary>
+    /// ADR 0227 — the batched form of <see cref="IsBookmarkedAsync"/> for card
+    /// lists (the feed card footer): of <paramref name="targetIds"/> (all of
+    /// <paramref name="targetKind"/>), the ids the owner has bookmarked. One
+    /// query per page. Same personal-read shape as the single read: no target
+    /// read, no <c>AccessAudit</c> row, no <c>CanAsync</c> pass; a blank owner,
+    /// a kind outside the closed set or an empty id list answers an empty set
+    /// with no query.
+    /// </summary>
+    Task<IReadOnlySet<string>> ListBookmarkedIdsAsync(
+        string ownerId, string targetKind, IReadOnlyCollection<string> targetIds);
+
     // ── Folder-tree methods (ADR 0168 — the M37 folder-tree shape re-applied
     //    to the bookmark surface; the §deferred "bookmark folders" lane
     //    from m17-bookmarks-design.md, now settled). The depth ≤ 2 pin, the
