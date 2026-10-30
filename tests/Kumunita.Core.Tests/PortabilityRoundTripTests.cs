@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
@@ -109,6 +110,12 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
+            // ADR 0276 — the EscalationOutboundConfig singleton (the
+            // /admin/escalation outbound config) — ConfigExport reads it
+            // and the apply writes it back. Not in the 44-doc inventory
+            // (it travels via the config.json escalation block, not as a
+            // docs/ row), but it must be registered on the test store.
+            EscalationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
@@ -846,6 +853,237 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             Assert.Single(auditRows);
             Assert.Equal(AccessVia.Admin, auditRows[0].Via);
         }
+    }
+
+    // The clean-slate restore must apply the archive's LocaleSettings singleton
+    // — including the platform default time zone (ADR 0019) and the sign-up
+    // posture (ADR 0050) — when the target instance already has a seeder row.
+    //
+    // The real-app failure this pins: FirstBootSeeder always creates the
+    // LocaleSettings row on first boot (UTC / FloorFormat / the seeder's
+    // boolean floors). The config apply's old shape was "write the singleton
+    // only when it is null", so on a real instance (where the row is never
+    // null) the archive's timezone + signup values were silently dropped and
+    // the seeder's defaults stuck. The D9a round-trip test does NOT catch
+    // this, because its instance B is a raw Marten store with no seeder row —
+    // the "write if null" branch fired and applied the values, masking the bug.
+    // This test mirrors the real scenario: B pre-exists with a seeder-shaped
+    // row, and a CleanSlate import must overwrite it with the archive's state.
+    [Fact]
+    public async Task PortabilityImport_CleanSlate_AppliesArchiveLocaleSettingsOverExistingSeederRow()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes). The plant's config block sets
+        // IsSignupOpen = true + MessagingEnabled = true — the values the
+        // archive carries (the D9a test already pins these round-trip).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a fresh instance (raw store) that has ALREADY booted,
+        // so the FirstBootSeeder's LocaleSettings row exists (the real-app
+        // shape: sign-up CLOSED, messaging OFF — the seeder's defaults). A
+        // CleanSlate import over this instance must replace those seeder
+        // values with the archive's (sign-up OPEN, messaging ON).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        // B's seeder row — the real-app shape the apply must overwrite.
+        // The seeder's defaults: sign-up closed, messaging off.
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new LocaleSettings
+            {
+                Id = LocaleSettings.SingletonId,
+                DefaultLanguageCode = "en",
+                DefaultTimezone = "UTC",
+                DefaultDateFormat = DateFormat.FloorFormat,
+                IsSignupOpen = false,
+                MessagingEnabled = false,
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        // The import (CleanSlate — the default mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.CleanSlate, ct);
+        Assert.True(result.Ok,
+            "the CleanSlate import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var localeB = await q.Query<LocaleSettings>()
+                .Where(l => l.Id == LocaleSettings.SingletonId)
+                .FirstAsync(ct);
+            // The archive's sign-up posture (open) replaced the seeder's closed default.
+            Assert.True(localeB.IsSignupOpen,
+                "the CleanSlate restore must apply the archive's sign-up posture (ADR 0050) — " +
+                "B's seeder IsSignupOpen = false stuck (the 'write only when null' bug)");
+            // The archive's messaging flag (on) replaced the seeder's off default.
+            Assert.True(localeB.MessagingEnabled,
+                "the CleanSlate restore must apply the archive's messaging flag — " +
+                "B's seeder MessagingEnabled = false stuck");
+        }
+    }
+
+    // ADR 0276 — the escalation outbound config round-trip (CleanSlate). The
+    // archive carries the receiving endpoint + enabled switch (the non-secret
+    // fields); the plaintext token is structurally absent from the config POCO
+    // (the C-M11·2 boundary). A CleanSlate import re-materializes the singleton
+    // from the archive's endpoint + enabled; the token is blank (the admin
+    // re-enters it on /admin/escalation after the restore).
+    [Fact]
+    public async Task PortabilityImport_CleanSlate_RestoresEscalationConfigEndpointAndEnabled()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance + the escalation outbound
+        // config (endpoint + enabled + a known plaintext token).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://other-community.example/escalations/inbound",
+                Token = "A-SECRET-TOKEN-abc123",
+                Enabled = true,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a fresh instance (no escalation config row yet).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+
+        // The import (CleanSlate — the default mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.CleanSlate, ct);
+        Assert.True(result.Ok,
+            "the CleanSlate import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var row = await q.LoadAsync<EscalationOutboundConfig>(
+                ConfigExport.EscalationOutboundConfigSingletonId, ct);
+            Assert.NotNull(row);
+            // The archive's endpoint + enabled were applied.
+            Assert.Equal("https://other-community.example/escalations/inbound", row!.Endpoint);
+            Assert.True(row.Enabled);
+            // The token is blank (structurally absent from the archive — the
+            // admin re-enters it after the restore; the C-M11·2 boundary).
+            Assert.True(string.IsNullOrEmpty(row.Token),
+                "the plaintext escalation token must NOT travel in the archive (the C-M11·2 boundary) — " +
+                $"got: '{row.Token}'");
+        }
+    }
+
+    // ADR 0276 — the KeepExisting merge does NOT touch the target's escalation
+    // config (the same keep-first discipline ADR 0274 / ADR 0275 apply to the
+    // tag / principal merges). The target's existing row — endpoint, token,
+    // enabled — is kept intact.
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_KeepsTargetEscalationConfig()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance + the escalation outbound
+        // config (a DIFFERENT endpoint + token from B's).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://a-community.example/escalations/inbound",
+                Token = "A-TOKEN-xyz789",
+                Enabled = true,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the representative instance + its OWN escalation config
+        // (a different endpoint + token + disabled).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        // Plant creates pt-admin-001 (with the elevated roles) itself — do NOT
+        // pre-create it with EnsurePrincipalWithRolesAsync here, or Plant's
+        // own CreateAsync hits the EF duplicate-tracking conflict.
+        await PlantRepresentativeInstanceAsync(storeB, userManagerB, roleManagerB, mediaStoreB, ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://b-community.example/escalations/inbound",
+                Token = "B-TOKEN-keep-me",
+                Enabled = false,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        // The import (KeepExisting — merge mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var row = await q.LoadAsync<EscalationOutboundConfig>(
+                ConfigExport.EscalationOutboundConfigSingletonId, ct);
+            Assert.NotNull(row);
+            // B's own escalation config is kept intact (endpoint, token, enabled
+            // — none of it overwritten by A's archive).
+            Assert.Equal("https://b-community.example/escalations/inbound", row!.Endpoint);
+            Assert.Equal("B-TOKEN-keep-me", row.Token);
+            Assert.False(row.Enabled);
+        }
+    }
+
+    // ADR 0276 — the archive's escalation block is a no-secret set (the
+    // C-M11·2 boundary applied to the escalation surface): the config POCO's
+    // escalation block has no field that carries a credential (the same
+    // "structurally incapable of traveling" pin the PortabilityPrincipal
+    // POCO enforces on the credential columns).
+    [Fact]
+    public void PortabilityNoSecret_EscalationBlockHasNoTokenField()
+    {
+        var secretFieldNames = new[] { "token", "secret", "password", "apikey" };
+        var fieldNames = typeof(PortabilityConfigEscalation)
+            .GetProperties()
+            .Select(p => p.Name.ToLowerInvariant())
+            .ToList();
+        Assert.All(
+            secretFieldNames,
+            name => Assert.DoesNotContain(
+                name, fieldNames, StringComparer.Ordinal));
     }
 
     // ADR 0193 D2 — KeepExisting (checked): the import is a MERGE. The

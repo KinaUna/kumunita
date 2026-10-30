@@ -255,12 +255,14 @@ public sealed class PortabilityService(
         await PortabilityApplyMedia.ApplyAsync(mediaFileStore, data, ct).ConfigureAwait(false);
 
         // Step 4 — the config apply (the LocaleSettings + the
-        // LanguageCatalog — the §config field set; the U02 ConfigExport
-        // mirror, verbatim). The last apply step (the §apply order —
-        // the LanguageCatalog / LocaleSettings re-materialize after the
-        // *Translation rows that reference them are stored). In
-        // KeepExisting mode, rows that already exist are kept intact.
-        await PortabilityApplyConfig.ApplyAsync(documentStore, config, mode, ct).ConfigureAwait(false);
+        // LanguageCatalog + the ADR 0276 escalation outbound config — the
+        // §config field set; the U02 ConfigExport mirror, verbatim). The
+        // last apply step (the §apply order — the LanguageCatalog /
+        // LocaleSettings / EscalationOutboundConfig re-materialize after
+        // the *Translation rows that reference them are stored). In
+        // KeepExisting mode, rows that already exist are kept intact
+        // (the target's own escalation config is never overwritten).
+        await PortabilityApplyConfig.ApplyAsync(documentStore, config, mode, actorId, ct).ConfigureAwait(false);
 
         // The one portability.import AccessAudit row (TargetKind
         // "portability", Via = Admin, verb import) — emitted by the

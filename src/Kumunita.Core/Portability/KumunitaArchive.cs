@@ -78,6 +78,61 @@ public sealed record PortabilityConfig
     /// </summary>
     [JsonPropertyName("languages")]
     public List<PortabilityConfigLanguage> Languages { get; init; } = new();
+
+    /// <summary>
+    /// ADR 0276 — the /admin/escalation outbound config (the <see
+    /// cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig"/>
+    /// singleton): the receiving platform's inbound <c>endpoint</c> + the
+    /// <c>enabled</c> switch. The <b>token</b> (the plaintext the origin
+    /// admin was handed, the OUTGOING secret) is <b>structurally absent</b>
+    /// from this POCO (the C-M11·2 boundary, the same "no-secret set" the
+    /// <see cref="PortabilityPrincipal"/> POCO enforces on the credential
+    /// columns) — a restore carries the forwarding endpoint + posture, and
+    /// the admin re-enters the token after a CleanSlate import (the same
+    /// "re-enter your credential" shape as the password reset, the
+    /// <see cref="PortabilityApplyIdentity"/> boundary). <c>null</c> when
+    /// the source instance has no escalation config row (a fresh instance
+    /// that never set one up) — the apply then leaves the target's existing
+    /// row untouched (or, on a CleanSlate restore, the forwarder's
+    /// <c>KUMUNITA_ESCALATION_ENDPOINT</c> env fallback still works).
+    /// </summary>
+    [JsonPropertyName("escalation")]
+    public PortabilityConfigEscalation? Escalation { get; init; }
+}
+
+/// <summary>
+/// ADR 0276 — the <c>config.json</c> <c>escalation</c> block (the <see
+/// cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig"/> singleton's
+/// <b>non-secret</b> fields: the receiving endpoint + the enabled switch).
+/// The <see cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig.Token"/>
+/// (plaintext, the OUTGOING secret) is <b>not</b> a field here — the
+/// C-M11·2 import boundary applied to the escalation surface (the same
+/// "structurally incapable of traveling" discipline the
+/// <see cref="PortabilityPrincipal"/> POCO enforces on the credential
+/// columns): a restore carries the forwarding endpoint + posture, and the
+/// admin re-enters the token after a CleanSlate import (the /admin/escalation
+/// save lane's <c>model.Token</c> binds to the freshly-restored row; the
+/// apply never writes the token, so the target's existing token — if any —
+/// is left intact, and a fresh restore's empty token is the admin's to set).
+/// </summary>
+public sealed record PortabilityConfigEscalation
+{
+    /// <summary>
+    /// The <see cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig.Endpoint"/>
+    /// (the receiving platform's inbound URL). <c>null</c> when the source
+    /// instance's config is disabled (no endpoint) — the JSON field is
+    /// omitted, the apply's "enabled" branch is the only path that writes
+    /// it, and a disabled restore leaves the target's row untouched.
+    /// </summary>
+    [JsonPropertyName("endpoint")]
+    public string? Endpoint { get; init; }
+
+    /// <summary>
+    /// The <see cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig.Enabled"/>
+    /// switch (whether escalation forwarding is live on the source instance).
+    /// </summary>
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; init; }
 }
 
 /// <summary>The <c>config.json</c> <c>community</c> block (§config).</summary>
