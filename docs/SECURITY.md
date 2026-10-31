@@ -154,6 +154,36 @@ privilege surface? If so, add a row here and in the relevant checklist.
 
 ### Decisions
 
+**Supply-chain pinning (SEC L5, decided 2026-10-31; protects A6):** what is
+pinned and what is intentionally left floating.
+
+- **Pinned (by commit / digest, not just tag):**
+  - **CI actions** (`.github/workflows/ci.yml`): `actions/checkout@fbc6f39…b6c09`
+    (`# v5`), `actions/setup-dotnet@26b0ec1…c95bf1` (`# v5`),
+    `actions/setup-node@a0853c2…a1444` (`# v5`). SHA = the tag's resolved commit
+    (GitHub API, 2026-10-31).
+  - **Container base images** (`Dockerfile`): `mcr.microsoft.com/dotnet/sdk:10.0`
+    and `mcr.microsoft.com/dotnet/aspnet:10.0` are SHA-pinned to their
+    multi-arch index digests (MCR registry, 2026-10-31).
+  - **NuGet + npm packages:** already version-pinned via `PackageReference`
+    / `package-lock.json`; `dotnet list package --vulnerable` + `npm audit` are
+    clean (U3 baseline).
+- **Intentionally not pinned ("to pin" list):**
+  - `node:22` (Dockerfile stage 1, the TS build) — Docker Hub blocks anonymous
+    digest resolution, so it stays a floating tag. **To pin:** resolve via a
+    token-authenticated pull or `docker pull node:22 && docker inspect` and add
+    the digest.
+  - `postgres:18`, `axllent/mailpit:latest` (dev `docker-compose.yml`) — dev-only,
+    not the deploy path, so left floating. **To pin:** same approach if a dev box
+    needs reproducible builds.
+  - **Workflow `permissions:`** is now scoped to `contents: read` (least
+    privilege — the workflow only reads the checked-out source).
+- **Non-root container runtime:** the app now runs as `USER app` (the `app`
+  user, UID 1654, that the MCR aspnet base ships) in the Dockerfile runtime
+  stage; the writable paths (`/app`, `/data/media`,
+  `/data/dataprotection-keys`) are `chown`ed to it. `curl`/`wget` are kept
+  (external health probe, no built-in substitute — see the U25 handoff note).
+
 **Rate limiting (mechanism, decided 2026-08-27; protects A2):**
 
 - **Mechanism:** ASP.NET Core's built-in rate-limiting middleware

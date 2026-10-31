@@ -10,7 +10,12 @@ COPY src/Kumunita.Web/client/ ./client/
 RUN npm ci && npm run build
 
 # --- 2. .NET: restore + publish the web app (with the compiled front-end in wwwroot) ---
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# SEC L5 (U25): the tag is SHA-pinned to the multi-arch index digest resolved
+# from the MCR registry on 2026-10-31 (re-resolve and update when the .NET 10
+# SDK rolls a new image; a pinned digest stops a base-image move changing the
+# build silently). `node:22` (stage 1) is left unpinned — Docker Hub blocks
+# anonymous digest resolution — and is on the "to pin" list in the handoff note.
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b AS build
 WORKDIR /src
 COPY global.json ./
 COPY src/Kumunita.Core/ ./src/Kumunita.Core/
@@ -19,7 +24,8 @@ COPY --from=ts /src/wwwroot/js ./src/Kumunita.Web/wwwroot/js/
 RUN dotnet publish src/Kumunita.Web -c Release -o /app/publish
 
 # --- 3. Runtime: slim ASP.NET Core image ---
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+# SEC L5 (U25): SHA-pinned to the multi-arch index digest (resolved 2026-10-31).
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:de0ee358cdd672f7017a003bed21e9ac9ed48a27c922a59b18175b6e82fa7fee AS runtime
 WORKDIR /app
 # curl is the healthcheck client: Coolify pings the /health endpoint with it
 # (the slim image ships neither curl nor wget). wget is installed too so
@@ -52,4 +58,14 @@ VOLUME /data/dataprotection-keys
 # the image layer, so without the mount uploads are lost on redeploy — exact
 # same floor-not-replacement rationale as the keyring volume above.
 VOLUME /data/media
+# SEC L5 (U25): run the app as a non-root user (was root). The MCR aspnet base
+# already ships a non-root `app` user (UID 1654, /home/app) — use it rather than
+# creating a new one. Own the app dir and both data-volume paths so the
+# non-root process can write them. curl/wget are KEPT (not dropped): the health
+# probe is external (Coolify's default `wget` probe / operator `curl`) and the
+# .NET runtime has no built-in one-line HTTP health client, so there is no
+# `HEALTHCHECK` built-in to substitute (see the `## U25` handoff note).
+RUN mkdir -p /data/media /data/dataprotection-keys \
+    && chown -R app:app /app /data
+USER app
 ENTRYPOINT ["dotnet", "Kumunita.Web.dll"]
