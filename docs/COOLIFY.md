@@ -160,7 +160,7 @@ port (OPS §10).
 | `Verification__BaseUrl` | **recommended — set for correct mail links** — this instance's public base URL: the §2 domain, scheme included, **no trailing slash** (e.g. `https://maplewood.kumunita.example`). The verification email's link is built from it; a recipient's mail client cannot resolve a bare `/account/verify` path, so an unset value degrades the email to a relative path. See **§5.3**. |
 | `Verification__TtlDays` | optional — how long a verification link stays valid (default `14`) |
 | `Verification__MaxVerifyAttempts` | optional — max clicks on a verification link before it expires (default `3`) |
-| `Health__Token` | optional, **secret** — shared-secret gating the full `/health` diagnostic payload (the minimal liveness probe stays anonymous); omit to leave the full payload visible. Recommended for production: `openssl rand -hex 24` |
+| `Health__Token` | optional, **secret** — shared-secret granting the full `/health` diagnostic payload. **Minimal-by-default (SEC U16 / M4):** an anonymous caller *always* gets only the liveness probe (`status`/`database`/`app`/`elapsedMs`); the full diagnostic (mail detail, dead-letter count, build SHA) requires this token as the `X-Health-Token` header, or an authenticated GlobalAdmin session. The token compare is constant-time and the SMTP relay handshake is cached ~60 s. The Coolify / edge-proxy health check works with the probe alone — set this token only to read the operator diagnostics. Recommended for production: `openssl rand -hex 24` |
 | `DataProtection__KeysDirectory` | **recommended — required in production** — a persistent directory (Coolify's `/data` volume, e.g. `/data/keys`) holding the data-protection keyring. See **§5.2** below. Omit to keep the in-memory default (sessions die on every redeploy). |
 | `Media__RootPath` | **recommended — required in production** — the path of the dedicated media volume holding the *bytes* (ADR 0011). See **§5.2A** below. Omit to keep the in-image default (`/app/media`) — in production, uploads are then lost on every redeploy. |
 | `Media__MaxBytes` | optional — **fallback** per-file cap in bytes (default `10485760` = 10 MiB; `0` = no cap). Primarily admin-set in-app (`/admin/storage/settings`); this env value is the fallback when no override is set — OPS *Configuration reference* (ADR 0135) |
@@ -429,7 +429,26 @@ Path `GET /health`, expected `200`.
 ## 6. Verify (then switch to the runbook)
 
 1. `https://<domain>/` renders with the correct `Community__Name`, over
-HTTPS.
+HTTPS. **Also check the forwarded-headers + cookie policy** (SEC H3 — the
+operator is the only one who can prove this, as it depends on live proxy
+config; none of the three checks below is covered by a unit test):
+   - a. `curl -sI https://<domain>/` → response must include
+     `Strict-Transport-Security: max-age=…` (HSTS) **and** the session
+     cookie (`Set-Cookie: kumunita.auth=…; Secure`) must carry the `Secure`
+     attribute. If `Secure` is missing the proxy is not forwarding
+     `X-Forwarded-Proto: https` to the app, or the non-dev `CookieSecurePolicy.Always`
+     block in `Program.cs` is not active.
+   - b. From two different source IPs (e.g. two devices, or a VPN vs. a direct
+     connection), submit a login attempt with the same wrong password 5+
+     times in rapid succession from *each*. If the second IP still accepts
+     attempts after the first is locked out, the rate-limit partitioning is
+     working (real client IPs are distinct). If both IPs lock out
+     simultaneously, the app sees a single shared IP — the proxy is not
+     forwarding `X-Forwarded-For`, or `ReverseProxy:KnownNetworks` is unset
+     and the proxy's source IP is not in the loopback+RFC1918 defaults.
+   - c. If (a) or (b) fails: set `ReverseProxy:KnownNetworks` to the CIDR of
+     the proxy's source address (e.g. `172.18.0.0/16` for the Docker network)
+     in the app's env or `appsettings.Production.json`, and redeploy.
 2. `GET /health` → `{"status":"ok","database":"ok","build":"<sha>",…}` and
 `build` matches the deployed commit (`release` tip).
 3. **First boot** (fresh database): the `mt` schema initializes with no
@@ -485,6 +504,26 @@ after the check.
 7. Record the instance in the **OPS inventory** (domain, VPS, DB name, commit
 SHA, admin contact, dates).
 8. Backups enabled / scheduled per OPS Procedure 4.
+9. **Host + security-header hardening** (SEC U26, L6/L7) — the in-repo defaults
+keep local dev working, so the operator must pin the production values in the
+app's env or `appsettings.Production.json`:
+   - **`AllowedHosts`** — the in-repo `appsettings.json` ships `"*"` (dev only,
+     so local host/port iteration keeps working). For production, set it to the
+     community's public host (e.g. `maplewood.example.com`), comma-separated if
+     there is a secondary name. Leave it `*` only for local dev.
+   - **`WellKnown__BaseUrl`** *(optional)* — the instance's public base URL
+     (no trailing slash, e.g. `https://maplewood.example.com`). When set, the
+     RFC 9116 `security.txt` `Policy:` field is built from this instead of the
+     incoming `Request.Host`, so a spoofed `Host` header (S-3) can't corrupt it.
+     Unset → falls back to the request origin (the previous behaviour).
+   - **`Strict-Transport-Security`** is now emitted with `max-age=31536000`
+     (one year; `includeSubDomains` is deliberately **off**). Verify with
+     `curl -sI https://<domain>/` (step 1a already asserts the HSTS header is
+     present — confirm the `max-age` value is `31536000`).
+   - **`Permissions-Policy`** is now emitted on every response with a
+     restrictive default (camera, microphone, geolocation, payment, usb,
+     fullscreen, picture-in-picture, web-share all disabled). No env value
+     needed; if a future feature legitimately needs one, opt it in here.
 
 ## Troubleshooting (quick)
 

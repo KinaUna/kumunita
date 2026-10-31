@@ -222,8 +222,34 @@ $aBaseline = @(
 # keys x en/de/fr/da added to KnownTranslationKeys.cs (13975 -> 14687) — the
 # same shipped-additions mechanism as above; the gate's ceiling starts from
 # 14687 now.
+# Re-baselined again 2026-10-30 (the ADR 0277 directory sort/filter lane close):
+# the directory's search/verified/clear labels (directory.search /
+# directory.verified_only / directory.no_results / directory.clear) + the
+# a11y.find_directory aria-label, x en/de/fr/da, added to
+# KnownTranslationKeys.cs (14687 -> 14707) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 14707 now.
+# Re-baselined again 2026-10-30 (the group-messaging lane close): the 15
+# group_message.* UI keys + the 8 group-messaging notification.* keys
+# (kind badge + preference label + subject + body for the two new kinds
+# group.message.new / group.message.mention) x en/de/fr/da added to
+# KnownTranslationKeys.cs (14707 -> 14815) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 14815 now.
+# Re-baselined again 2026-10-30 (the group-title + messages-tab amendment
+# to the group-messaging lane, ADR 0278): the two group_message.new.name*
+# keys (the new-group name field's label + placeholder) x en/de/fr/da added
+# to KnownTranslationKeys.cs (14815 -> 14823) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 14823 now.
+# Re-baselined again (the group-messaging invitation flow, ADR 0278
+# amendment): the seven new group_message.* UI keys (members / pending /
+# invite_sent / invite_accepted / invite_declined / invite_not_pending) +
+# the three notification.* group.message.invite keys x en/de/fr/da added to
+# KnownTranslationKeys.cs (14823 -> 14863) — the same shipped-additions
+# mechanism as above; the gate's ceiling starts from 14863 now.
+# Re-baselined again 2026-10-31 (the SEC L3 U24 verify confirm step): two new
+# account.verify_confirm_* keys x en/de/fr/da added to KnownTranslationKeys.cs
+# (14863 -> 14885) — the same shipped-additions mechanism as above.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14687
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14885
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
@@ -435,7 +461,13 @@ $fBaselineSizes = @{
   # resolution + English fallback in the <title> pass, 21 insertions / 1
   # deletion) — the same shipped-additions mechanism as above (the M29
   # precedent).
-  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 853
+  # Re-baselined again 2026-10-31 (the ADR 0279 hand-drawn icon-sprite close):
+  # _Layout crossed its 853 baseline by one line from the new
+  # _IconSprite partial render right after <body> (the 28 inline 16-grid
+  # copies were replaced by <use> references in place, so the only net
+  # addition is the partial line) — the same shipped-additions mechanism as
+  # above (the M29 precedent).
+  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 854
   'src/Kumunita.Web/Views/Groups/Detail.cshtml'        = 814
 }
 $fNew = [System.Collections.Generic.List[string]]::new()

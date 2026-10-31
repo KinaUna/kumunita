@@ -1,5 +1,6 @@
 using Kumunita.Core;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.Controllers;
@@ -47,10 +48,12 @@ namespace Kumunita.Web.Controllers;
 public sealed class WellKnownController : Controller
 {
     private readonly IOptions<CommunityOptions> _community;
+    private readonly IConfiguration _config;
 
-    public WellKnownController(IOptions<CommunityOptions> community)
+    public WellKnownController(IOptions<CommunityOptions> community, IConfiguration config)
     {
         _community = community;
+        _config = config;
     }
 
     /// <summary>
@@ -76,8 +79,13 @@ public sealed class WellKnownController : Controller
         // Policy — the canonical URL of the VDP. There is no separate served
         // VDP page, so the Policy points at this same security.txt route
         // (the F13 plan: "pointing at this same security.txt or a dedicated
-        // page"); built from the request origin so it is a full, correct URL.
-        var origin = $"{Request.Scheme}://{Request.Host}";
+        // page"). SEC U26 (L7): when the operator has pinned the public base URL
+        // (WellKnown__BaseUrl), build the Policy from it so security.txt is correct
+        // regardless of the incoming Host — the Request.Host of a spoofed request is
+        // not trustworthy (S-3). Unset (fresh/dev) falls back to the request origin,
+        // the previous behaviour.
+        var baseurl = _config["WellKnown:BaseUrl"]?.TrimEnd('/');
+        var origin = string.IsNullOrWhiteSpace(baseurl) ? $"{Request.Scheme}://{Request.Host}" : baseurl;
         var policy = $"{origin}/.well-known/security.txt";
 
         // Expires — a future date at least 12 months out (today is 2026-10-24;

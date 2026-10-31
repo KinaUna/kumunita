@@ -1927,6 +1927,10 @@ public static class KnownTranslationKeys
             ["directory.title"] = "Directory",
             ["directory.lead"]  = "Everyone in the neighborhood — every resident on the platform.",
             ["directory.empty"] = "No residents on this neighborhood yet.",
+            ["directory.no_results"] = "No residents match your search.",
+            ["directory.search"] = "Search",
+            ["directory.verified_only"] = "Verified only",
+            ["directory.clear"] = "Clear",
 
             // ── profile (page heading + primary action) ─────────────────────
             ["profile.title"]      = "Your profile",
@@ -2998,6 +3002,45 @@ public static class KnownTranslationKeys
             ["message.other"] = "the other person",
             ["message.sent_to"] = "Sent to {0}.",
             ["message.load_earlier"] = "Load earlier messages",
+            // ── Group messaging lane (the N:1 generalization of the M9 1:1 surface, ADR 0105) ──
+            ["group_message.nav"] = "Group messages",
+            ["group_message.title"] = "Group messages",
+            ["group_message.new"] = "New group",
+            ["group_message.new.name"] = "Group name",
+            ["group_message.new.name.placeholder"] = "Give this group a name (optional)",
+            ["group_message.add_members"] = "Add people",
+            ["group_message.add_members.placeholder"] = "Choose residents to add",
+            ["group_message.thread.empty"] = "No messages yet — start the conversation.",
+            ["group_message.compose.placeholder"] = "Write a message to the group…",
+            ["group_message.compose.send"] = "Send",
+            ["group_message.unread"] = "unread",
+            ["group_message.disabled"] = "Group messaging is turned off on this instance.",
+            ["group_message.participants"] = "{0} people",
+            ["group_message.creator"] = "created by {0}",
+            ["group_message.sent_to"] = "Sent to the group.",
+            ["group_message.load_earlier"] = "Load earlier messages",
+            ["group_message.you"] = "You",
+            ["group_message.members"] = "Members",
+            ["group_message.pending"] = "pending",
+            ["group_message.invite_sent"] = "{0} invitation(s) sent.",
+            ["group_message.invite_accepted"] = "Invitation accepted — you are now a member.",
+            ["group_message.invite_declined"] = "Invitation declined.",
+            ["group_message.invite_not_pending"] = "That invitation is no longer pending.",
+
+            // ── Group messaging lane — the two new notification kinds + nudge templates ──
+            ["notifications.kind.group.message.new"] = "New group message",
+            ["notifications.preference.group.message.new.label"] = "Messages in groups",
+            ["notification.group.message.new.subject"] = "A new group message",
+            ["notification.group.message.new.body"] = "A resident sent a message in a group you follow: ",
+            ["notifications.kind.group.message.mention"] = "Group message mention",
+            ["notifications.preference.group.message.mention.label"] = "Mentions in group messages",
+            ["notification.group.message.mention.subject"] = "You were mentioned in a group message",
+            ["notification.group.message.mention.body"] = "You were mentioned in a group message: ",
+            ["notifications.kind.group.message.invite"] = "Group message invitation",
+            ["notifications.preference.group.message.invite.label"] = "Group message invitations",
+            ["notification.group.message.invite.subject"] = "You've been invited to a group conversation",
+            ["notification.group.message.invite.body"] = "A resident invited you to join a group conversation: ",
+
             ["pages.subscribe"] = "Subscribe to updates",
             ["pages.unsubscribe"] = "Unsubscribe from updates",
 
@@ -3530,6 +3573,7 @@ public static class KnownTranslationKeys
             ["a11y.notifications"]             = "Notifications",
             ["a11y.find_tag"]                  = "Find by tag",
             ["a11y.find_bio"]                  = "Find by bio",
+            ["a11y.find_directory"]            = "Search residents",
             ["a11y.avatar"]                    = "Avatar image",
             ["a11y.board_actions"]             = "Board actions",
             ["a11y.calendar_view"]             = "Calendar view",
@@ -3847,6 +3891,13 @@ public static class KnownTranslationKeys
                 "Never got the confirmation email?",
             ["account.signup_resend_link"] =
                 "Resend the confirmation email",
+
+            // SEC L3 (U24, 2026-10-31) — the self-serve confirm step: the
+            // GET renders a confirm page (side-effect-free); the POST
+            // validates the token + signs in via ConfirmAndSignInAsync.
+            ["account.verify_confirm_lede"] =
+                "Confirm that this is your account and you're ready to sign in.",
+            ["account.verify_confirm_submit"] = "Confirm & sign in",
         };
 
     // ─────────────────────────────────────────────────────────────────────
@@ -5718,6 +5769,10 @@ public static class KnownTranslationKeys
             ["directory.title"] = "Verzeichnis",
             ["directory.lead"]  = "Alle in der Nachbarschaft — jede:r Anwohner:in auf der Plattform.",
             ["directory.empty"] = "Noch keine Anwohner:innen in dieser Nachbarschaft.",
+            ["directory.no_results"] = "Keine Anwohner:innen entsprechen deiner Suche.",
+            ["directory.search"] = "Suchen",
+            ["directory.verified_only"] = "Nur verifizierte",
+            ["directory.clear"] = "Zurücksetzen",
 
             // ── profile (page heading + primary action) ─────────────────────
             ["profile.title"]      = "Dein Profil",
@@ -6703,6 +6758,45 @@ public static class KnownTranslationKeys
             ["message.other"] = "die andere Person",
             ["message.sent_to"] = "Gesendet an {0}.",
             ["message.load_earlier"] = "Frühere Nachrichten laden",
+            // ── Group messaging lane (the N:1 generalization of the M9 1:1 surface, ADR 0105) ──
+            ["group_message.nav"] = "Gruppennachrichten",
+            ["group_message.title"] = "Gruppennachrichten",
+            ["group_message.new"] = "Neue Gruppe",
+            ["group_message.new.name"] = "Gruppenname",
+            ["group_message.new.name.placeholder"] = "Diese Gruppe einen Namen geben (optional)",
+            ["group_message.add_members"] = "Personen hinzufügen",
+            ["group_message.add_members.placeholder"] = "Bewohner auswählen, die hinzugefügt werden",
+            ["group_message.thread.empty"] = "Noch keine Nachrichten — fang die Unterhaltung an.",
+            ["group_message.compose.placeholder"] = "Nachricht an die Gruppe schreiben…",
+            ["group_message.compose.send"] = "Senden",
+            ["group_message.unread"] = "ungelesen",
+            ["group_message.disabled"] = "Gruppennachrichten sind auf dieser Instanz deaktiviert.",
+            ["group_message.participants"] = "{0} Personen",
+            ["group_message.creator"] = "angelegt von {0}",
+            ["group_message.sent_to"] = "An die Gruppe gesendet.",
+            ["group_message.load_earlier"] = "Frühere Nachrichten laden",
+            ["group_message.you"] = "Du",
+            ["group_message.members"] = "Mitglieder",
+            ["group_message.pending"] = "ausstehend",
+            ["group_message.invite_sent"] = "{0} Einladung(en) gesendet.",
+            ["group_message.invite_accepted"] = "Einladung angenommen — du bist jetzt Mitglied.",
+            ["group_message.invite_declined"] = "Einladung abgelehnt.",
+            ["group_message.invite_not_pending"] = "Diese Einladung ist nicht mehr ausstehend.",
+
+            // ── Group messaging lane — the two new notification kinds + nudge templates ──
+            ["notifications.kind.group.message.new"] = "Neue Gruppennachricht",
+            ["notifications.preference.group.message.new.label"] = "Nachrichten in Gruppen",
+            ["notification.group.message.new.subject"] = "Eine neue Gruppennachricht",
+            ["notification.group.message.new.body"] = "Eine Bewohnerin hat in einer Gruppe, die du folgst, eine Nachricht geschickt: ",
+            ["notifications.kind.group.message.mention"] = "Erwähnung in Gruppennachricht",
+            ["notifications.preference.group.message.mention.label"] = "Erwähnungen in Gruppennachrichten",
+            ["notification.group.message.mention.subject"] = "Du wurdest in einer Gruppennachricht erwähnt",
+            ["notification.group.message.mention.body"] = "Du wurdest in einer Gruppennachricht erwähnt: ",
+            ["notifications.kind.group.message.invite"] = "Gruppennachrichten-Einladung",
+            ["notifications.preference.group.message.invite.label"] = "Einladungen zu Gruppennachrichten",
+            ["notification.group.message.invite.subject"] = "Du wurdest zu einer Gruppengespräch eingeladen",
+            ["notification.group.message.invite.body"] = "Ein Bewohner hat dich zu einem Gruppengespräch eingeladen: ",
+
             ["pages.subscribe"] = "Aktualisierungen abonnieren",
             ["pages.unsubscribe"] = "Abonnierung aufheben",
 
@@ -7209,6 +7303,7 @@ public static class KnownTranslationKeys
             ["a11y.notifications"]             = "Benachrichtigungen",
             ["a11y.find_tag"]                  = "Nach Tag finden",
             ["a11y.find_bio"]                  = "Nach Bio finden",
+            ["a11y.find_directory"]            = "Anwohner:innen durchsuchen",
             ["a11y.avatar"]                    = "Avatarbild",
             ["a11y.board_actions"]             = "Board-Aktionen",
             ["a11y.calendar_view"]             = "Kalenderansicht",
@@ -7525,6 +7620,11 @@ public static class KnownTranslationKeys
             ["posts.board_report_button"] = "Dieses Board melden",
             ["posts.todo_report_button"] = "Diese Aufgabe melden",
             ["posts.grouppost_report_button"] = "Diesen Beitrag melden",
+
+            // SEC L3 (U24, 2026-10-31) — the self-serve confirm step.
+            ["account.verify_confirm_lede"] =
+                "Bestätige, dass es dein Konto ist und du dich anmelden möchtest.",
+            ["account.verify_confirm_submit"] = "Bestätigen & anmelden",
         };
 
     /// <summary>
@@ -9305,6 +9405,10 @@ public static class KnownTranslationKeys
             ["directory.title"] = "Annuaire",
             ["directory.lead"]  = "Tout le monde dans le quartier — chaque habitant sur la plateforme.",
             ["directory.empty"] = "Pas encore d'habitants dans ce quartier.",
+            ["directory.no_results"] = "Aucun habitant ne correspond à votre recherche.",
+            ["directory.search"] = "Rechercher",
+            ["directory.verified_only"] = "Vérifiés uniquement",
+            ["directory.clear"] = "Effacer",
 
             // ── profile (page heading + primary action) ─────────────────────
             ["profile.title"]      = "Ton profil",
@@ -10225,6 +10329,45 @@ public static class KnownTranslationKeys
             ["message.other"] = "l'autre personne",
             ["message.sent_to"] = "Envoyé à {0}.",
             ["message.load_earlier"] = "Charger les messages antérieurs",
+            // ── Group messaging lane (the N:1 generalization of the M9 1:1 surface, ADR 0105) ──
+            ["group_message.nav"] = "Messages de groupe",
+            ["group_message.title"] = "Messages de groupe",
+            ["group_message.new"] = "Nouveau groupe",
+            ["group_message.new.name"] = "Nom du groupe",
+            ["group_message.new.name.placeholder"] = "Donner un nom à ce groupe (facultatif)",
+            ["group_message.add_members"] = "Ajouter des personnes",
+            ["group_message.add_members.placeholder"] = "Choisir les résidents à ajouter",
+            ["group_message.thread.empty"] = "Pas encore de messages — commencez la conversation.",
+            ["group_message.compose.placeholder"] = "Écrire un message au groupe…",
+            ["group_message.compose.send"] = "Envoyer",
+            ["group_message.unread"] = "non lu",
+            ["group_message.disabled"] = "La messagerie de groupe est désactivée sur cette instance.",
+            ["group_message.participants"] = "{0} personnes",
+            ["group_message.creator"] = "créé par {0}",
+            ["group_message.sent_to"] = "Envoyé au groupe.",
+            ["group_message.load_earlier"] = "Charger les messages antérieurs",
+            ["group_message.you"] = "Vous",
+            ["group_message.members"] = "Membres",
+            ["group_message.pending"] = "en attente",
+            ["group_message.invite_sent"] = "{0} invitation(s) envoyée(s).",
+            ["group_message.invite_accepted"] = "Invitation acceptée — vous êtes maintenant membre.",
+            ["group_message.invite_declined"] = "Invitation déclinée.",
+            ["group_message.invite_not_pending"] = "Cette invitation n'est plus en attente.",
+
+            // ── Group messaging lane — the two new notification kinds + nudge templates ──
+            ["notifications.kind.group.message.new"] = "Nouveau message de groupe",
+            ["notifications.preference.group.message.new.label"] = "Messages dans les groupes",
+            ["notification.group.message.new.subject"] = "Un nouveau message de groupe",
+            ["notification.group.message.new.body"] = "Un résident a envoyé un message dans un groupe que vous suivez : ",
+            ["notifications.kind.group.message.mention"] = "Mention dans un message de groupe",
+            ["notifications.preference.group.message.mention.label"] = "Mentions dans les messages de groupe",
+            ["notification.group.message.mention.subject"] = "Vous avez été mentionné dans un message de groupe",
+            ["notification.group.message.mention.body"] = "Vous avez été mentionné dans un message de groupe : ",
+            ["notifications.kind.group.message.invite"] = "Invitation à une conversation de groupe",
+            ["notifications.preference.group.message.invite.label"] = "Invitations aux conversations de groupe",
+            ["notification.group.message.invite.subject"] = "Vous avez été invité à une conversation de groupe",
+            ["notification.group.message.invite.body"] = "Un résident vous a invité à rejoindre une conversation de groupe : ",
+
             ["notifications.subscriptions.intro"] = "Choisis quelles communautés, quels groupes et quelles pages t'informent. Les préférences décident des types que tu reçois aussi par e-mail ; ces interrupteurs décident des cibles qui t'informent.",
             ["notifications.subscription.announcement.label"] = "Nouvelles annonces",
             ["notifications.subscription.community.post.label"] = "Nouvelles publications dans les communautés",
@@ -10797,6 +10940,7 @@ public static class KnownTranslationKeys
             ["a11y.notifications"]             = "Notifications",
             ["a11y.find_tag"]                  = "Chercher par étiquette",
             ["a11y.find_bio"]                  = "Chercher par bio",
+            ["a11y.find_directory"]            = "Rechercher des habitants",
             ["a11y.avatar"]                    = "Image du profil",
             ["a11y.board_actions"]             = "Actions du tableau",
             ["a11y.calendar_view"]             = "Vue calendrier",
@@ -11116,6 +11260,11 @@ public static class KnownTranslationKeys
             ["posts.board_report_button"] = "Signaler ce tableau",
             ["posts.todo_report_button"] = "Signaler cette tâche",
             ["posts.grouppost_report_button"] = "Signaler ce message",
+
+            // SEC L3 (U24, 2026-10-31) — the self-serve confirm step.
+            ["account.verify_confirm_lede"] =
+                "Confirme que c'est ton compte et que tu es prêt·e à te connecter.",
+            ["account.verify_confirm_submit"] = "Confirmer & me connecter",
         };
 
     /// <summary>
@@ -12888,6 +13037,10 @@ public static class KnownTranslationKeys
             ["directory.title"] = "Kontaktliste",
             ["directory.lead"]  = "Alle i nabolaget — alle beboere på platformen.",
             ["directory.empty"] = "Ingen beboere i dette nabolag endnu.",
+            ["directory.no_results"] = "Ingen beboere matcher dit søgning.",
+            ["directory.search"] = "Søg",
+            ["directory.verified_only"] = "Kun verificerede",
+            ["directory.clear"] = "Ryd",
 
             // ── profile (page heading + primary action) ─────────────────────
             ["profile.title"]      = "Din profil",
@@ -13799,6 +13952,45 @@ public static class KnownTranslationKeys
             ["message.other"] = "den anden person",
             ["message.sent_to"] = "Sendt til {0}.",
             ["message.load_earlier"] = "Indlæs tidligere beskeder",
+            // ── Group messaging lane (the N:1 generalization of the M9 1:1 surface, ADR 0105) ──
+            ["group_message.nav"] = "Gruppebeskeder",
+            ["group_message.title"] = "Gruppebeskeder",
+            ["group_message.new"] = "Ny gruppe",
+            ["group_message.new.name"] = "Gruppenavn",
+            ["group_message.new.name.placeholder"] = "Giv gruppen et navn (valgfrit)",
+            ["group_message.add_members"] = "Tilføj personer",
+            ["group_message.add_members.placeholder"] = "Vælg beboere, der skal tilføjes",
+            ["group_message.thread.empty"] = "Ingen beskeder endnu — start samtalen.",
+            ["group_message.compose.placeholder"] = "Skriv en besked til gruppen…",
+            ["group_message.compose.send"] = "Send",
+            ["group_message.unread"] = "ulæst",
+            ["group_message.disabled"] = "Gruppebeskeder er slået fra på denne instans.",
+            ["group_message.participants"] = "{0} personer",
+            ["group_message.creator"] = "oprettet af {0}",
+            ["group_message.sent_to"] = "Sendt til gruppen.",
+            ["group_message.load_earlier"] = "Indlæs tidligere beskeder",
+            ["group_message.you"] = "Dig",
+            ["group_message.members"] = "Medlemmer",
+            ["group_message.pending"] = "afventende",
+            ["group_message.invite_sent"] = "{0} invitation(er) sendt.",
+            ["group_message.invite_accepted"] = "Invitation accepteret — du er nu medlem.",
+            ["group_message.invite_declined"] = "Invitation afvist.",
+            ["group_message.invite_not_pending"] = "Denne invitation er ikke længere afventende.",
+
+            // ── Group messaging lane — the two new notification kinds + nudge templates ──
+            ["notifications.kind.group.message.new"] = "Ny gruppebesked",
+            ["notifications.preference.group.message.new.label"] = "Beskeder i grupper",
+            ["notification.group.message.new.subject"] = "En ny gruppebesked",
+            ["notification.group.message.new.body"] = "En beboer har sendt en besked i en gruppe, du følger: ",
+            ["notifications.kind.group.message.mention"] = "Nævneværdi i gruppebesked",
+            ["notifications.preference.group.message.mention.label"] = "Nævneværdier i gruppebeskeder",
+            ["notification.group.message.mention.subject"] = "Du blev nævnt i en gruppebesked",
+            ["notification.group.message.mention.body"] = "Du blev nævnt i en gruppebesked: ",
+            ["notifications.kind.group.message.invite"] = "Invitation til gruppebesked",
+            ["notifications.preference.group.message.invite.label"] = "Invitationer til gruppebeskeder",
+            ["notification.group.message.invite.subject"] = "Du er blevet inviteret til en gruppebesked",
+            ["notification.group.message.invite.body"] = "En beboer har inviteret dig til en gruppebesked: ",
+
             ["notifications.subscriptions.intro"] = "Vælg hvilke lokalsamfund, grupper og sider, der giver dig besked. Indstillinger afgør hvilke typer du også får på e-mail; disse indstillingsknapper afgør hvilke mål der giver dig besked.",
             ["notifications.subscription.announcement.label"] = "Nye meddelelser",
             ["notifications.subscription.community.post.label"] = "Nye indlæg i lokalsamfund",
@@ -14368,6 +14560,7 @@ public static class KnownTranslationKeys
             ["a11y.notifications"]             = "Notifikationer",
             ["a11y.find_tag"]                  = "Find med tag",
             ["a11y.find_bio"]                  = "Find med bio",
+            ["a11y.find_directory"]            = "Søg beboere",
             ["a11y.avatar"]                    = "Avatarbillede",
             ["a11y.board_actions"]             = "Bræt-handlinger",
             ["a11y.calendar_view"]             = "Kalendervisning",
@@ -14679,6 +14872,11 @@ public static class KnownTranslationKeys
             ["posts.board_report_button"] = "Anmelde dette bræt",
             ["posts.todo_report_button"] = "Anmelde denne todo",
             ["posts.grouppost_report_button"] = "Anmelde dette indlæg",
+
+            // SEC L3 (U24, 2026-10-31) — the self-serve confirm step.
+            ["account.verify_confirm_lede"] =
+                "Bekræft, at det er din konto, og at du er klar til at logge ind.",
+            ["account.verify_confirm_submit"] = "Bekræft & log ind",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

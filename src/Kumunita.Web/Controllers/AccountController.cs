@@ -586,8 +586,16 @@ public sealed class AccountController(
 
         if (await AccountHasPasswordAsync(token.UserId))
         {
-            // Self-serve lane — the credential exists; confirm and sign in directly.
-            return await ConfirmAndSignInAsync(token);
+            // Self-serve lane — the credential exists.
+            //
+            // SEC L3 (U24, 2026-10-31) — the GET no longer signs in. A GET must
+            // be side-effect-free (a prefetching proxy, a browser prefetch, or a
+            // crawler must not consume the one-time token or mint a session
+            // cookie). The GET renders a confirm page; the POST (same link,
+            // same token row id round-tripped in the hidden input) validates
+            // + signs in via ConfirmAndSignInAsync and is the only path that
+            // consumes the token (ADR 0146's "consume at the POST" principle).
+            return View(new VerifyViewModel { RequiresPassword = false, Id = id });
         }
 
         // Child lane — the account has no password; render the set-password form so
@@ -716,6 +724,18 @@ public sealed class AccountController(
             IsPersistent = true,  // persistent cookie — survives a browser close
             ExpiresUtc = DateTimeOffset.UtcNow.Add(TimeSpan.FromDays(14)),
         };
+
+        // SEC M5 (U17) — attach the current security stamp so the
+        // RevocationStampMiddleware (which reads `kumunita.stamp` from
+        // AuthenticationProperties.Items) can validate it on subsequent
+        // requests. Without this, the verify sign-in lane mints a cookie
+        // with no stamp and the middleware passes it through (fail-open).
+        var stamp = await userManager.GetSecurityStampAsync(user);
+        if (!string.IsNullOrEmpty(stamp))
+        {
+            authProperties.Items["kumunita.stamp"] = stamp;
+        }
+
         await HttpContext.SignInAsync(
             scheme: CookieAuthenticationDefaults.AuthenticationScheme,
             principal: identityPrinciple,
@@ -904,6 +924,14 @@ public sealed class AccountController(
             // signed in — the redirect to enrollment works. Signing out would
             // break the `[Authorize]` (auth challenge → redirect back to
             // /Account/Login → loop).
+            // SEC H2 (invariant S-2): this redirect is a **convenience only**,
+            // not the control. The server-side gate is
+            // `AdminTwoFactorMiddleware` (registered in Program.cs after
+            // UseAuthentication, before UseAuthorization), which enforces
+            // 2FA on every subsequent request for an un-enrolled GlobalAdmin
+            // and redirects any non-allow-listed route to enrolment. Even if
+            // this branch were skipped, the middleware is what keeps an
+            // un-enrolled admin out of the rest of the site.
             return RedirectToAction("Mfa", "SecuritySettings");
         }
 

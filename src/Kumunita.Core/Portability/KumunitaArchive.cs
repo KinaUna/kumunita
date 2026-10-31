@@ -78,6 +78,61 @@ public sealed record PortabilityConfig
     /// </summary>
     [JsonPropertyName("languages")]
     public List<PortabilityConfigLanguage> Languages { get; init; } = new();
+
+    /// <summary>
+    /// ADR 0276 — the /admin/escalation outbound config (the <see
+    /// cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig"/>
+    /// singleton): the receiving platform's inbound <c>endpoint</c> + the
+    /// <c>enabled</c> switch. The <b>token</b> (the plaintext the origin
+    /// admin was handed, the OUTGOING secret) is <b>structurally absent</b>
+    /// from this POCO (the C-M11·2 boundary, the same "no-secret set" the
+    /// <see cref="PortabilityPrincipal"/> POCO enforces on the credential
+    /// columns) — a restore carries the forwarding endpoint + posture, and
+    /// the admin re-enters the token after a CleanSlate import (the same
+    /// "re-enter your credential" shape as the password reset, the
+    /// <see cref="PortabilityApplyIdentity"/> boundary). <c>null</c> when
+    /// the source instance has no escalation config row (a fresh instance
+    /// that never set one up) — the apply then leaves the target's existing
+    /// row untouched (or, on a CleanSlate restore, the forwarder's
+    /// <c>KUMUNITA_ESCALATION_ENDPOINT</c> env fallback still works).
+    /// </summary>
+    [JsonPropertyName("escalation")]
+    public PortabilityConfigEscalation? Escalation { get; init; }
+}
+
+/// <summary>
+/// ADR 0276 — the <c>config.json</c> <c>escalation</c> block (the <see
+/// cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig"/> singleton's
+/// <b>non-secret</b> fields: the receiving endpoint + the enabled switch).
+/// The <see cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig.Token"/>
+/// (plaintext, the OUTGOING secret) is <b>not</b> a field here — the
+/// C-M11·2 import boundary applied to the escalation surface (the same
+/// "structurally incapable of traveling" discipline the
+/// <see cref="PortabilityPrincipal"/> POCO enforces on the credential
+/// columns): a restore carries the forwarding endpoint + posture, and the
+/// admin re-enters the token after a CleanSlate import (the /admin/escalation
+/// save lane's <c>model.Token</c> binds to the freshly-restored row; the
+/// apply never writes the token, so the target's existing token — if any —
+/// is left intact, and a fresh restore's empty token is the admin's to set).
+/// </summary>
+public sealed record PortabilityConfigEscalation
+{
+    /// <summary>
+    /// The <see cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig.Endpoint"/>
+    /// (the receiving platform's inbound URL). <c>null</c> when the source
+    /// instance's config is disabled (no endpoint) — the JSON field is
+    /// omitted, the apply's "enabled" branch is the only path that writes
+    /// it, and a disabled restore leaves the target's row untouched.
+    /// </summary>
+    [JsonPropertyName("endpoint")]
+    public string? Endpoint { get; init; }
+
+    /// <summary>
+    /// The <see cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig.Enabled"/>
+    /// switch (whether escalation forwarding is live on the source instance).
+    /// </summary>
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; init; }
 }
 
 /// <summary>The <c>config.json</c> <c>community</c> block (§config).</summary>
@@ -268,38 +323,89 @@ public sealed class KumunitaArchive
     /// Throws <see cref="InvalidDataException"/> when <c>manifest.json</c>
     /// is absent (a malformed archive is the U05 reject surface,
     /// C-M11·1/4).
+    /// <para>
+    /// <b>Zip-bomb guard (SEC-lane U13 / M2):</b> enforces
+    /// <paramref name="limits"/> (default <see cref="ArchiveLimits.Default"/>)
+    /// while streaming — entry count, per-entry decompressed bytes and total
+    /// decompressed bytes are checked against the <em>real bytes read</em>
+    /// (never the declared <c>entry.Length</c>, which a forged central
+    /// directory can understate), and duplicate entry names are rejected.
+    /// Any violation throws <see cref="InvalidDataException"/>.
+    /// </para>
     /// </summary>
     public static async Task<KumunitaArchiveData> ReadAsync(
-        Stream stream, CancellationToken ct = default)
+        Stream stream, CancellationToken ct = default, ArchiveLimits? limits = null)
     {
+        var bounds = limits ?? ArchiveLimits.Default;
         using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+        if (zip.Entries.Count > bounds.MaxEntries)
+            throw new InvalidDataException(
+                $"archive has {zip.Entries.Count} entries; the limit is {bounds.MaxEntries}");
+
+        var seenNames = new HashSet<string>(StringComparer.Ordinal);
         var data = new KumunitaArchiveData();
+        var state = new LimitState(bounds);
         foreach (var entry in zip.Entries)
         {
             var name = entry.FullName;
+            if (!seenNames.Add(name))
+                throw new InvalidDataException(
+                    $"archive contains a duplicate entry name '{name}'");
             if (name == ManifestPath)
-                data.Manifest = FromJson<PortabilityManifest>(await ReadEntryBytesAsync(entry, ct))
+                data.Manifest = FromJson<PortabilityManifest>(await ReadEntryBytesAsync(entry, state, ct))
                     ?? throw new InvalidDataException("archive manifest.json is missing or malformed");
             else if (name == PrincipalsPath)
-                data.Principals = await ReadEntryBytesAsync(entry, ct);
+                data.Principals = await ReadEntryBytesAsync(entry, state, ct);
             else if (name == ConfigPath)
-                data.Config = await ReadEntryBytesAsync(entry, ct);
+                data.Config = await ReadEntryBytesAsync(entry, state, ct);
             else if (name.StartsWith(DocsPrefix, StringComparison.Ordinal)
                      && name.EndsWith(".json", StringComparison.Ordinal))
-                data.Docs[name[DocsPrefix.Length..^5]] = await ReadEntryBytesAsync(entry, ct);
+                data.Docs[name[DocsPrefix.Length..^5]] = await ReadEntryBytesAsync(entry, state, ct);
             else if (name.StartsWith(MediaPrefix, StringComparison.Ordinal))
-                data.Media[MediaIdFromEntryName(name)] = await ReadEntryBytesAsync(entry, ct);
+                data.Media[MediaIdFromEntryName(name)] = await ReadEntryBytesAsync(entry, state, ct);
         }
         if (data.Manifest is null)
             throw new InvalidDataException("archive manifest.json is missing");
         return data;
     }
 
-    private static async Task<byte[]> ReadEntryBytesAsync(ZipArchiveEntry entry, CancellationToken ct)
+    /// <summary>
+    /// Per-call mutable state threaded through the streaming read —
+    /// the running total of decompressed bytes (a class reference so it
+    /// can be passed to the async <see cref="ReadEntryBytesAsync"/> helper;
+    /// <c>ref</c> is not legal on async-method parameters).
+    /// </summary>
+    private sealed class LimitState
     {
+        public LimitState(ArchiveLimits bounds)
+        {
+            Bounds = bounds;
+        }
+        public ArchiveLimits Bounds { get; }
+        public long TotalBytes { get; set; }
+    }
+
+    private static async Task<byte[]> ReadEntryBytesAsync(
+        ZipArchiveEntry entry, LimitState state, CancellationToken ct)
+    {
+        var bounds = state.Bounds;
         await using var source = entry.Open();
         using var buffer = new MemoryStream();
-        await source.CopyToAsync(buffer, ct);
+        var entryBytes = 0L;
+        var chunk = new byte[64 * 1024];
+        int read;
+        while ((read = await source.ReadAsync(chunk.AsMemory(), ct).ConfigureAwait(false)) > 0)
+        {
+            entryBytes += read;
+            if (entryBytes > bounds.MaxEntryBytes)
+                throw new InvalidDataException(
+                    $"archive entry '{entry.FullName}' decompressed to {entryBytes} bytes; the limit is {bounds.MaxEntryBytes}");
+            state.TotalBytes += read;
+            if (state.TotalBytes > bounds.MaxTotalBytes)
+                throw new InvalidDataException(
+                    $"archive decompressed to {state.TotalBytes} bytes so far; the limit is {bounds.MaxTotalBytes}");
+            buffer.Write(chunk, 0, read);
+        }
         return buffer.ToArray();
     }
 }

@@ -218,14 +218,34 @@ public sealed class PortabilityService(
         if (mode == PortabilityImportMode.CleanSlate)
             await WipeForCleanSlateImportAsync(data, ct).ConfigureAwait(false);
 
-        await PortabilityApplyIdentity.ApplyAsync(
+        // ADR 0275 — the KeepExisting principal merge map (archive principal
+        // SubjectId → existing User.Id): the rows an archived principal merged
+        // into an existing account. PortabilityApplyDocuments uses it to skip
+        // the archive's doubled Profile (the directory is not doubled) and to
+        // re-point the archive's content's principal references at the existing
+        // account's id. CleanSlate → empty map → no skip, no re-point (exactly
+        // the D1 restore semantic).
+        var principalMergeMap = await PortabilityApplyIdentity.ApplyAsync(
             userManager, roleManager, principals, mode, ct).ConfigureAwait(false);
+
+        // The config block (the LocaleSettings + the LanguageCatalog — the
+        // §config field set). Parsed here, BEFORE the docs apply, so the ADR
+        // 0274 KeepExisting tag merge can consult the archive's default
+        // language (the merge key: a tag is merged when its slug AND its
+        // display name in the default language are equal). The same POCO is
+        // re-applied in step 4 (the §apply order is preserved — the config
+        // WRITE still happens last, after the *Translation rows).
+        var config = KumunitaArchive.FromJson<PortabilityConfig>(data.Config) ?? new PortabilityConfig();
 
         // Step 2 — store the domain documents in the registry's
         // import order (parents before children — the D7 order). In
         // KeepExisting mode, rows whose id already exists in the target
-        // store are skipped (the existing content is kept intact).
-        await PortabilityApplyDocuments.ApplyAsync(documentStore, data, mode, ct).ConfigureAwait(false);
+        // store are skipped (the existing content is kept intact); ADR 0274 —
+        // the tags are merged (the archive's copy is dropped, its references
+        // re-pointed at the existing tag, its translations folded in) when the
+        // slug + default-language name are equal.
+        await PortabilityApplyDocuments.ApplyAsync(
+            documentStore, data, mode, config.Locale.DefaultLanguageCode, principalMergeMap, ct).ConfigureAwait(false);
 
         // Step 3 — copy the media bytes into the volume at the
         // {Id[0..2]}/{Id} content-addressed layout (C-M11·3 — the
@@ -235,13 +255,14 @@ public sealed class PortabilityService(
         await PortabilityApplyMedia.ApplyAsync(mediaFileStore, data, ct).ConfigureAwait(false);
 
         // Step 4 — the config apply (the LocaleSettings + the
-        // LanguageCatalog — the §config field set; the U02 ConfigExport
-        // mirror, verbatim). The last apply step (the §apply order —
-        // the LanguageCatalog / LocaleSettings re-materialize after the
-        // *Translation rows that reference them are stored). In
-        // KeepExisting mode, rows that already exist are kept intact.
-        var config = KumunitaArchive.FromJson<PortabilityConfig>(data.Config) ?? new PortabilityConfig();
-        await PortabilityApplyConfig.ApplyAsync(documentStore, config, mode, ct).ConfigureAwait(false);
+        // LanguageCatalog + the ADR 0276 escalation outbound config — the
+        // §config field set; the U02 ConfigExport mirror, verbatim). The
+        // last apply step (the §apply order — the LanguageCatalog /
+        // LocaleSettings / EscalationOutboundConfig re-materialize after
+        // the *Translation rows that reference them are stored). In
+        // KeepExisting mode, rows that already exist are kept intact
+        // (the target's own escalation config is never overwritten).
+        await PortabilityApplyConfig.ApplyAsync(documentStore, config, mode, actorId, ct).ConfigureAwait(false);
 
         // The one portability.import AccessAudit row (TargetKind
         // "portability", Via = Admin, verb import) — emitted by the

@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
@@ -13,6 +14,7 @@ using Kumunita.Core.Pages;
 using Kumunita.Core.Portability;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Microsoft.AspNetCore.Identity;
@@ -108,6 +110,12 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
+            // ADR 0276 — the EscalationOutboundConfig singleton (the
+            // /admin/escalation outbound config) — ConfigExport reads it
+            // and the apply writes it back. Not in the 44-doc inventory
+            // (it travels via the config.json escalation block, not as a
+            // docs/ row), but it must be registered on the test store.
+            EscalationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
@@ -847,6 +855,237 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         }
     }
 
+    // The clean-slate restore must apply the archive's LocaleSettings singleton
+    // — including the platform default time zone (ADR 0019) and the sign-up
+    // posture (ADR 0050) — when the target instance already has a seeder row.
+    //
+    // The real-app failure this pins: FirstBootSeeder always creates the
+    // LocaleSettings row on first boot (UTC / FloorFormat / the seeder's
+    // boolean floors). The config apply's old shape was "write the singleton
+    // only when it is null", so on a real instance (where the row is never
+    // null) the archive's timezone + signup values were silently dropped and
+    // the seeder's defaults stuck. The D9a round-trip test does NOT catch
+    // this, because its instance B is a raw Marten store with no seeder row —
+    // the "write if null" branch fired and applied the values, masking the bug.
+    // This test mirrors the real scenario: B pre-exists with a seeder-shaped
+    // row, and a CleanSlate import must overwrite it with the archive's state.
+    [Fact]
+    public async Task PortabilityImport_CleanSlate_AppliesArchiveLocaleSettingsOverExistingSeederRow()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes). The plant's config block sets
+        // IsSignupOpen = true + MessagingEnabled = true — the values the
+        // archive carries (the D9a test already pins these round-trip).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a fresh instance (raw store) that has ALREADY booted,
+        // so the FirstBootSeeder's LocaleSettings row exists (the real-app
+        // shape: sign-up CLOSED, messaging OFF — the seeder's defaults). A
+        // CleanSlate import over this instance must replace those seeder
+        // values with the archive's (sign-up OPEN, messaging ON).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        // B's seeder row — the real-app shape the apply must overwrite.
+        // The seeder's defaults: sign-up closed, messaging off.
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new LocaleSettings
+            {
+                Id = LocaleSettings.SingletonId,
+                DefaultLanguageCode = "en",
+                DefaultTimezone = "UTC",
+                DefaultDateFormat = DateFormat.FloorFormat,
+                IsSignupOpen = false,
+                MessagingEnabled = false,
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        // The import (CleanSlate — the default mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.CleanSlate, ct);
+        Assert.True(result.Ok,
+            "the CleanSlate import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var localeB = await q.Query<LocaleSettings>()
+                .Where(l => l.Id == LocaleSettings.SingletonId)
+                .FirstAsync(ct);
+            // The archive's sign-up posture (open) replaced the seeder's closed default.
+            Assert.True(localeB.IsSignupOpen,
+                "the CleanSlate restore must apply the archive's sign-up posture (ADR 0050) — " +
+                "B's seeder IsSignupOpen = false stuck (the 'write only when null' bug)");
+            // The archive's messaging flag (on) replaced the seeder's off default.
+            Assert.True(localeB.MessagingEnabled,
+                "the CleanSlate restore must apply the archive's messaging flag — " +
+                "B's seeder MessagingEnabled = false stuck");
+        }
+    }
+
+    // ADR 0276 — the escalation outbound config round-trip (CleanSlate). The
+    // archive carries the receiving endpoint + enabled switch (the non-secret
+    // fields); the plaintext token is structurally absent from the config POCO
+    // (the C-M11·2 boundary). A CleanSlate import re-materializes the singleton
+    // from the archive's endpoint + enabled; the token is blank (the admin
+    // re-enters it on /admin/escalation after the restore).
+    [Fact]
+    public async Task PortabilityImport_CleanSlate_RestoresEscalationConfigEndpointAndEnabled()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance + the escalation outbound
+        // config (endpoint + enabled + a known plaintext token).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://other-community.example/escalations/inbound",
+                Token = "A-SECRET-TOKEN-abc123",
+                Enabled = true,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a fresh instance (no escalation config row yet).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+
+        // The import (CleanSlate — the default mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.CleanSlate, ct);
+        Assert.True(result.Ok,
+            "the CleanSlate import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var row = await q.LoadAsync<EscalationOutboundConfig>(
+                ConfigExport.EscalationOutboundConfigSingletonId, ct);
+            Assert.NotNull(row);
+            // The archive's endpoint + enabled were applied.
+            Assert.Equal("https://other-community.example/escalations/inbound", row!.Endpoint);
+            Assert.True(row.Enabled);
+            // The token is blank (structurally absent from the archive — the
+            // admin re-enters it after the restore; the C-M11·2 boundary).
+            Assert.True(string.IsNullOrEmpty(row.Token),
+                "the plaintext escalation token must NOT travel in the archive (the C-M11·2 boundary) — " +
+                $"got: '{row.Token}'");
+        }
+    }
+
+    // ADR 0276 — the KeepExisting merge does NOT touch the target's escalation
+    // config (the same keep-first discipline ADR 0274 / ADR 0275 apply to the
+    // tag / principal merges). The target's existing row — endpoint, token,
+    // enabled — is kept intact.
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_KeepsTargetEscalationConfig()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance + the escalation outbound
+        // config (a DIFFERENT endpoint + token from B's).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://a-community.example/escalations/inbound",
+                Token = "A-TOKEN-xyz789",
+                Enabled = true,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the representative instance + its OWN escalation config
+        // (a different endpoint + token + disabled).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        // Plant creates pt-admin-001 (with the elevated roles) itself — do NOT
+        // pre-create it with EnsurePrincipalWithRolesAsync here, or Plant's
+        // own CreateAsync hits the EF duplicate-tracking conflict.
+        await PlantRepresentativeInstanceAsync(storeB, userManagerB, roleManagerB, mediaStoreB, ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://b-community.example/escalations/inbound",
+                Token = "B-TOKEN-keep-me",
+                Enabled = false,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        // The import (KeepExisting — merge mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var row = await q.LoadAsync<EscalationOutboundConfig>(
+                ConfigExport.EscalationOutboundConfigSingletonId, ct);
+            Assert.NotNull(row);
+            // B's own escalation config is kept intact (endpoint, token, enabled
+            // — none of it overwritten by A's archive).
+            Assert.Equal("https://b-community.example/escalations/inbound", row!.Endpoint);
+            Assert.Equal("B-TOKEN-keep-me", row.Token);
+            Assert.False(row.Enabled);
+        }
+    }
+
+    // ADR 0276 — the archive's escalation block is a no-secret set (the
+    // C-M11·2 boundary applied to the escalation surface): the config POCO's
+    // escalation block has no field that carries a credential (the same
+    // "structurally incapable of traveling" pin the PortabilityPrincipal
+    // POCO enforces on the credential columns).
+    [Fact]
+    public void PortabilityNoSecret_EscalationBlockHasNoTokenField()
+    {
+        var secretFieldNames = new[] { "token", "secret", "password", "apikey" };
+        var fieldNames = typeof(PortabilityConfigEscalation)
+            .GetProperties()
+            .Select(p => p.Name.ToLowerInvariant())
+            .ToList();
+        Assert.All(
+            secretFieldNames,
+            name => Assert.DoesNotContain(
+                name, fieldNames, StringComparer.Ordinal));
+    }
+
     // ADR 0193 D2 — KeepExisting (checked): the import is a MERGE. The
     // target's existing accounts + content are kept intact (never overwritten,
     // credentials never reset), and only NEW content from the archive is
@@ -1414,6 +1653,278 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
                 using var stream = await mediaStore.OpenReadAsync(
                     "pt-nonexistent-media-id", ct);
             });
+    }
+
+    // ADR 0274 D1 — the KeepExisting tag merge. A tag the archive carries that
+    // the target already holds — same slug AND same default-language display
+    // name — is NOT stored as a second tag (the existing one is kept intact,
+    // never overwritten); the archive's content's tag references are re-pointed
+    // at the existing tag, and the archive's TagTranslation rows fold in as
+    // translations of the existing tag (one row per language — a language the
+    // existing tag already has is left untouched, never overwritten; a new one
+    // is added). This closes the duplicate-tag failure a KeepExisting import
+    // produced over a live instance (the natural-identity skip cannot see the
+    // Tag/TagTranslation pair: Tag has no unique index — C-TG·4 — and the
+    // TagTranslation (TagId, LanguageCode) unique index is keyed on the
+    // surrogate TagId, so it silently doubles).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_MergesSameTagBySlugAndDefaultLanguageName()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes) + a tag (slug "recycling", base
+        // name "Recycling", default language en) + a TagTranslation (de) + the
+        // planted Post re-pointed at it.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var plantedA = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        const string aTagId = "a-tag-recycling";
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            // Add fr to the catalog (the validate gate's ref.dangling check
+            // resolves every TagTranslation LanguageCode against the
+            // archive's catalog languages — the plant seeds only en/de).
+            sa.Store(new LanguageCatalog { Id = "fr", NativeName = "Français", Enabled = true, SortOrder = 2 });
+            sa.Store(new Tag { Id = aTagId, Slug = "recycling", Name = "Recycling", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sa.Store(new TagTranslation { Id = "a-tagtr-de", TagId = aTagId, LanguageCode = "de", Name = "Recycling (A)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sa.Store(new TagTranslation { Id = "a-tagtr-fr", TagId = aTagId, LanguageCode = "fr", Name = "Recyclage (A)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            // A Post that references the tag (the archive's content — its
+            // TagIds must be re-pointed at B's existing tag on import).
+            sa.Store(new Post { Id = "a-post-tagged", ComponentId = "pt-component-001", AuthorId = "pt-resident-001", TagIds = [aTagId], Created = DateTimeOffset.UtcNow });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a MINIMAL target (the principals + the config + the SAME
+        // tag under B's OWN surrogate id — a cross-instance shape — with only
+        // the de translation; fr is new for B so the merge must add it). B does
+        // NOT re-plant A's content (the KeepExisting import adds A's content;
+        // B already holds the tag + its de translation).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        const string bTagId = "b-tag-recycling";
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Tag { Id = bTagId, Slug = "recycling", Name = "Recycling", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sb.Store(new TagTranslation { Id = "b-tagtr-de", TagId = bTagId, LanguageCode = "de", Name = "Recycling (B — kept)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // The tag is MERGED: exactly ONE "recycling" tag, and it is B's
+            // existing one (kept intact — never overwritten, never a second).
+            var recyclingTags = await q.Query<Tag>().Where(t => t.Slug == "recycling").ToListAsync(ct);
+            Assert.True(recyclingTags.Count == 1,
+                "the same tag (slug + default-language name) must appear ONCE — " +
+                $"got {recyclingTags.Count}");
+            Assert.Equal(bTagId, recyclingTags[0].Id);
+            Assert.Equal("Recycling", recyclingTags[0].Name);
+
+            // The archive's tagged Post's tag reference is re-pointed at B's
+            // existing tag (so the archive's content lands on B's tag — not a
+            // second one).
+            var importedPost = await q.LoadAsync<Post>("a-post-tagged", ct);
+            Assert.NotNull(importedPost);
+            Assert.True(importedPost!.TagIds.Contains(bTagId),
+                "the archive's Post's tag reference must be re-pointed at B's existing tag");
+            Assert.True(!importedPost.TagIds.Contains(aTagId),
+                "the archive's tag id must NOT appear on the imported Post — " +
+                "its reference must be re-pointed at B's existing tag");
+
+            // The archive's TagTranslation rows fold in as translations of the
+            // EXISTING tag: the de row (B already had it) is kept intact
+            // (never overwritten), the fr row (new for B) is added.
+            var translations = await q.Query<TagTranslation>()
+                .Where(t => t.TagId == bTagId).ToListAsync(ct);
+            var de = translations.FirstOrDefault(t => t.LanguageCode == "de");
+            var fr = translations.FirstOrDefault(t => t.LanguageCode == "fr");
+            Assert.NotNull(de);
+            Assert.Equal("b-tagtr-de", de!.Id);
+            Assert.Equal("Recycling (B — kept)", de.Name); // B's row kept intact
+            Assert.NotNull(fr);
+            Assert.Equal("Recyclage (A)", fr!.Name);       // archive's fr added
+            Assert.True(!translations.Any(t => t.TagId == aTagId),
+                "the archive's tag id must NOT appear as a TagTranslation parent — " +
+                "the translations must fold into B's existing tag");
+        }
+    }
+
+    // ADR 0274 D2 — the keep-vs-add boundary. A tag the archive carries that
+    // the target already holds — same slug but a DIFFERENT default-language
+    // display name — is a DIFFERENT tag (the ADR 0044 D3 design: two names,
+    // two tags). It is stored as its own new tag, NOT merged (no false merge).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_KepsTwoTagsWithSameSlugButDifferentDefaultLanguageName()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — a tag (slug "recycling", base name "Recycling — A").
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerA, roleManagerA,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new Tag { Id = "a-tag-recycling-x", Slug = "recycling", Name = "Recycling — A", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the same slug but a DIFFERENT default-language name
+        // ("Recycling — B").
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Tag { Id = "b-tag-recycling-x", Slug = "recycling", Name = "Recycling — B", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // Two tags (same slug, different default-language name) — the
+            // archive's is stored as its own new tag, NOT merged (no false
+            // merge; B's existing one is kept intact).
+            var recyclingTags = await q.Query<Tag>().Where(t => t.Slug == "recycling").ToListAsync(ct);
+            Assert.True(recyclingTags.Count == 2,
+                "same slug + different default-language name = two tags (ADR 0044 D3) — " +
+                $"got {recyclingTags.Count}");
+            Assert.True(recyclingTags.Any(t => t.Id == "b-tag-recycling-x" && t.Name == "Recycling — B"),
+                "B's existing tag (the different default-language name) must be kept intact");
+            Assert.True(recyclingTags.Any(t => t.Id == "a-tag-recycling-x" && t.Name == "Recycling — A"),
+                "the archive's tag (the different default-language name) must be stored as its own new tag — NOT merged");
+        }
+    }
+
+    // ADR 0275 — the KeepExisting principal merge. A principal the archive
+    // carries that the target already holds — same EMAIL (the cross-instance
+    // identity; the archive's account id and the target's account id are
+    // DIFFERENT, the sample-seeder's random-subject shape) — is NOT stored as
+    // a second account/Profile (the existing profile is kept intact, the
+    // directory is not doubled); the archive's content's principal references
+    // are re-pointed at the existing account's id (so the archive's content
+    // lands on the target's account — not a dangling foreign subject id).
+    // This closes the duplicate-directory failure a KeepExisting import
+    // produced over a live instance (the natural-identity skip cannot see the
+    // Profile/Principal pair: Profile has no unique index — its identity is
+    // SubjectId, a cross-instance random id — so the archive's Profile for the
+    // same person silently lands as a second /directory entry).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_MergesSamePrincipalByEmail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes) + a DISTINCT resident (a new
+        // principal with its own id + email + Profile + a Post they authored).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var plantedA = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        const string aResidentId = "pt-resident-002";
+        const string residentEmail = "resident-two@maplewood.example";
+        await EnsurePrincipalWithRolesAsync(userManagerA, roleManagerA,
+            aResidentId, "pt-resident-two", residentEmail, [Roles.Member], ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new Profile
+            {
+                SubjectId = aResidentId,
+                DisplayName = "PT Resident Two (A)",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+            });
+            // A Post authored by this principal (the archive's content — its
+            // AuthorId must be re-pointed at B's existing account on import).
+            sa.Store(new Post
+            {
+                Id = "a-post-merged-author",
+                ComponentId = "pt-component-001",
+                AuthorId = aResidentId,
+                Title = "PT ADR 0275 — authored by the merged resident",
+                Body = "PT ADR 0275 — the round-trip principal-merge author witness.",
+                Created = DateTimeOffset.UtcNow,
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the representative instance (so B already holds
+        // pt-admin-001 + pt-resident-001) + the SAME person as a DIFFERENT
+        // account (a new principal with a DIFFERENT id + the SAME email — the
+        // cross-instance sample-seeder shape — and B's OWN Profile for them).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        var plantedB = await PlantRepresentativeInstanceAsync(storeB, userManagerB, roleManagerB, mediaStoreB, ct);
+        const string bResidentId = "pt-resident-002-b";
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            bResidentId, "pt-resident-two", residentEmail, [Roles.Member], ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Profile
+            {
+                SubjectId = bResidentId,
+                DisplayName = "PT Resident Two (B — kept)",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // The person is NOT doubled on the directory: B's existing profile
+            // (kept intact — never overwritten, never a second one) is the
+            // profile for that email's person, and the archive's Profile row
+            // (a different SubjectId, same person) is NOT stored.
+            var bProfile = await q.LoadAsync<Profile>(bResidentId, ct);
+            Assert.NotNull(bProfile);
+            Assert.Equal("PT Resident Two (B — kept)", bProfile!.DisplayName);
+            Assert.True(!await q.Query<Profile>().AnyAsync(p => p.SubjectId == aResidentId, ct),
+                "the archive's Profile row for the merged person must NOT be stored — " +
+                "the directory must not be doubled (the existing profile is kept intact)");
+
+            // The archive's Post's author reference is re-pointed at B's
+            // existing account (so the archive's content lands on B's account
+            // — not a dangling foreign subject id).
+            var importedPost = await q.LoadAsync<Post>("a-post-merged-author", ct);
+            Assert.NotNull(importedPost);
+            Assert.Equal(bResidentId, importedPost!.AuthorId);
+            Assert.True(!importedPost.AuthorId.Equals(aResidentId, StringComparison.Ordinal),
+                "the archive's author id must NOT appear on the imported Post — " +
+                "its reference must be re-pointed at B's existing account");
+        }
     }
 
     // ── The stream helper — the MemoryStream → byte[] bridge (the export

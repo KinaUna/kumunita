@@ -47,12 +47,19 @@ public sealed class DirectoryIndexViewModelTests
             .OrderBy(n => n)
             .ToList();
 
-        // The list model exposes exactly the projected rows — and nothing more. There
-        // is no "hidden count" (the directory lists every non-blocked resident to
-        // every signed-in viewer: the platform is invitation-only and limited to
-        // residents) and no channel to a Profile's own contact/audience fields (those
-        // only surface on the detail row, behind the ContactVisibility opt-in).
-        Assert.Equal(new[] { "Profiles" }, fields.ToArray());
+        // The list model exposes the projected rows + the viewer's own
+        // presentation state (the search/filter/sort controls added to the
+        // directory) — and nothing more. There is no "hidden count" (the
+        // directory lists every non-blocked resident to every signed-in viewer)
+        // and no channel to a Profile's own contact/audience fields (those only
+        // surface on the detail row, behind the ContactVisibility opt-in).
+        // The five new fields are the directory's search (Query), the verified
+        // toggle (VerifiedOnly), the full-catalog presence (HasAnyResidents —
+        // the two-empty-shape disambiguator), and the shared sort control (Sort).
+        // (re-baselined 2026-10-30, the directory sort/filter lane)
+        Assert.Equal(
+            new[] { "HasAnyResidents", "Profiles", "Query", "Sort", "VerifiedOnly" },
+            fields.ToArray());
     }
 
     [Fact]

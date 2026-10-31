@@ -154,6 +154,44 @@ privilege surface? If so, add a row here and in the relevant checklist.
 
 ### Decisions
 
+**Supply-chain pinning (SEC L5, decided 2026-10-31; protects A6):** what is
+pinned and what is intentionally left floating.
+
+- **Pinned (by commit / digest, not just tag):**
+  - **CI actions** (`.github/workflows/ci.yml`): `actions/checkout@fbc6f39…b6c09`
+    (`# v5`), `actions/setup-dotnet@26b0ec1…c95bf1` (`# v5`),
+    `actions/setup-node@a0853c2…a1444` (`# v5`). SHA = the tag's resolved commit
+    (GitHub API, 2026-10-31).
+  - **Container base images** (`Dockerfile`): `mcr.microsoft.com/dotnet/sdk:10.0`
+    and `mcr.microsoft.com/dotnet/aspnet:10.0` are SHA-pinned to their
+    multi-arch index digests (MCR registry, 2026-10-31).
+  - **NuGet + npm packages:** already version-pinned via `PackageReference`
+    / `package-lock.json`; `dotnet list package --vulnerable` + `npm audit` are
+    clean (U3 baseline).
+- **Intentionally not pinned ("to pin" list):**
+  - `node:22` (Dockerfile stage 1, the TS build) — Docker Hub blocks anonymous
+    digest resolution, so it stays a floating tag. **To pin:** resolve via a
+    token-authenticated pull or `docker pull node:22 && docker inspect` and add
+    the digest.
+  - `postgres:18`, `axllent/mailpit:latest` (dev `docker-compose.yml`) — dev-only,
+    not the deploy path, so left floating. **To pin:** same approach if a dev box
+    needs reproducible builds.
+  - **Workflow `permissions:`** is now scoped to `contents: read` (least
+    privilege — the workflow only reads the checked-out source).
+- **Non-root container runtime:** the app's *running process* is `app` (UID 1654,
+  the user the MCR aspnet base ships), achieved via `docker/entrypoint.sh`:
+  the entrypoint starts as the image's default USER (root) just long enough to
+  `chown -R app:app /app /data` (re-claiming any root-owned files in the mounted
+  volumes), then drops to `app` via `setpriv --reuid app --regid app
+  --clear-groups` and `exec`s `dotnet Kumunita.Web.dll`. The dotnet process
+  is therefore non-root (PID 1, UID 1654) — the U25 invariant — but the
+  entrypoint's root phase repairs the ownership of *any* stale pre-U25 volume
+  files at every boot (the U25-era `RUN chown` only fixed the image layer, not
+  a mounted named volume first populated when the app ran as root). `curl`/`wget`
+  are kept (external health probe, no built-in substitute — see the U25 handoff
+  note). The MCR base ships `setpriv` (util-linux) but not `gosu`/`su-exec`;
+  `setpriv` is the setuid-free, PAM-free, env-preserving privilege drop.
+
 **Rate limiting (mechanism, decided 2026-08-27; protects A2):**
 
 - **Mechanism:** ASP.NET Core's built-in rate-limiting middleware
@@ -172,11 +210,35 @@ privilege surface? If so, add a row here and in the relevant checklist.
   deployment assumption, §1) — per-instance limits stop protecting the others, and the
   CAPTCHA decision (OPS.md §10) is revisited in that case.
 
+**Proxy trust (SEC H3, decided 2026-10-31; protects A2 — the real-client-IP
+requirement above):** the trusted-proxy list is **configuration-driven, never
+trust-all.** `ForwardedHeadersSetup` (U9) reads `ReverseProxy:KnownNetworks`
+(CIDR ranges) and `ReverseProxy:KnownProxies` (IPs) from the app's config;
+when both are unset or empty it falls back to a safe default — loopback
+(`127.0.0.0/8`, `::1/128`) and the RFC1918 ranges (`10.0.0.0/8`,
+`172.16.0.0/12`, `192.168.0.0/16`), which covers the Docker network — and
+**never** to "trust everyone." An out-of-range peer's `X-Forwarded-For` /
+`X-Forwarded-Proto` headers are ignored, so a spoofed client cannot inject a
+false source IP or scheme. An unparseable CIDR or IP value throws
+`InvalidOperationException` at `builder.Services` time (the boot fails, the
+door does not open). In production, set `ReverseProxy:KnownNetworks` to the
+CIDR of the edge proxy's source address (e.g. `172.18.0.0/16`) so the
+`X-Forwarded-For` header is honored and the `login` rate-limit partitioning
+sees real client IPs. The cookie `Secure` attribute is set explicitly via
+`CookieSecurePolicy.Always` outside Development (U10), so the session cookie
+is never issued over plain HTTP even on a non-TLS hop.
+
 **2FA (decided 2026-08-27; protects A3, A4):** TOTP via ASP.NET Identity's built-in
 support, plus recovery codes.
 
 - **GlobalAdmin: required.** An admin account is total instance compromise (roles,
   standing moderator visibility, audit log); 2FA is the control, not optional.
+  Enforced server-side by `AdminTwoFactorMiddleware` (registered in `Program.cs`
+  after `UseAuthentication`, before `UseAuthorization`): an authenticated
+  GlobalAdmin without enrolled 2FA (and not a sample-data account) is limited
+  to the enrolment, logout and static routes; every other route is redirected
+  to enrolment. The login redirect in `AccountController` is a convenience only
+  — the middleware is the gate.
 - **Moderator: recommended, not required** — standing is component-scoped and their
   restricted reads are already audited.
 - **Member: none** — overkill at this scale; their content is protected by
@@ -223,9 +285,16 @@ no content to a third party, and changes none of this posture.
 
 ### Open items (decide before shipping the surface they protect)
 
+SEC lane (2026-10-31, `6dafb783`) **closed:** the proxy-trust / forwarded-headers
+item (H3 — see the "Proxy trust" decision above: config-driven, never trust-all,
+`Secure` cookie policy, HSTS `max-age=31536000` + `Permissions-Policy`) and the
+GlobalAdmin 2FA item (H2 — see the "2FA" decision above: `AdminTwoFactorMiddleware`
+is the server-side gate, the login redirect a convenience). The SEC remediation
+register and its per-finding test rows are in `SECURITY-AUDIT.md` §8.
+
 | Item | Protects | Decision needed |
 |------|----------|-----------------|
-| Log hygiene: sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged | A3 (log integrity) | M1 |
+| Log hygiene: sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged — **still open (SEC L8c, parked 2026-10-31, no owner decision; the open-ended scope is why it parked)** | A3 (log integrity) | M1 — undecided |
 | Named invariant tests (empty-audience-denies, delegation action-scope) referenced from ARCHITECTURE.md §4.4 | A3 | M1 |
 | **Sign-up gate (ADR 0050) + the invitation mechanism it closes to.** The gate is landed: a GlobalAdmin flips the instance open / invitation-only (`/admin/signup`; `LocaleSettings.IsSignupOpen`, `false` floor as amended 2026-10-05 — a fresh instance ships **invitation-only** so the admin can set up the platform first), and when closed the `/account/signup` write lane and the nav/login sign-up affordances are authoritative — new self-service accounts are refused (existing residents unaffected). That is the control that answers A2 better than rate-limiting alone. **Still open:** the *invitation mechanism* a closed instance closes the door *to* — an invited resident self-serves their password from an admin-sent link rather than registering (token lifecycle, expiry, admin UX). Decide it before the community is open to residents beyond the development team. | A2 (signup bots) | Gate: landed (ADR 0050); invitation mechanism: before wider rollout |
 

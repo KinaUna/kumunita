@@ -228,6 +228,57 @@ public class MarkdownRendererTests
     }
 
     /// <summary>
+    /// SEC U19 (L4): a backslash-prefixed link target — <c>/\evil.example</c>
+    /// — previously slipped through the relative branch (no <c>:</c>).
+    /// <see cref="MarkdownRenderer.IsSafeUrl"/> now rejects any raw backslash,
+    /// so the link is not rendered as an anchor: no <c>&lt;a</c> / no
+    /// <c>href=</c>, and the label alone survives as plain text (the renderer
+    /// drops the unsafe target, keeping only the label).
+    /// </summary>
+    [Fact]
+    public void Link_BackslashPrefixed_RendersAsText()
+    {
+        var output = MarkdownRenderer.RenderHtml("[x](/\\evil.example)");
+
+        Assert.DoesNotContain("<a", output);
+        Assert.DoesNotContain("href=", output);
+        Assert.Contains(">x<", output); // label renders as plain text
+    }
+
+    /// <summary>
+    /// SEC U19 (L4): <c>mailto:</c> links stay whitelisted — a
+    /// <c>[x](mailto:a@example.test)</c> target (no <c>://</c>, carries a
+    /// <c>:</c>) renders a real <c>&lt;a href="mailto:…"&gt;</c> rather than
+    /// being rejected by the relative branch. Synthetic address only.
+    /// </summary>
+    [Fact]
+    public void Link_Mailto_IsAllowed()
+    {
+        var output = MarkdownRenderer.RenderHtml("[x](mailto:a@example.test)");
+
+        Assert.Contains("<a", output);
+        Assert.Contains("href=\"mailto:a@example.test\"", output);
+    }
+
+    /// <summary>
+    /// SEC U19 (L4) regression pin: <c>javascript:</c> and <c>data:</c> link
+    /// targets are still rejected — the link renders as plain text with no
+    /// <c>&lt;a</c> / no <c>href=</c>. The hardening did not loosen the
+    /// scheme whitelist.
+    /// </summary>
+    [Fact]
+    public void Link_JavascriptAndData_StillRejected()
+    {
+        var js = MarkdownRenderer.RenderHtml("[x](javascript:alert(1))");
+        Assert.DoesNotContain("<a", js);
+        Assert.DoesNotContain("href=", js);
+
+        var data = MarkdownRenderer.RenderHtml("[x](data:text/html,abc)");
+        Assert.DoesNotContain("<a", data);
+        Assert.DoesNotContain("href=", data);
+    }
+
+    /// <summary>
     /// Counts non-overlapping occurrences of <paramref name="needle"/> in
     /// <paramref name="haystack"/> (ordinal).
     /// </summary>

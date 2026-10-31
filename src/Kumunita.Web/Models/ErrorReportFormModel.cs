@@ -26,6 +26,9 @@ public class ErrorReportFormModel
     /// pin). Bound from the <c>errorreport.description.*</c> kw-l labelled
     /// textarea.</summary>
     [System.ComponentModel.DataAnnotations.Required]
+    // SEC-lane U15 (M3 / S-5): cap the anonymous free-text (M3 "no length cap")
+    // at 4000 chars — a form-level 400 re-render, never a crash.
+    [System.ComponentModel.DataAnnotations.MaxLength(4000)]
     public string Description { get; set; } = "";
 
     /// <summary>The optional contact email for anonymous follow-up (never

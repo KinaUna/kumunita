@@ -1,0 +1,58 @@
+@* The /messages section sub-nav (the _ProjectsTabs.cshtml Bootstrap nav-tabs
+   idiom, ADR 0062). Two tabs — Direct · Group — so a resident can jump between
+   the M9 1:1 surface (/messages) and the group-messaging lane
+   (/group-messages, ADR 0278) without going back to the account menu. The
+   active tab is derived from the current controller name (Messages → direct,
+   GroupMessages → group); the two surfaces are deliberately kept apart (the
+   user's ask: "move the link to group chats from the account menu to tabs on
+   the messages page to keep them differentiated").
+
+   The whole strip is rendered only when the instance messaging toggle is on
+   AND the signed-in resident is per-actor messaging-allowed (the same
+   composite gate as the 1:1 entry the account menu used — a resident who is
+   opted out / restricted sees no messaging tabs at all, the same non-leaky
+   shape as an off instance: the surface is simply absent, no explanation).
+   A signed-out caller (or a guest hitting these pages directly) sees nothing
+   here — the [Authorize]d controllers 404 them before any view renders. *@
+@using Kumunita.Core.Localization
+@using Kumunita.Core.Messaging
+@using Kumunita.Web.Security
+@inject ITranslationProvider Translation
+@inject ILocalizationService Localization
+@inject IMessagingService Messaging
+@{
+    bool showTabs = false;
+    bool isDirect = false;
+    string directLabel = string.Empty;
+    string groupLabel = string.Empty;
+    if (User.Identity is { IsAuthenticated: true })
+    {
+        var subj = KumunitaPrincipal.SubjectId(User);
+        if (subj is not null
+            && await Messaging.IsMessagingEnabledAsync()
+            && await Messaging.IsMessagingAllowedForAsync(subj))
+        {
+            showTabs = true;
+            var lang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+            var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "Messages";
+            isDirect = controller == "Messages";
+            directLabel = Translation is null ? "Direct messages" : await Translation.GetAsync("message.nav", lang);
+            groupLabel = Translation is null ? "Group messages" : await Translation.GetAsync("group_message.nav", lang);
+        }
+    }
+}
+@if (showTabs)
+{
+    <ul class="nav nav-tabs kmb-tab-under-navbar mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link @(isDirect ? "active" : string.Empty)" href="/messages">
+                @directLabel
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link @(!isDirect ? "active" : string.Empty)" href="/group-messages">
+                @groupLabel
+            </a>
+        </li>
+    </ul>
+}

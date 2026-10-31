@@ -3,6 +3,7 @@ using Kumunita.Core.ErrorReports;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Kumunita.Web.Controllers;
 
@@ -55,6 +56,13 @@ public class IssueController : Controller
     /// </summary>
     [HttpPost("/issues/new")]
     [ValidateAntiForgeryToken]
+    // SEC-lane U15 (M3 / S-5): anonymous state-storing POST, was unthrottled and
+    // uncapped — now the house "write" policy (Program.cs AddWindow "write",
+    // 30/15 min per IP) + a request-size cap. The free-text is already bounded
+    // by [StringLength(2000)] on IssueFormModel.Description (stricter than the
+    // 4000 pin — left untouched, see the U15 handoff note).
+    [EnableRateLimiting("write")]
+    [RequestSizeLimit(512L * 1024 * 1024)]
     public async Task<IActionResult> PostNew(IssueFormModel form)
     {
         var requestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;

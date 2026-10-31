@@ -11,6 +11,7 @@ using Kumunita.Core.SiteContent;
 using Kumunita.Core.UserInfo;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Kumunita.Web.Models;
@@ -270,6 +271,12 @@ public class HomeController : Controller
     /// </remarks>
     [HttpPost("/Home/Error/Report")]
     [ValidateAntiForgeryToken]
+    // SEC-lane U15 (M3 / S-5): anonymous state-storing POST, was unthrottled and
+    // uncapped — now the house "report" policy (Program.cs AddWindow "report",
+    // 10/1 h per IP) + a request-size cap. The free-text itself is bounded by
+    // [MaxLength(4000)] on ErrorReportFormModel.Description (U15).
+    [EnableRateLimiting("report")]
+    [RequestSizeLimit(512L * 1024 * 1024)]
     public async Task<IActionResult> ErrorReport(ErrorReportFormModel form)
     {
         var requestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
