@@ -716,6 +716,18 @@ public sealed class AccountController(
             IsPersistent = true,  // persistent cookie — survives a browser close
             ExpiresUtc = DateTimeOffset.UtcNow.Add(TimeSpan.FromDays(14)),
         };
+
+        // SEC M5 (U17) — attach the current security stamp so the
+        // RevocationStampMiddleware (which reads `kumunita.stamp` from
+        // AuthenticationProperties.Items) can validate it on subsequent
+        // requests. Without this, the verify sign-in lane mints a cookie
+        // with no stamp and the middleware passes it through (fail-open).
+        var stamp = await userManager.GetSecurityStampAsync(user);
+        if (!string.IsNullOrEmpty(stamp))
+        {
+            authProperties.Items["kumunita.stamp"] = stamp;
+        }
+
         await HttpContext.SignInAsync(
             scheme: CookieAuthenticationDefaults.AuthenticationScheme,
             principal: identityPrinciple,
