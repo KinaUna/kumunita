@@ -38,7 +38,12 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.Local.json", optional: true, reloadOnChange: false);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+// SEC M1 (U12) — global anti-forgery enforcement (invariant S-4): every
+// state-changing MVC action validates a token unless it carries the closed
+// two-action allow-list ([IgnoreAntiforgeryToken] — the Bearer-token
+// escalation inbound + X-Suppression-Token mail-suppress ingest; see
+// AntiforgeryCoverageTests for the reflection pin).
+builder.Services.AddControllersWithViews(o => o.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute()));
 
 // SEC H3 (U9/U10) — config-driven forwarded-header trust (open veto 3): the
 // X-Forwarded-For / X-Forwarded-Proto honoring at app.UseForwardedHeaders()

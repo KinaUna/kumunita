@@ -65,6 +65,8 @@ public sealed class EscalationInboundController(
     /// idempotent (ESC·7).
     /// </summary>
     [HttpPost("inbound")]
+    // SEC M1 (U12) — exempt from the global anti-forgery filter: the Authorization: Bearer <token> header is the credential.
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Inbound([FromBody] InboundEscalationPayload? body)
     {
         // 1. Parse the Bearer credential (ESC·6 — the token is the plaintext the

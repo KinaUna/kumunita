@@ -64,6 +64,8 @@ public sealed class MailSuppressionController : Controller
     /// </para>
     /// </summary>
     [HttpPost("api/mail/suppress")]
+    // SEC M1 (U12) — exempt from the global anti-forgery filter: the X-Suppression-Token header is the credential.
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Suppress([FromBody] SuppressionIngestRequest? req, CancellationToken ct)
     {
         // (1) Validate the body (pin §3.3 step 1) — before the auth check, so a
