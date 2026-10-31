@@ -3,6 +3,11 @@
 # the scratch/app database), plus a dedicated non-superuser app role `kumunita`
 # created by dev-db-init/01-app-role.sql (dev credentials are weak-by-design; the app
 # connection string and its host/port differ from prod by exactly those two things).
+#
+# DEV ONLY — NOT A DEPLOY TEMPLATE. Published ports are bound to 127.0.0.1 so they are
+# reachable only from the host machine (SEC remediation U26, L6); a real deployment runs
+# the single container behind the Coolify/Caddy edge (COOLIFY.md §1/§5) and never
+# publishes Postgres or Mailpit to the network.
 services:
   db:
     image: postgres:18
@@ -12,7 +17,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     # Single mount at /var/lib/postgresql (NOT .../data): the 18+ image stores data in
     # major-version-specific subdirectories under the mount point (docker-library/postgres#37)
     # and refuses to start over a leftover layout with data directly at /var/lib/postgresql/data.
@@ -31,8 +36,8 @@ services:
     image: axllent/mailpit:latest
     container_name: kumunita_mailpit
     ports:
-      - "1025:1025"   # SMTP
-      - "8025:8025"   # web UI
+      - "127.0.0.1:1025:1025"   # SMTP
+      - "127.0.0.1:8025:8025"   # web UI
 
   app:
     build:
@@ -91,7 +96,7 @@ services:
       # Omit (or set 0) for unlimited.
       Media__MaxPlatformBytes: "524288000"
     ports:
-      - "5080:8080"
+      - "127.0.0.1:5080:8080"
     volumes:
       # Survives container recreation (unlike the image's VOLUME floor, whose
       # anonymous form can be pruned); only wiped by an explicit

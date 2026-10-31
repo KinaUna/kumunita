@@ -994,8 +994,9 @@ if (!app.Environment.IsDevelopment())
     // UseExceptionHandler / UseHsts so those see the resolved scheme and remote IP.
     app.UseForwardedHeaders();
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    // HSTS (SEC U26, L7): set via the security-header middleware below — MaxAge
+    // one year, includeSubDomains OFF. HstsOptions is internal in .NET 10, so we
+    // emit the header directly (gated on Request.IsHttps, matching UseHsts()).
 }
 
 // No app-level HTTP→HTTPS redirect: in production TLS terminates at the edge
@@ -1046,6 +1047,21 @@ app.Use(async (context, next) =>
     // privacy model is SECURITY.md's "the audience choice is authoritative").
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    // HSTS (SEC U26, L7) — MaxAge one year, includeSubDomains OFF (no owner
+    // decision to cover subdomains we don't control). Emitted only on an https
+    // request (the forwarded-scheme pipeline resolves Request.IsHttps for the
+    // edge-proxy hop). HstsOptions is internal in .NET 10, so we set the header
+    // directly rather than via UseHsts(); a plain-HTTP request must not carry it.
+    if (context.Request.IsHttps)
+    {
+        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000";
+    }
+    // Permissions-Policy (SEC U26, L7): a restrictive default — every feature is
+    // explicitly disabled (no camera/mic/geolocation/payment/usb, no fullscreen,
+    // no web-share). The platform has no legitimate need for any of these, so the
+    // fail-closed list is the safe floor; opt a feature in only if a feature needs it.
+    context.Response.Headers["Permissions-Policy"] =
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(), picture-in-picture=(), web-share=()";
     await next();
 });
 

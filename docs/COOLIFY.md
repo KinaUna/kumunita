@@ -504,6 +504,26 @@ after the check.
 7. Record the instance in the **OPS inventory** (domain, VPS, DB name, commit
 SHA, admin contact, dates).
 8. Backups enabled / scheduled per OPS Procedure 4.
+9. **Host + security-header hardening** (SEC U26, L6/L7) — the in-repo defaults
+keep local dev working, so the operator must pin the production values in the
+app's env or `appsettings.Production.json`:
+   - **`AllowedHosts`** — the in-repo `appsettings.json` ships `"*"` (dev only,
+     so local host/port iteration keeps working). For production, set it to the
+     community's public host (e.g. `maplewood.example.com`), comma-separated if
+     there is a secondary name. Leave it `*` only for local dev.
+   - **`WellKnown__BaseUrl`** *(optional)* — the instance's public base URL
+     (no trailing slash, e.g. `https://maplewood.example.com`). When set, the
+     RFC 9116 `security.txt` `Policy:` field is built from this instead of the
+     incoming `Request.Host`, so a spoofed `Host` header (S-3) can't corrupt it.
+     Unset → falls back to the request origin (the previous behaviour).
+   - **`Strict-Transport-Security`** is now emitted with `max-age=31536000`
+     (one year; `includeSubDomains` is deliberately **off**). Verify with
+     `curl -sI https://<domain>/` (step 1a already asserts the HSTS header is
+     present — confirm the `max-age` value is `31536000`).
+   - **`Permissions-Policy`** is now emitted on every response with a
+     restrictive default (camera, microphone, geolocation, payment, usb,
+     fullscreen, picture-in-picture, web-share all disabled). No env value
+     needed; if a future feature legitimately needs one, opt it in here.
 
 ## Troubleshooting (quick)
 
