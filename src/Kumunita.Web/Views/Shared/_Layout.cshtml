@@ -319,6 +319,7 @@
 }
 
 <body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null) @(kmbKiosk ? "kmb-kiosk" : null)">
+    <partial name="_IconSprite" />
     @* Flash toast — the one, uniform flash-message surface (TempData["info"]
        / ["error"]). Renders a fixed top-right Bootstrap toast when the
        controller left a flash value on the last redirect. Replaces the
@@ -404,10 +405,10 @@
                     <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                         <ul class="navbar-nav flex-grow-1">
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5 8 2.5l5.5 5v6h-11z"/></svg><span class="kmb-nav-label">@_navHome</span></a>
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-home"/></svg><span class="kmb-nav-label">@_navHome</span></a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark @(activeNav == "announcements" ? "active" : null)" href="/announcements"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5 10 3v10l-7.5-3.5z"/><path d="M2.5 7.5H1v4h1.5z"/><path d="M12 5.2a4 4 0 0 1 0 5.6"/><path d="M13.8 3.8a6.5 6.5 0 0 1 0 8.4"/></svg><span class="kmb-nav-label">@_navAnnouncements</span></a>
+                                <a class="nav-link text-dark @(activeNav == "announcements" ? "active" : null)" href="/announcements"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-announcements"/></svg><span class="kmb-nav-label">@_navAnnouncements</span></a>
                             </li>
                             @if (User.Identity?.IsAuthenticated == true)
                             {
@@ -418,10 +419,10 @@
                                    are inert without that module, and absent in variant C and
                                    for signed-out users, so the fold is self-scoped. *@
                                 <li class="nav-item" data-nav-fold>
-                                    <a class="nav-link text-dark @(activeNav == "community" ? "active" : null)" asp-controller="Posts" asp-action="AllSections"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 11V4.5h4v6.5H3zM8.5 11V2.5h4V11h-4z"/></svg><span class="kmb-nav-label">@_navCommunity</span></a>
+                                    <a class="nav-link text-dark @(activeNav == "community" ? "active" : null)" asp-controller="Posts" asp-action="AllSections"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-community"/></svg><span class="kmb-nav-label">@_navCommunity</span></a>
                                 </li>
                                 <li class="nav-item" data-nav-fold>
-                                    <a class="nav-link text-dark @(activeNav == "groups" ? "active" : null)" asp-controller="Groups" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.5"/><path d="M2 13c.5-2.5 2-3.5 3.5-3.5S8.5 10.5 9 13"/><circle cx="11" cy="6.5" r="2"/><path d="M10.5 13c.4-1.8 1.3-2.6 2.5-2.6 1.2 0 2.1.8 2.5 2.6"/></svg><span class="kmb-nav-label">@_navGroups</span></a>
+                                    <a class="nav-link text-dark @(activeNav == "groups" ? "active" : null)" asp-controller="Groups" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-groups"/></svg><span class="kmb-nav-label">@_navGroups</span></a>
                                 </li>
                                 @* ADR 0111 — the More menu: the five less-frequent
                                    resident-only sections folded into one dropdown.
@@ -432,34 +433,34 @@
                                         <kw-l key="nav.more">More</kw-l>
                                     </a>
                                     <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item text-dark @(activeNav == "events" ? "active" : null)" href="/events"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2.2 1.3"/></svg>@_navEvents</a></li>
-                                        <li><a class="dropdown-item text-dark @(activeNav == "projects" ? "active" : null)" href="/projects/todos"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h4"/></svg>@_navProjects</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "events" ? "active" : null)" href="/events"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-events"/></svg>@_navEvents</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "projects" ? "active" : null)" href="/projects/todos"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-projects"/></svg>@_navProjects</a></li>
                                         @* M16 (ADR 0117) — the Inventory surface (D6: a
                                            standing core surface, no admin toggle; the M5
                                            projects nav-entry shape). *@
-                                        <li><a class="dropdown-item text-dark @(activeNav == "inventory" ? "active" : null)" href="/inventory"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="5" width="11" height="8" rx="1"/><path d="M6 5V3.5h4V5M8 8v3M6.5 9.5h3"/></svg>@_navInventory</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "inventory" ? "active" : null)" href="/inventory"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-inventory"/></svg>@_navInventory</a></li>
                                         @* M17 (ADR 0118) — the Bookmarks surface (D6: a
                                            standing core surface, no admin toggle; the M16
                                            inventory nav-entry shape). *@
-                                        <li><a class="dropdown-item text-dark @(activeNav == "bookmarks" ? "active" : null)" href="/bookmarks"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>@_navBookmarks</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "bookmarks" ? "active" : null)" href="/bookmarks"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-bookmarks"/></svg>@_navBookmarks</a></li>
                                         @* M37 (ADR 0167) — the Personal Notes surface (D6: a
                                            standing core surface, no admin toggle; the M17
                                            bookmarks nav-entry shape, immediately after bm.nav). *@
-                                        <li><a class="dropdown-item text-dark @(activeNav == "notes" ? "active" : null)" href="/notes"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h6l2 2v9.5H4z"/><path d="M10 2.5V4.5h2"/><path d="M6 8h4M6 10.5h3"/></svg>@_navNotes</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "notes" ? "active" : null)" href="/notes"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-notes"/></svg>@_navNotes</a></li>
                                         @* M21 (ADR 0122) — the Document management surface
                                            (D5 standing, D6 download; the M16/M17 nav-entry
                                            shape). Reuses documents.title (the closed 12-key set
                                            stays closed — no 13th nav.documents key). *@
-                                        <li><a class="dropdown-item text-dark @(activeNav == "documents" ? "active" : null)" href="/documents"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h5l3.5 3.5v7.5h-8.5z"/><path d="M9 2.5V6h3.5"/><path d="M6 9.5h4M6 12h3"/></svg>@_navDocuments</a></li>
-                                        <li><a class="dropdown-item text-dark @(activeNav == "pages" ? "active" : null)" href="/pages"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>@_navPages</a></li>
-                                        <li><a class="dropdown-item text-dark @(activeNav == "tags" ? "active" : null)" href="/tags"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m5.5 4 6.5 6.5"/><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="12" r="1.8"/></svg>@_navTags</a></li>
-                                        <li><a class="dropdown-item text-dark @(activeNav == "directory" ? "active" : null)" asp-controller="Directory" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="5.5" r="3"/><path d="M2.5 14c.5-3 2.5-4.5 5.5-4.5s5 1.5 5.5 4.5"/></svg>@_navDirectory</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "documents" ? "active" : null)" href="/documents"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-documents"/></svg>@_navDocuments</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "pages" ? "active" : null)" href="/pages"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-pages"/></svg>@_navPages</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "tags" ? "active" : null)" href="/tags"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-tags"/></svg>@_navTags</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "directory" ? "active" : null)" asp-controller="Directory" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-directory"/></svg>@_navDirectory</a></li>
                                         @* M23 (ADR 0123 F6) — the "People" nav
                                            entry (the find-people surface, /people):
                                            next to Directory, the same
                                            asp-controller/asp-action dropdown-item
                                            shape. *@
-                                        <li><a class="dropdown-item text-dark @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5" r="2.5"/><path d="M1.5 13c.4-2.6 2-3.9 4-3.9s3.6 1.3 4 3.9"/><circle cx="11" cy="6" r="2"/><path d="M10 13c.3-2 1.4-3 3-3 1 0 1.9.6 2.3 1.6"/></svg>@_navPeople</a></li>
+                                        <li><a class="dropdown-item text-dark @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-people"/></svg>@_navPeople</a></li>
                                     </ul>
                                 </li>
                             }
@@ -504,13 +505,13 @@
                         <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="m6.5 4.5 4.5 3.5-4.5 3.5"/><path d="M5 4.5v7"/></svg>
                     </button>
                     <a class="kmb-rail-btn" asp-area="" asp-controller="Home" asp-action="Index">
-                        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5 8 2.5l5.5 5v6h-11z"/></svg>
+                        <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-home"/></svg>
                         <span class="visually-hidden">@_navHome</span>
                         <span class="kmb-rail-label">@_navHome</span>
                         <span class="kmb-rail-tip">@_navHome</span>
                     </a>
                     <a class="kmb-rail-btn @(activeNav == "announcements" ? "active" : null)" href="/announcements">
-                        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5 10 3v10l-7.5-3.5z"/><path d="M2.5 7.5H1v4h1.5z"/><path d="M12 5.2a4 4 0 0 1 0 5.6"/><path d="M13.8 3.8a6.5 6.5 0 0 1 0 8.4"/></svg>
+                        <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-announcements"/></svg>
                         <span class="visually-hidden">@_navAnnouncements</span>
                         <span class="kmb-rail-label">@_navAnnouncements</span>
                         <span class="kmb-rail-tip">@_navAnnouncements</span>
@@ -518,25 +519,25 @@
                     @if (User.Identity?.IsAuthenticated == true)
                     {
                         <a class="kmb-rail-btn @(activeNav == "community" ? "active" : null)" asp-controller="Posts" asp-action="AllSections">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 11V4.5h4v6.5H3zM8.5 11V2.5h4V11h-4z"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-community"/></svg>
                             <span class="visually-hidden">@_navCommunity</span>
                             <span class="kmb-rail-label">@_navCommunity</span>
                             <span class="kmb-rail-tip">@_navCommunity</span>
                         </a>
                         <a class="kmb-rail-btn @(activeNav == "groups" ? "active" : null)" asp-controller="Groups" asp-action="Index">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.5"/><path d="M2 13c.5-2.5 2-3.5 3.5-3.5S8.5 10.5 9 13"/><circle cx="11" cy="6.5" r="2"/><path d="M10.5 13c.4-1.8 1.3-2.6 2.5-2.6 1.2 0 2.1.8 2.5 2.6"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-groups"/></svg>
                             <span class="visually-hidden">@_navGroups</span>
                             <span class="kmb-rail-label">@_navGroups</span>
                             <span class="kmb-rail-tip">@_navGroups</span>
                         </a>
                         <a class="kmb-rail-btn @(activeNav == "events" ? "active" : null)" href="/events">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2.2 1.3"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-events"/></svg>
                             <span class="visually-hidden">@_navEvents</span>
                             <span class="kmb-rail-label">@_navEvents</span>
                             <span class="kmb-rail-tip">@_navEvents</span>
                         </a>
                         <a class="kmb-rail-btn @(activeNav == "projects" ? "active" : null)" href="/projects/todos">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-projects"/></svg>
                             <span class="visually-hidden">@_navProjects</span>
                             <span class="kmb-rail-label">@_navProjects</span>
                             <span class="kmb-rail-tip">@_navProjects</span>
@@ -545,7 +546,7 @@
                            (the M5 projects nav-entry shape; D6 standing core
                            surface). *@
                         <a class="kmb-rail-btn @(activeNav == "inventory" ? "active" : null)" href="/inventory">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="5" width="11" height="8" rx="1"/><path d="M6 5V3.5h4V5M8 8v3M6.5 9.5h3"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-inventory"/></svg>
                             <span class="visually-hidden">@_navInventory</span>
                             <span class="kmb-rail-label">@_navInventory</span>
                             <span class="kmb-rail-tip">@_navInventory</span>
@@ -554,7 +555,7 @@
                            (the M16 inventory nav-entry shape; D6 standing
                            core surface). *@
                         <a class="kmb-rail-btn @(activeNav == "bookmarks" ? "active" : null)" href="/bookmarks">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-bookmarks"/></svg>
                             <span class="visually-hidden">@_navBookmarks</span>
                             <span class="kmb-rail-label">@_navBookmarks</span>
                             <span class="kmb-rail-tip">@_navBookmarks</span>
@@ -563,7 +564,7 @@
                            (the M17 bookmarks rail-entry shape; D6 standing core
                            surface). A paper + pencil glyph (a note). *@
                         <a class="kmb-rail-btn @(activeNav == "notes" ? "active" : null)" href="/notes">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h6l2 2v9.5H4z"/><path d="M10 2.5V4.5h2"/><path d="M6 8h4M6 10.5h3"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-notes"/></svg>
                             <span class="visually-hidden">@_navNotes</span>
                             <span class="kmb-rail-label">@_navNotes</span>
                             <span class="kmb-rail-tip">@_navNotes</span>
@@ -573,25 +574,25 @@
                            documents.title — the closed 12-key nav set stays
                            closed (no 13th nav.documents key). *@
                         <a class="kmb-rail-btn @(activeNav == "documents" ? "active" : null)" href="/documents">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h5l3.5 3.5v7.5h-8.5z"/><path d="M9 2.5V6h3.5"/><path d="M6 9.5h4M6 12h3"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-documents"/></svg>
                             <span class="visually-hidden">@_navDocuments</span>
                             <span class="kmb-rail-label">@_navDocuments</span>
                             <span class="kmb-rail-tip">@_navDocuments</span>
                         </a>
                         <a class="kmb-rail-btn @(activeNav == "pages" ? "active" : null)" href="/pages">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-pages"/></svg>
                             <span class="visually-hidden">@_navPages</span>
                             <span class="kmb-rail-label">@_navPages</span>
                             <span class="kmb-rail-tip">@_navPages</span>
                         </a>
                         <a class="kmb-rail-btn @(activeNav == "tags" ? "active" : null)" href="/tags">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m5.5 4 6.5 6.5"/><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="12" r="1.8"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-tags"/></svg>
                             <span class="visually-hidden">@_navTags</span>
                             <span class="kmb-rail-label">@_navTags</span>
                             <span class="kmb-rail-tip">@_navTags</span>
                         </a>
                         <a class="kmb-rail-btn @(activeNav == "directory" ? "active" : null)" asp-controller="Directory" asp-action="Index">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="5.5" r="3"/><path d="M2.5 14c.5-3 2.5-4.5 5.5-4.5s5 1.5 5.5 4.5"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-directory"/></svg>
                             <span class="visually-hidden">@_navDirectory</span>
                             <span class="kmb-rail-label">@_navDirectory</span>
                             <span class="kmb-rail-tip">@_navDirectory</span>
@@ -600,7 +601,7 @@
                            find-people surface, /people): next to Directory in
                            the rail, the same rail-btn shape (a two-people icon). *@
                         <a class="kmb-rail-btn @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index">
-                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="5.5" cy="5" r="2.5"/><path d="M1.5 13c.4-2.6 2-3.9 4-3.9s3.6 1.3 4 3.9"/><circle cx="11" cy="6" r="2"/><path d="M10 13c.3-2 1.4-3 3-3 1 0 1.9.6 2.3 1.6"/></svg>
+                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-people"/></svg>
                             <span class="visually-hidden">@_navPeople</span>
                             <span class="kmb-rail-label">@_navPeople</span>
                             <span class="kmb-rail-tip">@_navPeople</span>

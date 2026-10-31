@@ -106,11 +106,7 @@
         <li class="nav-item position-relative">
             <a class="nav-link position-relative d-inline-flex align-items-center"
                href="/notifications" id="notifications-bell" aria-label="@_navBellAria">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16"
-                     fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M8 1.6c-2.4 0-4 1.9-4 4.3 0 2.5-1 3.6-1.6 4.2-.3.3-.1.8.3.8h10.6c.4 0 .6-.5.3-.8-.6-.6-1.6-1.7-1.6-4.2 0-2.4-1.6-4.3-4-4.3z"/>
-                    <path d="M6.4 13.2a1.7 1.7 0 0 0 3.2 0"/>
-                </svg>
+                <svg class="kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-bell"/></svg>
                 <span class="visually-hidden"><kw-l key="notifications.bell">Notifications</kw-l></span>
                 <span class="badge rounded-pill text-bg-danger position-absolute top-0 start-100 translate-middle"
                       id="notifications-badge" style="display:none;" data-count="0"></span>
@@ -148,7 +144,7 @@
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountMenu">
                 <li class="nav-item">
-                    <a class="dropdown-item text-dark" asp-controller="Profile" asp-action="Edit"><kw-l key="nav.profile">Profile</kw-l></a>
+                    <a class="dropdown-item text-dark" asp-controller="Profile" asp-action="Edit"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-profile"/></svg><kw-l key="nav.profile">Profile</kw-l></a>
                 </li>
                 @* GU (ADR 0028) — the guardian's child-accounts surface moved to a
                    settings tab (2026-09-30); it is reached via the settings "Children"
@@ -156,10 +152,10 @@
                 @* ADR 0037 — the author's drafts surface: saved-but-not-published posts,
                    group posts, and announcements live here, hidden from every feed. *@
                 <li class="nav-item">
-                    <a class="dropdown-item text-dark" href="/my/drafts"><kw-l key="nav.my_drafts">My drafts</kw-l></a>
+                    <a class="dropdown-item text-dark" href="/my/drafts"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-drafts"/></svg><kw-l key="nav.my_drafts">My drafts</kw-l></a>
                 </li>
                 <li class="nav-item">
-                    <a class="dropdown-item text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
+                    <a class="dropdown-item text-dark" href="/settings/language"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-settings"/></svg><kw-l key="settings.settings">Settings</kw-l></a>
                 </li>
                 @* ADR 0138 — the resident's self-serve change-password surface
                    (/account/password) moved to a settings tab (2026-10-04); it
@@ -169,7 +165,7 @@
                    explicit "notify me for this community / group / page" choice,
                    distinct from the per-kind email preferences). *@
                 <li class="nav-item">
-                    <a class="dropdown-item text-dark" href="/notifications/subscriptions"><kw-l key="notifications.subscriptions.title">Notification subscriptions</kw-l></a>
+                    <a class="dropdown-item text-dark" href="/notifications/subscriptions"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-subscriptions"/></svg><kw-l key="notifications.subscriptions.title">Notification subscriptions</kw-l></a>
                 </li>
                 @* M9 (ADR 0105, U04) — the resident messaging surface: rendered only
                    when signed in AND the instance toggle is on (the F5 pin — a read of
@@ -195,7 +191,7 @@
                        /messages page), so the resident sees one "Messages"
                        entry that differentiates Direct vs. Group. *@
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/messages"><kw-l key="message.nav">Messages</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/messages"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-messages"/></svg><kw-l key="message.nav">Messages</kw-l></a>
                     </li>
                 }
                 @if (isGlobalAdmin)
@@ -205,17 +201,17 @@
                         <kw-l key="nav.management">Management</kw-l>
                     </li>
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" asp-controller="Admin" asp-action="Index"><kw-l key="nav.admin">Admin</kw-l></a>
+                        <a class="dropdown-item text-dark" asp-controller="Admin" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-admin"/></svg><kw-l key="nav.admin">Admin</kw-l></a>
                     </li>
                     @* The two admin-side issue surfaces, both GlobalAdmin-gated at
                        the controller: the platform error-report triage surface
                        (/admin/error-reports, M31/M32) + the resident report
                        queue (/moderation, M3b). *@
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/admin/error-reports"><kw-l key="nav.error_reports">Error reports</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/admin/error-reports"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-error-reports"/></svg><kw-l key="nav.error_reports">Error reports</kw-l></a>
                     </li>
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/moderation"><kw-l key="nav.moderation">Moderation</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg><kw-l key="nav.moderation">Moderation</kw-l></a>
                     </li>
                 }
                 else if (KumunitaPrincipal.IsModerator(User))
@@ -228,7 +224,7 @@
                        the /moderation queue — scoped to their assigned components
                        at the read lane; no error-report surface. *@
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/moderation"><kw-l key="nav.moderation">Moderation</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg><kw-l key="nav.moderation">Moderation</kw-l></a>
                     </li>
                 }
                 @* ADR 0021 — the Translator's home: the language catalog + translation editors.
@@ -236,34 +232,28 @@
                 @if (isTranslator && !isGlobalAdmin)
                 {
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/admin/languages"><kw-l key="nav.translations">Translations</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/admin/languages"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-translations"/></svg><kw-l key="nav.translations">Translations</kw-l></a>
                     </li>
                 }
                 <li><hr class="dropdown-divider" /></li>
                 <li class="nav-item">
                     <form class="form-inline m-0" asp-controller="Account" asp-action="Logout" method="post">
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="dropdown-item text-dark"><kw-l key="nav.sign_out">Sign out</kw-l></button>
+                        <button type="submit" class="dropdown-item text-dark"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-sign-out"/></svg><kw-l key="nav.sign_out">Sign out</kw-l></button>
                     </form>
                 </li>
-                @* Language switcher — a globe icon + enabled-language list inside the
+                @* Language switcher — a heading + enabled-language list inside the
                    account menu (ML-UI U7). Picking a language posts to the same public
                    /language save the quick picker used; the ReturnUrl keeps the resident
                    on the page they were on. The full settings experience
                    (/settings/language) remains the [Authorize]d page. *@
                 <li><hr class="dropdown-divider" /></li>
-                @* Language picker — a non-interactive header row (globe + the
+                @* Language picker — a non-interactive header row (text only — menu
+                   headings carry no icon, ADR 0279 — plus the
                    current choice as a hint) above the indented language list.
                    A real nested dropdown would close the parent account menu
                    when opened, so the list renders inline instead. *@
                 <li class="px-3 pt-2 pb-1 small text-secondary d-flex align-items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" class="me-2 flex-shrink-0"
-                         fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="8" cy="8" r="6.2"/>
-                        <path d="M1.9 8h12.2"/>
-                        <path d="M8 1.9c2.55 2.1 2.55 10.1 0 12.2"/>
-                        <path d="M8 1.9c-2.55 2.1-2.55 10.1 0 12.2"/>
-                    </svg>
                     <span title="@("Language — " + (currentLang is null ? "instance default" : (browserMatched ? currentLang + " (matched)" : currentLang)))">
                         <kw-l key="settings.choose_language">Choose your language</kw-l>
                     </span>
@@ -404,13 +394,7 @@
             <a class="nav-link text-dark dropdown-toggle d-inline-flex align-items-center" href="#"
                id="languageMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false"
                title="@("Language — " + (currentLang is null ? "instance default" : (browserMatched ? currentLang + " (matched)" : currentLang)))">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16"
-                     fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="8" cy="8" r="6.2"/>
-                    <path d="M1.9 8h12.2"/>
-                    <path d="M8 1.9c2.55 2.1 2.55 10.1 0 12.2"/>
-                    <path d="M8 1.9c-2.55 2.1-2.55 10.1 0 12.2"/>
-                </svg>
+                <svg class="kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-globe"/></svg>
                 <span class="visually-hidden"><kw-l key="settings.choose_language">Choose your language</kw-l></span>
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageMenu">

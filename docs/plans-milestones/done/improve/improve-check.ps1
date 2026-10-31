@@ -458,7 +458,13 @@ $fBaselineSizes = @{
   # resolution + English fallback in the <title> pass, 21 insertions / 1
   # deletion) — the same shipped-additions mechanism as above (the M29
   # precedent).
-  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 853
+  # Re-baselined again 2026-10-31 (the ADR 0279 hand-drawn icon-sprite close):
+  # _Layout crossed its 853 baseline by one line from the new
+  # _IconSprite partial render right after <body> (the 28 inline 16-grid
+  # copies were replaced by <use> references in place, so the only net
+  # addition is the partial line) — the same shipped-additions mechanism as
+  # above (the M29 precedent).
+  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 854
   'src/Kumunita.Web/Views/Groups/Detail.cshtml'        = 814
 }
 $fNew = [System.Collections.Generic.List[string]]::new()
