@@ -341,3 +341,79 @@ new view; `KnownTranslationKeys` entries appended (never reformatted). The desig
   - U28 (account enumeration, L1) — **parked** (no `## Decision — L1`).
 - **Logs:** `.tmp/u29-build.log`, `.tmp/u29-core.log`, `.tmp/u29-web.log`.
 - **No warnings, no skipped items** beyond the U3 baseline skips.
+
+## Summary
+
+**Lane state at close (U30, 2026-10-31):** 29 units landed, U23 n/a (owner
+decision 2026-10-31), U28 parked (no `## Decision — L1`), U31 = final
+consistency check + folder move (human). The U29 acceptance gate is **PASS**
+(commit `6dafb783`): Core **1668 · 0 failed · 2 skipped** (pre-existing
+skips), Web **1209 · 0 failed · 0 skipped**; U3 baseline was 0 pre-existing
+failures in both projects, so nothing new is a regression.
+
+| Unit | Title | Status | New test(s) |
+|------|-------|--------|-------------|
+| U1 | design Part 1 | landed | — (docs) |
+| U2 | design Part 2 (pins) | landed | — (docs) |
+| U3 | baseline: build/test/scan | landed | — (baseline: Web 1165, Core 1642, 0 pre-existing failures) |
+| U4 | `ImportOwnershipGuard` | landed | 10 (`ImportOwnershipGuardTests`) |
+| U5 | guard into `ClassifyAsync` | landed | 4 (`UserPortabilityHostileClassifyTests`) |
+| U6 | guard in `ResolveAsync` | landed | 5 (`UserPortabilityHostileResolveTests`) |
+| U7 | `AdminTwoFactorMiddleware` | landed | 7 (`AdminTwoFactorMiddlewareTests`) |
+| U8 | gate registered, docs reconciled | landed | — (wiring) |
+| U9 | `ForwardedHeadersSetup` | landed | 4 (`ForwardedHeadersSetupTests`) |
+| U10 | H3 wired, `Secure` cookie, COOLIFY | landed | — (waived per §2.3; U9's suite is the evidence) |
+| U11 | client forms/fetches send tokens | landed (verified no-op) | — (table recorded, no token-less client found) |
+| U12 | global antiforgery + 2-token allow-list | landed | 2 (`AntiforgeryCoverageTests`) |
+| U13 | `ArchiveLimits` (zip bomb) | landed | 4 (`KumunitaArchiveLimitsTests`) |
+| U14 | import media gate + `upload` limiter | landed | 3 (`UserPortabilityMediaGateTests`) |
+| U15 | anonymous writes: limiter + caps | landed | 3 (`AnonymousWriteLimitsTests`) |
+| U16 | `/health` minimal-by-default + cache | landed | 4 new (+5 pre-existing updated, `HealthControllerTests` 9) |
+| U17 | stamped sign-ins | landed | 1 (`VerifySignInStampTests`) |
+| U18 | stamp fail-closed after cut-off | landed | 4 (`RevocationStampFailClosedTests`) |
+| U19 | markdown link filter | landed | 3 (`MarkdownRendererTests`) |
+| U20 | `UploadSignatureSniffer` (pure) | landed | 3 (`UploadSignatureSnifferTests`) |
+| U21 | sniffer: attachments + content-images | landed (after Drift pause → owner decision, tri-state) | 2 (`UploadSniffAttachmentImageTests`) |
+| U22 | sniffer: avatars + documents | landed | 2 (`Avatar_MismatchedBytes_Rejected`, `Document_MismatchedBytes_Rejected`) |
+| U23 | hash-only tokens | **n/a** (owner decision 2026-10-31: dual-compare load-bearing in verify-by-Id lanes; L3 carried by U24) | — (`VerifyToken_ExistingCleartextRowHandled` stays) |
+| U24 | verify confirm step (GET no sign-in) | landed | 3 (`VerifyConfirmStepTests`) |
+| U25 | container + CI hardening | landed | — (`docker build` EXIT 0 + YAML parse) |
+| U26 | compose 127.0.0.1 bind, hosts, HSTS, `Permissions-Policy` | landed | — (existing `F13U2_SecurityTxtTests` green) |
+| U27 | L8 smalls (limiter partition; L8b n/a) | landed | 2 (`LoginLimiterPartitionTests`) |
+| U28 | account enumeration (L1) | **parked** (no `## Decision — L1`) | — |
+| U29 | acceptance gate | landed (gate **PASS**, `6dafb783`) | — (gate run, recorded in design doc) |
+| U30 | close: audit log + SECURITY.md + this Summary | landed (this unit) | — (docs) |
+| U31 | final consistency + folder move | pending (human moves `in-progress/sec/` → `done/sec/`) | — |
+
+**Deferred list (carried out of the lane, each with its owner action):**
+
+1. **L1 / U28 — account enumeration** — parked, no owner decision. Uniform
+   signup/login responses + equal work for unknown emails remain unaddressed.
+2. **L8c — log-forging (user-supplied strings into `ILogger`)** — parked per
+   the lane's Assumptions; `SECURITY.md` §6 Open items marks it **still open**
+   (2026-10-31, no decision).
+3. **"To pin" digests (U25, network-blocked):** `node:22` (Docker Hub blocks
+   anonymous digest resolution — Dockerfile stage 1); `postgres:18` +
+   `axllent/mailpit:latest` (`docker-compose.yml`, dev-only). Resolve via a
+   token-authenticated pull / `docker pull && docker inspect` and pin.
+4. **Operator live-config checks no test can do (D-9, `SECURITY-AUDIT.md`
+   §4):** `ReverseProxy:KnownNetworks` (H3, U10) — verify HSTS + `Secure`
+   cookie + two-IP lockout partition; `Health__Token` (M4, U16) — verify
+   minimal-by-default payload; `AllowedHosts` + `WellKnown__BaseUrl` (L7, U26);
+   ClamAV `VirusScan__Host`/`Port` (L2/F16, deliberate-fail-open only if
+   documented); `Security:RevocationStamp:RequiredAfter` (M5, U18) — set to a
+   UTC date ≈ deploy + 14 days so existing unstamped sessions are not logged
+   out at once, then fail closed.
+5. **Dedup-by-hash keeps the first uploader's declared type (U22 flag):**
+   `IMediaStore.PutAsync` content-hash dedup stores the *first* uploader's
+   `ContentType`; a byte-identical body under a different (allowlisted)
+   declared type keeps the first one. Follow-up decision, not a finding — no
+   lane unit owns it.
+6. **M11 operator-lane `InvalidDataException` surfacing (U14 `Noticed`):**
+   `PortabilityService.ImportAsync` (the *admin/operator* resident-import,
+   `AdminPortabilityController`) still has no `InvalidDataException` handler
+   (a 500 today). Outside the SEC resident-lane scope; owner decision if in
+   scope for a follow-up lane.
+7. **Stale `HealthOptions.cs` doc-comment (U16 `Noticed`):** the
+   "back-compat: full payload without token" comment is stale after the M4
+   flip; one-line refresh owed (Core project, outside U16's file set).

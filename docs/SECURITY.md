@@ -277,9 +277,16 @@ no content to a third party, and changes none of this posture.
 
 ### Open items (decide before shipping the surface they protect)
 
+SEC lane (2026-10-31, `6dafb783`) **closed:** the proxy-trust / forwarded-headers
+item (H3 — see the "Proxy trust" decision above: config-driven, never trust-all,
+`Secure` cookie policy, HSTS `max-age=31536000` + `Permissions-Policy`) and the
+GlobalAdmin 2FA item (H2 — see the "2FA" decision above: `AdminTwoFactorMiddleware`
+is the server-side gate, the login redirect a convenience). The SEC remediation
+register and its per-finding test rows are in `SECURITY-AUDIT.md` §8.
+
 | Item | Protects | Decision needed |
 |------|----------|-----------------|
-| Log hygiene: sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged | A3 (log integrity) | M1 |
+| Log hygiene: sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged — **still open (SEC L8c, parked 2026-10-31, no owner decision; the open-ended scope is why it parked)** | A3 (log integrity) | M1 — undecided |
 | Named invariant tests (empty-audience-denies, delegation action-scope) referenced from ARCHITECTURE.md §4.4 | A3 | M1 |
 | **Sign-up gate (ADR 0050) + the invitation mechanism it closes to.** The gate is landed: a GlobalAdmin flips the instance open / invitation-only (`/admin/signup`; `LocaleSettings.IsSignupOpen`, `false` floor as amended 2026-10-05 — a fresh instance ships **invitation-only** so the admin can set up the platform first), and when closed the `/account/signup` write lane and the nav/login sign-up affordances are authoritative — new self-service accounts are refused (existing residents unaffected). That is the control that answers A2 better than rate-limiting alone. **Still open:** the *invitation mechanism* a closed instance closes the door *to* — an invited resident self-serves their password from an admin-sent link rather than registering (token lifecycle, expiry, admin UX). Decide it before the community is open to residents beyond the development team. | A2 (signup bots) | Gate: landed (ADR 0050); invitation mechanism: before wider rollout |
 

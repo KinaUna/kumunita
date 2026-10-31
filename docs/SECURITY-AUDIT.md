@@ -124,6 +124,27 @@ served.
 - **D-8** Post-upgrade: warm-boot backfills ran (seeders, create-if-missing),
   no unexpected Marten migrations, health/monitoring endpoints green
   (OPS.md §3, §8).
+- **D-9** SEC live-config checks (2026-10-31, SEC lane H3/H5/M4/L7 — none of
+  these is provable by a unit test, verify on the live instance):
+  - (a) **Forwarded headers:** `curl -sI https://<domain>/` shows
+    `Strict-Transport-Security: max-age=31536000` **and** a
+    `Set-Cookie: kumunita.auth=…; Secure` attribute; from two source IPs a
+    wrong-password burst locks out only one IP (real-IP partitioning —
+    otherwise set `ReverseProxy:KnownNetworks` to the proxy's source CIDR).
+  - (b) **`/health`:** anonymous `GET /health` returns only the minimal
+    liveness payload; the full payload requires the `X-Health-Token` header
+    matching `Health__Token` (or a GlobalAdmin session). Set `Health__Token`
+    (COOLIFY.md §6).
+  - (c) **`AllowedHosts`:** set to the community's public host (in-repo stays
+    `*` for dev); optionally set `WellKnown__BaseUrl` so `security.txt`
+    carries the public origin.
+  - (d) **ClamAV `Scan`:** `VirusScan__Host`/`VirusScan__Port` are set only
+    if the operator has a ClamAV daemon; the default (unset ⇒ fail-open seam
+    absent) is a deliberate choice and must be a *documented* one on this
+    instance.
+  - (e) **Revocation cut-off:** `Security:RevocationStamp:RequiredAfter` set
+    to a UTC date ≈ 14 days out (veto 5 — deploy date + 14 days) so existing
+    unstamped sessions are not logged out at once, and are rejected after.
 
 *Last run: (record date + release tag in §8).*
 
@@ -220,6 +241,41 @@ lane). No PII — checklist IDs and a one-line summary only.
 | Date       | Scope (section + cadence)          | Who        | Result (pass / findings)        | Follow-up (lane/ADR) |
 |------------|------------------------------------|------------|---------------------------------|----------------------|
 |            | e.g. `C+D — release 2026-09-XX`    |            | pass / `C-8: Deny row missing`  |                      |
+| 2026-10-31 | `C — SEC remediation (audit of `main` @ `bdcaff7`)` | dev | 14 fixed · 1 n/a · 2 parked (see lane rows below) | SEC lane; `6dafb783` |
+
+### SEC remediation lane — per-finding rows (2026-10-31)
+
+Closed in the SEC lane (`docs/plans-milestones/in-progress/sec/`), all
+remediation commits through `6dafb783` (the U29 acceptance gate, **PASS**).
+No PII — test class names and lane IDs only.
+
+| Finding | Result | Fixed in (unit) | Regression test(s) |
+|---------|--------|-----------------|--------------------|
+| H1 — import trusts archive rows | fixed | U4–U6 (guard → classify → resolve) | `ImportOwnershipGuardTests` (10), `UserPortabilityHostileClassifyTests` (4), `UserPortabilityHostileResolveTests` (5) |
+| H2 — GlobalAdmin 2FA is a redirect | fixed | U7–U8 (`AdminTwoFactorMiddleware`, registered post-auth) | `AdminTwoFactorMiddlewareTests` (7) |
+| H3 — forwarded headers no-op | fixed | U9–U10 (`ForwardedHeadersSetup` + `Secure` cookie policy) | `ForwardedHeadersSetupTests` (4); the cookie-policy wiring test is waived per design §2.3 (COOLIFY.md §6 checklist is the evidence) |
+| M1 — seven POSTs unvalidated | fixed | U11 (no-op, verified) + U12 (global filter + 2-token allow-list) | `AntiforgeryCoverageTests` (2) |
+| M2 — zip bomb + un-gated import media | fixed | U13–U14 (`ArchiveLimits`, import media gate, `upload` limiter) | `KumunitaArchiveLimitsTests` (4), `UserPortabilityMediaGateTests` (3) |
+| M3 — anonymous writes unthrottled | fixed | U15 (limiter + size cap + `[MaxLength(4000)]`) | `AnonymousWriteLimitsTests` (3) |
+| M4 — `/health` public-by-default | fixed | U16 (minimal-by-default + constant-time compare + SMTP probe cache) | `HealthControllerTests` (9, incl. 4 new) |
+| M5 — revocation fails open | fixed | U17–U18 (stamped sign-ins + fail-closed after cut-off) | `VerifySignInStampTests` (1), `RevocationStampFailClosedTests` (4) |
+| L1 — account enumeration | **parked** | U28 — no `## Decision — L1` (2026-10-31) | — (parked; unit text stands ready) |
+| L2 — upload type client-trusted | fixed | U20–U22 (`UploadSignatureSniffer`, tri-state `Mismatch`-only wire, owner decision 2026-10-31) | `UploadSignatureSnifferTests` (3), `UploadSniffAttachmentImageTests` (2), `Avatar_MismatchedBytes_Rejected` + `Document_MismatchedBytes_Rejected` |
+| L3 — verify token / GET signs in | fixed (U23 **n/a**) | U23 n/a (dual-compare load-bearing in verify-by-Id lanes, owner decision 2026-10-31) + U24 (GET confirm page, POST signs in) | `VerifyConfirmStepTests` (3); `IdentityServiceTokenHashTests` untouched |
+| L4 — markdown link filter | fixed | U19 (backslash/control-char reject, `mailto:` allowed) | `MarkdownRendererTests` (11, incl. 3 new) |
+| L5 — container/CI hardening | fixed | U25 (non-root, SHA-pinned actions + MCR images, `permissions:`) | no tests — `docker build` EXIT 0 + workflow YAML parse (build/container surface) |
+| L6 — compose publishes Postgres | fixed | U26 (ports bound to `127.0.0.1`, dev-only banner) | no new tests (dev-only surface; existing suites green) |
+| L7 — HSTS scope / hosts / headers | fixed | U26 (1-year HSTS, `Permissions-Policy`, `WellKnown:BaseUrl`) | `F13U2_SecurityTxtTests` (existing, harness updated) |
+| L8 — limiter exemption / smalls | fixed (L8c **parked**) | U27 (IP-only partition, exemption removed; L8b break-glass is n/a — parameterised SQL, no C# compare) | `LoginLimiterPartitionTests` (2) |
+
+**Follow-ups owed (not fixed in the lane):** L1/U28 parked; L8c log-forging
+parked (see SECURITY.md §6 Open items); `node:22` / `postgres:18` /
+`axllent/mailpit:latest` still "to pin" (Docker Hub blocks anonymous digest
+resolution — U25); operator live-config checks below (Checklist D-9);
+dedup-by-hash keeps the first uploader's declared type (U22 flag — a
+follow-up decision, not a finding); the M11 operator-lane
+`PortabilityService.ImportAsync` has no `InvalidDataException` handler
+(U14 `Noticed`, outside the resident-lane scope).
 
 **Ownership summary:** dev owns C and D (with the operator for D-1/D-6/D-8),
 the GlobalAdmin owns P, the operator owns D-1/D-6/D-8 and R-1. When in doubt
