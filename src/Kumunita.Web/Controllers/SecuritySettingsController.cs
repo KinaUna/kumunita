@@ -131,6 +131,27 @@ public sealed class SecuritySettingsController(
     }
 
     /// <summary>
+    /// ADR 0138 — the sample-account <b>change-password</b> lock decision (the
+    /// single place the rule lives, so the Security page's change-password
+    /// section and the <c>ChangePassword</c> write guard below agree). The
+    /// change-password surface now lives on this Security page (co-located
+    /// with MFA — one tab holds both credential-security options), so this
+    /// reads the <see cref="IIdentityService.IsChangePasswordLockedForAsync"/>
+    /// seam for the signed-in subject. Every real account and the sample
+    /// <c>GlobalAdmin</c> are never locked (the ADR 0138 exemption).
+    /// </summary>
+    private async Task<bool> IsPasswordChangeLockedAsync()
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+        {
+            return false;   // fail-closed: no subject → not locked (no password surface to guard)
+        }
+
+        return await identity.IsChangePasswordLockedForAsync(subject);
+    }
+
+    /// <summary>
     /// Build the <c>otpauth://</c> URI from the one-time setup key + a
     /// deployment-identifying issuer (the pin §4 enrollment leg — the app
     /// builds the URI; the key comes from
@@ -282,7 +303,10 @@ public sealed class SecuritySettingsController(
         // actions below), so a crafted POST is refused even if the view
         // were bypassed.
         if (await IsMfaLockedAsync())
-            return View("MfaLocked", new MfaLockedViewModel());
+            return View("MfaLocked", new MfaLockedViewModel
+            {
+                PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
+            });
 
         var enabled = await userManager.GetTwoFactorEnabledAsync(user);
 
@@ -294,6 +318,7 @@ public sealed class SecuritySettingsController(
             {
                 Enabled = true,
                 RemainingRecoveryCodes = remaining,
+                PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
             });
         }
 
@@ -333,6 +358,7 @@ public sealed class SecuritySettingsController(
             QrDataUri = BuildQrDataUri(otpAuthUrl),
             RecoveryCodes = codes,
             RemainingRecoveryCodes = codes.Length,
+            PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
         });
     }
 
@@ -415,7 +441,10 @@ public sealed class SecuritySettingsController(
         // static MfaLocked notice instead of the recovery surface (the same
         // "surface replaced by a notice" shape as the Mfa() GET above).
         if (await IsMfaLockedAsync())
-            return View("MfaLocked", new MfaLockedViewModel());
+            return View("MfaLocked", new MfaLockedViewModel
+            {
+                PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
+            });
 
         var enabled = await userManager.GetTwoFactorEnabledAsync(user);
         var remaining = await userManager.CountRecoveryCodesAsync(user);
@@ -425,6 +454,7 @@ public sealed class SecuritySettingsController(
         {
             Enabled = enabled,
             RemainingRecoveryCodes = remaining,
+            PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
         });
     }
 
@@ -466,6 +496,7 @@ public sealed class SecuritySettingsController(
             Enabled = true,
             RecoveryCodes = codes,
             RemainingRecoveryCodes = codes.Length,
+            PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
         });
     }
 
@@ -528,6 +559,102 @@ public sealed class SecuritySettingsController(
         await RestampSessionAsync(user);
         TempData["info"] = await this.FlashAsync("security.flash_2fa_disabled", "Two-factor authentication has been disabled.");
         return RedirectToAction(nameof(Mfa));
+    }
+
+    // ── Change password (ADR 0138, co-located with MFA on the Security tab) ──
+    //
+    // The resident's self-serve change-password surface (moved from
+    // /account/password 2026-10-31) now lives on this Security page — the
+    // ADR 0138 "one tab, both credential-security options" shape. The write
+    // idiom matches the adjacent MFA legs (redirect-and-flash via TempData,
+    // the _FlashToast surface): a re-render of Mfa() would re-mint the
+    // one-time MFA secrets (GenerateNewAuthenticatorKey + recovery codes),
+    // which must not happen on a failed password change.
+
+    /// <summary>
+    /// <c>POST /settings/security/password</c> — the resident's self-serve
+    /// change-password write lane (ADR 0138, now co-located with MFA on the
+    /// Security tab). The guard is authoritative on the write path too (the
+    /// MFA-locked precedent): a locked, non-admin sample account is refused
+    /// before any write, even if the form were crafted by hand. Otherwise the
+    /// <b>current</b> password is verified against the account (the self-serve
+    /// lane confirms it is really this resident), and the new password is
+    /// written through <see cref="IIdentityService.ChangePasswordAsync"/> (the
+    /// single audited write lane, <c>via: Owner</c>; it rotates the security
+    /// stamp). On success the resident is signed out (the credential just
+    /// changed — confirm the new one on the next sign-in) and redirected to
+    /// the login surface with an <c>info</c> flash.
+    /// </summary>
+    [HttpPost("/settings/security/password")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+    {
+        var user = await ResolveUserAsync();
+        if (user is null)
+        {
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        // ADR 0138 — the lock, authoritative on the write path (defense in
+        // depth over the GET notice the Mfa() action surfaces): a locked,
+        // non-admin sample account is denied before any write — no
+        // current-password check, no write.
+        if (await IsPasswordChangeLockedAsync())
+        {
+            TempData["error"] = await this.FlashAsync("account.change_password_locked_body", "Password changes are locked for this account.");
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        // A validation failure (a required field empty, a too-short new
+        // password, a confirm mismatch) surfaces the field-specific message
+        // (the DataAnnotations text on the first failed entry) as the flash —
+        // the redirect-and-flash idiom, the nearest equivalent to the original
+        // view's asp-validation-summary.
+        if (!ModelState.IsValid)
+        {
+            var firstError = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+            TempData["error"] = firstError ?? await this.FlashAsync("account.err.required", "Please complete all the password fields.");
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        // Verify the current password (the self-serve lane proves it is really
+        // this resident changing their own credential — not a blind set). A
+        // wrong current password is a form error (the account is untouched).
+        var currentOk = await userManager.CheckPasswordAsync(user, model.CurrentPassword);
+        if (!currentOk)
+        {
+            TempData["error"] = await this.FlashAsync("validation.current_password_wrong", "Your current password is incorrect.");
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        try
+        {
+            // The single audited write lane (via: Owner; rotates the security
+            // stamp, so this account's existing sessions are invalidated).
+            // The subject is the signed-in principal (User.Id, the
+            // Kumunita.Sub claim value — the repo idiom, the
+            // AccountController.SubjectId helper's equivalent).
+            await identity.ChangePasswordAsync(user.Id!, model.NewPassword, byAdmin: false);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The Core guard (IsChangePasswordLockedForAsync) refused the write
+            // — surface the locked notice (defense in depth: the GET/POST lock
+            // check above normally catches this first).
+            TempData["error"] = await this.FlashAsync("account.change_password_locked_body", "Password changes are locked for this account.");
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        // The credential just changed: sign this session out so the new
+        // password is confirmed on the next sign-in (the ChangePasswordAsync
+        // security-stamp rotation already invalidates this account's other
+        // sessions).
+        await signInManager.SignOutAsync();
+        TempData["info"] = await this.FlashAsync("account.flash_password_changed", "Your password was changed. Sign in again with the new password.");
+        return RedirectToAction("Login", "Account");
     }
 
     // ── F5 (AUTH-04) — session management (kill-all + invalidation) ──────────

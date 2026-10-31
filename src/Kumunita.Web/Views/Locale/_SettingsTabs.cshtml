@@ -1,16 +1,18 @@
 @* The /settings section sub-nav (the _EventsTabs.cshtml Bootstrap nav-tabs idiom,
-   ADR 0062 / ADR 0080). Six tabs — Language (now also the home of the email &
+   ADR 0062 / ADR 0080). Tabs — Language (now also the home of the email &
    notification language section, folded in 2026-09-30), Time zone, Date & time
    format, Quiet hours (M20, ADR 0121 D7), Children (ADR 0028, moved here from
-   the account dropdown 2026-09-30), and Change password (ADR 0138, moved here
-   from the account dropdown 2026-10-04) — so a resident can jump between
-   sections without scrolling. The active tab is derived from the current
-   controller + action: LocaleController owns the four settings GET actions
-   (Index, SettingsTimezone, SettingsDateFormat, SettingsQuiet),
-   GuardianController owns the Children page, and AccountController owns the
-   ChangePassword page. Active detection is controller-aware because both the
-   Children and Language tabs' actions are named "Index", so the action name
-   alone is ambiguous. *@
+   the account dropdown 2026-09-30), and Security (the MFA enrollment +
+   change-password surface, SecuritySettingsController) — so a resident can
+   jump between sections without scrolling. Change password (ADR 0138) was a
+   standalone tab until 2026-10-31, when it was folded into the Security tab
+   (one tab holds both credential-security options), so it is no longer a row
+   here. The active tab is derived from the current controller + action:
+   LocaleController owns the four settings GET actions (Index,
+   SettingsTimezone, SettingsDateFormat, SettingsQuiet), GuardianController owns
+   the Children page, and SecuritySettingsController owns the Security page.
+   Active detection is controller-aware because both the Children and Language
+   tabs' actions are named "Index", so the action name alone is ambiguous. *@
 @{
     var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "Locale";
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "Index";
@@ -24,12 +26,13 @@
         ("settings.quiet.title",     "Quiet hours",       "/settings/quiet"),
         ("settings.messaging.title", "Messaging",         "/settings/messaging"),
         ("nav.children",             "Children",          "/me/children"),
-        ("nav.change_password",      "Change password",   "/account/password"),
         // ADR 0174 — the per-resident Security tab (the MFA enrollment + session
         // management surface at /settings/security/mfa, SecuritySettingsController).
         // Previously reached only by deep-linking the /settings/security/mfa URL;
         // now a first-class settings tab so the resident can set up or change MFA
-        // from the settings strip.
+        // from the settings strip. Since 2026-10-31 it is also the home of the
+        // change-password form (ADR 0138, folded in from its own tab) — one tab
+        // holds both credential-security options.
         ("settings.security.title",  "Security",          "/settings/security/mfa"),
         // M27 (ADR 0148) — the resident's own backup/restore surface: export
         // their authored content to a *.kumunita archive, or import one back.
@@ -53,7 +56,10 @@
         ("SecuritySettings", "Sessions")       => "Security",
         ("Kiosk",    "SettingsGet")       => "Kiosk",
         ("Kiosk",    "SettingsPost")      => "Kiosk",
-        ("Account",  "ChangePassword")    => "Change password",
+        // Change password no longer has a standalone tab (folded into the
+        // Security tab 2026-10-31) — the AccountController.ChangePassword
+        // actions are removed, so there is no ("Account","ChangePassword")
+        // case to map.
         // M27 (ADR 0148) — the UserPortability index (the /account/portability
         // "My data" page, the resident's backup/restore surface).
         ("UserPortability", "Index")      => "My data",

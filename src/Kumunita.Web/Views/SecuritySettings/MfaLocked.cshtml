@@ -28,3 +28,10 @@
         </p>
     </div>
 </div>
+
+@* Change-password section (ADR 0138, co-located with MFA on the Security tab).
+   Rendered here too — a resident who is MFA-locked but not password-locked
+   still keeps their change-password lane (the locks are independent toggles).
+   The _PasswordChange partial renders the form or the "password changes are
+   locked" notice based on Model.PasswordChangeLocked. *@
+@await Html.PartialAsync("_PasswordChange", Model.PasswordChangeLocked)

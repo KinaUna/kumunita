@@ -4,7 +4,11 @@ namespace Kumunita.Web.Models;
 
 /// <summary>
 /// The resident's self-serve <b>change password</b> form (ADR 0138) — the
-/// new / confirm pair the <c>POST /account/password</c> lane binds. The
+/// new / confirm pair the <c>POST /settings/security/password</c> lane binds
+/// (the <see cref="Kumunita.Web.Controllers.SecuritySettingsController.ChangePassword"/>
+/// action — moved from <c>POST /account/password</c> on the
+/// <see cref="Kumunita.Web.Controllers.AccountController"/> 2026-10-31, when
+/// the form was folded into the Security tab, co-located with MFA). The
 /// <b>current</b> password is verified server-side against the account before
 /// the write (the self-serve lane confirms it is really this resident changing
 /// their own credential); it is not persisted. The subject is always the
