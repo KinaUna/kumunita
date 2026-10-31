@@ -346,3 +346,44 @@ Three gate tests, executed once in U29 against the **full** suites (Core + Web) 
 - **U23 — hash-only verification tokens (L3 part 1):** drift pause → owner decision 2026-10-31: **n/a** (dual-compare is load-bearing in the verify-by-Id lanes; the L3 vector is carried by U24). `IdentityService.cs` and `IdentityServiceTokenHashTests` untouched.
 - **U24 — verify confirm step (L3 part 2):** **landed** — `VerifyConfirmStepTests` 3/3 green.
 - **U28 — account enumeration (L1):** **parked** — no `## Decision — L1` line; the unit exits as parked per its own text.
+
+## SEC — Closed (recorded)
+
+**U29 acceptance gate — PASS** (commit `6dafb783`, 2026-10-31).
+
+| Project | U3 baseline | U29 run | Failures |
+|---|---|---|---|
+| `Kumunita.Core.Tests` | 1642 · 0 failed · 2 skipped | **1668 · 0 failed · 2 skipped** | 0 → 0 |
+| `Kumunita.Web.Tests` | 1165 · 0 failed · 0 skipped | **1209 · 0 failed · 0 skipped** | 0 → 0 |
+
+No new failures vs. the U3 baseline.
+
+**Deferred list** (carried out of the lane, each with its owner action):
+
+1. **L1 / U28 — account enumeration** — parked, no owner decision.
+2. **L8c — log-forging** (user-supplied strings into `ILogger`) — parked per lane Assumptions; `SECURITY.md` §6 marks it still open.
+3. **"To pin" digests** (U25, network-blocked): `node:22` (Dockerfile stage 1); `postgres:18` + `axllent/mailpit:latest` (`docker-compose.yml`, dev-only). Resolve via token-authenticated pull and pin.
+4. **Operator live-config checks** (D-9, `SECURITY-AUDIT.md` §4): `ReverseProxy:KnownNetworks` (H3); `Health__Token` (M4); `AllowedHosts` + `WellKnown__BaseUrl` (L7); ClamAV `VirusScan__Host`/`Port` (L2); `Security:RevocationStamp:RequiredAfter` (M5).
+5. **Dedup-by-hash keeps the first uploader's declared type** (U22 flag) — follow-up decision, not a finding.
+6. **M11 operator-lane `InvalidDataException` surfacing** (U14 `Noticed`) — `AdminPortabilityController` resident-import still returns 500 on `InvalidDataException`; outside SEC resident-lane scope.
+7. **Stale `HealthOptions.cs` doc-comment** (U16 `Noticed`) — the "back-compat: full payload without token" comment is stale after the M4 flip; one-line refresh owed.
+
+**Open vetoes — final decisions** (all defaulted as pinned; none flipped by owner):
+
+| Veto | Default (pinned) | Final |
+|---|---|---|
+| H1 import policy | `GroupMembership`/`GroupInvitation`/`GroupJoinRequest` rejected; `Group` owner-only; `Profile` actor-only; `Conversation`/`Message` participation-gated | defaulted as pinned |
+| H2 gate mechanism | server-side middleware; allow-list = enrolment + logout + static; sample-data exempt | defaulted as pinned |
+| H3 trusted proxies | config-driven (`ReverseProxy:KnownNetworks` / `KnownProxies`); default loopback + RFC1918; unset ≠ trust-all | defaulted as pinned |
+| M4 health | anonymous + token-unset → minimal; full needs token or GlobalAdmin | defaulted as pinned |
+| M5 stamp cut-off | `Security:RevocationStamp:RequiredAfter` (UTC); reject empty stamp after date; key left unset in repo | defaulted as pinned |
+
+**Consistency checks (U31, 2026-10-31):**
+
+- ✅ All 16 findings (H1–H3, M1–M5, L1–L8) have a row in `SECURITY-AUDIT.md` §8.
+- ✅ Both `Drift pause` entries (U21, U23) have matching `## Decision —` sections in the handoff note.
+- ✅ `## Summary` present in handoff note; deferred list matches this section.
+- ✅ U1–U31 all present in `plan-sec-remediation.md`.
+- `README.md` has no lane list — that deliverable is skipped.
+
+Lane sealed. A human moves the folder from `in-progress/sec/` to `done/sec/`.
