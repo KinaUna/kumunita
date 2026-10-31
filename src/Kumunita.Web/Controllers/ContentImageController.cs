@@ -190,6 +190,29 @@ public sealed class ContentImageController(
         if (!mediaOpts.Value.IsAllowed(file.ContentType))
             return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type (incl. SVG) → 415 (untouched)
 
+        // SEC U21 (owner decision, 2026-10-31) — magic-byte sniffer wire.
+        // Reject on **`Mismatch`** only (declared type whose known signature
+        // is contradicted by the bytes); `Match` and `Unknown` pass through.
+        // The wire reads the leading 16 bytes via `OpenReadStream` so it
+        // works for every `IFormFile` implementation without materialising
+        // the payload twice; the read is bounded to 16 bytes so it cannot
+        // leak a full upload into memory.
+        var head = new byte[Math.Min(16L, file.Length)];
+        if (head.Length > 0)
+        {
+            await using var rs = file.OpenReadStream();
+            var n = 0;
+            while (n < head.Length)
+            {
+                var got = await rs.ReadAsync(head.AsMemory(n));
+                if (got == 0) break;
+                n += got;
+            }
+            if (n < head.Length) Array.Resize(ref head, n);
+        }
+        if (UploadSignatureSniffer.Classify(file.ContentType, head) == UploadSignatureSniffer.SniffVerdict.Mismatch)
+            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // declared type contradicted by the bytes → 415
+
         // R·5: the IFormFile never crosses into Core — copy to bytes, then
         // store-first (orphan-safe order, C-MED·7):
         using var ms = new MemoryStream();

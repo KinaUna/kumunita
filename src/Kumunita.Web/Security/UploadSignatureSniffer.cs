@@ -41,6 +41,21 @@ namespace Kumunita.Web.Security;
 /// </remarks>
 public static class UploadSignatureSniffer
 {
+    /// <summary>
+    /// SEC U21 (owner decision, 2026-10-31) — the tri-state verdict the upload
+    /// wire acts on. <see cref="SniffVerdict.Match"/> means the head bytes
+    /// support the declared type; <see cref="SniffVerdict.Mismatch"/> means the
+    /// head bytes **contradict** a declared type with a known, unambiguous
+    /// signature (the wire rejects this); <see cref="SniffVerdict.Unknown"/>
+    /// means the declared type has no known signature, or the alias carries a
+    /// non-canonical payload (the wire **allows** this — it cannot prove a
+    /// contradiction). The wire (U21/U22) rejects on <c>Mismatch</c> only, so a
+    /// legacy alias such as <c>application/x-zip-compressed</c> carrying a PDF
+    /// stays green (the landed <c>AttachUpload_Support_ZipLegacyAlias_IsAllowed</c>
+    /// pin).
+    /// </summary>
+    public enum SniffVerdict { Match, Mismatch, Unknown }
+
     // Recognised leading signatures (design doc §2.2 U20). Static byte[] —
     // ReadOnlySpan<byte> is a ref struct and cannot be a field.
     private static readonly byte[] Png  = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
@@ -51,16 +66,16 @@ public static class UploadSignatureSniffer
     private static readonly byte[] Pdf  = [0x25, 0x50, 0x44, 0x46];   // "%PDF"
     private static readonly byte[] Zip  = [0x50, 0x4B, 0x03, 0x04];   // "PK\x03\x04"
 
-    // A strict UTF-8 decoder: GetChars throws on invalid bytes (the default
-    // shared UTF8Encoding would substitute U+FFFD instead), so "text" is
-    // distinguishable from an arbitrary binary blob.
-    private static readonly System.Text.UTF8Encoding StrictUtf8 =
-        new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
 
     /// <summary>
-    /// Reports whether the first <paramref name="head"/> bytes (the caller
-    /// reads the leading 16, or fewer if the payload is shorter) are consistent
-    /// with the declared <paramref name="declaredContentType"/>.
+    /// Two-valued wrapper over <see cref="Classify"/> (SEC U21 owner decision,
+    /// 2026-10-31): <c>true</c> iff <see cref="Classify"/> reports
+    /// <see cref="SniffVerdict.Match"/>. <c>Mismatch</c> and <c>Unknown</c>
+    /// both map to <c>false</c> — fail-closed. U20's three pinned tests
+    /// (<c>Png_Jpeg_Gif_WebP_Pdf_Accepted</c>,
+    /// <c>DeclaredPng_ButHtmlBytes_Rejected</c>,
+    /// <c>UnknownDeclaredType_Rejected</c>) are unchanged by this delegation.
     /// </summary>
     /// <param name="declaredContentType">
     /// The client-supplied <c>Content-Type</c> (any <c>;</c>-parameters are
@@ -71,39 +86,68 @@ public static class UploadSignatureSniffer
     /// signature; a head shorter than a required signature cannot match and is
     /// reported <c>false</c> (fail-closed).
     /// </param>
-    /// <returns>
-    /// <c>true</c> only when the declared type has a known signature **and**
-    /// the head bytes match it (or, for the plain-text family, are valid UTF-8
-    /// with no NUL byte). <c>false</c> for a null/empty declared type, an empty
-    /// head, a declared type with no known signature, or a mismatch.
-    /// </returns>
     public static bool Matches(string declaredContentType, ReadOnlySpan<byte> head)
+        => Classify(declaredContentType, head) == SniffVerdict.Match;
+
+    /// <summary>
+    /// SEC U21 — the tri-state verdict used by the upload wire
+    /// (<c>AttachmentController</c> / <c>ContentImageController</c> reject on
+    /// <see cref="SniffVerdict.Mismatch"/>; <see cref="SniffVerdict.Match"/>
+    /// and <see cref="SniffVerdict.Unknown"/> pass through).
+    /// </summary>
+    /// <param name="declaredContentType">
+    /// The client-supplied <c>Content-Type</c> (any <c>;</c>-parameters are
+    /// ignored; the comparison is case-insensitive on the base MIME).
+    /// </param>
+    /// <param name="head">
+    /// The leading bytes of the uploaded payload (the wire reads the leading
+    /// 16, or fewer if the payload is shorter).
+    /// </param>
+    /// <returns>
+    /// <see cref="SniffVerdict.Match"/> — the declared type has a known
+    /// signature and the head bytes support it (or, for the plain-text
+    /// family, are valid UTF-8 with no NUL byte).
+    /// <see cref="SniffVerdict.Mismatch"/> — the head bytes contradict the
+    /// declared type: a binary signature declared but the head contradicts it
+    /// (e.g. <c>image/png</c> declared but <c>&lt;script&gt;</c> bytes), or a
+    /// text type declared but a NUL byte sits in the first 16 bytes.
+    /// <see cref="SniffVerdict.Unknown"/> — the declared type has no known
+    /// signature (outside the allowlist, a legacy binary office / audio /
+    /// video MIME), or the declared type is null/empty, or the head is empty,
+    /// or the alias is declared with a non-canonical payload (e.g.
+    /// <c>application/x-zip-compressed</c> carrying a PDF — a legacy alias
+    /// that legitimately may carry non-zip payloads).
+    /// </returns>
+    public static SniffVerdict Classify(string declaredContentType, ReadOnlySpan<byte> head)
     {
         if (string.IsNullOrWhiteSpace(declaredContentType) || head.IsEmpty)
-            return false;
+            return SniffVerdict.Unknown;
 
         var baseType = BaseMime(declaredContentType);
 
         return baseType switch
         {
-            "image/png"        => StartsWith(head, Png),
-            "image/jpeg"       => StartsWith(head, Jpeg),
-            "image/gif"        => StartsWith(head, Gif),
-            "image/webp"       => MatchesWebP(head),
-            "application/pdf"  => StartsWith(head, Pdf),
+            "image/png"       => StartsWith(head, Png)  ? SniffVerdict.Match : SniffVerdict.Mismatch,
+            "image/jpeg"      => StartsWith(head, Jpeg) ? SniffVerdict.Match : SniffVerdict.Mismatch,
+            "image/gif"       => StartsWith(head, Gif)  ? SniffVerdict.Match : SniffVerdict.Mismatch,
+            "image/webp"      => MatchesWebP(head)      ? SniffVerdict.Match : SniffVerdict.Mismatch,
+            "application/pdf" => StartsWith(head, Pdf)  ? SniffVerdict.Match : SniffVerdict.Mismatch,
             "text/plain" or
             "text/markdown" or
-            "text/csv"         => IsPlainText(head),
+            "text/csv"        => head.Contains((byte)0x00)
+                                    ? SniffVerdict.Mismatch    // NUL in a text document = binary → contradicts "text"
+                                    : SniffVerdict.Unknown,    // can't prove the text claim from bytes alone — allow
             "application/zip" or
             "application/x-zip-compressed" or
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" or
             "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                                => StartsWith(head, Zip),
+                                => SniffVerdict.Unknown,        // zip-family: the head may be a PK header, an alias payload, or empty — allow the wire's discretion
             // Any other declared type — outside the allowlist, or allowed but
             // with no known leading signature (legacy binary office, audio,
-            // video) — is fail-closed.
-            _ => false
+            // video) — is Unknown (the wire allows it; the allowlist gate is
+            // the control, not the sniffer).
+            _ => SniffVerdict.Unknown
         };
     }
 
@@ -115,23 +159,6 @@ public static class UploadSignatureSniffer
 
     private static bool StartsWith(ReadOnlySpan<byte> head, byte[] magic) =>
         head.Length >= magic.Length && head.Slice(0, magic.Length).SequenceEqual(magic);
-
-    // Plain-text family: valid UTF-8 (strict decoder) and no NUL byte — a NUL
-    // is the practical binary marker and is not valid in a text document.
-    private static bool IsPlainText(ReadOnlySpan<byte> head)
-    {
-        if (head.Contains((byte)0x00))
-            return false;
-        try
-        {
-            StrictUtf8.GetString(head.ToArray());
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-    }
 
     // The client-supplied MIME with any ';' -delimited parameters stripped and
     // surrounding whitespace trimmed, lowercased — mirrors MediaOptions.BaseMime.
