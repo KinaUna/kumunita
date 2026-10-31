@@ -172,6 +172,24 @@ privilege surface? If so, add a row here and in the relevant checklist.
   deployment assumption, §1) — per-instance limits stop protecting the others, and the
   CAPTCHA decision (OPS.md §10) is revisited in that case.
 
+**Proxy trust (SEC H3, decided 2026-10-31; protects A2 — the real-client-IP
+requirement above):** the trusted-proxy list is **configuration-driven, never
+trust-all.** `ForwardedHeadersSetup` (U9) reads `ReverseProxy:KnownNetworks`
+(CIDR ranges) and `ReverseProxy:KnownProxies` (IPs) from the app's config;
+when both are unset or empty it falls back to a safe default — loopback
+(`127.0.0.0/8`, `::1/128`) and the RFC1918 ranges (`10.0.0.0/8`,
+`172.16.0.0/12`, `192.168.0.0/16`), which covers the Docker network — and
+**never** to "trust everyone." An out-of-range peer's `X-Forwarded-For` /
+`X-Forwarded-Proto` headers are ignored, so a spoofed client cannot inject a
+false source IP or scheme. An unparseable CIDR or IP value throws
+`InvalidOperationException` at `builder.Services` time (the boot fails, the
+door does not open). In production, set `ReverseProxy:KnownNetworks` to the
+CIDR of the edge proxy's source address (e.g. `172.18.0.0/16`) so the
+`X-Forwarded-For` header is honored and the `login` rate-limit partitioning
+sees real client IPs. The cookie `Secure` attribute is set explicitly via
+`CookieSecurePolicy.Always` outside Development (U10), so the session cookie
+is never issued over plain HTTP even on a non-TLS hop.
+
 **2FA (decided 2026-08-27; protects A3, A4):** TOTP via ASP.NET Identity's built-in
 support, plus recovery codes.
 

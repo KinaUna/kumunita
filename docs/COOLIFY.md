@@ -429,7 +429,26 @@ Path `GET /health`, expected `200`.
 ## 6. Verify (then switch to the runbook)
 
 1. `https://<domain>/` renders with the correct `Community__Name`, over
-HTTPS.
+HTTPS. **Also check the forwarded-headers + cookie policy** (SEC H3 — the
+operator is the only one who can prove this, as it depends on live proxy
+config; none of the three checks below is covered by a unit test):
+   - a. `curl -sI https://<domain>/` → response must include
+     `Strict-Transport-Security: max-age=…` (HSTS) **and** the session
+     cookie (`Set-Cookie: kumunita.auth=…; Secure`) must carry the `Secure`
+     attribute. If `Secure` is missing the proxy is not forwarding
+     `X-Forwarded-Proto: https` to the app, or the non-dev `CookieSecurePolicy.Always`
+     block in `Program.cs` is not active.
+   - b. From two different source IPs (e.g. two devices, or a VPN vs. a direct
+     connection), submit a login attempt with the same wrong password 5+
+     times in rapid succession from *each*. If the second IP still accepts
+     attempts after the first is locked out, the rate-limit partitioning is
+     working (real client IPs are distinct). If both IPs lock out
+     simultaneously, the app sees a single shared IP — the proxy is not
+     forwarding `X-Forwarded-For`, or `ReverseProxy:KnownNetworks` is unset
+     and the proxy's source IP is not in the loopback+RFC1918 defaults.
+   - c. If (a) or (b) fails: set `ReverseProxy:KnownNetworks` to the CIDR of
+     the proxy's source address (e.g. `172.18.0.0/16` for the Docker network)
+     in the app's env or `appsettings.Production.json`, and redeploy.
 2. `GET /health` → `{"status":"ok","database":"ok","build":"<sha>",…}` and
 `build` matches the deployed commit (`release` tip).
 3. **First boot** (fresh database): the `mt` schema initializes with no

@@ -40,6 +40,14 @@ builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.Environment
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+// SEC H3 (U9/U10) — config-driven forwarded-header trust (open veto 3): the
+// X-Forwarded-For / X-Forwarded-Proto honoring at app.UseForwardedHeaders()
+// below reads this ForwardedHeadersOptions from DI (verified — the no-arg
+// overload picks up the registered options). Trusted proxies come from
+// ReverseProxy:KnownNetworks / ReverseProxy:KnownProxies, defaulting to
+// loopback + RFC1918 (the Docker network); unset/empty NEVER means trust-all.
+builder.Services.AddKumunitaForwardedHeaders(builder.Configuration);
+
 // The app never registered the logging stack (WebApplication.CreateBuilder does not
 // call AddLogging for us), so even LoggerFactory was missing from DI. AddLogging
 // registers LoggerFactory, ILoggerFactory, and the open-generic ILogger<T>.
@@ -771,6 +779,16 @@ builder.Services.Configure<Kumunita.Core.Events.EventReminderOptions>(
 builder.Services.Configure<SmtpOptions>(
     builder.Configuration.GetSection(SmtpOptions.SectionName));
 
+// SEC H3 (U10) — outside Development the anti-forgery cookie is always `Secure`,
+// matching the session cookie below so neither can leak over plain HTTP.
+builder.Services.AddAntiforgery(options =>
+{
+    if (!builder.Environment.IsDevelopment())
+    {
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    }
+});
+
 // Cookie-based authentication (the Web's only scheme; the thin-principal claim set
 // IS the authentication artifact, per ADR 0001-B / ADR 0006-D). The scheme name and
 // login path are the host's choice — the Core never names them (ADR 0006-D).
@@ -801,6 +819,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         // elapsed time passes the halfway point of the 14-day window, so an active
         // resident stays signed in and only an idle one lapses at the boundary.
         options.SlidingExpiration = true;
+        // SEC H3 (U10) — outside Development the auth cookie is always `Secure`.
+        // The default CookieSecurePolicy.SameHost only sets the Secure flag once
+        // Request.IsHttps is true (restored by the forwarded-header wiring above);
+        // Always makes it Secure on the very first set, even on a non-TLS hop, so
+        // the session cookie can never leak over plain HTTP in production.
+        if (!builder.Environment.IsDevelopment())
+        {
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        }
     });
 
 // F5 (AUTH-04, Option B) — session kill-all + invalidation. The `SecurityStamp`
@@ -955,9 +982,11 @@ if (!app.Environment.IsDevelopment())
     // those headers (this is the proxy, the only trusted hop) restores the real client
     // IP — SECURITY.md §6 rate-limit "real client IP is a hard requirement" — and makes
     // Request.IsHttps reflect the client's TLS, so the session cookie is correctly
-    // marked Secure (the cookie default, CookieSecurePolicy.SameHost, then upgrades
-    // itself — no explicit SecurePolicy needed). Must run before UseExceptionHandler /
-    // UseHsts so those see the resolved scheme and remote IP.
+    // marked Secure. (U10 additionally pins CookieSecurePolicy.Always on the
+    // session + anti-forgery cookies in the DI block, so the Secure attribute is
+    // set even on a non-TLS hop — this header wiring is what makes the forwarded
+    // scheme available for the default SameHost path.) Must run before
+    // UseExceptionHandler / UseHsts so those see the resolved scheme and remote IP.
     app.UseForwardedHeaders();
     app.UseExceptionHandler("/Home/Error");
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
