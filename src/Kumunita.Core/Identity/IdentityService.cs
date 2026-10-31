@@ -615,9 +615,9 @@ public sealed class IdentityService(
     public async Task<bool> IsChangePasswordLockedForAsync(string subjectId)
     {
         // ADR 0138 decision seam: the single place the "is this account locked
-        // out of changing its own password?" rule lives, so the resident
-        // /account/password surface and the ChangePasswordAsync enforcement
-        // guard below agree. Four conjuncts (1)+(2) are this method's, (3)+(4)
+        // out of changing its own password?" rule lives, so the resident's
+        // self-serve change-password surface (now on the Security tab, ADR
+        // 0280) and the ChangePasswordAsync enforcement guard below agree. Four conjuncts (1)+(2) are this method's, (3)+(4)
         // are shared with the ADR 0194 MFA lock via IsSampleNonAdminAsync
         // (the two locks cannot drift):
         //   (1) the instance carries the closed set (SampleData__Enabled);
@@ -1600,8 +1600,8 @@ public sealed class IdentityService(
     public async Task ChangePasswordAsync(string subjectId, string newPassword, bool byAdmin)
     {
         // ADR 0138 — the enforcement guard (the single place the lock bites,
-        // so the resident /account/password surface and this write path can
-        // never disagree). It applies to the self-serve lane only (byAdmin
+        // so the resident's self-serve change-password surface (now on the
+        // Security tab, ADR 0280) and this write path can never disagree). It applies to the self-serve lane only (byAdmin
         // false): an admin's reset of a sample account is always allowed (an
         // admin must be able to recover a demo credential they set), so the
         // guard is a no-op for the byAdmin path. A locked, non-admin sample

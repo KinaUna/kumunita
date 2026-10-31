@@ -1608,10 +1608,10 @@ public static class KnownTranslationKeys
             ["account.signup_has_account"] = "Already have an account?",
 
             // ── ADR 0138 — the resident self-serve change-password surface
-            //    (/account/password: the form + the locked notice), the
-            //    settings-tab link (nav.change_password, moved out of the
-            //    account dropdown 2026-10-04), and the
-            //    GlobalAdmin /admin/sample toggle (admin.sample.*) ──
+            //    (the form + the locked notice, now on the Security tab per
+            //    ADR 0280), the nav key, and the GlobalAdmin
+            //    /admin/sample toggle (admin.sample.*). The
+            //    nav.change_password tab link was removed 2026-10-31. ──
             ["account.change_password_title"] = "Change password",
             ["account.change_password_lede"] =
                 "Pick a new password for your account. After saving you'll be " +

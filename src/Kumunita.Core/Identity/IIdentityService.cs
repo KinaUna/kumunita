@@ -298,8 +298,9 @@ public interface IIdentityService
     /// Whether the given <paramref name="subjectId"/>'s self-serve password
     /// change is currently <b>locked</b> (ADR 0138). Combines the three
     /// conditions into one decision (the single place the rule lives, so the
-    /// resident <c>/account/password</c> surface and the
-    /// <see cref="ChangePasswordAsync"/> enforcement guard agree):
+    /// resident's self-serve change-password surface (now on the Security tab,
+    /// ADR 0280) and the <see cref="ChangePasswordAsync"/> enforcement guard
+    /// agree):
     /// <see cref="IsSampleDataEnabledAsync"/> (the instance carries the closed
     /// set) <b>AND</b> <see cref="IsSamplePasswordChangeLockedAsync"/> (the
     /// admin opted in) <b>AND</b> the subject is a member of
