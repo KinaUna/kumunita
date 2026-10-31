@@ -597,39 +597,19 @@ builder.Services.AddRateLimiter(opts =>
                 }));
     }
 
-    // Login: 5 attempts per 15 minutes per IP for regular accounts (per-account
+    // Login: 5 attempts per 15 minutes per **resolved client IP** (per-account
     // Identity lockout already covers same-account brute-force; this covers
-    // cross-account stuffing). **Exempt**: the sample/test accounts
-    // (SampleDataSeeder.SampleAccountEmails — the closed set sourced from the
-    // embedded sample-data document) are unlimited, so an operator switching
-    // between test logins is never throttled (the live-site report: "randomly
-    // cannot log in with the test accounts"). Reading the posted e-mail here is
-    // safe: the rate limiter runs before model binding, and ASP.NET Core caches
-    // the FormCollection after the first read, so this does not block the
-    // controller's binding. (Brute-force on a sample account stays bounded by
-    // the account-level Identity lockout, which is independent of this IP limit;
-    // sample accounts also use random high-entropy passwords on a deploy.)
-    opts.AddPolicy("login", (context) =>
-    {
-        var postedEmail = context.Request.HasFormContentType
-            ? context.Request.Form["Email"].ToString()
-            : null;
-
-        if (postedEmail is not null
-            && SampleDataSeeder.SampleAccountEmails.Contains(postedEmail))
-        {
-            return RateLimitPartition.GetNoLimiter("sample-exempt");
-        }
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(15),
-                AutoReplenishment = true
-            });
-    });
+    // cross-account stuffing). SEC L8/U27 — the historical sample-account
+    // exemption (a `GetNoLimiter("sample-exempt")` branch that read the posted
+    // e-mail) is **removed**: the limiter now partitions on the resolved IP
+    // only and never reads the form body. Brute-force on *any* account (sample
+    // or not) stays bounded by the account-level ASP.NET Identity lockout,
+    // which is independent of this IP limit, so the exemption was unnecessary.
+    // The partition key is the resolved client IP (via UseForwardedHeaders —
+    // SEC H3/U10), so a trusted proxy's forwarded X-Forwarded-For is honoured
+    // and the operator "randomly cannot log in with the test accounts" case is
+    // no longer a throttle concern (each real IP still gets its own bucket).
+    opts.AddPolicy("login", LoginRateLimitPolicy.Partition);
 
     // Signup: 5 per hour per IP (account-creation flood).
     AddWindow(opts, "signup", limit: 5, window: TimeSpan.FromHours(1));
