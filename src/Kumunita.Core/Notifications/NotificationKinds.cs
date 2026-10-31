@@ -190,6 +190,41 @@ public static class NotificationKinds
     /// </summary>
     public const string MessageMention = "message.mention";
 
+    // ── Group messaging lane — the N:1 generalization of the M9 1:1 kinds ──
+
+    /// <summary>
+    /// Group messaging lane — a participant of a group thread (other than the
+    /// sender) gets a nudge through the M6 lane. Resident-facing, opt-OUT
+    /// default (the same posture as <see cref="MessageNew"/> / <c>group.post</c>).
+    /// The emitter is <see cref="Kumunita.Core.GroupMessaging
+    /// .GroupMessagingService"/>.SendAsync/ (the idempotency key
+    /// <c>notification:group.message.new:{messageId}</c>, <c>LinkPath =
+    /// /group-messages/{conversationId}</c>, <c>targetId = null</c>).
+    /// </summary>
+    public const string GroupMessageNew = "group.message.new";
+
+    /// <summary>
+    /// Group messaging lane — a group thread's body mentions the resident.
+    /// Resident-facing, opt-OUT (the M36 posture, generalized to the group
+    /// surface). Emitter: the <see cref="Kumunita.Core.GroupMessaging
+    /// .GroupMessagingService"/>.SendAsync/ mention step.
+    /// </summary>
+    public const string GroupMessageMention = "group.message.mention";
+
+    /// <summary>
+    /// Group messaging invitation lane — a resident has been invited to join
+    /// a group-message thread (they must accept or decline before becoming
+    /// a participant). Resident-facing, opt-OUT. The emitter is
+    /// <see cref="Kumunita.Core.GroupMessaging
+    /// .GroupMessagingService"/>.OpenGroupAsync / AddMembersAsync (the
+    /// idempotency key
+    /// <c>notification:group.message.invite:{conversationId}:{inviteeId}</c>,
+    /// <c>LinkPath = /group-messages/{conversationId}</c>,
+    /// <c>AcceptPath = /group-messages/{conversationId}/invitations/accept</c>,
+    /// <c>DeclinePath = /group-messages/{conversationId}/invitations/decline</c>).
+    /// </summary>
+    public const string GroupMessageInvite = "group.message.invite";
+
     // ── GU community-approval lane — the guardian-facing pair ─────────────
 
     /// <summary>
@@ -303,6 +338,11 @@ public static class NotificationKinds
         // of the guardian / admin-adjacent lane that trails them.
         GroupPostMention, PageMention, EventMention,
         TodoMention, AnnouncementMention, MessageMention,
+        // Group messaging lane — the N:1 generalization of the M9 1:1 kinds
+        // (MessageNew / MessageMention). Resident-facing, opt-OUT; grouped
+        // with the M9 pair they generalize. GroupMessageInvite is the
+        // invitation lane (the N:1 analogue of GroupInvite for chat threads).
+        GroupMessageNew, GroupMessageMention, GroupMessageInvite,
         GuardianGroupInvite, GuardianCommunityInvite, GuardianAssign,
         GuardianEventRequest, GuardianEventRsvp,
     ];

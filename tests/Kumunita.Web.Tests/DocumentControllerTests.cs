@@ -521,6 +521,35 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     }
 
     /// <summary>
+    /// SEC U22 (finding **L2**) — a declared <c>application/pdf</c> whose head
+    /// bytes are a **PNG** signature (<c>89 50 4E 47</c>) is rejected <b>415</b>
+    /// by the magic-byte sniffer wire (the U21/U22 <c>Mismatch</c>-reject): the
+    /// allowlist accepts the declared type, but the bytes contradict it, so the
+    /// second, independent check fires before <see cref="IMediaStore.PutAsync"/>.
+    /// Synthetic bytes only (rule 8) — no binary fixture. This is the New-upload
+    /// lane; the Edit re-upload site carries the same wire (U22).
+    /// </summary>
+    [Fact]
+    public async Task Document_MismatchedBytes_Rejected()
+    {
+        var (controller, media, _, _) = BuildUploadController(roles: new[] { "GlobalAdmin" });
+
+        // A 12-byte PNG payload (the real PNG magic header + filler) declared
+        // as application/pdf — the sniffer reports Mismatch (declared binary
+        // signature contradicted by the bytes).
+        byte[] png =
+        {
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01, 0x02, 0x03,
+        };
+        var result = await controller.Upload(ValidUploadForm(TestFile("fake.pdf", "application/pdf", png)));
+
+        AssertFormRejected(result, "New", StatusCodes.Status415UnsupportedMediaType, "File");
+        // C-UP·2 / guards-before-write: no byte written on the Mismatch guard.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
     /// <c>POST /documents</c> with a **malformed audience** (a mode of
     /// <c>null</c> — <see cref="AudienceEditorModel.IsValid"/> false) is a
     /// <b>form error</b> (re-render of the <c>New</c> view with the bound

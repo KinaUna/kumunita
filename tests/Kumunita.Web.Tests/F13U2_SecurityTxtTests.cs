@@ -2,6 +2,7 @@ using Kumunita.Core;
 using Kumunita.Web.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -137,10 +138,12 @@ public sealed class F13U2_SecurityTxtTests
     /// </summary>
     private static WellKnownController Build()
     {
-        var controller = new WellKnownController(Options.Create(new CommunityOptions
-        {
-            SupportEmail = SupportEmail,
-        }));
+        var controller = new WellKnownController(
+            Options.Create(new CommunityOptions
+            {
+                SupportEmail = SupportEmail,
+            }),
+            new ConfigurationBuilder().Build()); // WellKnown__BaseUrl unset → Request.Host origin
 
         var httpContext = new DefaultHttpContext
         {

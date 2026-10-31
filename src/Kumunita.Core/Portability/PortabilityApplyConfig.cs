@@ -1,3 +1,4 @@
+using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Localization;
 using Microsoft.Extensions.Options;
 
@@ -44,8 +45,8 @@ public static class PortabilityApplyConfig
     /// <c>LocaleSettings</c> + <c>LanguageCatalog</c> target — the
     /// <see cref="ConfigExport"/> source, mirrored verbatim).</param>
     /// <param name="config">The <c>config.json</c> POCO — the
-    /// <c>community</c> / <c>locale</c> / <c>languages[]</c> blocks (the
-    /// U02 <see cref="ConfigExport"/> mirror, verbatim).</param>
+    /// <c>community</c> / <c>locale</c> / <c>languages[]</c> / <c>escalation</c>
+    /// blocks (the U02 <see cref="ConfigExport"/> mirror, verbatim).</param>
     /// <param name="mode">The import mode (ADR 0193).
     /// <see cref="PortabilityImportMode.CleanSlate"/> — the D1 restore
     /// semantic: the <c>LocaleSettings</c> singleton and every
@@ -55,11 +56,18 @@ public static class PortabilityApplyConfig
     /// row that already exists in the target store is <b>kept intact</b>
     /// (the existing config is never overwritten); only new
     /// <c>LanguageCatalog</c> rows are added.</param>
+    /// <param name="actorId">The import's actor (the admin who ran the
+    /// import) — stamped as <c>UpdatedBy</c> on the
+    /// <see cref="EscalationOutboundConfig"/> row the apply (re)stores
+    /// (ADR 0276 — the Web save lane's <c>config.UpdatedBy = actor</c>
+    /// shape, mirrored for the portability surface; the actor is the
+    /// restore's author, not the source instance's admin).</param>
     /// <param name="ct">Cancellation.</param>
     public static async Task ApplyAsync(
         Marten.IDocumentStore documentStore,
         PortabilityConfig config,
         PortabilityImportMode mode,
+        string actorId,
         CancellationToken ct)
     {
         // The full session (the IDocumentStore.OpenSession seam, the same
@@ -69,28 +77,45 @@ public static class PortabilityApplyConfig
 
         // The LocaleSettings singleton (one row per instance, Id =
         // "singleton") — the seven instance-level locale fields, verbatim
-        // from the U02 ConfigExport mirror (the §config field set).
-        // CleanSlate (the D1 restore semantic): the load-then-Store
-        // idempotent shape (the FirstBootSeeder idiom — a fresh instance
-        // has no row, a re-import overwrites it with the archive's state).
-        // KeepExisting (ADR 0193): an existing row is kept intact — the
-        // instance's current config is never overwritten.
-        var locale = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct);
-        if (locale is null)
+        // from the U02 ConfigExport mirror (the §config field set:
+        // default language + timezone + date format + the four boolean
+        // switches: sign-up open, notify admins on signup, announcement
+        // comments, messaging).
+        //
+        // CleanSlate (the D1 restore semantic): the archive's state IS the
+        // instance's state — the singleton row is (re)materialized from the
+        // archive, overwriting whatever the seeder set on first boot. The
+        // FirstBootSeeder's row (UTC / FloorFormat / the seeder's boolean
+        // floors) is the *fresh-instance* default, not the *restore* value:
+        // a CleanSlate import's whole point is that the archive's instance
+        // becomes the target's instance, and that includes its platform
+        // default time zone (ADR 0019) and its sign-up posture (ADR 0050) —
+        // the two fields the user reported missing after a restore (the
+        // seeder's UTC / IsSignupOpen = false had been sticking because the
+        // apply's old "write only when null" shape saw the seeder's row and
+        // skipped the write).
+        //
+        // KeepExisting (ADR 0193): the existing row is kept intact — the
+        // instance's current config (the operator's own time zone / sign-up
+        // posture) is never overwritten by the imported community's; only
+        // the imported community's *content* is added. (The same keep-first
+        // discipline ADR 0274 / ADR 0275 apply to the tag / principal
+        // merges.)
+        if (mode == PortabilityImportMode.CleanSlate)
         {
-            // A fresh instance (or a CleanSlate re-import) — re-materialize.
-            locale = new LocaleSettings { Id = LocaleSettings.SingletonId };
-            locale.DefaultLanguageCode = config.Locale.DefaultLanguageCode!;
-            locale.DefaultTimezone = config.Locale.DefaultTimezone!;
-            locale.DefaultDateFormat = config.Locale.DefaultDateFormat!;
-            locale.IsSignupOpen = config.Locale.IsSignupOpen;
-            locale.NotifyAdminsOnSignup = config.Locale.NotifyAdminsOnSignup;
-            locale.AnnouncementCommentsEnabled = config.Locale.AnnouncementCommentsEnabled;
-            locale.MessagingEnabled = config.Locale.MessagingEnabled;
-            session.Store(locale);
+            var singleton = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+                ?? new LocaleSettings { Id = LocaleSettings.SingletonId };
+            singleton.DefaultLanguageCode = config.Locale.DefaultLanguageCode ?? singleton.DefaultLanguageCode;
+            singleton.DefaultTimezone = config.Locale.DefaultTimezone ?? singleton.DefaultTimezone;
+            singleton.DefaultDateFormat = config.Locale.DefaultDateFormat ?? singleton.DefaultDateFormat;
+            singleton.IsSignupOpen = config.Locale.IsSignupOpen;
+            singleton.NotifyAdminsOnSignup = config.Locale.NotifyAdminsOnSignup;
+            singleton.AnnouncementCommentsEnabled = config.Locale.AnnouncementCommentsEnabled;
+            singleton.MessagingEnabled = config.Locale.MessagingEnabled;
+            session.Store(singleton);
         }
         // KeepExisting — the existing LocaleSettings row is kept intact
-        // (the load returned non-null; nothing to store).
+        // (the instance's own config is never overwritten by the import).
 
         // Every LanguageCatalog row (the per-instance language catalog —
         // the §config languages[] field set, the U02 ConfigExport mirror,
@@ -130,6 +155,51 @@ public static class PortabilityApplyConfig
             row.Enabled = language.Enabled;
             row.SortOrder = language.SortOrder;
             session.Store(row);
+        }
+
+        // ADR 0276 — the /admin/escalation outbound config (the
+        // EscalationOutboundConfig singleton's non-secret fields: the
+        // receiving endpoint + the enabled switch). The Token (the
+        // plaintext the origin admin was handed, the OUTGOING secret) is
+        // structurally absent from the config's escalation block (the
+        // C-M11·2 import boundary applied to the escalation surface) —
+        // the restore carries the forwarding endpoint + posture, and the
+        // admin re-enters the token after a CleanSlate import (the same
+        // "re-enter your credential" shape as the password reset, the
+        // PortabilityApplyIdentity boundary). The apply never writes the
+        // token: a fresh restore's empty token is the admin's to set, and
+        // a target that already holds a token keeps it (the apply's
+        // keep-first discipline, the ADR 0274 / ADR 0275 shape).
+        //
+        // CleanSlate (the D1 restore semantic): the archive's escalation
+        // config IS the instance's config — the singleton row is
+        // (re)materialized from the archive's endpoint + enabled (the
+        // token is blank, the admin re-enters it on /admin/escalation).
+        // A null escalation block (the source never set one up) leaves the
+        // target's row untouched — a fresh instance's forwarder env-var
+        // fallback still works, and a target that had a config keeps it.
+        //
+        // KeepExisting (ADR 0193): the existing row is kept intact — the
+        // target's own escalation config (endpoint + token + posture) is
+        // never overwritten by the imported community's; only the imported
+        // community's *content* is added. (The same keep-first discipline
+        // ADR 0274 / ADR 0275 apply to the tag / principal merges.)
+        if (mode == PortabilityImportMode.CleanSlate && config.Escalation is not null)
+        {
+            var escalationRow = await session.LoadAsync<EscalationOutboundConfig>(
+                ConfigExport.EscalationOutboundConfigSingletonId, ct)
+                ?? new EscalationOutboundConfig { Id = ConfigExport.EscalationOutboundConfigSingletonId };
+            escalationRow.Endpoint = config.Escalation.Endpoint ?? string.Empty;
+            escalationRow.Enabled = config.Escalation.Enabled;
+            // The Token is NOT written (structurally absent from the
+            // config's escalation block — the C-M11·2 boundary). A fresh
+            // restore's row has the POCO's empty-string token default; a
+            // re-import over a target that already holds a token leaves it
+            // intact (the load above returned the existing row; we only
+            // touch Endpoint + Enabled + the audit stamps).
+            escalationRow.Updated = DateTimeOffset.UtcNow;
+            escalationRow.UpdatedBy = actorId;
+            session.Store(escalationRow);
         }
 
         // One commit (the C-M11·4 "one commit" pin — the config is the

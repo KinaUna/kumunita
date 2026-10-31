@@ -26,6 +26,12 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* The Direct / Group tab strip (the _MessagesTabs.cshtml idiom — the
+           group-messaging lane, ADR 0278, lives beside the 1:1 surface
+           rather than in the account menu). Self-gates on the toggle +
+           per-actor standing. *@
+        <partial name="_MessagesTabs" />
+
         <header class="airy-head d-flex align-items-baseline gap-3">
             <a href="/messages" class="text-dark text-decoration-none me-1" aria-label="@ariaBack">←</a>
             <h1>

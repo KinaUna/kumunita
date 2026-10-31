@@ -116,6 +116,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Notifications/      # M6 ✓ (ADR 0076) — Notification + NotificationPreference docs (the NotificationDocTypes surface) + NotificationService (the EmitAsync writer + the inbox / preference lanes, reusing the M1 durable-email trio, no IAuthorizationService — a personal read, not an AccessAction decision); see design/m6-notifications-design.md; M20 ✓ (ADR 0121) — notification quiet times: the `NotificationQuietSchedule` doc (the per-resident blocked/allowed hours-of-day + days-of-week schedule, `RecipientId` identity, registered on `NotificationDocTypes`) + the pure `QuietScheduleEvaluator.IsQuietNow` (the recipient's own effective zone, ADR 0019) + the two owner-scope seams (`GetQuietScheduleAsync` / `SetQuietScheduleAsync`, no audit row — the ADR 0019 personal-preference shape); the additive `Notification.EmailDeferred` field + the `EmitAsync` quiet gate (the email nudge is deferred, **never the inbox row** — ADR 0076 D7) + the distinct deferred idempotency key `notification:{kind}:{source-id}:deferred`; the §6.4 `NotificationFlushService` (the Wolverine-free durable flush, the `EventReminderService` shape) + the `LocaleSettings.QuietCheckMinutes` additive field (admin-set cadence, the ADR 0050/0105 shape) + the audited `SetQuietCheckMinutesAsync` write lane (C-M20·6); zero new authorization surface (C-M20·5); see design/m20-notification-quiet-times-design.md
     │   │   ├── Search/             # M8 ✓ (ADR 0091) — no docs, no DocTypes surface (zero schema change, ADR 0004 §B untouched) + ISearchService (SearchAsync `all` read + SearchSurfaceAsync paged single-surface read, the ADR 0090 D1/D3 HasMore shape) + SearchService (store-composing; composes only the frozen IDocumentStore / IAuthorizationService / IUserInfoService; per-surface candidate predicates copied from the canonical reads, the case-insensitive substring match over Title + Body, the truncated context window); one aggregate audit row per (query, surface, scope) decision — TargetKind "search:<surface>" (search:posts / search:events / search:pages / search:announcements), TargetId null, zero-candidate visits emit no row; see design/m8-search-design.md
     │   │   ├── Messaging/          # M9 ✓ (ADR 0105) — Conversation + Message docs (the MessagingDocTypes surface; a unique (ParticipantA, ParticipantB) pair index + a (ConversationId, Created) thread index) + IMessagingService / MessagingService (the toggle seams IsMessagingEnabledAsync / SetMessagingEnabledAsync over the LocaleSettings.MessagingEnabled false-floor + open / send / list / thread / mark-read); participant-by-id access — no Audience, no IAuthorizationService call, zero new AccessAction / AccessVia / IAuditableResource adapter (a non-participant, GlobalAdmin included, gets a non-leaky 404); one in-transaction AccessAudit row per write (Action/TargetKind "message" on open + send, Via Owner; "messaging.toggle" on the admin flip, Via Admin), reads + mark-read emit no row; the D6 nudge reuses the M6 lane (EmitAsync, kind message.new, idempotency key notification:message.new:{messageId}); plain-text ≤ 2000 chars, immutable in M9 (rich content / edit / delete are the follow-on lanes' entry); see design/m9-messaging-design.md
+    │   │   ├── GroupMessaging/     # GM ✓ (ADR 0278 + the invitation-flow amendment) — the N:1 generalization of M9 (the group-messaging lane): GroupConversation + GroupMessage + GroupMessagingInvitation docs (the GroupMessagingDocTypes surface — a Participants membership index + a (ConversationId, Created) thread index + a unique (ConversationId, InvitedId) business-key index on the invitation row; **no** unique pair index on the conversation, a group is not canonical) + IGroupMessagingService / GroupMessagingService (the IsMessagingEnabledAsync read over the **same** LocaleSettings.MessagingEnabled false-floor as M9, one master gate — the M9 admin write is the sole writer; OpenGroupAsync (creator is the only initial participant) / InviteMembersAsync / AcceptInviteAsync / DeclineInviteAsync / GetMembersAsync / GetPendingInvitationsForUserAsync / SendAsync / ListGroupsAsync / GetConversationAsync / MarkReadAsync); the **invitation flow** (the creator is the only initial member; everyone else — picked at open time or added later — gets a Pending GroupMessagingInvitation row + a group.message.invite nudge with Accept / Decline deep-links, the community-group GroupInvitation shape minus the Cancelled state; an invitee accepts → appended to Participants on the next read, or declines → never a member); the any-participant-can-invite rule; a per-participant read marker (GroupMessage.ReadBy is a sorted **set** of reader ids, not a single id); participant-by-id access — no Audience, no IAuthorizationService call, zero new AccessAction / AccessVia / IAuditableResource adapter (a non-participant, GlobalAdmin included, gets the same non-leaky 404 as M9); one in-transaction AccessAudit row per write (Action/TargetKind "group.message" on open + send, Via Owner; "group.message.invite" / "group.message.invite.accept" / "group.message.invite.decline" on the invitation-flow seams, Via Owner), reads + mark-read emit no row; the nudge reuses the M6 lane (EmitAsync, kind group.message.new / group.message.mention / group.message.invite, idempotency key notification:group.message.new:{messageId}); plain-text ≤ 2000 chars, immutable (the M9 D7 cap carried); zero re-shape of the M9 context (a parallel bounded context, the M9 ADR 0105 pins byte-identical)
     │   │   ├── Usage/              # M13 ✓ (ADR 0114) — UsageEvent doc (the UsageDocTypes surface) + the pure UsageCapturePolicy.Decide (skip no-endpoint / static-file) + the pure SurfaceKey closed-list mapper (26 top-level segments + "other") + IUsageAnalyticsService / UsageAnalyticsService (the 7/30/90-day window aggregation — Total / AuthenticatedTotal / AnonymousTotal / DistinctActors / SurfaceRanking; touches only UsageEvent, zero new authorization surface) + UsagePurgeService (the 365-day platform-constant batched delete) + UsagePurgeTick (the 1-day self-rescheduling TimeoutMessage); see design/m13-logging-analytics-design.md
     │   │   └── Logging/            # M13 ✓ (ADR 0114) — the BCL-only file sink: FileSinkOptions POCO + LogLine (JSON-lines writer, BCL-only escaping) + RollingFileSink (BuildFileName daily rotation + Retain boot deletion) + FileLoggerProvider / FileLogger (an ILoggerProvider over a per-category TextWriter) + the AddFileSink extension (registered on builder.Logging, additive to the console sink; the sink never logs request bodies / cookies / secrets — C-M13·1/2)
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
@@ -191,7 +192,39 @@ included — gets a non-leaky 404) — and the write audit rows
 `TargetKind = "message"` (open / send, `Via = Owner`) and
 `TargetKind = "messaging.toggle"` (the admin flip, `Via = Admin`); reads and
 mark-read emit no row; the new-message nudge rides the M6 `Notification` lane
-(kind `message.new`). `Usage/` + `Logging/` (M13) are now live —
+(kind `message.new`). `GroupMessaging/` (GM) is now live —
+ADR 0278 ships the `GroupConversation` + `GroupMessage` + `GroupMessagingInvitation` docs (the
+`GroupMessagingDocTypes` surface) + the `IGroupMessagingService` seam
+(`IsMessagingEnabledAsync` over the **same** `LocaleSettings.MessagingEnabled`
+false-floor as M9 — one master gate, the M9 admin write is the sole writer —
++ `OpenGroupAsync` / `InviteMembersAsync` / `AcceptInviteAsync` /
+`DeclineInviteAsync` / `GetMembersAsync` /
+`GetPendingInvitationsForUserAsync` / `SendAsync` /
+`ListGroupsAsync` / `GetConversationAsync` / `MarkReadAsync`) on the
+**participant-by-id** access story (the M9 C-M9·5 shape generalized to the
+N:1 participant set — zero new authorization surface, no `Audience`, no
+`IAuthorizationService` call, no new `AccessAction` / `AccessVia` /
+`IAuditableResource` adapter; a non-participant — GlobalAdmin included — gets
+the same non-leaky 404 as M9) — and the write audit rows
+`TargetKind = "group.message"` (open / send, `Via = Owner`) and
+`TargetKind = "group.message"` (`Action = "group.message.invite"` /
+`"group.message.invite.accept"` / `"group.message.invite.decline"`, the
+invitation-flow seams, `Via = Owner`); reads and mark-read emit no row; the
+new-message nudge rides the M6 `Notification` lane (kind `group.message.new` /
+`group.message.mention` / `group.message.invite` — the three kinds join the
+closed `NotificationKinds.Known` set, the 28 → 31 re-baseline). The
+**invitation flow** (the ADR 0278 amendment): the creator is the only
+initial participant; everyone else — picked at open time or added later —
+gets a `GroupMessagingInvitation` Pending row (business key
+`(ConversationId, InvitedId)`, the community-group `GroupInvitation` shape
+minus the `Cancelled` state) + a `group.message.invite` nudge with Accept /
+Decline deep-links; an invitee accepts (becomes a participant on the next
+read, the invariant C4 carry) or declines (never becomes a member); the
+thread's `GetMembersAsync` roster lists the accepted participants + the
+pending invitees (marked "(pending)"). The lane is a
+**parallel bounded context** — the M9 `Kumunita.Core.Messaging` context, the
+`MessagingService`, the `MessagesController`, and the M9 ADR 0105 pins are
+byte-identical (the N:1 is not a re-shape of the 1:1). `Usage/` + `Logging/` (M13) are now live —
 ADR 0114 ships the BCL-only file sink (the `Logging/` surface —
 `FileLoggerProvider` / `FileLogger` / the `LogLine` JSON-lines writer / the
 `RollingFileSink` daily rotation + boot retention, additive to the console
@@ -222,7 +255,7 @@ the seam for later extraction.
 - **LocalizationModule** — language catalog, default language, and translated UI
   strings (ADR 0005); consumed by the presentation layer, never by feature
   authorization. (Static pages live in the `Pages` context now, ADR 0039.)
-- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054), Projects (M5 ✓ — ADR 0067), Notifications (M6 ✓ — ADR 0076), Search (M8 ✓ — ADR 0091), Messaging (M9 ✓ — ADR 0105), Usage (M13 ✓ — ADR 0114), Logging (M13 ✓ — ADR 0114, the BCL-only file sink).
+- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054), Projects (M5 ✓ — ADR 0067), Notifications (M6 ✓ — ADR 0076), Search (M8 ✓ — ADR 0091), Messaging (M9 ✓ — ADR 0105), GroupMessaging (GM ✓ — ADR 0278, the N:1 generalization of M9), Usage (M13 ✓ — ADR 0114), Logging (M13 ✓ — ADR 0114, the BCL-only file sink).
   Directory and Posts are both *consumers* of the single bulk visibility
   capability (`CanSeeAsync`, §4.2) — list authorization is one platform
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:

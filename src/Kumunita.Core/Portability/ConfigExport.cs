@@ -1,3 +1,4 @@
+using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Localization;
 using Marten;
 using Microsoft.Extensions.Options;
@@ -56,6 +57,31 @@ public static class ConfigExport
             })
             .ToList();
 
+        // ADR 0276 — the /admin/escalation outbound config (the
+        // EscalationOutboundConfig singleton's non-secret fields: the
+        // receiving endpoint + the enabled switch). The Token (the
+        // plaintext the origin admin was handed, the OUTGOING secret) is
+        // structurally absent from the PortabilityConfigEscalation POCO
+        // (the C-M11·2 import boundary applied to the escalation surface) —
+        // the restore carries the forwarding endpoint + posture, and the
+        // admin re-enters the token after a CleanSlate import (the same
+        // "re-enter your credential" shape as the password reset). A
+        // missing row (a fresh instance that never set up escalation) is
+        // exported as null — the JSON field is omitted, and the apply
+        // leaves the target's row untouched (the forwarder's env-var
+        // fallback still works on both sides).
+        PortabilityConfigEscalation? escalation = null;
+        var outbound = await session.LoadAsync<EscalationOutboundConfig>(
+            EscalationOutboundConfigSingletonId, ct);
+        if (outbound is not null)
+        {
+            escalation = new PortabilityConfigEscalation
+            {
+                Endpoint = outbound.Endpoint,
+                Enabled = outbound.Enabled,
+            };
+        }
+
         var config = new PortabilityConfig
         {
             Community = new PortabilityConfigCommunity
@@ -74,8 +100,18 @@ public static class ConfigExport
                 MessagingEnabled = locale.MessagingEnabled,
             },
             Languages = languages,
+            Escalation = escalation,
         };
 
         return KumunitaArchive.ToJson(config);
     }
+
+    /// <summary>
+    /// ADR 0276 — the fixed singleton id for the <see cref="EscalationOutboundConfig"/>
+    /// row (the Web layer's <c>EscalationConfigController</c> + <c>EscalationForwarder</c>
+    /// both read/write under this id — the "outbound-config" conventional id
+    /// the doc comment names; defined once here so the portability surface
+    /// does not re-invent it).
+    /// </summary>
+    public const string EscalationOutboundConfigSingletonId = "outbound-config";
 }

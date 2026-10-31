@@ -36,12 +36,22 @@ on:
     branches:
       - release
 
+# SEC L5 (U25): least-privilege workflow token. This workflow only reads the
+# checked-out source (build + test + e2e); it never pushes, creates a PR, or
+# writes a check run, so `contents: read` is the full scope it needs. The
+# default token (broad) is scoped down to the minimum.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # SEC L5 (U25): tag + commit-SHA pin. The SHA is the tag's resolved commit
+      # (GitHub API, 2026-10-31); the `# v5` suffix keeps the tag human-readable
+      # while the SHA is what actually pins the action code.
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK.
       # @v5 runs on Node 24 (the v4 major targets deprecated Node 20).
@@ -49,7 +59,7 @@ jobs:
       # 'roll-forward' inputs are not valid inputs for setup-dotnet and were
       # being ignored). 10.0.400 matches global.json's sdk.version.
       - name: Set up .NET SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: '10.0.400'
 
@@ -106,15 +116,16 @@ jobs:
       KUMUNITA_APP_URL: http://localhost:5080
       KUMUNITA_MAILPIT_URL: http://localhost:8025
     steps:
+      # SEC L5 (U25): tag + commit-SHA pin (same `# v5` convention as the test job).
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # CI plumbing (NOT a pinned gate command): install Node for the E2E
       # project. The e2e project does NOT use a <PackageReference>; it is a
       # standalone npm project with its own package.json + package-lock.json
       # (F19.U2).
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '20'
 

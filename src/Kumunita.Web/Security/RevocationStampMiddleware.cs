@@ -1,6 +1,8 @@
+using System.Globalization;
 using Kumunita.Core.Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kumunita.Web.Security;
@@ -64,20 +66,65 @@ namespace Kumunita.Web.Security;
 /// <see cref="RequestDelegate"/>, which is exactly the shape the ASP.NET Core
 /// middleware-class contract requires.
 /// </para>
+/// <para>
+/// <b>Fail-closed cut-off (SEC M5, U18):</b> the backward-compat rule above
+/// (no stamp → pass through) is time-boxed. When the config key
+/// <c>Security:RevocationStamp:RequiredAfter</c> (an ISO UTC date) is set and
+/// <c>DateTime.UtcNow</c> is at or past it, an empty-stamp session is treated
+/// as revoked — the SAME response as a stale stamp (sign-out via
+/// <c>SignInManager.SignOutAsync</c> + redirect to
+/// <c>/Account/Login?error=session-revoked</c>). Before the cut-off (or when
+/// the key is unset) the pass-through is unchanged, so existing unstamped
+/// sessions are not logged out at once (veto 5: the value is operator-set per
+/// deployment and is deliberately left unset in the committed
+/// <c>appsettings.json</c>).
+/// </para>
 /// </summary>
 public sealed class RevocationStampMiddleware
 {
     private readonly RequestDelegate _next;
 
     /// <summary>
+    /// The parsed <c>Security:RevocationStamp:RequiredAfter</c> cut-off (UTC),
+    /// or null when the key is unset (the backward-compat pass-through then
+    /// applies for the session's whole life).
+    /// </summary>
+    private readonly DateTime? _requiredAfter;
+
+    /// <summary>
     /// Conforms to the documented middleware-class shape (learn.microsoft.com/aspnet/core/
     /// fundamentals/middleware/write#middleware-class): "a public constructor with a
-    /// parameter of type RequestDelegate." Without this the app fails to start with
-    /// "A suitable constructor for type 'RevocationStampMiddleware' could not be located."
+    /// parameter of type RequestDelegate." (The additional <see cref="IConfiguration"/>
+    /// parameter is a root-lifetime singleton, so it does not break the shape.)
+    /// An unset/blank cut-off yields a null <see cref="_requiredAfter"/>; an
+    /// unparseable one throws so a typo fails the boot rather than the gate
+    /// silently failing open.
     /// </summary>
-    public RevocationStampMiddleware(RequestDelegate next)
+    public RevocationStampMiddleware(RequestDelegate next, IConfiguration configuration)
     {
         _next = next ?? throw new ArgumentNullException(nameof(next));
+        var raw = configuration["Security:RevocationStamp:RequiredAfter"];
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            _requiredAfter = null;
+            return;
+        }
+
+        try
+        {
+            _requiredAfter = DateTime.Parse(
+                raw,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+        }
+        catch (FormatException ex)
+        {
+            throw new InvalidOperationException(
+                "Security:RevocationStamp:RequiredAfter is not a valid ISO UTC date: "
+                + raw
+                + " (an unparseable cut-off must not silently disable the gate).",
+                ex);
+        }
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -122,13 +169,34 @@ public sealed class RevocationStampMiddleware
             ? stampObj as string
             : null;
 
-        // No stamp in the cookie (e.g. a session minted before F5 shipped) —
-        // let it through (the resident can still kill-all via the new surface;
-        // the stamp will be present on their next sign-in). This is the
-        // backward-compat rule: existing sessions continue to work until a
-        // rotation happens.
+        // No stamp in the cookie (e.g. a session minted before F5 shipped).
+        //
+        // SEC M5 (U18) fail-closed: if the operator has set
+        // Security:RevocationStamp:RequiredAfter and UtcNow is at or past it,
+        // an empty stamp is treated EXACTLY like a stale one — sign out +
+        // redirect to /Account/Login?error=session-revoked (the same response
+        // the rotation path below produces; no new response shape is invented).
+        // Before the cut-off (or with the key unset), the backward-compat rule
+        // applies: let the session through until its next sign-in re-stamps it.
         if (string.IsNullOrEmpty(cookieStamp))
         {
+            if (_requiredAfter is DateTime requiredAfter && DateTime.UtcNow >= requiredAfter)
+            {
+                // Fail closed. No DB read is needed here — the cookie carries
+                // no stamp, so there is nothing to compare against; the gate
+                // rejects on the absence itself. Resolved from the current
+                // request's scope, matching the stale-stamp path below.
+                await context.RequestServices
+                    .GetRequiredService<SignInManager<User>>()
+                    .SignOutAsync();
+                context.Response.Redirect("/Account/Login?error=session-revoked");
+                await context.Response.CompleteAsync();
+                return;
+            }
+
+            // Backward-compat (before the cut-off, or key unset): let it
+            // through (the resident can still kill-all via the new surface;
+            // the stamp will be present on their next sign-in).
             await _next(context);
             return;
         }

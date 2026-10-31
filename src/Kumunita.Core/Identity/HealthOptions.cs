@@ -4,11 +4,12 @@ namespace Kumunita.Core.Identity;
 /// <c>/health</c> diagnostic payload gate (M3). Bound from
 /// <c>Health__Token</c> env / <c>appsettings</c>.
 /// <para>
-/// When <see cref="Token"/> is set (non-empty), the full diagnostic payload
-/// (SMTP relay detail, dead-letter count, build SHA) requires either the
-/// <c>X-Health-Token</c> header to match this token, or an authenticated
-/// GlobalAdmin session. Without a token, the full payload is always visible
-/// (back-compat for existing deployments that don't set it).
+/// The full diagnostic payload (SMTP relay detail, dead-letter count, build
+/// SHA) is <em>never</em> visible to anonymous callers by default. It requires
+/// either the <c>X-Health-Token</c> header to match <see cref="Token"/> (when
+/// <see cref="Token"/> is set), or an authenticated GlobalAdmin session. When
+/// <see cref="Token"/> is unset, only the GlobalAdmin route grants the full
+/// payload — anonymous callers always get the minimal liveness probe.
 /// </para>
 /// <para>
 /// The minimal liveness probe (<c>status</c>, <c>database</c>, <c>app</c>,
@@ -22,8 +23,10 @@ public sealed class HealthOptions
 
     /// <summary>
     /// Shared-secret for the full <c>/health</c> diagnostic payload.
-    /// When set, the full payload requires <c>X-Health-Token</c> header match
-    /// or a GlobalAdmin session. Empty/null = full payload always visible.
+    /// When set, the full payload requires an <c>X-Health-Token</c> header
+    /// match (or a GlobalAdmin session). Empty/null = the full payload is
+    /// reachable only via an authenticated GlobalAdmin session; anonymous
+    /// callers always get the minimal liveness probe.
     /// </summary>
     public string? Token { get; set; }
 }

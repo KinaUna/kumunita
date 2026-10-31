@@ -1422,6 +1422,31 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
   vertical-align: -0.15em;
 }
 
+/* ADR 0279 — the hand-drawn icon family. Every nav / account-menu icon is a
+   <svg class="kmb-icon"><use href="#kmb-i-…"/></svg> pointing at the one
+   sprite (Views/Shared/_IconSprite.cshtml). The stroke recipe lives here, not
+   per symbol, so the whole family changes in one place; <use> shadow trees
+   inherit these properties. The sprite itself takes no space. Accent dots read
+   var(--kmb-icon-accent, currentColor): set that custom property on a
+   context to tint them (page selectors can't reach inside a <use>). */
+.kmb-icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.kmb-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+/* TODO(ADR 0279): opt-in accent tint for the active section, e.g.
+   .kmb-rail-btn.active { --kmb-icon-accent: var(--kmb-accent, var(--bs-primary)); }
+   — left off for now: the approved preview keeps accents in the ink colour. */
+
 .kmb-rail {
   position: fixed;
   top: 0; left: 0; bottom: 0;

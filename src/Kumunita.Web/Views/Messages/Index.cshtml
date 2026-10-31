@@ -25,6 +25,12 @@
             <h1><kw-l key="message.title">Messages</kw-l></h1>
         </header>
 
+        @* The Direct / Group tab strip (the _MessagesTabs.cshtml idiom — the
+           group-messaging lane, ADR 0278, lives beside the 1:1 surface
+           rather than in the account menu). Self-gates on the toggle +
+           per-actor standing. *@
+        <partial name="_MessagesTabs" />
+
         @if (Model.Disabled || Model.Error)
         {
             @* F5 — the instance toggle is off (or an open attempt failed): the

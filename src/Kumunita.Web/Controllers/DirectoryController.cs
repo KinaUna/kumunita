@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Messaging;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -171,11 +172,43 @@ public sealed class DirectoryController(
     /// fail-closed empty list for a null/empty subject).
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(
+        [FromQuery] string? q = null,
+        [FromQuery] bool verified = false,
+        [FromQuery] string? sort = null,
+        [FromQuery] string? dir = null)
     {
         var subject = SubjectId(User) ?? string.Empty;
 
         var list = await directory.ListAsync(subject);
+
+        // The viewer's own narrowing over the catalog (the find-people
+        // "organizer, never a gate" posture): a case-insensitive display-name
+        // substring (q) + the verified-only toggle (verified). Pure
+        // presentation ordering/filtering of the already-catalogued rows —
+        // no CanAsync, no audit (the ListAsync catalog read owns the only
+        // gate, Blocked exclusion). An unfiltered read keeps every row, so
+        // the pre-feature behavior is byte-identical.
+        var query = string.IsNullOrWhiteSpace(q) ? null : q.Trim();
+        var filteredRows = list.Visible
+            .Where(p => query is null
+                || (p.DisplayName ?? string.Empty).Contains(query, System.StringComparison.OrdinalIgnoreCase))
+            .Where(p => !verified || p.Verified)
+            .ToList();
+
+        // The one closed sort key for this surface (Profile has no Created,
+        // so name is the only criterion — the FindPeople PeopleFindAllowedKeys
+        // idiom). A viewer-chosen sort orders the filtered rows by DisplayName;
+        // a no-sort read keeps the catalog order exactly (the pre-feature
+        // shape, C-SORT·2). Ordering is a Web presentation concern over the
+        // already-gated catalog rows — ListAsync stays the frozen gate.
+        var dirSort = ParseDirectorySort(sort, dir);
+        var nameComparer = System.StringComparer.OrdinalIgnoreCase;
+        var orderedRows = dirSort is { } spec
+            ? (spec.Descending
+                ? filteredRows.OrderByDescending(p => p.DisplayName ?? string.Empty, nameComparer)
+                : filteredRows.OrderBy(p => p.DisplayName ?? string.Empty, nameComparer)).ToList()
+            : filteredRows;
 
         // M9 amendment (ADR 0139) — the "Send a message" button on each card.
         // It renders only when *both* parties' messaging standing is on (the
@@ -203,7 +236,7 @@ public sealed class DirectoryController(
             // shown," matching the detail row's short-circuit). No email/phone/audience
             // fields — those surface only on the detail row, behind the ContactVisibility
             // opt-in + one CanAsync decision.
-            Profiles = list.Visible
+            Profiles = orderedRows
                 .Select(p => new VisibleProfile(
                     p.SubjectId,
                     p.DisplayName,
@@ -214,9 +247,62 @@ public sealed class DirectoryController(
                     // above, and never for the self-row (no self-conversations).
                     viewerAllowed && p.SubjectId != subject && p.MessagingOptIn && !p.MessagingRestricted))
                 .ToList(),
+            // The viewer's own narrowing, echoed back so a sort-toggle re-render
+            // keeps the search box text + the verified toggle (the _Sort partial
+            // rebuilds its links from these carried params).
+            Query = query,
+            VerifiedOnly = verified,
+            HasAnyResidents = list.Visible.Count > 0,
+            // The one shared sort control (the _Sort reference, reused verbatim —
+            // the FindPeople PeopleSortViewModel idiom): the closed allowlist
+            // (name → DisplayName, asc). CarriedParams carries the active filters
+            // so a sort flip preserves the search + verified state.
+            Sort = SortViewModel.ForRoute(
+                "/directory",
+                currentKey: dirSort?.Key,
+                currentDir: dirSort is { } s ? (s.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("name", "asc"),
+                ],
+                carriedParams: DirectorySortCarriedParams(query, verified)),
         };
 
         return View(model);
+    }
+
+    // The one closed sort key for this surface (Profile has no Created, so
+    // name is the only criterion — the FindPeople PeopleFindAllowedKeys
+    // idiom). A null pair returns from ParseDirectorySort means "no viewer
+    // sort choice", not a sort: Index then keeps the catalog order exactly.
+    private static readonly IReadOnlySet<string> DirectoryAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "name" };
+
+    // Parse the request's ?sort=/?dir= against the directory's closed
+    // allowlist (name asc is the pinned default — the FindPeople pinned-asc
+    // idiom). Returns null only when the viewer chose no sort key; a known
+    // key resolves to a SortSpec with its resolved direction.
+    private static SortSpec? ParseDirectorySort(string? sort, string? dir)
+        => string.IsNullOrWhiteSpace(sort)
+            ? null
+            : SortKeys.Parse(sort, dir, DirectoryAllowedKeys, "name", defaultDir: false);
+
+    // The query pairs the _Sort partial's links preserve when a sort is
+    // toggled: the active filters (q, verified) only. The _Sort partial's
+    // SortLink ALWAYS appends the sort=/dir= pair after CarriedParams, so the
+    // filters ride along and the sort/dir are owned by the link builder —
+    // no duplicate params. (This is the Posts/Announcement pattern: Carried
+    // Params = the surface's non-sort filters; the sort/dir are the link's.)
+    // Carrying the filters here is what keeps a sort flip from dropping the
+    // viewer's search + verified state.
+    private static IReadOnlyDictionary<string, string> DirectorySortCarriedParams(
+        string? query, bool verified)
+    {
+        var carried = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(query))
+            carried["q"] = query!;
+        if (verified)
+            carried["verified"] = "true";
+        return carried;
     }
 
     /// <summary>

@@ -413,6 +413,29 @@ public sealed class DocumentController(
             if (!mediaOpts.Value.IsDocumentAllowed(form.File.ContentType))
                 return await RejectFormAsync("Edit", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
+            // SEC U22 (owner decision, 2026-10-31) — magic-byte sniffer wire.
+            // Reject on **`Mismatch`** only (declared type whose known signature
+            // is contradicted by the bytes); `Match` and `Unknown` pass through.
+            // The wire reads the leading 16 bytes via `OpenReadStream` so it
+            // works for every `IFormFile` implementation without materialising
+            // the payload twice; the read is bounded to 16 bytes so it cannot
+            // leak a full upload into memory.
+            var head = new byte[Math.Min(16L, form.File.Length)];
+            if (head.Length > 0)
+            {
+                await using var rs = form.File.OpenReadStream();
+                var n = 0;
+                while (n < head.Length)
+                {
+                    var got = await rs.ReadAsync(head.AsMemory(n));
+                    if (got == 0) break;
+                    n += got;
+                }
+                if (n < head.Length) Array.Resize(ref head, n);
+            }
+            if (UploadSignatureSniffer.Classify(form.File.ContentType, head) == UploadSignatureSniffer.SniffVerdict.Mismatch)
+                return await RejectFormAsync("Edit", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
+
             using var stream = new MemoryStream();
             await form.File.CopyToAsync(stream).ConfigureAwait(false);
             var stored = await media.PutAsync(stream.ToArray(), form.File.FileName, form.File.ContentType, subject)
@@ -644,6 +667,29 @@ public sealed class DocumentController(
             return await RejectFormAsync("New", form, gateStatus.StatusCode, "File", "documents.err_too_large");
         if (reject is not null) return reject;
         if (!mediaOpts.Value.IsDocumentAllowed(file.ContentType))           // disallowed type → 415
+            return await RejectFormAsync("New", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
+
+        // SEC U22 (owner decision, 2026-10-31) — magic-byte sniffer wire.
+        // Reject on **`Mismatch`** only (declared type whose known signature
+        // is contradicted by the bytes); `Match` and `Unknown` pass through.
+        // The wire reads the leading 16 bytes via `OpenReadStream` so it
+        // works for every `IFormFile` implementation without materialising
+        // the payload twice; the read is bounded to 16 bytes so it cannot
+        // leak a full upload into memory.
+        var head = new byte[Math.Min(16L, file.Length)];
+        if (head.Length > 0)
+        {
+            await using var rs = file.OpenReadStream();
+            var n = 0;
+            while (n < head.Length)
+            {
+                var got = await rs.ReadAsync(head.AsMemory(n));
+                if (got == 0) break;
+                n += got;
+            }
+            if (n < head.Length) Array.Resize(ref head, n);
+        }
+        if (UploadSignatureSniffer.Classify(file.ContentType, head) == UploadSignatureSniffer.SniffVerdict.Mismatch)
             return await RejectFormAsync("New", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
         // D3 — store-first (orphan-safe, C-MED·7): the bytes land on the frozen

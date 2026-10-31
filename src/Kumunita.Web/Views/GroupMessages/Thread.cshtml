@@ -1,0 +1,218 @@
+@model Kumunita.Web.Controllers.GroupMessagesController.GroupMessagesThreadViewModel
+@using Kumunita.Core.Localization
+@using Kumunita.Core.GroupMessaging
+@using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
+@inject ITranslationProvider Translation
+@inject ILocalizationService Localization
+@{
+    ViewData["Title"] = "Group messages";
+    // The composer's placeholder + the back arrow's accessible name + the
+    // "you" word — all are fixed UI strings in attribute / plain-text
+    // positions the <kw-l> TagHelper can't reach, so resolve them
+    // server-side (the ADR 0072 / Search/Index pattern, the M9
+    // Messages/Thread shape).
+    var lang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var ariaBack = await Translation.GetAsync("a11y.back_to_messages", lang);
+    var ariaResident = await Translation.GetAsync("a11y.resident", lang);
+    var composePlaceholder = await Translation.GetAsync("group_message.compose.placeholder", lang);
+    var youWord = await Translation.GetAsync("group_message.you", lang);
+    var loadEarlierWord = await Translation.GetAsync("group_message.load_earlier", lang);
+    // The header label: the group's user-chosen title when it has one, else
+    // the participant count (the M9 OtherDisplayName has no N:1 analogue, so
+    // the count is the fallback for an unnamed group).
+    string headerName = Model.Conversation is { } hConv
+        ? (!string.IsNullOrEmpty(hConv.Title)
+            ? hConv.Title
+            : System.String.Format(System.Globalization.CultureInfo.InvariantCulture,
+                await Translation.GetAsync("group_message.participants", lang),
+                hConv.ParticipantIds.Count))
+        : youWord;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        @* The Direct / Group tab strip (the _MessagesTabs.cshtml idiom — the
+           group-messaging lane, ADR 0278, lives beside the 1:1 surface
+           rather than in the account menu). Self-gates on the toggle +
+           per-actor standing. *@
+        <partial name="_MessagesTabs" />
+
+        <header class="airy-head d-flex align-items-baseline gap-3">
+            <a href="/group-messages" class="text-dark text-decoration-none me-1" aria-label="@ariaBack">←</a>
+            <h1>@headerName</h1>
+        </header>
+
+        @if (Model.Disabled)
+        {
+            @* F5 — the instance toggle is off: the disabled state, no thread, no composer. *@
+            <div class="alert alert-secondary" role="status">
+                <kw-l key="group_message.disabled">Group messaging is turned off on this instance.</kw-l>
+            </div>
+            return;
+        }
+
+        @if (Model.Error)
+        {
+            @* A send failed (blank/over-cap body): the composer error state. *@
+            <div class="alert alert-warning" role="alert">
+                <kw-l key="group_message.compose.send">Send</kw-l> —
+                <span>
+                    @if (Model.Conversation is { } eConv)
+                    {
+                        <a href="/group-messages/@eConv.Id" class="alert-link">@headerName</a>
+                    }
+                    else
+                    {
+                        <a href="/group-messages" class="alert-link">
+                            @System.String.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                await Translation.GetAsync("group_message.participants", lang), 0)
+                        </a>
+                    }
+                </span>
+            </div>
+        }
+
+        @* ── The thread (chronological — latest last, the M9 rendering) ─── *@
+        @if (Model.Messages.Count == 0)
+        {
+            <div class="alert alert-secondary" role="status">
+                <kw-l key="group_message.thread.empty">No messages yet — start the conversation.</kw-l>
+            </div>
+        }
+        else
+        {
+            @if (Model.Pager is { HasNext: true } p)
+            {
+                <div class="text-center mb-3">
+                    <a class="btn btn-outline-secondary btn-sm"
+                       href="@p.BaseUrl?page=@(p.CurrentPage + 1)"
+                       title="@loadEarlierWord">@loadEarlierWord</a>
+                </div>
+            }
+
+            <ul class="message-thread">
+                @foreach (var m in Model.Messages)
+                {
+                    bool mine = m.SenderId == Model.ActorId;
+                    // The per-participant read marker: unread for this actor
+                    // when the sender is not the actor AND the actor's id is
+                    // not yet in ReadBy (or ReadBy is null).
+                    bool unread = !mine && (m.ReadBy is null || !m.ReadBy.Contains(Model.ActorId));
+                    // The sender's display name: the actor's own name when it
+                    // is their message, else the resolved name from the
+                    // conversation's participant name list (the view model
+                    // carries a parallel list of display names, one per
+                    // participant — the null falls back to the "you" word).
+                    string senderName;
+                    if (mine)
+                    {
+                        senderName = !string.IsNullOrEmpty(Model.ActorDisplayName)
+                            ? Model.ActorDisplayName
+                            : youWord;
+                    }
+                    else if (Model.Conversation is { } tConv)
+                    {
+                        var idx = Array.IndexOf(tConv.ParticipantIds.ToArray(), m.SenderId);
+                        senderName = idx >= 0 && idx < tConv.ParticipantDisplayNames.Count
+                            && !string.IsNullOrEmpty(tConv.ParticipantDisplayNames[idx])
+                            ? tConv.ParticipantDisplayNames[idx]!
+                            : youWord;
+                    }
+                    else
+                    {
+                        senderName = youWord;
+                    }
+                    string senderAvatarId = m.SenderId;
+                    string senderInitial = !string.IsNullOrWhiteSpace(senderName)
+                        ? char.ToUpperInvariant(senderName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <li class="msg-row @(mine ? "mine" : "other") @(unread ? "unread" : "")">
+                        @if (!string.IsNullOrEmpty(senderAvatarId))
+                        {
+                            <span class="msg-avatar d-inline-flex align-items-center">
+                                <kw-avatar subject="@senderAvatarId" mono="@senderInitial" />
+                            </span>
+                        }
+                        <div class="msg-bundle">
+                            <div class="msg-meta d-flex gap-2 align-items-baseline flex-wrap">
+                                <span class="fw-semibold small">@senderName</span>
+                                <span class="small text-secondary">
+                                    <kw-dt dt="@m.Created" format="g"></kw-dt>
+                                    @if (unread)
+                                    {
+                                        <span class="badge text-bg-primary ms-2"><kw-l key="group_message.unread">unread</kw-l></span>
+                                    }
+                                </span>
+                            </div>
+                            <div class="message-body"><partial name="_MentionRendererPlain" model="new MentionBodyModel(m.Body, m.SenderId)" /></div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+
+        @* ── The composer ───────────────────────────────────────────────── *@
+        @if (Model.Conversation is { } conv)
+        {
+            <form method="post" action="/group-messages/@conv.Id/send" class="mt-3">
+                @Html.AntiForgeryToken()
+                <textarea class="form-control mb-2" name="body" rows="3"
+                          placeholder="@composePlaceholder" required
+                          maxlength="@Kumunita.Core.GroupMessaging.GroupMessagingService.MaxBodyChars"
+                          aria-label="@composePlaceholder"></textarea>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary"><kw-l key="group_message.compose.send">Send</kw-l></button>
+                </div>
+            </form>
+
+            @* ── The member roster (accepted + pending, the invitation
+               flow, ADR 0278 amendment) ─ *@
+            @if (Model.Members.Count > 0)
+            {
+                <section class="mt-3">
+                    <h2 class="h6 text-secondary"><kw-l key="group_message.members">Members</kw-l></h2>
+                    <ul class="member-list list-unstyled mb-0">
+                        @foreach (var member in Model.Members)
+                        {
+                            var label = !string.IsNullOrEmpty(member.DisplayName)
+                                ? member.DisplayName
+                                : member.SubjectId;
+                            <li>
+                                <span class="member-name">@label</span>
+                                @if (member.Pending)
+                                {
+                                    <span class="badge text-bg-secondary ms-1"><kw-l key="group_message.pending">pending</kw-l></span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            @* ── The add-people invitation picker (the any-participant-can-
+               invite rule — the invitation flow, ADR 0278 amendment) ─ *@
+            @if (Model.AddCandidates.Count > 0)
+            {
+                <section class="mt-3">
+                    <h2 class="h6 text-secondary"><kw-l key="group_message.add_members">Invite people</kw-l></h2>
+                    <form method="post" action="/group-messages/@conv.Id/members" class="d-flex gap-2">
+                        @Html.AntiForgeryToken()
+                        @* The multi-select: the form posts memberIds[] (the
+                           bound array name the InviteMembers action reads). *@
+                        <select class="form-select" name="memberIds" multiple size="3"
+                                aria-label="@ariaResident">
+                            @foreach (var candidate in Model.AddCandidates)
+                            {
+                                <option value="@candidate.SubjectId">@candidate.DisplayName</option>
+                            }
+                        </select>
+                        <button type="submit" class="btn btn-outline-primary align-self-end">
+                            <kw-l key="group_message.add_members">Invite people</kw-l>
+                        </button>
+                    </form>
+                </section>
+            }
+        }
+    </div>
+</div>

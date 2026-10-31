@@ -48,9 +48,24 @@
         }
         else
         {
-            <div class="alert alert-secondary">
-                <kw-l key="account.verify_pending">We're confirming your account — you'll be signed in in a moment.</kw-l>
-            </div>
+            @*
+                SEC L3 (U24, 2026-10-31) — the self-serve confirm step. The
+                GET renders this page (side-effect-free); the POST — same link,
+                the hidden Id round-trips the one-time token row id back to the
+                action — validates the token, signs the resident in via
+                ConfirmAndSignInAsync, and consumes the token (ADR 0146's
+                "consume at the POST" principle, extended to the self-serve
+                lane so a prefetching GET cannot burn the link).
+            *@
+            <p class="text-muted">
+                <kw-l key="account.verify_confirm_lede">Confirm that this is your account and you're ready to sign in.</kw-l>
+            </p>
+            <form asp-action="Verify" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Id" />
+                <div asp-validation-summary="All" class="text-danger mb-3"></div>
+                <button type="submit" class="btn btn-primary"><kw-l key="account.verify_confirm_submit">Confirm & sign in</kw-l></button>
+            </form>
         }
         </div>
     </div>

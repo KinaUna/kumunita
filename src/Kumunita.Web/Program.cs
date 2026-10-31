@@ -38,7 +38,20 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.Local.json", optional: true, reloadOnChange: false);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+// SEC M1 (U12) — global anti-forgery enforcement (invariant S-4): every
+// state-changing MVC action validates a token unless it carries the closed
+// two-action allow-list ([IgnoreAntiforgeryToken] — the Bearer-token
+// escalation inbound + X-Suppression-Token mail-suppress ingest; see
+// AntiforgeryCoverageTests for the reflection pin).
+builder.Services.AddControllersWithViews(o => o.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute()));
+
+// SEC H3 (U9/U10) — config-driven forwarded-header trust (open veto 3): the
+// X-Forwarded-For / X-Forwarded-Proto honoring at app.UseForwardedHeaders()
+// below reads this ForwardedHeadersOptions from DI (verified — the no-arg
+// overload picks up the registered options). Trusted proxies come from
+// ReverseProxy:KnownNetworks / ReverseProxy:KnownProxies, defaulting to
+// loopback + RFC1918 (the Docker network); unset/empty NEVER means trust-all.
+builder.Services.AddKumunitaForwardedHeaders(builder.Configuration);
 
 // The app never registered the logging stack (WebApplication.CreateBuilder does not
 // call AddLogging for us), so even LoggerFactory was missing from DI. AddLogging
@@ -314,6 +327,19 @@ var marten = builder.Services.AddMarten(opts =>
     // KioskDocTypes lives in Kumunita.Core (like the other *DocTypes), so
     // the unqualified name resolves here unchanged.
     KioskDocTypes.Configure(opts);
+
+    // Group messaging lane (the N:1 generalization of the M9 1:1 Messaging
+    // context, ADR 0105): the GroupConversation + GroupMessage documents
+    // (ADR 0004 §B.1 — the Participants membership index on GroupConversation
+    // (the ListGroupsAsync participant-set query) and the
+    // (ConversationId, Created) thread-ordering index on GroupMessage, the
+    // M6/M9 feed-ordering index shape). Unlike the M9 Conversation there is
+    // no unique pair index — a group is not canonical (the same members may
+    // legitimately form two groups). Without this call the docs are
+    // invisible to Marten (the M3/Media/Page/Tag/M9/M16/M17 precedent). The
+    // dev-only ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap
+    // versioned boot both pick the surface up automatically.
+    GroupMessagingDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
@@ -571,39 +597,19 @@ builder.Services.AddRateLimiter(opts =>
                 }));
     }
 
-    // Login: 5 attempts per 15 minutes per IP for regular accounts (per-account
+    // Login: 5 attempts per 15 minutes per **resolved client IP** (per-account
     // Identity lockout already covers same-account brute-force; this covers
-    // cross-account stuffing). **Exempt**: the sample/test accounts
-    // (SampleDataSeeder.SampleAccountEmails — the closed set sourced from the
-    // embedded sample-data document) are unlimited, so an operator switching
-    // between test logins is never throttled (the live-site report: "randomly
-    // cannot log in with the test accounts"). Reading the posted e-mail here is
-    // safe: the rate limiter runs before model binding, and ASP.NET Core caches
-    // the FormCollection after the first read, so this does not block the
-    // controller's binding. (Brute-force on a sample account stays bounded by
-    // the account-level Identity lockout, which is independent of this IP limit;
-    // sample accounts also use random high-entropy passwords on a deploy.)
-    opts.AddPolicy("login", (context) =>
-    {
-        var postedEmail = context.Request.HasFormContentType
-            ? context.Request.Form["Email"].ToString()
-            : null;
-
-        if (postedEmail is not null
-            && SampleDataSeeder.SampleAccountEmails.Contains(postedEmail))
-        {
-            return RateLimitPartition.GetNoLimiter("sample-exempt");
-        }
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(15),
-                AutoReplenishment = true
-            });
-    });
+    // cross-account stuffing). SEC L8/U27 — the historical sample-account
+    // exemption (a `GetNoLimiter("sample-exempt")` branch that read the posted
+    // e-mail) is **removed**: the limiter now partitions on the resolved IP
+    // only and never reads the form body. Brute-force on *any* account (sample
+    // or not) stays bounded by the account-level ASP.NET Identity lockout,
+    // which is independent of this IP limit, so the exemption was unnecessary.
+    // The partition key is the resolved client IP (via UseForwardedHeaders —
+    // SEC H3/U10), so a trusted proxy's forwarded X-Forwarded-For is honoured
+    // and the operator "randomly cannot log in with the test accounts" case is
+    // no longer a throttle concern (each real IP still gets its own bucket).
+    opts.AddPolicy("login", LoginRateLimitPolicy.Partition);
 
     // Signup: 5 per hour per IP (account-creation flood).
     AddWindow(opts, "signup", limit: 5, window: TimeSpan.FromHours(1));
@@ -758,6 +764,16 @@ builder.Services.Configure<Kumunita.Core.Events.EventReminderOptions>(
 builder.Services.Configure<SmtpOptions>(
     builder.Configuration.GetSection(SmtpOptions.SectionName));
 
+// SEC H3 (U10) — outside Development the anti-forgery cookie is always `Secure`,
+// matching the session cookie below so neither can leak over plain HTTP.
+builder.Services.AddAntiforgery(options =>
+{
+    if (!builder.Environment.IsDevelopment())
+    {
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    }
+});
+
 // Cookie-based authentication (the Web's only scheme; the thin-principal claim set
 // IS the authentication artifact, per ADR 0001-B / ADR 0006-D). The scheme name and
 // login path are the host's choice — the Core never names them (ADR 0006-D).
@@ -788,6 +804,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         // elapsed time passes the halfway point of the 14-day window, so an active
         // resident stays signed in and only an idle one lapses at the boundary.
         options.SlidingExpiration = true;
+        // SEC H3 (U10) — outside Development the auth cookie is always `Secure`.
+        // The default CookieSecurePolicy.SameHost only sets the Secure flag once
+        // Request.IsHttps is true (restored by the forwarded-header wiring above);
+        // Always makes it Secure on the very first set, even on a non-TLS hop, so
+        // the session cookie can never leak over plain HTTP in production.
+        if (!builder.Environment.IsDevelopment())
+        {
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        }
     });
 
 // F5 (AUTH-04, Option B) — session kill-all + invalidation. The `SecurityStamp`
@@ -942,13 +967,16 @@ if (!app.Environment.IsDevelopment())
     // those headers (this is the proxy, the only trusted hop) restores the real client
     // IP — SECURITY.md §6 rate-limit "real client IP is a hard requirement" — and makes
     // Request.IsHttps reflect the client's TLS, so the session cookie is correctly
-    // marked Secure (the cookie default, CookieSecurePolicy.SameHost, then upgrades
-    // itself — no explicit SecurePolicy needed). Must run before UseExceptionHandler /
-    // UseHsts so those see the resolved scheme and remote IP.
+    // marked Secure. (U10 additionally pins CookieSecurePolicy.Always on the
+    // session + anti-forgery cookies in the DI block, so the Secure attribute is
+    // set even on a non-TLS hop — this header wiring is what makes the forwarded
+    // scheme available for the default SameHost path.) Must run before
+    // UseExceptionHandler / UseHsts so those see the resolved scheme and remote IP.
     app.UseForwardedHeaders();
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    // HSTS (SEC U26, L7): set via the security-header middleware below — MaxAge
+    // one year, includeSubDomains OFF. HstsOptions is internal in .NET 10, so we
+    // emit the header directly (gated on Request.IsHttps, matching UseHsts()).
 }
 
 // No app-level HTTP→HTTPS redirect: in production TLS terminates at the edge
@@ -999,6 +1027,21 @@ app.Use(async (context, next) =>
     // privacy model is SECURITY.md's "the audience choice is authoritative").
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    // HSTS (SEC U26, L7) — MaxAge one year, includeSubDomains OFF (no owner
+    // decision to cover subdomains we don't control). Emitted only on an https
+    // request (the forwarded-scheme pipeline resolves Request.IsHttps for the
+    // edge-proxy hop). HstsOptions is internal in .NET 10, so we set the header
+    // directly rather than via UseHsts(); a plain-HTTP request must not carry it.
+    if (context.Request.IsHttps)
+    {
+        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000";
+    }
+    // Permissions-Policy (SEC U26, L7): a restrictive default — every feature is
+    // explicitly disabled (no camera/mic/geolocation/payment/usb, no fullscreen,
+    // no web-share). The platform has no legitimate need for any of these, so the
+    // fail-closed list is the safe floor; opt a feature in only if a feature needs it.
+    context.Response.Headers["Permissions-Policy"] =
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(), picture-in-picture=(), web-share=()";
     await next();
 });
 
@@ -1026,6 +1069,14 @@ app.UseMiddleware<BlockedAccountMiddleware>();
 // re-read as a role change). See RevocationStampMiddleware for the full
 // mechanism and the .NET 10.0.13 source grounding.
 app.UseMiddleware<RevocationStampMiddleware>();
+
+// SEC H2 (invariant S-2) — the GlobalAdmin 2FA gate: for an authenticated
+// GlobalAdmin whose 2FA is not enrolled (and who is not a sample-data
+// account), only the enrolment/logout/static routes are reachable; every
+// other route is 302-redirected to enrolment. Registered after
+// UseAuthentication (so HttpContext.User is populated) and before
+// UseAuthorization. Server-side control, not a redirect (veto 2).
+app.UseMiddleware<AdminTwoFactorMiddleware>();
 
 // M28 — guardian time-limit enforcement (ADR 0151, D5): a child whose
 // guardian-set schedule window says "not now" (evaluated in the child's ADR

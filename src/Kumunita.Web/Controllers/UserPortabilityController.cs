@@ -3,6 +3,7 @@ using Kumunita.Core.Portability;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Kumunita.Web.Controllers;
 
@@ -126,8 +127,16 @@ public sealed class UserPortabilityController(
     /// redirect idiom.
     /// </para>
     /// </summary>
+    // SEC-lane U14 (M2 / S-5): the import upload is a state-storing POST that
+    // was unthrottled — it now carries the house "upload" rate-limit policy
+    // (Program.cs AddWindow "upload", 10/15 min) + a request-size cap
+    // (512 MB, above the U13 archive defaults of 100 MB per-entry / 500 MB
+    // total). The anti-forgery token is already enforced (S-4, U12's global
+    // filter).
     [HttpPost("import")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("upload")]
+    [RequestSizeLimit(512L * 1024 * 1024)]
     public async Task<IActionResult> Import(IFormFile archive)
     {
         var actor = ActorId(User) ?? string.Empty;
@@ -250,8 +259,15 @@ public sealed class UserPortabilityController(
     /// standing check).
     /// </para>
     /// </summary>
+    // SEC-lane U14 (M2 / S-5): the resolve POST re-uploads the archive (the
+    // apply reads from the re-uploaded bytes) — same rate-limit + size-cap
+    // treatment as the classify <c>import</c> POST (U13's archive limits are
+    // enforced inside <c>KumunitaArchive.ReadAsync</c>; this caps the raw
+    // request body first).
     [HttpPost("import/resolve")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("upload")]
+    [RequestSizeLimit(512L * 1024 * 1024)]
     public async Task<IActionResult> Resolve(ResolveReviewModel model, IFormFile archive)
     {
         if (archive is null || archive.Length == 0 || model?.Conflicts is null)

@@ -393,16 +393,42 @@ public static class MarkdownRenderer
     /// Scheme whitelist for links. <c>http</c>, <c>https</c>, <c>mailto</c>,
     /// and relative paths are allowed; <c>javascript:</c>, <c>data:</c>, and
     /// any other scheme are rejected (the link renders as plain text).
+    /// <para>
+    /// SEC U19 (L4): a URL containing a raw backslash (<c>\</c>) or a control
+    /// character (char &lt; 0x20 or 0x7F) is hostile and rejected before any
+    /// scheme / relative analysis — this closes the <c>/\host</c> and
+    /// <c>\\evil</c> vectors that previously slipped through the relative
+    /// branch. <c>mailto:</c> is matched explicitly (it never carries
+    /// <c>://</c>, and a bare <c>mailto:addr</c> would otherwise be rejected
+    /// by the relative branch for its <c>:</c>) so it stays whitelisted.
+    /// </para>
     /// </summary>
     private static bool IsSafeUrl(string url)
     {
         if (string.IsNullOrWhiteSpace(url))
             return false;
+
+        // L4 (SEC U19): a raw backslash or control character anywhere in the
+        // URL is hostile — reject before scheme / relative analysis. A `\`
+        // inside a relative path (e.g. `/\host`, `\\evil`) is the audited
+        // vector that the relative branch used to let through.
+        foreach (var c in url)
+        {
+            if (c == '\\' || c < '\u0020' || c == '\u007F')
+                return false;
+        }
+
+        // mailto: never carries "://", so match it explicitly (RFC 6068:
+        // both mailto:addr and mailto://addr) before the relative branch
+        // would reject it for containing a ":".
+        if (url.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+            return true;
+
         // Relative URLs (no scheme, no protocol-relative //) are safe.
         if (!url.Contains("://") && !url.StartsWith("//", StringComparison.Ordinal))
             return !url.Contains(":"); // a bare "foo:bar" is not a relative path
         var scheme = url.Split("://")[0].Trim().ToLowerInvariant();
-        return scheme is "http" or "https" or "mailto";
+        return scheme is "http" or "https";
     }
 
     /// <summary>

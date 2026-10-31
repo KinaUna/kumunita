@@ -65,13 +65,33 @@ public static class PortabilityApplyIdentity
     /// is <b>skipped entirely</b> — no password reset, no role churn, no
     /// security-stamp rotation. Only new principals are created.</param>
     /// <param name="ct">Cancellation.</param>
-    public static async Task ApplyAsync(
+    /// <returns>
+    /// ADR 0275 — the <b>principal merge map</b> (archive principal
+    /// <c>SubjectId</c> → the existing account's <c>User.Id</c>), for
+    /// <see cref="PortabilityImportMode.KeepExisting"/>: the rows an
+    /// archived principal merged into an existing account (matched by
+    /// <c>Email</c> — the cross-instance identity — or <c>SubjectId</c>).
+    /// <see cref="PortabilityApplyDocuments"/> uses it to skip the archive's
+    /// <see cref="Kumunita.Core.UserInfo.Profile"/> row for that person (the
+    /// existing profile is kept intact — the directory is not doubled) and to
+    /// re-point the archive's content's <c>Target == "principal"</c>
+    /// references at the existing account's id. Empty for
+    /// <see cref="PortabilityImportMode.CleanSlate"/> (no merge) and when no
+    /// principal matched an existing account (a fresh account is created
+    /// under its own <c>SubjectId</c> — no re-point needed).
+    /// </returns>
+    public static async Task<Dictionary<string, string>> ApplyAsync(
         UserManager<User> userManager,
         RoleManager<IdentityRole> roleManager,
         IReadOnlyList<PortabilityPrincipal> principals,
         PortabilityImportMode mode,
         CancellationToken ct)
     {
+        // ADR 0275 — archive principal SubjectId → existing User.Id (KeepExisting
+        // merges only; a fresh principal is created under its own SubjectId, so
+        // it never appears here). Consumed by PortabilityApplyDocuments to skip
+        // the doubled Profile and re-point the content's principal references.
+        var mergeMap = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var principal in principals)
         {
             ct.ThrowIfCancellationRequested();
@@ -103,6 +123,13 @@ public static class PortabilityApplyIdentity
                         if (!inRole)
                             await userManager.AddToRoleAsync(existing, role).ConfigureAwait(false);
                     }
+
+                    // ADR 0275 — record the merge: this archive principal maps
+                    // onto the existing account. PortabilityApplyDocuments uses
+                    // this to skip the archive's Profile row (the directory is
+                    // not doubled) and to re-point the archive's content's
+                    // principal references at the existing account's id.
+                    mergeMap[principal.SubjectId] = existing.Id;
                     continue; // skip — the existing account is kept intact
                 }
             }
@@ -162,6 +189,8 @@ public static class PortabilityApplyIdentity
             // secret; the C-M11·2 import boundary).
             await userManager.UpdateSecurityStampAsync(user);
         }
+
+        return mergeMap;
     }
 
     /// <summary>

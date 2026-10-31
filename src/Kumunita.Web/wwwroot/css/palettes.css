@@ -817,6 +817,16 @@ html[data-kmb-palette] .kmb-filter-bar .form-check { margin-bottom: 0.5rem; }
     left: 50%;
     transform: translateX(-50%);
   }
+  /* The board header card (ADR 0200) takes the board's exact breakout width and
+     centering, so its left edge aligns with the board's left edge (previously
+     it stayed in the narrower col-lg-9 page column). */
+  html[data-kmb-palette] body:not(.kmb-page-expanded):not(.kmb-kiosk):not(.kmb-embed) .kmb-board-head {
+    width: min(1400px, calc(100vw - 2rem));
+    max-width: none;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
 html[data-kmb-palette] .kanban-board { gap: 1rem; padding-bottom: 0.75rem; }
 html[data-kmb-palette] .kanban-lane {

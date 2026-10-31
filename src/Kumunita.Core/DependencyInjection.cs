@@ -305,6 +305,17 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Notifications.NotificationService>(),
             sp.GetRequiredService<Mentions.IMentionService>()));
 
+        // Group messaging lane (the N:1 generalization of the M9 1:1 surface,
+        // ADR 0105): the same store-composing shape as IMessagingService
+        // above — the IUserInfoService read seam for the participant display
+        // names, the M6 NotificationService for the group.message.new nudge,
+        // and the M36 IMentionService for the group.message.mention step.
+        services.AddTransient<GroupMessaging.IGroupMessagingService>(sp => new GroupMessaging.GroupMessagingService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
+
         // PG (ADR 0039, plan U01): the pages-side service seam (bounded
         // context Kumunita.Core.Pages — the "hierarchical, audience-restricted,
         // translatable knowledge tree" lane that absorbs the static-page lane

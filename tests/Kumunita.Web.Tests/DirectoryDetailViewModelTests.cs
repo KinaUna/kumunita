@@ -123,12 +123,15 @@ public sealed class DirectoryDetailViewModelTests
     }
 
     /// <summary>
-    /// <see cref="DirectoryViewModel"/> (the list model) stays exactly one field —
-    /// <c>Profiles</c> — (the show-everyone rule: no <c>HiddenCount</c>). The detail
-    /// surface lives in the <b>nested</b> <see cref="DirectoryViewModel.Detail"/> type,
-    /// not as new list-model properties, so U7's shape-pin
-    /// (<c>DirectoryViewModel_Only_Exposes_Profiles</c>) stays green. This guards
-    /// against a "sneak the Detail fields onto the list model" regression.
+    /// <see cref="DirectoryViewModel"/> (the list model) carries the projected rows
+    /// plus the viewer's own presentation state (the search/filter/sort controls) —
+    /// the show-everyone rule still holds: no <c>HiddenCount</c>. The detail surface
+    /// lives in the <b>nested</b> <see cref="DirectoryViewModel.Detail"/> type, not as
+    /// new list-model properties. This guards against a "sneak the Detail fields
+    /// onto the list model" regression.
+    /// (re-baselined 2026-10-30, the directory sort/filter lane: the list model now
+    /// also carries Query / VerifiedOnly / HasAnyResidents / Sort — the viewer's own
+    /// narrowing over the catalog, not Profile contact/audience fields.)
     /// </summary>
     [Fact]
     public void DirectoryViewModel_Still_Only_Profiles()
@@ -139,8 +142,11 @@ public sealed class DirectoryDetailViewModelTests
             .OrderBy(n => n)
             .ToList();
 
-        // Detail is a *nested type* (typeof(DirectoryViewModel.Detail)), not a property — so
-        // the list model's public property set is just Profiles.
-        Assert.Equal(new[] { "Profiles" }, fields);
+        // Detail is a *nested type* (typeof(DirectoryViewModel.Detail)), not a property —
+        // so the list model's public property set is the rows + the viewer's
+        // presentation controls (search/filter/sort), and nothing else.
+        Assert.Equal(
+            new[] { "HasAnyResidents", "Profiles", "Query", "Sort", "VerifiedOnly" },
+            fields);
     }
 }
