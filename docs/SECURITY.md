@@ -178,11 +178,19 @@ pinned and what is intentionally left floating.
     needs reproducible builds.
   - **Workflow `permissions:`** is now scoped to `contents: read` (least
     privilege — the workflow only reads the checked-out source).
-- **Non-root container runtime:** the app now runs as `USER app` (the `app`
-  user, UID 1654, that the MCR aspnet base ships) in the Dockerfile runtime
-  stage; the writable paths (`/app`, `/data/media`,
-  `/data/dataprotection-keys`) are `chown`ed to it. `curl`/`wget` are kept
-  (external health probe, no built-in substitute — see the U25 handoff note).
+- **Non-root container runtime:** the app's *running process* is `app` (UID 1654,
+  the user the MCR aspnet base ships), achieved via `docker/entrypoint.sh`:
+  the entrypoint starts as the image's default USER (root) just long enough to
+  `chown -R app:app /app /data` (re-claiming any root-owned files in the mounted
+  volumes), then drops to `app` via `setpriv --reuid app --regid app
+  --clear-groups` and `exec`s `dotnet Kumunita.Web.dll`. The dotnet process
+  is therefore non-root (PID 1, UID 1654) — the U25 invariant — but the
+  entrypoint's root phase repairs the ownership of *any* stale pre-U25 volume
+  files at every boot (the U25-era `RUN chown` only fixed the image layer, not
+  a mounted named volume first populated when the app ran as root). `curl`/`wget`
+  are kept (external health probe, no built-in substitute — see the U25 handoff
+  note). The MCR base ships `setpriv` (util-linux) but not `gosu`/`su-exec`;
+  `setpriv` is the setuid-free, PAM-free, env-preserving privilege drop.
 
 **Rate limiting (mechanism, decided 2026-08-27; protects A2):**
 

@@ -59,13 +59,31 @@ VOLUME /data/dataprotection-keys
 # same floor-not-replacement rationale as the keyring volume above.
 VOLUME /data/media
 # SEC L5 (U25): run the app as a non-root user (was root). The MCR aspnet base
-# already ships a non-root `app` user (UID 1654, /home/app) — use it rather than
-# creating a new one. Own the app dir and both data-volume paths so the
-# non-root process can write them. curl/wget are KEPT (not dropped): the health
-# probe is external (Coolify's default `wget` probe / operator `curl`) and the
-# .NET runtime has no built-in one-line HTTP health client, so there is no
-# `HEALTHCHECK` built-in to substitute (see the `## U25` handoff note).
-RUN mkdir -p /data/media /data/dataprotection-keys \
-    && chown -R app:app /app /data
-USER app
-ENTRYPOINT ["dotnet", "Kumunita.Web.dll"]
+# already ships a non-root `app` user (UID 1654, /home/app) — we use it as the
+# *runtime* user for the .NET process, not as the container's default USER.
+# curl/wget are KEPT (not dropped): the health probe is external (Coolify's
+# default `wget` probe / operator `curl`) and the .NET runtime has no built-in
+# one-line HTTP health client, so there is no `HEALTHCHECK` built-in to
+# substitute (see the `## U25` handoff note).
+#
+# U25 follow-up (2026-10-31): the U25-era `RUN chown -R app:app /app /data`
+# fixed the *image layer* ownership, but a mounted named volume first populated
+# by a pre-U25 (root-running) image keeps root:root ownership on its files —
+# e.g. a 0600 data-protection key that the `app` process then cannot read
+# (antiforgery `Protect()` throws, every page 500s), or a media-volume file
+# that a new upload cannot write. The `docker/entrypoint.sh` script runs as
+# root just long enough to re-claim the volume dirs at *every* boot, then drops
+# to `app` via `setpriv` and `exec`s the .NET app — the running dotnet process
+# is still non-root (the U25 invariant), but volume ownership is correct
+# regardless of how the volume was first populated. The MCR base image ships
+# `setpriv` (util-linux) but not `gosu` or `su-exec`; `setpriv` is the
+# setuid-free, PAM-free, env-preserving drop (unlike `su`/`runuser`).
+#
+# Note: we deliberately do NOT set `USER app` in the image. The container's
+# default USER stays the MCR base default (root) so the entrypoint can run its
+# chown; the entrypoint then drops to `app` before `exec`-ing the app, so the
+# running process is non-root. This matches the standard pattern used by
+# PostgreSQL and other "run-as-root-for-init-then-drop" containers.
+COPY docker/entrypoint.sh /docker/entrypoint.sh
+RUN chmod +x /docker/entrypoint.sh
+ENTRYPOINT ["/docker/entrypoint.sh"]
