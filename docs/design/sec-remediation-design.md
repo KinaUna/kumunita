@@ -321,3 +321,28 @@ Three gate tests, executed once in U29 against the **full** suites (Core + Web) 
 | U28 | `grep -n "EmailAlreadyExists\|IsLockedOut\|user is null" src/Kumunita.Web/Controllers/AccountController.cs` |
 
 **No PII** (unit-series rule 7): all fixtures use synthetic ids/emails (`user-a`, `a@example.test`).
+
+## Run result (SEC acceptance gate — 2026-10-31)
+
+**Executed by:** U29. Build: `dotnet build Kumunita.slnx -c Debug` → EXIT 0. Suites: `dotnet exec` xunit.v3 in-process runners (U3's confirmed working form).
+
+| Gate | Result |
+|---|---|
+| 1 — Hostile import (S-1): U4–U6 pinned tests + `Resolve_GenuineRoundTrip_StillImports` | **PASS** — all green in `Kumunita.Core.Tests` full run (0 failed) |
+| 2 — Admin without 2FA (S-2): `AdminTwoFactorMiddlewareTests` (7/7) | **PASS** — all green in `Kumunita.Web.Tests` full run (0 failed) |
+| 3 — Part-vs-whole (S-8): every §2.3 pinned test + full suites vs U3 baseline | **PASS** — no failure not in the U3 baseline (U3: 0 pre-existing failures in both projects) |
+
+**Per-project totals vs U3 baseline** (U3 baseline: 0 pre-existing failures in both projects):
+
+| Project | U3 baseline | U29 run | Δ tests | Failures (U3 → U29) |
+|---|---|---|---|---|
+| `Kumunita.Core.Tests` | Total 1642 · Failed 0 · Skipped 2 | **Total 1668 · Failed 0 · Skipped 2** · 192.6 s | +26 | 0 → 0 |
+| `Kumunita.Web.Tests` | Total 1165 · Failed 0 · Skipped 0 | **Total 1209 · Failed 0 · Skipped 0** · 24.8 s | +44 | 0 → 0 |
+
+**Open items (recorded — U29 records, does not fix):**
+
+- **U21 — sniffer wired (L2, attachments + content images):** drift pause (2026-10-30) → owner decision 2026-10-31 (tri-state `Mismatch`-only wire) → **landed** — `UploadSniffAttachmentImageTests` 2/2 green; `AttachUpload_Support_ZipLegacyAlias_IsAllowed` regression pin stays green.
+- **U22 — sniffer wired (L2, avatars + documents):** **landed** — `Avatar_MismatchedBytes_Rejected` + `Document_MismatchedBytes_Rejected` green.
+- **U23 — hash-only verification tokens (L3 part 1):** drift pause → owner decision 2026-10-31: **n/a** (dual-compare is load-bearing in the verify-by-Id lanes; the L3 vector is carried by U24). `IdentityService.cs` and `IdentityServiceTokenHashTests` untouched.
+- **U24 — verify confirm step (L3 part 2):** **landed** — `VerifyConfirmStepTests` 3/3 green.
+- **U28 — account enumeration (L1):** **parked** — no `## Decision — L1` line; the unit exits as parked per its own text.

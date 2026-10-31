@@ -326,3 +326,18 @@ new view; `KnownTranslationKeys` entries appended (never reformatted). The desig
 - **Tests run + pass:** full `Kumunita.Web.Tests` suite — **1209 total, 0 failed, 0 skipped, 0 errors, 21.5 s** (U24 baseline 1207; +2 = the two new U22 tests). `ProfileAvatarUploadTests` (existing avatar guards) + `DocumentControllerTests` (existing document upload/edit guards) + `UploadSignatureSnifferTests` (U20) + `UploadSniffAttachmentImageTests` (U21) all green.
 - **Flag for U30 (dedup-by-hash keeps the first uploader's declared type):** the sniffer validates the *declared* type against the *bytes*, but `IMediaStore.PutAsync` content-hash dedup stores the **first uploader's** `ContentType`. If two uploaders send byte-identical bodies under different declared types (both passing), the stored `MediaObject.ContentType` is whichever uploader got there first — not necessarily the second's. U30 records whether a follow-up is needed to store the sniffed/canonical type instead.
 - **No warnings, no skipped items.**
+## U29 — gate recorded
+- **Files changed (1 modify, no code):** `docs/design/sec-remediation-design.md` (appended `## Run result (SEC acceptance gate — 2026-10-31)`). No product code, no test code.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` → EXIT 0.
+- **Gate results:**
+  1. **Hostile import (S-1):** PASS — `ImportOwnershipGuardTests` 10/10, `UserPortabilityHostileClassifyTests` 4/4, `UserPortabilityHostileResolveTests` 5/5, `PortabilityRoundTripTests` (genuine round-trip) — all green in the full Core run.
+  2. **Admin without 2FA (S-2):** PASS — `AdminTwoFactorMiddlewareTests` 7/7 green in the full Web run.
+  3. **Part-vs-whole (S-8):** PASS — full Core `Kumunita.Core.Tests` **Total 1668 · Failed 0 · Skipped 2** (the 2 skips = U3's pre-existing `ErrorReportServiceTests` pins, not new) · 192.6 s; full Web `Kumunita.Web.Tests` **Total 1209 · Failed 0 · Skipped 0** · 24.8 s. U3 baseline was 0 pre-existing failures in both projects; nothing new is a regression.
+- **Open items (recorded, not fixed):**
+  - U21 (sniff attachments/content-images) — **landed** after owner decision 2026-10-31 (tri-state `Mismatch`-only wire); `UploadSniffAttachmentImageTests` 2/2 + `AttachUpload_Support_ZipLegacyAlias_IsAllowed` regression pin green.
+  - U22 (sniff avatars/documents) — **landed**; `Avatar_MismatchedBytes_Rejected` + `Document_MismatchedBytes_Rejected` green.
+  - U23 (hash-only tokens) — **n/a** per owner decision 2026-10-31 (dual-compare load-bearing in verify-by-Id lanes; L3 carried by U24). No code change; `VerifyToken_ExistingCleartextRowHandled` stays.
+  - U24 (verify confirm step) — **landed**; `VerifyConfirmStepTests` 3/3 green.
+  - U28 (account enumeration, L1) — **parked** (no `## Decision — L1`).
+- **Logs:** `.tmp/u29-build.log`, `.tmp/u29-core.log`, `.tmp/u29-web.log`.
+- **No warnings, no skipped items** beyond the U3 baseline skips.
