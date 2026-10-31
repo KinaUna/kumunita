@@ -274,3 +274,27 @@ the last 1–2 sections it names as `Needs`.
 - **Break-glass compare (L8b) — n/a, recorded, not edited:** the §2.2-U27 paragraph and §2.1 note (lines 110–119) both resolve this as **n/a — there is no C# compare to fix**. Verified against the live tree: `ConsumeBreakGlassAsync` (`IdentityService.cs:1451`) validates the token **only via parameterised SQL** (`WHERE "token" = @token`, `:1471`). There is no `string.Equals`/`==`/`FixedTimeEquals` on the token value anywhere in the method (grep + read confirm). §2.3's U27 row says exactly this ("it is **n/a** (no C# compare; parameterised SQL), so **Web class only**"). Per the design doc (the primary source of truth U27 must match) I make **no** `IdentityService.cs` change and **no** Core constant-time test — inventing a `FixedTimeEquals` call around a SQL compare would be improvising, not fixing. The compare already runs as a parameterised Postgres predicate, so the token is never equalled in C# at all.
 - **Tests run (exit 0):** `LoginLimiterPartitionTests` — `LoginLimiter_PartitionsOnIpOnly`, `LoginLimiter_NoSampleAccountExemption` (both green; they drive the pure `KeyFor(HttpContext)` helper in isolation, the house idiom U9 uses for `ForwardedHeadersSetup`, because .NET 10's `RateLimitPartition` is opaque — no public `Key`/`Name`/`Limiter`). **No Core test, because** the break-glass compare is n/a (parameterised SQL, no C# compare behind an accessible helper). `IdentityServiceSamplePasswordLockTests` + `IdentityServiceSampleMfaLockTests` green (untouched — I made no Core change). **Full suites (exit 0):** `Kumunita.Web.Tests` Total **1202, 0 failed, 0 skipped**; `Kumunita.Core.Tests` Total **1668, 0 failed, 2 skipped** (pre-existing skips — not a U27 regression).
 - **Noticed (U27):** none.
+
+## Decision — U21 (owner, 2026-10-31)
+Wire the upload sniffer on **`Mismatch` only**, not `Unknown`. Add a tri-state
+`UploadSignatureSniffer.Classify(...) → SniffVerdict { Match | Mismatch | Unknown }`
+as a **new** method; **keep `Matches` and U20's three tests untouched** (`Matches`
+becomes `Classify(...) == Match`). Controllers reject on `Mismatch` (a declared
+type whose known signature is contradicted by the bytes) and **allow `Unknown`**
+(an allowlisted type with no known signature / legacy MIME alias — preserves the
+landed `AttachUpload_Support_ZipLegacyAlias_IsAllowed`). This resolves the U21
+drift pause. The design doc §2.2-U20/U21 paragraphs and the §2.3 U21 row are
+amended accordingly. U21 may proceed.
+
+## Decision — U23 + U24 (owner, 2026-10-31)
+**U23 = n/a.** The "match only `Sha256Hex(presented)`" is incoherent with the
+verify-by-Id lanes (they load the row by `Id` and present the stored value;
+dropping the stored-value arm breaks every verify link in production). Hash-at-rest
+already holds in the setup lane (pinned by `IdentityServiceTokenHashTests`), and the
+verify-by-Id lanes use the stored value **by design** (the link carries the `Id`; the
+row is loaded server-side; the stored value is never exposed to the browser). U23
+exits **n/a**; `VerifyToken_ExistingCleartextRowHandled` stays untouched. **U24 ships**
+as the real L3 fix: `Verify` GET stops signing in (renders a confirm page); `Verify`
+POST validates + signs in via `ConfirmAndSignInAsync` + `[ValidateAntiForgeryToken]`;
+new view; `KnownTranslationKeys` entries appended (never reformatted). The design doc
+§2.2-U23 paragraph and the §2.3 U23 row are amended accordingly. U24 may proceed.
