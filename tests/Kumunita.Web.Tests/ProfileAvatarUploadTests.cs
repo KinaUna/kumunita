@@ -131,6 +131,39 @@ public class ProfileAvatarUploadTests
     }
 
     /// <summary>
+    /// SEC U22 (finding **L2**) — a declared <c>image/png</c> whose head bytes
+    /// are a **PDF** signature (<c>%PDF-1.4</c>) is rejected <b>415</b> by the
+    /// magic-byte sniffer wire (the U21/U22 <c>Mismatch</c>-reject): the
+    /// allowlist accepts the declared type, but the bytes contradict it, so the
+    /// second, independent check fires before <see cref="IMediaStore.PutAsync"/>.
+    /// Synthetic bytes only (rule 8) — no binary fixture.
+    /// </summary>
+    [Fact]
+    public async Task Avatar_MismatchedBytes_Rejected()
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
+        var media = Substitute.For<IMediaStore>();
+        var controller = Build(userInfo, authz, media, new MediaOptions(), Owner);
+
+        // A 12-byte PDF payload (the %PDF-1.4 magic header + filler) declared
+        // as image/png — the sniffer reports Mismatch (declared binary signature
+        // contradicted by the bytes).
+        byte[] pdf =
+        {
+            0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A, 0x00, 0x01, 0x02,
+        };
+        var result = await controller.AvatarUpload(TestFile("fake.png", "image/png", pdf));
+
+        // The 415 is the re-rendered Profile/Edit (ADR 0237) with the
+        // "not allowed" message (the profile.avatar_err_type key).
+        AssertRejectedForm(result, StatusCodes.Status415UnsupportedMediaType, "not allowed");
+        // C-UP·2 / guards-before-write: no byte written on the Mismatch guard.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+    }
+
+    /// <summary>
     /// M25 U9 (item 11, F2) — the **oversize** reject on the avatar lane,
     /// driven through U8's <see cref="Kumunita.Web.Security.IUploadGate"/>. A
     /// small <see cref="CommunityStorageSettings.MaxFileBytes"/> + a large
