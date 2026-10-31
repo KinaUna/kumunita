@@ -586,8 +586,16 @@ public sealed class AccountController(
 
         if (await AccountHasPasswordAsync(token.UserId))
         {
-            // Self-serve lane — the credential exists; confirm and sign in directly.
-            return await ConfirmAndSignInAsync(token);
+            // Self-serve lane — the credential exists.
+            //
+            // SEC L3 (U24, 2026-10-31) — the GET no longer signs in. A GET must
+            // be side-effect-free (a prefetching proxy, a browser prefetch, or a
+            // crawler must not consume the one-time token or mint a session
+            // cookie). The GET renders a confirm page; the POST (same link,
+            // same token row id round-tripped in the hidden input) validates
+            // + signs in via ConfirmAndSignInAsync and is the only path that
+            // consumes the token (ADR 0146's "consume at the POST" principle).
+            return View(new VerifyViewModel { RequiresPassword = false, Id = id });
         }
 
         // Child lane — the account has no password; render the set-password form so

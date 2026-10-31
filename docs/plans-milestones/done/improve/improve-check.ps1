@@ -245,8 +245,11 @@ $aBaseline = @(
 # the three notification.* group.message.invite keys x en/de/fr/da added to
 # KnownTranslationKeys.cs (14823 -> 14863) — the same shipped-additions
 # mechanism as above; the gate's ceiling starts from 14863 now.
+# Re-baselined again 2026-10-31 (the SEC L3 U24 verify confirm step): two new
+# account.verify_confirm_* keys x en/de/fr/da added to KnownTranslationKeys.cs
+# (14863 -> 14885) — the same shipped-additions mechanism as above.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14863
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14885
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926

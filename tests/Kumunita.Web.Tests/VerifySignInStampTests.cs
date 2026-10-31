@@ -4,6 +4,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web;
 using Kumunita.Web.Controllers;
+using Kumunita.Web.Models;
 using Marten;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
@@ -74,10 +75,12 @@ public sealed class VerifySignInStampTests(PostgresFixture fixture) : IClassFixt
         Assert.False(string.IsNullOrEmpty(expectedStamp),
             "the security stamp must be non-empty (Identity mints it at CreateAsync)");
 
-        // Drive the self-serve Verify GET lane. The account has a password
-        // (created above), so the action takes the ConfirmAndSignInAsync
-        // path → SignInAfterVerifyAsync → HttpContext.SignInAsync.
-        var result = await controller.Verify(id: "tok-1");
+        // Drive the self-serve Verify POST lane (SEC L3 U24 — the GET now
+        // renders a confirm page; the POST validates + signs in via
+        // ConfirmAndSignInAsync → SignInAfterVerifyAsync →
+        // HttpContext.SignInAsync). The account has a password (created
+        // above), so the action takes the ConfirmAndSignInAsync path.
+        var result = await controller.Verify(new VerifyViewModel { Id = "tok-1" });
         Assert.IsType<RedirectResult>(result);
 
         // The captured AuthenticationProperties must carry the stamp.

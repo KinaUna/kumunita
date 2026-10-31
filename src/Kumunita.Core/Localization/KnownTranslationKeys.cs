@@ -3891,6 +3891,13 @@ public static class KnownTranslationKeys
                 "Never got the confirmation email?",
             ["account.signup_resend_link"] =
                 "Resend the confirmation email",
+
+            // SEC L3 (U24, 2026-10-31) — the self-serve confirm step: the
+            // GET renders a confirm page (side-effect-free); the POST
+            // validates the token + signs in via ConfirmAndSignInAsync.
+            ["account.verify_confirm_lede"] =
+                "Confirm that this is your account and you're ready to sign in.",
+            ["account.verify_confirm_submit"] = "Confirm & sign in",
         };
 
     // ─────────────────────────────────────────────────────────────────────
@@ -7613,6 +7620,11 @@ public static class KnownTranslationKeys
             ["posts.board_report_button"] = "Dieses Board melden",
             ["posts.todo_report_button"] = "Diese Aufgabe melden",
             ["posts.grouppost_report_button"] = "Diesen Beitrag melden",
+
+            // SEC L3 (U24, 2026-10-31) — the self-serve confirm step.
+            ["account.verify_confirm_lede"] =
+                "Bestätige, dass es dein Konto ist und du dich anmelden möchtest.",
+            ["account.verify_confirm_submit"] = "Bestätigen & anmelden",
         };
 
     /// <summary>
@@ -11248,6 +11260,11 @@ public static class KnownTranslationKeys
             ["posts.board_report_button"] = "Signaler ce tableau",
             ["posts.todo_report_button"] = "Signaler cette tâche",
             ["posts.grouppost_report_button"] = "Signaler ce message",
+
+            // SEC L3 (U24, 2026-10-31) — the self-serve confirm step.
+            ["account.verify_confirm_lede"] =
+                "Confirme que c'est ton compte et que tu es prêt·e à te connecter.",
+            ["account.verify_confirm_submit"] = "Confirmer & me connecter",
         };
 
     /// <summary>
@@ -14855,6 +14872,11 @@ public static class KnownTranslationKeys
             ["posts.board_report_button"] = "Anmelde dette bræt",
             ["posts.todo_report_button"] = "Anmelde denne todo",
             ["posts.grouppost_report_button"] = "Anmelde dette indlæg",
+
+            // SEC L3 (U24, 2026-10-31) — the self-serve confirm step.
+            ["account.verify_confirm_lede"] =
+                "Bekræft, at det er din konto, og at du er klar til at logge ind.",
+            ["account.verify_confirm_submit"] = "Bekræft & log ind",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
