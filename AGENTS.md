@@ -455,3 +455,14 @@ keypress — prefer `git --no-pager <cmd>`, or set `core.pager` to `cat` for
 repos this applies to. Commands that are long-running by design
 (`dotnet watch`, `npm start`, dev servers) should be started as background
 tasks, not awaited as if they will exit on their own.
+
+## Terminal commands
+- Never end your turn while a terminal command you depend on is still running.
+  "I'll be notified when it finishes" is not an acceptable stopping point.
+- Run builds, tests and migrations in the foreground. Use a background terminal
+  only for processes that never exit, like `dotnet watch`, dev servers or containers.
+- If a command times out or you start it in the background, wait for it with the
+  await-terminal tool, or keep checking get_terminal_output until it exits.
+  Then continue the task from the result.
+- For a long-running server, wait until its output shows it's ready
+  (e.g. "Now listening on"), then carry on.
