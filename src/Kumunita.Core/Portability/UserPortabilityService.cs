@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Kumunita.Core.Usage;
 using Kumunita.Core.UserInfo;
 
 namespace Kumunita.Core.Portability;
@@ -197,7 +198,10 @@ public sealed class UserPortabilityService(
     Marten.IDocumentStore documentStore,
     IUserInfoService userInfoService,
     IMediaStore mediaStore,
-    Microsoft.AspNetCore.Identity.UserManager<User> userManager) : IUserPortabilityService
+    Microsoft.AspNetCore.Identity.UserManager<User> userManager,
+    IStorageSettingsService? storageSettings = null,
+    IStorageMetricsService? storageMetrics = null,
+    Microsoft.Extensions.Options.IOptions<MediaOptions>? mediaOpts = null) : IUserPortabilityService
 {
     /// <summary>
     /// The U02 resident-scope filter (C-M27·3) — the <em>pure</em>
@@ -736,7 +740,19 @@ public sealed class UserPortabilityService(
         nameToType["Bookmark"]       = typeof(Kumunita.Core.Bookmarks.Bookmark);
 
         // ── Read the archive (the M11 KumunitaArchive reader) ─────────────
-        var data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
+        // SEC-lane U14 (M2 / U13 carry-forward): a zip-bomb rejection (U13's
+        // <see cref="InvalidDataException"/>) is surfaced as a user-facing
+        // fail-closed plan, not a 500.
+        KumunitaArchiveData data;
+        try
+        {
+            data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
+        }
+        catch (InvalidDataException ex)
+        {
+            return new UserPortabilityImportPlan(false, [],
+                [$"archive.invalid:{ex.Message}"]);
+        }
 
         // ── Pre-pass: the target id sets (the M11 validate pre-pass, over
         //    the target store — read-only) ─────────────────────────────────
@@ -1112,7 +1128,19 @@ public sealed class UserPortabilityService(
             return new UserPortabilityImportResult(false, 0, 0, ["archive.missing"]);
 
         // ── Read the archive (the M11 KumunitaArchive reader) ─────────────
-        var data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
+        // SEC-lane U14 (M2 / U13 carry-forward): a zip-bomb rejection (U13's
+        // <see cref="InvalidDataException"/>) is surfaced as a user-facing
+        // fail-closed result, not a 500.
+        KumunitaArchiveData data;
+        try
+        {
+            data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
+        }
+        catch (InvalidDataException ex)
+        {
+            return new UserPortabilityImportResult(false, 0, 0,
+                [$"archive.invalid:{ex.Message}"]);
+        }
 
         // ── The name → Type map (the M11 NameToType + the 4 non-M11 types) ─
         var nameToType = new Dictionary<string, Type>(
@@ -1377,9 +1405,99 @@ public sealed class UserPortabilityService(
         // (idempotent — the C-MED·4 dedup: identical bytes → same id →
         // no second volume file). The resident's own write lane for media
         // (not a new bulk importer).
-        foreach (var (_, bytes) in data.Media)
+        //
+        // SEC-lane U14 (M2 / S-5): each imported media now runs the
+        // **same** size/quota/type decision as an upload. Per design
+        // doc §2.2 (U14), the decision already lives in a reachable
+        // **Core** seam — <see cref="StorageLimits.Decide"/> (the pure
+        // decision the Web <c>IUploadGate</c> composes) + the C-SM·7
+        // usage read + the platform-space read + the <see cref="MediaOptions"/>
+        // allowlist — all registered by <c>AddKumunitaCore</c>. So the
+        // "one new interface in the lane" branch is **not** needed: the
+        // service consumes the Core seams directly and Core stays
+        // HTTP-free (ADR 0006-D). A media that fails the gate is
+        // **skipped** (no byte written) and recorded as
+        // <c>media.skipped:&lt;reason&gt;</c> in the result's message
+        // list (the U6 <c>import.rejected:</c> shape) — the import
+        // stays <c>Ok</c> (a partial skip is not a fail-closed rollback;
+        // the actor's genuine rows + allowed media still import). When
+        // the policy seams are absent (a unit boot that constructs the
+        // service without the Core DI registrations) the legacy
+        // no-gate behaviour applies — the production registration
+        // (Core <c>DependencyInjection.cs</c>) always resolves them.
+        var mediaGateEnabled = storageSettings is not null && mediaOpts is not null;
+        CommunityStorageSettings? mediaSettings = null;
+        long mediaUsage = 0;
+        if (mediaGateEnabled)
+        {
+            mediaSettings = await storageSettings.GetOrCreateAsync(ct).ConfigureAwait(false);
+            mediaUsage = await storageSettings
+                .GetPerUserUsageBytesAsync(residentSubjectId, ct).ConfigureAwait(false);
+        }
+
+        var mediaManifestById = data.Manifest?.MediaManifest is { Count: > 0 } entries
+            ? entries
+                .Where(e => e is not null && !string.IsNullOrEmpty(e.Id))
+                .GroupBy(e => e.Id, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal)
+            : null;
+
+        long mediaImportedBytes = 0;
+        foreach (var (mediaId, bytes) in data.Media)
         {
             ct.ThrowIfCancellationRequested();
+
+            if (mediaGateEnabled)
+            {
+                // The same decision order the Web IUploadGate runs
+                // (platform-space first, then the pure size/quota
+                // decision — the C-UP·2 size-first ordering) + the
+                // allowlist check every upload lane runs. The resident's
+                // export ships image/attachment/document-lane media, so
+                // the union of the three allowlists is the allowed set.
+                if (storageMetrics is not null
+                    && (await storageMetrics.GetPlatformSpaceAsync(
+                        mediaOpts.Value.MaxPlatformBytes, ct).ConfigureAwait(false)).IsFull)
+                {
+                    rejectedReasons.Add("media.skipped:platform-full");
+                    continue;
+                }
+
+                var declaredType = mediaManifestById is not null
+                    ? mediaManifestById.GetValueOrDefault(mediaId)?.ContentType
+                    : null;
+                if (string.IsNullOrWhiteSpace(declaredType)
+                    || !(mediaOpts.Value.IsAllowed(declaredType)
+                        || mediaOpts.Value.IsAttachmentAllowed(declaredType)
+                        || mediaOpts.Value.IsDocumentAllowed(declaredType)))
+                {
+                    // A media with no manifest entry (hence no declared
+                    // type) is fail-closed — it never round-tripped from
+                    // a genuine export (the manifest field set is
+                    // locked, C-M11·3).
+                    rejectedReasons.Add("media.skipped:disallowed-type");
+                    continue;
+                }
+
+                var decision = StorageLimits.Decide(
+                    bytes.LongLength,
+                    mediaUsage + mediaImportedBytes,
+                    mediaSettings,
+                    mediaOpts.Value.MaxBytes);
+                if (decision is StorageDecision.Oversize)
+                {
+                    rejectedReasons.Add("media.skipped:oversize");
+                    continue;
+                }
+                if (decision is StorageDecision.OverQuota)
+                {
+                    rejectedReasons.Add("media.skipped:over-quota");
+                    continue;
+                }
+
+                mediaImportedBytes += bytes.LongLength;
+            }
+
             await mediaStore.PutAsync(bytes, null, "application/octet-stream",
                 residentSubjectId, ct).ConfigureAwait(false);
         }
