@@ -1,5 +1,6 @@
 using Kumunita.Core.Notifications;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
 
@@ -66,6 +67,11 @@ public sealed class MailSuppressionController : Controller
     [HttpPost("api/mail/suppress")]
     // SEC M1 (U12) — exempt from the global anti-forgery filter: the X-Suppression-Token header is the credential.
     [IgnoreAntiforgeryToken]
+    // SEC-lane U15 (M3 / S-5): token-auth, but still an anonymous state-storing
+    // POST — the house "report" policy (Program.cs AddWindow "report", 10/1 h
+    // per IP) + a request-size cap. The anti-forgery exemption is untouched (U12).
+    [EnableRateLimiting("report")]
+    [RequestSizeLimit(512L * 1024 * 1024)]
     public async Task<IActionResult> Suppress([FromBody] SuppressionIngestRequest? req, CancellationToken ct)
     {
         // (1) Validate the body (pin §3.3 step 1) — before the auth check, so a

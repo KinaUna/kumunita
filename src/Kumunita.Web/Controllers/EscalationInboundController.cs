@@ -1,6 +1,7 @@
 using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Localization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Kumunita.Web.Controllers;
 
@@ -67,6 +68,11 @@ public sealed class EscalationInboundController(
     [HttpPost("inbound")]
     // SEC M1 (U12) — exempt from the global anti-forgery filter: the Authorization: Bearer <token> header is the credential.
     [IgnoreAntiforgeryToken]
+    // SEC-lane U15 (M3 / S-5): token-auth, but still an anonymous state-storing
+    // POST — the house "report" policy (Program.cs AddWindow "report", 10/1 h
+    // per IP) + a request-size cap. The anti-forgery exemption is untouched (U12).
+    [EnableRateLimiting("report")]
+    [RequestSizeLimit(512L * 1024 * 1024)]
     public async Task<IActionResult> Inbound([FromBody] InboundEscalationPayload? body)
     {
         // 1. Parse the Bearer credential (ESC·6 — the token is the plaintext the
