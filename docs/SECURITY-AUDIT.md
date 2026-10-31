@@ -245,7 +245,7 @@ lane). No PII — checklist IDs and a one-line summary only.
 
 ### SEC remediation lane — per-finding rows (2026-10-31)
 
-Closed in the SEC lane (`docs/plans-milestones/in-progress/sec/`), all
+Closed in the SEC lane (`docs/plans-milestones/done/sec/`), all
 remediation commits through `6dafb783` (the U29 acceptance gate, **PASS**).
 No PII — test class names and lane IDs only.
 
