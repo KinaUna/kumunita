@@ -107,7 +107,7 @@
 </style>
 
 <div id="kiosk-stage"
-     data-view-interval="@Model.ViewIntervalSeconds"
+     data-view-interval="@Model.DefaultDurationSeconds"
      data-refresh-interval="@Model.RefreshIntervalSeconds"
      data-slide-count="@Model.Slides.Count"
      data-display-mode="@(Model.DisplayMode.ToString().ToLowerInvariant())">
@@ -144,7 +144,7 @@
                  data-index="@slide.Index"
                  data-href="@(slide.Href ?? string.Empty)"
                  data-denied="@slide.Denied.ToString().ToLowerInvariant()"
-                 data-label="@(slide.Label ?? string.Empty)"
+                 data-label="@(slide.Label ?? slide.Title ?? string.Empty)"
                  data-fingerprint="@(slide.Fingerprint ?? string.Empty)"></div>
         }
 
@@ -160,7 +160,7 @@
         {
             <iframe class="kmb-kiosk-iframe"
                     src="@Model.FirstSlide!.Href"
-                    title="@(Model.FirstSlide!.Label ?? "Kiosk slide")"></iframe>
+                    title="@(Model.FirstSlide!.Label ?? Model.FirstSlide!.Title ?? "Kiosk slide")"></iframe>
         }
     }
 </div>

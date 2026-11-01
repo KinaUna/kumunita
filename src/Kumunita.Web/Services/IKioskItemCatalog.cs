@@ -11,6 +11,21 @@ namespace Kumunita.Web.Services;
 public sealed record KioskItemOption(string Id, string Title, string? GroupId, string? Subtitle);
 
 /// <summary>
+/// One playlist entry resolved for the viewer (ADR 0285): whether they can
+/// see the item, its title (for the editor and the iframe title), the route
+/// the kiosk slide frames, and a <see cref="Version"/> string — the
+/// display-relevant content the kiosk fingerprints to decide whether a
+/// refresh tick needs to reload the slide (<c>null</c> when the caller
+/// computes its own, as for the calendar).
+/// </summary>
+public sealed record KioskResolvedItem(bool Visible, string? Title, string? Href, string? Version)
+{
+    /// <summary>The not-visible shape (missing, deleted or denied — the
+    /// three are not told apart, so nothing leaks).</summary>
+    public static KioskResolvedItem Hidden { get; } = new(false, null, null, null);
+}
+
+/// <summary>
 /// The kiosk playlist's item catalog (ADR 0285) — the Web-side composition
 /// that answers "which items of this type can I put on my kiosk?" for the
 /// <c>/settings/kiosk</c> picker. It adds no access logic of its own: every
@@ -35,4 +50,16 @@ public interface IKioskItemCatalog
     /// </summary>
     Task<IReadOnlyList<KioskItemOption>> SearchAsync(
         KioskItemType type, string? query, string actorId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves one stored entry for <paramref name="actorId"/> through the
+    /// item's own read seam (the same decision its detail route runs — the
+    /// kiosk adds none). A missing, deleted or denied item is
+    /// <see cref="KioskResolvedItem.Hidden"/>. <paramref name="roles"/> are the
+    /// viewer's roles (the announcement read takes them). For a calendar the
+    /// title is the component name (<c>null</c> for "All") and the version is
+    /// left to the caller (it depends on the viewer's time zone window).
+    /// </summary>
+    Task<KioskResolvedItem> ResolveAsync(
+        KioskEntry entry, string actorId, IReadOnlySet<string> roles, CancellationToken ct = default);
 }
