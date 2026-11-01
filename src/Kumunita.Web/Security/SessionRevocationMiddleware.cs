@@ -111,7 +111,14 @@ public sealed class SessionRevocationMiddleware
 
         // Load the SessionDoc by id (a read — QuerySession, no write session
         // opened; the codebase idiom, SessionService.GetSessionsForUserAsync).
-        await using var store = requestServices.GetRequiredService<IDocumentStore>();
+        // NOTE: IDocumentStore is a DI-registered SINGLETON (Marten AddMarten
+        // → AddSingleton<IDocumentStore>).  It must NOT be disposed here —
+        // doing so disposes the shared Npgsql.PoolingDataSource owned by the
+        // store, which is also used by the EF Core AppDbContext, Wolverine's
+        // Postgres transport, and every other domain service for the lifetime
+        // of the process.  Only the QuerySession (scoped per request) is
+        // correctly disposed with `await using`.
+        var store = requestServices.GetRequiredService<IDocumentStore>();
         await using var querySession = store.QuerySession();
         var doc = await querySession.LoadAsync<SessionDoc>(sessionId);
 
