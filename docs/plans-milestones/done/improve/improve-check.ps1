@@ -255,9 +255,15 @@ $aBaseline = @(
 # annotation: ADR 0281 (the sessions lane ADR) does not yet exist — it lands in
 # the sessions lane's U12 close; the ADR that drives this re-baseline will be
 # annotated there. Do not loosen the gate (the pin is the point).
+# Re-baselined again 2026-11-01 (the ADR 0285 kiosk lane — patches 1/4, 2/4
+# and 3/4): the new kiosk.settings.* / board list-view / per-entry kiosk keys
+# x en/de/fr/da added to KnownTranslationKeys.cs (14905 -> 15157); the board
+# list view (?view=list, ADR 0285 D6) handlers added to
+# ProjectsController.cs (5370 -> 5373) — the same shipped-additions
+# mechanism as above. ADR 0285 annotated in its Consequences.
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14905
-  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 15157
+  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5373
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
   'src/Kumunita.Core/UserInfo/UserInfoService.cs'          = 4286

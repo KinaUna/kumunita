@@ -117,6 +117,11 @@ of the board page, also reachable outside the kiosk.
   types).
 - New translation keys under `kiosk.settings.*` (en / de / fr / da; de / fr /
   da machine-written, native review pending).
+- The `improve-check.ps1` gate (a) baseline re-baselined on 2026-11-01:
+  `KnownTranslationKeys.cs` **14905 → 15157** (the new `kiosk.*`, board
+  list-view and per-entry kiosk keys × en/de/fr/da) and
+  `ProjectsController.cs` **5370 → 5373** (the board list-view handlers,
+  D6). Annotated in `improve-check.ps1` gate (a) and here.
 
 ## Delivery
 
