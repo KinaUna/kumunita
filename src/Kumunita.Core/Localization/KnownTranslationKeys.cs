@@ -302,6 +302,14 @@ public static class KnownTranslationKeys
             ["projects.board.title_hint"]    = "A short name for the board — the feed label.",
             ["projects.board.description_hint"] = "An optional description of what this board tracks. A board is usable title-only.",
             ["projects.board.back"]          = "← Back to boards",
+            ["projects.board.view_switch"] =
+                "Board view",
+            ["projects.board.view_board"] =
+                "Board",
+            ["projects.board.view_list"] =
+                "List",
+            ["projects.board.list_empty_lane"] =
+                "No cards in this lane.",
             ["projects.board.untitled"]      = "Untitled board",
             ["projects.board.delete"]        = "Delete board",
             ["projects.board.edit"]          = "Edit board",
@@ -4220,6 +4228,14 @@ public static class KnownTranslationKeys
             ["projects.board.title_hint"]    = "Ein kurzer Name für das Board — die Feed-Beschriftung.",
             ["projects.board.description_hint"] = "Eine optionale Beschreibung, was dieses Board nachverfolgt. Ein Board ist allein mit Titel nutzbar.",
             ["projects.board.back"]          = "← Zurück zu den Boards",
+            ["projects.board.view_switch"] =
+                "Board-Ansicht",
+            ["projects.board.view_board"] =
+                "Board",
+            ["projects.board.view_list"] =
+                "Liste",
+            ["projects.board.list_empty_lane"] =
+                "Keine Karten in dieser Spalte.",
             ["projects.board.untitled"]      = "Board ohne Titel",
             ["projects.board.delete"]        = "Board löschen",
             ["projects.board.edit"]          = "Board bearbeiten",
@@ -7941,6 +7957,14 @@ public static class KnownTranslationKeys
             ["projects.board.save"]          = "Enregistrer les modifications",
             ["projects.board.description_hint"] = "Une description optionnelle de ce que ce tableau suit. Un tableau est utilisable avec un titre seul.",
             ["projects.board.back"]          = "← Retour aux tableaux",
+            ["projects.board.view_switch"] =
+                "Vue du tableau",
+            ["projects.board.view_board"] =
+                "Tableau",
+            ["projects.board.view_list"] =
+                "Liste",
+            ["projects.board.list_empty_lane"] =
+                "Aucune carte dans cette colonne.",
             ["projects.board.untitled"]      = "Tableau sans titre",
             ["projects.board.delete"]        = "Supprimer le tableau",
             ["projects.board.create"]        = "Créer le tableau",
@@ -11586,6 +11610,14 @@ public static class KnownTranslationKeys
             ["projects.board.save"]          = "Gem ændringer",
             ["projects.board.description_hint"] = "En valgfri beskrivelse af, hvad brættet følger. Et bræt kan bruges kun med et navn.",
             ["projects.board.back"]          = "← Tilbage til brætter",
+            ["projects.board.view_switch"] =
+                "Tavlevisning",
+            ["projects.board.view_board"] =
+                "Tavle",
+            ["projects.board.view_list"] =
+                "Liste",
+            ["projects.board.list_empty_lane"] =
+                "Ingen kort i denne kolonne.",
             ["projects.board.untitled"]      = "Bræt uden navn",
             ["projects.board.delete"]        = "Slet bræt",
             ["projects.board.create"]        = "Opret bræt",

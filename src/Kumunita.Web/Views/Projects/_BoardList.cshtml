@@ -1,0 +1,62 @@
+@model Kumunita.Web.Models.BoardDetailViewModel
+@*
+  ADR 0285 D6 — the board's list view (/projects/boards/{id}?view=list):
+  the same lanes and cards as the board view, as rows grouped under each
+  lane's heading. Read-only (no drag-and-drop, no lane menus — edit on the
+  board view); every row links to the to-do. Built from the same
+  BoardDetailViewModel, so it shows exactly the cards the board's read
+  decision already returned.
+*@
+<div class="kmb-board-list">
+    @if (Model.Lanes.Count == 0)
+    {
+        <p class="kanban-board-empty p-4 text-muted border rounded">
+            <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
+        </p>
+    }
+    @foreach (var lane in Model.Lanes.OrderBy(l => l.Order))
+    {
+        var headingId = "board-list-lane-" + lane.LaneId;
+        <section class="kmb-board-list-lane" aria-labelledby="@headingId">
+            <h2 class="kmb-board-list-lane-title" id="@headingId">
+                <span>@lane.Title</span>
+                <span class="kmb-board-list-count">@lane.Cards.Count</span>
+            </h2>
+            @if (lane.Cards.Count == 0)
+            {
+                <p class="kmb-board-list-empty text-muted small mb-0">
+                    <kw-l key="projects.board.list_empty_lane">No cards in this lane.</kw-l>
+                </p>
+            }
+            else
+            {
+                <ul class="kmb-board-list-rows list-unstyled mb-0">
+                    @foreach (var card in lane.Cards.OrderBy(c => c.Order))
+                    {
+                        var overdue = card.DueAt is not null
+                                      && card.DueAt < DateTimeOffset.UtcNow
+                                      && !string.Equals(card.Status, "done", StringComparison.OrdinalIgnoreCase)
+                                      && !string.Equals(card.Status, "cancelled", StringComparison.OrdinalIgnoreCase);
+                        <li class="kmb-board-list-row">
+                            <a class="kmb-board-list-title" href="/projects/todos/@card.TodoId">@card.Title</a>
+                            <span class="kmb-board-list-meta">
+                                @if (!string.IsNullOrWhiteSpace(card.Status))
+                                {
+                                    <partial name="_StatusChip" model="card.Status" />
+                                }
+                                @if (!string.IsNullOrWhiteSpace(card.AssigneeDisplayName))
+                                {
+                                    <span>@card.AssigneeDisplayName</span>
+                                }
+                                @if (card.DueAt is not null)
+                                {
+                                    <span class="@(overdue ? "kmb-overdue" : null)"><kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@card.DueAt" format="g"></kw-dt></span>
+                                }
+                            </span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    }
+</div>

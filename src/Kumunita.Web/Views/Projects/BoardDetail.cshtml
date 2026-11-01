@@ -15,6 +15,8 @@
     // TagHelper can't wrap an attribute). The en floor is the server fallback
     // (a null provider — a non-HTTP render — degrades to en).
     string confirmRemoveTrans = "Remove this translation?";
+    // ADR 0285 D6 — the Board / List view switch's accessible name.
+    string ariaBoardView = Translation is null ? "Board view" : await Translation.GetAsync("projects.board.view_switch", _kwL);
     // The board's modal close buttons + lane action menus carry accessible
     // names the kw-l TagHelper can't wrap (an attribute) — server-resolved,
     // same idiom (the a11y.* closed set is the floor).
@@ -285,7 +287,7 @@
                        a regular viewport; the :fullscreen styles in site.css
                        give it the full-bleed look. *@
                     <button type="button" class="btn btn-sm btn-outline-secondary kanban-fullscreen-toggle"
-                            aria-pressed="false">
+                            aria-pressed="false" hidden="@(Model.ListView ? "hidden" : null)">
                         <svg class="kanban-fullscreen-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
                         <span><kw-l key="projects.board.fullscreen">Full screen</kw-l></span>
                     </button>
@@ -542,7 +544,23 @@
            translation td-group variants (above), so the standalone card is
            gone: a translation's body swaps in as the description. *@
 
-        @if (Model.Lanes.Count == 0)
+        @* ADR 0285 D6 — Board / List: two plain GET links (the calendar
+           Day/Week/Month toggle idiom); the active view is pressed. The list
+           view is read-only, so editing stays on the board view. *@
+        <div class="d-flex justify-content-end mb-2">
+            <div class="btn-group btn-group-sm" role="group" aria-label="@ariaBoardView">
+                <a class="btn btn-outline-secondary @(Model.ListView ? null : "active")" href="/projects/boards/@Model.Board.Id" aria-pressed="@(Model.ListView ? "false" : "true")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-boards"/></svg><kw-l key="projects.board.view_board">Board</kw-l></a>
+                <a class="btn btn-outline-secondary @(Model.ListView ? "active" : null)" href="/projects/boards/@Model.Board.Id?view=list" aria-pressed="@(Model.ListView ? "true" : "false")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-rows"/></svg><kw-l key="projects.board.view_list">List</kw-l></a>
+            </div>
+        </div>
+
+        @if (Model.ListView)
+        {
+            <partial name="_BoardList" model="Model" />
+        }
+        else
+        {
+        if (Model.Lanes.Count == 0)
         {
             <p class="kanban-board-empty p-4 text-muted border rounded">
                 <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
@@ -855,6 +873,7 @@
                 </div>
             </div>
         </div>
+        }
     </div>
 
     @if (Model.Projects is { Count: > 0 })
