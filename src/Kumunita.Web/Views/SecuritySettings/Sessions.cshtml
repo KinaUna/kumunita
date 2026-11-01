@@ -1,33 +1,34 @@
 @using Kumunita.Web.Security
-@model Kumunita.Web.Models.SessionSettingsViewModel
+@model Kumunita.Web.Models.SessionListViewModel
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var _sessKillConfirm = Translation is null ? "Sign out of every session for this account? Your other devices and browsers will be signed out immediately." : await Translation.GetAsync("settings.sessions.kill_confirm", _aL);
+    // The per-row revoke confirm (the sessions lane). Resolved the same way as
+    // the kill-all confirm: the confirm.ts seam reads the data-confirm attribute
+    // verbatim, and the kw-l TagHelper cannot wrap an attribute value (the
+    // PostDetail.cshtml idiom) — so it is a server-resolved string with an en
+    // floor (a null provider — a non-HTTP render — degrades to en).
+    var _sessRevokeConfirm = Translation is null ? "Revoke this session? Your other devices and browsers will not be affected." : await Translation.GetAsync("settings.sessions.revoke_confirm", _aL);
 }
 @{
     ViewData["Title"] = "Settings — Security";
 }
 
-@* F5 (AUTH-04) — the per-resident session-management surface (F5.U3). The
-   /settings/security/sessions section, the ADR 0080 settings-tab shape (the
-   same sub-nav strip + page heading + section as /settings/security/mfa).
-   <para>
-   <b>Plain-English strings, deliberately not <c>kw-l</c> keys:</b> the same
-   discipline as the F3 Mfa.cshtml view (a <c>kw-l</c> key used but not in
-   KnownTranslationKeys fails the build, and registering new keys would
-   exceed this unit's ≤3-file budget). The surface works en-only today.
-   </para>
-   <para>
-   <b>Server-side state, not a per-browser cookie read (pin §3):</b> the
-   "other active sessions" the list describes is the server's revocation
-   state (the <c>User.SecurityStamp</c>, rotated by
-   <c>KillAllSessionsAsync</c> / <c>ChangePasswordAsync</c>) — the server
-   cannot enumerate another browser's cookies. The minimum-viable surface
-   shows "this session" + the kill-all control.
-   </para>
-*@
+@* sessions lane — the per-session list + revoke-one-device surface (U8).
+   Extends the F5 (AUTH-04) "Sign out everywhere" whole-account kill below,
+   which is kept unchanged (the two mechanisms coexist: the SecurityStamp
+   rotation = whole-account kill, SessionDoc.RevokedAt = per-session kill —
+   see docs/design/sessions-per-session-revocation.md). The "Active sessions"
+   table is the new per-session surface; its kw-l keys
+   (settings.sessions.list_heading / list_desc / current_badge /
+   revoke_button) + the data-confirm key (settings.sessions.revoke_confirm)
+   are registered by U9 in KnownTranslationKeys + the 4-language seed. The
+   per-row revoke form uses the codebase data-confirm idiom
+   (client/lib/confirm.ts, loaded in _Layout) — NOT an onsubmit handler. The
+   bare @item.Id in the action attribute is a real Razor expression (NOT the
+   @($("…")) C#-interpolation bug named in AGENTS.md). *@
 @await Html.PartialAsync("../Locale/_SettingsTabs.cshtml")
 
 <h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
@@ -41,6 +42,55 @@
         <h3 class="h5"><kw-l key="settings.sessions.this_heading">This session</kw-l></h3>
         <p class="text-muted mb-0">
             <kw-l key="settings.sessions.this_desc">You are currently signed in. Signing out everywhere below ends this session as well as every other active session for this account.</kw-l></p>
+    </div>
+</div>
+
+<hr />
+
+<div class="card">
+    <div class="card-body">
+        <h3 class="h5"><kw-l key="settings.sessions.list_heading">Active sessions</kw-l></h3>
+        <p class="text-muted mb-2">
+            <kw-l key="settings.sessions.list_desc">The sessions currently signed in to this account. Revoke a session to sign out that device immediately — your other sessions are not affected.</kw-l></p>
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th scope="col">Device</th>
+                    <th scope="col">IP address</th>
+                    <th scope="col">Signed in</th>
+                    <th scope="col">Last active</th>
+                    <th scope="col" class="text-end"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Sessions)
+                {
+                    var _ua = item.UserAgent;
+                    <tr>
+                        <td title="@_ua">@(_ua.Length <= 60 ? _ua : _ua.Substring(0, 60) + "…")</td>
+                        <td>@item.Ip</td>
+                        <td>@(item.CreatedAt.ToLocalTime().ToString("g"))</td>
+                        <td>@(item.LastActive.ToLocalTime().ToString("g"))</td>
+                        <td class="text-end">
+                            @if (item.IsCurrent)
+                            {
+                                <span class="badge bg-success"><kw-l key="settings.sessions.current_badge">This session</kw-l></span>
+                            }
+                            else
+                            {
+                                <form method="post" action="/settings/security/sessions/@item.Id/revoke"
+                                      data-confirm="@_sessRevokeConfirm">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <kw-l key="settings.sessions.revoke_button">Revoke</kw-l>
+                                    </button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 </div>
 

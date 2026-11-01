@@ -52,6 +52,16 @@ public sealed class MfaSettingsViewModel
     /// (<c>UserManager.CountRecoveryCodesAsync(user)</c>).
     /// The only thing a steady GET shows.</summary>
     public int RemainingRecoveryCodes { get; init; }
+
+    /// <summary>Whether the resident's self-serve <b>change-password</b> form
+    /// (ADR 0138) is locked for this account — a non-admin sample account on an
+    /// opted-in demo instance (<see cref="Kumunita.Core.Identity.IIdentityService.IsChangePasswordLockedForAsync"/>).
+    /// The change-password surface now lives on this Security page (co-located
+    /// with MFA): <c>true</c> renders the "password changes are locked" notice
+    /// in place of the form, <c>false</c> (the floor, and every real /
+    /// non-sample account) renders the form. The <c>_PasswordChange</c> partial
+    /// reads this flag (typed <c>bool</c>) to decide which to render.</summary>
+    public bool PasswordChangeLocked { get; init; }
 }
 
 /// <summary>
@@ -93,11 +103,17 @@ public sealed class MfaDisableViewModel
 /// (non-sample) account are unaffected (they keep their own MFA lane). The
 /// back-to-settings affordance is rendered by the view. The model exists so
 /// the view has an explicit <c>@model</c> contract (the repo's Razor
-/// convention, the <see cref="ChangePasswordLockedViewModel"/> shape).
+/// convention). It also carries <see cref="PasswordChangeLocked"/> so the
+/// co-located change-password section (the ADR 0138 surface, now on this
+/// Security page) can render its form or "password changes are locked" notice.
 /// </summary>
 public sealed class MfaLockedViewModel
 {
-    // No bindable fields: the surface is a notice, not a form. The model
-    // exists so the view has an explicit @model contract (the ADR 0138
-    // ChangePasswordLockedViewModel shape, re-applied to the MFA surface).
+    // The change-password section is rendered on this locked-MFA page too (so a
+    // resident who is MFA-locked but not password-locked keeps their change-
+    // password lane — the ADR 0138 surface, now co-located with MFA on the
+    // Security tab). The _PasswordChange partial reads this flag (the same
+    // ADR 0138 decision as the MfaSettingsViewModel one) to decide whether to
+    // render the form or the "password changes are locked" notice.
+    public bool PasswordChangeLocked { get; init; }
 }

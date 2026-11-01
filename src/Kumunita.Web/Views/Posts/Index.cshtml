@@ -65,7 +65,16 @@
 }
 
 <div class="row justify-content-center">
-    <div class="col-md-10 col-lg-9">
+    @* ADR 0282 — the communities rail is the fixed 230px left column of
+       .airy-comm-layout; the old col-md-10/col-lg-9 cap left the feed narrow
+       with dead margin on both sides. Loosening to col-md-12/col-lg-11 lets
+       the feed (the right grid column) take that freed width, so the posts
+       list reads wider and more central while the communities list stays the
+       left rail. Below md the rail is on top as chips (unchanged).
+       2026-11-01 — full width (col-lg-12) to match the footer / the other
+       single-surface pages; .airy-comm-layout is a fixed-rail + fluid-feed
+       grid, so the extra room goes to the feed, not a paired column. *@
+    <div class="col-md-12 col-lg-12">
         <header class="airy-head">
             <div class="head-row">
                 <div>

@@ -1,4 +1,5 @@
 using Kumunita.Core.Identity;
+using Kumunita.Core.Sessions;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authentication;
@@ -83,7 +84,8 @@ namespace Kumunita.Web.Controllers;
 public sealed class SecuritySettingsController(
     UserManager<User> userManager,
     SignInManager<User> signInManager,
-    IIdentityService identity) : Controller
+    IIdentityService identity,
+    SessionService sessionService) : Controller
 {
     private static readonly string AuthenticatorProvider = "Authenticator";
     private const int RecoveryCodeCount = 10;
@@ -128,6 +130,27 @@ public sealed class SecuritySettingsController(
         }
 
         return await identity.IsMfaLockedForAsync(subject);
+    }
+
+    /// <summary>
+    /// ADR 0138 — the sample-account <b>change-password</b> lock decision (the
+    /// single place the rule lives, so the Security page's change-password
+    /// section and the <c>ChangePassword</c> write guard below agree). The
+    /// change-password surface now lives on this Security page (co-located
+    /// with MFA — one tab holds both credential-security options), so this
+    /// reads the <see cref="IIdentityService.IsChangePasswordLockedForAsync"/>
+    /// seam for the signed-in subject. Every real account and the sample
+    /// <c>GlobalAdmin</c> are never locked (the ADR 0138 exemption).
+    /// </summary>
+    private async Task<bool> IsPasswordChangeLockedAsync()
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+        {
+            return false;   // fail-closed: no subject → not locked (no password surface to guard)
+        }
+
+        return await identity.IsChangePasswordLockedForAsync(subject);
     }
 
     /// <summary>
@@ -282,7 +305,10 @@ public sealed class SecuritySettingsController(
         // actions below), so a crafted POST is refused even if the view
         // were bypassed.
         if (await IsMfaLockedAsync())
-            return View("MfaLocked", new MfaLockedViewModel());
+            return View("MfaLocked", new MfaLockedViewModel
+            {
+                PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
+            });
 
         var enabled = await userManager.GetTwoFactorEnabledAsync(user);
 
@@ -294,6 +320,7 @@ public sealed class SecuritySettingsController(
             {
                 Enabled = true,
                 RemainingRecoveryCodes = remaining,
+                PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
             });
         }
 
@@ -333,6 +360,7 @@ public sealed class SecuritySettingsController(
             QrDataUri = BuildQrDataUri(otpAuthUrl),
             RecoveryCodes = codes,
             RemainingRecoveryCodes = codes.Length,
+            PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
         });
     }
 
@@ -415,7 +443,10 @@ public sealed class SecuritySettingsController(
         // static MfaLocked notice instead of the recovery surface (the same
         // "surface replaced by a notice" shape as the Mfa() GET above).
         if (await IsMfaLockedAsync())
-            return View("MfaLocked", new MfaLockedViewModel());
+            return View("MfaLocked", new MfaLockedViewModel
+            {
+                PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
+            });
 
         var enabled = await userManager.GetTwoFactorEnabledAsync(user);
         var remaining = await userManager.CountRecoveryCodesAsync(user);
@@ -425,6 +456,7 @@ public sealed class SecuritySettingsController(
         {
             Enabled = enabled,
             RemainingRecoveryCodes = remaining,
+            PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
         });
     }
 
@@ -466,6 +498,7 @@ public sealed class SecuritySettingsController(
             Enabled = true,
             RecoveryCodes = codes,
             RemainingRecoveryCodes = codes.Length,
+            PasswordChangeLocked = await IsPasswordChangeLockedAsync(),
         });
     }
 
@@ -530,6 +563,102 @@ public sealed class SecuritySettingsController(
         return RedirectToAction(nameof(Mfa));
     }
 
+    // ── Change password (ADR 0138, co-located with MFA on the Security tab) ──
+    //
+    // The resident's self-serve change-password surface (moved from
+    // /account/password 2026-10-31) now lives on this Security page — the
+    // ADR 0138 "one tab, both credential-security options" shape. The write
+    // idiom matches the adjacent MFA legs (redirect-and-flash via TempData,
+    // the _FlashToast surface): a re-render of Mfa() would re-mint the
+    // one-time MFA secrets (GenerateNewAuthenticatorKey + recovery codes),
+    // which must not happen on a failed password change.
+
+    /// <summary>
+    /// <c>POST /settings/security/password</c> — the resident's self-serve
+    /// change-password write lane (ADR 0138, now co-located with MFA on the
+    /// Security tab). The guard is authoritative on the write path too (the
+    /// MFA-locked precedent): a locked, non-admin sample account is refused
+    /// before any write, even if the form were crafted by hand. Otherwise the
+    /// <b>current</b> password is verified against the account (the self-serve
+    /// lane confirms it is really this resident), and the new password is
+    /// written through <see cref="IIdentityService.ChangePasswordAsync"/> (the
+    /// single audited write lane, <c>via: Owner</c>; it rotates the security
+    /// stamp). On success the resident is signed out (the credential just
+    /// changed — confirm the new one on the next sign-in) and redirected to
+    /// the login surface with an <c>info</c> flash.
+    /// </summary>
+    [HttpPost("/settings/security/password")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+    {
+        var user = await ResolveUserAsync();
+        if (user is null)
+        {
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        // ADR 0138 — the lock, authoritative on the write path (defense in
+        // depth over the GET notice the Mfa() action surfaces): a locked,
+        // non-admin sample account is denied before any write — no
+        // current-password check, no write.
+        if (await IsPasswordChangeLockedAsync())
+        {
+            TempData["error"] = await this.FlashAsync("account.change_password_locked_body", "Password changes are locked for this account.");
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        // A validation failure (a required field empty, a too-short new
+        // password, a confirm mismatch) surfaces the field-specific message
+        // (the DataAnnotations text on the first failed entry) as the flash —
+        // the redirect-and-flash idiom, the nearest equivalent to the original
+        // view's asp-validation-summary.
+        if (!ModelState.IsValid)
+        {
+            var firstError = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+            TempData["error"] = firstError ?? await this.FlashAsync("account.err.required", "Please complete all the password fields.");
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        // Verify the current password (the self-serve lane proves it is really
+        // this resident changing their own credential — not a blind set). A
+        // wrong current password is a form error (the account is untouched).
+        var currentOk = await userManager.CheckPasswordAsync(user, model.CurrentPassword);
+        if (!currentOk)
+        {
+            TempData["error"] = await this.FlashAsync("validation.current_password_wrong", "Your current password is incorrect.");
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        try
+        {
+            // The single audited write lane (via: Owner; rotates the security
+            // stamp, so this account's existing sessions are invalidated).
+            // The subject is the signed-in principal (User.Id, the
+            // Kumunita.Sub claim value — the repo idiom, the
+            // AccountController.SubjectId helper's equivalent).
+            await identity.ChangePasswordAsync(user.Id!, model.NewPassword, byAdmin: false);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The Core guard (IsChangePasswordLockedForAsync) refused the write
+            // — surface the locked notice (defense in depth: the GET/POST lock
+            // check above normally catches this first).
+            TempData["error"] = await this.FlashAsync("account.change_password_locked_body", "Password changes are locked for this account.");
+            return RedirectToAction(nameof(Mfa));
+        }
+
+        // The credential just changed: sign this session out so the new
+        // password is confirmed on the next sign-in (the ChangePasswordAsync
+        // security-stamp rotation already invalidates this account's other
+        // sessions).
+        await signInManager.SignOutAsync();
+        TempData["info"] = await this.FlashAsync("account.flash_password_changed", "Your password was changed. Sign in again with the new password.");
+        return RedirectToAction("Login", "Account");
+    }
+
     // ── F5 (AUTH-04) — session management (kill-all + invalidation) ──────────
     //
     // F5.U3 — the /settings/security/sessions surface (the pin §3 shape):
@@ -548,28 +677,81 @@ public sealed class SecuritySettingsController(
     // read (a server cannot enumerate another browser's cookies — pin §3).
 
     /// <summary>
+    /// Read the <c>kumunita.sid</c> cookie item (the session id, set by the
+    /// <c>OnSigningIn</c> handler alongside F5's <c>kumunita.stamp</c>).
+    /// Returns <c>null</c> when absent (a pre-lane session, or a sign-in
+    /// whose <c>CreateSessionAsync</c> guard tripped) — <c>TryGetValue</c>
+    /// (not the indexer) so a missing key is a clean <c>null</c>, not a
+    /// <c>KeyNotFoundException</c>. The <c>ApplicationScheme</c> is the app
+    /// cookie the sid is stamped into (the F5 <c>RevocationStampMiddleware</c>
+    /// "Explicit scheme" idiom).
+    /// </summary>
+    private async Task<string?> CurrentSessionIdAsync()
+    {
+        var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+        if (result?.Properties is { } props
+            && props.Items.TryGetValue("kumunita.sid", out var sid))
+        {
+            return sid;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// <c>GET /settings/security/sessions</c> — the session-management list.
     /// Minimum viable (pin §3): "this session" + "other active sessions
     /// (revoked if a kill-all has run)." This is **server-side state** (the
     /// <c>User.SecurityStamp</c>, rotated by
-    /// <see cref="IIdentityService.KillAllSessionsAsync"/> / 
+    /// <see cref="IIdentityService.KillAllSessionsAsync"/> /
     /// <see cref="IIdentityService.ChangePasswordAsync"/>), **not** a
     /// per-browser cookie read. The <c>POST …/kill-all</c> action is the
     /// only write; there is no form to bind (no <c>ModelState</c> check).
+    /// <para>
+    /// Sessions-lane (U7) extension: the list is now this resident's active
+    /// (non-revoked) <c>SessionDoc</c> rows (the <see cref="SessionService"/>
+    /// composition point — the controller is route + shape, never a
+    /// re-derivation), with <c>IsCurrent</c> marking the session whose id is
+    /// in this browser's <c>kumunita.sid</c> cookie item.
+    /// </para>
     /// </summary>
     [HttpGet("/settings/security/sessions")]
-    public IActionResult Sessions()
+    public async Task<IActionResult> Sessions()
     {
         // Fail-closed: the [Authorize] attribute makes a null subject
         // impossible for a real request, but the pin §3 discipline is to
         // handle it anyway (redirect to login rather than render a list
         // for an unauthenticated principal).
-        if (string.IsNullOrEmpty(KumunitaPrincipal.SubjectId(User)))
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
         {
             return RedirectToAction("Login", "Account");
         }
 
-        return View(new SessionSettingsViewModel());
+        // The sessions-lane (U7) list: this resident's active (non-revoked)
+        // SessionDocs, most-recent-first (SessionService — the single
+        // composition point; the controller is route + shape, never a
+        // re-derivation). IsCurrent marks the session whose id is in this
+        // browser's kumunita.sid cookie item.
+        var currentSessionId = (await CurrentSessionIdAsync()) ?? "";
+        var docs = await sessionService.GetSessionsForUserAsync(subject);
+        var items = docs
+            .Select(d => new SessionItem
+            {
+                Id = d.Id,
+                UserAgent = d.UserAgent,
+                Ip = d.Ip,
+                CreatedAt = d.CreatedAt,
+                LastActive = d.LastActive,
+                IsCurrent = d.Id == currentSessionId,
+            })
+            .ToList();
+
+        return View(new SessionListViewModel
+        {
+            CurrentSessionId = currentSessionId,
+            Sessions = items,
+            KillAllEnabled = true,
+        });
     }
 
     /// <summary>
@@ -613,6 +795,17 @@ public sealed class SecuritySettingsController(
         // rotation or the gate (F5.U2 owns both).
         await identity.KillAllSessionsAsync(subject);
 
+        // Sessions-lane extension (U7) — the kill-all now also revokes
+        // all-but-current at the Marten layer (the per-session analog of the
+        // stamp rotation above). The current session's SessionDoc.RevokedAt
+        // stays null (kept active); every other session's is set to UtcNow.
+        // The C3 pin is satisfied at the *request* level: the Identity/EF
+        // stamp rotation and the Marten writes below commit in **separate
+        // transactions within the same request** (the two modules do not
+        // share a transaction — the design doc §2.3 documents this deviation).
+        var currentSessionId = (await CurrentSessionIdAsync()) ?? "";
+        await sessionService.RevokeAllButCurrentAsync(subject, currentSessionId);
+
         // The local effect — SignOutAsync (not a bare SignOutAsync on the
         // auth scheme) clears BOTH of the app's cookies: AddIdentity
         // registers an auxiliary .AspNetCore.Identity.Application cookie
@@ -621,5 +814,46 @@ public sealed class SecuritySettingsController(
         await signInManager.SignOutAsync();
 
         return RedirectToAction("Login", "Account");
+    }
+
+    /// <summary>
+    /// <c>POST /settings/security/sessions/{id}/revoke</c> — the per-row
+    /// revoke (U7, the sessions-lane per-session kill). C-S1·1: this action
+    /// refuses to revoke the **current** session (the one whose id is in
+    /// this browser's <c>kumunita.sid</c> cookie item) — a 409, because the
+    /// per-row surface is "revoke one *other* device", not "sign out this
+    /// one" (that is the kill-all's job). C-S1·3 owner-scoped + idempotency
+    /// are enforced inside <see cref="SessionService.RevokeSessionAsync"/>
+    /// (a cross-user id or an already-revoked id is a silent no-op; the
+    /// service does not know the current-session id, so that guard lives
+    /// here). A successful revoke commits (the <c>RevokedAt</c> write + the
+    /// <c>session.revoke</c> audit row, same session) and returns 204.
+    /// </summary>
+    [HttpPost("/settings/security/sessions/{id}/revoke")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting("sessions")]
+    public async Task<IActionResult> SessionsRevoke(string id)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+        {
+            return RedirectToAction("Login", "Account");
+        }
+
+        // C-S1·1: the per-row action refuses to revoke the current session.
+        // (id == null is impossible for a real route; the comparison is
+        // null-safe: a missing sid on this browser means no session is
+        // "current" here, so the revoke proceeds for any other id.)
+        var currentSessionId = await CurrentSessionIdAsync();
+        if (id == currentSessionId)
+        {
+            return Conflict(); // 409 — "use 'Sign out everywhere' to end it"
+        }
+
+        // C-S1·3 owner-scoped + idempotency live in the service (the
+        // controller is route + authz + shape, never a re-derivation).
+        await sessionService.RevokeSessionAsync(subject, id);
+
+        return NoContent(); // 204 — the revoke is committed
     }
 }

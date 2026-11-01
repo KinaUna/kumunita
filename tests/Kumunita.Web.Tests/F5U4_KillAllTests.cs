@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Kumunita.Core;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Sessions;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
@@ -158,6 +159,26 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
         Assert.NotNull(pendingStamp);
         Assert.NotEmpty(pendingStamp);
 
+        // A SessionDoc row for the "current session" (the sessions-lane U7
+        // extension reads kumunita.sid via CurrentSessionIdAsync — the
+        // SidAuthenticationService stub below returns this id as the
+        // current session, so RevokeAllButCurrentAsync preserves it).
+        const string currentSessionId = "s-f5u4-current";
+        await using (var plant = b.Store.LightweightSession())
+        {
+            plant.Store(new SessionDoc
+            {
+                Id = currentSessionId,
+                UserId = subject,
+                UserAgent = "Mozilla/5.0 (f5u4 current)",
+                Ip = "10.0.0.1",
+                CreatedAt = DateTime.UtcNow,
+                LastActive = DateTime.UtcNow,
+                RevokedAt = null,
+            });
+            await plant.SaveChangesAsync();
+        }
+
         // Drive the real F5.U3 surface: SessionsKillAll → Core seam
         // (KillAllSessionsAsync, the stamp rotation) + local SignOutAsync.
         var signInManager = Substitute.For<SignInManager<User>>(
@@ -169,10 +190,12 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
             Substitute.For<IAuthenticationSchemeProvider>(),
             Substitute.For<IUserConfirmation<User>>());
 
+        var sessionService = new SessionService(b.Store);
         var secController = new SecuritySettingsController(
             userManager:    b.UserManager,
             signInManager:  signInManager,
-            identity:       b.Identity);
+            identity:       b.Identity,
+            sessionService: sessionService);
 
         var httpCtx = new DefaultHttpContext
         {
@@ -181,6 +204,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
                 new Dictionary<Type, object>
                 {
                     [typeof(UserManager<User>)] = b.UserManager,
+                    [typeof(IAuthenticationService)] = new SidAuthenticationService(currentSessionId),
                 }),
         };
         secController.ControllerContext = new ControllerContext { HttpContext = httpCtx };
@@ -227,6 +251,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
         public required User              User        { get; init; }
         public required UserManager<User> UserManager { get; init; }
         public required IdentityService   Identity    { get; init; }
+        public required IDocumentStore    Store       { get; init; }
     }
 
     private async Task<Boot> BootAsync()
@@ -242,6 +267,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
             opts.DatabaseSchemaName = "mt";
             CoreDocTypes.Configure(opts);
             PostDocTypes.Configure(opts);
+            SessionDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
@@ -291,7 +317,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
             sampleDataOptions:    Options.Create(new SampleDataOptions { Enabled = false }),
             mediaStore:           null);
 
-        return new Boot { User = user, UserManager = userManager, Identity = identity };
+        return new Boot { User = user, UserManager = userManager, Identity = identity, Store = store };
     }
 
     /// <summary>
@@ -322,6 +348,50 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
     private sealed class EmptyServiceProvider : IServiceProvider
     {
         public object? GetService(Type serviceType) => null;
+    }
+
+    /// <summary>
+    /// An <see cref="IAuthenticationService"/> stub (the U7-
+    /// defect-repair shape — see the U10 handoff note) so U7's
+    /// <c>CurrentSessionIdAsync</c> (the <c>kumunita.sid</c> cookie-item read via
+    /// <c>HttpContext.AuthenticateAsync</c>) resolves in the direct-
+    /// construction harness. It returns a success
+    /// <c>AuthenticateResult</c> whose <c>AuthenticationProperties
+    /// .Items</c> carries the <c>kumunita.sid</c> item (the F5</c>
+    /// <c>OnSigningIn</c> handler's shape, <c>Program.cs:890</c>) set to
+    /// the test's "current session" id — so the kill-all extension's
+    /// <c>RevokeAllButCurrentAsync</c> call preserves that session (the
+    /// §2.3 shape 2 — the all-but-current rule) rather than degrading to
+    /// "revoke all" (the §2.3 shape 3 — the "kumunita.sid unknown" rule).
+    /// </summary>
+    private sealed class SidAuthenticationService : IAuthenticationService
+    {
+        private readonly string _sessionId;
+        public SidAuthenticationService(string sessionId) => _sessionId = sessionId;
+
+        public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme)
+        {
+            var props = new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+            {
+                Items = { ["kumunita.sid"] = _sessionId },
+            };
+            return Task.FromResult(AuthenticateResult.Success(
+                new Microsoft.AspNetCore.Authentication.AuthenticationTicket(
+                    new System.Security.Claims.ClaimsPrincipal(), props, scheme ?? "test")));
+        }
+        public Task ChallengeAsync(HttpContext context, string? scheme,
+            Microsoft.AspNetCore.Authentication.AuthenticationProperties? properties)
+            => Task.CompletedTask;
+        public Task ForbidAsync(HttpContext context, string? scheme,
+            Microsoft.AspNetCore.Authentication.AuthenticationProperties? properties)
+            => Task.CompletedTask;
+        public Task SignInAsync(HttpContext context, string? scheme,
+            System.Security.Claims.ClaimsPrincipal user,
+            Microsoft.AspNetCore.Authentication.AuthenticationProperties? properties)
+            => Task.CompletedTask;
+        public Task SignOutAsync(HttpContext context, string? scheme,
+            Microsoft.AspNetCore.Authentication.AuthenticationProperties? properties)
+            => Task.CompletedTask;
     }
 
     private sealed class NoOpTempDataProvider : ITempDataProvider

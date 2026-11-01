@@ -908,8 +908,6 @@ public static class KnownTranslationKeys
             ["admin.platform.site_title"] = "Site content",
             ["admin.platform.site_desc"] = "Edit the landing surfaces' hero text and choose which sections are shown on the home and about pages.",
             ["admin.platform.labels_desc"] = "Rename the top-navigation surfaces (Home, Announcements, Community, Groups, and the \"More\" menu items) — the nav and each surface's page header follow the choice. A blank field keeps the default label.",
-            ["admin.platform.kiosk_title"] = "Kiosk display",
-            ["admin.platform.kiosk_desc"] = "Every signed-in resident configures their own kiosk display at /settings/kiosk (the ordered list of views it cycles through and the two auto-cycle / auto-refresh cadences). The display is /kiosk (signed-in on the TV).",
             ["admin.platform.help_title"] = "Help pages",
             ["admin.platform.help_desc"] = "Reset the seeded platform help pages — per page, or every page at once — back to their shipped text.",
             ["admin.platform.quiet_desc"] = "How often held notification emails are re-checked and delivered — residents set their own quiet window on /settings/quiet.",
@@ -1082,6 +1080,11 @@ public static class KnownTranslationKeys
             ["settings.sessions.kill_heading"] = "Sign out everywhere",
             ["settings.sessions.kill_desc"] = "Use this if you have signed in on a shared or public device, or if you believe another session may be compromised. Every other active session for this account is revoked immediately, and this browser is signed out.",
             ["settings.sessions.kill_confirm"] = "Sign out of every session for this account? Your other devices and browsers will be signed out immediately.",
+            ["settings.sessions.list_heading"] = "Active sessions",
+            ["settings.sessions.list_desc"] = "The sessions currently signed in to this account. Revoke a session to sign out that device immediately — your other sessions are not affected.",
+            ["settings.sessions.current_badge"] = "This session",
+            ["settings.sessions.revoke_button"] = "Revoke",
+            ["settings.sessions.revoke_confirm"] = "Revoke this session? Your other devices and browsers will not be affected.",
             ["account.delete_confirm_dialog"] = "Delete your account permanently? This cannot be undone.",
             ["myportability.index.lede"] = "Your own authored content — the posts, events, projects, documents, pages, messages, and media you created — as one portable *.kumunita archive. Export it as a file, or import one of your archives back into this community. Nothing here ever carries your password, and only your own rows travel.",
             ["myportability.export_desc"] = "One *.kumunita archive — your own authored content and media (never your password, and only your rows).",
@@ -1608,10 +1611,10 @@ public static class KnownTranslationKeys
             ["account.signup_has_account"] = "Already have an account?",
 
             // ── ADR 0138 — the resident self-serve change-password surface
-            //    (/account/password: the form + the locked notice), the
-            //    settings-tab link (nav.change_password, moved out of the
-            //    account dropdown 2026-10-04), and the
-            //    GlobalAdmin /admin/sample toggle (admin.sample.*) ──
+            //    (the form + the locked notice, now on the Security tab per
+            //    ADR 0280), the nav key, and the GlobalAdmin
+            //    /admin/sample toggle (admin.sample.*). The
+            //    nav.change_password tab link was removed 2026-10-31. ──
             ["account.change_password_title"] = "Change password",
             ["account.change_password_lede"] =
                 "Pick a new password for your account. After saving you'll be " +
@@ -4808,8 +4811,6 @@ public static class KnownTranslationKeys
             ["admin.platform.site_title"] = "Seiteninhalte",
             ["admin.platform.site_desc"] = "Den Hero-Text der Einstiegsseiten bearbeiten und festlegen, welche Abschnitte auf der Start- und der Über-Seite angezeigt werden.",
             ["admin.platform.labels_desc"] = "Die Bereiche der Hauptnavigation umbenennen (Start, Ankündigungen, Gemeinschaft, Gruppen und die Einträge des Menüs „Mehr“) – Navigation und Seitenkopf jedes Bereichs folgen der Wahl. Ein leeres Feld behält die Standardbezeichnung.",
-            ["admin.platform.kiosk_title"] = "Kiosk-Anzeige",
-            ["admin.platform.kiosk_desc"] = "Jeder angemeldete Bewohner konfiguriert seine eigene Kiosk-Anzeige unter /settings/kiosk (die geordnete Liste der durchlaufenen Ansichten und die beiden Takte für automatischen Wechsel und automatische Aktualisierung). Die Anzeige selbst ist /kiosk (am Fernseher angemeldet).",
             ["admin.platform.help_title"] = "Hilfeseiten",
             ["admin.platform.help_desc"] = "Die mitgelieferten Hilfeseiten der Plattform – einzeln oder alle auf einmal – auf ihren ausgelieferten Text zurücksetzen.",
             ["admin.platform.quiet_desc"] = "Wie oft zurückgehaltene Benachrichtigungs-E-Mails erneut geprüft und zugestellt werden – Bewohner legen ihr eigenes Ruhefenster unter /settings/quiet fest.",
@@ -4982,6 +4983,11 @@ public static class KnownTranslationKeys
             ["settings.sessions.kill_heading"] = "Überall abmelden",
             ["settings.sessions.kill_desc"] = "Nutze dies, wenn du dich auf einem gemeinsam genutzten oder öffentlichen Gerät angemeldet hast oder glaubst, dass eine andere Sitzung kompromittiert sein könnte. Alle anderen aktiven Sitzungen dieses Kontos werden sofort widerrufen, und dieser Browser wird abgemeldet.",
             ["settings.sessions.kill_confirm"] = "Von allen Sitzungen dieses Kontos abmelden? Deine anderen Geräte und Browser werden sofort abgemeldet.",
+            ["settings.sessions.list_heading"] = "Aktive Sitzungen",
+            ["settings.sessions.list_desc"] = "Die Sitzungen, die derzeit bei diesem Konto angemeldet sind. Widerrufe eine Sitzung, um dieses Gerät sofort abzumelden – deine anderen Sitzungen bleiben dabei unberührt.",
+            ["settings.sessions.current_badge"] = "Diese Sitzung",
+            ["settings.sessions.revoke_button"] = "Widerrufen",
+            ["settings.sessions.revoke_confirm"] = "Diese Sitzung widerrufen? Deine anderen Geräte und Browser bleiben davon unberührt.",
             ["account.delete_confirm_dialog"] = "Dein Konto endgültig löschen? Das kann nicht rückgängig gemacht werden.",
             ["myportability.index.lede"] = "Deine selbst verfassten Inhalte – die Beiträge, Veranstaltungen, Projekte, Dokumente, Seiten, Nachrichten und Medien, die du erstellt hast – als ein portables *.kumunita-Archiv. Exportiere es als Datei oder importiere eines deiner Archive zurück in diese Gemeinschaft. Dein Passwort ist nie enthalten, und es reisen nur deine eigenen Zeilen mit.",
             ["myportability.export_desc"] = "Ein *.kumunita-Archiv – deine selbst verfassten Inhalte und Medien (nie dein Passwort, und nur deine Zeilen).",
@@ -8442,8 +8448,6 @@ public static class KnownTranslationKeys
             ["admin.platform.site_title"] = "Contenu du site",
             ["admin.platform.site_desc"] = "Modifier le texte d’en-tête des pages d’accueil et choisir les sections affichées sur les pages d’accueil et À propos.",
             ["admin.platform.labels_desc"] = "Renommer les surfaces de la navigation principale (Accueil, Annonces, Communauté, Groupes et les éléments du menu « Plus ») — la navigation et l’en-tête de chaque page suivent le choix. Un champ vide conserve le libellé par défaut.",
-            ["admin.platform.kiosk_title"] = "Affichage kiosque",
-            ["admin.platform.kiosk_desc"] = "Chaque résident connecté configure son propre affichage kiosque sur /settings/kiosk (la liste ordonnée des vues parcourues et les deux cadences de rotation et d’actualisation automatiques). L’affichage lui-même est /kiosk (connecté sur la télévision).",
             ["admin.platform.help_title"] = "Pages d’aide",
             ["admin.platform.help_desc"] = "Rétablir les pages d’aide de la plateforme à leur texte d’origine — page par page, ou toutes d’un coup.",
             ["admin.platform.quiet_desc"] = "À quelle fréquence les e-mails de notification retenus sont revérifiés et envoyés — les résidents définissent leur propre plage de silence sur /settings/quiet.",
@@ -8616,6 +8620,11 @@ public static class KnownTranslationKeys
             ["settings.sessions.kill_heading"] = "Se déconnecter partout",
             ["settings.sessions.kill_desc"] = "Utilisez ceci si vous vous êtes connecté sur un appareil partagé ou public, ou si vous pensez qu’une autre session est compromise. Toutes les autres sessions actives de ce compte sont révoquées immédiatement et ce navigateur est déconnecté.",
             ["settings.sessions.kill_confirm"] = "Se déconnecter de toutes les sessions de ce compte ? Vos autres appareils et navigateurs seront déconnectés immédiatement.",
+            ["settings.sessions.list_heading"] = "Sessions actives",
+            ["settings.sessions.list_desc"] = "Les sessions actuellement connectées à ce compte. Révoquez une session pour déconnecter immédiatement cet appareil — vos autres sessions ne sont pas affectées.",
+            ["settings.sessions.current_badge"] = "Cette session",
+            ["settings.sessions.revoke_button"] = "Révoquer",
+            ["settings.sessions.revoke_confirm"] = "Révoquer cette session ? Vos autres appareils et navigateurs ne seront pas affectés.",
             ["account.delete_confirm_dialog"] = "Supprimer définitivement votre compte ? Cette action est irréversible.",
             ["myportability.index.lede"] = "Vos propres contenus — les messages, événements, projets, documents, pages, conversations et médias que vous avez créés — dans une seule archive *.kumunita portable. Exportez-la en fichier, ou réimportez l’une de vos archives dans cette communauté. Votre mot de passe n’y figure jamais et seules vos propres lignes voyagent.",
             ["myportability.export_desc"] = "Une archive *.kumunita — vos propres contenus et médias (jamais votre mot de passe, et uniquement vos lignes).",
@@ -12080,8 +12089,6 @@ public static class KnownTranslationKeys
             ["admin.platform.site_title"] = "Webstedets indhold",
             ["admin.platform.site_desc"] = "Rediger heltetekst på indgangssiderne og vælg, hvilke sektioner der vises på start- og om-siden.",
             ["admin.platform.labels_desc"] = "Omdøb områderne i hovednavigationen (Start, Meddelelser, Fællesskab, Grupper og punkterne i menuen “Mere”) — navigationen og hvert områdes sidehoved følger valget. Et tomt felt beholder standardnavnet.",
-            ["admin.platform.kiosk_title"] = "Kioskvisning",
-            ["admin.platform.kiosk_desc"] = "Hver indlogget beboer indstiller sin egen kioskvisning på /settings/kiosk (den ordnede liste over visninger og de to kadencer for automatisk skift og automatisk opdatering). Selve visningen er /kiosk (logget ind på tv’et).",
             ["admin.platform.help_title"] = "Hjælpesider",
             ["admin.platform.help_desc"] = "Nulstil platformens medfølgende hjælpesider — enkeltvis eller alle på én gang — til deres leverede tekst.",
             ["admin.platform.quiet_desc"] = "Hvor ofte tilbageholdte notifikationsmails kontrolleres igen og leveres — beboere vælger deres eget stilletidsvindue på /settings/quiet.",
@@ -12254,6 +12261,11 @@ public static class KnownTranslationKeys
             ["settings.sessions.kill_heading"] = "Log ud overalt",
             ["settings.sessions.kill_desc"] = "Brug dette, hvis du har logget ind på en delt eller offentlig enhed, eller hvis du tror, at en anden session er kompromitteret. Alle andre aktive sessioner for denne konto tilbagekaldes med det samme, og denne browser logges ud.",
             ["settings.sessions.kill_confirm"] = "Log ud af alle sessioner for denne konto? Dine andre enheder og browsere logges ud med det samme.",
+            ["settings.sessions.list_heading"] = "Aktive sessioner",
+            ["settings.sessions.list_desc"] = "De sessioner, der i øjeblikket er logget ind på denne konto. Tilbagekald en session for med det samme at logge enheden ud — dine øvrige sessioner påvirkes ikke.",
+            ["settings.sessions.current_badge"] = "Denne session",
+            ["settings.sessions.revoke_button"] = "Tilbagekald",
+            ["settings.sessions.revoke_confirm"] = "Tilbagekalde denne session? Dine øvrige enheder og browsere påvirkes ikke.",
             ["account.delete_confirm_dialog"] = "Slette din konto permanent? Det kan ikke fortrydes.",
             ["myportability.index.lede"] = "Dit eget indhold — de indlæg, arrangementer, projekter, dokumenter, sider, beskeder og medier, du har oprettet — som ét flytbart *.kumunita-arkiv. Eksportér det som en fil, eller importér et af dine arkiver tilbage i dette fællesskab. Din adgangskode medfølger aldrig, og kun dine egne rækker rejser med.",
             ["myportability.export_desc"] = "Ét *.kumunita-arkiv — dit eget indhold og dine egne medier (aldrig din adgangskode, og kun dine rækker).",

@@ -14,8 +14,9 @@
 }
 
 @* The /settings section sub-nav (the ADR 0080 house pattern the
-   /account/password and /account/delete pages use) — the active-tab
-   detection is controller-aware in _SettingsTabs.cshtml (UserPortability +
+   change-password (now on the Security tab, ADR 0280) and delete-account
+   (Settings, ADR 0084) surfaces use) — the active-tab detection is
+   controller-aware in _SettingsTabs.cshtml (UserPortability +
    Index → "My data"), so the resident can jump between settings sections. *@
 @await Html.PartialAsync("~/Views/Locale/_SettingsTabs.cshtml")
 

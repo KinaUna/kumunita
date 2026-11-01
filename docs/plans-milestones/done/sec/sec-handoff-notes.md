@@ -257,7 +257,25 @@ the last 1–2 sections it names as `Needs`.
 - **Non-root:** the MCR aspnet base ships `app` (UID 1654) — used directly (the first attempt with a custom `useradd --uid 1000` failed: UID 1000 is already taken by `ubuntu` in the base). Writable paths `/app`, `/data/media`, `/data/dataprotection-keys` are `chown`ed to `app:app`. Verified: `docker build` → EXIT 0; `docker run --entrypoint sh kumunita-u25-test -c 'id'` → `uid=1654(app)`.
 - **curl/wget kept:** no `HEALTHCHECK` instruction exists in the Dockerfile; the health probe is external (Coolify's default `wget` probe or operator `curl`). The .NET runtime has no built-in one-line HTTP health client to substitute, so curl and wget must stay. Recorded in the Dockerfile comment.
 - **No new tests:** build/container/CI surface — validated by YAML parse (`python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"` → OK, `permissions: {contents: read}`) + `docker build` (EXIT 0). No C# changed, no C# build needed.
-- **Noticed (U25):** none.
+- **Noticed (U25):** the `RUN chown -R app:app /app /data` in the U25 Dockerfile
+  fixed the *image layer* ownership, but a mounted named volume first populated
+  by a pre-U25 (root-running) image keeps root:root ownership on its files.
+  Concretely: the dev `kumunita_dpkeys` volume was first written by the app
+  running as root (pre-U25), so its keyring key file was `root:root 0600`.
+  After the U25 rebuild, the app ran as `app` (uid 1654) and could not read
+  the root-owned 0600 key → antiforgery `Protect()` threw
+  `UnauthorizedAccessException` → every page 500'd at `_Layout.cshtml:210`
+  (the `@antiforgery` token helper). The `kumunita_media` volume had the same
+  latent issue (any new avatar upload would fail the same way). **Fix (U25
+  follow-up, 2026-10-31):** `docker/entrypoint.sh` — starts as root, `chown -R
+  app:app /app /data` (repairs the stale volume ownership at every boot), then
+  `exec setpriv --reuid app --regid app --clear-groups dotnet Kumunita.Web.dll`
+  (the dotnet process is non-root, PID 1, UID 1654 — the U25 invariant is
+  preserved). The Dockerfile's `USER app` was removed (the image's default USER
+  stays root so the entrypoint can chown; the entrypoint drops to `app` before
+  exec'ing the app). `docker compose build app && docker compose up -d app`
+  → HTTP 200, both volumes `app:app`, keyring key `app:app 0600`, dotnet PID 1
+  UID `app`, no data-protection errors in logs.
 
 ## U26 — compose/hosts/headers
 - **Files changed:** `docker-compose.yml` (all published ports — Postgres `5433`, Mailpit `1025`/`8025`, app `5080` — now bind to `127.0.0.1:<hostport>:<port>`, plus a "DEV ONLY — NOT A DEPLOY TEMPLATE" banner comment); `src/Kumunita.Web/appsettings.json` (`AllowedHosts` stays `*` — JSON can't carry a comment, so the production value is documented in COOLIFY.md §6 step 9 instead); `src/Kumunita.Web/Controllers/WellKnownController.cs` (new `IConfiguration` ctor param; `Policy:` origin built from `WellKnown:BaseUrl` when set, else the previous `Request.Scheme`+`Request.Host` — dev behaviour unchanged); `src/Kumunita.Web/Program.cs` (HSTS + `Permissions-Policy`); `tests/Kumunita.Web.Tests/F13U2_SecurityTxtTests.cs` (harness updated for the new ctor dependency only — no test logic changed).

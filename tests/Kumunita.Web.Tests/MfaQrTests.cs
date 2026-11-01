@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Sessions;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -258,7 +259,8 @@ public sealed class MfaQrTests(PostgresFixture fixture) : IClassFixture<Postgres
         var controller = new SecuritySettingsController(
             userManager:    b.UserManager,
             signInManager:  signInManager,
-            identity:       Substitute.For<IIdentityService>());
+            identity:       Substitute.For<IIdentityService>(),
+            sessionService: null!);
 
         // Wire the signed-in principal (the Kumunita.Sub claim — the
         // KumunitaPrincipal.SubjectId read path; the repo idiom is
