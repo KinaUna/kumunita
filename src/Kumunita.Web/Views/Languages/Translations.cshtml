@@ -51,11 +51,11 @@
 <div class="d-inline-flex btn-group mb-3" role="group" aria-label="@modeLabel">
     <a href="/admin/languages/@Model.Code/translations"
        class="btn btn-sm @(isBatch ? "btn-outline-secondary" : "btn-secondary active")">
-        <kw-l key="translations.bulk.mode_single">Edit one at a time</kw-l>
+        <svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-edit-one"/></svg><kw-l key="translations.bulk.mode_single">Edit one at a time</kw-l>
     </a>
     <a href="/admin/languages/@Model.Code/translations?batch=true"
        class="btn btn-sm @(isBatch ? "btn-secondary active" : "btn-outline-secondary")">
-        <kw-l key="translations.bulk.mode_batch">Batch editing</kw-l>
+        <svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-edit-batch"/></svg><kw-l key="translations.bulk.mode_batch">Batch editing</kw-l>
     </a>
 </div>
 

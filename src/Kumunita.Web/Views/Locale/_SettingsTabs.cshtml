@@ -16,16 +16,16 @@
 @{
     var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "Locale";
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "Index";
-    var tabs = new (string LabelKey, string Label, string Href)[]
+    var tabs = new (string LabelKey, string Label, string Href, string Icon)[]
     {
-        ("locale.language_heading",  "Language",          "/settings/language"),
-        ("settings.timezone_title",  "Time zone",         "/settings/timezone"),
-        ("settings.dateformat_title","Date & time format","/settings/dateformat"),
-        ("settings.pagesize_title",  "Items per page",    "/settings/pagesize"),
-        ("settings.home_title",      "Home page",         "/settings/home"),
-        ("settings.quiet.title",     "Quiet hours",       "/settings/quiet"),
-        ("settings.messaging.title", "Messaging",         "/settings/messaging"),
-        ("nav.children",             "Children",          "/me/children"),
+        ("locale.language_heading",  "Language",          "/settings/language", "kmb-i-globe"),
+        ("settings.timezone_title",  "Time zone",         "/settings/timezone", "kmb-i-clock"),
+        ("settings.dateformat_title","Date & time format","/settings/dateformat", "kmb-i-date-format"),
+        ("settings.pagesize_title",  "Items per page",    "/settings/pagesize", "kmb-i-rows"),
+        ("settings.home_title",      "Home page",         "/settings/home", "kmb-i-home"),
+        ("settings.quiet.title",     "Quiet hours",       "/settings/quiet", "kmb-i-moon"),
+        ("settings.messaging.title", "Messaging",         "/settings/messaging", "kmb-i-messages"),
+        ("nav.children",             "Children",          "/me/children", "kmb-i-children"),
         // ADR 0174 — the per-resident Security tab (the MFA enrollment + session
         // management surface at /settings/security/mfa, SecuritySettingsController).
         // Previously reached only by deep-linking the /settings/security/mfa URL;
@@ -33,14 +33,14 @@
         // from the settings strip. Since 2026-10-31 it is also the home of the
         // change-password form (ADR 0138, folded in from its own tab) — one tab
         // holds both credential-security options.
-        ("settings.security.title",  "Security",          "/settings/security/mfa"),
+        ("settings.security.title",  "Security",          "/settings/security/mfa", "kmb-i-lock"),
         // M27 (ADR 0148) — the resident's own backup/restore surface: export
         // their authored content to a *.kumunita archive, or import one back.
-        ("nav.my_data",              "My data",           "/account/portability"),
+        ("nav.my_data",              "My data",           "/account/portability", "kmb-i-database"),
         // M35 (ADR 0164 amendment) — the per-resident kiosk playlist editor,
         // moved out of /admin/kiosk so any signed-in user can configure their
         // own /kiosk display (the KioskController.SettingsGet / SettingsPost).
-        ("kiosk.settings.title",     "Kiosk",             "/settings/kiosk"),
+        ("kiosk.settings.title",     "Kiosk",             "/settings/kiosk", "kmb-i-kiosk"),
     };
     var activeLabel = (controller, action) switch
     {
@@ -78,7 +78,7 @@
         var isActive = tab.Label == activeLabel;
         <li class="nav-item" role="presentation">
             <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href">
-                <kw-l key="@tab.LabelKey">@tab.Label</kw-l>
+                <svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="@("#" + tab.Icon)"/></svg><kw-l key="@tab.LabelKey">@tab.Label</kw-l>
             </a>
         </li>
     }

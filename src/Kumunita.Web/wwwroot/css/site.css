@@ -1421,6 +1421,12 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
   margin-right: 0.4rem;
   vertical-align: -0.15em;
 }
+/* ADR 0283 — the same icon + label shape inside button-group switches
+   (Upcoming/Past, Day/Week/Month, the Translations mode toggle). */
+.btn .kmb-nav-icon {
+  margin-right: 0.35rem;
+  vertical-align: -0.125em;
+}
 
 /* ADR 0279 — the hand-drawn icon family. Every nav / account-menu icon is a
    <svg class="kmb-icon"><use href="#kmb-i-…"/></svg> pointing at the one

@@ -157,9 +157,9 @@
                          keys (U05 — registered in all four languages, the
                          inline text is the en floor, C-DWM·9). -->
                     <div class="btn-group btn-group-sm events-view-toggle" role="group" aria-label="@ariaCalendarView">
-                        <a class="btn btn-outline-secondary @(Model.View == "day" ? "active" : null)" href="@ViewHref("day")" aria-pressed="@(Model.View == "day" ? "true" : "false")"><kw-l key="events.calendar.view.day">Day</kw-l></a>
-                        <a class="btn btn-outline-secondary @(Model.View == "week" ? "active" : null)" href="@ViewHref("week")" aria-pressed="@(Model.View == "week" ? "true" : "false")"><kw-l key="events.calendar.view.week">Week</kw-l></a>
-                        <a class="btn btn-outline-secondary @(Model.View == "month" ? "active" : null)" href="@ViewHref("month")" aria-pressed="@(Model.View == "month" ? "true" : "false")"><kw-l key="events.calendar.view.month">Month</kw-l></a>
+                        <a class="btn btn-outline-secondary @(Model.View == "day" ? "active" : null)" href="@ViewHref("day")" aria-pressed="@(Model.View == "day" ? "true" : "false")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-cal-day"/></svg><kw-l key="events.calendar.view.day">Day</kw-l></a>
+                        <a class="btn btn-outline-secondary @(Model.View == "week" ? "active" : null)" href="@ViewHref("week")" aria-pressed="@(Model.View == "week" ? "true" : "false")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-cal-week"/></svg><kw-l key="events.calendar.view.week">Week</kw-l></a>
+                        <a class="btn btn-outline-secondary @(Model.View == "month" ? "active" : null)" href="@ViewHref("month")" aria-pressed="@(Model.View == "month" ? "true" : "false")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-cal-month"/></svg><kw-l key="events.calendar.view.month">Month</kw-l></a>
                     </div>
                     <!-- ADR 0081 — the "New event" quick-create affordance:
                          a Bootstrap-modal button (the ADR 0071 convention)

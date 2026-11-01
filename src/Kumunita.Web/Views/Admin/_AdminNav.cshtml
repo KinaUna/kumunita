@@ -9,14 +9,14 @@
 @{
     var path = (ViewContext.HttpContext.Request.Path.Value ?? "/admin").TrimEnd('/');
     if (path.Length == 0) { path = "/admin"; }
-    var tabs = new (string Label, string Href)[]
+    var tabs = new (string Label, string Href, string Icon)[]
     {
-        ("Overview",    "/admin"),
-        ("Accounts",    "/admin/accounts"),
-        ("Communities", "/admin/communities"),
-        ("Platform",    "/admin/platform"),
-        ("Security",    "/admin/security"),
-        ("Analytics",   "/admin/analytics"),
+        ("Overview",    "/admin", "kmb-i-dashboard"),
+        ("Accounts",    "/admin/accounts", "kmb-i-accounts"),
+        ("Communities", "/admin/communities", "kmb-i-communities"),
+        ("Platform",    "/admin/platform", "kmb-i-server"),
+        ("Security",    "/admin/security", "kmb-i-lock"),
+        ("Analytics",   "/admin/analytics", "kmb-i-chart"),
     };
     var activeLabel = tabs
         .Where(t => path == t.Href || path.StartsWith(t.Href + "/", StringComparison.Ordinal))
@@ -48,7 +48,7 @@
     {
         var isActive = tab.Label == activeLabel;
         <li class="nav-item" role="presentation">
-            <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href">@tab.Label</a>
+            <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href"><svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="@("#" + tab.Icon)"/></svg>@tab.Label</a>
         </li>
     }
 </ul>
