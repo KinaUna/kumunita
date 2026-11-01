@@ -308,3 +308,83 @@ Registered the 5 `settings.sessions.*` keys U8 shipped unregistered, × en/de/fr
 - **BLOCKER for U10/U11/U12 (pre-existing, NOT introduced by U9, outside U9's Deliverables):** `dotnet build Kumunita.slnx -c Debug` reports **Build FAILED — 4 Error(s)**, all `CS7036` "no argument given that corresponds to the required parameter 'sessionService' of SecuritySettingsController" in four **pre-existing** test files: `AccountControllerChangePasswordTests.cs(74)`, `F5U4_KillAllTests.cs(172)`, `MfaQrTests.cs(258)`, `SecuritySettingsMfaLockTests.cs(281)`. Root cause: **U7 added a `SessionService` parameter to the `SecuritySettingsController` constructor** but did not update these four call sites — U7's handoff notes show it only built `Kumunita.Web.csproj`, never the test project, so it never saw the break. This blocks `Kumunita.Web.Tests` from compiling (and therefore U10's `SessionsKillAllExtTests` from running). Fix = pass a `SessionService` (or a stub) to each of the four `new SecuritySettingsController(...)` calls — a U10-adjacent repair, but it edits test files, which U9's unit-series rule (1) forbids me from touching. **Do not attribute these errors to U9.**
 - **BLOCKER for U12 (pre-existing, outside U9's Deliverables):** `improve-check.ps1` **gate (g) [FAIL]** — `docs/design/sessions-per-session-revocation.md` (692 lines, no Abstract in first 15 lines; new beyond the U07 baseline). Authored by U1/U2; adding an Abstract (or the design-doc gate re-baseline) is a U12-close task (U12 owns the design-doc/ADR/ARCHITECTURE flip). Not a U9 file.
 - **Files touched (exactly the U9 Deliverables):** `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (20 entries added), `docs/plans-milestones/done/improve/improve-check.ps1` (gate (a) re-baseline 14885 → 14905 + comment), and this handoff note. No other file touched; no test (U10's lane); no `FirstBootSeeder.cs` (no separate seed for these keys); no view / controller edit (U8's / U7's lanes).
+
+## U10 — seam tests (12 + 1)
+
+Authored the 12 pinned `SessionServiceTests` (§2.4, verbatim) + 1 kill-all
+extension Web test. **Build green: 0 errors** (`dotnet build Kumunita.slnx -c
+Debug`, `EXIT=0`). **13 discovered, 13 executed, 0 failed** — the pass counts U11
+consumes (Core 12/12; Web 1/1).
+
+- **(a) 2 test file paths:** `tests/Kumunita.Core.Tests/SessionServiceTests.cs`
+  (new, 12 `[Fact]`s) + `tests/Kumunita.Web.Tests/SessionsKillAllExtTests.cs`
+  (new, 1 `[Fact]`).
+- **(b) 13 names (verbatim, §2.4 + §2.5):**
+  - `F1_CreateSession_ReturnsDocWithGuidIdAndTimestamps`
+  - `F2_GetSessionsForUser_ReturnsOnlyActiveSessionsMostRecentFirst`
+  - `F3_GetSessionsForUser_ExcludesRevokedSessions`
+  - `F3_GetSessionsForUser_ReturnsEmptyForUnknownUser`
+  - `F4_RevokeSession_SetsRevokedAtToUtcNow`
+  - `F4_RevokeSession_DoesNotTouchCurrentSession`
+  - `F4_RevokeSession_DeniesCrossUser`
+  - `F4_RevokeSession_IsIdempotent`
+  - `F5_RevokeAllButCurrent_RevokesOthersKeepsCurrent`
+  - `F5_RevokeAllButCurrent_RevokesOthersWhenCurrentUnknown`
+  - `F6_TouchSession_UpdatesLastActiveWhenDue`
+  - `F6_TouchSession_SkipsWhenNotDue`
+  - `KillAllExt_RevokesOthersKeepsCurrent` (the Web kill-all extension test)
+- **(c) 13 pass/red counts (for U11):** **12/12 Core green** (`Kumunita.Core.
+  Tests` `Total: 12, Errors: 0, Failed: 0`); **1/1 Web green**
+  (`Kumunita.Web.Tests` `Total: 1, Errors: 0, Failed: 0`). **13 discovered, 13
+  executed, 0 failed.** The F5U4 pre-existing tests I repaired also re-verified
+  green (2/2 `F5U4_KillAllTests`, and the 3 other repaired files 14/14).
+- **(d) PREREQUISITE REPAIR (a U7-defect fix, NOT U10's authored test — named
+  explicitly per the unit-series rule):** U7 added a `sessionService:` param to
+  the `SecuritySettingsController` ctor but never updated 4 pre-existing test
+  call sites (U7 built only `Kumunita.Web.csproj`, never the test project), so
+  `Kumunita.Web.Tests` did not compile (4 `CS7036`). Repaired all 4:
+  - `AccountControllerChangePasswordTests.cs`, `MfaQrTests.cs`,
+    `SecuritySettingsMfaLockTests.cs` — added `sessionService: null!` (these
+    tests never touch the session actions; `SessionService` is **sealed** so
+    NSubstitute cannot proxy it — `Substitute.For<SessionService>()` threw
+    `TypeLoadException: parent type is sealed` at runtime — and these files have
+    no store, so `null!` is the safe, minimal repair). All 14 tests in these 3
+    files pass.
+  - `F5U4_KillAllTests.cs` — the one to think about: `SessionsKillAll` now also
+    calls `sessionService.RevokeAllButCurrentAsync(...)`. I wired a **real**
+    `IDocumentStore`-backed `SessionService` (registered `SessionDocTypes` on the
+    test store + exposed the store on the `Boot` record + seeded one `SessionDoc`
+    for the "current session"). The action's `CurrentSessionIdAsync()` (added by
+    U7) calls `HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme)`,
+    which in the direct-construction harness needs an `IAuthenticationService` in
+    `RequestServices` — without it the test throws `ArgumentNullException
+    (provider)` **and F5U4's `KillAllSessions_SignsOutAll` breaks too** (a second
+    U7 defect the U9 blocker note did not anticipate). I added a
+    `SidAuthenticationService` stub returning a success `AuthenticateResult`
+    whose `AuthenticationProperties.Items["kumunita.sid"]` is the current-session
+    id (the `Program.cs:890` `OnSigningIn` shape), so `CurrentSessionIdAsync`
+    resolves and `RevokeAllButCurrentAsync` preserves the current session
+    (the §2.3 shape 2, not the "sid unknown" degrade-to-all). F5U4 now passes 2/2.
+- **(e) compile warnings (new code):** **none that matter** — `SessionsKillAll
+  ExtTests.cs` had 2 `xUnit1051` (pass `TestContext.Current.CancellationToken`
+  to `LoadAsync`), fixed; the remaining warnings in the build are pre-existing
+  (CS8602 in other views, `xUnit1051` in `DocumentControllerTests` /
+  `HealthControllerTests` / `VerifyConfirmStepTests` — none in U10's files).
+  **One note for U11/U12:** the F5 `session.kill_all` audit row uses
+  `TargetKind = "account"` (the `IdentityService.AccountKind` const,
+  `IdentityService.cs:62`) — **not** `"session"` — so any assertion on that row
+  must filter on the `Action` tag, not `TargetKind`. The per-session lane's
+  `session.revoke` / `session.revoke_all_but_current` rows DO use
+  `TargetKind = "session"` (U4's `SessionService`).
+- **Drift check (unit-series rule 6):** no drift — the 12 §2.4 test names landed
+  verbatim; the `SessionService` 5-method surface, the `SessionDoc` 7-field
+  shape, the `kumunita.sid` cookie key, and the `session.revoke` /
+  `session.revoke_all_but_current` audit `Action` tags all match U4's landed
+  implementation. **No `## U10 — Drift pause`.**
+- **Files touched (U10 Deliverables + the named prerequisite repair):**
+  `tests/Kumunita.Core.Tests/SessionServiceTests.cs` (new, U10-authored),
+  `tests/Kumunita.Web.Tests/SessionsKillAllExtTests.cs` (new, U10-authored), and
+  the 4-file prerequisite repair (`AccountControllerChangePasswordTests.cs`,
+  `MfaQrTests.cs`, `SecuritySettingsMfaLockTests.cs`, `F5U4_KillAllTests.cs`).
+  No controller / view / `KnownTranslationKeys.cs` / design-doc edits (those lanes
+  are closed); no e2e authored (U11's lane); no gate run (U11's lane).

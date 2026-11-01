@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Sessions;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
 using Microsoft.AspNetCore.Authentication;
@@ -281,7 +282,8 @@ public sealed class SecuritySettingsMfaLockTests(PostgresFixture fixture) : ICla
         var controller = new SecuritySettingsController(
             userManager:    b.UserManager,
             signInManager:  signInManager,
-            identity:       b.Identity);
+            identity:       b.Identity,
+            sessionService: null!);
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(

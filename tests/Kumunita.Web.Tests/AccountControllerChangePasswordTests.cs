@@ -1,4 +1,5 @@
 using Kumunita.Core.Identity;
+using Kumunita.Core.Sessions;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
 using Microsoft.AspNetCore.Authentication;
@@ -74,7 +75,8 @@ public class AccountControllerChangePasswordTests
         var controller = new SecuritySettingsController(
             userManager:   userManager,
             signInManager: signInManager,
-            identity:      identity);
+            identity:      identity,
+            sessionService: null!);
 
         // The change-password actions read the signed-in principal (never a
         // path param) — a principal carrying the Kumunita.Sub subject claim
