@@ -248,8 +248,15 @@ $aBaseline = @(
 # Re-baselined again 2026-10-31 (the SEC L3 U24 verify confirm step): two new
 # account.verify_confirm_* keys x en/de/fr/da added to KnownTranslationKeys.cs
 # (14863 -> 14885) — the same shipped-additions mechanism as above.
+# Re-baselined again 2026-11-01 (the sessions lane U9 i18n close): five new
+# settings.sessions.* keys (list_heading / list_desc / current_badge /
+# revoke_button / revoke_confirm) x en/de/fr/da added to KnownTranslationKeys.cs
+# (14885 -> 14905) — the same shipped-additions mechanism as above. ADR
+# annotation: ADR 0281 (the sessions lane ADR) does not yet exist — it lands in
+# the sessions lane's U12 close; the ADR that drives this re-baseline will be
+# annotated there. Do not loosen the gate (the pin is the point).
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14885
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 14905
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5370
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
