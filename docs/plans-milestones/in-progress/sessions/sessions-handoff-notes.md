@@ -388,3 +388,93 @@ consumes (Core 12/12; Web 1/1).
   `MfaQrTests.cs`, `SecuritySettingsMfaLockTests.cs`, `F5U4_KillAllTests.cs`).
   No controller / view / `KnownTranslationKeys.cs` / design-doc edits (those lanes
   are closed); no e2e authored (U11's lane); no gate run (U11's lane).
+
+## U11 — gate recorded
+
+Recorded the sessions lane's acceptance gate (the §2.5 three-test shape:
+**closed-loop** / **handoff** / **part-vs-whole**) in
+`docs/design/sessions-per-session-revocation.md` as
+`### Run result (sessions acceptance gate — 2026-11-01)` (appended after §2.6's
+U2 frozen-counts blockquote). **No code, no build** (the build was re-run to
+confirm the test assemblies were current — `dotnet build Kumunita.slnx -c
+Debug`, 0 errors — and the 13 tests were re-executed to confirm they still
+pass, mirroring U10's "re-run them if needed" instruction).
+
+- **Three test names + pass counts + date (2026-11-01):**
+  1. **Closed-loop** — evidenced by `F1_CreateSession_ReturnsDocWithGuidIdAnd
+     Timestamps` · `F2_GetSessionsForUser_ReturnsOnlyActiveSessionsMostRecentFirst`
+     · `F4_RevokeSession_SetsRevokedAtToUtcNow` ·
+     `F3_GetSessionsForUser_ExcludesRevokedSessions` — **green**.
+  2. **Handoff** — evidenced by
+     `F5_RevokeAllButCurrent_RevokesOthersKeepsCurrent` ·
+     `F5_RevokeAllButCurrent_RevokesOthersWhenCurrentUnknown` ·
+     `SessionsKillAllExtTests.KillAllExt_RevokesOthersKeepsCurrent` (the Web
+     kill-all extension test — the two mechanisms coexist, the C3 same-
+     transaction pin at the request level per the §2.3 documented deviation) —
+     **green**.
+  3. **Part-vs-whole** — all **12** `SessionServiceTests` + the **1**
+     `SessionsKillAllExtTests` must pass together — **13/13 green, 0 failed**.
+- **13-test count (from U10):** **12 Core / 12 green** (`Kumunita.Core.Tests`
+  `Total: 12, Errors: 0, Failed: 0`) + **1 Web / 1 green** (`Kumunita.Web.Tests`
+  `Total: 1, Errors: 0, Failed: 0`) = **13/13 passed, 0 failed** — re-confirmed
+  in this unit (Core via `dotnet exec …/Kumunita.Core.Tests.dll -class
+  'Kumunita.Core.Tests.SessionServiceTests'`, Web via `dotnet exec
+  …/Kumunita.Web.Tests.dll -class 'Kumunita.Web.Tests.SessionsKillAllExtTests'`,
+  the AGENTS.md "Running the tests (test-runner quirk)" reliable path; Testcontainers
+  `postgres:18`, fresh container per class, cleaned up on completion).
+- **F5 e2e status (present / gap / deferred to U12):** **gap — deferred to
+  the owner-ops scope, not a U12 unit deliverable.** The `STATUS.md`
+  prod-hardening owner-ops list carries the "live E2E + F5 sign-out
+  verifications" line, explicitly "recorded, not assumed done" (the same shape
+  as the other owner-ops items in `STATUS.md`). The `e2e/` Playwright project
+  **is present** (F19 — `e2e/package.json` + `playwright.config.ts` + the two
+  F19 specs `signup_verify_login.e2e.ts` / `post_write.e2e.ts`), but **no
+  sessions spec is authored** in `e2e/specs/` (U10's handoff note confirms "no
+  e2e authored (U11's lane)"; my unit-series rule (1) forbids me from authoring
+  outside my Deliverables), and the owner-ops list **owns** the live F5 sign-out
+  verification. Per the plan's U11 fallback path, the **gate is evidenced at
+  the seam-test layer** by the 12 `SessionServiceTests` + the 1
+  `SessionsKillAllExtTests` above (13/13 green) — **this is not a gate fail**.
+  The owner-ops item that lands the live F5 + sessions sign-out verification
+  records the pass count in a subsequent `### Run result (sessions e2e —
+  <date>)` section of the design doc.
+- **`improve-check.ps1` gate (g) (the design-doc Abstract blocker from U9):
+  STILL OPEN FOR U12.** U11 did **not** add an Abstract to the design doc (the
+  `### Run result` append is the only change I made to that file, per the
+  unit-series rule that the design-doc close-flip — ADR 0281 + the Abstract +
+  the `improve-check.ps1` gate (g) re-baseline — is U12's close-flip file, not
+  U11's). Gate (g) requires a `> **Abstract:**` blockquote in the first 15
+  lines of any `docs/design/*.md` over 400 lines (the design doc is now
+  ~740 lines). U12's close-flip (ADR 0281 + `WhatsNew.cs` + `ARCHITECTURE.md`
+  + the `SL·D` deferral note) must add the Abstract blockquote to the design
+  doc's first 15 lines in the same commit as the `improve-check.ps1` gate (g)
+  re-baseline (the `KnownTranslationKeys.cs` re-baseline U9 already did was
+  gate (a), a separate gate — the Abstract is gate (g), a distinct gate).
+- **Still-open drift:** **No `## U<m> — Drift pause` sections exist in the
+  handoff note** (confirmed by a direct scan of the handoff note — the three
+  "Drift note (a correction, NOT a `## U<m> — Drift pause`)" mentions in U3,
+  U8, and U10's sections are explicitly *not* drift pauses). The two
+  pre-existing blockers U9 inherited (the 4 `CS7036` `SecuritySettingsController`
+  ctor call-site breaks in pre-existing test files — **repaired by U10**,
+  green; the `improve-check.ps1` gate (g) design-doc-Abstract blocker —
+  **still open for U12**) are likewise **not §2.6 drift-pauses** (gate (g) is
+  a close-flip task, not a frozen-pin violation). **No still-open §2.6 drift.**
+  The plan-documentation slips recorded by U3 (the `SchemaBootstrap.cs` entry-
+  read file list — the codebase has exactly one `StoreOptions`, built in
+  `Program.cs`, and `SessionDocTypes.Configure` lives there for every context,
+  including `SessionDoc`'s), U8 (the `site.js` handler + `tsc` step — the
+  codebase's actual confirm contract is the `data-confirm` attribute +
+  `client/lib/confirm.ts`, which the existing kill-all form in the same view
+  already uses), and U9 (the `improve-check.ps1` gate (a) vs (d) label — the
+  `KnownTranslationKeys.cs` line-count pin actually lives in gate (a)'s
+  `$aBaselineSizes`, not gate (d) as the plan labels it) are all **not §2.6
+  drift-pauses** and **do not affect the frozen pins**; they are carried into
+  U12's close (the ADR 0281 author) for the record.
+- **Files touched (exactly the U11 Deliverables):**
+  `docs/design/sessions-per-session-revocation.md` (one `### Run result
+  (sessions acceptance gate — 2026-11-01)` section appended after §2.6's U2
+  frozen-counts blockquote — the three-test gate table + the E2E status + the
+  drift status), and this handoff note. **No** ADR, **no** `WhatsNew.cs`,
+  **no** `ARCHITECTURE.md`, **no** plan-file move (those are U12's close
+  flip), **no** controller / view / `KnownTranslationKeys.cs` / test-file
+  edits (those lanes are closed).

@@ -690,3 +690,66 @@ The following pins are **frozen** in this doc, and any violation is a `## U<m>
 > (the sessions lane is a caller, not a modifier). The C3 same-transaction
 > deviation (the kill-all extension's two-mechanism case) is **documented**,
 > not a violation.
+
+### Run result (sessions acceptance gate — 2026-11-01)
+
+Command: the AGENTS.md "Running the tests (test-runner quirk)" reliable path —
+`dotnet exec` of each test assembly in-process through xunit.v3's own runner,
+`-class` filtered to the two sessions test classes. Testcontainers
+`postgres:18`, fresh container per class (cleaned up on completion).
+
+**`Kumunita.Core.Tests` 12/12 passed, 0 failed** — the 12 M3-pinned
+`SessionServiceTests` (§2.4, re-run in this unit, green). **`Kumunita.Web.
+Tests` 1/1 passed, 0 failed** — `SessionsKillAllExtTests.
+KillAllExt_RevokesOthersKeepsCurrent` (the kill-all extension test, re-run in
+this unit, green). **Total: 13/13 passed, 0 failed.** No reds.
+
+Record (shape mirrored from M3's `### Run result (M3 acceptance gate —
+2026-09-04)`):
+
+| # | Test | Evidence (actual test names — all passed) |
+|---|---|---|
+| 1 | **Closed-loop** (resident signs in → a `SessionDoc` row exists (F1) → the session list shows it (F2) → the resident revokes **another** session (F4) → the revoked session is **invalid on its next request** (C-S1·2, C4)) | `SessionServiceTests.F1_CreateSession_ReturnsDocWithGuidIdAndTimestamps` (F1 — sign-in creates the `SessionDoc` row with GUID id + correct `CreatedAt` / `LastActive`), `SessionServiceTests.F2_GetSessionsForUser_ReturnsOnlyActiveSessionsMostRecentFirst` (F2 — the list shows the active session, most-recent-first), `SessionServiceTests.F4_RevokeSession_SetsRevokedAtToUtcNow` (F4 — the revoke sets `RevokedAt`, the next-request invalidation the `SessionRevocationMiddleware` enforces per C-S1·2 / C4), `SessionServiceTests.F3_GetSessionsForUser_ExcludesRevokedSessions` (F3 — the revoked session is excluded from the list on the next read). |
+| 2 | **Handoff** (the kill-all extension revokes **all-but-current**: the current `SessionDoc` is kept, the others are revoked, and the F5 stamp rotation + local sign-out coexist independently) | `SessionServiceTests.F5_RevokeAllButCurrent_RevokesOthersKeepsCurrent` (F5 — all-but-current revoked, the current `SessionDoc.RevokedAt` stays `null`), `SessionServiceTests.F5_RevokeAllButCurrent_RevokesOthersWhenCurrentUnknown` (F5 — the degrade-to-all shape when the `kumunita.sid` is unknown, §2.3 shape 4), `SessionsKillAllExtTests.KillAllExt_RevokesOthersKeepsCurrent` (the Web-layer handoff — the extended `POST /sessions/kill-all` action: the F5 `session.kill_all` audit row **and** the `session.revoke_all_but_current` row both committed, the current session kept, the other revoked — the two mechanisms coexist and are independent, the C3 same-transaction pin at the request level per the §2.3 documented deviation). |
+| 3 | **Part-vs-whole** (the 12-test list in §2.4 is the **whole**; the closed-loop + handoff tests are the **parts**; all 12 — plus the kill-all extension test — pass together) | U10's 12 pinned `[Fact]`s in `tests/Kumunita.Core.Tests/SessionServiceTests.cs` (`F1_CreateSession_ReturnsDocWithGuidIdAndTimestamps` · `F2_GetSessionsForUser_ReturnsOnlyActiveSessionsMostRecentFirst` · `F3_GetSessionsForUser_ExcludesRevokedSessions` · `F3_GetSessionsForUser_ReturnsEmptyForUnknownUser` · `F4_RevokeSession_SetsRevokedAtToUtcNow` · `F4_RevokeSession_DoesNotTouchCurrentSession` · `F4_RevokeSession_DeniesCrossUser` · `F4_RevokeSession_IsIdempotent` · `F5_RevokeAllButCurrent_RevokesOthersKeepsCurrent` · `F5_RevokeAllButCurrent_RevokesOthersWhenCurrentUnknown` · `F6_TouchSession_UpdatesLastActiveWhenDue` · `F6_TouchSession_SkipsWhenNotDue`) — all 12 green, **plus** `SessionsKillAllExtTests.KillAllExt_RevokesOthersKeepsCurrent` — **13/13 passed, 0 failed** in this run. **Drift check (§2.6):** all 12 §2.4 names landed **verbatim** in `SessionServiceTests.cs` (confirmed by U11's direct read of the `[Fact]` list) — no rename, no §2.6 drift. |
+
+**E2E status.** The F5 e2e (the `STATUS.md` prod-hardening owner-ops item
+"live E2E + F5 sign-out verifications") is **recorded, not assumed done** —
+same shape as the other prod-hardening owner-ops items in `STATUS.md`. The
+standalone `e2e/` Playwright project **is present** in the repo (F19 — `e2e/
+package.json` + `playwright.config.ts` + the two F19 specs
+`signup_verify_login.e2e.ts` / `post_write.e2e.ts`), but **no sessions spec is
+authored** in `e2e/specs/` (U10's handoff note confirms "no e2e authored
+(U11's lane)"; U11's own unit-series rule (1) forbids me from authoring
+outside my Deliverables), and the prod-hardening owner-ops list — which
+**owns** the live F5 sign-out verification — is explicitly "recorded, not
+assumed done" in `STATUS.md`. Per the plan's U11 fallback path ("if the e2e
+runtime … is not yet present, the spec is authored (mirroring F5's U13) and
+*not run* — the gap is recorded in the design doc and the next unit who lands
+the runtime records the pass count"): the **gate is evidenced at the
+seam-test layer** by the 12 `SessionServiceTests` + the 1
+`SessionsKillAllExtTests` above — per §2.5 the three gate tests are *defined
+by* those (rows 1 and 2 cite the F1/F2/F3/F4/F5 pins; row 3 is the 13 itself).
+**This is not a gate fail** — 13/13 green, 0 failed, re-confirmed in this
+unit. **The owner-ops item that lands** the live F5 + sessions sign-out
+verification (the `STATUS.md` "live E2E + F5 sign-out verifications" line,
+owner-ops scope, not a U12 unit deliverable) records the pass count in a
+subsequent `### Run result (sessions e2e — <date>)` section of this doc.
+
+**Drift status.** No `## U<m> — Drift pause` sections exist in the handoff
+note. The plan-documentation slips recorded by U3 (the `SchemaBootstrap.cs`
+entry-read file list — the codebase has exactly one `StoreOptions`, built in
+`Program.cs`, and `SessionDocTypes.Configure` lives there for every context,
+including `SessionDoc`'s), U8 (the `site.js` handler + `tsc` step — the
+codebase's actual confirm contract is the `data-confirm` attribute +
+`client/lib/confirm.ts`, which the existing kill-all form in the same view
+already uses), and U9 (the `improve-check.ps1` gate (a) vs (d) label — the
+`KnownTranslationKeys.cs` line-count pin actually lives in gate (a)'s
+`$aBaselineSizes`, not gate (d) as the plan labels it) are all flagged as
+**not `## U<m> — Drift pause`s** and **do not affect the frozen pins**; they
+are carried into U12's close (the ADR 0281 author) for the record. The two
+pre-existing blockers U9 inherited (the 4 `CS7036` `SecuritySettingsController`
+ctor call-site breaks in pre-existing test files — **repaired by U10**, not a
+drift pause; the `improve-check.ps1` gate (g) design-doc-Abstract blocker —
+**still open for U12**) are likewise **not §2.6 drift-pauses** (gate (g) is a
+close-flip task, not a frozen-pin violation). **No still-open §2.6 drift.**
