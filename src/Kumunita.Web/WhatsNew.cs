@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.84.0", "2026-11-01", new List<string>
+        {
+            "Sessions — per-session list + revoke one device (the `sessions` named lane, ADR 0281). On top of the existing **Sign out everywhere** whole-account kill (F5), a resident can now **see** their active sessions — each row a device (browser / OS) + IP + signed-in time + last-active — and **revoke one** at a time (a device the resident may no longer have). The current session is never revocable by the per-row action (use **Sign out everywhere** to end it); revoking a session signs that device out immediately, and the existing kill-all is extended to also revoke **all-but-current**. 13 tests (12 seam + 1 kill-all extension), gate 13/13 green.",
+        }),
         new("0.83.0", "2026-10-31", new List<string>
         {
             "Security — one tab for both credential-security options. The **Change password** form (ADR 0138) is now on the **Security** tab alongside two-factor authentication (MFA) (ADR 0280), so a resident manages their password and MFA in one place (the standalone \"Change password\" settings tab is removed). A sample account whose password changes are still locked (the ADR 0138 sample-data lock) sees the \"password changes are locked\" notice in place of the form, right there on the Security tab.",

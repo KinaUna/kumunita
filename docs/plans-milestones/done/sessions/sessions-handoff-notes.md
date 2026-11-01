@@ -478,3 +478,90 @@ pass, mirroring U10's "re-run them if needed" instruction).
   **no** `ARCHITECTURE.md`, **no** plan-file move (those are U12's close
   flip), **no** controller / view / `KnownTranslationKeys.cs` / test-file
   edits (those lanes are closed).
+
+## Summary
+
+The `sessions` lane (per-session list + revoke one device) is **closed** at
+U12 (2026-11-01). This is the **first session-data milestone**: F5
+(prod-hardening) shipped the whole-account stamp-rotation kill; this lane adds
+the per-session model on top — the two mechanisms coexist and are independent
+(the stamp is the whole-account kill, `SessionDoc.RevokedAt` is the per-session
+kill). **Gate: 13/13 green, 0 failed** (U11; the F5 e2e is *recorded, not
+assumed done* — the prod-hardening owner-ops item). **ADR 0281 Accepted**;
+v0.84.0 in `WhatsNew.cs`. `Milestones.cs` / README Roadmap /
+`MilestonesTests.cs` **byte-identical** (a **named lane**, not a milestone —
+the ADR 0013 `GP` / ADR 0171 `FDW` precedent).
+
+### Shipped units (U1–U11)
+
+| Unit | Goal (one-liner) | Tests | Deviations |
+|---|---|---|---|
+| **U1** | design doc Part 1 (Context, Scope incl. the 5 `SL·D` deferrals, the invariants table, the 6 FACES, the Part-1 drift-guard) | — | Plan-documentation slip: plan headline said "11" invariants, body is **12** (body wins; the *reversed* direction of M3's U1 slip). |
+| **U2** | design doc Part 2 (frozen seam list, new Core types, revoke rule, 12 pinned test names, the 3-test gate, the drift-guard + U2 frozen-counts blockquote) | — | None — the 12 invariants + 12 test names + 2 tables + 3-test gate are the frozen pins; the C3 same-transaction deviation is documented (not a violation). |
+| **U3** | `SessionDoc` (7 fields) + `SessionDocTypes` (1 `.Schema.For` line) + boot wiring (one `Program.cs` registration line) | — | **Plan-documentation slip (U12 record):** the plan's U3 "Entry reads / Deliverables" named `SchemaBootstrap.cs` as a registration site; that file has **no** `*DocTypes.Configure` calls — this codebase has exactly one `StoreOptions` (built in `Program.cs`), so the single `Program.cs` registration is the whole boot wiring (every other context, incl. `SessionDoc`'s, lives there). Not a §2.6 drift pause. |
+| **U4** | `SessionService` (the frozen 5-method surface: create / list / revoke / revoke-all-but-current / touch) + the `DependencyInjection.cs` registration | — | None — C-S1·1 (controller), C-S1·3 (service), C3 (same-session audit + write), C-S1·5 (middleware, not service) pins all landed as pinned. |
+| **U5** | `OnSigningIn` hook — the `kumunita.sid` cookie item + the `CreateSessionAsync` guard (sign-in never fails) | — | None — the `TwoFactorUserIdScheme` handler is unchanged (leg-1 is not a full session). |
+| **U6** | `SessionRevocationMiddleware` (per-request enforce + the rate-limited touch) + the registration order (after `RevocationStampMiddleware`) + the `Kumunita:Sessions:TouchIntervalSeconds` config key (default 60) | — | None — the 5-state table (no sid → pass; sid + not found → pass; sid + revoked → sign out; sid + active + due → touch; sid + active + not due → no touch) all landed as pinned. |
+| **U7** | `SecuritySettingsController` extension (the `GET /sessions` list + `POST /sessions/{id}/revoke` + the kill-all extension) + the `sessions` rate-limit policy (10/15 min per IP) + the `SessionListViewModel` | — | **Deviation (U12 record):** the `SecuritySettingsController` ctor gained a `sessionService:` param, which **broke 4 pre-existing test call sites** (U7 built only `Kumunita.Web.csproj`, never the test project) — repaired by U10 (see below). The C3 same-transaction pin is satisfied at the *request* level (the F5 Identity/EF path and the sessions Marten path do not share a transaction) — the §2.3 documented deviation, the one `C3` relaxation in this lane. |
+| **U8** | `Sessions.cshtml` sessions table (the "This session" badge + the per-row "Revoke" form on every *other* row) on top of the **unchanged** F5 kill-all card | — | **Plan-documentation slip (U12 record):** the plan's U8 "Deliverables" listed a `site.js` handler + a `tsc` step; the codebase's actual confirm contract is the `data-confirm` attribute + `client/lib/confirm.ts` (which the existing kill-all form in the same view already uses) — no `site.js` change, no `tsc` step. Not a §2.6 drift pause. |
+| **U9** | 5 `settings.sessions.*` `kw-l` keys × en/de/fr/da = 20 entries in `KnownTranslationKeys.cs` + the `improve-check.ps1` gate (a) re-baseline (14885 → 14905) | — | **Plan-documentation slip (U12 record):** the plan labeled the `KnownTranslationKeys.cs` line-count pin as "gate (d)"; it actually lives in **gate (a)**'s `$aBaselineSizes` (gate (d) is the handoff-notes TL;DR gate) — the intent is the same re-baseline-and-annotate mechanism. **ADR annotation status:** the re-baseline comment at U9 recorded "ADR 0281 does not yet exist — it lands in the sessions lane's U12 close"; the ADR that drives this re-baseline is **ADR 0281** (this close). |
+| **U10** | 12 pinned `SessionServiceTests` (§2.4, verbatim) + 1 kill-all extension Web test (`SessionsKillAllExtTests`) | **12 + 1 = 13 discovered, 13 executed, 0 failed** | **Prerequisite repair (a U7-defect fix, NOT U10's authored test — named per the unit-series rule):** U7 added a `sessionService:` param to the `SecuritySettingsController` ctor but never updated 4 pre-existing test call sites, so `Kumunita.Web.Tests` did not compile (4 `CS7036`). Repaired all 4: `AccountControllerChangePasswordTests.cs` / `MfaQrTests.cs` / `SecuritySettingsMfaLockTests.cs` (added `sessionService: null!` — `SessionService` is **sealed**, NSubstitute cannot proxy it, and these files have no store) + `F5U4_KillAllTests.cs` (wired a real `IDocumentStore`-backed `SessionService` + a `SidAuthenticationService` stub for the `CurrentSessionIdAsync()` `AuthenticateAsync` call — a second U7 defect the U9 blocker note did not anticipate). All 16 tests in the 4 repaired files pass (U10's 13 + the F5U4 2/2 + the 3 other files 14/14). |
+| **U11** | run + record the 3-test acceptance gate (closed-loop / handoff / part-vs-whole) + the F5 e2e status | **13/13 green, 0 failed** (Core 12/12 + Web 1/1, re-confirmed) | The F5 e2e (the `STATUS.md` prod-hardening owner-ops item "live E2E + F5 sign-out verifications") is **recorded, not assumed done** — the `e2e/` Playwright project is present (F19) but no sessions spec is authored (U11's own unit-series rule (1) forbids authoring outside its Deliverables); the owner-ops item that lands it records the pass count in a subsequent `### Run result (sessions e2e — <date>)` section of the design doc. **Gate (g) (the design-doc Abstract blocker from U9) is inherited, currently the open blocker — U12 resolves it.** |
+| **U12** | close: ADR 0281 + `WhatsNew.cs` 0.84.0 head + `ARCHITECTURE.md` flip + `README.md` row + `STATUS.md` note + gate (g) resolved + plan → `done/` | (Web suite re-run to confirm the `WhatsNewTests` head-pin is green after the bump — the AGENTS.md "Running the tests" reliable path) | **Gate (g) resolved:** the design doc's first 15 lines now carry the `> **Abstract:**` blockquote (the `improve-check.ps1` gate (g) — the 10-second "is this the right read" gate — was the open blocker U9 + U11 carried to U12; the doc is ~740 lines, over the 400-line ceiling, and was not in the U07 baseline, so a *new* file without an Abstract fails the close — the Abstract is the actual fix, not a re-baseline). **Deviation record (per the unit-series rule):** the close-flip convention requires 7 files (`docs/adr/0281-…md`, `docs/adr/README.md`, `src/Kumunita.Web/WhatsNew.cs`, `tests/Kumunita.Web.Tests/WhatsNewTests.cs`, `docs/ARCHITECTURE.md`, `README.md`, `docs/STATUS.md`) + the design-doc Abstract + this `## Summary` + the plan-folder move — **10 files + the move**, exceeding U12's "≤ 4 files" cap. The repo's doc↔code parity (AGENTS.md) + the M27 `WhatsNew.cs` lesson are the authority: a missed member = a red test (`WhatsNewTests` head-pin) or a stale doc. The two documented deviations of record (the U3 `SchemaBootstrap.cs` entry-read slip; the C3 same-transaction request-level deviation from §2.3) are recorded in **ADR 0281** (§ "Deviations of record"). |
+
+### The 5 `SL·D` deferrals (verbatim, with the one-line candidate each)
+
+Each is a **named deferral** with a one-line `SL·D` follow-up candidate
+(resolved by U12's ADR 0281 § "Not covered"):
+
+1. **Per-session `DeviceLabel`** — a resident-set label (rename "Chrome on
+   work laptop" to "My laptop"). A future `SL·D` lane adds the field + the
+   rename surface. *`SL·D` candidate: add `DeviceLabel?` to `SessionDoc` + a
+   `PATCH /sessions/{id}/label` action.*
+2. **Per-session `Kiosk` flag** — a kiosk-mode session property. The kiosk is a
+   separate surface, not a session property. *`SL·D` candidate: the kiosk
+   surface declares its own session scope, not a `SessionDoc` field.*
+3. **Admin "sign out all residents"** — a new `GlobalAdmin` action (kill every
+   resident's sessions platform-wide). Not a per-resident surface. *`SL·D`
+   candidate: a `GlobalAdmin` `POST /admin/sessions/kill-all` action over
+   `SessionService.*` with an `Admin` audit row (ADR 0006-E named lane).*
+4. **Per-group / per-event session scoping** — sessions are per-account, not
+   per-resource. *`SL·D` candidate: a `SessionScope` document keyed to a
+   resource id, only if a M4/M5 surface genuinely needs it.*
+5. **A session `Trust` / `Remember me` distinction** — the existing cookie
+   already carries a `Persistent` flag; no new surface in this lane. *`SL·D`
+   candidate: surface `Persistent` in the list if a resident asks.*
+
+### Close-flip record (U12, 2026-11-01)
+
+- `docs/design/sessions-per-session-revocation.md` — `> **Abstract:**`
+  blockquote added to the first 15 lines (gate (g) resolved — the doc is
+  ~740 lines, over the 400-line ceiling, not in the U07 baseline).
+- `docs/adr/0281-session-doc-and-per-session-revocation.md` — **new** ADR
+  (Context / Decision / Consequences / Not covered (the 5 `SL·D` deferrals,
+  verbatim) / **Deviations of record** (the U3 `SchemaBootstrap.cs` entry-read
+  slip + the C3 same-transaction request-level deviation) / Close flip).
+- `docs/adr/README.md` — the **0281** index row added (after 0280).
+- `src/Kumunita.Web/WhatsNew.cs` — the **0.84.0** / `2026-11-01` / ADR 0281
+  head row (the **required sixth close-flip member**, the M27 lesson).
+- `tests/Kumunita.Web.Tests/WhatsNewTests.cs` — the head-pin **bumped**:
+  `0.84.0` / `2026-11-01` / ADR 0281 is now the head (the old `0.83.0` /
+  ADR 0280 assertion shifts down one row; the rest of the positional
+  assertions shift down one row each; a `sessionsLane` version-anchored
+  assertion added for `0.84.0`).
+- `docs/ARCHITECTURE.md` — the `Sessions/` bounded-context line added to §2
+  (the `Identity/` / `UserInfo/` / `Authorization/` / `Posts/` /
+  `Moderation/` / `Localization/` / `Bootstrap/` lines are **untouched**).
+- `README.md` — the **`Sessions`** named-lane row added (mirroring the
+  **Prod-hardening** named-lane row — "a named lane, not a milestone").
+- `docs/STATUS.md` — the **Sessions is done** note added (mirroring the
+  prod-hardening named-lane paragraph shape).
+- `docs/plans-milestones/done/improve/improve-check.ps1` — **unchanged by U12**
+  (the gate (a) re-baseline 14885 → 14905 was done by U9; the gate (g) fix is
+  the design-doc Abstract above, not a re-baseline).
+- **Plan folder moved:** `docs/plans-milestones/in-progress/sessions/` →
+  `docs/plans-milestones/done/sessions/` (the close flip — the `in-progress/`
+  → `done/` move is the lane-closed marker).
+- `Milestones.cs` / `MilestonesTests.cs` — **byte-identical** (a named lane
+  reuses no milestone letter; the M4/M5/M6 roadmap stays Events/Projects/
+  Portability).

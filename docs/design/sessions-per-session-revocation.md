@@ -1,5 +1,27 @@
 # Design Doc — sessions: per-session list + revoke one device
 
+> **Abstract:** *What it settles:* the **per-session model** — F5 (the
+> prod-hardening "Sign out everywhere" stamp-rotation kill) shipped a
+> **whole-account** kill with no per-session record; this lane adds the missing
+> piece so a resident can *see* their active sessions and revoke **one** at a
+> time (or all-but-current via the existing kill-all, which becomes "revoke
+> all-but-current" on top of F5's stamp rotation). A new bounded context
+> `Kumunita.Core.Sessions`: one new domain document (`SessionDoc`), one new
+> versioned registration surface (`SessionDocTypes`), one new service seam
+> (`SessionService`, the 5-method surface — create / list / revoke /
+> revoke-all-but-current / touch), a new `kumunita.sid` cookie item, a new
+> `SessionRevocationMiddleware` (the per-session analog of
+> `RevocationStampMiddleware`, registered **after** it), a `SecuritySettings-
+> Controller` extension (the `GET /sessions` list + `POST /sessions/{id}/revoke`
+> + the kill-all extension), and 13 tests (12 seam + 1 kill-all extension).
+> *The one contract:* **the stamp is the whole-account kill (F5, unchanged);
+> `SessionDoc.RevokedAt` is the per-session kill (this lane)** — the two
+> mechanisms coexist and are independent. *Out of scope (`SL·D`):* per-session
+> `DeviceLabel`, per-session `Kiosk` flag, admin "sign out all residents",
+> per-group / per-event session scoping, a session `Trust` / `Remember me`
+> distinction. Gate: 13/13 green (the `### Run result` section below). LOCKED
+> in ADR 0281.
+
 > Part 1 of 2 (U1). Part 2 (U2) will append "Seams & contracts (Part 2)" with the
 > exact C# shapes U3–U11 must match, the **pinned seam-test names**, the
 > **three-test acceptance gate**, and the **drift-guard** — mirroring
