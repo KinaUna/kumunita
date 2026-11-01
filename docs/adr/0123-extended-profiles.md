@@ -325,11 +325,13 @@ captioning (D8·6).
   item + the variant-C rail item beside Directory in `_Layout.cshtml`) is
   removed. It is now reached through a **Directory · People tab strip**
   (`src/Kumunita.Web/Views/Shared/_DirectoryTabs.cshtml`, the `_EventsTabs.cshtml`
-  nav-tabs idiom) that sits on the Directory landing page, so Directory and
-  People are sibling tabs of one section. Affected: `_Layout.cshtml` (the two
+  nav-tabs idiom) that sits on **both** the Directory and the People landing
+  pages, so the two surfaces are sibling tabs of one section and a resident can
+  switch between them from either. Affected: `_Layout.cshtml` (the two
   nav entries + the `_navPeople` label plumbing + the `/people` `activeNav`
   mapping removed), the new `_DirectoryTabs.cshtml`, `Views/Directory/Index.cshtml`
-  (the tab strip included), and `M23FindPeopleTests`
+  and `Views/FindPeople/Index.cshtml` (the tab strip included), and
+  `M23FindPeopleTests`
   (`Layout_Carries_APeopleNavEntry_InBothVariants` →
   `Directory_Page_Carries_APeopleTab_LinkingTo_People`, pinning the tab strip
   + its Directory inclusion instead of the nav entry). The `nav.people` key
