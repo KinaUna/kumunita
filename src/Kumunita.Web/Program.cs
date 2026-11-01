@@ -139,6 +139,20 @@ var marten = builder.Services.AddMarten(opts =>
     // convention needed. ADR 0004 §B.1.
     PostDocTypes.Configure(opts);
 
+    // sessions (the per-session list + revoke one device lane — the F5 "Sign out
+    // everywhere" whole-account kill is unchanged and coexists with this): the
+    // SessionDoc bounded context's document (ADR 0004 §B.1 — a parallel surface
+    // to PostDocTypes / MediaDocTypes / UsageDocTypes, not additive on an
+    // existing one: SessionDoc uses the conventional string Id — a GUID, the
+    // session id — so no non-default convention or business-key index is pinned).
+    // Without this call the SessionDoc doc is invisible to Marten (the
+    // M3/Media/Page/Tag/M4/M5/M6/M9/M16/M17/M37 precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically (SchemaBootstrap.cs does not
+    // call any *DocTypes surface — the Program.cs registration is the only boot
+    // wiring, per every other bounded context's precedent in this block).
+    SessionDocTypes.Configure(opts);
+
     // Media (plan U2): the media catalog doc (MediaObject) — its Id *is* the
     // content hash (C-MED·4), so Marten's default Id-unique mapping is the dedup;
     // no business-key index (the M3 "string Id" convention). ADR 0004 §B.1. Without
@@ -854,8 +868,28 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             if (string.IsNullOrEmpty(subject)) return;
             var um = ctx.HttpContext!.RequestServices.GetRequiredService<UserManager<User>>();
             var user = await um.FindByIdAsync(subject);
-            if (user is not null && !string.IsNullOrEmpty(user.SecurityStamp))
+            if (user is null) return;
+            if (!string.IsNullOrEmpty(user.SecurityStamp))
                 ctx.Properties.Items["kumunita.stamp"] = user.SecurityStamp;
+
+            // sessions lane (U5) — create a SessionDoc and stamp its id into the
+            // cookie Items alongside kumunita.stamp. Guarded: a DB failure must
+            // never fail the sign-in (C-S1·4 — the sign-in flow is unchanged).
+            try
+            {
+                var sessionService = ctx.HttpContext!.RequestServices.GetRequiredService<Kumunita.Core.Sessions.SessionService>();
+                var userAgent = ctx.HttpContext.Request.Headers.UserAgent.ToString();
+                var ip = ctx.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+                var newDoc = await sessionService.CreateSessionAsync(user.Id, userAgent, ip);
+                ctx.Properties.Items["kumunita.sid"] = newDoc.Id;
+            }
+            catch (Exception ex)
+            {
+                var logger = ctx.HttpContext!.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Kumunita.Sessions");
+                logger.LogWarning(ex,
+                    "sessions lane: CreateSessionAsync failed for user {UserId}; sign-in continues without kumunita.sid",
+                    user.Id);
+            }
         };
     });
     identityServices.Configure<CookieAuthenticationOptions>(IdentityConstants.TwoFactorUserIdScheme, o =>
@@ -1069,6 +1103,19 @@ app.UseMiddleware<BlockedAccountMiddleware>();
 // re-read as a role change). See RevocationStampMiddleware for the full
 // mechanism and the .NET 10.0.13 source grounding.
 app.UseMiddleware<RevocationStampMiddleware>();
+
+// sessions lane — per-session enforcement: re-reads the SessionDoc on every
+// request for authenticated principals carrying a kumunita.sid cookie item
+// and signs them out if RevokedAt is set; otherwise touches LastActive when
+// due (Kumunita:Sessions:TouchIntervalSeconds, default 60 s). Registered
+// AFTER RevocationStampMiddleware (the stamp gate is the higher-priority
+// whole-account kill; the two mechanisms coexist and are independent — a
+// stamp-rotated session is revoked regardless of its SessionDoc.RevokedAt)
+// and BEFORE the remaining per-request gates (AdminTwoFactor, TimeLimit,
+// PrivilegedStamp, UsageCapture) so a per-session-revoked request is killed
+// before the narrower role-specific gates re-read it. See
+// SessionRevocationMiddleware for the full mechanism and the 5-state table.
+app.UseMiddleware<SessionRevocationMiddleware>();
 
 // SEC H2 (invariant S-2) — the GlobalAdmin 2FA gate: for an authenticated
 // GlobalAdmin whose 2FA is not enrolled (and who is not a sample-data

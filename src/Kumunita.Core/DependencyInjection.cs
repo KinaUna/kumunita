@@ -667,6 +667,18 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IMediaStore>(),
             sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>()));
 
+        // sessions lane (U4, the per-session list + revoke one device; the F5
+        // "Sign out everywhere" whole-account kill is unchanged and coexists —
+        // see docs/design/sessions-per-session-revocation.md). The same
+        // "AddTransient with the store injected" shape as IEventService /
+        // IProjectService / IPortabilityService above: composes the host-
+        // registered Marten IDocumentStore (reads open a QuerySession, writes
+        // open a LightweightSession — invariant C3). Core stays HTTP-free
+        // (ADR 0006-D): the Web gate (U7) is the only place the 409 / 404
+        // responses are produced.
+        services.AddTransient<Sessions.SessionService>(sp => new Sessions.SessionService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         return services;
     }
 }
