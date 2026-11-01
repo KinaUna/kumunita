@@ -194,24 +194,7 @@ public sealed class SearchService : ISearchService
         // ADR 0124 D5 — the tag-name map is loaded once and shared by the tag-aware surfaces.
         var tagNames = await LoadTagNamesAsync(session, ct);
 
-        var visible = surface switch
-        {
-            PostsSurface when effectiveScope == SearchScope.Community => await CommunityPostsAsync(session, query, actorId, tagNames, ct),
-            PostsSurface => await GroupPostsAsync(session, query, actorId, tagNames, ct),
-            EventsSurface when effectiveScope == SearchScope.Community => await CommunityEventsAsync(session, query, actorId, tagNames, ct),
-            EventsSurface => await GroupEventsAsync(session, query, actorId, tagNames, ct),
-            PagesSurface => await PagesAsync(session, query, actorId, tagNames, ct),
-            AnnouncementsSurface => await AnnouncementsAsync(session, query, actorId, ct),
-            ProjectsSurface => await ProjectsAsync(session, query, actorId, ct),
-            BoardsSurface => await BoardsAsync(session, query, actorId, tagNames, ct),
-            TodosSurface => await TodosAsync(session, query, actorId, tagNames, ct),
-            InventorySurface => await InventoryAsync(session, query, actorId, ct),
-            DocumentsSurface => await DocumentsAsync(session, query, actorId, ct),
-            PeopleSurface => await PeopleAsync(session, query, actorId, tagNames, ct),
-            _ => throw new ArgumentException(
-                $"Unknown search surface '{surface}'. Expected one of: posts, events, pages, announcements, projects, boards, todos, inventory, documents, people.",
-                nameof(surface)),
-        };
+        var visible = await VisibleForSurfaceAsync(session, surface, effectiveScope, query, actorId, tagNames, ct);
         await session.SaveChangesAsync(ct);
 
         // M26 (design §2.2 row 18, §2.3 row 18) — the SearchHit ordering
@@ -245,6 +228,67 @@ public sealed class SearchService : ISearchService
         var hasMore = visible.Count > page * ps;
         var hits = visible.Skip((page - 1) * ps).Take(ps).ToList();
         return new SearchSurfacePage(surface, hits, page, hasMore);
+    }
+
+    // ── Browse (ADR 0285 — the kiosk playlist item picker) ─────────────────
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<SearchHit>> BrowseSurfaceAsync(
+        string surface, SearchScope scope, string actorId, int take, CancellationToken ct = default)
+    {
+        // ADR 0285 — the kiosk item picker opens on "the most recent items you
+        // can see" before anything is typed. The browse is the surface read
+        // with no text filter: the same canonical pre-filter → frozen decision
+        // → "search:<surface>" audit row as SearchSurfaceAsync, so the access
+        // checks are exactly the search's (no new Decide() branch, no new
+        // AccessAction). Signed-in only (the picker is behind [Authorize]); an
+        // anonymous caller gets nothing, no decision, no row.
+        if (string.IsNullOrWhiteSpace(actorId) || take <= 0)
+            return Array.Empty<SearchHit>();
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var tagNames = await LoadTagNamesAsync(session, ct);
+
+        // The empty query matches every candidate (string.Contains("") is
+        // true), so the helpers return the full visible set for the surface.
+        var visible = await VisibleForSurfaceAsync(session, surface, scope, string.Empty, actorId, tagNames, ct);
+        await session.SaveChangesAsync(ct);
+
+        return visible
+            .OrderByDescending(h => h.Created)
+            .ThenBy(h => h.Id, StringComparer.Ordinal)
+            .Take(take)
+            .ToList();
+    }
+
+    /// <summary>
+    /// The per-surface visible set for <paramref name="query"/> (shared by
+    /// <see cref="SearchSurfaceAsync"/> and <see cref="BrowseSurfaceAsync"/>).
+    /// Each helper stores its own audit row in <paramref name="session"/>; the
+    /// caller commits.
+    /// </summary>
+    private async Task<List<SearchHit>> VisibleForSurfaceAsync(
+        IDocumentSession session, string surface, SearchScope effectiveScope, string query,
+        string? actorId, IReadOnlyDictionary<string, string> tagNames, CancellationToken ct)
+    {
+        return surface switch
+        {
+            PostsSurface when effectiveScope == SearchScope.Community => await CommunityPostsAsync(session, query, actorId, tagNames, ct),
+            PostsSurface => await GroupPostsAsync(session, query, actorId, tagNames, ct),
+            EventsSurface when effectiveScope == SearchScope.Community => await CommunityEventsAsync(session, query, actorId, tagNames, ct),
+            EventsSurface => await GroupEventsAsync(session, query, actorId, tagNames, ct),
+            PagesSurface => await PagesAsync(session, query, actorId, tagNames, ct),
+            AnnouncementsSurface => await AnnouncementsAsync(session, query, actorId, ct),
+            ProjectsSurface => await ProjectsAsync(session, query, actorId, ct),
+            BoardsSurface => await BoardsAsync(session, query, actorId, tagNames, ct),
+            TodosSurface => await TodosAsync(session, query, actorId, tagNames, ct),
+            InventorySurface => await InventoryAsync(session, query, actorId, ct),
+            DocumentsSurface => await DocumentsAsync(session, query, actorId, ct),
+            PeopleSurface => await PeopleAsync(session, query, actorId, tagNames, ct),
+            _ => throw new ArgumentException(
+                $"Unknown search surface '{surface}'. Expected one of: posts, events, pages, announcements, projects, boards, todos, inventory, documents, people.",
+                nameof(surface)),
+        };
     }
 
     // ── Surface helpers (each = canonical pre-filter → C# match → frozen decision → search row) ──

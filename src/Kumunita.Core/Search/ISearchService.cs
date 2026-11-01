@@ -74,4 +74,22 @@ public interface ISearchService
         string surface, string q, SearchScope scope, string actorId, int page,
         CancellationToken ct = default,
         Kumunita.Core.Query.SortSpec? sort = null, int? pageSize = null);
+
+    /// <summary>
+    /// The no-text browse (ADR 0285 — the kiosk playlist item picker): the
+    /// most recent <paramref name="take"/> items of one surface the actor can
+    /// see, newest first. The same canonical pre-filter, frozen decision and
+    /// <c>"search:&lt;surface&gt;"</c> audit row as
+    /// <see cref="SearchSurfaceAsync"/>, with every candidate matching (an
+    /// empty query). Signed-in only: a blank <paramref name="actorId"/> or a
+    /// non-positive <paramref name="take"/> returns an empty list, no decision,
+    /// no row.
+    /// </summary>
+    /// <param name="surface">The surface (the <see cref="SearchSurfaceAsync"/> set).</param>
+    /// <param name="scope">The scope (<see cref="SearchScope.Groups"/> for group posts / group events).</param>
+    /// <param name="actorId">The acting account.</param>
+    /// <param name="take">The maximum number of hits.</param>
+    /// <param name="ct">Cancellation.</param>
+    Task<IReadOnlyList<SearchHit>> BrowseSurfaceAsync(
+        string surface, SearchScope scope, string actorId, int take, CancellationToken ct = default);
 }

@@ -6,6 +6,7 @@ using Kumunita.Core.Projects;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
+using Kumunita.Web.Services;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,19 +56,25 @@ public sealed class KioskController : Controller
     private readonly IEventService events;
     private readonly EffectiveTimezoneResolver? timezone;
     private readonly IDocumentStore? store;
+    private readonly IKioskItemCatalog? catalog;
 
     public KioskController(
         IKioskService kiosk,
         IProjectService projects,
         IEventService events,
         EffectiveTimezoneResolver? timezone = null,
-        IDocumentStore? store = null)
+        IDocumentStore? store = null,
+        IKioskItemCatalog? catalog = null)
     {
         this.kiosk = kiosk ?? throw new ArgumentNullException(nameof(kiosk));
         this.projects = projects ?? throw new ArgumentNullException(nameof(projects));
         this.events = events ?? throw new ArgumentNullException(nameof(events));
         this.timezone = timezone;
         this.store = store;
+        // ADR 0285 — the playlist editor's item picker. Optional so the
+        // existing test construction sites keep compiling; DI always supplies
+        // it in the app (Program.cs).
+        this.catalog = catalog;
     }
 
     /// <summary>
@@ -222,6 +229,49 @@ public sealed class KioskController : Controller
 
         ViewData["Title"] = "Kiosk settings";
         return View("Settings", vm);
+    }
+
+    /// <summary>
+    /// <c>GET /settings/kiosk/items?type=&lt;KioskItemType&gt;&amp;q=&lt;text&gt;</c>
+    /// — the playlist editor's item picker (ADR 0285). Returns
+    /// <c>{ items: [{ id, title, groupId, subtitle }] }</c>: the items of the
+    /// type the signed-in resident can see, the most recent first when
+    /// <c>q</c> is blank, a title / body match otherwise (at most
+    /// <see cref="IKioskItemCatalog.MaxResults"/>). For a Calendar the first
+    /// option is "All" (empty id), then the enabled community components.
+    /// A CSRF-free GET (a read, the <c>/kiosk/slide</c> shape); an unknown type
+    /// is a 400. The catalog composes the existing read seams only, so no item
+    /// the resident cannot already see is ever offered.
+    /// </summary>
+    [HttpGet("/settings/kiosk/items")]
+    public async Task<IActionResult> Items(string? type, string? q, CancellationToken ct = default)
+    {
+        if (!Enum.TryParse<KioskItemType>(type ?? string.Empty, ignoreCase: true, out var itemType)
+            || !Enum.IsDefined(itemType))
+        {
+            return BadRequest();
+        }
+
+        var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
+        var options = new List<KioskItemOption>();
+
+        if (itemType == KioskItemType.Calendar)
+        {
+            var allLabel = await this.FlashAsync("kiosk.settings.calendar_all", "All communities");
+            var query = (q ?? string.Empty).Trim();
+            if (query.Length == 0 || allLabel.Contains(query, StringComparison.OrdinalIgnoreCase))
+                options.Add(new KioskItemOption(string.Empty, allLabel, null, null));
+        }
+
+        if (catalog is not null)
+        {
+            options.AddRange(await catalog.SearchAsync(itemType, q, actorId, ct).ConfigureAwait(false));
+        }
+
+        return Json(new
+        {
+            items = options.Select(o => new { id = o.Id, title = o.Title, groupId = o.GroupId, subtitle = o.Subtitle }),
+        });
     }
 
     /// <summary>

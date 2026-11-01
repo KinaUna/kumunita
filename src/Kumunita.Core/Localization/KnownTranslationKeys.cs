@@ -3886,6 +3886,8 @@ public static class KnownTranslationKeys
                 "Save playlist",
             ["kiosk.settings.preview"] =
                 "Preview the kiosk",
+            ["kiosk.settings.calendar_all"] =
+                "All communities",
             ["account.signup_bot_failed"] =
                 "The security check did not pass. Please try again.",
             ["account.signup_domain_disallowed"] =
@@ -7610,6 +7612,8 @@ public static class KnownTranslationKeys
                 "Playlist speichern",
             ["kiosk.settings.preview"] =
                 "Kiosk-Vorschau",
+            ["kiosk.settings.calendar_all"] =
+                "Alle Gemeinschaften",
             ["account.signup_bot_failed"] =
                 "Die Sicherheitsprüfung wurde nicht bestanden. Bitte versuche es erneut.",
             ["account.signup_domain_disallowed"] =
@@ -11253,6 +11257,8 @@ public static class KnownTranslationKeys
                 "Enregistrer la liste",
             ["kiosk.settings.preview"] =
                 "Aperçu du kiosque",
+            ["kiosk.settings.calendar_all"] =
+                "Toutes les communautés",
             ["account.signup_bot_failed"] =
                 "La vérification de sécurité a échoué. Veuillez réessayer.",
             ["account.signup_domain_disallowed"] =
@@ -14868,6 +14874,8 @@ public static class KnownTranslationKeys
                 "Gem afspilningsliste",
             ["kiosk.settings.preview"] =
                 "Forhåndsvis kiosken",
+            ["kiosk.settings.calendar_all"] =
+                "Alle fællesskaber",
             ["account.signup_bot_failed"] =
                 "Sikkerhedstjekket blev ikke bestået. Prøv igen.",
             ["account.signup_domain_disallowed"] =

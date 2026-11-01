@@ -5,6 +5,7 @@ using Kumunita.Core.Kiosk;
 using Kumunita.Core.Projects;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
+using Kumunita.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -301,15 +302,66 @@ public class KioskControllerTests
     /// <see cref="IDocumentStore"/> seams the test stubs. <paramref name="role"/>
     /// is <c>null</c> for the anonymous (no-principal) case. No Postgres (the
     /// Core seam behaviour is pinned in <c>Kiosk/KioskServiceTests.cs</c>).</summary>
+    // ── ADR 0285 — the playlist editor's item picker ──────────────────────
+
+    [Fact]
+    public async Task ADR0285_Items_UnknownType_Is400()
+    {
+        var (controller, _, _, _, _) = Build(role: Member, Substitute.For<IKioskItemCatalog>());
+
+        var action = await controller.Items("Inventory", null, TestContext.Current.CancellationToken);
+
+        Assert.IsType<BadRequestResult>(action);
+    }
+
+    [Fact]
+    public async Task ADR0285_Items_Calendar_All_First_Then_Components()
+    {
+        var catalog = Substitute.For<IKioskItemCatalog>();
+        catalog.SearchAsync(KioskItemType.Calendar, null, Subject, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<KioskItemOption>>([new KioskItemOption("c-1", "Main street", null, null)]));
+        var (controller, _, _, _, _) = Build(role: Member, catalog);
+
+        var action = await controller.Items("calendar", null, TestContext.Current.CancellationToken);
+
+        var items = ItemsOf(action);
+        Assert.Equal(2, items.Count);
+        Assert.Equal("", items[0].GetProperty("id").GetString());
+        Assert.Equal("All communities", items[0].GetProperty("title").GetString());
+        Assert.Equal("c-1", items[1].GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task ADR0285_Items_Board_PassesQueryAndActor()
+    {
+        var catalog = Substitute.For<IKioskItemCatalog>();
+        catalog.SearchAsync(KioskItemType.Board, "garden", Subject, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<KioskItemOption>>([new KioskItemOption("b-1", "Garden board", null, null)]));
+        var (controller, _, _, _, _) = Build(role: Member, catalog);
+
+        var action = await controller.Items("Board", "garden", TestContext.Current.CancellationToken);
+
+        var item = Assert.Single(ItemsOf(action));
+        Assert.Equal("b-1", item.GetProperty("id").GetString());
+        Assert.Equal("Garden board", item.GetProperty("title").GetString());
+    }
+
+    private static List<System.Text.Json.JsonElement> ItemsOf(IActionResult action)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(Assert.IsType<JsonResult>(action).Value);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        return doc.RootElement.GetProperty("items").EnumerateArray().Select(e => e.Clone()).ToList();
+    }
+
     private static (KioskController controller, IKioskService kiosk, IProjectService projects,
-        IEventService events, IDocumentStore store) Build(string? role)
+        IEventService events, IDocumentStore store) Build(string? role, IKioskItemCatalog? catalog = null)
     {
         var kiosk    = Substitute.For<IKioskService>();
         var projects = Substitute.For<IProjectService>();
         var events   = Substitute.For<IEventService>();
         var store    = Substitute.For<IDocumentStore>();
 
-        var controller = new KioskController(kiosk, projects, events, null, store);
+        var controller = new KioskController(kiosk, projects, events, null, store, catalog);
 
         // The direct-construction harness must expose the MVC services
         // Controller.ViewData / Controller.TempData / Controller.View resolve

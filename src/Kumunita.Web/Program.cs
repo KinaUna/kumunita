@@ -502,6 +502,9 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<Kumunita.Web.Services.IEscalationForwarder, Kumunita.Web.Services.EscalationForwarder>();
 // ADR 0175 — the cached platform-default palette read by _Layout.
 builder.Services.AddSingleton<Kumunita.Web.Services.PlatformPaletteProvider>();
+// ADR 0285 — the kiosk playlist editor's item picker (composes the M8 search
+// surfaces + the component list; no access logic of its own).
+builder.Services.AddScoped<Kumunita.Web.Services.IKioskItemCatalog, Kumunita.Web.Services.KioskItemCatalog>();
 
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
