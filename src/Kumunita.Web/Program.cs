@@ -656,6 +656,12 @@ builder.Services.AddRateLimiter(opts =>
     // an automated uploader is not (the audit row names this exact gap:
     // "the four upload lanes have no [EnableRateLimiting]").
     AddWindow(opts, "upload", limit: 10, window: TimeSpan.FromMinutes(15));
+
+    // Sessions lane (U7) — the per-row revoke (POST …/sessions/{id}/revoke)
+    // write surface: 10 per 15 minutes per IP (a resident revoking a handful
+    // of stale sessions is fine; an automated revocation loop is not). The
+    // same fixed-window-per-IP shape as the F8 upload policy above.
+    AddWindow(opts, "sessions", limit: 10, window: TimeSpan.FromMinutes(15));
 });
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the

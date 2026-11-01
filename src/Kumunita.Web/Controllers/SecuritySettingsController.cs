@@ -1,4 +1,5 @@
 using Kumunita.Core.Identity;
+using Kumunita.Core.Sessions;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authentication;
@@ -83,7 +84,8 @@ namespace Kumunita.Web.Controllers;
 public sealed class SecuritySettingsController(
     UserManager<User> userManager,
     SignInManager<User> signInManager,
-    IIdentityService identity) : Controller
+    IIdentityService identity,
+    SessionService sessionService) : Controller
 {
     private static readonly string AuthenticatorProvider = "Authenticator";
     private const int RecoveryCodeCount = 10;
@@ -675,28 +677,81 @@ public sealed class SecuritySettingsController(
     // read (a server cannot enumerate another browser's cookies — pin §3).
 
     /// <summary>
+    /// Read the <c>kumunita.sid</c> cookie item (the session id, set by the
+    /// <c>OnSigningIn</c> handler alongside F5's <c>kumunita.stamp</c>).
+    /// Returns <c>null</c> when absent (a pre-lane session, or a sign-in
+    /// whose <c>CreateSessionAsync</c> guard tripped) — <c>TryGetValue</c>
+    /// (not the indexer) so a missing key is a clean <c>null</c>, not a
+    /// <c>KeyNotFoundException</c>. The <c>ApplicationScheme</c> is the app
+    /// cookie the sid is stamped into (the F5 <c>RevocationStampMiddleware</c>
+    /// "Explicit scheme" idiom).
+    /// </summary>
+    private async Task<string?> CurrentSessionIdAsync()
+    {
+        var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+        if (result?.Properties is { } props
+            && props.Items.TryGetValue("kumunita.sid", out var sid))
+        {
+            return sid;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// <c>GET /settings/security/sessions</c> — the session-management list.
     /// Minimum viable (pin §3): "this session" + "other active sessions
     /// (revoked if a kill-all has run)." This is **server-side state** (the
     /// <c>User.SecurityStamp</c>, rotated by
-    /// <see cref="IIdentityService.KillAllSessionsAsync"/> / 
+    /// <see cref="IIdentityService.KillAllSessionsAsync"/> /
     /// <see cref="IIdentityService.ChangePasswordAsync"/>), **not** a
     /// per-browser cookie read. The <c>POST …/kill-all</c> action is the
     /// only write; there is no form to bind (no <c>ModelState</c> check).
+    /// <para>
+    /// Sessions-lane (U7) extension: the list is now this resident's active
+    /// (non-revoked) <c>SessionDoc</c> rows (the <see cref="SessionService"/>
+    /// composition point — the controller is route + shape, never a
+    /// re-derivation), with <c>IsCurrent</c> marking the session whose id is
+    /// in this browser's <c>kumunita.sid</c> cookie item.
+    /// </para>
     /// </summary>
     [HttpGet("/settings/security/sessions")]
-    public IActionResult Sessions()
+    public async Task<IActionResult> Sessions()
     {
         // Fail-closed: the [Authorize] attribute makes a null subject
         // impossible for a real request, but the pin §3 discipline is to
         // handle it anyway (redirect to login rather than render a list
         // for an unauthenticated principal).
-        if (string.IsNullOrEmpty(KumunitaPrincipal.SubjectId(User)))
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
         {
             return RedirectToAction("Login", "Account");
         }
 
-        return View(new SessionSettingsViewModel());
+        // The sessions-lane (U7) list: this resident's active (non-revoked)
+        // SessionDocs, most-recent-first (SessionService — the single
+        // composition point; the controller is route + shape, never a
+        // re-derivation). IsCurrent marks the session whose id is in this
+        // browser's kumunita.sid cookie item.
+        var currentSessionId = (await CurrentSessionIdAsync()) ?? "";
+        var docs = await sessionService.GetSessionsForUserAsync(subject);
+        var items = docs
+            .Select(d => new SessionItem
+            {
+                Id = d.Id,
+                UserAgent = d.UserAgent,
+                Ip = d.Ip,
+                CreatedAt = d.CreatedAt,
+                LastActive = d.LastActive,
+                IsCurrent = d.Id == currentSessionId,
+            })
+            .ToList();
+
+        return View(new SessionListViewModel
+        {
+            CurrentSessionId = currentSessionId,
+            Sessions = items,
+            KillAllEnabled = true,
+        });
     }
 
     /// <summary>
@@ -740,6 +795,17 @@ public sealed class SecuritySettingsController(
         // rotation or the gate (F5.U2 owns both).
         await identity.KillAllSessionsAsync(subject);
 
+        // Sessions-lane extension (U7) — the kill-all now also revokes
+        // all-but-current at the Marten layer (the per-session analog of the
+        // stamp rotation above). The current session's SessionDoc.RevokedAt
+        // stays null (kept active); every other session's is set to UtcNow.
+        // The C3 pin is satisfied at the *request* level: the Identity/EF
+        // stamp rotation and the Marten writes below commit in **separate
+        // transactions within the same request** (the two modules do not
+        // share a transaction — the design doc §2.3 documents this deviation).
+        var currentSessionId = (await CurrentSessionIdAsync()) ?? "";
+        await sessionService.RevokeAllButCurrentAsync(subject, currentSessionId);
+
         // The local effect — SignOutAsync (not a bare SignOutAsync on the
         // auth scheme) clears BOTH of the app's cookies: AddIdentity
         // registers an auxiliary .AspNetCore.Identity.Application cookie
@@ -748,5 +814,46 @@ public sealed class SecuritySettingsController(
         await signInManager.SignOutAsync();
 
         return RedirectToAction("Login", "Account");
+    }
+
+    /// <summary>
+    /// <c>POST /settings/security/sessions/{id}/revoke</c> — the per-row
+    /// revoke (U7, the sessions-lane per-session kill). C-S1·1: this action
+    /// refuses to revoke the **current** session (the one whose id is in
+    /// this browser's <c>kumunita.sid</c> cookie item) — a 409, because the
+    /// per-row surface is "revoke one *other* device", not "sign out this
+    /// one" (that is the kill-all's job). C-S1·3 owner-scoped + idempotency
+    /// are enforced inside <see cref="SessionService.RevokeSessionAsync"/>
+    /// (a cross-user id or an already-revoked id is a silent no-op; the
+    /// service does not know the current-session id, so that guard lives
+    /// here). A successful revoke commits (the <c>RevokedAt</c> write + the
+    /// <c>session.revoke</c> audit row, same session) and returns 204.
+    /// </summary>
+    [HttpPost("/settings/security/sessions/{id}/revoke")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting("sessions")]
+    public async Task<IActionResult> SessionsRevoke(string id)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+        {
+            return RedirectToAction("Login", "Account");
+        }
+
+        // C-S1·1: the per-row action refuses to revoke the current session.
+        // (id == null is impossible for a real route; the comparison is
+        // null-safe: a missing sid on this browser means no session is
+        // "current" here, so the revoke proceeds for any other id.)
+        var currentSessionId = await CurrentSessionIdAsync();
+        if (id == currentSessionId)
+        {
+            return Conflict(); // 409 — "use 'Sign out everywhere' to end it"
+        }
+
+        // C-S1·3 owner-scoped + idempotency live in the service (the
+        // controller is route + authz + shape, never a re-derivation).
+        await sessionService.RevokeSessionAsync(subject, id);
+
+        return NoContent(); // 204 — the revoke is committed
     }
 }
