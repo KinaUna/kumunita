@@ -48,7 +48,6 @@
         else if (_navPath.StartsWith("/pages", StringComparison.OrdinalIgnoreCase)) activeNav = "pages";
         else if (_navPath.StartsWith("/tags", StringComparison.OrdinalIgnoreCase)) activeNav = "tags";
         else if (_navPath.StartsWith("/directory", StringComparison.OrdinalIgnoreCase)) activeNav = "directory";
-        else if (_navPath.StartsWith("/people", StringComparison.OrdinalIgnoreCase)) activeNav = "people";
     }
 
     // P0-6 (translation audit) — the client-JS strings bundle: the effective
@@ -162,7 +161,7 @@
     // floor), so a null/absent service only degrades to the raw kw-l text.
     string _navHome, _navAnnouncements, _navCommunity, _navGroups,
            _navEvents, _navProjects, _navInventory, _navBookmarks, _navNotes,
-           _navDocuments, _navPages, _navTags, _navDirectory, _navPeople;
+           _navDocuments, _navPages, _navTags, _navDirectory;
     if (SurfaceLabels is not null)
     {
         try
@@ -186,7 +185,6 @@
             _navPages        = await SurfaceLabels.GetLabelAsync("pages",        "nav.pages",         navLang);
             _navTags         = await SurfaceLabels.GetLabelAsync("tags",         "nav.tags",          navLang);
             _navDirectory    = await SurfaceLabels.GetLabelAsync("directory",    "nav.directory",     navLang);
-            _navPeople       = await SurfaceLabels.GetLabelAsync("people",       "nav.people",        navLang);
         }
         catch
         {
@@ -194,7 +192,7 @@
             _navHome = "Home"; _navAnnouncements = "Announcements"; _navCommunity = "Community";
             _navGroups = "Groups"; _navEvents = "Events"; _navProjects = "Projects";
             _navInventory = "Inventory"; _navBookmarks = "Bookmarks"; _navNotes = "Notes"; _navDocuments = "Documents";
-            _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory"; _navPeople = "People";
+            _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory";
         }
     }
     else
@@ -203,7 +201,7 @@
         _navHome = "Home"; _navAnnouncements = "Announcements"; _navCommunity = "Community";
         _navGroups = "Groups"; _navEvents = "Events"; _navProjects = "Projects";
         _navInventory = "Inventory"; _navBookmarks = "Bookmarks"; _navNotes = "Notes"; _navDocuments = "Documents";
-        _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory"; _navPeople = "People";
+        _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory";
     }
 }
 <!DOCTYPE html>
@@ -455,12 +453,6 @@
                                         <li><a class="dropdown-item text-dark @(activeNav == "pages" ? "active" : null)" href="/pages"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-pages"/></svg>@_navPages</a></li>
                                         <li><a class="dropdown-item text-dark @(activeNav == "tags" ? "active" : null)" href="/tags"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-tags"/></svg>@_navTags</a></li>
                                         <li><a class="dropdown-item text-dark @(activeNav == "directory" ? "active" : null)" asp-controller="Directory" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-directory"/></svg>@_navDirectory</a></li>
-                                        @* M23 (ADR 0123 F6) — the "People" nav
-                                           entry (the find-people surface, /people):
-                                           next to Directory, the same
-                                           asp-controller/asp-action dropdown-item
-                                           shape. *@
-                                        <li><a class="dropdown-item text-dark @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-people"/></svg>@_navPeople</a></li>
                                     </ul>
                                 </li>
                             }
@@ -596,15 +588,6 @@
                             <span class="visually-hidden">@_navDirectory</span>
                             <span class="kmb-rail-label">@_navDirectory</span>
                             <span class="kmb-rail-tip">@_navDirectory</span>
-                        </a>
-                        @* M23 (ADR 0123 F6) — the "People" nav entry (the
-                           find-people surface, /people): next to Directory in
-                           the rail, the same rail-btn shape (a two-people icon). *@
-                        <a class="kmb-rail-btn @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index">
-                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-people"/></svg>
-                            <span class="visually-hidden">@_navPeople</span>
-                            <span class="kmb-rail-label">@_navPeople</span>
-                            <span class="kmb-rail-tip">@_navPeople</span>
                         </a>
                     }
                 </nav>

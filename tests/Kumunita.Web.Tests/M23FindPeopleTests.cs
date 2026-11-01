@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Security.Claims;
-using System.Text.RegularExpressions;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
@@ -45,13 +44,15 @@ namespace Kumunita.Web.Tests;
 ///       GET cannot carry a field into the <c>/people/tag/{slug}</c> path
 ///       segment without inline script — SECURITY.md §6) and <c>Index</c>
 ///       302-redirects to the canonical <c>ByTag</c> route.</item>
-/// <item><b>The paging (the ADR 0090 D6 idiom) + the nav entry (F6) + the six
-///       U05 kw-l keys non-empty in en/de/fr/da.</b> The view models carry the
-///       ADR 0090 D6 <c>HasMore</c> flag + page; the results views emit a
-///       "Next page" link only when <c>HasMore</c>; the <c>_Layout.cshtml</c>
-///       dropdown + rail carry the <c>nav.people</c> item linking to
-///       <c>/people</c>; and each of the six U05 keys carries a non-empty
-///       value in all four languages.</item>
+/// <item><b>The paging (the ADR 0090 D6 idiom) + the People section entry (F6)
+///       + the six U05 kw-l keys non-empty in en/de/fr/da.</b> The view models
+///       carry the ADR 0090 D6 <c>HasMore</c> flag + page; the results views
+///       emit a "Next page" link only when <c>HasMore</c>; the <c>/people</c>
+///       surface entry (the ADR 0123 F6 nav entry) now lives as a tab on the
+///       Directory page — a shared <c>_DirectoryTabs.cshtml</c> strip carrying
+///       a <c>nav.people</c> tab that links to <c>/people</c>, included by the
+///       <c>Directory</c> landing page — and each of the six U05 keys carries
+///       a non-empty value in all four languages.</item>
 /// <item><b>The find requires sign-in (F6, [Authorize]) + zero new
 ///       authorization surface (GATE-4, C-M23·2, D7).</b> A pin that
 ///       <see cref="FindPeopleController"/> carries <c>[Authorize]</c> (no
@@ -246,36 +247,35 @@ public sealed class M23FindPeopleTests
     // ── Face 5 — the nav entry (F6) + the six U05 kw-l keys ───────────────
 
     /// <summary>
-    /// F6 — the <c>_Layout.cshtml</c> carries a "People" nav item in <b>both</b>
-    /// variants (the variant-B "More ▾" dropdown next to Directory, and the
-    /// variant-C icon rail next to Directory), each linking to
-    /// <c>FindPeople/Index</c>. M29 (ADR 0152) resolves the item's *label* via
-    /// the <c>ISurfaceLabelsService</c> resolver (the U05 <c>nav.people</c>
-    /// key is the kw-l floor the resolver falls back to — a non-empty value in
-    /// the current language, the parity pin below) rather than the literal
-    /// <c>&lt;kw-l key="…"&gt;</c> markup, so this pin holds the LINK +
-    /// resolver invariants, not the old literal-key markup.
+    /// F6 — the "People" surface entry. The <c>/people</c> item was moved out
+    /// of the <c>_Layout.cshtml</c> top nav bar (the ADR 0123 F6 variant-B
+    /// "More ▾" dropdown + variant-C rail entry) into a tab on the Directory
+    /// page, so this pin now holds the <b>tab</b> invariants instead of the
+    /// nav-entry invariants: a shared <c>_DirectoryTabs.cshtml</c> strip
+    /// carries a "People" tab linking to <c>/people</c> (with the U05
+    /// <c>nav.people</c> kw-l key as the label floor — the M29 (ADR 0152)
+    /// resolver registry entry that stays, per the parity pin below) and the
+    /// <c>Directory</c> landing page includes that strip. A rename never moves
+    /// a link — "label, not re-route" — so the link target stays <c>/people</c>.
     /// </summary>
     [Fact]
-    public void Layout_Carries_APeopleNavEntry_InBothVariants()
+    public void Directory_Page_Carries_APeopleTab_LinkingTo_People()
     {
-        var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "Shared", "_Layout.cshtml");
-        Assert.True(File.Exists(path), $"_Layout.cshtml not found at {path}.");
-        var html = File.ReadAllText(path);
+        // The shared Directory · People tab strip: the "People" tab links to
+        // /people (the find-people surface) and carries the U05 nav.people
+        // kw-l key as its label floor.
+        var tabs = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "Shared", "_DirectoryTabs.cshtml");
+        Assert.True(File.Exists(tabs), $"_DirectoryTabs.cshtml not found at {tabs}.");
+        var tabsHtml = File.ReadAllText(tabs);
+        Assert.Contains("/people", tabsHtml);
+        Assert.Contains("nav.people", tabsHtml);
 
-        // Both variants link to the FindPeople controller (dropdown + rail) —
-        // the M29·9 link invariant (a rename never moves a link — "label, not
-        // re-route").
-        var findPeopleLinks = Regex.Matches(html, "asp-controller=\"FindPeople\"\\s+asp-action=\"Index\"");
-        Assert.True(findPeopleLinks.Count >= 2,
-            $"Expected ≥2 'FindPeople/Index' nav links (variant-B dropdown + variant-C rail); found {findPeopleLinks.Count}.");
-
-        // M29 (ADR 0152) drives the label via the resolver, with the U05
-        // nav.people key as the kw-l floor (the registry entry stays — ADR
-        // 0152 D3) and a non-empty value in all four languages (the parity pin
-        // below).
-        Assert.Contains("GetLabelAsync", html);
-        Assert.Contains("nav.people", html);
+        // The Directory landing page includes the strip (so the People surface
+        // is reachable from the Directory section — the nav entry's job, now
+        // carried by the tab).
+        var index = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "Directory", "Index.cshtml");
+        Assert.True(File.Exists(index), $"Directory/Index.cshtml not found at {index}.");
+        Assert.Contains("_DirectoryTabs", File.ReadAllText(index));
     }
 
     /// <summary>

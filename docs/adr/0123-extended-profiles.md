@@ -318,6 +318,24 @@ captioning (D8·6).
     **superseded**. No D# text is rewritten — this is the single
     D#-relevant clarification in the unit.
 
+- **2026-11-01 — F6 nav entry relocated from the top nav bar to a tab on the
+  Directory page.** The M23 find-people surface keeps its `/people` route and
+  the `nav.people` kw-l key (the label registry entry is untouched — a rename
+  never re-routes), but its **nav-bar entry** (the variant-B "More ▾" dropdown
+  item + the variant-C rail item beside Directory in `_Layout.cshtml`) is
+  removed. It is now reached through a **Directory · People tab strip**
+  (`src/Kumunita.Web/Views/Shared/_DirectoryTabs.cshtml`, the `_EventsTabs.cshtml`
+  nav-tabs idiom) that sits on the Directory landing page, so Directory and
+  People are sibling tabs of one section. Affected: `_Layout.cshtml` (the two
+  nav entries + the `_navPeople` label plumbing + the `/people` `activeNav`
+  mapping removed), the new `_DirectoryTabs.cshtml`, `Views/Directory/Index.cshtml`
+  (the tab strip included), and `M23FindPeopleTests`
+  (`Layout_Carries_APeopleNavEntry_InBothVariants` →
+  `Directory_Page_Carries_APeopleTab_LinkingTo_People`, pinning the tab strip
+  + its Directory inclusion instead of the nav entry). The `nav.people` key
+  stays registered in all four languages (the tab reuses it as its label
+  floor).
+
 ## Supersedes
 
 - **None.** M23 **extends the existing `Profile` doc + adds one composition
@@ -353,7 +371,8 @@ captioning (D8·6).
   (bio + tags surfaces) + the directory detail gate (bio + tags behind
   `Visibility`) (D2/D3/D5) (U04).
 - `src/Kumunita.Web/Controllers/FindPeopleController.cs` — new (the `/people`
-  by-tag + by-bio find-people surface + the nav entry) (D4/D6) (U05).
+  by-tag + by-bio find-people surface; the nav entry was moved to a tab on the
+  Directory page — see the 2026-11-01 amendment) (D4/D6) (U05).
 - `src/Kumunita.Web/Models/` + `src/Kumunita.Web/Views/` — the profile
   editor/detail + find-people view models + views (U04/U05).
 - `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four locale
