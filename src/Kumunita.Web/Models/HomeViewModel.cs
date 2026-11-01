@@ -22,13 +22,15 @@ public sealed record HomeViewModel(
     HomeUpcoming? Upcoming = null);
 
 /// <summary>
-/// The /home "what's new" feed (signed-in visitors only): the latest of
-/// each surface — posts (the /community all-sections feed), announcements
-/// (the /announcements visible list), pages (the /pages tree). Each row is
-/// display-shaped: the title/preview in the viewer's language when a
-/// translation exists (the ADR 0051 / 0022 floor), else the authored-in
-/// text. No decision data leaks — only rows the viewer's own feed reads
-/// already surfaced.
+/// The /home "what's new" feed (every visitor, signed-in or not): the
+/// latest of each surface — posts (the /community all-sections feed;
+/// always audience-restricted so the column is empty for an anonymous
+/// visitor), announcements (the /announcements visible list; an anonymous
+/// visitor sees public-scope only), and pages (the /pages tree; an
+/// anonymous visitor sees public pages only). Each row is display-shaped:
+/// the title/preview in the viewer's language when a translation exists
+/// (the ADR 0051 / 0022 floor), else the authored-in text. No decision
+/// data leaks — only rows the viewer's own feed reads already surfaced.
 /// </summary>
 public sealed record HomeFeed(
     IReadOnlyList<HomeFeedRow> Posts,

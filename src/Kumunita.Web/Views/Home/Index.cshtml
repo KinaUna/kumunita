@@ -299,7 +299,10 @@
     </section>
 }
 
-<!-- ══════════ 3. What's new (signed-in visitors only) ══════════ -->
+<!-- ══════════ 3. What's new (every visitor; posts/announcements/pages columns
+     each degrade to the anonymous-visible subset — the posts column is
+     structurally empty for an anonymous visitor since posts are always
+     audience-restricted) ══════════ -->
 @if (Model.Feed is { } feed)
 {
     <section class="kmb-section" aria-label="@ariaWhatsNew">

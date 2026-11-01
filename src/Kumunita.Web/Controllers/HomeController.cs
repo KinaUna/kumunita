@@ -338,16 +338,23 @@ public class HomeController : Controller
     // ── the signed-in "what's new" feed ────────────────────────────────────
 
     /// <summary>
-    /// Assembles the feed for a signed-in visitor, or null for an anonymous
-    /// one. Each column is built independently and best-effort: a missing
+    /// Assembles the feed for the current visitor (anonymous or signed-in).
+    /// Each column is built independently and best-effort: a missing
     /// seam or a read failure yields an empty column, never an error page —
     /// the home page must always render the hero + roadmap.
+    /// For an anonymous visitor the posts column is always empty (posts are
+    /// always audience-restricted — <c>Post.Audience</c> is non-null, so the
+    /// frozen <c>Decide()</c> has no "public" branch for them); the
+    /// announcements column shows only public-scope announcements
+    /// (<see cref="Kumunita.Core.Announcements.IAnnouncementService
+    /// .ListVisibleAsync"/> with a null actor returns public-only); and the
+    /// pages column shows only public pages (<c>Page.Audience</c> is null —
+    /// the <c>Decide()</c> branch 5 "public" path, the only branch that
+    /// matches an anonymous actor).
     /// </summary>
     private async Task<HomeFeed?> BuildFeedAsync()
     {
         var subjectId = KumunitaPrincipal.SubjectId(User);
-        if (subjectId is null)
-            return null;
 
         // ADR 0051 — one per-request language read for the whole feed; null
         // (no provider / no language chain) means "show authored-in".
@@ -364,10 +371,14 @@ public class HomeController : Controller
             }
         }
 
-        var roles = User.Claims
+        // User can be null in a controller-without-context test construction —
+        // the role set is empty (the anonymous/unsigned shape, the same floor
+        // ListVisibleAsync applies for a null actor).
+        var roles = User?.Claims
             .Where(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role)
             .Select(c => c.Value)
-            .ToHashSet(StringComparer.Ordinal);
+            .ToHashSet(StringComparer.Ordinal)
+            ?? new HashSet<string>(StringComparer.Ordinal);
 
         return new HomeFeed(
             Posts: await BuildPostRowsAsync(subjectId, effLang).ConfigureAwait(false),
@@ -382,9 +393,13 @@ public class HomeController : Controller
     /// truncated to <see cref="FeedRowsPerColumn"/>. The post's community
     /// name becomes the row badge (the ADR 0026 / 0051 floor).
     /// </summary>
-    private async Task<IReadOnlyList<HomeFeedRow>> BuildPostRowsAsync(string subjectId, string? effLang)
+    private async Task<IReadOnlyList<HomeFeedRow>> BuildPostRowsAsync(string? subjectId, string? effLang)
     {
-        if (Posts is null || UserInfo is null)
+        // Posts are always audience-restricted (Post.Audience is non-null —
+        // invariant C1), so the frozen Decide() has no "public" branch for
+        // them. An anonymous visitor (subjectId is null) therefore never
+        // sees any posts — the column is structurally empty, no service call.
+        if (Posts is null || UserInfo is null || subjectId is null)
             return [];
         try
         {
@@ -465,7 +480,7 @@ public class HomeController : Controller
     /// "pinned" badge (the layout's existing pin concept).
     /// </summary>
     private async Task<IReadOnlyList<HomeFeedRow>> BuildAnnouncementRowsAsync(
-            string subjectId, System.Collections.Generic.IReadOnlySet<string> roles, string? effLang)
+            string? subjectId, System.Collections.Generic.IReadOnlySet<string> roles, string? effLang)
     {
         if (Announcements is null)
             return [];
@@ -514,7 +529,7 @@ public class HomeController : Controller
     /// <see cref="IAuthorizationService.CanSeeAsync"/>>), truncated to
     /// <see cref="FeedRowsPerColumn"/>>.
     /// </summary>
-    private async Task<IReadOnlyList<HomeFeedRow>> BuildPageRowsAsync(string subjectId, string? effLang)
+    private async Task<IReadOnlyList<HomeFeedRow>> BuildPageRowsAsync(string? subjectId, string? effLang)
     {
         if (Pages is null || Authz is null)
             return [];
@@ -523,6 +538,9 @@ public class HomeController : Controller
             var tree = await Pages.GetTreeAsync().ConfigureAwait(false);
 
             // (1) the author-only draft gate (the /pages tree browse's shape)
+            //     — for an anonymous visitor (subjectId is null) every draft
+            //     is excluded (a draft is visible only to its author, and no
+            //     page has a null author).
             var candidate = tree
                 .Where(p => !(p.IsDraft && !string.Equals(p.AuthorId, subjectId, StringComparison.Ordinal)))
                 .ToList();
@@ -531,8 +549,12 @@ public class HomeController : Controller
 
             // (2) the Read decision over the whole candidate set — ONE
             //     CanSeeAsync (the /pages aggregate shape, not one per page).
+            //     For an anonymous visitor the actor id is the empty string;
+            //     the frozen Decide() branch 5 (Audience is null → public)
+            //     is the only branch that matches, so only public pages are
+            //     visible — exactly the /pages tree-browse behavior.
             var visibleIds = (await Authz.CanSeeAsync(
-                    subjectId, AccessAction.Read,
+                    subjectId ?? string.Empty, AccessAction.Read,
                     candidate.Select(p => new PageToAuditableResource(p)))
                 .ConfigureAwait(false)).Visible
                 .Select(v => v.Id)
