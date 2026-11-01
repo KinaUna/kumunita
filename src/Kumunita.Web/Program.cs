@@ -979,7 +979,7 @@ builder.UseWolverine(opts =>
     // Per-type service-location opt-ins (Wolverine 6.x default is
     // ServiceLocationPolicy.NotAllowed; 5.x was AllowedButWarn — see
     // WolverineOptions.ServiceLocationPolicy XML doc + wolverine#2584). The
-    // three services below are registered in Kumunita.Core/DependencyInjection.cs
+    // four services below are registered in Kumunita.Core/DependencyInjection.cs
     // as opaque lambda factories (or, for IUserInfoService, the impl's ctor
     // takes IServiceProvider? as a circular-dependency escape hatch — see
     // UserInfoService.cs lines 57-71), so the generated handler code cannot
@@ -988,16 +988,20 @@ builder.UseWolverine(opts =>
     // when you have to" — is the surgical alternative to a global
     // ServiceLocationPolicy change: the strict default stays in force for every
     // future opaque service (which will still fail fast at first dispatch), but
-    // these three known-good services are allowed to be service-located.
+    // these four known-good services are allowed to be service-located.
     //
-    // The failing handlers (EventReminderTick, NotificationFlushTick) are the
-    // only two §6.4 jobs whose handler signatures cross into opaque-land — the
-    // other three (AuditPurgeTick / UsagePurgeTick / StorageMetricsCaptureTick)
-    // take only IDocumentStore + IOptions<T>, both transparent. See the app
-    // log: "InvalidServiceLocationException … ServiceLocationPolicy.NotAllowed
-    // is in effect" on the first dispatch of each.
+    // The §6.4 jobs whose handler signatures cross into opaque-land are
+    // EventReminderTick (IMailerStage), NotificationFlushTick (IMailerStage +
+    // IUserInfoService) and StorageMetricsCaptureTick (IStorageMetricsService —
+    // added in M33, commit 6132f7d0, when the handler signature gained the
+    // IStorageMetricsService param; the opt-in was missed then and the envelopes
+    // went to the error queue). AuditPurgeTick / UsagePurgeTick take only
+    // IDocumentStore + IOptions<T>, both transparent, so need no opt-in. See
+    // the app log: "InvalidServiceLocationException … ServiceLocationPolicy.
+    // NotAllowed is in effect" on the first dispatch of each.
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Identity.IMailerStage>();
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Notifications.NotificationService>();
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Usage.IStorageMetricsService>();
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.UserInfo.IUserInfoService>();
 });
 
