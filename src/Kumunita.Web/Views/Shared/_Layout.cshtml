@@ -314,9 +314,15 @@
             kmbKiosk = false; // missing context — not kiosk (the floor).
         }
     }
+    // ADR 0285 D5 — a kiosk slide hides comment threads, replies and RSVP
+    // lists unless its playlist entry shows them; the kiosk passes
+    // ?kioskComments=1 on the framed route, and the kmb-kiosk-comments class
+    // lets site.css keep the .kmb-discussion sections visible. Display-only.
+    bool kmbKioskComments = kmbKiosk
+        && string.Equals(Context.Request.Query["kioskComments"].ToString(), "1", StringComparison.Ordinal);
 }
 
-<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null) @(kmbKiosk ? "kmb-kiosk" : null)">
+<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null) @(kmbKiosk ? "kmb-kiosk" : null) @(kmbKioskComments ? "kmb-kiosk-comments" : null)">
     <partial name="_IconSprite" />
     @* Flash toast — the one, uniform flash-message surface (TempData["info"]
        / ["error"]). Renders a fixed top-right Bootstrap toast when the

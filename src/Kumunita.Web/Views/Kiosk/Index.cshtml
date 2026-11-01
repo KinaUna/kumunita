@@ -28,6 +28,9 @@
   the iframe) is already hidden by the layout's body.kmb-embed rules (the
   Sec-Fetch-Dest: iframe signal). No inline <script> (script-src 'self'); no new
   npm package (M35·7).
+  ADR 0285 — each slide's meta carries its own duration (data-duration) and
+  scroll behaviour (data-scroll); the stage carries the default duration and
+  the playlist's scroll speed. kiosk.ts plays them.
   The display mode (the ADR 0164 amendment "full page vs. full screen") is
   declared on #kiosk-stage as data-display-mode; kiosk.ts reads it and, for
   FullScreen, requests the browser's Fullscreen API on the stage (the board /
@@ -107,8 +110,9 @@
 </style>
 
 <div id="kiosk-stage"
-     data-view-interval="@Model.DefaultDurationSeconds"
+     data-default-duration="@Model.DefaultDurationSeconds"
      data-refresh-interval="@Model.RefreshIntervalSeconds"
+     data-scroll-speed="@(Model.ScrollSpeed.ToString().ToLowerInvariant())"
      data-slide-count="@Model.Slides.Count"
      data-display-mode="@(Model.DisplayMode.ToString().ToLowerInvariant())">
     @if (Model.DisplayMode == KioskDisplayMode.FullScreen)
@@ -145,7 +149,9 @@
                  data-href="@(slide.Href ?? string.Empty)"
                  data-denied="@slide.Denied.ToString().ToLowerInvariant()"
                  data-label="@(slide.Label ?? slide.Title ?? string.Empty)"
-                 data-fingerprint="@(slide.Fingerprint ?? string.Empty)"></div>
+                 data-fingerprint="@(slide.Fingerprint ?? string.Empty)"
+                 data-duration="@slide.DurationSeconds"
+                 data-scroll="@(slide.Scroll.ToString().ToLowerInvariant())"></div>
         }
 
         @* The initial (first) slide: the iframe (the surface's own route), or

@@ -389,7 +389,7 @@ public sealed class KioskController : Controller
             ? KioskResolvedItem.Hidden
             : await catalog.ResolveAsync(entry, actorId, roles, ct).ConfigureAwait(false);
 
-        if (!resolved.Visible || resolved.Href is null)
+        if (!resolved.Visible || resolved.Href is not { } baseHref)
             return DeniedSlide(index, entry);
 
         var version = resolved.Version;
@@ -407,14 +407,35 @@ public sealed class KioskController : Controller
             }
         }
 
+        // ADR 0285 D5 — comments / replies / RSVP lists are hidden on a slide
+        // unless the entry shows them; the flag rides to the framed page as a
+        // query parameter that _Layout turns into the kmb-kiosk-comments body
+        // class (display-only — the framed route's own read is unchanged).
+        var href = entry.ShowComments && HasDiscussion(entry.Type)
+            ? AppendQuery(baseHref, CommentsQueryKey, "1")
+            : baseHref;
+
         return new KioskSlideViewModel(
-            index, entry.Type, entry.Label, resolved.Href, Denied: false,
+            index, entry.Type, entry.Label, href, Denied: false,
             Fingerprint: KioskFingerprint.Of(version),
             DurationSeconds: entry.DurationSeconds,
             Scroll: entry.Scroll,
             ShowComments: entry.ShowComments,
             Title: resolved.Title);
     }
+
+    /// <summary>The query parameter that asks a framed page to keep its
+    /// comments / replies / RSVP list visible (ADR 0285 D5; read by _Layout).</summary>
+    public const string CommentsQueryKey = "kioskComments";
+
+    /// <summary>The types whose detail page has a comment thread, replies or
+    /// an RSVP list (ADR 0285 D5).</summary>
+    internal static bool HasDiscussion(KioskItemType type) => type is
+        KioskItemType.Todo or KioskItemType.Event or KioskItemType.Announcement
+        or KioskItemType.CommunityPost or KioskItemType.GroupPost;
+
+    private static string AppendQuery(string href, string key, string value) =>
+        href + (href.Contains('?') ? "&" : "?") + Uri.EscapeDataString(key) + "=" + Uri.EscapeDataString(value);
 
     private async Task<string> CalendarVersionAsync(KioskEntry entry, string actorId, CancellationToken ct)
     {

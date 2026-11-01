@@ -551,17 +551,17 @@
             }
         }
 
-        <h2 id="replies" class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 id="replies" class="h5 mt-4 mb-2 kmb-section-title kmb-discussion" style="font-weight:600;">
             <kw-l key="posts.replies_heading">Replies</kw-l> <span class="text-muted">(@Model.Replies.Count)</span>
         </h2>
 
         @if (Model.Replies.Count == 0)
         {
-            <p class="text-muted"><kw-l key="posts.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l></p>
+            <p class="text-muted kmb-discussion"><kw-l key="posts.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l></p>
         }
         else
         {
-            <ul class="kmb-detail-comments list-unstyled p-0 mb-4">
+            <ul class="kmb-detail-comments kmb-discussion list-unstyled p-0 mb-4">
                 @foreach (var r in Model.Replies)
                 {
                     <partial name="_PostReply" model="new PostReplyModel(r, postId, Model.Languages, defaultVariant, confirmRemoveTrans, confirmDeleteReply, ariaActionsFor, reportReasonPlaceholder)" />
@@ -570,7 +570,7 @@
             </ul>
         }
 
-        <h2 class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 class="h5 mt-4 mb-2 kmb-section-title kmb-composer-title" style="font-weight:600;">
             @if (Model.IsAuthor)
             {
                 <text><kw-l key="posts.reply_heading_author">Reply (you are the author of this post)</kw-l></text>

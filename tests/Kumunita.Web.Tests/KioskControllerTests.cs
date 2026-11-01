@@ -368,6 +368,62 @@ public class KioskControllerTests
         }
     }
 
+    // ── ADR 0285 D4 / D5 — playback attributes and the comments toggle ─────
+
+    [Theory]
+    [InlineData(KioskItemType.Announcement, true, "/announcements/a-1", "/announcements/a-1?kioskComments=1")]
+    [InlineData(KioskItemType.Announcement, false, "/announcements/a-1", "/announcements/a-1")]
+    [InlineData(KioskItemType.Page, true, "/pages/bins", "/pages/bins")]                   // no discussion on a page
+    [InlineData(KioskItemType.Todo, true, "/projects/todos/t-1", "/projects/todos/t-1?kioskComments=1")]
+    public async Task ADR0285_ShowComments_AddsTheQueryFlag_OnlyWhereThereIsADiscussion(
+        KioskItemType type, bool showComments, string resolvedHref, string expectedHref)
+    {
+        var (controller, kiosk, catalog, _, _) = Build(role: Member);
+        var entry = new KioskEntry { Type = type, ItemId = "x", ShowComments = showComments };
+        kiosk.GetPlaylistAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
+        {
+            Id = Subject,
+            Entries = [entry],
+        });
+        catalog.ResolveAsync(entry, Subject, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new KioskResolvedItem(true, "Item", resolvedHref, "v"));
+
+        var action = await controller.Slide(slide: 0, t: 1, ct: Ct);
+        var vm = Assert.IsType<KioskSlideRefreshViewModel>(Assert.IsType<JsonResult>(action).Value);
+
+        Assert.Equal(expectedHref, vm.Href);
+    }
+
+    [Fact]
+    public void ADR0285_PlaybackAndCommentsWiring_IsInPlace()
+    {
+        // The stage + slide meta carry what kiosk.ts plays.
+        var index = ViewSource("Kiosk", "Index.cshtml");
+        Assert.Contains("data-default-duration=", index);
+        Assert.Contains("data-scroll-speed=", index);
+        Assert.Contains("data-duration=", index);
+        Assert.Contains("data-scroll=", index);
+
+        // The layout turns ?kioskComments=1 into the body class …
+        var layout = ViewSource("Shared", "_Layout.cshtml");
+        Assert.Contains("kmb-kiosk-comments", layout);
+        Assert.Contains("kioskComments", layout);
+
+        // … site.css hides the discussion sections without it …
+        var css = File.ReadAllText(Path.Combine(RepoRoot, "src", "Kumunita.Web", "wwwroot", "css", "site.css"));
+        Assert.Contains("body.kmb-kiosk:not(.kmb-kiosk-comments) .kmb-discussion", css);
+
+        // … and every detail page with a discussion marks it.
+        foreach (var (folder, view) in new[]
+        {
+            ("Posts", "Detail.cshtml"), ("Groups", "PostDetail.cshtml"), ("Announcement", "Detail.cshtml"),
+            ("Projects", "TodoDetail.cshtml"), ("Event", "Detail.cshtml"), ("Groups", "EventDetail.cshtml"),
+        })
+        {
+            Assert.Contains("kmb-discussion", ViewSource(folder, view));
+        }
+    }
+
     // ── ADR 0285 — the playlist editor's item picker ──────────────────────
 
     [Fact]

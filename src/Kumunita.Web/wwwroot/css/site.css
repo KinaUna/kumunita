@@ -843,6 +843,25 @@ body.kmb-kiosk .kanban-divided-menu {
 body.kmb-kiosk .head-row > .d-flex {
   display: none !important;
 }
+/* ADR 0285 D5 — comment threads, replies and event RSVP lists (the
+   .kmb-discussion sections of the detail pages) are hidden on a kiosk slide
+   unless the playlist entry shows them (the kiosk passes ?kioskComments=1 and
+   _Layout adds .kmb-kiosk-comments). Comment composers are always hidden on
+   a slide: a wall display does not take input. */
+body.kmb-kiosk:not(.kmb-kiosk-comments) .kmb-discussion,
+body.kmb-kiosk .kmb-detail-composer,
+body.kmb-kiosk .kmb-composer-title {
+  display: none !important;
+}
+/* ADR 0285 D4 — a slide may be scrolled by the kiosk (auto-scroll); a wall
+   display shows no scrollbar while it does. */
+html:has(> body.kmb-kiosk) {
+  scrollbar-width: none;
+}
+html:has(> body.kmb-kiosk)::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
 
 .lead {
   font-weight: 400;
