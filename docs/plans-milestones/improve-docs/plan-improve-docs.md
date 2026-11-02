@@ -3,7 +3,7 @@ id: plan-improve-docs
 title: "Plan: IMPROVE-DOCS — differentiate and link the documentation"
 tier: living
 kind: plan
-status: proposed
+status: in-progress
 audiences: [developer, agent, platform-maintainer]
 lane: improve-docs
 related:
@@ -124,6 +124,12 @@ The archive move goes early because it is mechanical and every later unit
 links to post-move paths; gates tighten last so no unit is blocked by
 a half-applied rule.
 
+### Unit progress
+
+- `D00` — ✅ (commit `264acf36`, 2026-11-02)
+- `D01` — ✅ (2026-11-02)
+- `D02`–`D14` — not started
+
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
   ADR cap, "link, don't backtick" rule, "one fact, one place" rule).
@@ -132,10 +138,10 @@ a half-applied rule.
   archive in `D02`). Add `docs-report.ps1`: abstract and front-matter coverage,
   inbound/outbound link counts, orphans, broken links, ADR length histogram.
 - Commit the baseline report next to this plan (the numbers above, script-reproduced).
-- // TODO ❓ wire `docs-check` into `.github/workflows/ci.yml` now (as
-  report-only) or only at `D14`?
+- **Resolved (2026-11-02):** wire `docs-check` into CI at `D14` (not now) —
+  the report-only phase ends with the close gate.
 
-### `D01` — Docs map + per-audience entry pages
+### `D01` — Docs map + per-audience entry pages ✅
 - `docs/README.md` (the map) + `docs/start/{resident,community-admin,platform-maintainer,developer,agent}.md`.
 - Entry pages contain **links and one-line reasons only** — no facts — so
   they cannot drift. They link to *current* paths and are updated by each
@@ -143,6 +149,11 @@ a half-applied rule.
 - Resident / community-admin pages link to the in-app guide registry
   (`docs/guides/CONVENTIONS.md`) and `philosophy/everyday-life.md` rather than
   restating them.
+- **Shipped 2026-11-02:** all six files landed with front-matter + abstract;
+  the D00 open decision (CI wiring) is resolved as `D14`. Entry pages link to
+  the *intended* paths for the not-yet-created folders (`docs/dev/`,
+  `docs/product/`, `docs/security/`) so the seams stay green as `D04`–`D08`
+  run.
 
 ### `D02` — Archive move (scripted)
 - `git mv docs/plans-milestones/done/* docs/archive/lanes/` (keeps history/blame).
