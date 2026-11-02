@@ -30,7 +30,7 @@ the platform for one community. The docs below are the ones that matter for
 | Link | Why |
 |---|---|
 | [`docs/OPS.md`](../OPS.md) | The ops runbook — the hub: a "when to use each" table linking into [`docs/ops/`](../ops/) (one file per procedure, split in `D04`). |
-| [`docs/COOLIFY.md`](../COOLIFY.md) | The Coolify deployment guide, step by step. The hub; `D05` splits it into one file per step. |
+| [`docs/COOLIFY.md`](../COOLIFY.md) | The Coolify deployment guide — the hub: an ordered checklist (0 → 6) linking into [`docs/deploy/coolify/`](../deploy/coolify/00-plan.md) (one file per step, split in `D05`). |
 | [`SECURITY.md`](../../SECURITY.md) | The privacy model and threat model — the authoritative constraint on the controls you operate. `D08` splits this into `docs/security/`. |
 | [`SECURITY-AUDIT.md`](../../SECURITY-AUDIT.md) | The audit cadence and the checklists (C / D / P / R) — the "did we do the thing" loop. `D08` splits this too. |
 | [`SECURITY-VDP.md`](../../SECURITY-VDP.md) | The vulnerability disclosure policy — how to report and how reports are handled. `D08` moves this to repo-root `SECURITY.md`. |

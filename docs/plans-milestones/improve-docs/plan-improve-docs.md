@@ -131,7 +131,8 @@ a half-applied rule.
 - `D02` — ✅ (2026-11-02)
 - `D03` — ✅ (commit `d89163f7`, 2026-11-02)
 - `D04` — ✅ (commit `782eca22`, 2026-11-02)
-- `D05`–`D14` — not started
+- `D05` — ✅ (2026-11-02)
+- `D06`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -225,12 +226,27 @@ a half-applied rule.
   links unchanged (9); front-matter 625 → 641, abstracts 606 → 616
   (the 15 new files + the rewritten hub).
 
-### `D05` — Split `docs/COOLIFY.md` → `docs/deploy/coolify/`
+### `D05` — Split `docs/COOLIFY.md` → `docs/deploy/coolify/` ✅
 - One file per numbered step (0 plan … 6 verify) + troubleshooting; step 5
   "the app" (~310 lines) splits further by concern (env vars, volumes,
   health checks, …).
 - Hub: an ordered checklist linking each step; the "switch to the runbook"
   handoff becomes an explicit link into `docs/ops/`.
+- **Shipped 2026-11-02:** 7 top-level step files (`00-plan` … `60-verify` +
+  `troubleshooting`) + 7 `step-5/` files (`00-overview`, `51-smtp`,
+  `52-data-protection`, `52a-media-volume`, `53-domains`, `54-health-check`,
+  `55-deploy`) landed under `docs/deploy/coolify/`, each with front-matter
+  (`tier: reference` / `kind: runbook`) + Abstract; `COOLIFY.md` is now the
+  54-line hub (abstract + the ordered 0 → 6 checklist, all real links).
+  Cross-references inside the split became real relative links — the
+  `OPS §N` / `OPS Procedure N` mentions now *call* the matching runbook in
+  `docs/ops/`, and the `§5.1` / `§5.2` / `§5.2A` / `§4` / `§2` / `§6` mentions
+  became links to the sibling step files. The stale `COOLIFY.md §N` pointers in
+  the living docs that *did* name a section (`adr/0131`, `adr/README`,
+  `ops/configuration-reference`, `SECURITY-AUDIT`) were re-pointed at the step
+  file that now owns that section (the "one fact, one place" rule); the
+  `ops/environments.md` + `ops/tls-domain.md` refs that just point at the hub
+  stay as-is.
 
 ### `D06` — Slim `AGENTS.md`
 - `AGENTS.md` is loaded into every agent session, so **its length is a

@@ -13,7 +13,7 @@ on the BCL `System.Net.Mail.SmtpClient`.
 
 The BCL `SmtpClient` had a documented limitation — the .NET API reference for
 `SmtpClient.EnableSsl` is explicit that the implicit-TLS / SMTPS model (port
-465) is **not** supported. This was recorded in `COOLIFY.md` §5.1B as a
+465) is **not** supported. This was recorded in `deploy/coolify/step-5/51-smtp.md` as a
 "relay-swap or implementation-change" note.
 
 On the 2026-10-02 VPS deployment (Proton Mail SMTP submission,
@@ -67,7 +67,7 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
   `MailKit.ProtocolException`). The cooldown list (6 attempts / ~24 h, the
   §6.2 shape) and the `Fault<OutboxEmail>` dead-letter path are untouched.
 - `Kumunita.Core.csproj` — adds `MailKit` 4.18.1 (pulls `MimeKit`).
-- `COOLIFY.md` §5.1 / §5.1B — the "465 is not supported" note is superseded;
+- `deploy/coolify/step-5/51-smtp.md` (the real-relay shape) — the "465 is not supported" note is superseded;
   `SMTP__Secure=Ssl` is now a first-class value
   (`SecureSocketOptions.SslOnConnect`).
 
@@ -115,7 +115,7 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
     path. The 8 queued `OutboxEmail` rows (the `Fail:` lines in the boot log)
     drain on the next handler tick under the existing retry policy.
   - **465 / implicit TLS (SMTPS) is now a first-class shape** — the
-    `COOLIFY.md` §5.1B "relay swap or implementation change" escape hatch is
+    `deploy/coolify/step-5/51-smtp.md` "relay swap or implementation change" escape hatch is
     retired; `SMTP__Secure=Ssl` + `SMTP__Port=465` is a legitimate
     configuration for a 465-only relay.
   - The `SmtpProbe` (the /health diagnostic) and the real send now share the
@@ -164,7 +164,7 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
   `mailDetail: null`), and the app's `SmtpFailedRecipientException` on
   `OutboxEmail#08df20a5` (and 7 sibling rows) — all reproduced on the same
   container, same credentials, same network path.
-- `COOLIFY.md` §5.1 / §5.1B (the pre-swap "465 is not supported" note, now
+- `deploy/coolify/step-5/51-smtp.md` (the pre-swap "465 is not supported" note, now
   superseded).
 - `src/Kumunita.Core/Identity/SmtpProbe.cs` (the hand-rolled sockets
   handshake the /health diagnostic uses — unchanged, now a faithful proxy for
@@ -175,4 +175,4 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
   + dead-letter shape this ADR leaves untouched).
 - The .NET API reference for `System.Net.Mail.SmtpClient.EnableSsl` (the
   original "implicit TLS is not supported" statement that motivated the
-  escape-hatch note in `COOLIFY.md` §5.1B).
+  escape-hatch note in `deploy/coolify/step-5/51-smtp.md`).

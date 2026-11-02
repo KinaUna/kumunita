@@ -43,7 +43,7 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | `architecture/` | `ARCHITECTURE.md` split by section (the hub stays at `docs/ARCHITECTURE.md`) |
 | `security/` | threat model, control map, audit checklists (split from `SECURITY.md` in `D08`) |
 | [`ops/`](ops/) | one runbook per procedure (split from the [`OPS.md`](OPS.md) hub in `D04`) |
-| `deploy/coolify/` | the Coolify guide, one step per file (split from `COOLIFY.md` in `D05`) |
+| [`deploy/coolify/`](deploy/coolify/00-plan.md) | the Coolify guide, one step per file (split from the [`COOLIFY.md`](COOLIFY.md) hub in `D05`) |
 | `dev/` | running locally, tests, CI cheatsheet, Razor doctrine, terminal/browser quirks |
 | `product/` | features, roadmap, deferred-by-design (from `README.md` in `D07`) |
 | [`philosophy/`](philosophy/README.md) | the trust model and the integration argument (unchanged shape) |
@@ -54,7 +54,7 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 
 Folders still marked "split in `D…`" don't exist yet — the lanes are running in
 order; the entry pages link to the *intended* paths so the seams stay green.
-(`ops/` landed in `D04`; the rest follow.)
+(`ops/` landed in `D04`; `deploy/coolify/` in `D05`; the rest follow.)
 
 ## Per-audience entry pages
 

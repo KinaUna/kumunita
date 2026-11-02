@@ -134,7 +134,7 @@ served.
   - (b) **`/health`:** anonymous `GET /health` returns only the minimal
     liveness payload; the full payload requires the `X-Health-Token` header
     matching `Health__Token` (or a GlobalAdmin session). Set `Health__Token`
-    (COOLIFY.md §6).
+    (deploy/coolify/60-verify.md).
   - (c) **`AllowedHosts`:** set to the community's public host (in-repo stays
     `*` for dev); optionally set `WellKnown__BaseUrl` so `security.txt`
     carries the public origin.
@@ -253,7 +253,7 @@ No PII — test class names and lane IDs only.
 |---------|--------|-----------------|--------------------|
 | H1 — import trusts archive rows | fixed | U4–U6 (guard → classify → resolve) | `ImportOwnershipGuardTests` (10), `UserPortabilityHostileClassifyTests` (4), `UserPortabilityHostileResolveTests` (5) |
 | H2 — GlobalAdmin 2FA is a redirect | fixed | U7–U8 (`AdminTwoFactorMiddleware`, registered post-auth) | `AdminTwoFactorMiddlewareTests` (7) |
-| H3 — forwarded headers no-op | fixed | U9–U10 (`ForwardedHeadersSetup` + `Secure` cookie policy) | `ForwardedHeadersSetupTests` (4); the cookie-policy wiring test is waived per design §2.3 (COOLIFY.md §6 checklist is the evidence) |
+| H3 — forwarded headers no-op | fixed | U9–U10 (`ForwardedHeadersSetup` + `Secure` cookie policy) | `ForwardedHeadersSetupTests` (4); the cookie-policy wiring test is waived per design §2.3 (deploy/coolify/60-verify.md checklist is the evidence) |
 | M1 — seven POSTs unvalidated | fixed | U11 (no-op, verified) + U12 (global filter + 2-token allow-list) | `AntiforgeryCoverageTests` (2) |
 | M2 — zip bomb + un-gated import media | fixed | U13–U14 (`ArchiveLimits`, import media gate, `upload` limiter) | `KumunitaArchiveLimitsTests` (4), `UserPortabilityMediaGateTests` (3) |
 | M3 — anonymous writes unthrottled | fixed | U15 (limiter + size cap + `[MaxLength(4000)]`) | `AnonymousWriteLimitsTests` (3) |
