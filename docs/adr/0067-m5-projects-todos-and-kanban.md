@@ -44,7 +44,7 @@ is the only roadmap move: M5 `StatusNext` → `StatusDone`, M6
 `MilestonesTests.cs`).
 
 **The canonical-names decision (recorded here, the M4 field-naming-decision
-precedent):** `docs/ARCHITECTURE.md` §5 sketches the context as
+precedent):** the [data model](../architecture/data-model.md) sketches the context as
 `Project { id, title, description, componentId?, ownerId, status, audience,
 created }`, `ProjectTask { id, projectId, title, assigneeId?, done, order }`,
 `ProjectMember { id, projectId, userId, role }`. This ADR settles the
@@ -54,9 +54,9 @@ canonical names as **`TodoItem`** (the to-do / work item), **`KanbanBoard`**
 / `ProjectTask` / `ProjectMember` do not exist** — the §5 sketch is the
 pre-decision shape; "project" is not a distinct document in M5 (a to-do is
 the unit, a board is the container). **The M5 close unit (U13) rewrites the
-ARCHITECTURE.md §5 `Projects` block + the §3 tree's `Projects/` line to these
+[data model — Projects](../architecture/data-model.md) block + the [solution layout](../architecture/solution-layout.md) tree's `Projects/` line to these
 names** (per the AGENTS.md doc↔code parity rule), so no unit in U02–U12
-touches that file.
+touches those files.
 
 **The one constraint:** the milestone is **additive and reusing.** The
 `Audience` doc (ADR 0001-B / 0036), the

@@ -35,7 +35,7 @@ the platform for one community. The docs below are the ones that matter for
 | [`SECURITY-AUDIT.md`](../SECURITY-AUDIT.md) | The audit cadence and the checklists (C / D / P / R) — the "did we do the thing" loop (the audit hub, split into [`audit-checklists`](../security/audit-checklists.md) / [`audit-annual-trigger`](../security/audit-annual-trigger.md) / [`audit-log`](../security/audit-log.md) in `D08`). |
 | [`SECURITY.md`](../../SECURITY.md) | The vulnerability disclosure policy — how to report and how reports are handled (moved to repo-root `SECURITY.md` in `D08`; the machine-readable companion is served at `GET /.well-known/security.txt`). |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The platform's philosophy — the trust model and the integration argument that the controls are built to hold. |
-| [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) | The architecture map — the stack, the bounded contexts, the CQRS convention, the extension seams. |
+| [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) | The architecture map — the hub: the stack, the bounded contexts, and a table of sections (the deep sections split into [`docs/architecture/`](../architecture/identity-access.md) in `D09`). |
 
 The community's own admins (the moderators and global admins of the
 neighborhood you're hosting) read the

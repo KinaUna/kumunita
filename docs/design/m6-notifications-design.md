@@ -1,7 +1,7 @@
 # M6 — Notifications — design (Parts 1 + 2)
 
 > **Milestone.** `M6` — the **shared awareness** arrow (the
-> `docs/ARCHITECTURE.md` §0 value-chain row: *"the platform reaches out to
+> [value-chain milestone table](../ARCHITECTURE.md): *"the platform reaches out to
 > the resident where they are"*, already pinned). **ADR 0076** is this
 > milestone's decision record — **authored Accepted by U01**; the decisions
 > D1–D11 below are the `[PROPOSED]` text U01 locked verbatim into it.
@@ -26,7 +26,7 @@
 ## 1. What this milestone is
 
 The next arrow — **shared awareness**: the platform reaches out to the
-resident *where they are* (`docs/ARCHITECTURE.md` §0: *"**M6** notifications |
+resident *where they are* (the [value-chain milestone table](../ARCHITECTURE.md): *"**M6** notifications |
 **shared awareness** — the platform reaches out to the resident where they
 are"*). M3 shipped **signal** (posts, replies, announcements, group posts,
 moderation); M4 shipped **coordination** (events, RSVPs, reminders); M5 shipped
@@ -149,7 +149,7 @@ that landing.
 | **C-M6·2** | **The kind vocabulary is a closed string set, code-owned.** `NotificationKinds` is a **static class** with **nine** `public const string` members (a code-owned, closed set — the M5 `KanbanStatuses` pattern; a resident *cannot* choose their own kind string — only the code's emitters can). **`PostMention` is reserved, not wired** (the constant + the `kw-l` keys exist; no emitter calls it in M6 — the mention-detection logic is a follow-on lane). The **other eight kinds** each have a **wired emitter** in M6 (U04 + the Web-side hook). | D2 |
 | **C-M6·3** | **A notification is a *personal read*, not an `AccessAction` decision.** A `Notification` row is **the recipient's own data** — the `RecipientId` is the whole access story; the inbox read lane does **not** call `IAuthorizationService` (there is no audience to evaluate, no `AccessAction` to check). **No `NotificationToAuditableResource` adapter exists** (a notification is not an *auditable resource* in the ADR 0006 sense). **No audit row is emitted for an inbox read** (the recipient reading their own notifications is not an *access decision* — the M1 `GetProfileAsync` owner-branch precedent). | D3 |
 | **C-M6·4** | **The idempotency key is the *emitter's* responsibility; a re-emission is a no-op.** Each emission supplies a **`notification:{kind}:{stable-source-id}`** idempotency key (the C3-envelope fix precedent — the `verify:{userId}:{attempt}` / `setup:{userId}` shape from the M1 step-7 plan, now with a `notification:` prefix). **The `IMailerStage.StageAsync` idempotency guarantee** (a duplicate key is a no-op, not a second email) is the **sole** dedup mechanism; the service does not re-check. **A re-emission of the same logical event is a no-op** (the C3 pin — the inbox row is stored once, the email is staged once, the envelope is published once). | D4 |
-| **C-M6·5** | **Email is *best-effort*; the inbox is the *durable* record.** The `IMailerStage.StageAsync` seam is called **in the same transaction** as the `Notification` row store (the C3 pin — the domain write + the outbox row + the envelope commit atomically). A failed send **never** rolls back the inbox row (the `EmailDeadLetterWriter` + the `/health` degraded gate — the ARCHITECTURE.md §6.2 posture). **The inbox is the primary channel; the email is the out-of-band nudge** (the M4 §6.4 event-reminder precedent). | D5 |
+| **C-M6·5** | **Email is *best-effort*; the inbox is the *durable* record.** The `IMailerStage.StageAsync` seam is called **in the same transaction** as the `Notification` row store (the C3 pin — the domain write + the outbox row + the envelope commit atomically). A failed send **never** rolls back the inbox row (the `EmailDeadLetterWriter` + the `/health` degraded gate — the [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) posture). **The inbox is the primary channel; the email is the out-of-band nudge** (the M4 [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) event-reminder precedent). | D5 |
 | **C-M6·6** | **The per-recipient email language is the ADR 0061 resolution, verbatim.** The `NotificationService` resolves the recipient's `Profile.EmailLanguage` (via the frozen `IUserInfoService.GetProfileAsync` read seam) and passes it to the `ITranslationProvider` (the ADR 0061 seam). **The sender's language is irrelevant** (the recipient's choice is the authority — ADR 0061 §Context). **The UGC snippet in the email body** (a reply's body, a to-do's title) is **rendered in the sender's authored language** (ADR 0018 — the content's own language, not the recipient's). | D6 |
 | **C-M6·7** | **A resident who has disabled a kind in their preferences still gets the inbox row** (the inbox is the record; the email is the nudge — the preference governs the *email*, not the *inbox*). The `NotificationService.EmitAsync` **always** stores the `Notification` row; it **conditionally** calls `IMailerStage.StageAsync` (only if the recipient's `NotificationPreference.KindsEnabled` includes the kind, or is `null` / empty = all enabled). **No per-kind email-only vs inbox-only split** (the preference is a single list; the split is a follow-on lane). | D7 |
 | **C-M6·8** | **The inbox is a flat list, capped at 50; no pagination, no per-kind filter in M6.** `ListInboxAsync` returns the **most recent 50** `Notification` rows for the recipient (newest-first, `Created` descending). **No pagination in M6** (a neighborhood is small — 50 is the shape; a full archive is M7). **No per-kind filter in M6** (the flat list is the shape; filtering is a follow-on lane). **The "mark all read" action** sets `ReadAt = now` on **all** the recipient's unread rows (one `Update` — no per-row loop). | D8 |
@@ -247,13 +247,13 @@ prefix.
 **in the same transaction** as the `Notification` row store (the C3 pin — the
 domain write + the outbox row + the envelope commit atomically). A failed send
 **never** rolls back the inbox row (the `EmailDeadLetterWriter` + the `/health`
-degraded gate — the ARCHITECTURE.md §6.2 posture). **The inbox is the primary
+degraded gate — the [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) posture). **The inbox is the primary
 channel; the email is the out-of-band nudge** (the M4 §6.4 event-reminder
 precedent — the reminder email is the nudge, the event detail is the content).
 *Forbids:* an inbox-row rollback on send failure, a new email mechanism, or a
 synchronous send path. *Precedent reused:* the M1 durable-email trio
 (`IMailerStage.StageAsync` + `OutboxEmailStager` + `OutboxEmailHandler` +
-`EmailDeadLetterWriter`) and the ARCHITECTURE.md §6.2 "audience notification:
+`EmailDeadLetterWriter`) and the [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) "audience notification:
 best-effort" row.
 
 ### 5.6 The per-recipient email language is the ADR 0061 resolution, verbatim (D6)
@@ -772,7 +772,7 @@ appended to the handoff note (`docs/plans-milestones/in-progress/notifications/
 notifications-handoff-notes.md`, the `## U10` section); the lane's unit files
 move `in-progress/notifications/` → `archive/lanes/notifications/`; the roadmap trio
 is confirmed (M5 `StatusDone`, M6 `StatusNext` → `StatusDone`, M7
-`StatusPlanned` → `StatusNext`); the ARCHITECTURE.md §3 + §5 sync, the README
+`StatusPlanned` → `StatusNext`); the [data model](../architecture/data-model.md) + [modular monolith](../ARCHITECTURE.md) sync, the README
 Roadmap, and the handoff summary are all honest at ship time.
 
 ### 6.6 Drift-guard

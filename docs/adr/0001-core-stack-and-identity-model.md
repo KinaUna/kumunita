@@ -66,7 +66,7 @@ Negative / accepted risks
 - Steeper learning curve than EF Core (Marten API, projections, handler conventions).
 - Email delivery is made reliable with **one** Wolverine durable handler (Postgres-backed
   invocation state), a 6-attempt/~24 h retry cap, and a small `EmailDeadLetter` table —
-  no new service, no queue broker (ARCHITECTURE.md §6.2).
+  no new service, no queue broker (see [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md)).
 - Smaller ecosystem / fewer ready-made answers than EF.
 - No EF migration tooling for the domain — instead Marten's own **versioned schema
   features** (`FeatureSchemaBase` subclasses registered in `StoreOptions.Storage`,

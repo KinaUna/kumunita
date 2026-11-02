@@ -39,7 +39,7 @@ event-reminder email (M4 §6.4) and the verification email (M1), and a
 resident had no way to *see* what happened to the things they own without
 re-visiting every surface.
 
-M6 is the **shared awareness** arrow (`docs/ARCHITECTURE.md` §0: *"M6
+M6 is the **shared awareness** arrow ([value-chain milestone table](../ARCHITECTURE.md): *"M6
 notifications — shared awareness: the platform reaches out to the resident
 where they are"*): the inbox (a first-class, always-available list of
 "things that happened to you") and the email (the durable, out-of-band
@@ -121,7 +121,7 @@ duplicate key.
 `IDocumentSession`: the domain write + the outbox row + the durable envelope
 commit atomically on one `SaveChangesAsync`). A failed send **never** rolls
 back the inbox row (the `EmailDeadLetterWriter` + the `/health` degraded
-gate — the ARCHITECTURE.md §6.2 "audience notification: best-effort"
+gate — the [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) "audience notification: best-effort"
 posture). **The inbox is the primary channel; the email is the out-of-band
 nudge** (the M4 §6.4 event-reminder precedent). *Forbids:* an inbox-row
 rollback on send failure, a new email mechanism, or a synchronous send path.

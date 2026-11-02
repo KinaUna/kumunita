@@ -293,7 +293,7 @@ public static async Task HandleFault(
 - **The alert fires AFTER the row commit** (the `WriteAndCommitAsync` call is
   unchanged; the `ReportAsync` call is additive, after it). **The `/health`
   degraded gate is UNCHANGED** (the `EmailDeadLetter` row count still drives
-  it — OPS §8, ARCHITECTURE.md §6.2). **F11 is additive, not a re-shape.**
+  it — OPS §8, [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md)). **F11 is additive, not a re-shape.**
 - **`IAlertSink? alertSink = null`** — the handler parameter is **nullable**
   (a method-injected parameter, the `Handle(OutboxEmail, ISmtpSender)`
   method-injection precedent in the same class). **Nullable** so the **existing

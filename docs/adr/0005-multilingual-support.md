@@ -47,7 +47,7 @@ No env var, no rebuild, no new service.
 
 The **source language (`en`) ships with the code**: its catalog row and UI
 strings are embedded in the image and materialized into `mt` by the first-run
-seeder (ARCHITECTURE.md §8). Every other language is community-provided —
+seeder (see [deployment & configuration](../ARCHITECTURE.md)). Every other language is community-provided —
 typed in or imported by the admin — **with one bundled exception** (amended
 2026-09-18, ADR 0042): `de` and `fr` additionally ship as **bundled initial
 values** (catalog rows + full UI-string baselines + `terms` / `help` page
@@ -95,7 +95,7 @@ The `/admin/languages` surface is split by standing (ADR 0021):
 
 Adding/removing languages, reordering, and changing the default are
 GlobalAdmin actions and are **audited** like every other admin action
-(ARCHITECTURE.md §5). Translation saves are audited the same way, with the
+(see [data model — audit retention & scope](../architecture/data-model.md)). Translation saves are audited the same way, with the
 actor's account recorded on the row (ADR 0021 — `Via: Admin`, `ActorId` =
 the GlobalAdmin *or* Translator).
 
@@ -118,7 +118,7 @@ Negative / accepted risks
 - Translations are only as good as the person who wrote them. Mitigated by
   the per-language completeness view and per-string fallback (B, D).
 - Two people editing translations can collide — the standard optimistic-
-  concurrency story applies (HTTP 409, ARCHITECTURE.md §5).
+  concurrency story applies (HTTP 409, see [data model — optimistic concurrency](../architecture/data-model.md)).
 
 ## Revisit when
 

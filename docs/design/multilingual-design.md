@@ -19,7 +19,7 @@ M1 shipped the **seed surface** of ADR 0005: the `LanguageCatalog` and
 `LocaleSettings` POCOs (in `src/Kumunita.Core/Localization/`), registered on
 `CoreDocTypes`, and materialized by the first-run seeder (`FirstBootSeeder` step 4) —
 the source-language `en` row (enabled, sort 0) and the instance default (`en`).
-`how-it-works.md` and `ARCHITECTURE.md` §8/§9 already name the two *unshipped*
+`how-it-works.md` and [ARCHITECTURE.md](../ARCHITECTURE.md) ([deployment](../ARCHITECTURE.md) + [localization](../architecture/localization.md)) already name the two *unshipped*
 documents the ADR's module surface promises:
 
 > `TranslationResource { key, languageCode, text }` — UI strings
@@ -86,7 +86,7 @@ renumbering an existing one is a breaking change and is not allowed mid-lane.
 | **M·3** | **UGC is never translated:** the provider resolves **platform** text only (UI keys + `LocalizedPage` slugs); it never touches a `Post` / `PostReply` / `Group` body (ADR 0005 C — machine translation is deferred). | **U2** (provider reads only the two content docs) · **U7** (M6 test) |
 | **M·4** | **Languages are data, not config** (ADR 0005 B): `LanguageCatalog` / `LocaleSettings` / `TranslationResource` / `LocalizedPage` are Marten docs in `mt`; an admin edit takes effect on the **next request** (no env var, no rebuild, no satellite assemblies). | **U1** (docs + registration) · **U3** (admin seam) |
 | **M·5** | **The preference is a cookie, not a claim** (thin-token rule, ADR 0001-B): the per-request preferred language comes from the `kumunita.locale` cookie (Web layer) and is passed to the provider as a plain BCP-47 string — **never** an identity claim, **never** part of the authorization decision. | **U4** (cookie helper) · **U7** (M8 test) |
-| **M·6** | **The admin surface is standing-gated (ADR 0021) and audited:** every `/admin/languages` mutation (add / remove / enable / reorder / set-default / save-string / save-page) appends **exactly one** `AccessAudit` row (`Via = Admin`, `Outcome = Allow`, `TargetKind` = `"language"` / `"translation"` / `"localized_page"`) — the `UserInfoService` admin-action idiom (ARCHITECTURE.md §5). Catalog mutations are `GlobalAdmin`-only; save-string / save-page are `GlobalAdmin` *or* `Translator` (ADR 0021), with the actor's account on the row (`ActorId`). | **U3** (audit rows) · **U7** (the six audit-row-shape tests) |
+| **M·6** | **The admin surface is standing-gated (ADR 0021) and audited:** every `/admin/languages` mutation (add / remove / enable / reorder / set-default / save-string / save-page) appends **exactly one** `AccessAudit` row (`Via = Admin`, `Outcome = Allow`, `TargetKind` = `"language"` / `"translation"` / `"localized_page"`) — the `UserInfoService` admin-action idiom (see [data model — audit retention & scope](../architecture/data-model.md)). Catalog mutations are `GlobalAdmin`-only; save-string / save-page are `GlobalAdmin` *or* `Translator` (ADR 0021), with the actor's account on the row (`ActorId`). | **U3** (audit rows) · **U7** (the six audit-row-shape tests) |
 | **M·7** | **Removing the default is blocked; removed-language rows are retained:** `RemoveLanguageAsync` on the current default **throws** (fail-closed — no audit row on the blocked attempt); a preference pointing at a removed language **falls back to the default** (M·1); `LocalizedPage` rows for a removed language are **retained** so re-adding restores them. | **U3** (guard + retain) · **U7** (M11/M13 tests) |
 | **M·8** | **Core stays HTTP-free** (ADR 0006-D): `ITranslationProvider` / `ILocalizationService` reference no ASP.NET/HTTP types; the cookie is read/written only in the Web layer and passed down as a BCP-47 string. | **U2/U3** (no `System.Web`/`HttpRequest` in Core) · **U4** (the one Web cookie seam) |
 | **M·9** | **The source language `en` is the guaranteed floor:** its catalog row and every UI string are materialized by the first-run seeder (M1, already shipped); `en` is **always resolvable** and is the last fallback in M·1. | **U2** (the `en` floor) · **U7** (M4 test) |
@@ -247,7 +247,7 @@ namespace Kumunita.Core.Localization;
 /// (ADR 0006-D): the Web `LanguagesController` (U5) is a thin GlobalAdmin-gated
 /// surface over this. Every **mutating** method appends **exactly one**
 /// <c>AccessAudit</c> row (M·6, the UserInfoService admin-action idiom —
-/// ARCHITECTURE.md §5): <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+/// ARCHITECTURE.md [data model](../architecture/data-model.md)): <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
 /// <c>Outcome = Allow</c>, <c>ActorId</c> = the GlobalAdmin, and the <c>Action</c>
 /// / <c>TargetKind</c> pinned per method below. <see cref="LanguageCompleteness"/>
 /// (M·12 FACES) is the read result of the completeness view.
@@ -387,7 +387,7 @@ while the translation editors — `SaveTranslation`, `SavePage`, `PreviewPage`,
 `[Authorize(Roles = "GlobalAdmin,Translator")]`), a thin surface: each action
 calls the **one** matching `ILocalizationService` method and maps a service
 exception to the Web status (M·7's blocked removal ⇒ **400/409** — the
-optimistic-concurrency story, ARCHITECTURE.md §5; the audit row is the
+optimistic-concurrency story, [data model](../architecture/data-model.md); the audit row is the
 service's, M·6 — `Via = Admin`, `ActorId` = the GlobalAdmin *or* Translator).
 The actions:
 
@@ -569,7 +569,7 @@ test, and re-verifies the two assemblies stay green after the roadmap bump.
 - **README Roadmap + status + feature bullet:** `Multilingual` restated as
   **shipped** (roadmap row now **Done.**, `M4` now **Next.**) and the feature
   bullet restated as the live admin + resident surface.
-- **`ARCHITECTURE.md` §8/§9:** §9 "Current state" restated to **`ML` lane
+- **[ARCHITECTURE.md](../ARCHITECTURE.md) ([deployment](../ARCHITECTURE.md) + [localization](../architecture/localization.md)):** [localization](../architecture/localization.md) "Current state" restated to **`ML` lane
   shipped**; the `CoreDocTypes` / `Localization/` tree note restated from "lands
   with M6" to **shipped (ML)**; the value-chain milestone table de-`ML`-folds
   (multilingual is a *named lane*, like `GP`/media, not an M-letter row) — and

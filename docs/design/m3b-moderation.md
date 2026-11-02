@@ -263,7 +263,7 @@ Part 1.
   `AssignReportAsync` (C-M3b·4, F5) is a *new* GlobalAdmin-gated surface
   (a **Moderator** / **GlobalAdmin** surface, not a `/admin` surface). U7
   (the `/moderation` surface) confirms `/admin` was not touched.
-- **`ARCHITECTURE.md` § `Moderation/` flip** (the "M3b ✓ live" status line)
+- **[solution layout](../architecture/solution-layout.md) `Moderation/` flip** (the "M3b ✓ live" status line)
   is a **U11** deliverable (the close), not a U1 / U2 deliverable, and is **not
   pinned** in this Part. U11 flips it in `## M3b — Closed (recorded)`.
 
@@ -1126,7 +1126,7 @@ M3b is closed. The three-test gate is recorded above in § `Run result
 `closed-loop · handoff · part-vs-whole`, `Kumunita.Core.Tests` 118/118 +
 `Kumunita.Web.Tests` 37/37 = **155/155**, 0 failed, M1 + M2 + M3 anchors
 re-run unchanged; **13 M3b-pinned** `ModerationServiceTests` +
-`PostServiceTests` ADDs landed by U9). The `ARCHITECTURE.md` §2
+`PostServiceTests` ADDs landed by U9). The [solution layout](../architecture/solution-layout.md)
 `Moderation/` line is flipped to **M3b ✓ live** with the gate summary
 (the `Events/` and `Projects/` lines are untouched — they are
 still M4 / M5 scope). **This design-doc close is the *record*

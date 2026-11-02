@@ -26,7 +26,7 @@ M2 delivers three surfaces:
 - **Group management** (`/groups`): list, create, per-group add/remove
   member — so an audience can point at a named group, not only individuals.
 
-Per `ARCHITECTURE.md` §4.3, **M2 introduces no new authorization rule.** Every
+Per the [identity & access — access model](../architecture/identity-access.md), **M2 introduces no new authorization rule.** Every
 decision routes through the frozen `IAuthorizationService` (ADR 0006). M2 adds
 exactly one new read method on `IUserInfoService`
 (`GetProfilesAsync(verifiedOnly)`, a *new* method on a frozen interface — the
@@ -123,7 +123,7 @@ violate):**
 
 **M2 invariants (new, M2-owned, pinned for U3–U14)**
 
-- **C-M2·1 — Contact-gating (§9, ARCHITECTURE.md / M1 design doc).**
+- **C-M2·1 — Contact-gating (see [Testing](../ARCHITECTURE.md) / M1 design doc).**
   `ContactVisibility` is evaluated *only after* `Visibility` has allowed the
   profile. A viewer not allowed by `Visibility` never reaches the contact
   check — no row, no render of contact fields. This is a *composition* rule
@@ -605,7 +605,7 @@ has *allowed* the profile (F3/F4 gating):
 after** the `Visibility` check has allowed the profile. A profile that
 fails `Visibility` never reaches the contact check; the contact row is
 *never* appended to `AccessAudit` for a hidden profile (F4 pin;
-`ARCHITECTURE.md` §9 "contact block never on a hidden profile").
+see [Testing](../ARCHITECTURE.md) — "contact block never on a hidden profile").
 
 **The *separate*-call pin (C6 compliance):** each of the two decisions
 (`Visibility` → profile; `ContactVisibility` → contact block) is a
@@ -750,7 +750,7 @@ Seam-list → invariant mapping (M2- *new* invariants only, anchored to their AD
 
 | Invariant | Seam test(s) that anchor it (all passed) |
 |-----------|------------------------------------------|
-| **C-M2·1** (contact-gating: contact check runs *only after* `Visibility` allowed) | `DirectoryServiceTests_U6.ContactVisibility_FourShape_TrightTable` (service-layer: each of the 4 §2.4 rows — `null`/`Any+empty`/`Any+grant`/`All+empty`/`All+grant` — is evaluated against a `Visibility` that already allowed the viewer; the "not evaluated" row (1) produces exactly 1 `AccessAudit` row, the "evaluated" rows (2–5) produce exactly 2 (a distinct second `Can*` call, not a merged compound — C6), and the contact row's `Via`/`Outcome` match the decision); `DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated` (view-model layer: hidden row ⇒ `ShowContactBlock=false` ⇒ `Email`/`Phone=null` — "contact block never on a hidden profile", `ARCHITECTURE.md` §9); `ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated` (editor's write-boundary: `ContactVisibility` settable only when `Visibility` non-null — the editor does not *produce* a "hidden profile + contact opt-in" state) |
+| **C-M2·1** (contact-gating: contact check runs *only after* `Visibility` allowed) | `DirectoryServiceTests_U6.ContactVisibility_FourShape_TrightTable` (service-layer: each of the 4 §2.4 rows — `null`/`Any+empty`/`Any+grant`/`All+empty`/`All+grant` — is evaluated against a `Visibility` that already allowed the viewer; the "not evaluated" row (1) produces exactly 1 `AccessAudit` row, the "evaluated" rows (2–5) produce exactly 2 (a distinct second `Can*` call, not a merged compound — C6), and the contact row's `Via`/`Outcome` match the decision); `DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated` (view-model layer: hidden row ⇒ `ShowContactBlock=false` ⇒ `Email`/`Phone=null` — "contact block never on a hidden profile", see [Testing](../ARCHITECTURE.md)); `ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated` (editor's write-boundary: `ContactVisibility` settable only when `Visibility` non-null — the editor does not *produce* a "hidden profile + contact opt-in" state) |
 | **C-M2·2** (candidate filter ≠ access decision, §4.3; never logged as an audit row) | `DirectoryServiceTests.ListAsync_Hides_Unverified` (unverified row: exactly one candidate — the viewer themself — survives the §2.3 filter before `CanSeeAsync` runs; the filtered-out verified resident is absent from `Visible` *and* `HiddenCount`, and appears in *no* `AccessAudit` row as actor, effective principal, or target); `DirectoryServiceTests_U6.Unverified_SelfCandidate_NotAudited` (the *only* audit row for an unverified self-sighting is the Owner branch on their own profile); `UserInfoServiceTests.GetProfilesAsync_VerifiedOnly_Filters` (the candidate-filter *source*: `verifiedOnly:true` → verified set, `verifiedOnly:false` → all, and *neither* appends an `AccessAudit` row); `UserInfoServiceGroupsU9Tests.GetGroupsForUserAsync_AppendsNoAuditRow_CM2_2` (group-read is a *read*, not an access decision — zero audit rows); `UserInfoServiceGroupsU9Tests.GetGroupMembersAsync_LiveOnNextCall_C4_StrongConsistency` (per-group member read is also a read — no audit row) |
 **C-M2·3** (group SoD — owner ∪ GlobalAdmin only, on the *remove* lane; extended to the *add* lane by ADR 0007; amended by ADR 0008, which adds the member **self-leave** lane — any member, own row only, owner excepted — as the intentional lone deviation from the owner ∪ GlobalAdmin standing) | `DirectoryServiceTests_U6.GroupAddRemoveMember_ReflectedOnNext_Call_Profile`
 
@@ -791,7 +791,7 @@ This design doc's §2.5 (the "22 seam tests" name list) freezes 22 `F[0-9]_`-pre
 
 **Closed forward-references (this commit):**
 
-1. `docs/ARCHITECTURE.md` §2 — `src/Kumunita.Core/Directory/  # M2 — not yet created` → closed (the `Directory` module name in ARCHITECTURE.md's §2 tree is a *forward-reference to the layout*, not a live module name — U5's `DirectoryService` landed in `src/Kumunita.Core/UserInfo/` per its frozen `Kumunita.Core.UserInfo` namespace; the ARCHITECTURE.md §2 line is now annotated with the recorded gate + counts pointing to this doc's § Acceptance Gate).
+1. [solution layout](../architecture/solution-layout.md) — `src/Kumunita.Core/Directory/  # M2 — not yet created` → closed (the `Directory` module name in [solution layout](../architecture/solution-layout.md)'s tree is a *forward-reference to the layout*, not a live module name — U5's `DirectoryService` landed in `src/Kumunita.Core/UserInfo/` per its frozen `Kumunita.Core.UserInfo` namespace; the [solution layout](../architecture/solution-layout.md) line is now annotated with the recorded gate + counts pointing to this doc's § Acceptance Gate).
 2. `docs/design/m1-identity-access.md` — "Profile editing UI and directory visibility rules (M2)" → closed: "✓ M2 — see `docs/design/m2-directory-profiles-groups.md` § Acceptance Gate (recorded 2026-09-04)".
 
 ## M2 — Closed (recorded)
@@ -806,7 +806,7 @@ This design doc's §2.5 (the "22 seam tests" name list) freezes 22 `F[0-9]_`-pre
 
 **Two doc updates folded into the closure (both landed by U12, confirmed consistent by U15):**
 
-1. `docs/ARCHITECTURE.md` §2 — the `Directory/` tree line now names the live module + the gate + the 115/0 count, pointing at this doc's § Acceptance Gate (confirmed consistent, line 82).
+1. [solution layout](../architecture/solution-layout.md) — the `Directory/` tree line now names the live module + the gate + the 115/0 count, pointing at this doc's § Acceptance Gate (confirmed consistent, line 82).
 2. `docs/design/m1-identity-access.md` — the "out of scope … profile editing UI and directory visibility rules (M2)" line is **closed** (`✓ M2 — shipped`, confirmed line 53). The line is retained (the surrounding "out of scope" list's ordering depends on it); it is *not* deleted.
 
 **Deferred (still open after U1–U14; each is a clean M3 follow-up, none blocks M3):**
@@ -814,7 +814,7 @@ This design doc's §2.5 (the "22 seam tests" name list) freezes 22 `F[0-9]_`-pre
 | # | Deferred item | Source | M3 action (one line) |
 |---|---|---|---|
 | D1 | **§2.5 22-test-name drift** — §2.5's `F[0-9]_`-prefixed name pins do not exist in the landed `[Fact]` methods (U5/U6/U9/U10/U11 landed the same invariant coverage under different names). | U12 drift note | Rename the landed `[Fact]` methods to §2.5's pins **or** rewrite §2.5 to the landed names, with a §2.7 drift note in the same commit. |
-| D2 | **Playwright e2e runtime absent** — U13 authored `tests/Kumunita.Web.Tests/e2e-m2.spec.ts` (three specs) but paused: no `@playwright/test` dep, no fixture, no Postgres boot, no token channel in the repo. The specs are *not runnable*; `docs/ARCHITECTURE.md` §7 "Playwright e2e arrives later" is still a forward reference. | U13 (paused) | Land the bounded runtime (package + webServer/globalSetup booting Postgres + the `signup`/`login`/`lastCreatedGroupId` helpers in the spec footer); run the three specs and record the pass count in a new handoff-notes section (append-only). |
+| D2 | **Playwright e2e runtime absent** — U13 authored `tests/Kumunita.Web.Tests/e2e-m2.spec.ts` (three specs) but paused: no `@playwright/test` dep, no fixture, no Postgres boot, no token channel in the repo. The specs are *not runnable*; the [front-end](../ARCHITECTURE.md) "Playwright e2e arrives later" is still a forward reference. | U13 (paused) | Land the bounded runtime (package + webServer/globalSetup booting Postgres + the `signup`/`login`/`lastCreatedGroupId` helpers in the spec footer); run the three specs and record the pass count in a new handoff-notes section (append-only). |
 | D3 | **`Models/ProfileViewModel.cs` orphaned** — zero live references after U14 removed `AccountController.Profile` + `Views/Account/Profile.cshtml`; U11's `ProfileEditViewModel` already carries the `DisplayName` + `Email` bootstrap fields. | U14 deviation 1 | Safe to delete (or keep if a later unit wants the shape). Zero live references; a one-file surface-area prune. |
 | D4 | **`IUserInfoService` unused in `AccountController` ctor** — after U14, no `IUserInfoService` method is called in `AccountController.cs`; the ctor param is retained to avoid a M2-unit DI shape change. | U14 deviation 3 | Optional: drop `IUserInfoService` from the `AccountController` ctor (and its DI wiring in `Program.cs`) if a later unit owns the controller. |
 

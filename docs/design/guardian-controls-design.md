@@ -728,7 +728,7 @@ read; it is exercised only on the `IUserInfoService` management lanes.
 - **Gate:** the 11 pinned seam tests + the 4 Web VM tests — see the
   `### Run result (GU acceptance gate — 2026-09-14)` section above (U10).
 - **Layout:** `GuardianLink` rides the existing `CoreDocTypes` surface (ADR
-  0004 §B.1, additive); `docs/ARCHITECTURE.md`'s `UserInfo/` line + doc-map
+  0004 §B.1, additive); the [solution layout](../architecture/solution-layout.md) `UserInfo/` line + doc-map
   carry the surface (U11).
 - **Non-decision (carried forward):** the GlobalAdmin `viaAdmin: true`
   dissolve shell (the admin surface) is **out of scope** here — it is a

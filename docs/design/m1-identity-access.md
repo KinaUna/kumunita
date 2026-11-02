@@ -8,7 +8,7 @@
 M0 delivered the deployable substrate: solution layout, Docker + Coolify
 deploys, versioned `mt` boot block, `/health`, per-instance `Community`
 config. M1 builds the **access model** — the linkage every later milestone
-hangs its arrows off of (ARCHITECTURE.md §2). For M1 the three access
+hangs its arrows off of ([identity & access](../architecture/identity-access.md)). For M1 the three access
 modules go from architecture prose to living code behind the interfaces
 frozen in **ADR 0006**.
 

@@ -135,7 +135,8 @@ a half-applied rule.
 - `D06` — ✅ (commit `40f390e6`, 2026-11-02)
 - `D07` — ✅ (commit `46e46783`, 2026-11-02)
 - `D08` — ✅ (commit `ef416bb5`, 2026-11-02)
-- `D09`–`D14` — not started
+- `D09` — ✅ (2026-11-02)
+- `D10`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -366,6 +367,39 @@ a half-applied rule.
 - Split the long sections: solution layout (~170 lines), identity & access
   (~140), data model (~220), CQRS/Wolverine, localization, extension seams.
 - Fix the duplicate `## 9.` numbering (Localization / Testing).
+- **Shipped 2026-11-02:** the six long sections split into
+  `docs/architecture/` — [`solution-layout`](../../architecture/solution-layout.md)
+  (the file-and-folder tree, the §2 content),
+  [`identity-access`](../../architecture/identity-access.md) (thin-token /
+  fat-authorization, the `IUserInfoService` + `IAuthorizationService` seam,
+  the access model, the decision algorithm, the roles — the §4 content),
+  [`data-model`](../../architecture/data-model.md) (the two-schema split,
+  the per-context doc inventory, the conventions, the optimistic-concurrency
+  rule, the audit retention — the §5 content),
+  [`cqrs-lite-wolverine`](../../architecture/cqrs-lite-wolverine.md) (the
+  command-handler discipline, the durable email handler, the projections,
+  the scheduled jobs — the §6 content),
+  [`localization`](../../architecture/localization.md) (the multilingual
+  operating shape — the §9a content), and
+  [`extension-seams`](../../architecture/extension-seams.md) (the deferred
+  seams + the M4→M5 deferrals — the §10 content). Each carries
+  front-matter (`tier: reference` / `kind: architecture`) + an Abstract.
+  `docs/ARCHITECTURE.md` is now the hub — front-matter + Abstract + the
+  philosophy mapping + the technology stack + the "## 2. The sections" map
+  (one row per split section, all real links) + the four short sections
+  that stay inline (the modular monolith, the front-end, deployment &
+  configuration, and testing). The duplicate `## 9.` (Localization / Testing)
+  is resolved — Localization moved to its own doc, Testing renumbered to
+  §6. The `ARCHITECTURE.md §N` cross-references in the living docs
+  (`docs/design/*`, `docs/adr/*`) re-pointed at the section file that now
+  owns that section; the internal cross-file §-refs in the split files
+  re-pointed at the sibling that owns the target. The frozen
+  `archive/lanes/*` references left alone. Verified on 2026-11-02:
+  `docs-report.ps1` — broken links **3** (the ≤ 3 baseline; the three are
+  pre-existing `archive/` + `philosophy/` targets, none from D09), front-matter
+  **683** (baseline 676), abstract **639** (baseline 634); `dotnet build` 0
+  errors / 0 warnings; `Kumunita.Web.Tests` 1249 passed / 0 failed;
+  `Kumunita.Core.Tests` 1682 passed / 0 failed / 2 pre-existing skips.
 
 ### `D10` — Design docs: living vs archived, abstracts, consolidation
 - // TODO ❓ the policy question for this unit: is a design doc the *current

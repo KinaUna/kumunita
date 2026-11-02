@@ -659,8 +659,8 @@ U4's `KeyNotFoundException` doc-wins, U6's `[ValidateAntiForgeryToken]`, U7's
 (`docs/adr/0011-media-and-file-storage.md`, accepted 2026-09-11); `SECURITY.md`
 data class **(e)** + the two C-MED control rows (`SECURITY.md` §3/§5);
 `OPS.md` `Media__*` config rows + the **second restore surface** (the media
-volume) in §4 backups and §5 restore; `ARCHITECTURE.md` §2/§3/§5 (Media module
-row, feature-module list, `MediaObject` POC, "one database + one volume");
+volume) in §4 backups and §5 restore; [solution layout](../architecture/solution-layout.md) (Media module
+row), the [modular monolith](../ARCHITECTURE.md) feature-module list, [data model — MediaObject](../architecture/data-model.md) ("one database + one volume");
 `README.md` status + features + ADR range (0001–0011). Per §2.7 rule 6 the
 ADR conformed to this doc — no drift guard fired against it.
 

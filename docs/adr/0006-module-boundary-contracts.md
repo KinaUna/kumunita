@@ -6,8 +6,9 @@ Amends: 0001 (B — thin token, fat authorization), 0003 (break-glass elevation)
 
 ## Context
 
-ADR 0001 decided thin token / fat authorization service; ARCHITECTURE.md §3–4.2
-sketch the three in-process modules behind interfaces, and §4.2 gives draft
+ADR 0001 decided thin token / fat authorization service; the modular-monolith +
+bounded-context sections in [ARCHITECTURE.md](../ARCHITECTURE.md) sketch the three
+in-process modules behind interfaces, and [identity & access](../architecture/identity-access.md) gives draft
 signatures. M1 now implements them and first makes the access model live.
 
 The philosophy (`docs/philosophy/in-code.md`) treats module interfaces as
@@ -70,8 +71,8 @@ avoidance — e.g. `AccessAction` for the docs' `Action` to avoid
 	}
 
 with `Decision = { Allowed, Via, EffectivePrincipalId }` and
-`VisibleSet = { visible: [(id, Via)], hiddenCount }` (ARCHITECTURE.md §4.2,
-§5).
+`VisibleSet = { visible: [(id, Via)], hiddenCount }` ([identity & access](../architecture/identity-access.md),
+[data model](../architecture/data-model.md)).
 
 ### B. The thin principal (frozen)
 
@@ -134,7 +135,7 @@ the interfaces; none may re-derive access on its own.
 - AuthorizationModule may call `IUserInfoService` (group/delegation
   resolution); it never depends on feature modules.
 - `Kumunita.Core` references no ASP.NET HTTP types (testable; future
-  API/MCP layer stays open — ARCHITECTURE.md §2).
+  API/MCP layer stays open — [solution layout](../architecture/solution-layout.md)).
 - **The authorization path is unique.** All feature-module access checks
   go through `IAuthorizationService` (`CanAsync` for detail, `CanSeeAsync`
   for lists). Feature modules do *not* read group membership for access

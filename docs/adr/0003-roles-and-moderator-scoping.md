@@ -48,7 +48,7 @@ Date: 2026-08-25
   host operator grants a time-limited, single-use, audited elevation (`AdminOverride`)
   by direct DB write — *no in-app endpoint can create one*, so a hostile admin cannot
   grant or extend it for themselves. Elevation lapses at `expiresAt` and all actions
-  under it are audited (`via: BreakGlass`). See ARCHITECTURE.md §4.5; runbook OPS.md §9.
+  under it are audited (`via: BreakGlass`). See [identity & access — Roles](../architecture/identity-access.md); runbook OPS.md §9.
 
 Rationale:
 - Three roles are operable by a volunteer; a per-action claims matrix is overkill and a bug

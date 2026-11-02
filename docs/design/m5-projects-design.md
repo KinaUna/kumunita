@@ -46,7 +46,7 @@ posts, moderation); M4 shipped **coordination** (events, RSVPs, reminders).
 M5 delivers the neighborhood's **project management**: assignable,
 hierarchical **to-dos** and **Kanban boards** with statused, limitable
 lanes. It is a **new bounded context** `Kumunita.Core.Projects` (the `Projects/`
-folder already sketched in `docs/ARCHITECTURE.md` §3, marked "not yet
+folder already sketched in the [solution layout](../architecture/solution-layout.md), marked "not yet
 created"), with **four documents**, **one new document surface**
 (`ProjectDocTypes`), **one new service seam** (`IProjectService`), **two new
 authorization adapters** (`TodoItemToAuditableResource`,
@@ -169,7 +169,7 @@ existing surfaces** — the four docs are new, the surface is additive (ADR
 ### 3.2 The canonical names (D2)
 **[PROPOSED]**
 
-`docs/ARCHITECTURE.md` §5 sketches the context as `Project { id, title,
+[data model](../architecture/data-model.md) sketches the context as `Project { id, title,
 description, componentId?, ownerId, status, audience, created }`,
 `ProjectTask { id, projectId, title, assigneeId?, done, order }`,
 `ProjectMember { id, projectId, userId, role }`. This lane delivers the
@@ -179,9 +179,9 @@ description, componentId?, ownerId, status, audience, created }`,
 presence on a board / lane). **`Project` / `ProjectTask` /
 `ProjectMember` do not exist** — the §5 sketch is the pre-decision shape;
 **"project" is not a distinct document in M5**: a to-do is the unit, a board
-is the container. **The M5 close unit (U13) rewrites the ARCHITECTURE.md §5
-`Projects` block + the §3 tree to these names** (per the AGENTS.md
-doc↔code parity rule), so no unit in U02–U12 touches that file. *(C-M5·1.)*
+is the container. **The M5 close unit (U13) rewrites the [data model](../architecture/data-model.md) `Projects`
+block + the [solution layout](../architecture/solution-layout.md) tree to these names** (per the AGENTS.md
+doc↔code parity rule), so no unit in U02–U12 touches those files. *(C-M5·1.)*
 
 ### 3.3 A to-do is standalone; placement is a separate record (D3)
 **[PROPOSED]**
@@ -417,7 +417,7 @@ dependency**. *(C-M5·11.)*
 ## 6. Parts affected
 
 - **`Kumunita.Core.Projects`** — the new bounded context (the `Projects/`
-  folder in the ARCHITECTURE.md §3 tree, flipped from "not yet created").
+  folder in the [solution layout](../architecture/solution-layout.md) tree, flipped from "not yet created").
   Four POCOs: `TodoItem`, `KanbanBoard`, `KanbanLane`,
   `BoardItemPlacement`.
 - **`ProjectDocTypes`** — the new document surface (a new file next to

@@ -40,14 +40,14 @@ commit closes `PG` (`StatusNext` → `StatusDone`) and opens `M4`
 `M4`). **M5 stays Projects; M6 stays Portability** — no roadmap letter
 moves.
 
-**The field-naming decision (recorded here):** `docs/ARCHITECTURE.md` §5
+**The field-naming decision (recorded here):** the [data model](../architecture/data-model.md)
 sketches the event document as `{ id, title, description, componentId?,
 authorId, start, end, location?, capacity?, audience, rsvpRequired }`.
 This ADR settles the canonical names as **`Body`** (rich Markdown content,
 mirroring `Announcement.Body` and the RC/RE surface) and
 **`ReminderEnabled`** (a bool, `true` floor — a per-event opt-*out* of the
-reminder, the reminder being the default). The §5 sketch is the
-pre-decision shape; **the M4 close unit (U12) syncs the ARCHITECTURE.md §5
+reminder, the reminder being the default). The data-model §5 sketch is the
+pre-decision shape; **the M4 close unit (U12) syncs the [data model](../architecture/data-model.md)
 `Events` block to these names** (per the AGENTS.md doc↔code parity rule),
 so no unit in U01–U11 has to touch that file.
 
@@ -56,7 +56,7 @@ so no unit in U01–U11 has to touch that file.
 the `MarkdownRenderer` + `bindRichEditor`, the content-image / attachment
 idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
 `OutboxEmailHandler` trio (M1 step 7), and the self-rescheduling
-`TimeoutMessage` §6.4-job shape (the `AuditPurgeHandler` precedent) are all
+`TimeoutMessage` [CQRS-lite §6.4 job](../architecture/cqrs-lite-wolverine.md) shape (the `AuditPurgeHandler` precedent) are all
 **frozen seams** — M4 adds **an adapter, not a branch**.
 
 ## Decision
@@ -78,7 +78,7 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   - **`EventRsvp`** — `Id`; `EventId`; `UserId`;
     **`Status`** (enum `Going | Maybe | No`); `At`. Registered with a
     **unique `(EventId, UserId)` index** — the
-    ARCHITECTURE.md §5 **last-write-wins concurrency exception**: a
+    [data model — last-write-wins concurrency exception](../architecture/data-model.md): a
     conflicting RSVP write is a no-op or self-converging; the resident's
     latest status is simply the truth (upsert semantics). **No
     `AccessAudit` row on an RSVP** — a routine resident action, not an
@@ -153,7 +153,7 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   event is included in the author's `/my/drafts` list. The
   `Post` / `Announcement` / `Page` surfaces stay **untouched**.
 - **The `EventReminders` §6.4 job** (the second of the three jobs named in
-  ARCHITECTURE.md §6.4 — `AuditPurge` shipped in M1, `VerifyDigest` stays
+  [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) §6.4 — `AuditPurge` shipped in M1, `VerifyDigest` stays
   deferred) follows the `AuditPurgeHandler` precedent **verbatim**:
   - **`EventReminderService`** (a Wolverine-free static class in
     `Kumunita.Core.Events`, the `AuditPurgeService` precedent):
@@ -188,7 +188,7 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
     (`WindowHours = 24` floor). **Wiring:** `Program.cs` registers the
     tick next to the `AuditPurgeTick` (durable scheduling —
     `IntegrateWithWolverine()`).
-  - **Best-effort, re-runnable** (ARCHITECTURE.md §6.2 — "Event reminder /
+  - **Best-effort, re-runnable** ([CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) §6.2 — "Event reminder /
     Best-effort / Re-runnable scheduled job; dead-letter if SMTP truly
     down"): a failed SMTP send dead-letters in `EmailDeadLetter`; the
     `IMailerStage` + `OutboxEmail` + `OutboxEmailHandler` trio is
@@ -222,7 +222,7 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   `PageService` precedent — the GlobalAdmin override is enforced
   server-side, not deferred to the Web boundary), the 25 test names, the
   three-test
-  gate, and the §6.4 job shape are **frozen** — a re-shape of any of them
+  gate, and the [CQRS-lite §6.4](../architecture/cqrs-lite-wolverine.md) job shape are **frozen** — a re-shape of any of them
   is a new ADR, a rename of a test name is a drift event, and a new
   Wolverine idiom is a new unit, not a silently-omitted one.
 
@@ -249,7 +249,7 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
 - **`Post` / `Announcement` / `Page` stay untouched** — M4 is additive on
   top of the shipped lanes; the new surface is a new context + a new doc
   surface, so nothing existing is re-shaped.
-- **The ARCHITECTURE.md §5 `Events` block is out of date by design
+- **The [data model](../architecture/data-model.md) `Events` block is out of date by design
   right now** (`description` / `rsvpRequired` vs. the settled
   `Body` / `ReminderEnabled`) — the close unit (U12) syncs it, per the
   AGENTS.md doc↔code parity rule.

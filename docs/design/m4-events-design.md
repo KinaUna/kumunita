@@ -18,9 +18,9 @@ The first **content-with-time** milestone: a new bounded context
 `Kumunita.Core.Events` with two documents (`Event` + `EventRsvp`), one new
 document surface (`EventDocTypes`), one new service seam (`IEventService`), one
 new adapter (`EventToAuditableResource`), one new Web surface
-(`EventController` + views + the nav entry), and **one new §6.4 scheduled
+(`EventController` + views + the nav entry), and **one new [CQRS-lite §6.4 scheduled](../architecture/cqrs-lite-wolverine.md)
 job** (`EventReminders` — the second of the three jobs named in
-`docs/ARCHITECTURE.md` §6.4, alongside the shipped `AuditPurge` and the
+the [scheduled jobs](../architecture/cqrs-lite-wolverine.md), alongside the shipped `AuditPurge` and the
 deferred `VerifyDigest`):
 
 - **The feed** — a resident sees the neighborhood's upcoming events
@@ -82,7 +82,7 @@ Read directly, not assumed:
    subject, body, ct)` stores the `OutboxEmail` row in the caller's session
    and enqueues the durable envelope in the same transaction; the durable
    handler dispatches over SMTP on commit, retries, then dead-letters
-   (`EmailDeadLetter`, ARCHITECTURE.md §6.2).
+   (`EmailDeadLetter`, see [CQRS-lite & side effects — durable email handler](../architecture/cqrs-lite-wolverine.md)).
 6. **`AuditPurgeHandler` + `AuditPurgeTick` + `AuditPurgeService`** (M1) —
    the **§6.4 job precedent**: the business logic is a Wolverine-free static
    class in `Kumunita.Core`; the Web handler is a thin adapter that injects
@@ -153,9 +153,9 @@ invents one):
 | `TagIds` / `ImageIds` / `AttachmentIds` | `Post` (ADR 0044 / 0025 / 0034) | the server-side body parse populates `ImageIds` / `AttachmentIds` (the client never sends them). |
 
 **Naming decision:** the canonical names are `Body` and `ReminderEnabled`
-(the plan's names, mirroring `Announcement.Body`). `docs/ARCHITECTURE.md` §5
+(the plan's names, mirroring `Announcement.Body`). The [data model](../architecture/data-model.md)
 sketches the event as `description` / `rsvpRequired` — that sketch is the
-pre-decision shape; **U12 (close) syncs the §5 block to these names** (per
+pre-decision shape; **U12 (close) syncs the [data model Events](../architecture/data-model.md) block to these names** (per
 the AGENTS.md doc↔code parity rule).  **[DECIDED — ADR 0054]**
 
 ### 3.2 The `EventRsvp` shape  **[DECIDED — ADR 0054]**
@@ -173,7 +173,7 @@ public sealed class EventRsvp
 }
 ```
 
-- **Last-write-wins concurrency** — the ARCHITECTURE.md §5 exception, keyed
+- **Last-write-wins concurrency** — the [data model](../architecture/data-model.md) exception, keyed
   per `(EventId, UserId)`: a conflicting RSVP write is a no-op or
   self-converging; the resident's latest status is simply the truth. The
   `EventDocTypes` surface registers a **unique** `(EventId, UserId)` index
@@ -273,7 +273,7 @@ that shipped separately under **ADR 0059**.
   precedent verbatim; the 1-day delay is baked into the message type).
 - **`EventReminderOptions`** — the `AuditPurgeOptions` shape (a POCO of
   config; `WindowHours = 24` floor).
-- **Best-effort, re-runnable** (ARCHITECTURE.md §6.2): a failed SMTP send
+- **Best-effort, re-runnable** (see [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md)): a failed SMTP send
   dead-letters in `EmailDeadLetter`; the durable trio is **untouched** — the
   job only *stages* rows.
 - **Wiring:** `Program.cs` registers the `EventReminderTick` next to the

@@ -542,5 +542,5 @@ prose now reads "Monday-first, the month's day count + the Monday-first
 leading offset"). No other drift pauses in the handoff note.
 
 **Lane closed.** The roadmap trio is updated (`EV-DWM` → `StatusDone`,
-`M5` → `StatusNext`); `ARCHITECTURE.md` §events-surface is extended with the
+`M5` → `StatusNext`); the [data model — Events](../architecture/data-model.md) is extended with the
 `EV-DWM` views; the lane folder moved to `archive/lanes/ev-dwm/`.

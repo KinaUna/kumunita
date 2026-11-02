@@ -257,7 +257,7 @@ Each is a **named deferral** with a one-line `SL·D` follow-up candidate:
 - `WhatsNew.cs` head = **`0.84.0`** / `2026-11-01` / ADR 0281 (the required
   sixth close-flip member, the M27 lesson; the `WhatsNewTests` head-pin
   bumped from `0.83.0` / ADR 0280 to `0.84.0` / ADR 0281).
-- `ARCHITECTURE.md` §2 — the `Sessions/` line flipped to **`sessions` ✓ live**
+- [solution layout](../architecture/solution-layout.md) — the `Sessions/` line flipped to **`sessions` ✓ live**
   with the gate summary (13/13 green).
 - `README.md` — the **`Sessions`** named-lane row added (mirroring the
   **Prod-hardening** named-lane row — "a named lane, not a milestone");

@@ -48,7 +48,7 @@ removal surface (`POST /admin/delete`) reach.
 The one thing the whole lane respects:
 
 - **The audit trail is pseudonymized, not deleted** (the `OPS.md` §9 /
-  `ARCHITECTURE.md` §5 "Deletion-of-account interaction" policy, now
+  [data model](../architecture/data-model.md) "Deletion-of-account interaction" policy, now
   implemented in-app): the rows the target wrote remain in the log (the
   community is still promised "prove what happened"), but the target's
   `ActorId` / `EffectivePrincipalId` are rewritten to a deterministic
@@ -98,7 +98,7 @@ Three facts about the current surface shape the decision:
   to `/Account/Login?error=account-removed`) — the app knows how to react
   to a deletion, but nothing in-app *performs* one.
 - **The pseudonymization policy is already designed** — `OPS.md` §9 and
-  `ARCHITECTURE.md` §5 both describe the "Deletion-of-account
+  [data model](../architecture/data-model.md) both describe the "Deletion-of-account
   interaction": the departing resident's `AccessAudit` / `Report` rows are
   **pseudonymized** (the actor id replaced by a tombstone), *not* deleted.
   The policy is documented; the mechanism is not. This ADR is the
@@ -151,7 +151,7 @@ ADR 0138 self-serve/admin distinction):
   "second admin removes a departing `GlobalAdmin`" scenario), and
   `DeleteAccountAsync_SelfDeletion_LastGlobalAdmin_ThrowsAndDoesNotWrite`
   pins the guard on the self branch.
-- **Pseudonymization** (the `OPS.md` §9 / `ARCHITECTURE.md` §5 policy):
+- **Pseudonymization** (the `OPS.md` §9 / [data model](../architecture/data-model.md) policy):
   the target's `AccessAudit` rows *remain* (the accountability the
   community is promised), but their `ActorId` and `EffectivePrincipalId`
   (when equal to the target) are rewritten to the deterministic
