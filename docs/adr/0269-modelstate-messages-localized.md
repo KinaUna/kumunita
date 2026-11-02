@@ -1,3 +1,16 @@
+---
+id: adr-0269
+title: "Controller ModelState validation messages are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0269 — Controller ModelState validation messages are localized
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0023
+title: "Reply as a report target (extending the M3b report lane)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m31-production-error-handling-design.md]
+supersedes: []
+superseded_by: [adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0023 — Reply as a report target (extending the M3b report lane)
 
 Status: Accepted

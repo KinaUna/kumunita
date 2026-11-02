@@ -1,3 +1,16 @@
+---
+id: adr-0141
+title: "GU community-approval lane: guardian approves / rejects a supervised child's community membership + group invitation"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/guardian-event-rsvp-gate-design.md]
+supersedes: [adr-0028]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0141 — GU community-approval lane: guardian approves / rejects a supervised child's community membership + group invitation
 
 Status: Accepted

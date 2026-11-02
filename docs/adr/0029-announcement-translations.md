@@ -1,3 +1,16 @@
+---
+id: adr-0029
+title: "0029 — Announcement user-added translations (the ADR 0022 lane carried to announcements)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/pages-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # 0029 — Announcement user-added translations (the ADR 0022 lane carried to announcements)
 
 Status: Accepted (2026-09-12)

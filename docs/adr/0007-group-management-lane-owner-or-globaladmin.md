@@ -1,3 +1,16 @@
+---
+id: adr-0007
+title: "Group management lane: owner ∪ GlobalAdmin for add and remove"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m2-directory-profiles-groups.md]
+supersedes: []
+superseded_by: [adr-0083, adr-0093, adr-0094]
+updated: 2026-11-02
+---
+
 # ADR 0007 — Group management lane: owner ∪ GlobalAdmin for add and remove
 
 Status: Accepted

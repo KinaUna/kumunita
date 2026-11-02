@@ -1,3 +1,16 @@
+---
+id: adr-0119
+title: "M18: Recurring events (repeating events over the M4 events surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-subsystem.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0119 — M18: Recurring events (repeating events over the M4 events surface)
 
 Status: Accepted

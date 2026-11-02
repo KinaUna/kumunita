@@ -1,3 +1,16 @@
+---
+id: adr-0054
+title: "M4: Events, RSVPs & reminders (a new `Kumunita.Core.Events` context reusing the frozen authorization / audience / renderer / editor / email / §6.4-job seams)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-design.md]
+supersedes: [adr-0001]
+superseded_by: [adr-0059, adr-0063, adr-0065, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0054 — M4: Events, RSVPs & reminders (a new `Kumunita.Core.Events` context reusing the frozen authorization / audience / renderer / editor / email / §6.4-job seams)
 
 Status: Accepted

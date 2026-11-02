@@ -1,3 +1,16 @@
+---
+id: adr-0175
+title: "Palettes (Forest / Ember) and the refreshed feed card"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md, docs/adr/0111-nav-layout-variants-b-and-c.md, docs/adr/0133-dark-theme-forest.md, docs/adr/0150-site-content-customization.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0175 — Palettes (Forest / Ember) and the refreshed feed card
 
 Status: **Proposed** (scaffolding landed)

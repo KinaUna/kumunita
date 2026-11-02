@@ -1,3 +1,16 @@
+---
+id: adr-0085
+title: "Notification item link + reply highlight: a same-origin `LinkPath` on the `Notification` doc (inbox renders it clickable; the email carries it **absolute**, the `VerificationOptions.BaseUrl` + relative-path precedent), and a `#reply-{id}` anchor + scroll-and-highlight on the post detail"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m12-ical-design.md]
+supersedes: [adr-0076]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0085 — Notification item link + reply highlight: a same-origin `LinkPath` on the `Notification` doc (inbox renders it clickable; the email carries it **absolute**, the `VerificationOptions.BaseUrl` + relative-path precedent), and a `#reply-{id}` anchor + scroll-and-highlight on the post detail
 
 Status: Accepted

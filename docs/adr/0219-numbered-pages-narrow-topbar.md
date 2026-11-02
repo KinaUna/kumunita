@@ -1,3 +1,16 @@
+---
+id: adr-0219
+title: "Numbered pager pages; the variant-B top row at 576–767px"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0219 — Numbered pager pages; the variant-B top row at 576–767px
 
 Status: Accepted

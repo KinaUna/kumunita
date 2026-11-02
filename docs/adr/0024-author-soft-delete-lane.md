@@ -1,3 +1,16 @@
+---
+id: adr-0024
+title: "Author soft-delete lane (posts + replies, community + group)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-design.md]
+supersedes: []
+superseded_by: [adr-0086]
+updated: 2026-11-02
+---
+
 # ADR 0024 — Author soft-delete lane (posts + replies, community + group)
 
 Status: Accepted

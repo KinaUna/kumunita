@@ -1,3 +1,16 @@
+---
+id: adr-0187
+title: "Group event detail and RSVP badges"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0180-event-detail.md, docs/adr/0182-form-look.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0187 — Group event detail and RSVP badges
 
 Status: **Proposed** (scaffolding landed)

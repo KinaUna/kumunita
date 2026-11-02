@@ -1,3 +1,16 @@
+---
+id: adr-0183
+title: "Announcements as cards"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0175-palettes-and-feed-card.md, docs/adr/0182-form-look.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0183 — Announcements as cards
 
 Status: **Proposed** (scaffolding landed)

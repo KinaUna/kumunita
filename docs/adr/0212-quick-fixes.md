@@ -1,3 +1,16 @@
+---
+id: adr-0212
+title: "Quick fixes: multi-day event time, member count, inventory date, community hint"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0212 — Quick fixes: multi-day event time, member count, inventory date, community hint
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0120
+title: "Guest accounts (limited-privilege, time-bounded accounts on the M1 identity surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m19-guest-accounts-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0120 — Guest accounts (limited-privilege, time-bounded accounts on the M1 identity surface)
 
 Status: Accepted

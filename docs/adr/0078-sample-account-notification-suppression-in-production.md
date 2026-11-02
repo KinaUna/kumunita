@@ -1,3 +1,16 @@
+---
+id: adr-0078
+title: "Sample-account notification suppression in production"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: [adr-0076]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0078 — Sample-account notification suppression in production
 
 Status: Accepted

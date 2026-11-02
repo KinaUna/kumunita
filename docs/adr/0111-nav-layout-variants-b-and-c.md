@@ -1,3 +1,16 @@
+---
+id: adr-0111
+title: "Navigation layout variants (the `kumunita.nav` preference, B default / C opt-in)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0111 — Navigation layout variants (the `kumunita.nav` preference, B default / C opt-in)
 
 Status: Accepted

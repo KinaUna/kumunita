@@ -1,3 +1,16 @@
+---
+id: adr-0040
+title: "Pages: system vs user (blog) kinds, and the per-resident blog feed"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/pages-design.md]
+supersedes: [adr-0039]
+superseded_by: [adr-0161]
+updated: 2026-11-02
+---
+
 # ADR 0040 — Pages: system vs user (blog) kinds, and the per-resident blog feed
 
 Status: Accepted

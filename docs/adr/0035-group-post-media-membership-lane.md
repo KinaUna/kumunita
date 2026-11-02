@@ -1,3 +1,16 @@
+---
+id: adr-0035
+title: "Group-post media: the membership lane is the serve decision"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0025]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0035 — Group-post media: the membership lane is the serve decision
 
 Status: Accepted

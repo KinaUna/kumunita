@@ -1,3 +1,16 @@
+---
+id: adr-0028
+title: "Guardian controls: account-scope supervision of a child's account"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: [adr-0006]
+superseded_by: [adr-0038, adr-0141, adr-0151]
+updated: 2026-11-02
+---
+
 # ADR 0028 — Guardian controls: account-scope supervision of a child's account
 
 Status: Accepted

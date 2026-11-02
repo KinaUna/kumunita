@@ -1,3 +1,16 @@
+---
+id: adr-0158
+title: "Surface label translations (the LBL-2 translation lane ADR 0152 §D8 named)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0158 — Surface label translations (the LBL-2 translation lane ADR 0152 §D8 named)
 
 Status: Accepted

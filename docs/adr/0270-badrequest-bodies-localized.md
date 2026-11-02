@@ -1,3 +1,16 @@
+---
+id: adr-0270
+title: "BadRequest bodies are localized; Core exception text stays English"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0270 — BadRequest bodies are localized; Core exception text stays English
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0237
+title: "A rejected avatar upload re-renders Profile/Edit with a localized error"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0237 — A rejected avatar upload re-renders Profile/Edit with a localized error
 
 Status: Accepted

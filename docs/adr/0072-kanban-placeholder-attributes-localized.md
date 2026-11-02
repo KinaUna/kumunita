@@ -1,3 +1,16 @@
+---
+id: adr-0072
+title: "Kanban board: the placeholder attributes joined the localized surface"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m11/m11-portability-handoff-notes.md]
+supersedes: [adr-0015]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0072 — Kanban board: the placeholder attributes joined the localized surface
 
 Status: Accepted

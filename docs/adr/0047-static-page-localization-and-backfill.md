@@ -1,3 +1,16 @@
+---
+id: adr-0047
+title: "Static-page localization: the hard-coded routes render in the"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/user-guides/plan-user-guides.md]
+supersedes: [adr-0043, adr-2026]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0047 — Static-page localization: the hard-coded routes render in the
 effective language + a warm-boot page-translation backfill
 

@@ -1,3 +1,16 @@
+---
+id: adr-0252
+title: "Guardian and admin pages use the accent back link"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0252 — Guardian and admin pages use the accent back link
 
 Status: Accepted

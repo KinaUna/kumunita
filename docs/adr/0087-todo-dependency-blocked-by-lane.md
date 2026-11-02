@@ -1,3 +1,16 @@
+---
+id: adr-0087
+title: "Todo dependency lane (`TBD`): one `BlockedByTodoId?` on `TodoItem` — the \"waiting on\" pointer (a display chip + a feed filter + one write lane; **never a gate**, never a graph)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m14-events-projects-design.md]
+supersedes: [adr-0067]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0087 — Todo dependency lane (`TBD`): one `BlockedByTodoId?` on `TodoItem` — the "waiting on" pointer (a display chip + a feed filter + one write lane; **never a gate**, never a graph)
 
 Status: Accepted

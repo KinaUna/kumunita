@@ -1,3 +1,16 @@
+---
+id: adr-0221
+title: "Non-text contrast pass (WCAG 1.4.11)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0221 — Non-text contrast pass (WCAG 1.4.11)
 
 Status: Accepted

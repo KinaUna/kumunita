@@ -1,3 +1,16 @@
+---
+id: adr-0239
+title: "Document uploader attribution + the owner-only delete lane"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0024-author-soft-delete-lane.md, docs/adr/0122-document-management.md, docs/adr/0125-document-edit-lane-owner-only.md]
+supersedes: []
+superseded_by: [adr-0240]
+updated: 2026-11-02
+---
+
 # ADR 0239 — Document uploader attribution + the owner-only delete lane
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0152
+title: "Admin surface labels (a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m29-admin-surface-labels-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0152 — Admin surface labels (a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice)
 
 Status: Accepted

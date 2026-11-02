@@ -1,3 +1,16 @@
+---
+id: adr-0177
+title: "Groups tile and friendly empty state"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0094-group-join-request-lane.md, docs/adr/0175-palettes-and-feed-card.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0177 — Groups tile and friendly empty state
 
 Status: **Proposed** (scaffolding landed)

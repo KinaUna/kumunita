@@ -1,3 +1,16 @@
+---
+id: adr-0057
+title: "User guides: resident-facing guides live in the `help/` subtree of the existing page tree; `en` floor + curated `de`/`fr`/`da` baselines (community-owned); a three-layer consistency loop keeps them honest as code changes (the `UG` named lane)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/user-guides/plan-user-guides.md]
+supersedes: [adr-0039]
+superseded_by: [adr-0127, adr-0160]
+updated: 2026-11-02
+---
+
 # ADR 0057 — User guides: resident-facing guides live in the `help/` subtree of the existing page tree; `en` floor + curated `de`/`fr`/`da` baselines (community-owned); a three-layer consistency loop keeps them honest as code changes (the `UG` named lane)
 
 Status: Accepted

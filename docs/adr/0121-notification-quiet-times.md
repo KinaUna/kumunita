@@ -1,3 +1,16 @@
+---
+id: adr-0121
+title: "Notification quiet times (per-resident quiet schedules on the M6 notification lane)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0121 — Notification quiet times (per-resident quiet schedules on the M6 notification lane)
 
 Status: Accepted

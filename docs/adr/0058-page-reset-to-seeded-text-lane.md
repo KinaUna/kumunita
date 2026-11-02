@@ -1,3 +1,16 @@
+---
+id: adr-0058
+title: "Page \"Reset to seeded text\" lane"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/improve/improve-audit.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0058 — Page "Reset to seeded text" lane
 
 **Status:** Accepted

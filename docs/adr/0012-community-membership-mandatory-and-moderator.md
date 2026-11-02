@@ -1,3 +1,16 @@
+---
+id: adr-0012
+title: "Community membership: mandatory communities + moderator-managed optional membership"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/guardian-assignment-design.md]
+supersedes: []
+superseded_by: [adr-0055, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0012 — Community membership: mandatory communities + moderator-managed optional membership
 
 Status: Accepted

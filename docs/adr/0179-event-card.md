@@ -1,3 +1,16 @@
+---
+id: adr-0179
+title: "Event card with date tile"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md, docs/adr/0019-timezone-platform-default-and-resident-override.md, docs/adr/0020-date-format-platform-default-and-resident-override.md, docs/adr/0065-events-feed-your-upcoming-events.md, docs/adr/0173-report-targets-lane.md, docs/adr/0175-palettes-and-feed-card.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0179 — Event card with date tile
 
 Status: **Proposed** (scaffolding landed)

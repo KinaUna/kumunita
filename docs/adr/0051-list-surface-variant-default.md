@@ -1,3 +1,16 @@
+---
+id: adr-0051
+title: "List surfaces: the default-visible variant is the viewer's current language"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0049]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0051 — List surfaces: the default-visible variant is the viewer's current language
 
 Status: Accepted

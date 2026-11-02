@@ -1,3 +1,16 @@
+---
+id: adr-0025
+title: "Rich content: Markdown bodies + in-content images"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0011]
+superseded_by: [adr-0031, adr-0034, adr-0035, adr-0075, adr-0086, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0025 — Rich content: Markdown bodies + in-content images
 
 Status: Accepted

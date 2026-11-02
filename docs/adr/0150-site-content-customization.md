@@ -1,3 +1,16 @@
+---
+id: adr-0150
+title: "Site content customization (the two landing surfaces' hero text is admin-editable + the sections are show/hide)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m29-admin-surface-labels-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0150 — Site content customization (the two landing surfaces' hero text is admin-editable + the sections are show/hide)
 
 Status: Accepted

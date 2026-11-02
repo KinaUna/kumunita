@@ -1,3 +1,16 @@
+---
+id: adr-0140
+title: "Guardian community block-and-hide (the per-child ceiling on the ADR 0028 surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0140 — Guardian community block-and-hide (the per-child ceiling on the ADR 0028 surface)
 
 Status: Accepted

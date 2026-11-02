@@ -1,3 +1,16 @@
+---
+id: adr-0195
+title: "Kanban board card edit modal: clicking a card (or choosing **Edit** in its ⋮ menu) opens a modal that edits the to-do in place instead of navigating to the detail page"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0190]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0195 — Kanban board card edit modal: clicking a card (or choosing **Edit** in its ⋮ menu) opens a modal that edits the to-do in place instead of navigating to the detail page
 
 Status: Accepted

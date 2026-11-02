@@ -1,3 +1,16 @@
+---
+id: adr-0240
+title: "Document delete asks for confirmation; \"Last modified by\" shown only when it adds a name"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0239]
+superseded_by: [adr-0242]
+updated: 2026-11-02
+---
+
 # ADR 0240 — Document delete asks for confirmation; "Last modified by" shown only when it adds a name
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0043
+title: "System pages shipped + discoverable (SP)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: [adr-0005]
+superseded_by: [adr-0047]
+updated: 2026-11-02
+---
+
 # ADR 0043 — System pages shipped + discoverable (SP)
 
 Status: Accepted

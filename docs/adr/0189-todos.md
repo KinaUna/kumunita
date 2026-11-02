@@ -1,3 +1,16 @@
+---
+id: adr-0189
+title: "To-dos: status chip, assignee, filter bar"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0184-announcement-detail.md, docs/adr/0188-projects-lists.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0189 — To-dos: status chip, assignee, filter bar
 
 Status: **Proposed** (scaffolding landed)

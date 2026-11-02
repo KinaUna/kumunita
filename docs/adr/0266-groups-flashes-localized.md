@@ -1,3 +1,16 @@
+---
+id: adr-0266
+title: "Groups controller flashes are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0266 — Groups controller flashes are localized
 
 Status: Accepted

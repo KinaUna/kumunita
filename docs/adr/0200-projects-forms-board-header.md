@@ -1,3 +1,16 @@
+---
+id: adr-0200
+title: "Projects forms and board header"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0182-form-look.md, docs/adr/0184-announcement-detail.md, docs/adr/0190-kanban-boards.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0200 — Projects forms and board header
 
 Status: **Proposed** (scaffolding landed)

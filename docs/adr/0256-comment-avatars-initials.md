@@ -1,3 +1,16 @@
+---
+id: adr-0256
+title: "Comment and reply avatars show the resident's initial"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0256 — Comment and reply avatars show the resident's initial
 
 Status: Accepted

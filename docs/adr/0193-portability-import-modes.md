@@ -1,3 +1,16 @@
+---
+id: adr-0193
+title: "Portability import modes: a \"keep existing\" choice"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m27/plan-m27-user-scoped-portability.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0193 — Portability import modes: a "keep existing" choice
 
 Status: Accepted

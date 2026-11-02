@@ -1,3 +1,16 @@
+---
+id: adr-0095
+title: "Group-invite accept / decline links (the group-invite notification is now actionable)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0095 — Group-invite accept / decline links (the group-invite notification is now actionable)
 
 Status: Accepted

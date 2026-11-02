@@ -1,3 +1,16 @@
+---
+id: adr-0038
+title: "Guardian assignment: an existing guardian assigns a second guardian to a child's account"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/guardian-assignment-design.md]
+supersedes: [adr-0028]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0038 — Guardian assignment: an existing guardian assigns a second guardian to a child's account
 
 Status: Accepted

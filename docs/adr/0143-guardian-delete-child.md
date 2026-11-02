@@ -1,3 +1,16 @@
+---
+id: adr-0143
+title: "Guardian deletes a child account: the 6th GU supervisory action that reuses the ADR 0142 deletion core, gated by an active `GuardianLink` and audited `Via: Guardian`"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0143 — Guardian deletes a child account: the 6th GU supervisory action that reuses the ADR 0142 deletion core, gated by an active `GuardianLink` and audited `Via: Guardian`
 
 Status: Accepted

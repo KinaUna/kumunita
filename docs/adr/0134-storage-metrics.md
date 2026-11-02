@@ -1,3 +1,16 @@
+---
+id: adr-0134
+title: "Storage metrics (M24) — a read-only, `GlobalAdmin`-gated admin view of the media byte store: total used space, available space, user-content used space, and space used per user"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m24-storage-metrics-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0134 — Storage metrics (M24) — a read-only, `GlobalAdmin`-gated admin view of the media byte store: total used space, available space, user-content used space, and space used per user
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0276
+title: "Portability import: restore the archive's locale settings, and carry the escalation outbound config (endpoint + enabled only)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0276 — Portability import: restore the archive's locale settings, and carry the escalation outbound config (endpoint + enabled only)
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0228
+title: "Housekeeping: light-dark() palette tokens, `kmb-detail-*` rename, notice-strip anchoring, Documents allow-list"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0228 — Housekeeping: light-dark() palette tokens, `kmb-detail-*` rename, notice-strip anchoring, Documents allow-list
 
 Status: Accepted

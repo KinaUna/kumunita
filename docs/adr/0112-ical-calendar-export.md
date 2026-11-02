@@ -1,3 +1,16 @@
+---
+id: adr-0112
+title: "iCal (calendar export of visible events)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m12-ical-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0112 — iCal (calendar export of visible events)
 
 Status: Accepted

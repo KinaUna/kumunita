@@ -1,3 +1,16 @@
+---
+id: adr-0161
+title: "Page-translation standing: the editor of a page can also translate it"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m34/m34-handoff-notes.md]
+supersedes: [adr-0040]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0161 — Page-translation standing: the editor of a page can also translate it
 
 Status: Accepted

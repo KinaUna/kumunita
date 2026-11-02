@@ -1,3 +1,16 @@
+---
+id: adr-0155
+title: "Issue submission & escalation (a general issue-submission lane + a GlobalAdmin resolution + escalation surface on the M31 ErrorReports surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0155 — Issue submission & escalation (a general issue-submission lane + a GlobalAdmin resolution + escalation surface on the M31 ErrorReports surface)
 
 Status: Accepted

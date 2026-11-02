@@ -1,3 +1,16 @@
+---
+id: adr-0275
+title: "Portability import (KeepExisting): merge principals by email, keep the existing profile"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0275 — Portability import (KeepExisting): merge principals by email, keep the existing profile
 
 Status: Accepted

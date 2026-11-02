@@ -1,3 +1,16 @@
+---
+id: adr-0264
+title: "Community controller flashes are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0264 — Community controller flashes are localized
 
 Status: Accepted

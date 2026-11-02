@@ -1,3 +1,16 @@
+---
+id: adr-0069
+title: "Kanban board: drag-and-drop moves, fixed statuses, add-lane"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/tbd-todo-dependency-design.md]
+supersedes: [adr-0067, adr-0068]
+superseded_by: [adr-0071]
+updated: 2026-11-02
+---
+
 # ADR 0069 — Kanban board: drag-and-drop moves, fixed statuses, add-lane
 
 Status: Accepted

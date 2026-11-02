@@ -1,3 +1,16 @@
+---
+id: adr-0098
+title: "Board audience-edit lane (creator ∪ GlobalAdmin)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m27-user-scoped-portability-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0098 — Board audience-edit lane (creator ∪ GlobalAdmin)
 
 Status: Accepted

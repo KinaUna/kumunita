@@ -1,3 +1,16 @@
+---
+id: adr-0039
+title: "Pages: a hierarchical, audience-restricted, translatable knowledge tree (absorbs the static-page lane)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m8-search-design.md]
+supersedes: [adr-0005]
+superseded_by: [adr-0040, adr-0057, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0039 — Pages: a hierarchical, audience-restricted, translatable knowledge tree (absorbs the static-page lane)
 
 Status: Accepted

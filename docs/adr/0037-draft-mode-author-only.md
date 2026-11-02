@@ -1,3 +1,16 @@
+---
+id: adr-0037
+title: "Draft mode: saved-but-not-published, author-only (community posts, group posts, announcements)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-design.md]
+supersedes: [adr-0004]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0037 — Draft mode: saved-but-not-published, author-only (community posts, group posts, announcements)
 
 Status: Accepted

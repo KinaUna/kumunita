@@ -1,3 +1,16 @@
+---
+id: adr-0102
+title: "\"Everyone in this community\" is exclusive + the \"all communities\" scope ⇒ all residents"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0036]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0102 — "Everyone in this community" is exclusive + the "all communities" scope ⇒ all residents
 
 Status: Accepted

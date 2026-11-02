@@ -1,3 +1,16 @@
+---
+id: adr-0097
+title: "Board lane-delete lane (creator ∪ GlobalAdmin)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0097 — Board lane-delete lane (creator ∪ GlobalAdmin)
 
 Status: Accepted

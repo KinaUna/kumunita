@@ -1,3 +1,16 @@
+---
+id: adr-0192
+title: "Documents"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0182-form-look.md, docs/adr/0184-announcement-detail.md, docs/adr/0188-projects-lists.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0192 — Documents
 
 Status: **Proposed** (scaffolding landed)

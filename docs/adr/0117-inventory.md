@@ -1,3 +1,16 @@
+---
+id: adr-0117
+title: "M16: Inventory (check-out / check-in + usage history)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m16-inventory-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0117 — M16: Inventory (check-out / check-in + usage history)
 
 Status: Accepted

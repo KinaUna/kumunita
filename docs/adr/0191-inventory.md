@@ -1,3 +1,16 @@
+---
+id: adr-0191
+title: "Inventory"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0182-form-look.md, docs/adr/0188-projects-lists.md, docs/adr/0189-todos.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0191 — Inventory
 
 Status: **Proposed** (scaffolding landed)

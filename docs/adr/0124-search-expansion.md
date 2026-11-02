@@ -1,3 +1,16 @@
+---
+id: adr-0124
+title: "M8 expansion — Search: six extended surfaces + tag-name match"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0124 — M8 expansion — Search: six extended surfaces + tag-name match
 
 Status: Accepted

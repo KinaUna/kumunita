@@ -1,3 +1,16 @@
+---
+id: adr-0258
+title: "Alert/modal Close labels and the \"only you can see this\" tooltips are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0258 — Alert/modal Close labels and the "only you can see this" tooltips are localized
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0109
+title: "Events \"Past\" lane (the /events past-events option)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m12-ical-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0109 — Events "Past" lane (the /events past-events option)
 
 Status: Accepted (amended 2026-09-28 — see **Amendment** below)

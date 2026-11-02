@@ -1,3 +1,16 @@
+---
+id: adr-0034
+title: "File attachments lane: downloads on post / reply / announcement"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0025]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0034 — File attachments lane: downloads on post / reply / announcement
 
 Status: Accepted

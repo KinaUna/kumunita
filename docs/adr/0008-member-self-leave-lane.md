@@ -1,3 +1,16 @@
+---
+id: adr-0008
+title: "Member self-leave lane (owner excepted)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/guardian-assignment-design.md]
+supersedes: []
+superseded_by: [adr-0094]
+updated: 2026-11-02
+---
+
 # ADR 0008 — Member self-leave lane (owner excepted)
 
 Status: Accepted

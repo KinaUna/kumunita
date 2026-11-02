@@ -1,3 +1,16 @@
+---
+id: adr-0251
+title: "Post edit and Post new: hard-coded English moves to translation keys"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0251 — Post edit and Post new: hard-coded English moves to translation keys
 
 Status: Accepted

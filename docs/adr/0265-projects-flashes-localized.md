@@ -1,3 +1,16 @@
+---
+id: adr-0265
+title: "Projects controller flashes are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0265 — Projects controller flashes are localized
 
 Status: Accepted

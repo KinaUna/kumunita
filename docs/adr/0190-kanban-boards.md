@@ -1,3 +1,16 @@
+---
+id: adr-0190
+title: "Kanban boards"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0067-m5-projects-todos-and-kanban.md, docs/adr/0069-kanban-drag-dnd-fixed-statuses-and-add-lane.md, docs/adr/0188-projects-lists.md, docs/adr/0189-todos.md]
+supersedes: []
+superseded_by: [adr-0195]
+updated: 2026-11-02
+---
+
 # ADR 0190 — Kanban boards
 
 Status: **Proposed** (scaffolding landed)

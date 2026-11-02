@@ -1,3 +1,16 @@
+---
+id: adr-0274
+title: "Portability import (KeepExisting): merge tags by slug + default-language name"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0274 — Portability import (KeepExisting): merge tags by slug + default-language name
 
 Status: Accepted

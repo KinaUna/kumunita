@@ -1,3 +1,16 @@
+---
+id: adr-0126
+title: "Attachment inline preview: the safe-renderable subset renders in the browser"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0126 — Attachment inline preview: the safe-renderable subset renders in the browser
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0160
+title: "Nested help guides: each tabbed surface's sub-pages become child guides under their top-level guide (the UG guide tree gains a second level)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: [adr-0057]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0160 — Nested help guides: each tabbed surface's sub-pages become child guides under their top-level guide (the UG guide tree gains a second level)
 
 Status: Accepted

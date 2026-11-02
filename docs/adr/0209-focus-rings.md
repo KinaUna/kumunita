@@ -1,3 +1,16 @@
+---
+id: adr-0209
+title: "Focus rings: the two `outline: 0/none` rules"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0209 — Focus rings: the two `outline: 0/none` rules
 
 Status: Accepted

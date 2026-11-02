@@ -1,3 +1,16 @@
+---
+id: adr-0260
+title: "Guardian attendance rows show the real RSVP status, localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0260 — Guardian attendance rows show the real RSVP status, localized
 
 Status: Accepted

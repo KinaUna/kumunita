@@ -1,3 +1,16 @@
+---
+id: adr-0059
+title: "Event user-added translations (the ADR 0022/0029 lane carried to the M4 surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-events-design.md]
+supersedes: [adr-0054]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0059 — Event user-added translations (the ADR 0022/0029 lane carried to the M4 surface)
 
 Status: Accepted

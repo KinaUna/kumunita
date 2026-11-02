@@ -1,3 +1,16 @@
+---
+id: adr-0129
+title: "Development sample data moved to an embedded JSON document"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0129 — Development sample data moved to an embedded JSON document
 
 **Status:** Accepted

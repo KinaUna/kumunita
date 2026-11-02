@@ -1,3 +1,16 @@
+---
+id: adr-0148
+title: "User-scoped portability (resident self-export + per-entity conflict-resolution import)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m27-user-scoped-portability-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0148 — User-scoped portability (resident self-export + per-entity conflict-resolution import)
 
 Status: Accepted

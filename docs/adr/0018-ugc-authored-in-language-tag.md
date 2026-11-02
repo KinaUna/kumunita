@@ -1,3 +1,16 @@
+---
+id: adr-0018
+title: "UGC authored-in language tag (posts, replies, announcements)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/guardian-controls-design.md]
+supersedes: []
+superseded_by: [adr-0027, adr-0086]
+updated: 2026-11-02
+---
+
 # ADR 0018 — UGC authored-in language tag (posts, replies, announcements)
 
 Status: Accepted

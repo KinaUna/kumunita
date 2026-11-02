@@ -1,3 +1,16 @@
+---
+id: adr-0041
+title: "Page audience scope dropdown: \"All residents\" as a first-class flag"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: [adr-0006]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0041 — Page audience scope dropdown: "All residents" as a first-class flag
 
 Status: Accepted

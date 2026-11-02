@@ -1,3 +1,16 @@
+---
+id: adr-0188
+title: "Projects landing, goal / project detail, shared list rows"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0183-announcements.md, docs/adr/0184-announcement-detail.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0188 — Projects landing, goal / project detail, shared list rows
 
 Status: **Proposed** (scaffolding landed)

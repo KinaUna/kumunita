@@ -1,3 +1,16 @@
+---
+id: adr-0196
+title: "Pages"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0183-announcements.md, docs/adr/0184-announcement-detail.md, docs/adr/0192-documents.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0196 — Pages
 
 Status: **Proposed** (scaffolding landed)

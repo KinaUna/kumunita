@@ -1,3 +1,16 @@
+---
+id: adr-0122
+title: "Document management (a shared, per-access-controlled repository of official documents, served as downloads)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0122 — Document management (a shared, per-access-controlled repository of official documents, served as downloads)
 
 Status: Accepted

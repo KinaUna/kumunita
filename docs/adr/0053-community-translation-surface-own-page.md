@@ -1,3 +1,16 @@
+---
+id: adr-0053
+title: "Community translation surface on its own page"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m30/plan-m30-admin-onboarding.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0053 — Community translation surface on its own page
 
 Status: Accepted

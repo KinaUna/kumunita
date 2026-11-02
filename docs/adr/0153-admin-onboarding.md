@@ -1,3 +1,16 @@
+---
+id: adr-0153
+title: "Admin onboarding (a guided walk-through for a new GlobalAdmin through the seven most important initial settings)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m30-admin-onboarding-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0153 — Admin onboarding (a guided walk-through for a new GlobalAdmin through the seven most important initial settings)
 
 Status: Accepted

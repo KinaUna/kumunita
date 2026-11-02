@@ -1,3 +1,16 @@
+---
+id: adr-0131
+title: "SMTP transport: MailKit in place of the BCL SmtpClient"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m22/m22-u00.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0131 — SMTP transport: MailKit in place of the BCL SmtpClient
 
 Status: Accepted

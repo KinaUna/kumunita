@@ -1,3 +1,16 @@
+---
+id: adr-0282
+title: "Community feed: widen the feed column, keep the communities rail on the left"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0282 — Community feed: widen the feed column, keep the communities rail on the left
 
 Status: Accepted

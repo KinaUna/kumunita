@@ -1,3 +1,16 @@
+---
+id: adr-0006
+title: "Module boundary contracts (Identity, UserInfo, Authorization)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0001, adr-0003]
+superseded_by: [adr-0028, adr-0041, adr-0086, adr-0138, adr-0142, adr-0151, adr-0165, adr-0281]
+updated: 2026-11-02
+---
+
 # ADR 0006 — Module boundary contracts (Identity, UserInfo, Authorization)
 
 Status: Accepted

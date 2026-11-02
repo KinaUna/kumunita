@@ -1,3 +1,16 @@
+---
+id: adr-0049
+title: "Default-visible variant: the viewer's current language (when a translation exists)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/improve/improve-audit.md]
+supersedes: [adr-0005]
+superseded_by: [adr-0051]
+updated: 2026-11-02
+---
+
 # ADR 0049 — Default-visible variant: the viewer's current language (when a translation exists)
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0123
+title: "Extended user profiles (a resident biography + free author-set tags + a find-people read)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m23-extended-profiles-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0123 — Extended user profiles (a resident biography + free author-set tags + a find-people read)
 
 Status: Accepted

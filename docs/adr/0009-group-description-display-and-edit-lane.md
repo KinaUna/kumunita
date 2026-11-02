@@ -1,3 +1,16 @@
+---
+id: adr-0009
+title: "Group description: resident-facing display + owner ∪ GlobalAdmin edit"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/tags-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0009 — Group description: resident-facing display + owner ∪ GlobalAdmin edit
 
 Status: Accepted

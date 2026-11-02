@@ -1,3 +1,16 @@
+---
+id: adr-0065
+title: "The `/events` feed's \"Your upcoming events\" section (`EV-MINE`): the signed-in viewer's own events above the feed"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m14-events-projects-design.md]
+supersedes: [adr-0054]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0065 — The `/events` feed's "Your upcoming events" section (`EV-MINE`): the signed-in viewer's own events above the feed
 
 Status: Accepted

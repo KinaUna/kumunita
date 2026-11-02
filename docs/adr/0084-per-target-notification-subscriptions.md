@@ -1,3 +1,16 @@
+---
+id: adr-0084
+title: "Per-target notification subscriptions: opt-in/opt-out per (recipient, kind, target) lane on the frozen M6 emitter, a settings-page list, and the per-page subscribe toggle"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: [adr-0076]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0084 — Per-target notification subscriptions: opt-in/opt-out per (recipient, kind, target) lane on the frozen M6 emitter, a settings-page list, and the per-page subscribe toggle
 
 Status: Accepted

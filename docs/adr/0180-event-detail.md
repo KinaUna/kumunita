@@ -1,3 +1,16 @@
+---
+id: adr-0180
+title: "Event detail: rich header"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md, docs/adr/0054-events-rsvp-reminders.md, docs/adr/0173-report-targets-lane.md, docs/adr/0175-palettes-and-feed-card.md, docs/adr/0179-event-card.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0180 — Event detail: rich header
 
 Status: **Proposed** (scaffolding landed)

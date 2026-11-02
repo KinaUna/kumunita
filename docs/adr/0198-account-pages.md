@@ -1,3 +1,16 @@
+---
+id: adr-0198
+title: "Account pages"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0182-form-look.md, docs/adr/0197-profile-directory.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0198 — Account pages
 
 Status: **Proposed** (scaffolding landed)

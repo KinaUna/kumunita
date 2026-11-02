@@ -1,3 +1,16 @@
+---
+id: adr-0182
+title: "One calm look for card-per-field-group forms"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0173-report-targets-lane.md, docs/adr/0175-palettes-and-feed-card.md, docs/adr/0179-event-card.md, docs/adr/0181-calendar.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0182 — One calm look for card-per-field-group forms
 
 Status: **Proposed** (scaffolding landed)

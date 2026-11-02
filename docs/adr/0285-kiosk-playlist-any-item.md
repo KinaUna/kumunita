@@ -1,3 +1,16 @@
+---
+id: adr-0285
+title: "Kiosk playlist: any item, per-entry duration, scroll and comments"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0164]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0285 — Kiosk playlist: any item, per-entry duration, scroll and comments
 
 Status: Accepted

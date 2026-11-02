@@ -1,3 +1,16 @@
+---
+id: adr-0186
+title: "Group detail and group posts"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0175-palettes-and-feed-card.md, docs/adr/0177-groups-tile-and-empty-state.md, docs/adr/0184-announcement-detail.md, docs/adr/0185-post-detail.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0186 — Group detail and group posts
 
 Status: **Proposed** (scaffolding landed)

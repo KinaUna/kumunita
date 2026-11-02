@@ -1,3 +1,16 @@
+---
+id: adr-0218
+title: "Hover states: icon rail tooltips, folded nav, pagination"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0218 — Hover states: icon rail tooltips, folded nav, pagination
 
 Status: Accepted

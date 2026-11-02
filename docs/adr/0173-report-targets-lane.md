@@ -1,3 +1,16 @@
+---
+id: adr-0173
+title: "Report targets: the \"Report this…\" lane for events, projects,"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/report-targets/handoff-notes.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0173 — Report targets: the "Report this…" lane for events, projects,
 boards, to-dos, and group posts
 

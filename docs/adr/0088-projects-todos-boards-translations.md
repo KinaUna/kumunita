@@ -1,3 +1,16 @@
+---
+id: adr-0088
+title: "Projects / to-dos / Kanban-board user-added translations (the ADR 0022/0029/0059 lane carried to the M5/PL surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-events-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0088 — Projects / to-dos / Kanban-board user-added translations (the ADR 0022/0029/0059 lane carried to the M5/PL surface)
 
 Status: Accepted

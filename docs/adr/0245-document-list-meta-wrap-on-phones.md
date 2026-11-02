@@ -1,3 +1,16 @@
+---
+id: adr-0245
+title: "The document list meta row keeps each item whole on phones"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0245 — The document list meta row keeps each item whole on phones
 
 Status: Accepted

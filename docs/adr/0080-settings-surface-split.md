@@ -1,3 +1,16 @@
+---
+id: adr-0080
+title: "The /settings surface split: linkable section pages"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0080 — The /settings surface split: linkable section pages
 
 Status: Accepted

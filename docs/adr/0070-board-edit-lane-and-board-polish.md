@@ -1,3 +1,16 @@
+---
+id: adr-0070
+title: "Board edit lane (title + description) + board polish"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/pl-goals-projects-design.md]
+supersedes: [adr-0067]
+superseded_by: [adr-0086]
+updated: 2026-11-02
+---
+
 # ADR 0070 — Board edit lane (title + description) + board polish
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0185
+title: "Community post detail"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0175-palettes-and-feed-card.md, docs/adr/0184-announcement-detail.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0185 — Community post detail
 
 Status: **Proposed** (scaffolding landed)

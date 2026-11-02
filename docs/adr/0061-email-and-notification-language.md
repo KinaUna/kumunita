@@ -1,3 +1,16 @@
+---
+id: adr-0061
+title: "Email & notification language: per-resident outbound-channel language"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m22-onboarding-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0061 — Email & notification language: per-resident outbound-channel language
 
 Status: Accepted

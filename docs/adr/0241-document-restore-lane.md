@@ -1,3 +1,16 @@
+---
+id: adr-0241
+title: "Documents can be restored: Undo in the delete toast and a Deleted documents list"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0239-document-uploader-attribution-and-delete-lane.md, docs/adr/0240-document-delete-confirm-and-modified-by-row.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0241 — Documents can be restored: Undo in the delete toast and a Deleted documents list
 
 Status: Accepted

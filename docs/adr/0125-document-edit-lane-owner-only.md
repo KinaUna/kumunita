@@ -1,3 +1,16 @@
+---
+id: adr-0125
+title: "Document edit lane: owner-only (change who can access it, or replace the file)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m21-document-management-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0125 — Document edit lane: owner-only (change who can access it, or replace the file)
 
 Status: Accepted

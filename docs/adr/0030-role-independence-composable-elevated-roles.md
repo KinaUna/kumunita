@@ -1,3 +1,16 @@
+---
+id: adr-0030
+title: "Role independence: elevated roles are composable, not mutually exclusive"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m11-portability-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0030 — Role independence: elevated roles are composable, not mutually exclusive
 
 Status: Accepted

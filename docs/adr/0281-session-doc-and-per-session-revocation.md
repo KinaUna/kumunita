@@ -1,3 +1,16 @@
+---
+id: adr-0281
+title: "Per-session model + per-session revocation (the `sessions` named lane): a `SessionDoc` in a new `Kumunita.Core.Sessions` bounded context, a `SessionService` 5-method surface, the `kumunita.sid` cookie item, the `SessionRevocationMiddleware`, and the `SecuritySettingsController` extension — on top of F5's whole-account stamp rotation (the two mechanisms coexist and are independent)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/sessions-per-session-revocation.md]
+supersedes: [adr-0006]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0281 — Per-session model + per-session revocation (the `sessions` named lane): a `SessionDoc` in a new `Kumunita.Core.Sessions` bounded context, a `SessionService` 5-method surface, the `kumunita.sid` cookie item, the `SessionRevocationMiddleware`, and the `SecuritySettingsController` extension — on top of F5's whole-account stamp rotation (the two mechanisms coexist and are independent)
 
 Status: Accepted

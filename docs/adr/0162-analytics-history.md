@@ -1,3 +1,16 @@
+---
+id: adr-0162
+title: "Analytics history (M34) — the M13 `/admin/analytics` admin surface gains a trend view over time so an operator can see usage patterns evolve"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/analytics-subsystem.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0162 — Analytics history (M34) — the M13 `/admin/analytics` admin surface gains a trend view over time so an operator can see usage patterns evolve
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0032
+title: "Inline editor: the rendered pane is the default view"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/image-editor-design.md]
+supersedes: [adr-0031]
+superseded_by: [adr-0033]
+updated: 2026-11-02
+---
+
 # ADR 0032 — Inline editor: the rendered pane is the default view
 
 Status: Accepted

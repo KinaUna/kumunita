@@ -1,3 +1,16 @@
+---
+id: adr-0170
+title: "Site content singleton save: upsert-on-missing"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m35-kiosk-mode-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0170 — Site content singleton save: upsert-on-missing
 
 Status: Accepted

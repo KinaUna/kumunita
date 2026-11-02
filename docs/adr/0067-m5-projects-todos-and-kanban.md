@@ -1,3 +1,16 @@
+---
+id: adr-0067
+title: "M5: Projects (to-dos + Kanban boards) — a new `Kumunita.Core.Projects` context reusing the frozen authorization / audience / renderer / editor / standing seams"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m14-events-projects-design.md]
+supersedes: [adr-0001]
+superseded_by: [adr-0068, adr-0069, adr-0070, adr-0073, adr-0079, adr-0086, adr-0087, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0067 — M5: Projects (to-dos + Kanban boards) — a new `Kumunita.Core.Projects` context reusing the frozen authorization / audience / renderer / editor / standing seams
 
 Status: Accepted

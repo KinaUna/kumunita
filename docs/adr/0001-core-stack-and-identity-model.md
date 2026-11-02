@@ -1,3 +1,16 @@
+---
+id: adr-0001
+title: "Core stack & identity model"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: []
+superseded_by: [adr-0004, adr-0006, adr-0036, adr-0054, adr-0067, adr-0076, adr-0086]
+updated: 2026-11-02
+---
+
 # ADR 0001 — Core stack & identity model
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0233
+title: "A rejected document upload re-renders the form with an error"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0233 — A rejected document upload re-renders the form with an error
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0076
+title: "M6: Notifications (inbox + recipient email) — a new `Kumunita.Core.Notifications` context reusing the frozen durable-email / translation / personal-read seams"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: [adr-0001]
+superseded_by: [adr-0077, adr-0078, adr-0084, adr-0085, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0076 — M6: Notifications (inbox + recipient email) — a new `Kumunita.Core.Notifications` context reusing the frozen durable-email / translation / personal-read seams
 
 Status: Accepted

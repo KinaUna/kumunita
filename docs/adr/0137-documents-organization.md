@@ -1,3 +1,16 @@
+---
+id: adr-0137
+title: "Documents organization: `TagIds` + `FolderId` on `Document` (tags reuse the TG tag vocabulary, folders a Page-style `DocumentFolder` ParentId forest — a display/organizational facet, never a gate)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0137 — Documents organization: `TagIds` + `FolderId` on `Document` (tags reuse the TG tag vocabulary, folders a Page-style `DocumentFolder` ParentId forest — a display/organizational facet, never a gate)
 
 Status: Accepted

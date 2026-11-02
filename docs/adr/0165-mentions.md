@@ -1,3 +1,16 @@
+---
+id: adr-0165
+title: "M36: @mentions — a cross-surface `@<resident>` reference token: type a resident's directory display name after an `@`, the platform resolves it against the frozen M2 directory and (a) notifies the mentioned resident on that surface (a new mention kind per surface, the ADR 0076 D2 \"follow-on lane\") and (b) renders the name as a link to the resident's directory page; additive on the frozen surfaces, no new bounded context"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m36-mentions-design.md]
+supersedes: [adr-0005, adr-0006, adr-0012, adr-0013, adr-0015, adr-0023, adr-0025, adr-0031, adr-0033, adr-0039, adr-0054, adr-0067, adr-0076, adr-0077, adr-0105]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0165 — M36: @mentions — a cross-surface `@<resident>` reference token: type a resident's directory display name after an `@`, the platform resolves it against the frozen M2 directory and (a) notifies the mentioned resident on that surface (a new mention kind per surface, the ADR 0076 D2 "follow-on lane") and (b) renders the name as a link to the resident's directory page; additive on the frozen surfaces, no new bounded context
 
 Status: Accepted

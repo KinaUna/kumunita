@@ -1,3 +1,16 @@
+---
+id: adr-0081
+title: "Events calendar: week as the default view + quick-create from empty space + month single-line grid"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0081 — Events calendar: week as the default view + quick-create from empty space + month single-line grid
 
 Status: Accepted

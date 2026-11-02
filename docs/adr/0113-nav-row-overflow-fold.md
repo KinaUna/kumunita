@@ -1,3 +1,16 @@
+---
+id: adr-0113
+title: "the variant-B nav-row overflow fold (Community + Groups into the More menu)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m13/plan-m13-logging-analytics.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0113 — the variant-B nav-row overflow fold (Community + Groups into the More menu)
 
 Status: Accepted

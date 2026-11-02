@@ -1,3 +1,16 @@
+---
+id: adr-0172
+title: "Password-hash posture: PBKDF2 (Identity default), no custom scheme"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/prod-hardening/hardening-handoff-notes.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0172 — Password-hash posture: PBKDF2 (Identity default), no custom scheme
 
 Status: Accepted

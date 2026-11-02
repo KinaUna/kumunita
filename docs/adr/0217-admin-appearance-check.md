@@ -1,3 +1,16 @@
+---
+id: adr-0217
+title: "Admin Appearance form: end-to-end check and duplicate flash"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0217 — Admin Appearance form: end-to-end check and duplicate flash
 
 Status: Accepted

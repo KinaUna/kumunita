@@ -1,3 +1,16 @@
+---
+id: adr-0099
+title: "A to-do created on the board inherits the board's audience"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0099 — A to-do created on the board inherits the board's audience
 
 Status: Accepted

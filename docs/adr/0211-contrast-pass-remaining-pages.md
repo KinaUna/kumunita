@@ -1,3 +1,16 @@
+---
+id: adr-0211
+title: "Contrast pass, remaining pages"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0211 — Contrast pass, remaining pages
 
 Status: Accepted

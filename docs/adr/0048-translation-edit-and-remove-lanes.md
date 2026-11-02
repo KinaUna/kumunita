@@ -1,3 +1,16 @@
+---
+id: adr-0048
+title: "Edit + remove lanes for user-added translations"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m15-translation-bulk-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0048 — Edit + remove lanes for user-added translations
 
 Status: Accepted

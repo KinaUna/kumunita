@@ -1,3 +1,16 @@
+---
+id: adr-0079
+title: "To-do optional start and due dates"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m14-events-projects-design.md]
+supersedes: [adr-0067]
+superseded_by: [adr-0086]
+updated: 2026-11-02
+---
+
 # ADR 0079 — To-do optional start and due dates
 
 Status: Accepted (amended 2026-09-28 — see **Amendment** below)

@@ -1,3 +1,16 @@
+---
+id: adr-0033
+title: "WYSIWYG inline editing: the rendered pane is the editable surface"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/rich-content-subsystem.md]
+supersedes: [adr-0031, adr-0032]
+superseded_by: [adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0033 — WYSIWYG inline editing: the rendered pane is the editable surface
 
 Status: Accepted

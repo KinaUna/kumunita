@@ -1,3 +1,16 @@
+---
+id: adr-0178
+title: "Home restyle (no structural change)"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0150-site-content-customization.md, docs/adr/0175-palettes-and-feed-card.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0178 — Home restyle (no structural change)
 
 Status: **Proposed** (scaffolding landed)

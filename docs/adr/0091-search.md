@@ -1,3 +1,16 @@
+---
+id: adr-0091
+title: "M8 — Search: one `/search` surface over the frozen seams"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m13-logging-analytics-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0091 — M8 — Search: one `/search` surface over the frozen seams
 
 Status: Accepted

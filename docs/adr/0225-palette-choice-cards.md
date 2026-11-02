@@ -1,3 +1,16 @@
+---
+id: adr-0225
+title: "Palette choice cards in the admin Appearance form"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0225 — Palette choice cards in the admin Appearance form
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0174
+title: "MFA enrollment: QR code pairing + first-class Security tab"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: [adr-0280]
+updated: 2026-11-02
+---
+
 # ADR 0174 — MFA enrollment: QR code pairing + first-class Security tab
 
 Status: Accepted

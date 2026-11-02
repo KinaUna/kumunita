@@ -1,3 +1,16 @@
+---
+id: adr-0146
+title: "Child accounts: the child owns the password (the guardian never sets it; the child sets it at the confirmation link)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/prod-hardening-f2-token-hash.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0146 — Child accounts: the child owns the password (the guardian never sets it; the child sets it at the confirmation link)
 
 Status: Accepted

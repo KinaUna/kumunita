@@ -1,3 +1,16 @@
+---
+id: adr-0017
+title: "Announcement edit lane: author-of-record ∪ GlobalAdmin (flat lane)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m21-document-management-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0017 — Announcement edit lane: author-of-record ∪ GlobalAdmin (flat lane)
 
 Status: Accepted

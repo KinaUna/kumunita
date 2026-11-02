@@ -1,3 +1,16 @@
+---
+id: adr-0052
+title: "Warm-boot backfill of the UI-string `de` / `fr` / `da` baselines"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m15-translation-bulk-design.md]
+supersedes: [adr-0042]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0052 — Warm-boot backfill of the UI-string `de` / `fr` / `da` baselines
 
 Status: Accepted

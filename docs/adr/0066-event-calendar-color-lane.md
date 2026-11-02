@@ -1,3 +1,16 @@
+---
+id: adr-0066
+title: "Event calendar color: an author-picked chip/block background"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0066 — Event calendar color: an author-picked chip/block background
 
 Status: Accepted

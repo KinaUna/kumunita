@@ -1,3 +1,16 @@
+---
+id: adr-0277
+title: "Directory: name search, verified-only filter, and name sort"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0277 — Directory: name search, verified-only filter, and name sort
 
 Status: Accepted

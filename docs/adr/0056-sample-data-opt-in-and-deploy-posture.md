@@ -1,3 +1,16 @@
+---
+id: adr-0056
+title: "Sample-data opt-in: a flag-gated seeder with a deploy posture"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/sec/sec-handoff-notes.md]
+supersedes: [adr-0055]
+superseded_by: [adr-0060]
+updated: 2026-11-02
+---
+
 # ADR 0056 — Sample-data opt-in: a flag-gated seeder with a deploy posture
 
 Status: Accepted

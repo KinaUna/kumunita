@@ -1,3 +1,16 @@
+---
+id: adr-0114
+title: "M13: Logging and usage analytics"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/analytics-subsystem.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0114 — M13: Logging and usage analytics
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0093
+title: "Group delete lane (owner ∪ GlobalAdmin)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-join-request-lane.md]
+supersedes: [adr-0007]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0093 — Group delete lane (owner ∪ GlobalAdmin)
 
 Status: Accepted

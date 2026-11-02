@@ -1,3 +1,16 @@
+---
+id: adr-0254
+title: "The Page form is localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0254 — The Page form is localized
 
 Status: Accepted

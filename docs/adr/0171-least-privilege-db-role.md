@@ -1,3 +1,16 @@
+---
+id: adr-0171
+title: "Least-privilege DB role: the two-role split (migrations under a separate owner role; app role demoted to DML)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/prod-hardening-f22-role.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0171 — Least-privilege DB role: the two-role split (migrations under a separate owner role; app role demoted to DML)
 
 Status: **Accepted** (owner accepted 2026-10-25 — the **F22.U2** gate is now

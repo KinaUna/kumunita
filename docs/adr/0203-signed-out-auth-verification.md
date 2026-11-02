@@ -1,3 +1,16 @@
+---
+id: adr-0203
+title: "Signed-out auth verification"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0203 — Signed-out auth verification
 
 Status: Accepted

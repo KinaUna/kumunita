@@ -1,3 +1,16 @@
+---
+id: adr-0086
+title: "Goals & Projects lane (`PL`): the higher-level goals + projects page on top of M5"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-events-design.md]
+supersedes: [adr-0001, adr-0006, adr-0018, adr-0019, adr-0020, adr-0024, adr-0025, adr-0031, adr-0036, adr-0067, adr-0070, adr-0079]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0086 — Goals & Projects lane (`PL`): the higher-level goals + projects page on top of M5
 
 Status: Accepted

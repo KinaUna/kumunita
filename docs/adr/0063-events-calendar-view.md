@@ -1,3 +1,16 @@
+---
+id: adr-0063
+title: "The events calendar (`EV-CAL`): a month-anchored, display-only overview of visible events"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-design.md]
+supersedes: [adr-0054]
+superseded_by: [adr-0064]
+updated: 2026-11-02
+---
+
 # ADR 0063 — The events calendar (`EV-CAL`): a month-anchored, display-only overview of visible events
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0224
+title: "Headed section cards on the other forms"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0224 — Headed section cards on the other forms
 
 Status: Accepted

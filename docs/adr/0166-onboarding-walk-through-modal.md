@@ -1,3 +1,16 @@
+---
+id: adr-0166
+title: "Onboarding walk-through: each onboarding step opens its setting in a modal (a same-origin iframe of the surface's own route) with Previous / Next navigation + a \"Step X of Y\" counter, so the resident / admin onboarding pages are a clean linear process"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0166 — Onboarding walk-through: each onboarding step opens its setting in a modal (a same-origin iframe of the surface's own route) with Previous / Next navigation + a "Step X of Y" counter, so the resident / admin onboarding pages are a clean linear process
 
 Status: Accepted

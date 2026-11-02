@@ -1,3 +1,16 @@
+---
+id: adr-0094
+title: "Resident join-request lane for public groups (self-initiated, the reverse of the m2b invitation lane)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-join-request-lane.md]
+supersedes: [adr-0007, adr-0008]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0094 — Resident join-request lane for public groups (self-initiated, the reverse of the m2b invitation lane)
 
 Status: Accepted

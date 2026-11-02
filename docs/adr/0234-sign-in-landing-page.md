@@ -1,3 +1,16 @@
+---
+id: adr-0234
+title: "Where a sign-in lands: Home, and MFA settings after a recovery code"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0234 — Where a sign-in lands: Home, and MFA settings after a recovery code
 
 Status: Accepted

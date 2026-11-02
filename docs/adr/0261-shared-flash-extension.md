@@ -1,3 +1,16 @@
+---
+id: adr-0261
+title: "A shared FlashAsync extension; Guardian, Announcement and Event flashes localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0261 — A shared FlashAsync extension; Guardian, Announcement and Event flashes localized
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0271
+title: "Admin hub views are localized (Admin/*)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0271 — Admin hub views are localized (Admin/*)
 
 Status: Accepted

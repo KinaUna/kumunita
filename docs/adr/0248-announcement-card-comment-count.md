@@ -1,3 +1,16 @@
+---
+id: adr-0248
+title: "Announcement cards show a comment count"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0248 — Announcement cards show a comment count
 
 Status: Accepted

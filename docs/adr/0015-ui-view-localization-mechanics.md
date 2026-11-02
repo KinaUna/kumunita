@@ -1,3 +1,16 @@
+---
+id: adr-0015
+title: "UI view-localization mechanics"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: []
+superseded_by: [adr-0072, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0015 — UI view-localization mechanics
 
 Status: Accepted

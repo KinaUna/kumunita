@@ -1,3 +1,16 @@
+---
+id: adr-0135
+title: "Upload limits (M25): admin-set per-file limit + per-user content quota over the content-addressed store; `Media__MaxBytes` demoted to the fallback; a pure-Core decision + a single Web gate adopted by every upload lane; a resident self-usage view"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m25-upload-limits-design.md]
+supersedes: [adr-0011]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0135 — Upload limits (M25): admin-set per-file limit + per-user content quota over the content-addressed store; `Media__MaxBytes` demoted to the fallback; a pure-Core decision + a single Web gate adopted by every upload lane; a resident self-usage view
 
 Status: Accepted

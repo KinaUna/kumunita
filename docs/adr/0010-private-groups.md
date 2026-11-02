@@ -1,3 +1,16 @@
+---
+id: adr-0010
+title: "Private groups: a membership/organizing unit, hidden from the audience pickers"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-events-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0010 — Private groups: a membership/organizing unit, hidden from the audience pickers
 
 Status: Accepted

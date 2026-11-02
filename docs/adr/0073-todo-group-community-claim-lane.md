@@ -1,3 +1,16 @@
+---
+id: adr-0073
+title: "To-do group / community assignment and claim lane (self-claim of unassigned work)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m6-notifications-design.md]
+supersedes: [adr-0067]
+superseded_by: [adr-0106]
+updated: 2026-11-02
+---
+
 # ADR 0073 — To-do group / community assignment and claim lane (self-claim of unassigned work)
 
 Status: Accepted

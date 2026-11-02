@@ -1,3 +1,16 @@
+---
+id: adr-0004
+title: "Data persistence & schema evolution"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: [adr-0001]
+superseded_by: [adr-0011, adr-0037, adr-0105, adr-0108]
+updated: 2026-11-02
+---
+
 # ADR 0004 — Data persistence & schema evolution
 
 Status: Accepted

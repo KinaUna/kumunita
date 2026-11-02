@@ -1,3 +1,16 @@
+---
+id: adr-0197
+title: "Profile and Directory"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0182-form-look.md, docs/adr/0184-announcement-detail.md, docs/adr/0196-pages.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0197 — Profile and Directory
 
 Status: **Proposed** (scaffolding landed)

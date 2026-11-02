@@ -1,3 +1,16 @@
+---
+id: adr-0116
+title: "M15: Translation bulk (import/export, review & extend the platform's translations as a batch)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m15-translation-bulk-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0116 — M15: Translation bulk (import/export, review & extend the platform's translations as a batch)
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0075
+title: "Client-side image editing (crop + resize) for avatars and inline images"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/image-editor-design.md, docs/adr/0011-media-and-file-storage.md, docs/adr/0031-wysiwyg-editor-and-toolbar.md]
+supersedes: [adr-0025]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0075 — Client-side image editing (crop + resize) for avatars and inline images
 
 Status: Accepted

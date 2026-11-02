@@ -1,3 +1,16 @@
+---
+id: adr-0159
+title: "Escalation authorization + receiving inbox (a token-gated acceptance lane + the receiving inbox + the outbound config page on the M32 ErrorReports surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0159 — Escalation authorization + receiving inbox (a token-gated acceptance lane + the receiving inbox + the outbound config page on the M32 ErrorReports surface)
 
 Status: Accepted

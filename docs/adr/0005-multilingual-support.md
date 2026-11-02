@@ -1,3 +1,16 @@
+---
+id: adr-0005
+title: "Multilingual support (UI & static pages)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-events-design.md]
+supersedes: []
+superseded_by: [adr-0039, adr-0042, adr-0043, adr-0046, adr-0049, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0005 — Multilingual support (UI & static pages)
 
 Status: Accepted

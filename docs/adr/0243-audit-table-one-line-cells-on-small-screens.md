@@ -1,3 +1,16 @@
+---
+id: adr-0243
+title: "The admin Audit table keeps cells on one line on small screens"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0243 — The admin Audit table keeps cells on one line on small screens
 
 Status: Accepted

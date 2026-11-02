@@ -1,3 +1,16 @@
+---
+id: adr-0027
+title: "Post & reply translation display and swap (authored-in as first-class variant)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/pages-design.md]
+supersedes: [adr-0018]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0027 — Post & reply translation display and swap (authored-in as first-class variant)
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0149
+title: "Home intro sections: a per-resident \"hide and show me the feed\" preference"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/site-content-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0149 — Home intro sections: a per-resident "hide and show me the feed" preference
 
 Status: Accepted

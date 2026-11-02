@@ -1,3 +1,16 @@
+---
+id: adr-0231
+title: "Phone audit of the admin and account pages (tab strips, Analytics overflow, Platform table, headings)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0231 — Phone audit of the admin and account pages (tab strips, Analytics overflow, Platform table, headings)
 
 Status: Accepted

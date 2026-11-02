@@ -1,3 +1,16 @@
+---
+id: adr-0244
+title: "Section cards on the last flat forms: To-do New/Edit, Page New/Edit, Kiosk settings"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0244 — Section cards on the last flat forms: To-do New/Edit, Page New/Edit, Kiosk settings
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0090
+title: "Pagination & filtering: the one canonical paging contract (M7)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m14-events-projects-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0090 — Pagination & filtering: the one canonical paging contract (M7)
 
 Status: Accepted

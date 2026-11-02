@@ -1,3 +1,16 @@
+---
+id: adr-0042
+title: "Bundled initial language pack (de / fr ship on first boot)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m15-translation-bulk-design.md]
+supersedes: [adr-0005]
+superseded_by: [adr-0045, adr-0052]
+updated: 2026-11-02
+---
+
 # ADR 0042 — Bundled initial language pack (de / fr ship on first boot)
 
 Status: Accepted

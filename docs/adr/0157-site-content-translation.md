@@ -1,3 +1,16 @@
+---
+id: adr-0157
+title: "Site content hero-translation (the SITE-2 translation lane ADR 0150 §D5 named)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0157 — Site content hero-translation (the SITE-2 translation lane ADR 0150 §D5 named)
 
 Status: Accepted

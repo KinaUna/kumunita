@@ -1,3 +1,16 @@
+---
+id: adr-0105
+title: "M9: 1:1 resident messaging (a new `Kumunita.Core.Messaging` context — participant-by-id access, plain-text capped immutable messages, the ADR 0101 admin-toggle shape with the floor inverted to OFF, the M6 `message.new` nudge, zero new authorization surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: [adr-0004]
+superseded_by: [adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0105 — M9: 1:1 resident messaging (a new `Kumunita.Core.Messaging` context — participant-by-id access, plain-text capped immutable messages, the ADR 0101 admin-toggle shape with the floor inverted to OFF, the M6 `message.new` nudge, zero new authorization surface)
 
 Status: Accepted

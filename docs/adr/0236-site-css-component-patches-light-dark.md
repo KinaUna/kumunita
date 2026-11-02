@@ -1,3 +1,16 @@
+---
+id: adr-0236
+title: "site.css component dark patches collapse into light-dark() (step 2 of the light-dark cleanup)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0236 — site.css component dark patches collapse into light-dark() (step 2 of the light-dark cleanup)
 
 Status: Accepted

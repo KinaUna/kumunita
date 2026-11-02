@@ -1,3 +1,16 @@
+---
+id: adr-0151
+title: "Guardian time limits (a per-child allow/block schedule that gates the child's platform access)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m28-guardian-time-limits-design.md]
+supersedes: [adr-0006, adr-0028]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0151 — Guardian time limits (a per-child allow/block schedule that gates the child's platform access)
 
 Status: Accepted

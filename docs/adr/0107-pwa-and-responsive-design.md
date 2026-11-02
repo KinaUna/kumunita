@@ -1,3 +1,16 @@
+---
+id: adr-0107
+title: "M10: PWA and responsive design (substrate-only PWA — an honest static manifest + the two new icon PNGs + one quiet localized install affordance; a GET-only closed-allowlist service worker that never caches signed-in content; one pinned breakpoint rule + a closed, split phone-width surface pass + two pinned a11y floors; zero Core change, zero new authorization surface, zero new audit verb, no `LocaleSettings` toggle)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: [adr-0031]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0107 — M10: PWA and responsive design (substrate-only PWA — an honest static manifest + the two new icon PNGs + one quiet localized install affordance; a GET-only closed-allowlist service worker that never caches signed-in content; one pinned breakpoint rule + a closed, split phone-width surface pass + two pinned a11y floors; zero Core change, zero new authorization surface, zero new audit verb, no `LocaleSettings` toggle)
 
 Status: Accepted

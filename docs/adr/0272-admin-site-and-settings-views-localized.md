@@ -1,3 +1,16 @@
+---
+id: adr-0272
+title: "AdminSite and the other admin settings views are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0272 — AdminSite and the other admin settings views are localized
 
 Status: Accepted

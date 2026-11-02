@@ -1,3 +1,16 @@
+---
+id: adr-0138
+title: "Sample-data change-password lock: a `GlobalAdmin` option (shown only on a `SampleData__Enabled` instance) that locks the demo (sample) accounts out of changing their own password — except the sample `GlobalAdmin` — plus the resident self-serve change-password surface it guards"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/improve/improve-audit.md]
+supersedes: [adr-0006]
+superseded_by: [adr-0194, adr-0280]
+updated: 2026-11-02
+---
+
 # ADR 0138 — Sample-data change-password lock: a `GlobalAdmin` option (shown only on a `SampleData__Enabled` instance) that locks the demo (sample) accounts out of changing their own password — except the sample `GlobalAdmin` — plus the resident self-serve change-password surface it guards
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0168
+title: "Bookmarks: a personal folder tree (the M17 §deferred \"bookmark"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m17-bookmarks-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0168 — Bookmarks: a personal folder tree (the M17 §deferred "bookmark
 folders" lane, now settled)
 

@@ -1,3 +1,16 @@
+---
+id: adr-0068
+title: "Lane action menu: rename / limit / status / move + add-to-do foot"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0067]
+superseded_by: [adr-0069, adr-0071]
+updated: 2026-11-02
+---
+
 # ADR 0068 — Lane action menu: rename / limit / status / move + add-to-do foot
 
 Status: Accepted

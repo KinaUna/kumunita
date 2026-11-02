@@ -1,3 +1,16 @@
+---
+id: adr-0163
+title: "Home upcoming events & to-dos — a resident can opt in to seeing the next events + to-dos on the home page, above the \"What's new\" feed"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m35/m35-u01.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0163 — Home upcoming events & to-dos — a resident can opt in to seeing the next events + to-dos on the home page, above the "What's new" feed
 
 Status: Accepted

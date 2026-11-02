@@ -1,3 +1,16 @@
+---
+id: adr-0110
+title: "Platform versioning + the \"What's new\" lane (the `VN` lane)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m37-personal-notes-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0110 — Platform versioning + the "What's new" lane (the `VN` lane)
 
 Status: Accepted

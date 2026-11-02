@@ -1,3 +1,16 @@
+---
+id: adr-0106
+title: "To-do self-assign lane (\"Assign to me\") and new-board \"Everyone\" default"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m16-inventory-design.md]
+supersedes: [adr-0073]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0106 — To-do self-assign lane ("Assign to me") and new-board "Everyone" default
 
 Status: Accepted

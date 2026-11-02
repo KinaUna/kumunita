@@ -1,3 +1,16 @@
+---
+id: adr-0115
+title: "Integration of Events and Projects (M14)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m14-events-projects-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0115 — Integration of Events and Projects (M14)
 
 Status: Accepted

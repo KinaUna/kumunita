@@ -1,3 +1,16 @@
+---
+id: adr-0278
+title: "Group messaging: multi-participant chat threads (the N:1 generalization of M9)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m9/m9-messaging-handoff-notes.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0278 — Group messaging: multi-participant chat threads (the N:1 generalization of M9)
 
 Status: Accepted

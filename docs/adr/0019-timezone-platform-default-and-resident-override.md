@@ -1,3 +1,16 @@
+---
+id: adr-0019
+title: "Timezone: platform default (admin) + per-resident override"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-design.md]
+supersedes: []
+superseded_by: [adr-0086]
+updated: 2026-11-02
+---
+
 # ADR 0019 — Timezone: platform default (admin) + per-resident override
 
 Status: Accepted

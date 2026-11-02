@@ -1,3 +1,16 @@
+---
+id: adr-0132
+title: "Onboarding (a guided, non-blocking walk-through of a new resident's account setup, with a completion record + a dismissible banner)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m22-onboarding-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0132 — Onboarding (a guided, non-blocking walk-through of a new resident's account setup, with a completion record + a dismissible banner)
 
 Status: Accepted

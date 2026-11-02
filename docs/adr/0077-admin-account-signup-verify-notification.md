@@ -1,3 +1,16 @@
+---
+id: adr-0077
+title: "Admin account notifications: notify every GlobalAdmin when a resident signs up or verifies (a new notify gate + two admin-lane kinds on the frozen M6 emitter)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: [adr-0076]
+superseded_by: [adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0077 — Admin account notifications: notify every GlobalAdmin when a resident signs up or verifies (a new notify gate + two admin-lane kinds on the frozen M6 emitter)
 
 Status: Accepted

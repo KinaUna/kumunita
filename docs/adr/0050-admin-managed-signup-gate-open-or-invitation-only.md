@@ -1,3 +1,16 @@
+---
+id: adr-0050
+title: "Admin-managed sign-up gate: open vs invitation-only"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m19-guest-accounts-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0050 — Admin-managed sign-up gate: open vs invitation-only
 
 Status: Accepted

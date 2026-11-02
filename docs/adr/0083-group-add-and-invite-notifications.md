@@ -1,3 +1,16 @@
+---
+id: adr-0083
+title: "Group membership notifications: notify the resident when they are added to a group or invited to join one (kinds `group.added` / `group.invite`), and the tabbed group detail page"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-join-request-lane.md]
+supersedes: [adr-0007]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0083 — Group membership notifications: notify the resident when they are added to a group or invited to join one (kinds `group.added` / `group.invite`), and the tabbed group detail page
 
 Status: Accepted

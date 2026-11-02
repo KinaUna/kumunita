@@ -1,3 +1,16 @@
+---
+id: adr-0046
+title: "Default-language fallback: browser `Accept-Language` match"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/events-calendar/events-calendar-handoff-notes.md]
+supersedes: [adr-0005]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0046 — Default-language fallback: browser `Accept-Language` match
 
 Status: Accepted

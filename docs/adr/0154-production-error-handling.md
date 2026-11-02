@@ -1,3 +1,16 @@
+---
+id: adr-0154
+title: "Production error handling (a report-an-issue affordance on the 500 error page + a GlobalAdmin triage surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0154 — Production error handling (a report-an-issue affordance on the 500 error page + a GlobalAdmin triage surface)
 
 Status: Accepted

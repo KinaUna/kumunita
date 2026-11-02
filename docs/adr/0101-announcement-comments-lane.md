@@ -1,3 +1,16 @@
+---
+id: adr-0101
+title: "Signed-in resident comments on announcements"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m11-portability-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0101 — Signed-in resident comments on announcements
 
 Status: Accepted

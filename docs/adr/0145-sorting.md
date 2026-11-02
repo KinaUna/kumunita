@@ -1,3 +1,16 @@
+---
+id: adr-0145
+title: "Sorting: the one canonical sort contract (M26)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m26-sorting-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0145 — Sorting: the one canonical sort contract (M26)
 
 Status: Accepted

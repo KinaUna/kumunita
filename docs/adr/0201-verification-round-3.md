@@ -1,3 +1,16 @@
+---
+id: adr-0201
+title: "Verification round 3 fixes"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0175-palettes-and-feed-card.md, docs/adr/0199-admin-shared-look.md, docs/adr/0200-projects-forms-board-header.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0201 — Verification round 3 fixes
 
 Status: **Proposed** (scaffolding landed)

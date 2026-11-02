@@ -1,3 +1,16 @@
+---
+id: adr-0284
+title: "Home \"What's new\" feed for anonymous visitors"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0284 — Home "What's new" feed for anonymous visitors
 
 Status: Accepted

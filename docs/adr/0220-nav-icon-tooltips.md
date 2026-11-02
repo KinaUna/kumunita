@@ -1,3 +1,16 @@
+---
+id: adr-0220
+title: "Tooltips for the icon-only top-row links"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0220 — Tooltips for the icon-only top-row links
 
 Status: Accepted

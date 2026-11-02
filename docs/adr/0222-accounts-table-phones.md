@@ -1,3 +1,16 @@
+---
+id: adr-0222
+title: "Admin Accounts table on phones"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0222 — Admin Accounts table on phones
 
 Status: Accepted

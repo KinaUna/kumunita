@@ -1,3 +1,16 @@
+---
+id: adr-0194
+title: "Sample-data MFA (two-factor) lock: a `GlobalAdmin` option (shown only on a `SampleData__Enabled` instance) that locks the demo (sample) accounts out of the MFA settings surface — except the sample `GlobalAdmin` — plus the login leg 1.5b forced-enrollment exemption that keeps the sample admin sign-in-able"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0138]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0194 — Sample-data MFA (two-factor) lock: a `GlobalAdmin` option (shown only on a `SampleData__Enabled` instance) that locks the demo (sample) accounts out of the MFA settings surface — except the sample `GlobalAdmin` — plus the login leg 1.5b forced-enrollment exemption that keeps the sample admin sign-in-able
 
 Status: Accepted

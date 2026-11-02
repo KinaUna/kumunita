@@ -1,3 +1,16 @@
+---
+id: adr-0280
+title: "The resident's self-serve change-password surface moves off its own settings tab onto the Security tab (co-located with MFA — one tab holds both credential-security options)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/sessions/sessions-handoff-notes.md]
+supersedes: [adr-0138, adr-0174]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0280 — The resident's self-serve change-password surface moves off its own settings tab onto the Security tab (co-located with MFA — one tab holds both credential-security options)
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0003
+title: "Roles & moderator scoping"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-events-design.md]
+supersedes: []
+superseded_by: [adr-0006]
+updated: 2026-11-02
+---
+
 # ADR 0003 — Roles & moderator scoping
 
 Status: Accepted

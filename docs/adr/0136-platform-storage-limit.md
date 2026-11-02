@@ -1,3 +1,16 @@
+---
+id: adr-0136
+title: "Platform storage limit: an operator env knob (`Media__MaxPlatformBytes`) capping the total resident content the platform may hold; `/admin/storage`'s \"available\" capped to the remaining budget; all new uploads blocked once the budget is spent or the volume's free space drops below a fixed 100 MiB floor"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0011]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0136 — Platform storage limit: an operator env knob (`Media__MaxPlatformBytes`) capping the total resident content the platform may hold; `/admin/storage`'s "available" capped to the remaining budget; all new uploads blocked once the budget is spent or the volume's free space drops below a fixed 100 MiB floor
 
 Status: Accepted

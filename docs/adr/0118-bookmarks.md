@@ -1,3 +1,16 @@
+---
+id: adr-0118
+title: "M17: Bookmarks (save posts, events, todos, etc. for quick"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m17-bookmarks-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0118 — M17: Bookmarks (save posts, events, todos, etc. for quick
 personal access)
 

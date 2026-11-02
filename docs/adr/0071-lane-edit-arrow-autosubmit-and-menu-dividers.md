@@ -1,3 +1,16 @@
+---
+id: adr-0071
+title: "Kanban lane / card editing: modals, autosubmit status, menu dividers"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0068, adr-0069]
+superseded_by: [adr-0074]
+updated: 2026-11-02
+---
+
 # ADR 0071 — Kanban lane / card editing: modals, autosubmit status, menu dividers
 
 Status: Accepted

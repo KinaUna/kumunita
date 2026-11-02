@@ -1,3 +1,16 @@
+---
+id: adr-0026
+title: "Group & community name/description translations"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/tags-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0026 — Group & community name/description translations
 
 Status: Accepted

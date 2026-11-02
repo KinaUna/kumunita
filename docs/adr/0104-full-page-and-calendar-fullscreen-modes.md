@@ -1,3 +1,16 @@
+---
+id: adr-0104
+title: "Full-page expand mode (board + calendar) and calendar full-screen"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m35-kiosk-mode-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0104 — Full-page expand mode (board + calendar) and calendar full-screen
 
 Status: Accepted

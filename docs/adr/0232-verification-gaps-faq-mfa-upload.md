@@ -1,3 +1,16 @@
+---
+id: adr-0232
+title: "Verification gaps: FAQ accordion in dark mode, MFA challenge, recovery code, lockout, PPTX/image upload"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0232 — Verification gaps: FAQ accordion in dark mode, MFA challenge, recovery code, lockout, PPTX/image upload
 
 Status: Accepted

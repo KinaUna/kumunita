@@ -1,3 +1,16 @@
+---
+id: adr-0013
+title: "Group posts: a membership-scoped group channel"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: []
+superseded_by: [adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0013 — Group posts: a membership-scoped group channel
 
 Status: Accepted

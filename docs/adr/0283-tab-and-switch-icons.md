@@ -1,3 +1,16 @@
+---
+id: adr-0283
+title: "Icons on tab strips and button-group switches"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0283 — Icons on tab strips and button-group switches
 
 Status: Accepted

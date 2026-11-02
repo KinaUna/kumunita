@@ -1,3 +1,16 @@
+---
+id: adr-0031
+title: "WYSIWYG editor + toolbar over the RC Markdown lane"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0025]
+superseded_by: [adr-0032, adr-0033, adr-0086, adr-0107, adr-0165]
+updated: 2026-11-02
+---
+
 # ADR 0031 — WYSIWYG editor + toolbar over the RC Markdown lane
 
 Status: Accepted

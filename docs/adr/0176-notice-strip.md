@@ -1,3 +1,16 @@
+---
+id: adr-0176
+title: "One notice strip instead of stacked banners"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0006-module-boundary-contracts.md, docs/adr/0110-platform-versioning-and-whats-new.md, docs/adr/0132-onboarding.md, docs/adr/0175-palettes-and-feed-card.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0176 — One notice strip instead of stacked banners
 
 Status: **Proposed** (scaffolding landed)

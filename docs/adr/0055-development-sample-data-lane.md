@@ -1,3 +1,16 @@
+---
+id: adr-0055
+title: "Development sample data: a first-boot, Development-only mock neighborhood"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0012]
+superseded_by: [adr-0056]
+updated: 2026-11-02
+---
+
 # ADR 0055 — Development sample data: a first-boot, Development-only mock neighborhood
 
 Status: Accepted (the **gate** is amended by [ADR 0056](0056-sample-data-opt-in-and-deploy-posture.md):

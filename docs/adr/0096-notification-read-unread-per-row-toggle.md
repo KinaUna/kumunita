@@ -1,3 +1,16 @@
+---
+id: adr-0096
+title: "Per-row read/unread toggle on the Notifications inbox"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m6-notifications-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0096 — Per-row read/unread toggle on the Notifications inbox
 
 Status: Accepted

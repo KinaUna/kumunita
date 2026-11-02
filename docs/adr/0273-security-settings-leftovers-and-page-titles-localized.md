@@ -1,3 +1,16 @@
+---
+id: adr-0273
+title: "Security settings views, the last leftovers and page titles are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0273 — Security settings views, the last leftovers and page titles are localized
 
 Status: Accepted

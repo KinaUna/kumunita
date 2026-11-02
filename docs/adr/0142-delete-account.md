@@ -1,3 +1,16 @@
+---
+id: adr-0142
+title: "Delete account: a resident-leave / admin-removal lane that pseudonymizes the audit trail, removes memberships and the profile, and deletes the Identity account — with the last-GlobalAdmin lockout pin and the self-serve GlobalAdmin gate"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/prod-hardening/hardening-handoff-notes.md]
+supersedes: [adr-0006]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0142 — Delete account: a resident-leave / admin-removal lane that pseudonymizes the audit trail, removes memberships and the profile, and deletes the Identity account — with the last-GlobalAdmin lockout pin and the self-serve GlobalAdmin gate
 
 Status: Accepted

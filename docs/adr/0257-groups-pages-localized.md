@@ -1,3 +1,16 @@
+---
+id: adr-0257
+title: "The Groups pages are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0257 — The Groups pages are localized
 
 Status: Accepted

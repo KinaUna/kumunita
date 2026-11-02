@@ -1,3 +1,16 @@
+---
+id: adr-0184
+title: "Announcement detail"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0180-event-detail.md, docs/adr/0183-announcements.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0184 — Announcement detail
 
 Status: **Proposed** (scaffolding landed)

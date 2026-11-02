@@ -1,3 +1,16 @@
+---
+id: adr-0011
+title: "Media & file storage: content-addressed local-volume bytes + a `mt` catalog"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0004]
+superseded_by: [adr-0025, adr-0135, adr-0136]
+updated: 2026-11-02
+---
+
 # ADR 0011 — Media & file storage: content-addressed local-volume bytes + a `mt` catalog
 
 Status: Accepted

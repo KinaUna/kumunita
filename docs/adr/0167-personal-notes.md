@@ -1,3 +1,16 @@
+---
+id: adr-0167
+title: "M37: Personal notes (a private note a resident attaches to"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m37-personal-notes-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0167 — M37: Personal notes (a private note a resident attaches to
 any content entity; organizable: a personal folder tree + free author-set
 tags; author-only)

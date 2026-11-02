@@ -1,3 +1,16 @@
+---
+id: adr-0242
+title: "The document delete confirmation points to Deleted documents"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0240]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0242 — The document delete confirmation points to Deleted documents
 
 Status: Accepted

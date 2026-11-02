@@ -1,3 +1,16 @@
+---
+id: adr-0036
+title: "Community-visible audience: the default for new community posts"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: [adr-0001]
+superseded_by: [adr-0086, adr-0102]
+updated: 2026-11-02
+---
+
 # ADR 0036 — Community-visible audience: the default for new community posts
 
 Status: Accepted

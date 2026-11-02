@@ -1,3 +1,16 @@
+---
+id: adr-0235
+title: "site.css colour tokens collapse into light-dark() (second half of the light-dark cleanup)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0235 — site.css colour tokens collapse into light-dark() (second half of the light-dark cleanup)
 
 Status: Accepted

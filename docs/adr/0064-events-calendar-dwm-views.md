@@ -1,3 +1,16 @@
+---
+id: adr-0064
+title: "The events calendar Day/Week/Month views (`EV-DWM`): the three named views over the same authorized events"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-dwm-design.md]
+supersedes: [adr-0063]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0064 — The events calendar Day/Week/Month views (`EV-DWM`): the three named views over the same authorized events
 
 Status: Accepted

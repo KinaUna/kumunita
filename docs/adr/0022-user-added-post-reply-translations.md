@@ -1,3 +1,16 @@
+---
+id: adr-0022
+title: "User-added post & reply translations (the lane ADR 0018 deferred)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m15-translation-bulk-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0022 — User-added post & reply translations (the lane ADR 0018 deferred)
 
 Status: Accepted

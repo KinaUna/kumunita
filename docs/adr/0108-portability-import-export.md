@@ -1,3 +1,16 @@
+---
+id: adr-0108
+title: "M11: Portability (import/export) — whole-instance export + a fail-closed restore of a versioned `*.kumunita` archive (a new `Kumunita.Core/Portability/` operator context — the closed content inventory read from the `*DocTypes` surfaces, the no-secret identity graph (never the credential material), the content-addressed media, the instance identity + localizations via `config.json`; validate-then-apply fail-closed atomic import; the GlobalAdmin admin plane with one `AccessAudit` row per action; zero new authorization surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m11-portability-design.md]
+supersedes: [adr-0004]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0108 — M11: Portability (import/export) — whole-instance export + a fail-closed restore of a versioned `*.kumunita` archive (a new `Kumunita.Core/Portability/` operator context — the closed content inventory read from the `*DocTypes` surfaces, the no-secret identity graph (never the credential material), the content-addressed media, the instance identity + localizations via `config.json`; validate-then-apply fail-closed atomic import; the GlobalAdmin admin plane with one `AccessAudit` row per action; zero new authorization surface)
 
 Status: Accepted

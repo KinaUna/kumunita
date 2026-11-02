@@ -1,3 +1,16 @@
+---
+id: adr-0127
+title: "Every navbar surface has a resident guide: the guide set is expanded to cover announcements, directory, people, inventory, bookmarks, documents, pages, and tags (one guide per remaining navbar item); the `help` page links all of them (the `UG` lane continues)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0057]
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0127 — Every navbar surface has a resident guide: the guide set is expanded to cover announcements, directory, people, inventory, bookmarks, documents, pages, and tags (one guide per remaining navbar item); the `help` page links all of them (the `UG` lane continues)
 
 Status: Accepted

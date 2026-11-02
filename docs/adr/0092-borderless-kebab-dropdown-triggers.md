@@ -1,3 +1,16 @@
+---
+id: adr-0092
+title: "Borderless ⋮ dropdown triggers (all views)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0092 — Borderless ⋮ dropdown triggers (all views)
 
 Status: Accepted

@@ -1,3 +1,16 @@
+---
+id: adr-0199
+title: "Admin: shared look"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0185-post-detail.md, docs/adr/0191-inventory.md, docs/adr/0198-account-pages.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0199 — Admin: shared look
 
 Status: **Proposed** (scaffolding landed)

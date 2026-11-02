@@ -1,3 +1,16 @@
+---
+id: adr-0133
+title: "Dark theme (\"Forest\") — an OS-following default with an explicit per-resident override, resolved entirely in CSS (no JS, no first-paint flash, CSP-safe)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m25/m25-u11.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
 # ADR 0133 — Dark theme ("Forest") — an OS-following default with an explicit per-resident override, resolved entirely in CSS (no JS, no first-paint flash, CSP-safe)
 
 Status: Accepted
