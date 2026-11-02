@@ -2975,3 +2975,454 @@ zero new ones**. **The find-people read is over visible profiles only**
 (D6, C-M23·4): a match is a feed organizer, never a gate; a denied profile's
 bio/tag never leaks; one aggregate audit row per read (emitted by the frozen
 `CanSeeAsync`, not hand-written).
+
+## ADR 0135 — Upload limits (M25) (moved detail)
+
+From `docs/adr/0135-upload-limits.md` (the ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+
+**D1 — One community settings doc (full, moved).** A new Marten doc
+**`CommunityStorageSettings`** (ns `Kumunita.Core.Usage`; stable string
+`Id = "community"`) holds the two admin-set numbers: **`long? MaxFileBytes`**
+(the admin **per-file** override; `null`/absent ⇒ the env `Media__MaxBytes`
+**fallback** is in force; a non-blank value including an explicit `0` is the
+override — a `0` here means *unlimited file size*), **`long
+PerUserQuotaBytes`** (the **per-user** total content quota; `0` =
+**unlimited**), **`DateTimeOffset Modified`** + **`string? ModifiedById`**.
+It is registered on a **new parallel** doc surface **`StorageSettingsDoc
+Types.Configure(StoreOptions)`** (`opts.Schema.For<CommunityStorageSettings>()
+`) — the ADR 0004 §B.1 shape. The sentinel semantics are **pinned**: quota
+`0` = unlimited; per-file limit unset/`0` = the env `Media__MaxBytes` default
+(C-UP·5) — so `0` is never read as "no uploads." The single **admin write**
+lane is `IStorageSettingsService.SetAsync(maxFileBytes, perUserQuotaBytes,
+actorId, session)` — one in-caller-session write (C3), stamped with the
+GlobalAdmin actor. The **read** lane is `GetOrCreateAsync()` — create-if-
+missing with the sentinel defaults.
+
+**D2 — A pure Core decision (full, moved).** **`StorageLimits`** (a pure
+`static class` in `Kumunita.Core.Usage`, **no** HTTP, **no** `IFormFile`):
+**`EffectiveMaxFileBytes(settings, envMaxBytes)`** =
+`settings.MaxFileBytes ?? envMaxBytes` (`0` = unlimited file size).
+**`Decide(incoming, currentUsage, settings, envMaxBytes) →
+StorageDecision`** (`{ Allowed, Oversize, OverQuota }`): compute the
+effective max; **size first** (`effectiveMax > 0 && incoming > effectiveMax →
+Oversize`), **then** quota (`PerUserQuotaBytes > 0 && currentUsage + incoming
+> PerUserQuotaBytes → OverQuota`); else `Allowed`. Size is checked first
+because the per-file bound is the stronger, cheaper check — an input over
+*both* reports `Oversize`, not `OverQuota` (C-UP·2 ordering).
+**`IStorageSettingsService`** composes the pure decision with the two reused
+reads: `GetOrCreateAsync`, `SetAsync`,
+`GetPerUserUsageBytesAsync(string, CancellationToken)` (**delegates to the
+M24 C-SM·7 seam** — the `Σ MediaObject.SizeBytes WHERE CreatedById ==
+subjectId` read, **not** a second copy of the query, C-UP·4), and `Decide`
+(delegates to `StorageLimits`).
+
+**D3 — A single Web gate (full, moved).** **`IUploadGate`** is **Web-only**:
+`Task<ActionResult?> CheckUpload(incomingBytes, subjectId, settings,
+envMaxBytes)` reads the subject's usage (the async C-SM·7 seam), runs the
+**pure** `StorageLimits.Decide` (size-first), and maps `Oversize` /
+`OverQuota` → `413`, `Allowed` → `null`. This is the **single** place a
+`413` is produced — the pre-M25 duplicated inline gates are deleted. Every
+upload lane replaces its inline `> MaxBytes → 413` with the **three-line
+adoption** **before** `PutAsync` (guards-before-write, C-UP·2): load-or-
+create the settings → `uploadGate.CheckUpload(file.Length, subject, settings,
+mediaOpts.Value.MaxBytes)` → `if (reject is not null) return reject;`. The
+**empty → 400** check stays *before* the gate; the **allowlist → 415** check
+stays *after* it. The lanes that adopt it: avatar
+(`ProfileController.AvatarUpload`), content-image
+(`ContentImageController.Upload`), attachment
+(`AttachmentController.Upload`), document upload
+(`DocumentController.Upload`), and **document edit / re-upload**
+(`DocumentController.Edit`). **The document *edit* lane is a deliberate
+extension** — `DocumentController.Edit` also calls `media.PutAsync`; leaving
+its inline `413` would create a **second** `413` producer, violating C-UP·3.
+**The F2-vs-F3 distinction lives in the decision, not the HTTP carrier.**
+The distinct reject reason (oversize vs over-quota) is carried by the **Core**
+`StorageDecision` enum + the M24 metric; the **HTTP carrier** is deliberately
+a bare `413` in both cases (.NET 10's `StatusCodeResult` carries no body).
+The distinguishability is pinned at the decision level
+(`UploadGate_OversizeAndOverQuota_HaveDistinctMessages`).
+
+**D4 — A resident self-view (full, moved).** A signed-in resident sees
+**their own** usage bytes, their per-user quota (or "Unlimited" when `0`),
+and how much of their quota remains — a **read-only** `GET /account/storage`
+on the resident `AccountController` surface. The subject is the signed-in
+principal (server-minted; never a route/path param), so a resident can never
+read another resident's numbers (F7). Quota `0` renders **Unlimited** (F5 /
+C-UP·5). Read-only: **no** `AccessAudit` row (C-UP·7), **no** new
+authorization surface.
+
+**D5 — The admin settings surface (full, moved).** `GET`/`POST
+/admin/storage/settings` (`AdminStorageController`,
+`[Authorize(Roles = GlobalAdmin)]`), **distinct from** M24's
+`GET /admin/storage` metrics surface (ADR 0134). The `POST`
+(`[ValidateAntiForgeryToken]`) reads the two values (blank per-file ⇒ `null`
+= env fallback; blank-or-`0` quota ⇒ `0` = unlimited), calls `SetAsync`
+**in the caller's session** (one write, C-UP·1), and redirects back. The
+community **total** read reuses M24's `GetSnapshotAsync` C-SM·2 seam (not a
+fresh `Query<MediaObject>().Sum(…)`). This is the **F4** strong-consistency
+contract: the admin raises the limit and the *next* within-limit upload
+succeeds, because the decision reads the **live** community doc.
+
+**The seven invariants C-UP·1–7 + the ten FACES F1–F10 (full, moved).**
+**C-UP·1** — the per-file limit + per-user quota are **GlobalAdmin-set** as a
+single community doc; the env `Media__MaxBytes` is the **fallback**. Not
+per-request spoofable. **C-UP·2** — **guards before write**: size + quota are
+checked **before** `PutAsync`; on a reject, **no byte is written**.
+**C-UP·3** — **`Core` stays HTTP-free** (ADR 0006-D): the decision is a pure
+Core function; the `ActionResult` mapping is Web-only. **C-UP·4** —
+**content-addressed usage**: a user's usage = `Σ MediaObject.SizeBytes WHERE
+CreatedById == subjectId`; dedup inherent. **C-UP·5** — **sentinel semantics**:
+quota `0` = **unlimited**; per-file limit unset/`0` = the env `Media__MaxBytes`
+default. **C-UP·6** — **single-in-progress milestone contract** (M25 starts
+only after M24 is `StatusDone`; M25's close promotes M26). **C-UP·7** — **no
+new authorization surface**: the check is at the authenticated upload boundary
+(self-scoped); it adds **no** `AccessAudit` row / `AccessAction`. **F1**
+under-quota within-limit → success · **F2** over the per-file limit → 413
+**oversize** · **F3** pushes over quota → 413 **over-quota** (distinct) ·
+**F4** admin raises the limit; the next within-limit upload succeeds (strong
+consistency) · **F5** quota `0` → unlimited; size still enforced · **F6**
+admin-unset limit → env fallback · **F7** resident self-view: own
+usage/quota/remaining, never another's · **F8** a byte uploaded by A is not in
+B's usage (first-storer attribution) · **F9** no byte written on a size/quota
+reject · **F10** enforcement is consistent across all upload lanes.
+
+**Consequences — full (moved).** **`Core` stays HTTP-free and the decision
+stays pure.** **One settings doc + one doc surface + one DI line.** The per-
+user usage read is the M24 C-SM·7 seam, not a second query. The gate is the
+single `413` producer (the pre-M25 duplicated inline lines are deleted).
+**OPS.md: `Media__MaxBytes` is now the *fallback*** — the per-file cap is
+primarily admin-set in-app; `Media__MaxBytes` remains the fallback. The admin
+settings surface is a distinct route from M24's metrics. **A pre-existing M24
+defect is flagged, not fixed here** — the `LocalVolumeFileStore.Statvfs`
+P/Invoke intermittently `AccessViolationException`s under Linux-in-Docker (a
+`statvfs_t` struct-layout mismatch); M25's admin settings view reaches it
+because it reuses the M24 `GetSnapshotAsync` seam; it is a **separate lane**,
+out of this ADR's scope.
+
+## ADR 0136 — Platform storage limit (moved detail)
+
+From `docs/adr/0136-platform-storage-limit.md` (the ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+**No design doc exists for this ADR** — the handoff note is the moved-detail
+home.
+
+**D1 — The limit is an operator env knob (full, moved).** `MediaOptions` gains
+`public long MaxPlatformBytes { get; set; } = 0;` (env
+`Media__MaxPlatformBytes`), bound the same way `Media__MaxBytes` is (a new
+member on the existing `Media` section is **zero** new registration). `0` /
+absent = **unlimited** — the exact default, so a deployment that omits it is
+byte-for-byte the M24/M25 baseline. This is deliberately an **operator** knob
+(env, OPS.md), **not** an admin-set-in-app value.
+
+**D2 — A fixed 100 MiB free-space floor (full, moved).** A new
+`public const long MinFreeSpaceFloor = 100L * 1024 * 1024;` — the operator
+safety margin that keeps the volume from filling to its physical edge. It is a
+**constant, not a knob** (a `const`, so it cannot be mis-bound by env): the
+floor applies **regardless** of whether a platform limit is set (it is a
+property of the disk, not the budget), and it is the second independent
+trigger of the block. `100` MiB is chosen as a margin small enough to be
+invisible on a dedicated volume and large enough to keep the operating system
++ the app from thrashing on a shared one; it is a recorded non-decision in
+the sense that it is **not** configurable, by design.
+
+**D3 — One pure Core seam (full, moved).** `IStorageMetricsService` gains
+`Task<AvailablePlatformSpace> GetPlatformSpaceAsync(long platformLimitBytes,
+CancellationToken ct = default)` returning a new plain DTO
+`AvailablePlatformSpace(used, freeVolumeBytes, limitBytes, isFull)`. The
+`StorageMetricsService` impl computes `isFull` as
+`(limit > 0 ∧ used ≥ limit) ∨ (free < MinFreeSpaceFloor)`, reusing the
+**same** `Σ MediaObject.SizeBytes` read + the **same**
+`GetFreeSpaceBytesAsync` stat the ADR 0134 C-SM·2 `GetSnapshotAsync` already
+runs (so the admin "available" figure and the upload-block decision are
+computed from identical inputs — no drift). **Optimization:** when
+`platformLimitBytes ≤ 0` the `used ≥ limit` trigger is off by construction,
+so the `Σ SizeBytes` catalog read is **skipped entirely** — only the cheap
+free-space stat runs. No `IFormFile`, no `ActionResult`, no `HttpContext`
+(C-SM·3).
+
+**D4 — The block runs in the existing single Web `IUploadGate` (full,
+moved).** `IUploadGate.CheckUpload` gains a `long platformLimitBytes`
+parameter (the caller passes `mediaOpts.Value.MaxPlatformBytes`). The gate
+now calls `IStorageMetricsService.GetPlatformSpaceAsync` **first**; if
+`IsFull` is `true` it returns the **same** `413` `StatusCodeResult` (the
+existing `Reject413()` — no new rejection shape, no new gate) and **never**
+reaches the per-resident `StorageLimits.Decide`. This is **authoritative**: a
+payload that would otherwise be `StorageDecision.Allowed` is still rejected
+when the platform is full. The per-file / per-user decision is **unchanged**
+and runs only when the platform is not full. All five upload lanes already
+resolve the gate and now pass the one extra env value — the guard-before-
+write ordering (ADR 0135 C-UP·2) is preserved: **no byte is written on a
+platform-block**.
+
+**D5 — `/admin/storage`'s "available" is capped (full, moved).**
+`AdminStorageMetricsController` gains `IOptions<MediaOptions>`; when
+`MaxPlatformBytes > 0` the `AvailableBytes` figure is
+`min(physical free space, limit − used)`, **clamped at `0`** once
+`used ≥ limit`, and the view surfaces the limit (`PlatformLimitBytes`) so the
+"available" card is labelled as a **platform-budget** figure rather than raw
+physical free space. When the limit is `0` / absent the figure is the
+physical free space exactly as before (the M24 baseline, unchanged). This is a
+**display** change only.
+
+**D6 — Pinned and documented (full, moved).** `StorageMetricsTests` gains
+**four** Core pins over the four trigger combinations (unlimited + above
+floor → not full; unlimited + below floor → full; limit reached → full;
+within limit + above floor → not full) — the last three against a real `mt`
+catalog (Testcontainers, the ADR 0134 U4 shape). `UploadGateTests` gains
+**two** Web pins (platform-full blocks an otherwise-`Allowed` upload;
+platform-not-full allows one). `AdminStorageMetricsControllerTests` gains
+**three** Web pins (available capped to the remaining budget; clamped to `0`
+when over; uncapped when unlimited). The env var is documented in **OPS.md**
+as an **Optional / No-secret** row alongside `Media__MaxBytes`.
+
+**Consequences — full (moved).** **C-PS·1** — One new `MediaOptions` member
++ one new constant. **C-PS·2** — One new pure Core seam, on the frozen ADR
+0134 interface. **C-PS·3** — One `413` producer, unchanged shape. **C-PS·4**
+— The admin "available" figure stays honest. **C-PS·5** — A named lane on the
+shipped M24/M25 surface; `Milestones.cs` / the README Roadmap /
+`MilestonesTests.cs` are **untouched**. **FACES F1–F4:** F1 — when
+`Media__MaxPlatformBytes > 0`, `/admin/storage`'s "available" is capped to
+the remaining budget. F2 — all new uploads are blocked (`413`, no byte
+written) once `used ≥ limit` **or** `free < 100 MiB`. F3 — the platform check
+runs **before** the per-file / per-user decision (authoritative). F4 — when
+the limit is `0` / absent, both the "available" figure and the upload gate are
+exactly the M24/M25 baseline. **The named non-decisions (each a future lane):**
+(1) An admin-set (in-app) platform limit. (2) Enforcement against the physical
+volume independently of resident content. (3) A per-resident share of the
+platform budget. (4) An admin surface to *change* the limit without a
+redeploy. **Done (2026-10-04):** `MediaOptions.MaxPlatformBytes` +
+`MinFreeSpaceFloor`; `IStorageMetricsService.GetPlatformSpaceAsync` +
+`AvailablePlatformSpace` + the `StorageMetricsService` impl; the
+`IUploadGate`/`UploadGate` platform-first check + the five lane call sites;
+`AdminStorageMetricsController` + `AdminStorageMetricsViewModel` +
+`Views/AdminStorageMetrics/Index.cshtml` capping the "available" figure; the
+`Program.cs` gate DI; **4** Core + **5** Web pins all green;
+`Media__MaxPlatformBytes` documented in OPS.md. `WhatsNew.cs` `0.29.0`
+added.
+
+## ADR 0076 — M6: Notifications (inbox + recipient email) (moved detail)
+
+From `docs/adr/0076-notifications-inbox-and-recipient-email.md` (the ADR body
+is condensed; the Status/Context/Decision/Consequences record stays there with
+pointers here).
+
+**D1 — One bounded context, two documents (full, moved).**
+`Kumunita.Core.Notifications` with two Marten-native POCOs — `Notification`
+(the inbox row: `Id`, `RecipientId`, `Kind`, `IdempotencyKey`, `SourceId?`,
+`Subject?`, `Body?`, `Created`, `ReadAt?`) and
+`NotificationPreference` (the per-recipient settings row: `RecipientId` as
+the document id, `KindsEnabled?` — a subset of the nine kind constants,
+`null` / empty = all enabled, `Updated?`) — and **one new document surface**
+`NotificationDocTypes` (the `ProjectDocTypes` pattern verbatim). Conventional
+`string` `Id`, delta-detected + idempotent, no seeding, no EF. **Zero
+migrations for existing surfaces.** *Forbids:* a third document, a migration
+on an existing surface, or an EF mapping.
+
+**D2 — The kind vocabulary (full, moved).** `NotificationKinds` is a
+**static class** with **nine** `public const string` members:
+`PostReply = "post.reply"`, `PostMention = "post.mention"` (**reserved, not
+wired** — the constant + the `kw-l` keys exist; no M6 emitter calls it),
+`GroupPost = "group.post"`, `EventRsvp = "event.rsvp"`,
+`EventReminder = "event.reminder"`, `ReportFiled = "report.filed"`,
+`ReportAssigned = "report.assigned"`, `ReportResolved = "report.resolved"`,
+`TodoAssign = "todo.assign"` (person-only). The **other eight kinds** each
+have a **wired emitter** in M6. *Forbids:* a resident-authored kind string,
+an enum-backed kind, or an unregistered kind reaching the inbox.
+
+**D3 — A notification is a *personal read* (full, moved).** A `Notification`
+row is **the recipient's own data** — the `RecipientId` is the whole access
+story. The inbox read + state lanes do **not** call `IAuthorizationService`.
+**No `NotificationToAuditableResource` adapter exists.** **No audit row is
+emitted for an inbox read** (the M1 `GetProfileAsync` owner-branch precedent).
+*Forbids:* a new `AccessAction`, a new `AccessVia`, an `IAuditableResource`
+adapter for `Notification`, or an audit row on the inbox read lane.
+
+**D4 — The idempotency key (full, moved).** Each emission supplies a **stable,
+content-derived** key of the shape **`notification:{kind}:{stable-source-id}`**
+(the C3-envelope fix precedent). Dedup is keyed on that same key on **both**
+channels: the **inbox side** via an `EmitAsync` look-up of an existing
+`Notification` row by `IdempotencyKey`, and the **email side** via the
+`IMailerStage.StageAsync` idempotency guarantee. **A re-emission of the same
+logical event is a no-op.** *Forbids:* a different key for the same logical
+event, or a second inbox row / second email for a duplicate key.
+
+**D5 — Email is *best-effort*; the inbox is the *durable* record (full,
+moved).** The `IMailerStage.StageAsync` seam is called **in the same
+transaction** as the `Notification` row store (the C3 pin). A failed send
+**never** rolls back the inbox row (the `EmailDeadLetterWriter` + the
+`/health` degraded gate). **The inbox is the primary channel; the email is
+the out-of-band nudge** (the M4 §6.4 event-reminder precedent). *Forbids:* an
+inbox-row rollback on send failure, a new email mechanism, or a synchronous
+send path.
+
+**D6 — The per-recipient email language (full, moved).** The
+`NotificationService` resolves the recipient's `Profile.EmailLanguage` (via
+the frozen `IUserInfoService.GetProfileAsync` read seam) and passes it to the
+`ITranslationProvider` (the ADR 0061 seam). **The sender's language is
+irrelevant.** **The UGC snippet in the email body** (a reply's body, a to-do's
+title) is **rendered in the sender's authored language** (ADR 0018); the
+template subject / body is in the **recipient's** `EmailLanguage`. *Forbids:*
+a new resolution path, a sender-language email, or a recipient-language UGC
+snippet.
+
+**D7 — A resident who has disabled a kind still gets the inbox row (full,
+moved).** The `NotificationService.EmitAsync` **always** stores the
+`Notification` row; it **conditionally** calls `IMailerStage.StageAsync`
+(only if the recipient's `NotificationPreference.KindsEnabled` includes the
+kind, or is `null` / empty = all enabled). The preference governs the
+*email*, not the *inbox*. **No per-kind email-only vs inbox-only split.**
+*Forbids:* suppressing the inbox row on a disabled kind, a per-kind
+email/inbox split, or a sender-side override of the recipient's choice.
+
+**D8 — The inbox is a flat list, capped at 50 (full, moved).**
+`ListInboxAsync` returns the **most recent 50** `Notification` rows for the
+recipient (newest-first, `Created` descending). A neighborhood is small — 50
+is the "everything that's happened to me recently" shape; a full archive is
+M7. **No per-kind filter in M6.** The **"mark all read" action** sets
+`ReadAt = now` on **all** the recipient's unread rows (one `Update` — no
+per-row loop). *Forbids:* pagination, per-kind filters, or a per-row mark-
+read loop.
+
+**D9 — The preferences document is *lean* (full, moved).**
+`NotificationPreference` has **one** field: `KindsEnabled` (an
+`IReadOnlyList<string>?`, the subset of the nine kind constants the resident
+has **enabled**; `null` / empty = **all enabled**). A resident edits the
+toggles on `/notifications/preferences`; the emitter reads the preference
+**at emit time**. **No per-kind sub-settings in M6.** *Forbids:* a second
+field, a per-kind email/inbox split, or a sender-side preference read.
+
+**D10 — The layout bell is a *poller*, not a push (full, moved).** The
+`client/lib/notifications-bell.ts` module polls `GET /notifications/unread-
+count` at a **30-second interval** (a `setInterval`, the `client/lib` plain-
+TS precedent — no WebSocket, no SSE, no push). **The badge shows the unread
+count**; **the dropdown is a plain `fetch` + DOM render** (the
+`client/lib/api.ts` CSRF-aware fetch shape). **No live update in M6.**
+*Forbids:* a WebSocket, SSE, or push mechanism; a new UI dependency.
+
+**D11 — Reuse, don't reinvent (full, moved).** The M1 durable-email trio, the
+ADR 0061 per-recipient outbound-channel language, the `kw-dt` TagHelper, the
+closed `KnownTranslationKeys` registry, and the plain `client/lib` tsc-only
+TS are all **frozen seams** — M6 adds **two documents + one surface + one
+service + one controller + one view set + one TS module**, not a branch.
+**No new `AccessAction`**, **no new `AccessVia`**, **no new
+`IAuditableResource` adapter**, **no new email mechanism**, **no new UI
+dependency**.
+
+**Consequences — full (moved).** One new bounded context
+(`Kumunita.Core.Notifications`), one new document surface
+(`NotificationDocTypes`), one new service (`NotificationService`), one new
+Web controller (`NotificationsController` — the `/notifications` inbox, the
+`/notifications/unread-count` poller endpoint, the `/notifications/mark-all-
+read` POST, the `/notifications/preferences` GET + POST), one view set + one
+layout bell, one plain-TS module, and the `kw-l` keys × 4 languages.
+*(Extended by **ADR 0096**: the per-row `MarkReadAsync` / `MarkUnreadAsync`
+state lanes + the `/notifications/{id}/mark-read` and `/notifications/{id}/
+mark-unread` POSTs + the per-row toggle buttons.)* **The no-ADD pin:** no new
+`AccessAction`, no new `AccessVia`, no new `IAuditableResource` adapter, no
+new email mechanism, no new UI dependency. **The reuse pin:** the M1 durable-
+email trio carries the notification emails; ADR 0061's per-recipient language
+resolution governs them verbatim. A resident who disables a kind keeps the
+inbox record and loses only the email nudge (D7); a re-emission of the same
+logical event is a no-op on both channels (D4). **Deferred, each named:**
+push / PWA push (M9 owns PWA), digests, per-kind inbox filters, the
+`post.mention` emitter (reserved kind, D2), the group / community to-do
+assignment notification (ADR 0073 / 0074), **the assigned-guardian
+notification (still deferred after M6)**, read receipts, cross-neighborhood
+notification, and live update (WebSocket / SSE) — each a follow-on lane with
+its own ADR.
+
+## ADR 0054 — M4: Events, RSVPs & reminders (moved detail)
+
+From `docs/adr/0054-events-rsvp-reminders.md` (the ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+
+**The two documents' full field sets (moved).** **`Event`** — `Id`; `Title`;
+**`Body`** (Markdown — the one `MarkdownRenderer`, ADR 0025); `ComponentId?`
+(a feed filter, *never* a gate — C-M3·2); `AuthorId`; **`Start` / `End`**
+(`DateTimeOffset` UTC instants); `Location?`; `Capacity?` (int — display
+metadata, **not** a gate); **`Audience`** (the **exact** post `Audience`, ADR
+0001-B / 0036 — `null` = public); **`ReminderEnabled`** (bool, `true` floor —
+the §6.4 job's opt-out); `IsDraft` (bool, `true` default — ADR 0037);
+`IsDeleted` (bool, `false` default — ADR 0024); `LanguageCode` (ADR 0018);
+`TagIds` (ADR 0044); `ImageIds` (ADR 0025); `AttachmentIds` (ADR 0034);
+`Created` / `Modified?`. Every field reuses an existing idiom; `Start` /
+`End` / `Location` / `Capacity` / `ReminderEnabled` are the only new concepts.
+**`EventRsvp`** — `Id`; `EventId`; `UserId`; **`Status`** (enum `Going |
+Maybe | No`); `At`. Registered with a **unique `(EventId, UserId)` index** —
+the last-write-wins concurrency exception: a conflicting RSVP write is a no-op
+or self-converging. **No `AccessAudit` row on an RSVP.** **`EventDocTypes`**
+— `Event` (conventional `Id`) + a `(ComponentId, Start)` index + `EventRsvp`
+(the unique `(EventId, UserId)` index). **Zero migrations for existing
+surfaces.**
+
+**The standing matrix (full table, moved).**
+
+| Action | Standing | `AccessVia` |
+|---|---|---|
+| **Create** | any signed-in resident (becomes the author) | `Owner` |
+| **Edit** (body / time / audience / …) | the `AuthorId` ∪ GlobalAdmin | `Owner` / `Admin` |
+| **Publish** a draft | the `AuthorId` only (ADR 0037 pin) | `Owner` |
+| **Soft-delete** | the `AuthorId` ∪ GlobalAdmin (ADR 0024) | `Owner` / `Admin` |
+| **RSVP** | any resident who may read the event | *(no row — the RSVP is not an access decision)* |
+
+`CheckCreateStanding` / `CheckEditStanding` throw
+`UnauthorizedAccessException` (403) / `KeyNotFoundException` (404) exactly
+like `AnnouncementService`. Every audited write lane stores its `AccessAudit`
+row in the caller's session (C3), `TargetKind = "event"`, `Action`
+`event.create` / `event.update` / `event.publish` / `event.delete` — **no
+`event.rsvp` action**.
+
+**The Web surface (full, moved).** `EventController`
+(`Kumunita.Web.Controllers`): `GET /events` (the feed — upcoming events,
+`componentId` filter optional, `CanSeeAsync(Read)`-filtered so a private
+event's *existence* does not leak); `GET /events/{id}` (the detail view —
+title + rendered body via the *one* `MarkdownRenderer`, every timestamp via
+the *one* `kw-dt` TagHelper, the RSVP form Going/Maybe/No, the RSVP list
+**owner-only** — a non-author sees only their own RSVP; 404 on absent, 403 on
+denied); `GET/POST /events/new` (compose — title, body in the **one**
+`bindRichEditor`, component picker, the `AudienceEditorModel` verbatim, the
+language picker, `Start`/`End`, `Location`, `Capacity`, the
+`ReminderEnabled` checkbox); `GET/POST /events/{id}/edit` (the edit lane);
+`POST /events/{id}/publish` / `delete` (the standing-gated actions);
+`POST /events/{id}/rsvp` (the last-write-wins lane, no audit row). The nav
+entry is one line; a draft event is included in the author's `/my/drafts`
+list. The `Post` / `Announcement` / `Page` surfaces stay **untouched**.
+
+**The `EventReminders` §6.4 job (full, moved).** **`EventReminderService`**
+(a Wolverine-free static class in `Kumunita.Core.Events`, the
+`AuditPurgeService` precedent): `SendRemindersAsync(store, options, now,
+mailer, localization, ct)` — (a) load events with `ReminderEnabled = true`
+and not deleted whose `Start` is within the **24-hour window** (`now < Start
+≤ now + 24h`); (b) recipients = the `EventRsvp` rows with `Status = Going`
+**plus the author, always**; (c) for each recipient, stage one `OutboxEmail`
+via the **frozen** `IMailerStage.StageAsync` with idempotency key
+**`remind:{eventId}:{userId}`**; (d) **no `AccessAudit` row**. The reminder's
+"when" renders in each **recipient's** own time zone + date-time format (ADR
+0019 / 0020). **`EventReminderHandler`** (`Kumunita.Web/SideEffects`): a thin
+adapter — call the Wolverine-free service, then **re-yield a fresh
+`EventReminderTick`**. **`EventReminderTick`** — `record
+EventReminderTick() : Wolverine.TimeoutMessage(TimeSpan.FromDays(1))`.
+**`EventReminderOptions`** — the `AuditPurgeOptions` shape (`WindowHours = 24`
+floor). **Wiring:** `Program.cs` registers the tick next to the
+`AuditPurgeTick`. **Best-effort, re-runnable** — a failed SMTP send dead-
+letters in `EmailDeadLetter`.
+
+**The 25 pinned seam test names (full list, moved).** 20 in
+`EventServiceTests` (T01–T18: the feed family, the `null`-audience-public
+branch, the `Community` + grants branches, the draft pin, the standing
+matrix, the publish author-only pin, the soft-delete filter, the RSVP last-
+write-wins + unique-index + owner-only-list + no-audit-row pins, the audit-
+row shape, the adapter shape; T24–T25: the GlobalAdmin-override end-to-end
+edit + delete) + 5 in `EventReminderServiceTests` (T19–T23: the window
+filter, the `Going`-RSVP filter, the author-inclusion rule, the idempotency-
+key shape, the no-audit-row pin). **The three-test acceptance gate** (recorded
+by the gate unit): **closed loop** (an author creates a published event → it
+appears in the feed with the `TargetKind = "event"` aggregate row; the author
+RSVPs → their RSVP is visible in the owner-only list), **handoff** (a user
+added to the audience's grants after creation sees the event on the next
+request), **part-vs-whole** (the 25 names pass together with the inherited
+M1–M3 / PG anchors). **The drift-guard** (the design doc §3.9): the `Event`
+field set, the `EventRsvp` shape, the `EventToAuditableResource` adapter, the
+`IEventService` public method set, the 25 test names, the three-test gate,
+and the CQRS-lite §6.4 job shape are **frozen**.
