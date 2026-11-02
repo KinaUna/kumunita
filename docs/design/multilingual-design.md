@@ -2,9 +2,9 @@
 
 > **Primary reference tier** for the multilingual lane (`ML`, ADR 0005). This doc
 > is **authored in full up front** (unlike group posts, whose Part 2 was written by
-> U2) — the unit register `docs/plans-milestones/done/plan-multilingual.md` is the
+> U2) — the unit register `docs/archive/lanes/multilingual/plan-multilingual.md` is the
 > **secondary** tier, and
-> `docs/plans-milestones/done/multilingual-handoff-notes.md` is the
+> `docs/archive/lanes/multilingual/multilingual-handoff-notes.md` is the
 > **scratch** tier. This file pins the invariant numbers (**M·1–M·9**), the FACES
 > numbers (**M1–M13**), the **exact C#** of every seam, the **19 pinned seam-test
 > names**, the **three-test acceptance gate**, and the **drift guard**. Every

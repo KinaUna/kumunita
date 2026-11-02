@@ -16,7 +16,7 @@ hand off to). No amendment to 0042, 0040, 0015, 0003, or 0021 — this ADR is
 additive on their decisions exactly as written.
 
 This ADR is the **sign-off gate** of the `SP` (System Pages shipped) lane —
-the lane plan is `plans-milestones/done/system-pages/plan-system-pages.md`.
+the lane plan is `archive/lanes/system-pages/plan-system-pages.md`.
 Every later `SP` unit (U01–U05) codes against the *locked* text here;
 changing a decision below requires an amendment, not a unit-level override.
 

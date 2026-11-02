@@ -143,7 +143,7 @@ contract, each gated on its *owning* resource's audience):**
 
 > **Pinned for U1–U9. A unit matches these verbatim; on any mismatch the doc
 > wins — fix the code in the same commit + append a note to
-> `docs/plans-milestones/done/media-file-storage-handoff-notes.md`.**
+> `docs/archive/lanes/media/media-file-storage-handoff-notes.md`.**
 
 ### §2.1 Seam surface (added / reused)
 
@@ -621,7 +621,7 @@ about is a discovery issue, not a result).
 ---
 
 *This doc is the **primary** reference tier. U1–U9 code against it. Each unit's
-entry-read list (in `docs/plans-milestones/done/plan-media-file-storage.md`)
+entry-read list (in `docs/archive/lanes/media/plan-media-file-storage.md`)
 cites the § it implements. The doc is written once (by the plan author) and
 only ever touched per the §2.7 drift-guard — never by a unit deciding a shape
 twice.*
@@ -697,6 +697,6 @@ pin now covers both the serving lane (§2.3) and the rendering lane
    OPS `Media__MaxBytes` guidance and the SEC (e) class sensitivity line both
    need revisiting in the same unit.
 
-**Sole handoff artifact:** `docs/plans-milestones/done/
+**Sole handoff artifact:** `docs/archive/lanes/
 media-file-storage-handoff-notes.md` `## Summary` — read it first when starting
 any follow-on lane's U1.

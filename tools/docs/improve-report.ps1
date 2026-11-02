@@ -85,7 +85,7 @@ foreach ($s in $shared) { Write-Host "    - $s" }
 
 # --- 4. handoff TL;DR --------------------------------------------------------
 Write-Host "`n[4] handoff notes under done/ over 600 lines without a TL;DR in first 20 lines:"
-$dDir = Join-Path $repo 'docs/plans-milestones/done'
+$dDir = Join-Path $repo 'docs/archive/lanes'
 $d = Get-ChildItem -Path $dDir -Recurse -Filter '*-handoff-notes.md' -File |
   ForEach-Object { $n = @((Get-Content $_.FullName)).Count; if ($n -gt 600) { [pscustomobject]@{ L=$n; F=(Rel $_.FullName); TLDR=@((Get-Content $_.FullName -TotalCount 20) | Select-String 'TL;DR').Count -gt 0 } } } |
   Where-Object { -not $_.TLDR } |

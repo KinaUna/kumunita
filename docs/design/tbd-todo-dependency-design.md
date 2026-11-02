@@ -659,7 +659,7 @@ Postgres):
 
 **Recorded at close (U04, 2026-09-25) — all three PASS**, confirmed by
 reading the named handoff sections + the code (the full record is in
-`docs/plans-milestones/done/tbd/tbd-handoff-notes.md`, `## U04`):
+`docs/archive/lanes/tbd/tbd-handoff-notes.md`, `## U04`):
 
 - **Closed loop — PASS.** U01 adds `TodoItem.BlockedByTodoId?` + the
   `ProjectDocTypes` index; U02 lands the seams + the cycle guard + the

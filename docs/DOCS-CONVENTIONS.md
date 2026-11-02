@@ -111,7 +111,7 @@ drift is silent coupling in the doc layer.
   time and is not expected to change without a deliberate revision.
   Examples: ADRs, design docs (after `D10` settles their status).
 - **`archive`** — *lane history*, frozen at the lane's close. Examples:
-  `docs/archive/lanes/<lane>/…` (the former `plans-milestones/done/`).
+  `docs/archive/lanes/<lane>/…` (the former `archive/lanes/`).
 
 The tier is a **contract about how the doc is maintained**, not about
 content. A `living` doc that has not been updated in a while is a *drift
@@ -124,4 +124,4 @@ at a lane close).
 The lane register for the work this conventions doc is written against is
 [`plan-improve-docs.md`](plans-milestones/improve-docs/plan-improve-docs.md).
 The previous IMPROVE lane (the code-layer audit) is
-[`plan-improve.md`](plans-milestones/done/improve/plan-improve.md).
+[`plan-improve.md`](archive/lanes/improve/plan-improve.md).

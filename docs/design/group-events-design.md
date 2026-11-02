@@ -256,7 +256,7 @@ then `dotnet exec <assembly>.dll` — **not** `dotnet test` / VS Test Explorer).
 ## Group events — Closed (recorded)
 
 **Date:** 2026-09-25 · **Single-agent run** (no per-unit handoff note — one
-sealed plan register, `docs/plans-milestones/done/group-events/`). The gate
+sealed plan register, `docs/archive/lanes/group-events/`). The gate
 record above (`## Group events — Gate (recorded)`) is the milestone's last
 line; this is its close marker. No new tests here — the checklist below is the
 entry reads, each line re-verified at close.
@@ -269,7 +269,7 @@ entry reads, each line re-verified at close.
 | **tests** | the 19 seam-test names all present in `tests/Kumunita.Core.Tests/GroupEventServiceTests.cs`, 19 `[Fact]`s, none missing / none extra vs §seams · the 13 `GroupsControllerGroupEventTests` 404 tests present in `tests/Kumunita.Web.Tests/GroupsControllerGroupEventTests.cs` · the U08 gate line (Core 851/851 + Web 466/466) still **PASS** per the recorded section above | **PASS** |
 | **close docs** | `README.md` — the **Group events** Features bullet + the Roadmap **Group events (`GE`, ADR 0089)** lane bullet (a shipped non-lettered lane lives in both; M4/M5/M6 Roadmap lines untouched) · `docs/adr/README.md` — the **0089** register row (`Accepted`) · `src/Kumunita.Web/Milestones.cs` **untouched** (a named lane, not a milestone — the ADR 0086 `PL` / ADR 0088 precedent) | **PASS** |
 | **kw-l** | the nine `groups.*` `kw-l` keys present in `en`/`de`/`fr`/`da` (the ADR 0005 "all keys in every language" rule) — `groups.back` · `groups.events_heading` · `groups.new_event` · `groups.events_empty_can` · `groups.events_empty` · `groups.new_event_title` · `groups.new_event_lead` · `groups.new_event_submit` · `groups.edit_event_title` | **PASS** |
-| **folders** | `docs/plans-milestones/done/group-events/plan-group-events.md` present (moved from `in-progress/`) · the design doc's gate + close sections recorded above | **PASS** |
+| **folders** | `docs/archive/lanes/group-events/plan-group-events.md` present (moved from `in-progress/`) · the design doc's gate + close sections recorded above | **PASS** |
 | **drift** | no drift pause recorded — the 19 pinned names landed verbatim (master verified 1:1, no renames, count 19 ✓) — **clean** | **PASS** |
 
 **Outcome: all six lines PASS — no hard failure. The group-events lane is

@@ -1002,4 +1002,4 @@ Failed: 0`; the same Events flakies surface intermittently under load.)
 in isolation (8 Core + 8 Web); the full-suite reds (4 Events-domain Core
 flakies + the single IMPROVE close gate) are recorded, not silent, and are
 not M30's — U07 owns the close flip + the `0.46.0` `WhatsNew` entry + the
-`done/m30/` move.*
+`archive/lanes/m30/` move.*

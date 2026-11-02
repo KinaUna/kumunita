@@ -9,13 +9,13 @@
 >
 > **Status.** **Closed** (lane opened by U01; closed by U07 — the three-test
 > acceptance gate is recorded in §6.6 below; the lane folder moved to
-> `plans-milestones/done/ev-dwm/`). Decisions **D1–D7** are
+> `archive/lanes/ev-dwm/`). Decisions **D1–D7** are
 > **locked — [DECIDED — ADR 0064]** (U01 authored **ADR 0064**, Accepted, and
 > flipped every marker). The ADR is the sign-off gate; this doc
 > is the primary reference tier for implementation. The lane plan register is
 > `plans-milestones/in-progress/ev-dwm/plan-ev-dwm.md`; the per-unit files
 > (U00–U07) and the scratch log (`handoff-notes.md`) are now under
-> `plans-milestones/done/ev-dwm/`.
+> `archive/lanes/ev-dwm/`.
 >
 > This is a **named lane** (`EV-DWM`) on the already-shipped **`EV-CAL`**
 > events calendar (ADR 0063) — not a milestone letter: **M5 stays Projects;
@@ -543,4 +543,4 @@ leading offset"). No other drift pauses in the handoff note.
 
 **Lane closed.** The roadmap trio is updated (`EV-DWM` → `StatusDone`,
 `M5` → `StatusNext`); `ARCHITECTURE.md` §events-surface is extended with the
-`EV-DWM` views; the lane folder moved to `plans-milestones/done/ev-dwm/`.
+`EV-DWM` views; the lane folder moved to `archive/lanes/ev-dwm/`.

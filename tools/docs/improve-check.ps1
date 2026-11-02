@@ -16,7 +16,7 @@
 #   (b) docs/adr/README.md index rows != docs/adr/0*.md file count
 #   (c) AGENTS.md and .github/copilot-instructions.md share a "## " heading
 #       with different content
-#   (d) any *-handoff-notes.md under docs/plans-milestones/done/ over 600
+#   (d) any *-handoff-notes.md under docs/archive/lanes/ over 600
 #       lines without a "TL;DR" in the first 20 lines
 #   (e) first-party .ts under src/Kumunita.Web/client/ over 800 lines
 #   (f) any .cshtml view over 800 lines
@@ -37,7 +37,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 # --- locate repo root (walk up from the CWD, or fall back to the script's
-# --- own location, which lives under docs/plans-milestones/done/improve/) -----
+# --- own location, which lives under tools/docs/) -----
 function Find-RepoRoot {
   $dir = (Get-Location).Path
   while ($dir -and $dir.Length -gt 0) {
@@ -46,7 +46,7 @@ function Find-RepoRoot {
     if (-not $parent -or $parent -eq $dir) { break }
     $dir = $parent
   }
-  # fallback: the script itself lives at docs/plans-milestones/done/improve/...
+  # fallback: the script itself lives at tools/docs/...
   $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
   for ($i = 0; $i -lt 5 -and $scriptDir; $i++) {
     if (Test-Path (Join-Path $scriptDir 'Kumunita.slnx')) { return $scriptDir }
@@ -350,7 +350,7 @@ foreach ($v in $cNew) { Write-Host "       - shared heading: $v" }
 # Gate (d) — handoff notes under done/ over 600 lines without a TL;DR
 # =============================================================================
 $dCeiling = 600
-$dDir = Join-Path $repo 'docs/plans-milestones/done'
+$dDir = Join-Path $repo 'docs/archive/lanes'
 $dViolations = [System.Collections.Generic.List[string]]::new()
 if (Test-Path $dDir) {
   $dFiles = Get-ChildItem -Path $dDir -Recurse -Filter '*-handoff-notes.md' -File
@@ -368,38 +368,38 @@ if (Test-Path $dDir) {
 # are grandfathered by *name*; when U02 (or any future unit) adds a TL;DR to
 # one, it drops out of the baseline naturally (it stops violating).
 $dBaseline = @(
-  'docs/plans-milestones/done/m3b/m3b-handoff-notes.md',
-  'docs/plans-milestones/done/pages/pages-handoff-notes.md',
-  'docs/plans-milestones/done/m11/m11-portability-handoff-notes.md',
-  'docs/plans-milestones/done/m10/m10-pwa-handoff-notes.md',
-  'docs/plans-milestones/done/file-attachments/file-attachments-handoff-notes.md',
-  'docs/plans-milestones/done/m4/m4-handoff-notes.md',
-  'docs/plans-milestones/done/m14/m14-events-projects-handoff-notes.md',
-  'docs/plans-milestones/done/media/media-file-storage-handoff-notes.md',
-  'docs/plans-milestones/done/rich-editor/rich-editor-handoff-notes.md',
-  'docs/plans-milestones/done/m13/m13-logging-analytics-handoff-notes.md',
-  'docs/plans-milestones/done/m9/m9-messaging-handoff-notes.md',
-  'docs/plans-milestones/done/m27/m27-handoff-notes.md',
-  'docs/plans-milestones/done/m15/m15-translation-bulk-handoff-notes.md',
-  'docs/plans-milestones/done/pl/pl-handoff-notes.md',
-  'docs/plans-milestones/done/m26/m26-handoff-notes.md',
-  'docs/plans-milestones/done/multilingual-ui/multilingual-ui-handoff-notes.md',
-  'docs/plans-milestones/done/site/site-handoff-notes.md',
-  'docs/plans-milestones/done/m16/m16-inventory-handoff-notes.md',
-  'docs/plans-milestones/done/group-posts/group-posts-handoff-notes.md',
-  'docs/plans-milestones/done/wysiwyg/wysiwyg-handoff-notes.md',
-  'docs/plans-milestones/done/m25/m25-handoff-notes.md',
-  'docs/plans-milestones/done/m20/m20-notification-quiet-times-handoff-notes.md',
-  'docs/plans-milestones/done/m1/m1-step-7-handoff-notes.md',
+  'docs/archive/lanes/m3b/m3b-handoff-notes.md',
+  'docs/archive/lanes/pages/pages-handoff-notes.md',
+  'docs/archive/lanes/m11/m11-portability-handoff-notes.md',
+  'docs/archive/lanes/m10/m10-pwa-handoff-notes.md',
+  'docs/archive/lanes/file-attachments/file-attachments-handoff-notes.md',
+  'docs/archive/lanes/m4/m4-handoff-notes.md',
+  'docs/archive/lanes/m14/m14-events-projects-handoff-notes.md',
+  'docs/archive/lanes/media/media-file-storage-handoff-notes.md',
+  'docs/archive/lanes/rich-editor/rich-editor-handoff-notes.md',
+  'docs/archive/lanes/m13/m13-logging-analytics-handoff-notes.md',
+  'docs/archive/lanes/m9/m9-messaging-handoff-notes.md',
+  'docs/archive/lanes/m27/m27-handoff-notes.md',
+  'docs/archive/lanes/m15/m15-translation-bulk-handoff-notes.md',
+  'docs/archive/lanes/pl/pl-handoff-notes.md',
+  'docs/archive/lanes/m26/m26-handoff-notes.md',
+  'docs/archive/lanes/multilingual-ui/multilingual-ui-handoff-notes.md',
+  'docs/archive/lanes/site/site-handoff-notes.md',
+  'docs/archive/lanes/m16/m16-inventory-handoff-notes.md',
+  'docs/archive/lanes/group-posts/group-posts-handoff-notes.md',
+  'docs/archive/lanes/wysiwyg/wysiwyg-handoff-notes.md',
+  'docs/archive/lanes/m25/m25-handoff-notes.md',
+  'docs/archive/lanes/m20/m20-notification-quiet-times-handoff-notes.md',
+  'docs/archive/lanes/m1/m1-step-7-handoff-notes.md',
   # Re-baselined 2026-10-25 (the prod-hardening close): these four lanes
   # (M30, M34, ESC, prod-hardening) shipped after the U00/U02 baseline with
   # over-600-line notes that carry no TL;DR in the first 20 lines — the same
   # "new file beyond the baseline" case the mechanism exists for. A future
   # unit adding a TL;DR to any of them drops it off the list naturally.
-  'docs/plans-milestones/done/m30/m30-handoff-notes.md',
-  'docs/plans-milestones/done/m34/m34-handoff-notes.md',
-  'docs/plans-milestones/done/esc/esc-handoff-notes.md',
-  'docs/plans-milestones/done/prod-hardening/hardening-handoff-notes.md'
+  'docs/archive/lanes/m30/m30-handoff-notes.md',
+  'docs/archive/lanes/m34/m34-handoff-notes.md',
+  'docs/archive/lanes/esc/esc-handoff-notes.md',
+  'docs/archive/lanes/prod-hardening/hardening-handoff-notes.md'
 )
 # violation strings are "path (N lines, ...)" — compare on the path prefix
 $dNew = @($dViolations | Where-Object { $p = ($_ -split ' \(')[0]; $dBaseline -notcontains $p })

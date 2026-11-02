@@ -858,4 +858,4 @@ satisfies the C-SORT·6 single-in-progress contract and unblocks **M27
   plans follow the same sealed-unit shape as this one (the register at
   `docs/plans-milestones/plan-m27-*.md`, the unit plans in
   `docs/plans-milestones/in-progress/`, the close moving them to
-  `docs/plans-milestones/done/m27/`).
+  `docs/archive/lanes/m27/`).

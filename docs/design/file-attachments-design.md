@@ -4,9 +4,9 @@
 > file-attachments lane: it pins the invariant numbers (C-ATT·1–10), the
 > FACES (F1–F9), the exact C# of every seam, the pinned seam-test names, the
 > acceptance gate, and the drift guard (Part 2 is authored by U2). The register
-> (`docs/plans-milestones/done/file-attachments/plan-file-attachments.md`) is
+> (`docs/archive/lanes/file-attachments/plan-file-attachments.md`) is
 > the **secondary** tier (unit-level deliverables + exit criteria).
-> `docs/plans-milestones/done/file-attachments/file-attachments-handoff-notes.md` is the **scratch**
+> `docs/archive/lanes/file-attachments/file-attachments-handoff-notes.md` is the **scratch**
 > tier (one short section per unit, appended, never rewritten).
 > When the three disagree, **this file wins for the pinned shapes**; the
 > register wins for *which files exist* and *what each unit does*.

@@ -6,7 +6,7 @@
 > drift guard. The register
 > (`docs/plans-milestones/plan-rich-content.md`) is the **secondary** tier
 > (unit-level deliverables + exit criteria).
-> `docs/plans-milestones/done/rich-content-handoff-notes.md` is the
+> `docs/archive/lanes/rich-content/rich-content-handoff-notes.md` is the
 > **scratch** tier (one short section per unit, appended, never rewritten).
 > When the three disagree, **this file wins for the pinned shapes**; the
 > register wins for *which files exist* and *what each unit does*.

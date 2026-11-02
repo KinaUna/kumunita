@@ -14,7 +14,7 @@ Translator edit standing the baselines hand off to). No amendment to 0015,
 written.
 
 This ADR is the **sign-off gate** of the `LS` (Languages Seeded) lane — the
-lane plan is `plans-milestones/done/languages-seeded/plan-languages-seeded.md`.
+lane plan is `archive/lanes/languages-seeded/plan-languages-seeded.md`.
 Every later `LS` unit (U01–U06) codes against the *locked* text here;
 changing a decision below requires an amendment, not a unit-level override.
 

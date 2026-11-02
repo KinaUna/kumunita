@@ -50,7 +50,7 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | [`guides/`](guides/CONVENTIONS.md) | the in-app guide registry and writing conventions |
 | [`adr/`](adr/README.md) | short decision records (~80-line cap, index generated from front-matter) |
 | [`design/`](design/m3b-moderation.md) | living design references (the current truth per subsystem) |
-| `archive/` | lane history (the former `plans-milestones/done/`), moved in `D02` |
+| [`archive/`](archive/README.md) | lane history (the former `plans-milestones/done/`), moved in `D02` |
 
 Folders marked "split in `D…`" don't exist yet — the lanes are running in
 order; the entry pages link to the *intended* paths so the seams stay green.
@@ -74,5 +74,5 @@ are updated in the same commit.
 The unit-by-unit work driving the restructure is tracked in the lane
 register, [`plans-milestones/improve-docs/plan-improve-docs.md`](plans-milestones/improve-docs/plan-improve-docs.md).
 Each unit `D00`–`D14` is one small, self-documenting commit (or a short
-series for the mechanical batches). `D00` is done; `D01` (this file + the
-entry pages) is this commit.
+series for the mechanical batches). `D00` (conventions + harness), `D01`
+(this map + the entry pages) and `D02` (the archive move) are done.

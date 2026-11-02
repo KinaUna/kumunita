@@ -853,7 +853,7 @@ C-M12·7 docs flip (M12 → `StatusDone`, M13 → `StatusNext`):
 confirmed untouched by U01–U04 (the handoff note's `## U01`–`## U04`
 entries record zero drift pauses; U00 locked the two source-driven
 refinements before any code ran). M12 is closed at U05; the register's
-six unit plans are moved to `docs/plans-milestones/done/`.
+six unit plans are moved to `docs/archive/lanes/`.
 
 ## §deferred lanes — the Consequences hand-off (each a named follow-on, own ADR)
 

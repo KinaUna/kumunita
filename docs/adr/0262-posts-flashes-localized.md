@@ -17,4 +17,4 @@ lifecycle, translation add/update/remove, report submitted).
 Not compiled or run (no .NET SDK here); de/fr/da text machine-written, review parked. Remaining literal flashes: 258 across the other controllers.
 
 ## Amendments
-2026-10-29: the improve gate (a) KnownTranslationKeys.cs pin re-based 12299 -> 12335 for this lane (see `docs/plans-milestones/done/improve/improve-check.ps1`).
+2026-10-29: the improve gate (a) KnownTranslationKeys.cs pin re-based 12299 -> 12335 for this lane (see `docs/archive/lanes/improve/improve-check.ps1`).

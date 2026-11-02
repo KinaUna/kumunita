@@ -307,7 +307,7 @@ under `src/Kumunita.Core/` beyond the one closed-key registry entry.
     + the admin's push-key management. Own ADR, under ADR 0076 (the
     notification lane). **This ADR supersedes the deferral's
     *substrate* claim** (ADR 0076 / 0083 / 0084 + the
-    `done/notifications/` handoff notes — the done-milestone records are
+    `archive/lanes/notifications/` handoff notes — the done-milestone records are
     untouched, per the "don't edit done records" discipline) and
     **re-names the follow-on lane "PWA push notifications"**; the push
     itself stays deferred.

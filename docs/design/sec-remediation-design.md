@@ -386,4 +386,4 @@ No new failures vs. the U3 baseline.
 - ✅ U1–U31 all present in `plan-sec-remediation.md`.
 - `README.md` has no lane list — that deliverable is skipped.
 
-Lane sealed. A human moves the folder from `in-progress/sec/` to `done/sec/`.
+Lane sealed. A human moves the folder from `in-progress/sec/` to `archive/lanes/sec/` (the close move, now recorded under `docs/archive/lanes/sec/`).

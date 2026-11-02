@@ -14,7 +14,7 @@ surface — and closed green. But its acceptance gate exercised the **part**
 (save a `TranslationResource` → the provider resolves it), not the **whole**
 (a resident actually seeing the platform in another language). Four gaps
 remained (re-verified against the code, 2026-09-12; full detail in
-`plans-milestones/done/plan-multilingual-ui.md`):
+`archive/lanes/multilingual-ui/plan-multilingual-ui.md`):
 
 1. **No view resolved through the provider** — every in-scope view (nav,
    footer, Home, Posts, Groups, Directory, Profile, Account, Admin) carried

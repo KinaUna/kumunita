@@ -616,7 +616,7 @@ are unchanged) — each **resolved**:
 
 **Next:** U8 (`m24-u08.md`) closes M24 — the `Milestones.cs` +
 `MilestonesTests.cs` status flip + the ADR + the OPS/README sync + the
-design-doc close section + the handoff close + the move to `done/m24/`.
+design-doc close section + the handoff close + the move to `archive/lanes/m24/`.
 
 ---
 

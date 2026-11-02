@@ -801,7 +801,7 @@ the six-member close flip, the U09 carry-forward reconciled green, and the
   `GlobalAdmin` gate, the blank-fallback, the single-string override).
 - **handoff — PASS.** The three-tier contract is complete through U10 (this
   section + the `## Summary` in `m29-handoff-notes.md` + the register + the 11
-  unit plans moved to `docs/plans-milestones/done/m29/`).
+  unit plans moved to `docs/archive/lanes/m29/`).
 - **part-vs-whole — PASS (the U09 carry-forward is reconciled).** The *whole*
   Web suite is now **green** (was red on 4 pre-existing failures at U09). The
   3 nav-structural tests (`InventoryControllerTests.Nav_Entry_…` ·
@@ -857,4 +857,4 @@ the six-member close flip, the U09 carry-forward reconciled green, and the
 `dotnet exec Kumunita.Web.Tests.dll` **green** (all 961, the 4 U09 failures
 reconciled); `improve-check.ps1` **ALL GATES PASS**. The M29 milestone is
 shipped — the register stays at the top level, the 11 unit plans + handoff
-note move to `docs/plans-milestones/done/m29/`.
+note move to `docs/archive/lanes/m29/`.

@@ -770,7 +770,7 @@ codes against these names, not a re-derivation):
 **The U10 recording (the close unit):** the gate result (pass / fail) is
 appended to the handoff note (`docs/plans-milestones/in-progress/notifications/
 notifications-handoff-notes.md`, the `## U10` section); the lane's unit files
-move `in-progress/notifications/` → `done/notifications/`; the roadmap trio
+move `in-progress/notifications/` → `archive/lanes/notifications/`; the roadmap trio
 is confirmed (M5 `StatusDone`, M6 `StatusNext` → `StatusDone`, M7
 `StatusPlanned` → `StatusNext`); the ARCHITECTURE.md §3 + §5 sync, the README
 Roadmap, and the handoff summary are all honest at ship time.

@@ -7,7 +7,7 @@ status: in-progress
 audiences: [developer, agent, platform-maintainer]
 lane: improve-docs
 related:
-  - docs/plans-milestones/done/improve/plan-improve.md
+  - docs/archive/lanes/improve/plan-improve.md
   - docs/philosophy/START-HERE.md
   - docs/philosophy/anti-patterns.md
 updated: 2026-11-02
@@ -47,7 +47,7 @@ Open decisions are asked one at a time, at the unit that needs them (marked
 | Measure | Value | Philosophy name |
 |---|---|---|
 | `.md` files / lines (excl. `wwwroot/lib`) | 1 016 / ~249 k | — |
-| …of which shipped-lane history (`plans-milestones/done/`) | 615 files | part sprawl (living + history mixed) |
+| …of which shipped-lane history (`archive/lanes/`) | 615 files | part sprawl (living + history mixed) |
 | Real Markdown links between docs | **96** | parts work, seams don't |
 | Files with **zero inbound** links | **978** | accidental integration (findable only by grep) |
 | Files with zero outbound links | 992 | — |
@@ -58,7 +58,7 @@ Open decisions are asked one at a time, at the unit that needs them (marked
 | Living top-level docs with an abstract | **1 of 10** (`ARCHITECTURE.md`) | — |
 | ADRs by length: ≤80 / 81–150 / 151–300 / >300 | 102 / 57 / 102 / 21 | ADRs drifting into design docs |
 | ADR index rows vs files | 282 / 282 ✅ | (IMPROVE U01 held) |
-| Doc-path mentions of `plans-milestones/done/…` | 556 | — |
+| Doc-path mentions of `archive/lanes/…` | 556 | — |
 | Code files mentioning `docs/…` paths | 46 (incl. `RepositoryInfo.cs` in-app links, `WhatsNew.cs`, tests reading the ADR index) | — |
 | `improve-check.ps1` wired into CI | **no** (manual) | signals without loops |
 
@@ -89,7 +89,7 @@ docs/
   archive/
     README.md                  lane index: lane → design doc → ADRs → handoff
     REDIRECTS.md               old path → new path (generated)
-    lanes/<lane>/…             former plans-milestones/done/<lane>/…
+    lanes/<lane>/…             former archive/lanes/<lane>/…
 tools/docs/                    docs-report, docs-check, link rewriter, front-matter stamper
 ```
 
@@ -128,7 +128,8 @@ a half-applied rule.
 
 - `D00` — ✅ (commit `264acf36`, 2026-11-02)
 - `D01` — ✅ (2026-11-02)
-- `D02`–`D14` — not started
+- `D02` — ✅ (2026-11-02)
+- `D03`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -155,18 +156,36 @@ a half-applied rule.
   `docs/product/`, `docs/security/`) so the seams stay green as `D04`–`D08`
   run.
 
-### `D02` — Archive move (scripted)
+### `D02` — Archive move (scripted) ✅
 - `git mv docs/plans-milestones/done/* docs/archive/lanes/` (keeps history/blame).
-- `tools/docs/rewrite-paths` rewrites the 556 doc references and the code
-  references; generates `docs/archive/REDIRECTS.md`.
-- **Code seams to check by hand:** `RepositoryInfo.cs` (in-app GitHub links —
-  a broken link here is a *resident-facing* bug), `WhatsNew.cs` (resident-facing
-  text that names doc paths), tests that read docs (e.g. `NavMoreFoldTests`
-  reads the ADR index), `Milestones.cs`.
-- `docs/plans-milestones/README.md` shrinks to the in-progress convention;
-  the done-lane conventions move to `docs/archive/README.md`.
-- // TODO ❓ leave one-line stub files at the old top-level lane folders for a
-  release, or rely on `REDIRECTS.md` alone?
+- `tools/docs/rewrite-paths.ps1` rewrites the `plans-milestones/done/…` doc and
+  code references to `archive/lanes/…`; `tools/docs/fix-stale-top-level.ps1`
+  resolves the handful of older references that pointed at a file as if it
+  lived directly under `done/` (it actually lived in a lane folder) to their
+  real `archive/lanes/<lane>/…` home; both generate / re-emit
+  `docs/archive/REDIRECTS.md`.
+- **Code seams checked by hand:** `RepositoryInfo.cs` (no `plans-milestones/done`
+  references — nothing to fix), `WhatsNew.cs` (the one prod-hardening reference
+  rewritten), `Milestones.cs` (no references), `U1PinnedApiProbe.cs` /
+  `IMailerStage.cs` / `Kumunita.Web.csproj` (the `m1` references rewritten), and
+  the two e2e spec comments (`e2e-m3.spec.ts`, `e2e-m4.spec.ts`). `NavMoreFoldTests`
+  reads the ADR index, not the archive — untouched.
+- `docs/plans-milestones/README.md` shrinks to the in-progress-lane convention;
+  the done-lane conventions (three-tier contract, TL;DR/Abstract rule, gate
+  note) move to `docs/archive/README.md`, which also carries the full lane
+  index as real links.
+- **Shipped 2026-11-02:** 614 lane files moved by `git mv` (renames, so
+  `git log --follow` still resolves the original history); ~300 doc + code
+  references rewritten; `docs/archive/README.md` + `docs/archive/REDIRECTS.md`
+  landed; the `improve-check.ps1` / `improve-report.ps1` gates re-pointed at
+  `docs/archive/lanes/`.
+- **Resolved (2026-11-02):** **rely on `REDIRECTS.md` alone** — no one-line
+  stub files at the old top-level lane folders. Rationale: the move is a
+  `git mv` (history intact), `REDIRECTS.md` is the authoritative path map, and
+  the two human-facing entry points (`docs/plans-milestones/README.md` and
+  `docs/archive/README.md`) both link straight into the archive. Stub files
+  would be a third, redundant place to keep in sync — the "one fact, one place"
+  rule says the redirect map is the single home for old-path resolution.
 
 ### `D03` — Archive tier: front-matter, abstracts, lane index
 - Stamp generated front-matter on all archived files (`tier: archive`,
