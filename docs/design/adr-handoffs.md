@@ -637,3 +637,374 @@ specific reply, a highlight that persists (the 4 s removal + the fade keep it a
 *flash*, not a sticky state), and a highlight for a reply that does not exist
 (the script no-ops when `getElementById` returns null — the inbox never 404s
 on an old notification, and the detail page never throws on a stale hash).
+
+
+---
+
+## ADR 0194 — Sample-data MFA lock (moved detail)
+
+*Source: `docs/adr/0194-sample-data-mfa-lock.md`. Supersedes: ADR 0138.*
+
+### Amends (the frozen-surface ledger)
+
+**0138** (its `IsChangePasswordLockedForAsync` four-conjunct decision, its
+`LocaleSettings.SamplePasswordChangeLocked` additive-field-on-the-singleton
+shape, and its "surface-replaced-by-notice" posture all become the *template*
+this ADR re-applies to the MFA surface — ADR 0138 is the source of the rule;
+this ADR does not restate it). Amends: **0056** (the `SampleData__Enabled`
+config-flag existence gate — the same "unreachable by construction" posture
+the MFA lock is gated on). Amends: the **F3/U4 login leg 1.5b** (the
+"GlobalAdmin-with-MFA-off is redirected to /settings/security/mfa to enroll"
+enforcement, ADR 0174 / the `AccountController.Login` seam) — the sample
+`GlobalAdmin` is **exempt** from that redirect on a `SampleData__Enabled`
+instance (the `IsSampleDataAccountAsync` seam, conjuncts 1+3 only, so a
+locked instance still lets the sample admin sign in with the shared
+password; a real, non-sample `GlobalAdmin` is still forced to enroll).
+
+### Tests
+
+The ADR 0138 test pin (the `AccessAudit` shape + the live-on-next-read
+invariant + the four-conjunct decision) is re-applied to the MFA surface in
+`tests/Kumunita.Core.Tests/IdentityServiceSampleMfaLockTests.cs`
+(15 tests: the `false` floor, the audit-row shape for the MFA lock, the
+re-unlock, the two-locks-are-independent, the four-conjunct decision for
+the MFA lock, the two-conjunct login-exemption decision, and the
+login-exemption-is-independent-of-the-admin-toggle-gate). The ADR 0138 test
+pin for the admin surface (the `AdminSampleDataController` thin seam) is
+re-applied to the MFA toggle in
+`tests/Kumunita.Web.Tests/AdminSampleDataControllerTests.cs` (6 new tests:
+the Index `MfaLocked` seed, the Index `MfaLocked` floor, the Save MFA-lock
+call, the Save MFA-unlock call, the Save MFA-lock 404 on a real instance,
+and the Save pre-0194 single-arg form shape). The ADR 0138 test pin for the
+resident surface (the `ChangePasswordLocked` notice shape) is re-applied to
+the MFA surface in
+`tests/Kumunita.Web.Tests/SecuritySettingsMfaLockTests.cs` (5 tests: the
+Mfa GET renders the `MfaLocked` notice when locked, the Mfa GET renders
+the enrollment surface when unlocked, the MfaEnable / MfaRotateRecovery /
+MfaDisable POSTs are refused before any MFA write). The ADR 0138 test pin
+for the login leg (the `F3U5_MfaLoginTests` harness) is extended with the
+`IsSampleDataAccountAsync` exemption (2 new tests: the
+`SampleAdminLogin_SkipsForcedMfaEnrollment` exemption fires for a sample
+account, the `NonSampleGlobalAdminLogin_StillForcedToMfaEnrollment` control
+does not fire for a non-sample account).
+
+### References
+
+- ADR 0138 (the template this ADR re-applies) — the sample-data
+  change-password lock: the four-conjunct decision, the
+  `LocaleSettings.SamplePasswordChangeLocked` additive field, the
+  "surface-replaced-by-notice" posture, the `GlobalAdmin` exemption.
+- ADR 0056 (the `SampleData__Enabled` existence gate) — the
+  "unreachable by construction" posture the MFA lock is gated on.
+- ADR 0078 / ADR 0129 (the closed `SampleAccountEmails` set) — the
+  single source of truth the MFA lock, the password lock, and the
+  notification-suppression gate all compare against.
+- ADR 0174 (the MFA enrollment surface + the pairing QR) — the
+  `SecuritySettingsController` MFA actions the MFA lock guards.
+- ADR 0004 §B.1 (the additive-field delta-detection) — the
+  `LocaleSettings.SampleMfaLocked` field is delta-detected, no migration.
+- ADR 0006 §A (the `IIdentityService` frozen surface) — the four
+  additive methods this ADR gains.
+- The F3/U4 login leg 1.5b (the `AccountController.Login` seam) — the
+  `GlobalAdmin`-with-MFA-off enforcement the `IsSampleDataAccountAsync`
+  exemption exempts the sample admin from.
+
+---
+
+## ADR 0117 — M16 Inventory (moved detail)
+
+*Source: `docs/adr/0117-inventory.md`.*
+
+### D7 — The close flip (U06 detail)
+
+`Milestones.cs` M16 `StatusNext` → `StatusDone` + M17 `StatusPlanned` →
+`StatusNext`; `MilestonesTests.cs` re-pinned to
+`M17_Is_The_Single_InProgress_Milestone` + the shipped list gains M16 +
+M18 stays planned; the README **Roadmap** (M16 → done, M17 → in
+progress) + the M16 **Status** line; `docs/STATUS.md`; and
+`docs/ARCHITECTURE.md`'s value-chain table gains the **M16 row** (the
+table currently ends at the M15 row). All four surfaces ship **in the
+same unit** (the M15/U10 docs-parity precedent, C-M16·7).
+
+### Consequences — "Not chosen" (the full list)
+
+- **A third "Usage" document or context for the history** (C-M16·3 — the
+  usage history **is** the `InventoryCheckout` records; a separate
+  "Usage" store would be a second copy to drift, reconcile, and
+  authorize — the D1 *Forbids* pin).
+- **A new `AccessAction` / `AccessVia` / `Decide()` branch / method on
+  `IAuthorizationService`** (C-M16·4 / D2 — the adapter is the **only**
+  new authorization surface; a branch would be a new decision path the
+  frozen seam does not own).
+- **`OwnerKind` as an enum or a read gate** (D3 / C-M16·1 — the label is
+  a **string** (the M5 `KanbanStatuses` shape) and drives only the UI
+  grouping + the write-standing breadth; the read decision is **always**
+  the frozen Audience).
+- **A notification on check-out/check-in** (D8 — the M6
+  `INotificationService` emitter idiom is a **new trust boundary** — an
+  outbound nudge on a state transition — that M16 deliberately does not
+  take; the README's "optionally" is the usage history, F3 — own ADR,
+  §deferred).
+- **An off-by-default admin toggle** (D6 / C-M16·6 — M16 is a
+  **milestone**, not a **lane**; M9's `LocaleSettings` toggle was the
+  *lane* shape — M16 is the M5 *milestone* shape, always available).
+
+### Deferred to their own lanes (each a named follow-on, own ADR)
+
+- **The "nudge the owner on checkout" notification lane** (D8): the M6
+  `INotificationService` emitter idiom + a Wolverine handler — a **new
+  outbound surface** on a state transition that M16 deliberately does
+  not take (the "optionally" is the **usage history** — F3). Own ADR as
+  a new trust boundary.
+- **The per-item translation lane** (the M5 `TodoTranslation` shape):
+  the item's `LanguageCode` tag (ADR 0018) is present for display; a
+  full translation record (one row per item × language, with its own
+  author standing matrix) is a **different inventory** — an own lane,
+  own ADR. M16's item is **single-language** by design (the README row
+  does not name translations).
+- **The media / attachments-on-items lane** (the ADR 0025 / ADR 0034
+  shape): an image / a file on an item is a **media lane** over the
+  ADR 0011 storage substrate — a new surface with its own standing
+  matrix. M16's item is **text + ownership** (the README row names the
+  *thing* and its *use*, not its *picture*). Own ADR.
+- **The recurring / reserved check-out lane** (a pre-booked slot, a
+  hold): a **reservation** is a second state (booked-but-not-checked-out)
+  the F1 transition does not model — a new document, a new transition, a
+  new standing matrix (who may book vs. who may check out). Own ADR as
+  a new surface on top of the F1 shape.
+- **A third "Usage" document or context** (C-M16·3 **forbids**): the
+  usage history **is** the `InventoryCheckout` records (D4 / F3) — a
+  separate "Usage" doc/context is the anti-pattern the D1 *Forbids:*
+  names. No ADR is needed for what is forbidden.
+
+---
+
+## ADR 0043 — System pages shipped + discoverable (moved detail)
+
+*Source: `docs/adr/0043-system-pages-shipped-and-discoverable.md`.
+Supersedes: ADR 0005. Superseded by: ADR 0047.*
+
+### D5 — Content scope (the two new `en` bodies)
+
+The two new `en` bodies are **platform-level statements, not legal
+advice**. They are the **shape contract** for U01 (`en`) and U02
+(`de` / `fr`): the ADR fixes the structure (heading, intro, the bullet
+topics, the closing line) and the topics each bullet covers; the final
+copy is U01 / U02's, at the ADR 0042 D2 bar (idiomatic, register-held
+`du` / `tu`, token-for-token, structure preserved exactly).
+
+**`privacy` — a platform-level statement derived from `SECURITY.md`:**
+
+- **Heading:** "Privacy" (page title).
+- **Intro:** this is a self-hosted platform for **one** neighborhood — the
+  operator runs the instance, and the operator is the **data controller**
+  for everything on it.
+- **Bullet topics:**
+  - **What the platform stores:** the neighborhood's accounts, posts,
+    groups, pages, and media — the database (Marten documents) plus the
+    media volume. What we don't store, we can't leak (SECURITY.md §1,
+    rule 5).
+  - **Audience enforcement is the privacy mechanism:** content is
+    deny-by-default; the author chooses each post's audience, and the
+    platform enforces it on every request (SECURITY.md §4.4, ARCHITECTURE
+    §4.4).
+  - **Audit-by-default:** access to audience-restricted content and
+    moderation/admin actions are always logged (SECURITY.md §1, rule 3).
+  - **Backups, migration, and retirement are the operator's job:** the
+    database and the uploaded files belong to the operator to back up,
+    migrate, and retire (the same closing line the `terms` body already
+    carries — the two bodies agree).
+  - **The one browser cookie:** the **locale preference** (the ADR 0005 B
+    cookie). **No third-party cookies exist or are planned** — recorded
+    here; a future integration lane may amend by re-opening this decision.
+- **Closing line:** the platform deliberately does **not** state
+  operator-specific facts (retention periods, DPO contact, sub-processors)
+  — those are the operator's, to edit in-app after first boot. The operator
+  is expected to complete this page in the in-app editor; that is the
+  design, not a gap.
+
+**`conduct` — short and enforcement-neutral:**
+
+- **Heading:** "Code of conduct".
+- **Intro:** a bounded neighborhood — treat your neighbors the way you'd
+  want to be treated on your street.
+- **The lines (short list):** no harassment; no doxxing (revealing private
+  details); no spam.
+- **Closing line:** enforcement is the operator's / moderators' judgment —
+  the moderation lane exists and is report-gated and audited (ADR 0003);
+  this page states the expectation, not the procedure.
+
+Two paragraphs + a short list, not a policy document. A dedicated **contact
+page** is *out of scope* (the operator's `Community__SupportEmail` already
+renders on the product-story view and the home hero — the `help` body names
+it as the operator concern); a separate **cookie policy** is *out of scope*
+(the single locale cookie is folded into the `privacy` body's cookie
+section, D5 above).
+
+### D7 — Scope (in/out list)
+
+**In (this lane):** the `privacy` + `conduct` `en` bodies in
+`EnDefaultPages()` (D5); their `de` / `fr` baselines in `DeDefaultPages()`
+/ `FrDefaultPages()` at the ADR 0042 D2 bar (D5, D3); the two new
+`PageTranslation` rows per page (D3); the `/privacy` + `/conduct` routes in
+`StaticPagesController` (D2); the footer "Platform" column with its six
+`footer.platform.*` registry keys in `EnValues` / `DeValues` / `FrValues`
+(D4); the `/admin` shell "Platform pages" section (D4); and the test pins
+(the Core parity / seed family moving 2 → 4 pages; the Web surface pins
+for the routes, the floor, the footer, and the admin section).
+
+**Out (→ future lanes):** machine translation of anything (ADR 0005 C — a
+deferred trust boundary, unchanged); a dedicated **contact** page (the
+`help` body names the operator's `SupportEmail` as the concern — the design
+already covers it); a separate **cookie** policy (folded into the `privacy`
+body, D5); **additional** system pages (a GlobalAdmin adds them under
+`system/` at runtime — the ADR 0040 §2 design, not this lane's shipped set);
+and the `Milestones.cs` / README / `MilestonesTests` trio **until the lane
+ships** (U05 owns it — the Consequences below).
+
+### Superseded record (2026-09-19)
+
+> **Superseded 2026-09-19 by [ADR 0047](../../adr/0047-static-page-localization-and-backfill.md)
+> (D1).** The "en-body by contract" record above was the state at U05 and
+> remains the **floor** (an absent translation still renders the `en`
+> body, and the ADR 0027 chip-swap is still *not* on the hard-coded
+> routes). But the hard-coded routes now **render the matching
+> `PageTranslation` in the request's effective language** (the ADR 0046
+> chain), and a warm-boot backfill (ADR 0047 D2) adds the missing
+> `de` / `fr` / `da` rows. So under a `de` / `fr` / `da` preference the
+> body is now localised — this "en-body" line is the degradation case, not
+> the normal case. See ADR 0047 for the locked decision.
+
+---
+
+## ADR 0132 — Onboarding (moved detail)
+
+*Source: `docs/adr/0132-onboarding.md`.*
+
+### D7 — The closed `onboarding.*` kw-l key set (15 keys × 4 languages)
+
+The locked closed set (15 keys): `onboarding.title`, `onboarding.intro`,
+`onboarding.step_displayname`, `onboarding.step_avatar`,
+`onboarding.step_language`, `onboarding.step_timezone`,
+`onboarding.step_dateformat`, `onboarding.step_email`,
+`onboarding.step_contact`, `onboarding.visit`, `onboarding.finish`,
+`onboarding.skip`, `onboarding.flash_done`, `onboarding.banner.text`,
+`onboarding.banner.action`.
+
+### D8 — Deferred lanes (each a future ADR, not part of M22)
+
+(1) Per-step progress / resume-across-sessions; (2) "you haven't set X"
+detection; (3) onboarding for elevated/guest accounts; (4) an admin
+"onboarding completion rate" metric; (5) I18n beyond the four-language
+floor.
+
+### The acceptance tests (GATE-1…GATE-6)
+
+GATE-1 — one additive field, `null` = not completed (C-M22·1, D1).
+GATE-2 — the completion stamp is one owner-scope write, no audit row, no
+load-or-create (C-M22·3, D2). GATE-3 — zero new field-write lanes; the
+walk-through rides the frozen lanes (C-M22·4, D3). GATE-4 — zero new
+authorization surface (C-M22·2, D6). GATE-5 — the banner is gated on the
+completion read and non-blocking (C-M22·5, D5). GATE-6 — the closed
+`onboarding.*` set is parity-pinned in four languages (C-M22·6, D7).
+
+---
+
+## ADR 0083 — Group membership notifications (moved detail)
+
+*Source: `docs/adr/0083-group-add-and-invite-notifications.md`.
+Supersedes: ADR 0007.*
+
+### Amends (the frozen-surface ledger)
+
+**0007** (the group-management lane — owner ∪ GlobalAdmin is the standing
+that *adds* / *invites*; the two emitters sit exactly on the two write
+seams that ADR 0007's SoD gate protects, and the recipient is always the
+*other* resident, never the actor), **0008** (the self-leave lane — its
+write seam `RemoveGroupMemberAsync` deliberately does **not** emit: a
+self-leave is not something to be notified *about*), **0010** (private
+groups — the Privacy tab this ADR re-homes; a private group's add/invite
+carries the same notification as a public one), **0013** (the group-post
+lane — its "notifications on new group posts" deferral was settled by ADR
+0076's `group.post` kind + wired emitter; this ADR is the sibling: the
+*membership-change* kinds, not the *content* kind), **0026** (group
+name/description translations — the Translations tab this ADR re-homes,
+unchanged in behavior), **0076** (the M6 notifications context — this ADR
+**adds two kinds** to the closed `NotificationKinds` vocabulary D2 froze,
+**reuses verbatim** the `NotificationService.EmitAsync` seam D1/D4/D5/D7
+pinned, the frozen `IMailerStage.StageAsync` trio, and the ADR 0061
+per-recipient language resolution; **no new context, no new document, no
+new surface, no new service**, the settings toggle list simply grows by
+two), **0077** (the admin-lane kinds — the precedent for "a kind whose
+recipient is not the acting resident"; here the recipient *is* the affected
+resident, so it is the resident lane, not the admin lane), and **0078**
+(sample-account suppression in production — inherited by the two new kinds
+for free: the `EmitAsync` suppression gate is kind-agnostic).
+
+### D3 — The circular-dependency seam (full detail)
+
+The `NotificationService` constructor takes `IUserInfoService` (for the
+recipient's `Profile.EmailLanguage` + `Email`, ADR 0061), so injecting a
+`NotificationService?` **directly** into `UserInfoService` would create a
+construction-time cycle (`IUserInfoService → UserInfoService →
+NotificationService → IUserInfoService`). The `IdentityService` emitters
+(ADR 0077) only avoid this because `IIdentityService` is a *different*
+registration than the `IUserInfoService` the `NotificationService`
+consumes. The fix here: `UserInfoService`'s primary-ctor gains a
+**trailing, optional** `IServiceProvider? services = null`, and the two
+emitters resolve the `NotificationService` **at emission time** via
+`services?.GetService<Notifications.NotificationService>()` — deferred to
+runtime, which breaks the construction-time cycle (the service graph is
+only assembled when an emission actually happens, by which point both ends
+of the would-be cycle are already constructed). The `null` default preserves
+the **181 pre-ADR 0083 direct-construction test call sites** that build
+`UserInfoService(store)` positionally: they get `services = null`, the
+`GetService` call is a no-op, and the emission is **silently skipped** (the
+write still commits; no notification row) — exactly the pre-M6 behavior, so
+no existing test's expectations change and no harness is forced to wire the
+`NotificationService`. The DI container (which *does* register the
+`NotificationService`) resolves `IServiceProvider` and supplies it, so the
+production emitters are live.
+
+### D6 — The kw-l key table (32 entries)
+
+Per kind the registry gains exactly the four keys the parity test pins, in
+**en / de / fr / da**: `notifications.kind.{kind}` (the settings + inbox
+label), `notifications.preference.{kind}.label` (the preferences toggle),
+`notification.{kind}.subject` (the email subject), `notification.{kind}.body`
+(the email body template — the UGC snippet, the group name, is appended
+after one space, so the templates carry a trailing space). That is 8 new
+keys × 4 languages = 32 entries added to `KnownTranslationKeys`, and the
+`KwLRegistryConsistencyTests` parity check (exact key-set equality across
+the four dictionaries) is what enforces the count.
+
+### D7 — The group detail page tab layout (full detail)
+
+`Views/Groups/Detail.cshtml` restructures the existing sections into the
+Bootstrap `nav nav-tabs` idiom (the `_ProjectsTabs.cshtml` precedent, ADR
+0062) with the header (back link, `<h1>` group name, "Owned by …" + the
+owner/private badges, the **description read**) above the tab bar:
+
+- **Feed** — the membership-scoped posts (ADR 0013): the "New post" button
+  (when `Model.CanPost`), the empty state, and the posts `list-group`. This
+  is the default tab and the one every member lands on.
+- **Members** — the member list (with the per-row **Remove** for
+  `canManage` / **Leave** on the actor's own row, ADR 0007/0008), the
+  owner's **pending invitations** list, the **invite** form (owner), and
+  the **add-member** form (`canManage`).
+- **Settings** — rendered **only when `canManage`**
+  (`Model.IsOwner || GlobalAdmin`, the C-M2·3 owner ∪ GlobalAdmin standing
+  the controller's `TryResolveOwnerSurface` gates already enforce): the
+  **About** (description *edit*) form, the **Privacy** toggle (ADR 0010,
+  `isPrivate`), and the **Translations** block (ADR 0026, the chips +
+  per-translation `<details>` + the add-translation forms when
+  `Model.CanTranslate`).
+
+The **active tab is derived server-side from the `?tab=` query string**
+(`?tab=feed|members|settings`), so a deep link `/groups/{id}?tab=settings`
+lands on Settings and the "back to the group" links from a post's detail
+page drop the query and fall back to the default (Feed) — no client-side
+tab JS, no new dependency (the ADR 0031 tsc-only / no-dependency pin).
+The description **read** stays in the header (a group's blurb sits above
+the tabs, like a profile's bio); only the description **edit** form moves
+into Settings.
