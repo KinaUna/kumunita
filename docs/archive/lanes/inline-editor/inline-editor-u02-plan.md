@@ -1,3 +1,18 @@
+---
+id: inline-editor-inline-editor-u02-plan
+title: "Inline Editor U02 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: inline-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U2 — The toggle button on all view instances
 
 - **Lane:** Inline editor (`IE`)

@@ -1,3 +1,18 @@
+---
+id: m22-m22-onboarding-handoff-notes
+title: "M22 Onboarding Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m22
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # M22 — Onboarding · rolling handoff notes
 
 > Every unit appends a short `## U##` section before it moves its own plan to

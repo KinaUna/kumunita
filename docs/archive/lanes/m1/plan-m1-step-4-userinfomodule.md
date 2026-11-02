@@ -1,3 +1,18 @@
+---
+id: m1-m1-step-4-userinfomodule
+title: "M1 Step 4 Userinfomodule"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # M1 Step 4 — UserInfoModule implementation
 
 ## Context

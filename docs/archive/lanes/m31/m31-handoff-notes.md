@@ -1,3 +1,14 @@
+---
+id: m31-m31-handoff-notes
+title: "M31 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m31
+updated: 2026-11-02
+---
+
 # M31 — Production error handling — rolling handoff note
 
 > **TL;DR:** Shipped M31 (production error handling, ADR 0154): a

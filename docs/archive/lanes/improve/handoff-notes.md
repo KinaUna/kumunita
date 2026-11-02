@@ -1,3 +1,18 @@
+---
+id: improve-handoff-notes
+title: "Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: improve
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for the first IMPROVE lane — the code-layer audit (long functions/files, the god-file and doc-size gates) that this `improve-docs` lane builds on (ADRs 0096 / 0037 / 0039).
+> **Seam it created:** the `improve-check.ps1` / `improve-report.ps1` gate harness (now at `tools/docs/`) with the grandfathered baselines that the reduction lanes measure against.
+> **Do not re-litigate:** the baselines are *pins, not ceilings to loosen* — the fix for a gate failure is always "re-baseline + annotate the ADR", never "loosen the gate".
+
 # IMPROVE lane — handoff notes
 
 ## U00 — Baseline: audit ledger + improvement harness (2026-10-08)

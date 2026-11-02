@@ -1,3 +1,18 @@
+---
+id: m26-m26-sorting
+title: "M26 Sorting"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m26
+updated: 2026-11-02
+---
+
+> **Abstract:** the M26 lane register — per-list sorting across the directory, groups, posts and boards, unit by unit (ADRs 0006 / 0090 / 0145); the design doc is `m26-sorting-design.md`.
+> **Seam it defined:** the sort-order seam on the query layer (the `Query` surface) applied after the authorization filter.
+> **Do not re-litigate:** sort is applied *after* the frozen `CanAsync` filter — you can only reorder what the actor may already see, and the default order per list is the frozen contract.
+
 # M26 — Sorting — sealed unit register
 
 > **In progress.** This is the **plan** for M26 (Sorting), split into

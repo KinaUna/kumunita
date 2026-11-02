@@ -1,3 +1,18 @@
+---
+id: m35-m35-kiosk-mode
+title: "M35 Kiosk Mode"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m35
+updated: 2026-11-02
+---
+
+> **Abstract:** the M35 lane register — kiosk mode (a full-page display that auto-cycles a GlobalAdmin-set playlist of views), unit by unit (ADRs 0104 / 0164); the design doc is `m35-kiosk-mode-design.md`.
+> **Seam it defined:** the `Kumunita.Core.Kiosk` bounded context (the `KioskPlaylist` singleton + `IKioskService` seam) + the `/kiosk` surface.
+> **Do not re-litigate:** the three kiosk slide surfaces are **full MVC views, not partials** (the U04 drift pause) — and the kiosk is a GlobalAdmin-set playlist, not a per-resident setting.
+
 # M35 — Kiosk mode — sealed unit register
 
 > **In progress.** This is the **lane register** (secondary tier of the

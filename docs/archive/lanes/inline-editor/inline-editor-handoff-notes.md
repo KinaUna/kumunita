@@ -1,3 +1,18 @@
+---
+id: inline-editor-inline-editor-handoff-notes
+title: "Inline Editor Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: inline-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # Inline editor (`IE`) — rolling handoff notes
 
 > **The scratch tier** of the IE lane's three-tier contract (the design

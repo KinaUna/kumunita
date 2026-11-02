@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u12-exec-plan
+title: "Group Posts U12 Exec Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U12 exec-plan — final consistency check + record `## Group posts — Closed (recorded)`
 
 Working note for this unit (media-exec-plan precedent). Appended to, never rewritten.

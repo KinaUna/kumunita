@@ -1,3 +1,18 @@
+---
+id: translation-display-translation-display-u05-plan
+title: "Translation Display U05 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: translation-display
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # TD U05 — TS swap module + layout wiring
 
 > **Sealed unit.** One fresh agent, ~32K context window. Self-contained. The

@@ -1,3 +1,18 @@
+---
+id: multilingual-ui-multilingual-ui-u04-plan
+title: "Multilingual Ui U04 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # ML-UI · U4 — wire the Groups views to `<kw-l>`
 
 > Part of the `ML-UI` lane (`docs/archive/lanes/multilingual-ui/plan-multilingual-ui.md`,

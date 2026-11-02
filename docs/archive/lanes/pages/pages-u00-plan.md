@@ -1,3 +1,18 @@
+---
+id: pages-pages-u00-plan
+title: "Pages U00 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: pages
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U0 — Sign-off + ADR 0039 + the `PG` milestone row (no code beyond the ADR)
 
 - **Lane:** Pages (`PG`)

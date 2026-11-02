@@ -1,3 +1,18 @@
+---
+id: ip-ip-u03
+title: "Ip U03"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: ip
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # IP · U03 — Rate-limit policies for message send + post/reply create
 
 **You are the U03 agent.** This is a **Web** unit. It adds **two** new

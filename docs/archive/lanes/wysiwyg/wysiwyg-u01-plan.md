@@ -1,3 +1,18 @@
+---
+id: wysiwyg-wysiwyg-u01-plan
+title: "Wysiwyg U01 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: wysiwyg
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U1 — Design doc Part 1 (invariants + FACES)
 
 - **Lane:** WYSIWYG inline editing (`WY`)

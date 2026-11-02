@@ -1,3 +1,18 @@
+---
+id: m37-m37-personal-notes
+title: "M37 Personal Notes"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m37
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Plan: M37 — Personal notes (a private note a resident attaches to any content entity; organizable: a personal folder tree + free author-set tags; author-only)
 
 > **M37 is the current in-progress milestone** (`Milestones.cs`: `M37` =

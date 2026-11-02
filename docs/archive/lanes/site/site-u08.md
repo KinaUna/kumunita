@@ -1,3 +1,18 @@
+---
+id: site-site-u08
+title: "Site U08"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: site
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # SITE U08 — Tests + close flip (the six-member close-flip contract)
 
 ## Context (self-contained)

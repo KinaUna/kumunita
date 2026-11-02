@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u03-plan
+title: "Group Posts U03 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U3 — Group posts: ADR 0013 (group posts are a membership lane)
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

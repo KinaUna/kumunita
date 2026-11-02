@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u12-plan
+title: "Group Posts U12 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U12 — Group posts: final consistency check + record `## Group posts — Closed (recorded)`
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

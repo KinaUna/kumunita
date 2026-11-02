@@ -1,3 +1,18 @@
+---
+id: multilingual-multilingual-handoff-notes
+title: "Multilingual Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: multilingual
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # Multilingual (UI & platform texts) — handoff notes (ML)
 
 > **Scratch tier.** One section per unit, **appended** (never rewritten). Each

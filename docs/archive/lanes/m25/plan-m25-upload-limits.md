@@ -1,3 +1,18 @@
+---
+id: m25-m25-upload-limits
+title: "M25 Upload Limits"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m25
+updated: 2026-11-02
+---
+
+> **Abstract:** the M25 lane register — upload limits (per-file and per-community ceilings on the media surface), unit by unit (ADRs 0011 / 0006); the design doc is `m25-upload-limits-design.md`.
+> **Seam it defined:** the upload-limit checks on the `Kumunita.Core.Media` surface (ADR 0011).
+> **Do not re-litigate:** the limits are enforced *before* the file is written to disk (fail fast, no partial blob) and ride the existing ADR 0011 media storage — there is no separate limit store.
+
 # M25 — Upload limits — sealed unit register
 
 > **In progress.** This is the **plan** for M25 (Upload limits), split into

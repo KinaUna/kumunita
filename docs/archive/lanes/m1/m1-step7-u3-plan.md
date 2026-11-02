@@ -1,3 +1,18 @@
+---
+id: m1-m1-step7-u3-plan
+title: "M1 Step7 U3 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U3 — verify the two existing call sites still work, unmodified
 
 **Status: complete (all steps executed; see the `## U3 — call sites verified/reordered` section in `docs/archive/lanes/m1/m1-step-7-handoff-notes.md` for the as-built record, the per-call-site invariant evidence, the canary-run result, and the files-touched table).** This file is the unit's own execution plan, saved per the unit brief; the authoritative sealed-unit contract is still `docs/archive/lanes/m1/plan-m1-step-7-outbox-email-c3.md` (lines 123–127) — this file mirrors it and does not supersede it.

@@ -1,3 +1,18 @@
+---
+id: prod-hardening-hardening-handoff-notes
+title: "Hardening Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: prod-hardening
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for the prod-hardening lane — the F1–F22 hardening fixes (GDPR deletion, MFA, sessions, error tracking, DLQ alerts, scan, bounce handling) (ADR 0006 + the per-fix ADRs).
+> **Seam it created:** the per-fix design docs under `docs/design/prod-hardening-f*.md` + the hardening control map in `docs/SECURITY.md`.
+> **Do not re-litigate:** each fix is a *named ADR* (F1…F22) — a change to one is an ADR amendment, not an edit to the handoff note; the `KnownTranslationKeys` re-baselines that this lane drove are the documented reason for the gate ceiling.
+
 # Prod-hardening — rolling handoff notes
 
 One short section per unit, **appended, never rewritten**. Each unit writes

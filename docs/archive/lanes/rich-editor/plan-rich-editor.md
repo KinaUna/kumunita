@@ -1,3 +1,18 @@
+---
+id: rich-editor-rich-editor
+title: "Rich Editor"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: rich-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** the Rich-editor (RE) lane register — WYSIWYG body editing + the toolbar over the RC Markdown lane, unit by unit (ADRs 0025 / 0031); the design doc is `rich-editor-design.md`.
+> **Seam it defined:** the `wwwroot/js/lib/rich-editor.js` client over the RC Markdown surface.
+> **Do not re-litigate:** the editor is a *client-side view over the RC Markdown document* — the stored shape is still the RC Markdown body and the WYSIWYG pane is a projection, never the source of truth.
+
 # Rich editor (`RE`) — WYSIWYG body editing + toolbar over the RC Markdown lane
 
 > **Status.** This is the **lane plan** (the register — secondary tier of the

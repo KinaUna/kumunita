@@ -1,3 +1,14 @@
+---
+id: pages-pages-handoff-notes
+title: "Pages Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: pages
+updated: 2026-11-02
+---
+
 # Pages lane (`PG`) — handoff notes (scratch tier)
 
 > **TL;DR:** Shipped the `PG` Pages lane (ADR 0039): a `Page` / `PageTranslation` tree that **absorbs and retires the legacy `LocalizedPage`**, a `MountPoint` resolver for the two UI slots (`footer/community`, `help/account`), the composer + translation surface, the navbar entry, and the `kw-l` registry consistency test — with the 2026-09-17 design-decision amendment (pages now default non-public / community-visible, consistent with posts).

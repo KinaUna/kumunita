@@ -1,3 +1,14 @@
+---
+id: m11-m11-portability-handoff-notes
+title: "M11 Portability Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m11
+updated: 2026-11-02
+---
+
 # M11 handoff notes
 
 > **TL;DR:** Shipped M11 (Portability — import/export, ADR 0108): a `*.kumunita` archive that round-trips a whole instance (the content graph + the media bytes + the role standing) onto a fresh instance byte-identically, with the no-secret identity boundary enforced at the wire and the closed-failure-set enforced before any write; the close is U07 (the D9 frozen tests + the Web-surface pins + the milestone flip + the plan-file moves).

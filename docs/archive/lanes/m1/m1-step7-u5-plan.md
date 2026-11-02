@@ -1,3 +1,18 @@
+---
+id: m1-m1-step7-u5-plan
+title: "M1 Step7 U5 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U5 plan — M1 step 7: full-verification sweep + doc-comment reconciliation
 
 Sealed unit U5 of `plan-m1-step-7-outbox-email-c3.md`. Follows U1 (pinned API),

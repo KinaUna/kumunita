@@ -1,3 +1,18 @@
+---
+id: file-attachments-file-attachments-u06-plan
+title: "File Attachments U06 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: file-attachments
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # ATT U6 — Core tests: 10 pinned names across the three owners
 
 > **Sealed unit.** One fresh agent, ~32K context window. Self-contained. The

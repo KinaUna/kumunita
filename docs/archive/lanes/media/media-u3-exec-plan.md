@@ -1,3 +1,18 @@
+---
+id: media-media-u3-exec-plan
+title: "Media U3 Exec Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: media
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U3 execution plan (working) — Core tests: file store + media store (byte-store correctness)
 
 > My (unit U3's) working plan for this pass. The **authoritative spec** is

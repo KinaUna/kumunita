@@ -1,3 +1,18 @@
+---
+id: pages-pages-u07-plan
+title: "Pages U07 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: pages
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U7 — Absorb complete: retire `LocalizedPage` (destructive, **last**)
 
 - **Lane:** Pages (`PG`)

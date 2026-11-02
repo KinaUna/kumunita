@@ -1,3 +1,18 @@
+---
+id: m13-m13-logging-analytics-handoff-notes
+title: "M13 Logging Analytics Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m13
+updated: 2026-11-02
+---
+
+> **Abstract:** the handoff note for M13 — structured logging + usage analytics over the existing audit trail (ADRs 0114 / 0025 / 0062).
+> **Seam it created:** the `Usage` bounded context (the analytics surface) + the `m13-logging-analytics-design.md` reference; M34 is the history lane that extends it.
+> **Do not re-litigate:** analytics reads the *existing* `AccessAudit` rows — there is no separate analytics write path, and the privacy model (`docs/SECURITY.md`) is the authoritative constraint on what is logged.
+
 # M13 — Logging and usage analytics — handoff notes
 
 > **The unit series' shared note file.** Each unit (U00–U07) appends its

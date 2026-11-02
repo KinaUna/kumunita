@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u06-plan
+title: "Group Posts U06 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U6 — Group posts: `PostService` group surface (feed + detail + create)
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

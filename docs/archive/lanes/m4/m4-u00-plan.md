@@ -1,3 +1,18 @@
+---
+id: m4-m4-u00-plan
+title: "M4 U00 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m4
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U00 — Sign-off + ADR 0054 + the `M4` milestone row (no code beyond the ADR)
 
 - **Lane:** Events (`M4`)

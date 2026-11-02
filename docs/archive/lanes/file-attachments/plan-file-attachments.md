@@ -1,3 +1,18 @@
+---
+id: file-attachments-file-attachments
+title: "File Attachments"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: file-attachments
+updated: 2026-11-02
+---
+
+> **Abstract:** the file-attachments lane register — attachments on posts / replies / announcements, unit by unit (ADRs 0034 / 0011 / 0025); the design doc is `file-attachments-design.md`.
+> **Seam it defined:** the attachment document + the `Kumunita.Core.Media` storage lanes (ADR 0011) that ride under the post/reply/announcement read gates.
+> **Do not re-litigate:** an attachment is *only* readable through its parent's frozen `CanAsync(Read)` — there is no standalone attachment grant, and the media storage (ADR 0011) is the single home for bytes.
+
 # File attachments (posts / replies / announcements) — sealed unit register
 
 > **In progress.** This is the **plan** for the file-attachment lane, split into

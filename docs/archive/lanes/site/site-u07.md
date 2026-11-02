@@ -1,3 +1,18 @@
+---
+id: site-site-u07
+title: "Site U07"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: site
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # SITE U07 — Web: `/admin/site` surface (the `AdminSiteController` + the `AdminSite` view + the `/admin/platform` link)
 
 ## Context (self-contained)

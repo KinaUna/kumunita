@@ -1,15 +1,14 @@
-# RT (Report targets) — the "Report this …" lane for events, projects, boards, to-dos, group posts
+---
+id: report-targets-handoff-notes
+title: "Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: report-targets
+updated: 2026-11-02
+---
 
-**Status:** Shipped 2026-10-27 (ADR 0173, v0.71.0)
-**Scope:** One new `ModerationService` write lane (`FileReportTargetAsync`) +
-the read-path helper it needs (`LoadReportTargetResourceAsync`, now also
-used by the existing `AssignReportAsync` / `UnlockAsync` /
-`ResolveReportAsync`), one new `ReportTargetsController` with five thin
-endpoints, one shared `_ReportModal` partial, five ⋮-dropdown integrations,
-the moderation queue + resolve views extended to render the five new target
-kinds, the five `posts.{kind}_report_button` kw-l keys × en/de/fr/da, and
-the nine `FileReportTargetAsync_*` tests in
-`ModerationServiceTests` (T1–T5).
 
 > **TL;DR:**
 > **What did this lane ship?** The "Report this event / project / board /
@@ -33,6 +32,7 @@ the nine `FileReportTargetAsync_*` tests in
 > `LoadReportTargetResourceAsync` switch arm + a new
 > `ReportTargetsController` endpoint + a new kw-l key — not a new
 > `ModerationService` lane, not a new `AccessAction`, not a new adapter.
+
 
 ## Why this lane existed
 

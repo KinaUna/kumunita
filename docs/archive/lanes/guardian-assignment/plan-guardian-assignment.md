@@ -1,3 +1,18 @@
+---
+id: guardian-assignment-guardian-assignment
+title: "Guardian Assignment"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: guardian-assignment
+updated: 2026-11-02
+---
+
+> **Abstract:** the Guardian-assignment (GA) lane register — a guardian assigns a second guardian to an existing child, unit by unit (ADRs 0038 / 0028 / 0013); the design doc is `guardian-assignment-design.md`.
+> **Seam it defined:** the guardian-assignment write lane on the `Kumunita.Core.UserInfo` surface (the guardian relationship, distinct from the time-limits lane).
+> **Do not re-litigate:** a guardian may assign a *second* guardian only (the ADR 0028 scope) — the guardian relationship is a *delegation* under the existing parent-child link, never a new account-ownership edge.
+
 # Guardian assignment (`GA`) — a guardian assigns a second guardian to an existing child — sealed unit register
 
 > **The secondary tier** of the GA lane's three-tier contract. The **primary**

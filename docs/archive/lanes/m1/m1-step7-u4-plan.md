@@ -1,3 +1,18 @@
+---
+id: m1-m1-step7-u4-plan
+title: "M1 Step7 U4 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U4 plan — M1 step 7: fix the first-boot ordering trap (`Program.cs`)
 
 Sealed unit U4 of `plan-m1-step-7-outbox-email-c3.md`. Follows U1 (pinned API),

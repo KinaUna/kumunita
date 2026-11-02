@@ -1,3 +1,18 @@
+---
+id: m8-m8-search
+title: "M8 Search"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m8
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Plan: M8 — Search
 
 > **In progress.** Unit register (secondary tier). Living handoff note:

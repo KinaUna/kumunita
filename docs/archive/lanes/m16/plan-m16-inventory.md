@@ -1,3 +1,18 @@
+---
+id: m16-m16-inventory
+title: "M16 Inventory"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m16
+updated: 2026-11-02
+---
+
+> **Abstract:** the M16 lane register — inventory (check-out / check-in + per-item usage history), unit by unit (ADRs 0117 / 0044); the design doc is `m16-inventory-design.md`.
+> **Seam it defined:** the `Kumunita.Core.Inventory` bounded context (the item + check-out documents).
+> **Do not re-litigate:** a check-out re-runs the item's own frozen `CanAsync(Read)` — the write lane grants nothing, and the inventory surface is core (the ADR 0101 inversion: no off-by-default admin toggle).
+
 # Plan: M16 — Inventory (check-out / check-in + usage history)
 
 > **M16 is the current in-progress milestone** (`Milestones.cs`: `M16` = `StatusNext`,

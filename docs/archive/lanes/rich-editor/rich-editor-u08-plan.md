@@ -1,3 +1,18 @@
+---
+id: rich-editor-rich-editor-u08-plan
+title: "Rich Editor U08 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: rich-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U8 — Close: ADR 0031 + roadmap + `rc.editor.*` keys + folder moves
 
 - **Lane:** Rich editor (`RE`)

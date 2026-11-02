@@ -1,3 +1,17 @@
+---
+id: improve-improve-audit
+title: "Improve Audit"
+tier: archive
+kind: audit
+status: archived
+audiences: [developer, agent]
+lane: improve
+updated: 2026-11-02
+---
+
+> **Abstract:** an audit ledger for this lane — the evidence that the lane's
+> gates were met. See the lane register for the what/why.
+
 # IMPROVE — audit ledger
 
 > **U00 deliverable** (the reading pass). This is the *deliverable the

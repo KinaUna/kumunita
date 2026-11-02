@@ -1,3 +1,14 @@
+---
+id: m2-u11-m2-profile-editor-profilecontroller-profileedit-profilepreview-audience-edi
+title: "U11 M2 Profile Editor Profilecontroller Profileedit Profilepreview Audience Edi"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m2
+updated: 2026-11-02
+---
+
 # 🎯 U11 — M2 profile editor (ProfileController + /profile/edit + /profile/preview + audience editor partial)
 
 ## Understanding

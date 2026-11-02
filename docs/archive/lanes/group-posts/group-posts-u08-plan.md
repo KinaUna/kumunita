@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u08-plan
+title: "Group Posts U08 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U8 — Group posts: view layer (feed / detail / new / reply + the entry link)
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

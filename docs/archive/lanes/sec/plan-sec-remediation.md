@@ -1,3 +1,18 @@
+---
+id: sec-sec-remediation
+title: "Sec Remediation"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: sec
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # SEC — Security-audit remediation — sealed unit register
 
 ## Understanding

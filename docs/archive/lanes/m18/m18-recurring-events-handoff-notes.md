@@ -1,3 +1,18 @@
+---
+id: m18-m18-recurring-events-handoff-notes
+title: "M18 Recurring Events Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m18
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # M18 — Recurring events · handoff notes
 
 ## U00 — Design doc + ADR 0119 locked

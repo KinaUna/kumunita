@@ -1,3 +1,18 @@
+---
+id: m12-m12-ical
+title: "M12 Ical"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m12
+updated: 2026-11-02
+---
+
+> **Abstract:** the M12 lane register — iCal (calendar export of the visible events), unit by unit (ADRs 0112 / 0054 / 0085); the design doc is `m12-ical-design.md`.
+> **Seam it defined:** the iCal export endpoint over the `Kumunita.Core.Events` surface (the events the actor may already see).
+> **Do not re-litigate:** the iCal feed is a *read-only projection* gated on the existing event `CanAsync(Read)` — it exposes exactly the visible events and nothing more (the privacy model is the authoritative constraint).
+
 # Plan: M12 — iCal (calendar export of visible events)
 
 > **Done** (closed U05, 2026-09-28). Unit register (secondary tier). Living handoff note:

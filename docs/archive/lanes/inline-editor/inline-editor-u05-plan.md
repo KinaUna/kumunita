@@ -1,3 +1,18 @@
+---
+id: inline-editor-inline-editor-u05-plan
+title: "Inline Editor U05 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: inline-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U5 — ADR 0032 + the close (roadmap + ADR index + folder move)
 
 - **Lane:** Inline editor (`IE`)

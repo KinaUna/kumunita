@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u02-plan
+title: "Group Posts U02 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U2 — Group posts: design doc Part 2 (seams, contracts, test list, gate, drift-guard)
 
 **Milestone:** group posts · **Read first (5 min):** the master register's *Pinned contract* block (`docs/plans-milestones/plan-group-posts.md`) — you freeze it. **No repo-wide scan.**

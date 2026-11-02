@@ -1,3 +1,18 @@
+---
+id: m30-m30-handoff-notes
+title: "M30 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m30
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for M30 — admin onboarding (the `/admin/setup` first-boot + admin self-service surface) (ADRs 0153 / 0150 / 0005).
+> **Seam it created:** the `AdminOnboarding` lanes on the `Kumunita.Web` admin surface + the `m30-admin-onboarding-design.md` reference.
+> **Do not re-litigate:** a successful `/admin/setup` POST returns a uniform **404** by design — the setup lane is permanently closed after one success and the 404 is success, not a bug to chase.
+
 # M30 — Admin onboarding — rolling handoff note
 
 > **Milestone open (U00).** This is the **scratch tier** (rolling handoff

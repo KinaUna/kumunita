@@ -1,3 +1,18 @@
+---
+id: multilingual-ui-multilingual-ui-u03-plan
+title: "Multilingual Ui U03 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # ML-UI · U3 — the Posts views wired to `<kw-l>`
 
 **Date:** 2026-09-12 · **Kind:** code unit (view edits only) · **Exit:** build green

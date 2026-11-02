@@ -1,3 +1,18 @@
+---
+id: m27-m27-user-scoped-portability
+title: "M27 User Scoped Portability"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m27
+updated: 2026-11-02
+---
+
+> **Abstract:** the M27 lane register — user-scoped portability (resident self-export + per-entity conflict-resolution import), unit by unit (ADRs 0148 / 0108); the design doc is `m27-user-scoped-portability-design.md`.
+> **Seam it defined:** the resident-scoped `Kumunita.Core.Portability` lanes (M11 is the community-wide version; M27 reuses its document shapes).
+> **Do not re-litigate:** the import is *per-entity conflict resolution* (the ADR 0193 `keep_existing` merge) — it never silently overwrites, and the resident-scoped lane reuses M11's shapes, it does not fork them.
+
 # Plan: M27 — User-scoped portability (resident self-export + per-entity conflict-resolution import)
 
 > **In progress.** Unit register (secondary tier). This file is the sealed unit

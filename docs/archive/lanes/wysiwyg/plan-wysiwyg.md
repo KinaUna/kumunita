@@ -1,3 +1,18 @@
+---
+id: wysiwyg-wysiwyg
+title: "Wysiwyg"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: wysiwyg
+updated: 2026-11-02
+---
+
+> **Abstract:** the WYSIWYG (WY) lane register — the rendered pane is the editable surface and the Markdown source becomes a read-only mirror, unit by unit (ADRs 0032 / 0031); the design doc is `wysiwyg-editor-design.md`.
+> **Seam it defined:** the inline-editing surface over the RC/Rich-editor lane.
+> **Do not re-litigate:** the Markdown source is the *mirror, not the truth* after this lane — the rendered pane edits the document and the Markdown view follows; do not re-introduce a second editable Markdown surface.
+
 # WYSIWYG inline editing (`WY`) — the rendered pane is the editable surface; the Markdown source becomes a read-only mirror
 
 > **Status.** This is the **lane register** (secondary tier of the lane's

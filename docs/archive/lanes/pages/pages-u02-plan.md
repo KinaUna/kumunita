@@ -1,3 +1,18 @@
+---
+id: pages-pages-u02-plan
+title: "Pages U02 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: pages
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U2 — `PageService` read lanes + `PageToAuditableResource` + the standing matrix
 
 - **Lane:** Pages (`PG`)

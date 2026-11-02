@@ -1,3 +1,18 @@
+---
+id: m18-m18-recurring-events
+title: "M18 Recurring Events"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m18
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Plan: M18 — Recurring events (repeating events over the M4 events surface)
 
 > **Milestones.cs status at start:** `new("M18", "Recurring events — repeating events over the M4 events surface", StatusNext)` — the **in-progress** milestone (M17 bookmarks is `StatusDone`); **M19** (`"Guest accounts: limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, and similar community-adjacent roles who need a place in the platform without full resident standing; admins set the limits on what a guest may access and for how long."`) is the next `StatusPlanned`.

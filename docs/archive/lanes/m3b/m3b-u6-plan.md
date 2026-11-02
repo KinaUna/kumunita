@@ -1,3 +1,18 @@
+---
+id: m3b-m3b-u6-plan
+title: "M3b U6 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m3b
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U6 — Reply route micro-fix (`POST /posts/{id}/replies`) — execution plan
 
 > Sealed unit U6 of M3b (plan § U6). **Web-only micro-fix**: close the M3 404

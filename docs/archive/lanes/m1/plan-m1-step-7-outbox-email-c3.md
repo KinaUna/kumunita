@@ -1,3 +1,18 @@
+---
+id: m1-m1-step-7-outbox-email-c3
+title: "M1 Step 7 Outbox Email C3"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # M1 step-7 fix — durable OutboxEmail via Wolverine transactional outbox (true C3) — sealed unit register
 
 ## Understanding

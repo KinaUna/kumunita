@@ -1,3 +1,18 @@
+---
+id: esc-esc-handoff-notes
+title: "Esc Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: esc
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for the ESC lane — the escalation-authorization + receiving-inbox surface that lets a community receive a resident-filed issue and route it to a named handler (ADRs 0154 / 0159).
+> **Seam it created:** the escalation write lane on the `Kumunita.Core.ErrorReports` bounded context + the `/escalation` receiving-inbox queue and the `esc-escalation-authorization-design.md` reference.
+> **Do not re-litigate:** escalation is the *receiving-inbox* model — the community takes in the report and assigns it; the M32 issue-submission lane is the intake side, and that split (intake vs. routing) is the frozen decision.
+
 # ESC — Escalation authorization + receiving inbox — rolling handoff note
 
 > **Lane open (U00).** This is the **scratch tier** (rolling handoff note)

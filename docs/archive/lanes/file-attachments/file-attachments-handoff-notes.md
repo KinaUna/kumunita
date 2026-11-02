@@ -1,3 +1,14 @@
+---
+id: file-attachments-file-attachments-handoff-notes
+title: "File Attachments Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: file-attachments
+updated: 2026-11-02
+---
+
 # File-attachments lane — handoff notes (scratch tier)
 
 > **TL;DR:** Shipped the ATT (file-attachments) lane, ADR 0034 (Amends 0025 + 0011): `AttachmentIds` on `Post` / `PostReply` / `Announcement` (additive, zero migrations), the `POST /attachment` upload lane + the `GET /attachment/{id}` serve lane (the 5-step ordering, the reply-parent resolution, `Content-Disposition: attachment` + `nosniff`), the separate `AttachmentAllowedContentTypes` allowlist (SVG excluded), and the "Attach file" editor button across 16 composers — 10 pinned Core tests + 10 pinned Web tests (7 live, 5 `AttachServe_F1..F5` drift-paused) green end-to-end.

@@ -1,3 +1,18 @@
+---
+id: group-posts-group-posts-handoff-notes
+title: "Group Posts Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for the group-posts lane — posts and replies scoped to a group, gated on membership (ADRs 0013 / 0003 / 0004).
+> **Seam it created:** the group-membership read/write lanes on the Posts surface (the `GP` lane, no milestone letter — roadmap M4/M5/M6 stay Events/Projects/Portability) + the `group-posts-design.md` reference.
+> **Do not re-litigate:** group posts are gated on *group membership* at read time (thin token, fat authorization), not on a membership claim; the `GP` lane ID is permanent and must not be renumbered into an M-letter.
+
 # Group posts — rolling handoff notes (appended, never rewritten)
 
 > One section per unit, **appended** (never rewritten). Each unit writes exactly

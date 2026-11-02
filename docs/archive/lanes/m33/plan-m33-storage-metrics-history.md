@@ -1,3 +1,18 @@
+---
+id: m33-m33-storage-metrics-history
+title: "M33 Storage Metrics History"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m33
+updated: 2026-11-02
+---
+
+> **Abstract:** the M33 lane register — storage-metrics history (the time-series over the M24 storage surface), unit by unit (ADRs 0134 / 0156 / 0004); the design doc is `m33-storage-metrics-history-design.md`.
+> **Seam it defined:** the history/time-series lanes on the `Kumunita.Core.Media` storage surface (M24 is the current-state version).
+> **Do not re-litigate:** storage-metrics history is a *read-only projection* over the existing media blobs — it never writes a separate metrics store, and the ADR 0011 storage contract is the single home for bytes.
+
 # M33 — Storage metrics history — sealed unit register
 
 > **In progress.** This is the **lane register** (secondary tier of the

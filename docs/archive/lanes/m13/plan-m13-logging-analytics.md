@@ -1,3 +1,18 @@
+---
+id: m13-m13-logging-analytics
+title: "M13 Logging Analytics"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m13
+updated: 2026-11-02
+---
+
+> **Abstract:** the M13 lane register — logging + usage analytics over the existing audit trail, unit by unit (ADR 0114); the design doc is `m13-logging-analytics-design.md` and M34 is the history lane that extends it.
+> **Seam it defined:** the `Kumunita.Core.Usage` bounded context (the analytics surface that reads `AccessAudit`).
+> **Do not re-litigate:** analytics is *read-only over the existing audit rows* — there is no separate analytics write path, and the privacy model (`docs/SECURITY.md`) is the authoritative constraint on what is logged.
+
 # Plan: M13 — Logging and analytics
 
 > **In progress** (M13 is the single in-progress milestone — `Milestones.cs`

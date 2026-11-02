@@ -1,3 +1,18 @@
+---
+id: m3b-m3b-u9-plan
+title: "M3b U9 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m3b
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M3b U9 — Seam tests: `ModerationServiceTests.cs` (new) + `PostServiceTests.cs` (+5 ADDs)
 
 This is the **execution** plan for M3b unit U9. Three-tier shape M2/M3 held:

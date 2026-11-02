@@ -1,3 +1,18 @@
+---
+id: m31-m31-production-error-handling
+title: "M31 Production Error Handling"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m31
+updated: 2026-11-02
+---
+
+> **Abstract:** the M31 lane register — production error handling (the error-report intake + the break-glass path), unit by unit (ADR 0154); the design doc is `m31-production-error-handling-design.md`.
+> **Seam it defined:** the `Kumunita.Core.ErrorReports` bounded context (the intake + the break-glass lane).
+> **Do not re-litigate:** the error-report intake is *audit-by-default* (a resident-filed report is the gate, not a privileged write) and the break-glass path is a named, logged lane — not an untracked admin shortcut.
+
 # M31 — Production error handling — sealed unit register
 
 > **In progress.** This is the **lane register** (secondary tier of the

@@ -1,3 +1,14 @@
+---
+id: m35-m35-handoff-notes
+title: "M35 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m35
+updated: 2026-11-02
+---
+
 # M35 — Kiosk mode — rolling handoff note
 
 > **TL;DR:** M35 ships the kiosk display (`/kiosk`) — a full-page chrome-hidden

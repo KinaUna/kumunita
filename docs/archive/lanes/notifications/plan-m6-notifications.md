@@ -1,3 +1,18 @@
+---
+id: notifications-m6-notifications
+title: "M6 Notifications"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: notifications
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # M6 — Notifications — sealed unit register
 
 > **In progress.** This is the **lane register** (the secondary register

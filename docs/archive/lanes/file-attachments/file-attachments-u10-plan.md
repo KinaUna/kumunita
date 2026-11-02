@@ -1,3 +1,18 @@
+---
+id: file-attachments-file-attachments-u10-plan
+title: "File Attachments U10 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: file-attachments
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # ATT U10 — Editor: `attachLink` + "Attach file" button (incl. reply composers) + F9 round-trip test
 
 > **Sealed unit.** One fresh agent, ~32K context window. Self-contained. The

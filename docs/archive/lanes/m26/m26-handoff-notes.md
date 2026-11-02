@@ -1,3 +1,18 @@
+---
+id: m26-m26-handoff-notes
+title: "M26 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m26
+updated: 2026-11-02
+---
+
+> **Abstract:** the handoff note for M26 — sorting (per-list sort orders across the directory, groups, posts and boards) (ADRs 0122 / 0015).
+> **Seam it created:** the sort-order seam on the query layer (the `Query` surface) + the `m26-sorting-design.md` reference.
+> **Do not re-litigate:** sort is applied *after* the frozen `CanAsync` filter — you can only reorder what the actor may already see, and the default order per list is the frozen contract.
+
 # M26 — Sorting — handoff notes
 
 > **Scratch tier** (the M25 `m25-handoff-notes.md` precedent). One `## U#`

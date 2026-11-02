@@ -1,3 +1,18 @@
+---
+id: tbd-tbd-todo-dependency
+title: "Tbd Todo Dependency"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: tbd
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # `TBD` — Todo dependency ("waiting on") — the `BlockedByTodoId?` lane (sealed unit register)
 
 > **In progress.** This is the **lane plan** (the secondary register tier)

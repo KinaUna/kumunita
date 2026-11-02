@@ -1,3 +1,18 @@
+---
+id: m34-m34-analytics-history
+title: "M34 Analytics History"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m34
+updated: 2026-11-02
+---
+
+> **Abstract:** the M34 lane register — analytics history (the time-series over the M13 usage surface), unit by unit (ADRs 0114 / 0156 / 0162); the design doc is `m34-analytics-history-design.md`.
+> **Seam it defined:** the history/time-series lanes on the `Kumunita.Core.Usage` bounded context (M13 is the current-state version).
+> **Do not re-litigate:** analytics history is *read-only over the existing audit rows* — it never writes a separate history stream, and the privacy model is the authoritative constraint on what is kept.
+
 # M34 — Analytics history — sealed unit register
 
 > **In progress.** This is the **lane register** (secondary tier of the

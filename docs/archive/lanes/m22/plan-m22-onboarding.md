@@ -1,3 +1,18 @@
+---
+id: m22-m22-onboarding
+title: "M22 Onboarding"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m22
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # M22 — Onboarding (the register)
 
 > **This file is the register** — the milestone map, the locked [PROPOSED]

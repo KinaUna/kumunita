@@ -1,3 +1,14 @@
+---
+id: m3b-m3b-handoff-notes
+title: "M3b Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m3b
+updated: 2026-11-02
+---
+
 # M3b — rolling handoff note
 
 > **TL;DR:** Shipped the M3b moderation lane: report filing, the `Via = Report` read branch, the `HidePostAsync` / `RemovePostAsync` write lanes on `Post` (the `PostStatus` enum, ADR 0004 §B.1 additive), the `/moderation` queue + resolve UI, the reply route, and 13 pinned Core tests + 3 acceptance gates (closed-loop / handoff / part-vs-whole) green end-to-end.

@@ -1,3 +1,18 @@
+---
+id: m24-m24-storage-metrics
+title: "M24 Storage Metrics"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m24
+updated: 2026-11-02
+---
+
+> **Abstract:** the M24 lane register — storage metrics (per-community disk usage over the media surface), unit by unit (ADRs 0011 / 0006); the design doc is `m24-storage-metrics-design.md` and M33 is the history lane that extends it.
+> **Seam it defined:** the storage-metrics query on the `Kumunita.Core.Media` surface (ADR 0011).
+> **Do not re-litigate:** storage metrics are a *read-only projection* over the existing media blobs — they never write a separate metrics store, and M33's history reuses this shape.
+
 # M24 — Storage metrics — sealed unit register
 
 > **In progress.** This is the **plan** for M24 (Storage metrics), split into

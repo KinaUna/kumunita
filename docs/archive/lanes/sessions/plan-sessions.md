@@ -1,3 +1,18 @@
+---
+id: sessions-sessions
+title: "Sessions"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: sessions
+updated: 2026-11-02
+---
+
+> **Abstract:** the Sessions lane register — the per-session list + revoke-one-device surface, unit by unit (ADRs 0281 / 0006); the design doc is `sessions-per-session-revocation.md`.
+> **Seam it defined:** the session list/revoke lanes on the `Kumunita.Core.Identity` surface (the ASP.NET Identity session store).
+> **Do not re-litigate:** revoking one session is a *targeted* operation (the `settings.sessions.*` surface) — it does not log out all devices, and the audit row for a revocation is the only record that it happened.
+
 # Sessions — per-session list + revoke one device — sealed unit register
 
 Lane id: **`sessions`** (named lane, "M37-adjacent"; the M-letter milestones

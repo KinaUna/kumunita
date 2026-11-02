@@ -1,3 +1,18 @@
+---
+id: m25-m25-handoff-notes
+title: "M25 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m25
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for M25 — upload limits (per-file and per-community size/count ceilings on the media surface) (ADRs 0004 / 0006 / 0134).
+> **Seam it created:** the upload-limit checks on the `Kumunita.Core.Media` surface + the `m25-upload-limits-design.md` reference.
+> **Do not re-litigate:** the limits are enforced *before* the file is written to disk (fail fast, no partial blob), and they ride the existing ADR 0011 media storage — there is no separate limit store.
+
 # M25 — Upload limits · rolling handoff notes
 
 > Every unit appends a short `## U#` section before it moves its own plan to

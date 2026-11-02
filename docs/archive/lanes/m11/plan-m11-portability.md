@@ -1,3 +1,18 @@
+---
+id: m11-m11-portability
+title: "M11 Portability"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m11
+updated: 2026-11-02
+---
+
+> **Abstract:** the M11 lane register — portability (community-wide import/export), unit by unit (ADRs 0108 / 0011 / 0101); the design doc is `m11-portability-design.md`.
+> **Seam it defined:** the `Kumunita.Core.Portability` bounded context (the export/import document shapes) — M27 is the resident-scoped version that reuses these shapes.
+> **Do not re-litigate:** portability is a *snapshot of the documents at a point in time* (the ADR 0011 storage) — it is not a live replica, and the import re-runs the existing write lanes, it does not bypass `CanAsync`.
+
 # Plan: M11 — Portability (import/export)
 
 > **In progress.** Unit register (secondary tier). Living handoff note:

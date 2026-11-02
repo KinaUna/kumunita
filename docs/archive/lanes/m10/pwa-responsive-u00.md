@@ -1,3 +1,18 @@
+---
+id: m10-pwa-responsive-u00
+title: "Pwa Responsive U00"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m10
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M10 U00 — Lock the design: `m10-pwa-responsive-design.md` + ADR 0107
 
 **Unit plan (secondary tier, self-contained).** Read **this file + your

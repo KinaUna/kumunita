@@ -1,3 +1,18 @@
+---
+id: m12-ical-u02
+title: "Ical U02"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m12
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M12 · U02 — Web: the `GET /events/{id}.ics` lane + serve shape + its Web pins
 
 > **You are the U02 agent.** Read **this file + your entry reads** and

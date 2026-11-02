@@ -1,3 +1,18 @@
+---
+id: m10-m10-pwa-responsive
+title: "M10 Pwa Responsive"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m10
+updated: 2026-11-02
+---
+
+> **Abstract:** the M10 lane register — PWA + responsive design (installable, offline-capable, responsive), unit by unit (ADRs 0107 / 0076); the design doc is `m10-pwa-responsive-design.md`.
+> **Seam it defined:** the `manifest.webmanifest` + service-worker surface in `Kumunita.Web` + the `@media` blocks in `site.css` (the PwaManifestTests pin counts them — a by-design anti-regression guard).
+> **Do not re-litigate:** the `@media` block count in `site.css` is *pinned by `PwaManifestTests`* — a new block is a re-baseline + ADR annotation, not a loosened gate.
+
 # Plan: M10 — PWA and responsive design
 
 > **In progress.** Unit register (secondary tier). Living handoff note:

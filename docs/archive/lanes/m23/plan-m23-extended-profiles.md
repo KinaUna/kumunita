@@ -1,3 +1,18 @@
+---
+id: m23-m23-extended-profiles
+title: "M23 Extended Profiles"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m23
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # M23 — Extended user profiles (biography + author-set tags + find-people)
 
 > **This file is the register** — the milestone map, the locked [PROPOSED]

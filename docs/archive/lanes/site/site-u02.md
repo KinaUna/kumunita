@@ -1,3 +1,18 @@
+---
+id: site-site-u02
+title: "Site U02"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: site
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # SITE U02 — Design doc Part 2 (seams, contracts, test list, gate, drift-guard) + ADR 0150
 
 ## Context (self-contained)

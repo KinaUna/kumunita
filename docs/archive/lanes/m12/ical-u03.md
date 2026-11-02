@@ -1,3 +1,18 @@
+---
+id: m12-ical-u03
+title: "Ical U03"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m12
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M12 · U03 — Web: the `GET /events.ics` feed lane + the composition pin + the feed Web pins
 
 > **You are the U03 agent.** Read **this file + your entry reads** and

@@ -1,3 +1,18 @@
+---
+id: notifications-notifications-handoff-notes
+title: "Notifications Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: notifications
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # M6 Notifications — rolling handoff note
 
 One `## U#` section per unit, **appended** (never

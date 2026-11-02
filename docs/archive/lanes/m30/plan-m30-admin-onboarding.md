@@ -1,3 +1,18 @@
+---
+id: m30-m30-admin-onboarding
+title: "M30 Admin Onboarding"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m30
+updated: 2026-11-02
+---
+
+> **Abstract:** the M30 lane register — admin onboarding (the `/admin/setup` first-boot + admin self-service surface), unit by unit (ADRs 0005 / 0150 / 0153); the design doc is `m30-admin-onboarding-design.md`.
+> **Seam it defined:** the `AdminOnboarding` lanes on the `Kumunita.Web` admin surface.
+> **Do not re-litigate:** a successful `/admin/setup` POST returns a uniform **404** by design — the setup lane is permanently closed after one success and the 404 is success, not a bug to chase.
+
 # M30 — Admin onboarding — sealed unit register
 
 > **Planned.** This is the **lane register** (secondary tier of the milestone's

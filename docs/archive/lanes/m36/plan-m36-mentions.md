@@ -1,3 +1,18 @@
+---
+id: m36-m36-mentions
+title: "M36 Mentions"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m36
+updated: 2026-11-02
+---
+
+> **Abstract:** the M36 lane register — @mentions (mentioning a resident in a post/reply and notifying them), unit by unit (ADRs 0165 / 0031 / 0076); the design doc is `m36-mentions-design.md`.
+> **Seam it defined:** the mention parse/notify lanes on the messaging surface (over the M9 DMs) + the `Mentions` surface.
+> **Do not re-litigate:** a mention notifies only a resident the actor may *already* see (thin token, fat authorization) — there is no mention-specific grant, and the mention is a *parse of the existing body*, not a new field.
+
 # M36 — @mentions — sealed unit register
 
 > **In progress.** This is the **lane register** (secondary tier of the

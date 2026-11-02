@@ -1,3 +1,18 @@
+---
+id: m4-m4-u06-plan
+title: "M4 U06 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m4
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U06 — Nav entry + `/my/drafts` lane + `kw-dt` timestamps
 
 - **Lane:** Events (`M4`)

@@ -1,3 +1,18 @@
+---
+id: m14-m14-events-projects
+title: "M14 Events Projects"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m14
+updated: 2026-11-02
+---
+
+> **Abstract:** the M14 lane register — the integration of Events and Projects (cross-linking the two surfaces), unit by unit (ADRs 0115 / 0028 / 0034); the design doc is `m14-events-projects-design.md`.
+> **Seam it defined:** the event↔project cross-link lanes on the `Kumunita.Core.Events` / `Projects` surfaces (a to-do linked to an event, a board linked to an event).
+> **Do not re-litigate:** the cross-link is a *reference between two existing documents* — it never grants a new permission; each side stays gated on its own frozen `CanAsync`.
+
 # Plan: M14 — Integration of Events and Projects
 
 > **Done** (closed U07, 2026-09-29). Unit register (secondary tier). Living

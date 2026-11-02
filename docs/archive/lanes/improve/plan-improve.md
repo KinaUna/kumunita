@@ -1,3 +1,18 @@
+---
+id: improve-improve
+title: "Improve"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: improve
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Plan: IMPROVE — a fractal integration audit of the shipped surface
 
 > **Planned.** This is the **lane register** (secondary tier of the three-tier

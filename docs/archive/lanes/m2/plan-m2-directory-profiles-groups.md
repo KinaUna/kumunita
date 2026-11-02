@@ -1,3 +1,18 @@
+---
+id: m2-m2-directory-profiles-groups
+title: "M2 Directory Profiles Groups"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m2
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # M2 — Directory, profiles, groups
 
 ## Understanding

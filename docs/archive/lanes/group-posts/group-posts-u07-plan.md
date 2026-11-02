@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u07-plan
+title: "Group Posts U07 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U7 — Group posts: Web controller surface (feed / detail / new / reply)
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

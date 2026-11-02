@@ -1,3 +1,18 @@
+---
+id: multilingual-ui-multilingual-ui-handoff-notes
+title: "Multilingual Ui Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
+> **Abstract:** the handoff note for the ML-UI lane — the UI wiring for multilingual (the per-page / per-audience language resolution over the M15 string store) (ADRs 0005 / 0015).
+> **Seam it created:** the effective-language resolution seam in `Kumunita.Web` (the `kw-l` / `kw-dt` tag helpers) + the `multilingual-design.md` reference.
+> **Do not re-litigate:** language resolution is *platform default + resident override* (ADR 0019/0020 lineage) — the `kw-l` tag helper is the only sanctioned way to emit a localized string in a view; a hard-coded English string in a view is the anti-pattern.
+
 # Multilingual — UI wiring (`ML-UI`) — handoff notes
 
 > **Scratch tier.** One section per unit, **appended** (never rewritten). Each

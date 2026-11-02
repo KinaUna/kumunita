@@ -1,3 +1,18 @@
+---
+id: media-media-u11-plan
+title: "Media U11 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: media
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # Media follow-on (U11) — close the open findings
 
 Owner: the follow-up unit for the Media & file-storage feature (2026-09-11).

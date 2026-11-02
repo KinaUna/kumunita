@@ -1,3 +1,14 @@
+---
+id: m10-m10-pwa-handoff-notes
+title: "M10 Pwa Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m10
+updated: 2026-11-02
+---
+
 # M10 handoff notes
 
 > **TL;DR:** Shipped M10 (PWA and responsive design, ADR 0107): an installable PWA app shell (the honest static `manifest.webmanifest` + the two icon PNGs + the GET-only same-origin closed-15-path-allowlist service worker + the quiet localized install affordance) + a single `@media (max-width: 767.98px)` phone-width pass over a closed surface inventory + the two pinned a11y floors (≥ 44×44 px hit areas, the `:focus-visible` ring on the `.kmb-*` custom pieces).

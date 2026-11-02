@@ -1,3 +1,18 @@
+---
+id: m21-m21-document-management-handoff-notes
+title: "M21 Document Management Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m21
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # M21 — Document management (rolling handoff notes)
 
 > **The cross-unit memory.** Every unit reads the `## U##` sections before it

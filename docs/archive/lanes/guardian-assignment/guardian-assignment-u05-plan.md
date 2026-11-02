@@ -1,3 +1,18 @@
+---
+id: guardian-assignment-guardian-assignment-u05-plan
+title: "Guardian Assignment U05 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: guardian-assignment
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # GA U05 — Web: `GuardianController.Assign` action + the
 `ActiveGuardiansAsync` helper + the `Detail` action's `GuardianItems`
 

@@ -1,3 +1,18 @@
+---
+id: media-media-u2-exec-plan
+title: "Media U2 Exec Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: media
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U2 execution plan (working) — `MediaObject` + `IMediaStore` + `LocalVolumeMediaStore` + `MediaDocTypes`
 
 > My (unit U2's) working plan for this pass. The **authoritative spec** is

@@ -1,3 +1,18 @@
+---
+id: group-posts-group-posts-u01-exec-plan
+title: "Group Posts U01 Exec Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U1 execution plan (working) — group posts: design doc Part 1
 
 > My (unit U1's) working plan for this pass. The **authoritative spec** is

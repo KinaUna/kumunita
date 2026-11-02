@@ -1,3 +1,18 @@
+---
+id: pl-pl-handoff-notes
+title: "Pl Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: pl
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for the PL lane — Goals & Projects (the Kanban board, the to-do / project document model) (ADR 0086).
+> **Seam it created:** the `Kumunita.Core.Projects` bounded context (the board + to-do + project docs) + the `pl-goals-projects-design.md` reference.
+> **Do not re-litigate:** the board is a *document* (one per project) with the to-dos embedded — not a relational project/issue table; the `ProjectsController` is the one surface that owns that shape (the IMPROVE gate pins its size, so grow carefully).
+
 # `PL` — Goals & Projects — rolling handoff notes
 
 One `## U#` section per unit, appended (never rewritten). Each unit writes

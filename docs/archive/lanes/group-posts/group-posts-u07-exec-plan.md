@@ -1,3 +1,18 @@
+---
+id: group-posts-group-posts-u07-exec-plan
+title: "Group Posts U07 Exec Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U7 execution plan (working) — group posts: Web controller surface (feed / detail / create / reply)
 
 > My (unit U7's) working plan for this pass. The **authoritative spec** is

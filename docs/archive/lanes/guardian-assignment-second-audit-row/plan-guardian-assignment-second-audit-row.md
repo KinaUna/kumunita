@@ -1,3 +1,18 @@
+---
+id: guardian-assignment-second-audit-row-guardian-assignment-second-audit-row
+title: "Guardian Assignment Second Audit Row"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: guardian-assignment-second-audit-row
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Guardian assignment, second audit row (`GA-AR`) — the conferral audit lane — sealed unit register
 
 > **The primary tier** of the GA-AR lane's three-tier contract is the

@@ -1,3 +1,18 @@
+---
+id: multilingual-ui-multilingual-ui-u07-plan
+title: "Multilingual Ui U07 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U7 — the public language picker (signed-out) + wire `/about`
 
 **Lane:** `ML-UI` · **Unit:** U7 of 9 · **Date:** 2026-09-12 · **Status:** done

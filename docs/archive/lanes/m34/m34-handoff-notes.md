@@ -1,3 +1,18 @@
+---
+id: m34-m34-handoff-notes
+title: "M34 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m34
+updated: 2026-11-02
+---
+
+> **Abstract:** the handoff note for M34 — analytics history (the time-series over the M13 usage surface) (ADRs 0162 / 0114).
+> **Seam it created:** the history/time-series lanes on the `Kumunita.Core.Usage` bounded context + the `m34-analytics-history-design.md` reference.
+> **Do not re-litigate:** analytics history is *read-only over the existing audit rows* — it never writes a separate history stream, and the privacy model is the authoritative constraint on what is kept.
+
 # M34 — Analytics history — rolling handoff note
 
 > **Milestone open (U00).** This is the **scratch tier** (rolling handoff

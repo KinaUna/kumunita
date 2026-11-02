@@ -1,3 +1,18 @@
+---
+id: site-site
+title: "Site"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: site
+updated: 2026-11-02
+---
+
+> **Abstract:** the SITE lane register — the `/home` + `/about` landing surfaces become admin-editable, unit by unit (ADRs 0043 / 0005 / 0042); the design doc is `site-content-design.md`.
+> **Seam it defined:** the `SiteContent` document + the admin-editable landing surface (over the M15 string store).
+> **Do not re-litigate:** the landing pages are *admin-authored documents* (the `SiteContent` shape) — the in-app guide registry (`docs/guides/`) is the *resident-facing* help and is a separate surface; do not conflate them.
+
 # Site content customization (`SITE`) — the `/home` + `/about` landing surfaces become admin-editable
 
 > **Planned.** This is the **lane register** (secondary tier of the lane's

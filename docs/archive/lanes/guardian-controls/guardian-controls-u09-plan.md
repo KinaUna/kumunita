@@ -1,3 +1,18 @@
+---
+id: guardian-controls-guardian-controls-u09-plan
+title: "Guardian Controls U09 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: guardian-controls
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # GU U09 — Core seam tests (the 11 pinned names)
 
 > **Sealed unit.** One fresh agent, ~32K context window. This file is

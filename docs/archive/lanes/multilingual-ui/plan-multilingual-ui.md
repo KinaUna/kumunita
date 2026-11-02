@@ -1,3 +1,18 @@
+---
+id: multilingual-ui-multilingual-ui
+title: "Multilingual Ui"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Multilingual — UI wiring (`ML-UI`, plan)
 
 > **Status.** This is the **plan** for a follow-on lane that completes what the

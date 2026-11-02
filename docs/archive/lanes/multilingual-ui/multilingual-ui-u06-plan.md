@@ -1,3 +1,14 @@
+---
+id: multilingual-ui-multilingual-ui-u06-plan
+title: "Multilingual Ui U06 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
 # U6 — the key-managed admin translation editor (`ML-UI`)
 
 **Lane:** `ML-UI` (multilingual UI wiring) · **Unit:** U6 of 9 (U0–U5 done)

@@ -1,3 +1,18 @@
+---
+id: guardian-assignment-guardian-assignment-u06-plan
+title: "Guardian Assignment U06 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: guardian-assignment
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # GA U06 — Web: `Detail.cshtml` two appends + the localization keys + the Web
 tests
 

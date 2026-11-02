@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u11-plan
+title: "Group Posts U11 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U11 — Group posts: close the milestone (ARCHITECTURE.md / README / Milestones.cs + folder moves)
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

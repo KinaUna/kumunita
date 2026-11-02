@@ -1,3 +1,18 @@
+---
+id: guardian-controls-guardian-controls
+title: "Guardian Controls"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: guardian-controls
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Guardian controls (`GU`) — account-scope supervision of a child's account — sealed unit register
 
 > **The secondary tier** of the GU lane's three-tier contract. The **primary**

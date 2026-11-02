@@ -1,3 +1,18 @@
+---
+id: guardian-assignment-guardian-assignment-u01-plan
+title: "Guardian Assignment U01 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: guardian-assignment
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # GA U01 — Design doc + ADR 0038 (the pinned contract)
 
 > **Sealed unit.** One fresh agent, ~32K context window. This file is

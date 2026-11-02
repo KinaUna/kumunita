@@ -1,3 +1,18 @@
+---
+id: m16-m16-inventory-handoff-notes
+title: "M16 Inventory Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m16
+updated: 2026-11-02
+---
+
+> **Abstract:** the handoff note for M16 — inventory (check-out / check-in + per-item usage history) (ADRs 0117 / 0044).
+> **Seam it created:** the `Inventory` bounded context + the `m16-inventory-design.md` reference.
+> **Do not re-litigate:** a check-out re-runs the item's own frozen `CanAsync` read — the write lane grants nothing; the inventory surface is core (the ADR 0101 inversion: no off-by-default admin toggle).
+
 # M16 — Inventory — handoff notes (scratch tier)
 
 > **Handoff notes (scratch tier).** `## U#` sections are **appended**

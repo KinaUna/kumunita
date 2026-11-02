@@ -1,3 +1,18 @@
+---
+id: m8-m8-handoff-notes
+title: "M8 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m8
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # M8 handoff notes
 
 One `## U#` section per unit, **appended, never rewritten** (the shared

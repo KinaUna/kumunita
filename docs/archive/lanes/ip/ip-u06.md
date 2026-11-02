@@ -1,3 +1,18 @@
+---
+id: ip-ip-u06
+title: "Ip U06"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: ip
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # IP · U06 — Login view `?error=` code → localized message (the cognitive-integration seam)
 
 **You are the U06 agent.** This is a **Web** unit (with a **Core** test

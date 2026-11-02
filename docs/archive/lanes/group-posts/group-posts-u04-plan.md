@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u04-plan
+title: "Group Posts U04 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U4 — Group posts: `Post.GroupId` additive field
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

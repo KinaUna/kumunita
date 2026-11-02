@@ -1,3 +1,18 @@
+---
+id: m1-m1-step-7-handoff-notes
+title: "M1 Step 7 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
+> **Abstract:** the step-7 handoff note for M1 — identity, access and delegation (the `/admin/setup` first-boot flow, the claim-shaping seam, ADR 0006).
+> **Seam it created:** the `Identity` / `Authorization` bounded contexts and the "thin token, fat authorization" seam — "may this actor see that resource?" resolved per request, not encoded in a claim.
+> **Do not re-litigate:** the M1-frozen `CanAsync` audit shape is authoritative for every later write lane — later lanes adapt to it, not the other way round.
+
 # M1 step 7 — rolling handoff notes
 
 One section per completed unit, appended (never rewritten). See

@@ -1,3 +1,18 @@
+---
+id: rich-content-rich-content-u03-plan
+title: "Rich Content U03 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: rich-content
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # RC U03 — `ImageIds` on the four owners + reverse lookup + `GET /content-image/{id}`
 
 > **Sealed unit.** One fresh agent, ~32K context window. This file is

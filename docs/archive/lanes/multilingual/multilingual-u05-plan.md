@@ -1,3 +1,18 @@
+---
+id: multilingual-multilingual-u05-plan
+title: "Multilingual U05 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U5 — the `LanguagesController` admin surface (thin, GlobalAdmin-gated)
 
 > **ML lane · U5 (of 9).** Sealed unit — sized for a ~64K-context fresh agent,

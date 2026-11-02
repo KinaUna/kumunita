@@ -1,3 +1,18 @@
+---
+id: tags-tags
+title: "Tags"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: tags
+updated: 2026-11-02
+---
+
+> **Abstract:** the Tags (TG) lane register — the tag surface over posts/replies (filter + group posts by tag), unit by unit (ADRs 0006 / 0011 / 0004); the design doc is `tags-design.md`.
+> **Seam it defined:** the `Kumunita.Core.Tags` surface (the tag document + the tag↔post link) over the post/reply read gates.
+> **Do not re-litigate:** a tag is a *reference on an existing post* — it grants no new permission (the post stays gated on its frozen `CanAsync`), and the tag is localized through the closed `KnownTranslationKeys` set, not a free-text string.
+
 # Tags (`TG`) — sealed unit register
 
 ## Understanding

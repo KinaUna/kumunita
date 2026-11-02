@@ -1,3 +1,18 @@
+---
+id: m9-messaging-u00
+title: "Messaging U00"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m9
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M9 Messaging — U00 · Lock the design: `m9-messaging-design.md` + ADR 0105
 
 > **Unit plan (secondary tier, self-contained).** You are a fresh-context

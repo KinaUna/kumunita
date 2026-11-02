@@ -1,3 +1,18 @@
+---
+id: m4-m4-u09-plan
+title: "M4 U09 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m4
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U09 — The 23 pinned seam tests (Core.Tests)
 
 - **Lane:** Events (`M4`)

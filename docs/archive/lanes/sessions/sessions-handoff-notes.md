@@ -1,3 +1,18 @@
+---
+id: sessions-sessions-handoff-notes
+title: "Sessions Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: sessions
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # sessions — rolling handoff notes
 
 (Lane: **`sessions`** — per-session list + revoke one device. This file is

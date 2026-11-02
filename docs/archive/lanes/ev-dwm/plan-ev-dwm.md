@@ -1,3 +1,18 @@
+---
+id: ev-dwm-ev-dwm
+title: "Ev Dwm"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: ev-dwm
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Events calendar day/week/month views (`EV-DWM`) — sealed unit register
 
 > **Lane plan** (the secondary register tier) for the **`EV-DWM`** named lane — an

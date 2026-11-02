@@ -1,3 +1,18 @@
+---
+id: m21-m21-document-management
+title: "M21 Document Management"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m21
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # M21 — Document management (the register)
 
 > **This file is the register** — the milestone map, the locked [PROPOSED]

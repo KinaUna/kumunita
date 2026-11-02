@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u09-plan
+title: "Group Posts U09 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U9 — Group posts: the 19 pinned seam tests
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

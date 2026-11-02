@@ -1,3 +1,18 @@
+---
+id: rich-editor-rich-editor-u01-plan
+title: "Rich Editor U01 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: rich-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U1 — The design doc + ADR 0031 (settles D1/D2/D3)
 
 - **Lane:** Rich editor (`RE`)

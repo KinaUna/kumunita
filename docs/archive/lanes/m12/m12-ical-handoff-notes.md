@@ -1,3 +1,18 @@
+---
+id: m12-m12-ical-handoff-notes
+title: "M12 Ical Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m12
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # M12 iCal — handoff notes (scratch tier)
 
 > One `## U#` section per unit, **appended, never rewritten**.

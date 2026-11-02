@@ -1,3 +1,18 @@
+---
+id: prod-hardening-prod-hardening
+title: "Prod Hardening"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: prod-hardening
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Prod-hardening — high-level fix plan for the 2026-10-22 full audit
 
 This is the **high-level plan** for fixing the **FAIL** rows from the

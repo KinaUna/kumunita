@@ -1,3 +1,18 @@
+---
+id: m10-pwa-responsive-u07
+title: "Pwa Responsive U07"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m10
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M10 PWA + responsive — U07 · Close the milestone
 
 > **Unit plan (secondary tier, self-contained).** This is the **final**

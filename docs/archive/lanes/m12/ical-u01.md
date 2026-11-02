@@ -1,3 +1,18 @@
+---
+id: m12-ical-u01
+title: "Ical U01"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m12
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M12 · U01 — Core: the `IcsWriter` pure emitter + its pinned pure tests
 
 > **You are the U01 agent.** Read **this file + your entry reads** and

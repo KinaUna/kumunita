@@ -1,3 +1,14 @@
+---
+id: m19-m19-guest-accounts-handoff-notes
+title: "M19 Guest Accounts Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m19
+updated: 2026-11-02
+---
+
 # M19 — Guest accounts · handoff notes
 
 ## U00 — Design doc + ADR 0120 locked

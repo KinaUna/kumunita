@@ -1,3 +1,18 @@
+---
+id: m32-m32-handoff-notes
+title: "M32 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m32
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # M32 — Issue submission & escalation — rolling handoff note
 
 > **Milestone open (U00).** This is the **scratch tier** (rolling handoff

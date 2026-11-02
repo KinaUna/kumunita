@@ -1,3 +1,18 @@
+---
+id: m15-m15-translation-bulk
+title: "M15 Translation Bulk"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m15
+updated: 2026-11-02
+---
+
+> **Abstract:** the M15 lane register — translation bulk (import/export + batch review of the UI strings), unit by unit (ADRs 0116 / 0005 / 0042); the design doc is `m15-translation-bulk-design.md`.
+> **Seam it defined:** the `TranslationResource` bulk lanes on the `Kumunita.Core.Localization` surface (the closed `KnownTranslationKeys` set).
+> **Do not re-litigate:** the closed `KnownTranslationKeys` × en/de/fr/da set is the contract (the IMPROVE gate pins its count) — a bulk lane adds to that set, it does not create a parallel string store.
+
 # Plan: M15 — Translation bulk (import/export, review & extend as a batch)
 
 > **Done** (closed U06, 2026-09-29). Unit register (secondary tier). Living

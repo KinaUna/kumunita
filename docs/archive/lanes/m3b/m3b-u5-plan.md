@@ -1,3 +1,18 @@
+---
+id: m3b-m3b-u5-plan
+title: "M3b U5 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m3b
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U5 — Assign / unlock / resolve + `Via = Report` read branch — execution plan
 
 - **Unit register line:** `docs/archive/lanes/m3b/plan-m3b-moderation.md` → U5 (line 208).

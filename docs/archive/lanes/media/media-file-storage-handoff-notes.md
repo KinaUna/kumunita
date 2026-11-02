@@ -1,3 +1,14 @@
+---
+id: media-media-file-storage-handoff-notes
+title: "Media File Storage Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: media
+updated: 2026-11-02
+---
+
 # Media & file storage — handoff notes
 
 > **TL;DR:** Shipped the Media & file-storage lane, ADR 0011: the `IMediaFileStore` / `IMediaStore` byte-seam primitives (content-addressed, `MediaObject` Marten doc, `MediaDocTypes` surface), the profile-avatar reference lane (the `Profile.AvatarId` + `IUserInfoService.SetProfileAvatarAsync` self-only upload, the audit-gated serving lane, the `POST /profile/avatar` + `GET /profile/avatar/{subjectId}` routes), the prod media volume (the `kumunita_media` named volume at `/data/media`, the **second restore surface** beside `pg_dump`), and the `client/lib/avatar.ts` monogram fallback (replacing the inline `onerror` CSP violation) — 70 Web tests + 223 Core tests green end-to-end.

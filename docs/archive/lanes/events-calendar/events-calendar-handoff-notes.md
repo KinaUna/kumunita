@@ -1,3 +1,18 @@
+---
+id: events-calendar-events-calendar-handoff-notes
+title: "Events Calendar Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: events-calendar
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # Events calendar (`EV-CAL`) — rolling handoff log
 
 > One `## U#` section per unit, appended (never rewritten). Each unit writes

@@ -1,3 +1,18 @@
+---
+id: multilingual-ui-multilingual-ui-u01-plan
+title: "Multilingual Ui U01 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # ML-UI U1 — the canonical `en` registry + the seeder step
 
 > **Lane.** `ML-UI` (the UI-wiring completion of the `ML` / ADR 0005 promise).

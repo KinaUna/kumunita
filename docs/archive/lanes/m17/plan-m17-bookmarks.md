@@ -1,3 +1,18 @@
+---
+id: m17-m17-bookmarks
+title: "M17 Bookmarks"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m17
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Plan: M17 — Bookmarks (save posts, events, todos, etc. for quick personal access)
 
 > **M17 is the current in-progress milestone** (`Milestones.cs`: `M17` =

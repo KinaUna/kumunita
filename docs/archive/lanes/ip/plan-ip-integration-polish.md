@@ -1,3 +1,18 @@
+---
+id: ip-ip-integration-polish
+title: "Ip Integration Polish"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: ip
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # IP — Integration Polish (seam deduplication, security completion, UX closure, docs parity)
 
 > **This file is the register** — the lane map, the [PROPOSED] decision set,

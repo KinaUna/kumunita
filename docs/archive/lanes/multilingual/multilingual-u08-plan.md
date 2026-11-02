@@ -1,3 +1,14 @@
+---
+id: multilingual-multilingual-u08-plan
+title: "Multilingual U08 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual
+updated: 2026-11-02
+---
+
 # U8 — Multilingual: run + record the acceptance gate
 
 **Milestone:** multilingual (`ML`) · **Register:** `docs/archive/lanes/multilingual/plan-multilingual.md` · **Read first:** the design doc `## Acceptance gate` + `§Pinned seam tests` + the U7 handoff section.

@@ -1,3 +1,18 @@
+---
+id: wysiwyg-wysiwyg-u07-plan
+title: "Wysiwyg U07 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: wysiwyg
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U7 — The code view rework (the `</>` toggle reveals the read-only mirror)
 
 - **Lane:** WYSIWYG inline editing (`WY`)

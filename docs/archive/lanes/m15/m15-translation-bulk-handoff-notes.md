@@ -1,3 +1,18 @@
+---
+id: m15-m15-translation-bulk-handoff-notes
+title: "M15 Translation Bulk Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m15
+updated: 2026-11-02
+---
+
+> **Abstract:** the handoff note for M15 — translation bulk (import/export and batch review of the UI strings) (ADRs 0116 / 0005 / 0042).
+> **Seam it created:** the `TranslationResource` bulk lanes on the `Kumunita.Core.Localization` surface + the `m15-translation-bulk-design.md` reference.
+> **Do not re-litigate:** the closed `KnownTranslationKeys` set × en/de/fr/da parity is the contract (the IMPROVE gate pins it) — a bulk import adds keys to that set, it does not create a parallel string store.
+
 # M15 translation bulk — handoff notes
 
 > Scratch tier — one `## U#` section per unit, **appended, never

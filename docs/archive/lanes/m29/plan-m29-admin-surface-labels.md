@@ -1,3 +1,18 @@
+---
+id: m29-m29-admin-surface-labels
+title: "M29 Admin Surface Labels"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m29
+updated: 2026-11-02
+---
+
+> **Abstract:** the M29 lane register — admin-surface labels (the localized admin UI copy), unit by unit (ADRs 0150 / 0152 / 0050); the design doc is `m29-admin-surface-labels-design.md`.
+> **Seam it defined:** the `SurfaceLabels` seeder rows + the `admin.*` / `labels.*` keys on the closed `KnownTranslationKeys` set.
+> **Do not re-litigate:** the admin labels ride the *closed translation-key set* (the IMPROVE gate pins its count) — a label change is a new key × en/de/fr/da, not a hard-coded string in a view.
+
 # M29 — Admin surface labels — sealed unit register
 
 > **Planned.** This is the **lane register** (secondary tier of the milestone's

@@ -1,3 +1,18 @@
+---
+id: rich-content-rich-content
+title: "Rich Content"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: rich-content
+updated: 2026-11-02
+---
+
+> **Abstract:** the Rich-content (RC) lane register — Markdown bodies + in-content images, unit by unit (ADRs 0011 / 0005); the design doc is `rich-content-design.md` and the RE/WY lanes are the editors over it.
+> **Seam it defined:** the Markdown body + in-content image document shapes on the post/reply/announcement surfaces (ADR 0011 storage for the images).
+> **Do not re-litigate:** the RC Markdown body is the *single source of truth* for rich content — the WYSIWYG/RE panes are projections over it, and an in-content image rides ADR 0011 media storage, never a separate store.
+
 # Rich content (`RC`) — Markdown bodies + in-content images — sealed unit register
 
 ## Understanding

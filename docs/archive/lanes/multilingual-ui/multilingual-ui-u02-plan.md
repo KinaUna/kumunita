@@ -1,3 +1,18 @@
+---
+id: multilingual-ui-multilingual-ui-u02-plan
+title: "Multilingual Ui U02 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # ML-UI U2 — the `<kw-l>` TagHelper + the shared layout wiring
 
 > **Unit 2 of the `ML-UI` lane** (`plan-multilingual-ui.md`). A **code** unit —

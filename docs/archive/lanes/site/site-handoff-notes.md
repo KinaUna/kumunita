@@ -1,3 +1,18 @@
+---
+id: site-site-handoff-notes
+title: "Site Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: site
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for the SITE lane — the admin-editable `/home` + `/about` landing surfaces (ADRs 0050 / 0004 / 0005).
+> **Seam it created:** the `SiteContent` document + the admin-edit surface + the `site-content-design.md` reference.
+> **Do not re-litigate:** the landing pages are *admin-authored documents* — the in-app guide registry (`docs/guides/`) is the resident-facing help and is a separate surface; the closed translation-key set (ADR 0005) is the string contract, not the page body.
+
 # SITE content customization (`SITE`) — rolling handoff notes
 
 > **The scratch tier** of the SITE lane's three-tier contract (the design

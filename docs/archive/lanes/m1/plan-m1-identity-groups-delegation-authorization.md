@@ -1,3 +1,14 @@
+---
+id: m1-m1-identity-groups-delegation-authorization
+title: "M1 Identity Groups Delegation Authorization"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
 # M1 — Implement Identity, Groups, Delegation, Authorization
 
 ## Understanding

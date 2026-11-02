@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u08-exec-plan
+title: "Group Posts U08 Exec Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U8 exec — Group posts: view layer (Feed / PostDetail / New + Detail entry link)
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md`

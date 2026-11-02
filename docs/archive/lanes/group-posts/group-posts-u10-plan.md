@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u10-plan
+title: "Group Posts U10 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U10 — Group posts: run + record the acceptance gate
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

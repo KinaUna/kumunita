@@ -1,3 +1,18 @@
+---
+id: m19-m19-guest-accounts
+title: "M19 Guest Accounts"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m19
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # M19 — Guest accounts (the register)
 
 > **This file is the register** — the milestone map, the locked [PROPOSED]

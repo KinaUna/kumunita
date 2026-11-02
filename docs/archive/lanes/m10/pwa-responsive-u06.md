@@ -1,3 +1,18 @@
+---
+id: m10-pwa-responsive-u06
+title: "Pwa Responsive U06"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m10
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M10 U06 — Tests: `e2e-pwa-responsive.spec.ts` + the `PwaManifestTests` extension
 
 **Unit plan (secondary tier, self-contained).** Read **this file + your

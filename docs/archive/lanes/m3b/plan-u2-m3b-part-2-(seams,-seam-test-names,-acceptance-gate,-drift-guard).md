@@ -1,3 +1,14 @@
+---
+id: m3b-u2-m3b-part-2-seams-seam-test-names-acceptance-gate-drift-guard
+title: "U2 M3b Part 2 Seams, Seam Test Names, Acceptance Gate, Drift Guard"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m3b
+updated: 2026-11-02
+---
+
 # 🎯 U2 — M3b Part 2 (seams, seam-test names, acceptance gate, drift-guard)
 
 ## Understanding

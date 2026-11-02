@@ -1,3 +1,14 @@
+---
+id: m1-m1-step7-u1-plan
+title: "M1 Step7 U1 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
 # M1 step-7 — U1 — pin the exact Wolverine API surface
 
 **Unit of:** `plan-m1-step-7-outbox-email-c3.md` (M1 step 7 — C3 fix)

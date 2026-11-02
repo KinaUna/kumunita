@@ -1,3 +1,18 @@
+---
+id: events-calendar-events-calendar
+title: "Events Calendar"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: events-calendar
+updated: 2026-11-02
+---
+
+> **Abstract:** the events-calendar (EV-CAL) lane register — the week/month calendar view of the visible events, unit by unit (ADRs 0054 / 0019); the design doc is `events-calendar-design.md`.
+> **Seam it defined:** the calendar query/view over the `Kumunita.Core.Events` surface (the events the actor may already see — no calendar-specific grant).
+> **Do not re-litigate:** the calendar is a *read-only projection of the existing events* gated on `CanAsync(Read)` — there is no calendar-specific write path and the timezone default + resident override (ADR 0019) governs the display.
+
 # Events calendar (`EV-CAL`) — sealed unit register
 
 > **Done.** This is the **lane plan** (the secondary register tier) for

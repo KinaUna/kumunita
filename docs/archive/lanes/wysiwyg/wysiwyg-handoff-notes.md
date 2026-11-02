@@ -1,3 +1,18 @@
+---
+id: wysiwyg-wysiwyg-handoff-notes
+title: "Wysiwyg Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: wysiwyg
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for the WYSIWYG (WY) lane — the rendered pane *is* the editable surface; the Markdown source becomes a read-only mirror (ADRs 0031 / 0032 / 0033).
+> **Seam it created:** the inline-editing surface over the RC/Rich-editor lane + the `wysiwyg-editor-design.md` reference.
+> **Do not re-litigate:** the Markdown source is the *mirror, not the truth* after this lane — the rendered pane edits the document and the Markdown view follows; do not re-introduce a second editable Markdown surface.
+
 # WYSIWYG inline editing (`WY`) — rolling handoff notes
 
 > **The scratch tier** of the WY lane's three-tier contract (the design

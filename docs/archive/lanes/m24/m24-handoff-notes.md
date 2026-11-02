@@ -1,3 +1,18 @@
+---
+id: m24-m24-handoff-notes
+title: "M24 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m24
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # M24 — Storage metrics · rolling handoff notes
 
 > Every unit appends a short `## U#` section before it moves its own plan to

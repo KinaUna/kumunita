@@ -1,3 +1,18 @@
+---
+id: site-site-u05
+title: "Site U05"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: site
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # SITE U05 — Web: `HomeController` reads `SiteContent` + `Views/Home/Index.cshtml` conditional rendering
 
 ## Context (self-contained)

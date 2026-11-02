@@ -1,3 +1,18 @@
+---
+id: m1-m1-step7-u6-plan
+title: "M1 Step7 U6 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U6 — Real end-to-end smoke check for the OutboxEmail C3 flow
 
 **Date:** 2026-09-07

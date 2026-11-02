@@ -1,3 +1,18 @@
+---
+id: m2-m2-handoff-notes
+title: "M2 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m2
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 ## U1 — Design doc Part 1
 - Wrote `docs/design/m2-directory-profiles-groups.md` (Part 1: scope, invariants, FACES).
 - Invariants used: ADR 0006 **C1, C3, C4, C6** (directory + contact block); ADR 0006 **C2** (delegation on a profile); ADR 0006 **C5** (moderator default-OFF); ADR 0001-B (author's choice absolute); ADR 0003 (SoD — group owner/GlobalAdmin only). ADRef 0006-D / 0006-E honored (single seam, compatible-lane addition).

@@ -1,3 +1,18 @@
+---
+id: multilingual-multilingual-u06-plan
+title: "Multilingual U06 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U6 — the resident-facing Web surface (locale settings + static-page routes) + the admin Razor views
 
 > **ML lane · U6 (of 9).** Sealed unit — sized for a ~64K-context fresh agent,

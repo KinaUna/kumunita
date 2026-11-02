@@ -1,3 +1,18 @@
+---
+id: m2-m2b-owner-invited-group-membership-invite-acceptdecline
+title: "M2b Owner Invited Group Membership Invite Acceptdecline"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m2
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Plan — M2b: owner-invited group membership (invite → accept/decline)
 
 ## Context

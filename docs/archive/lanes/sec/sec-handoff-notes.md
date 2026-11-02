@@ -1,3 +1,18 @@
+---
+id: sec-sec-handoff-notes
+title: "Sec Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: sec
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # SEC — rolling handoff notes
 
 Appended per unit; never rewritten. A unit reads only its own entry list plus

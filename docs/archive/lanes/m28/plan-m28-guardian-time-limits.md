@@ -1,3 +1,18 @@
+---
+id: m28-m28-guardian-time-limits
+title: "M28 Guardian Time Limits"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m28
+updated: 2026-11-02
+---
+
+> **Abstract:** the M28 lane register — guardian time limits (a per-child allow/block schedule that gates the child's access to the platform), unit by unit (ADRs 0028 / 0038 / 0121); the design doc is `m28-guardian-time-limits-design.md`.
+> **Seam it defined:** the time-limit schedule on the `Kumunita.Core.UserInfo` surface (the guardian relationship's delivery gate).
+> **Do not re-litigate:** a time limit gates *delivery/access for the child* only — it never changes the audit trail, and the ADR 0028 scope (guardian-set, per-child) is the frozen boundary.
+
 # Plan: M28 — Guardian time limits (a per-child allow/block schedule that gates the child's access to the platform)
 
 > **Planned.** This is the **lane register** (secondary tier of the lane's

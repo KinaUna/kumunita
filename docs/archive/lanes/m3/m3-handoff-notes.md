@@ -1,3 +1,18 @@
+---
+id: m3-m3-handoff-notes
+title: "M3 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m3
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 ## U1 — design doc Part 1
 - Wrote `docs/design/m3-posts-design.md` Part 1: Context, Scope (in-scope
   list + explicit **M3b deferral** block as M3's M1-style close

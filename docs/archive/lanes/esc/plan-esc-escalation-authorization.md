@@ -1,3 +1,18 @@
+---
+id: esc-esc-escalation-authorization
+title: "Esc Escalation Authorization"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: esc
+updated: 2026-11-02
+---
+
+> **Abstract:** the ESC lane register — escalation-authorization + the receiving inbox, unit by unit (ADRs 0154 / 0155); the handoff note is the running log and `esc-escalation-authorization-design.md` is the current truth.
+> **Seam it defined:** the escalation write lane on the `Kumunita.Core.ErrorReports` bounded context + the `/escalation` receiving-inbox queue.
+> **Do not re-litigate:** escalation is the *receiving-inbox* model (the community takes in a resident-filed issue and routes it) — the split from M32's intake lane is the frozen decision.
+
 # ESC — Escalation authorization + receiving inbox — lane register
 
 > **In progress.** This is the **lane register** (secondary tier of the lane's

@@ -1,3 +1,18 @@
+---
+id: m9-m9-messaging-handoff-notes
+title: "M9 Messaging Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m9
+updated: 2026-11-02
+---
+
+> **Abstract:** the handoff note for M9 — resident-to-resident messaging (DMs with the existing audit + privacy rules) (ADRs 0105 / 0076).
+> **Seam it created:** the messaging write/read lanes on the `Kumunita.Core` messaging surface + the `m9-messaging-design.md` reference; group messaging (ADR 0278) is the later extension.
+> **Do not re-litigate:** a message is delivered only between actors who may *already* see each other's profile (thin token, fat authorization) — there is no messaging-specific grant, and the `AccessAudit` row is the only record that a message was seen.
+
 # M9 handoff notes
 
 One `## U#` section per unit, **appended, never rewritten** (the shared

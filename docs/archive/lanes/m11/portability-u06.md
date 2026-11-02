@@ -1,3 +1,18 @@
+---
+id: m11-portability-u06
+title: "Portability U06"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m11
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M11 U06 — Import: the identity re-creation (secrets reset) + the config apply + the web surface + the `portability.import` audit + the kw-l keys
 
 **Unit plan (secondary tier, self-contained).** Read **this file + your

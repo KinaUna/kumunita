@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u01-plan
+title: "Group Posts U01 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U1 — Group posts: design doc Part 1
 
 **Milestone:** group posts · **Read first (5 min):** `docs/plans-milestones/plan-group-posts.md` (master register — Understanding, Assumptions, Invariants G·1–G·8, FACES G1–G13) — this unit writes those into the design doc. **No repo-wide scan.**

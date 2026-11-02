@@ -1,3 +1,18 @@
+---
+id: media-media-u8-plan
+title: "Media U8 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: media
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U8 — Web views: avatar form + list + detail + preview renders
 
 > Self-contained: this file + the **entry reads** below is the whole context.

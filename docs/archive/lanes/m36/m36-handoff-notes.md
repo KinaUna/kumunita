@@ -1,3 +1,14 @@
+---
+id: m36-m36-handoff-notes
+title: "M36 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m36
+updated: 2026-11-02
+---
+
 # M36 — @mentions — rolling handoff note
 
 > **TL;DR (drafted at milestone open, not yet shipped):** M36 ships the

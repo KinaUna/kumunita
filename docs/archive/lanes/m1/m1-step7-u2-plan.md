@@ -1,3 +1,18 @@
+---
+id: m1-m1-step7-u2-plan
+title: "M1 Step7 U2 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m1
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U2 — rework OutboxEmailStager to use the U1-pinned API (signature unchanged)
 
 **Status: complete (all steps executed; see the `## U2 — stager reworked` section in

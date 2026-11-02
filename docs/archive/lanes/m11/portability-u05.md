@@ -1,3 +1,18 @@
+---
+id: m11-portability-u05
+title: "Portability U05"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m11
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M11 U05 — Import: the validate-then-apply of documents + media, fail-closed
 
 **Unit plan (secondary tier, self-contained).** Read **this file + your

@@ -1,3 +1,18 @@
+---
+id: m7-m7-pagination-filtering
+title: "M7 Pagination Filtering"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m7
+updated: 2026-11-02
+---
+
+> **Abstract:** the M7 lane register — pagination + filtering across the list surfaces, unit by unit (ADR 0090); the design doc is `m7-pagination-filtering-design.md`.
+> **Seam it defined:** the pagination/filter query seam on the list surfaces (directory, groups, posts, boards).
+> **Do not re-litigate:** pagination/filter is applied *after* the frozen `CanAsync` filter — a page may only contain what the actor may already see, and the page-size ceiling is the frozen contract.
+
 # M7 — Pagination & filtering (sealed unit register)
 
 > **In progress.** This is the **lane plan** (the secondary register tier) for

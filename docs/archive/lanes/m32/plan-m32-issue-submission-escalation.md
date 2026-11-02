@@ -1,3 +1,18 @@
+---
+id: m32-m32-issue-submission-escalation
+title: "M32 Issue Submission Escalation"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m32
+updated: 2026-11-02
+---
+
+> **Abstract:** the M32 lane register — issue submission & escalation (the resident-facing intake + the escalation hand-off to ESC), unit by unit (ADRs 0155 / 0006 / 0004); the design doc is `m32-issue-submission-escalation-design.md`.
+> **Seam it defined:** the issue-submission write lane on the `Kumunita.Core.ErrorReports` surface — the *intake* side; ESC (the register at `lanes/esc/`) is the *routing* side.
+> **Do not re-litigate:** the intake-vs-routing split is the frozen decision — M32 takes the report in, ESC routes it; the `PostStatus` / `AccessAudit` shape M3b pinned is authoritative for both.
+
 # M32 — Issue submission & escalation — sealed unit register
 
 > **In progress.** This is the **lane register** (secondary tier of the

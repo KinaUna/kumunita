@@ -1,3 +1,18 @@
+---
+id: m27-m27-handoff-notes
+title: "M27 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m27
+updated: 2026-11-02
+---
+
+> **Abstract:** the living handoff note for M27 — user-scoped portability (a resident self-exports, and a per-entity conflict-resolution import) (ADR 0148).
+> **Seam it created:** the `Kumunita.Core.Portability` user-scoped lanes (the M11 lane is the community-wide version; M27 is the resident-scoped one) + the `m27-user-scoped-portability-design.md` reference.
+> **Do not re-litigate:** the import is *per-entity conflict resolution* (the ADR 0193 `keep_existing` merge mode) — it never silently overwrites; the resident-scoped lane reuses M11's document shapes, it does not fork them.
+
 # M27 — living handoff note (scratch tier)
 
 > One `## U#` section per unit, appended (never rewritten). Each unit writes

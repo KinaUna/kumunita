@@ -1,3 +1,14 @@
+---
+id: m14-m14-events-projects-handoff-notes
+title: "M14 Events Projects Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m14
+updated: 2026-11-02
+---
+
 # M14 — Living handoff note (scratch tier)
 
 > **TL;DR:** Shipped M14 (integration of Events and Projects, ADR 0115): the additive `TodoItem.EventId?` association (a feed filter, never a gate — C-M14·1), the `(EventId)` index on `ProjectDocTypes` (ADR 0004 §B.1, zero migration), the `IProjectService.ListTodosForEventAsync` reverse read seam + the `SetTodoEventAsync` set-event write lane, both-direction display links (the to-do → event chip + the event → to-do "linked to-dos" section, dangling-safe — C-M14·2), the `TodoIcsWriter` `VTODO` emitter + the two `.ics` routes, and the three acceptance tests (closed-loop / handoff / part-vs-whole) green end-to-end (Web 588/588, Core 1000/1000) — zero new authorization surface (C-M14·4).

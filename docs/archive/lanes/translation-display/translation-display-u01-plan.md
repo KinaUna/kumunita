@@ -1,3 +1,18 @@
+---
+id: translation-display-translation-display-u01-plan
+title: "Translation Display U01 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: translation-display
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # TD U01 — Design doc (`translation-display-design.md`) + ADR 0027
 
 > **Sealed unit.** One fresh agent, ~32K context window. This file is

@@ -1,3 +1,18 @@
+---
+id: ip-ip-u04
+title: "Ip U04"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: ip
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # IP · U04 — Log + narrow the two silent `catch {}` blocks (the degraded-but-signed-in seam)
 
 **You are the U04 agent.** This is a **Web** unit. It fixes the two silent

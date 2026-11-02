@@ -1,3 +1,18 @@
+---
+id: m4-m4-u08-plan
+title: "M4 U08 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m4
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U08 — `EventReminderHandler` + `EventReminderTick` (§6.4 job wiring)
 
 - **Lane:** Events (`M4`)

@@ -1,3 +1,18 @@
+---
+id: multilingual-multilingual
+title: "Multilingual"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: multilingual
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Multilingual (UI & platform texts) — sealed unit register (ML, in progress)
 
 > **In progress.** This is the **plan** for the multilingual lane (`ML`, ADR 0005),

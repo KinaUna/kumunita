@@ -1,3 +1,18 @@
+---
+id: wysiwyg-wysiwyg-u04-plan
+title: "Wysiwyg U04 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: wysiwyg
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U4 — The editing loop (the pane becomes `contenteditable`; the binder keeps the textarea in sync)
 
 - **Lane:** WYSIWYG inline editing (`WY`)

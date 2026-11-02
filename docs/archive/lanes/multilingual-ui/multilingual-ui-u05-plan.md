@@ -1,3 +1,18 @@
+---
+id: multilingual-ui-multilingual-ui-u05-plan
+title: "Multilingual Ui U05 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: multilingual-ui
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # ML-UI · U5 — wire the remaining in-scope views to `<kw-l>`
 
 > Part of the `ML-UI` lane (`docs/archive/lanes/multilingual-ui/plan-multilingual-ui.md`,

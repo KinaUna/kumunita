@@ -1,3 +1,14 @@
+---
+id: group-posts-group-posts-u05-plan
+title: "Group Posts U05 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: group-posts
+updated: 2026-11-02
+---
+
 # U5 — Group posts: authorization group lane (`AccessVia.Group` + `CanSeeGroupAsync`)
 
 **Milestone:** group posts · **Register:** `docs/plans-milestones/plan-group-posts.md` · **Read first

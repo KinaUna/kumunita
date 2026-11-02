@@ -1,3 +1,18 @@
+---
+id: m20-m20-notification-quiet-times
+title: "M20 Notification Quiet Times"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: m20
+updated: 2026-11-02
+---
+
+> **Abstract:** the M20 lane register — per-resident notification quiet times, unit by unit (ADRs 0121 / 0076 / 0019); the design doc is `m20-notification-quiet-times-design.md`.
+> **Seam it defined:** the quiet-time preference on the resident's profile + the notify-time gate in the messaging/notifications path.
+> **Do not re-litigate:** quiet times are a *resident self* setting — they gate delivery to the resident only and never change whether the event is recorded in the audit trail.
+
 # M20 — Notification quiet times (the register)
 
 > **This file is the register** — the milestone map, the locked [PROPOSED]

@@ -1,3 +1,18 @@
+---
+id: m9-messaging-u04
+title: "Messaging U04"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m9
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M9 Messaging — U04 · Web surface: resident messaging
 
 > **Unit plan (secondary tier, self-contained).** You are a fresh-context

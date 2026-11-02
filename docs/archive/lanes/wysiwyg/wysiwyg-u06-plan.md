@@ -1,3 +1,18 @@
+---
+id: wysiwyg-wysiwyg-u06-plan
+title: "Wysiwyg U06 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: wysiwyg
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U6 — The sanitizer + the `paste` handler (WY·6)
 
 - **Lane:** WYSIWYG inline editing (`WY`)

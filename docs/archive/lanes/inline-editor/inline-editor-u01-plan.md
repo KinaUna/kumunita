@@ -1,3 +1,18 @@
+---
+id: inline-editor-inline-editor-u01-plan
+title: "Inline Editor U01 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: inline-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U1 — Core module: the toggle button + default-hidden state in `rich-editor.ts`
 
 - **Lane:** Inline editor (`IE`)

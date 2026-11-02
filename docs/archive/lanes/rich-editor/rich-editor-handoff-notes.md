@@ -1,3 +1,18 @@
+---
+id: rich-editor-rich-editor-handoff-notes
+title: "Rich Editor Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: rich-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** the rolling handoff note for the Rich editor (RE) lane — WYSIWYG body editing + the toolbar over the RC Markdown lane (ADRs 0031 / 0025).
+> **Seam it created:** the `wwwroot/js/lib/rich-editor.js` client (the `.tmp/build-harness.js` harness mirrors it) over the RC Markdown surface + the `rich-editor-design.md` reference.
+> **Do not re-litigate:** the editor is a *client-side view over the RC Markdown document* — the stored shape is still the RC Markdown body, and the WYSIWYG pane is a projection, never the source of truth.
+
 # Rich editor (`RE`) — rolling handoff notes
 
 > **The scratch tier** of the RE lane's three-tier contract (the design

@@ -1,3 +1,18 @@
+---
+id: m12-ical-u04
+title: "Ical U04"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: m12
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # M12 · U04 — Surface: the two `kw-l` affordances × en/de/fr/da + the phone-width re-check
 
 > **You are the U04 agent.** Read **this file + your entry reads** and

@@ -1,3 +1,18 @@
+---
+id: m20-m20-notification-quiet-times-handoff-notes
+title: "M20 Notification Quiet Times Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m20
+updated: 2026-11-02
+---
+
+> **Abstract:** the handoff note for M20 — per-resident notification quiet times (a resident suppresses their own notifications on a schedule) (ADR 0121).
+> **Seam it created:** the quiet-time preference on the resident's profile + the notify-time gate in the messaging/notifications path + the `m20-notification-quiet-times-design.md` reference.
+> **Do not re-litigate:** quiet times are a *resident self* setting — they gate delivery to the resident only, they never change whether the event is recorded in the audit trail.
+
 # M20 — Notification quiet times — rolling handoff notes
 
 > The cross-unit memory (register §drift-guard, tier 3). Every unit appends a

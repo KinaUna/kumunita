@@ -1,3 +1,18 @@
+---
+id: inline-editor-inline-editor
+title: "Inline Editor"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: inline-editor
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # Inline editor (`IE`) — the rendered view is the default editor; the Markdown source is hidden behind a toggle
 
 > **Status.** This is the **lane register** (secondary tier of the lane's

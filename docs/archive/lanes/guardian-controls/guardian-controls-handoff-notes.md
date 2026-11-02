@@ -1,3 +1,18 @@
+---
+id: guardian-controls-guardian-controls-handoff-notes
+title: "Guardian Controls Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: guardian-controls
+updated: 2026-11-02
+---
+
+> **Abstract:** the running handoff note for this lane — the commit-by-commit
+> log of what the lane shipped, the seams it created, and the decisions a
+> future reader must not re-litigate. See the lane register for the what/why.
+
 # Guardian controls (`GU`) — rolling handoff notes
 
 > **The scratch tier** of the GU lane's three-tier contract (the design doc is

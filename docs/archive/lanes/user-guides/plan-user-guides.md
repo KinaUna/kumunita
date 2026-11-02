@@ -1,3 +1,18 @@
+---
+id: user-guides-user-guides
+title: "User Guides"
+tier: archive
+kind: plan
+status: archived
+audiences: [developer, agent]
+lane: user-guides
+updated: 2026-11-02
+---
+
+> **Abstract:** the lane register — what the lane set out to do, why, and how
+> it ships, unit by unit. See the handoff note for the running log and the
+> design doc / ADRs for the current truth.
+
 # User guides (`UG`) — resident-facing guides in the `help/` subtree + the three-layer consistency loop
 
 > **The ADR** is `docs/adr/0057-user-guides-in-help-subtree-and-consistency-loop.md`;

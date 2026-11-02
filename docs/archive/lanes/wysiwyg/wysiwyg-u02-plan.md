@@ -1,3 +1,18 @@
+---
+id: wysiwyg-wysiwyg-u02-plan
+title: "Wysiwyg U02 Plan"
+tier: archive
+kind: unit
+status: archived
+audiences: [developer, agent]
+lane: wysiwyg
+updated: 2026-11-02
+---
+
+> **Abstract:** a unit plan in this lane — the step-by-step work for one unit.
+> See the lane register for the what/why and the handoff note for the
+> running log.
+
 # U2 — Design doc Part 2 (seams, contracts, test list, gate, drift-guard) + ADR 0033
 
 - **Lane:** WYSIWYG inline editing (`WY`)

@@ -1,3 +1,14 @@
+---
+id: m4-m4-handoff-notes
+title: "M4 Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m4
+updated: 2026-11-02
+---
+
 # M4 — Events, RSVPs & reminders — rolling handoff log
 
 > **TL;DR:** Shipped M4 (Events, RSVPs & reminders, ADR 0054) + U13 (GlobalAdmin edit/delete write override): the `Event` / `EventRsvp` docs, the `IEventService` write lanes (`CreateAsync` / `PublishAsync` / `UpdateAsync` / `DeleteAsync` / `RsvpAsync`), the §6.4 scheduled `EventReminders` job, the `EventToAuditableResource` adapter + the `EventDocTypes` surface, and the 25 pinned seam tests (T01–T25) green end-to-end (Core 670/670, Web 351/351).

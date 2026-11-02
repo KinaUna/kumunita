@@ -1,3 +1,14 @@
+---
+id: m37-m37-personal-notes-handoff-notes
+title: "M37 Personal Notes Handoff Notes"
+tier: archive
+kind: handoff
+status: archived
+audiences: [developer, agent]
+lane: m37
+updated: 2026-11-02
+---
+
 # M37 — Personal notes — handoff notes (scratch tier)
 
 > **TL;DR (for the next unit's agent):** This file holds the rolling
