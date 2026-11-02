@@ -843,6 +843,38 @@ body.kmb-kiosk .kanban-divided-menu {
 body.kmb-kiosk .head-row > .d-flex {
   display: none !important;
 }
+/* ADR 0285 D5 — the interactive-only shells on the detail surfaces. The
+   generic hide rules above already strip the inner buttons / forms / chips,
+   but three cards are composed ONLY of controls (a heading + hint + form),
+   so once the form is hidden an orphaned heading band is left on the wall
+   display. Hide the WHOLE card when it is nothing but a control:
+   • a card whose only meaningful content is an inner <form> (the "Add a
+     to-do to this event" composer — heading + hint + the POST form); and
+   • the RSVP card, which carries the .kmb-rsvp form (the Going/Maybe/No
+     buttons + the owner-only responses list).
+   The "Translations:" chip row is a separate concern (the language-swap
+   selector for the variant bodies): hide just the row that carries the
+   data-translation-chip buttons, never the card. Every selector targets a
+   control-only shell — never the surrounding content — so the event's
+   title, body, date, byline and any other kiosk-meaningful content stay.
+   The selector is deliberately the direct-child `> .card-body > form` shape
+   (the "Add a to-do to this event" composer), NOT `:has(form)` — a content
+   card carries the ⋮ action dropdown whose menu holds forms (Delete,
+   translation remove), so a broad :has(form) would hide the whole title +
+   body card. */
+body.kmb-kiosk .kmb-detail-card:has(> .card-body > form) {
+  display: none !important;
+}
+/* The RSVP card: the Going/Maybe/No form + the owner-only responses list.
+   Its form sits one level deeper (card-body > h2 + form.kmb-rsvp), so it is
+   carried as its own rule. (The kmb-discussion rule above already hides it
+   when the entry opts comments ON — this covers the comments-OFF case.) */
+body.kmb-kiosk .kmb-detail-card:has(form.kmb-rsvp) {
+  display: none !important;
+}
+body.kmb-kiosk .d-flex:has(> [data-translation-chip]) {
+  display: none !important;
+}
 /* ADR 0285 D5 — comment threads, replies and event RSVP lists (the
    .kmb-discussion sections of the detail pages) are hidden on a kiosk slide
    unless the playlist entry shows them (the kiosk passes ?kioskComments=1 and

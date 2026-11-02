@@ -128,3 +128,55 @@ of the board page, also reachable outside the kiosk.
 Patches 110–113: item search (110), board list view (111), playlist model
 and editor (112), playback and the comments toggle (113). Each compiles on
 its own.
+
+## Amendment (2026-11-02) — hide the control-only shells on a slide
+
+A wall display is read-only: it shows the item's **content**, not the
+chrome that does something. The generic kiosk rules already strip the
+interactive leaves on a framed slide — `body.kmb-kiosk button, .btn, form,
+select, input, .nav, .dropdown` — which covers the named controls (back
+links, the Bookmark / Add-note buttons, prev/next, the subscribe toggle,
+the ⋮ actions dropdown, the translation chips, the RSVP form, the "Add a
+to-do" composer). Three cards, however, are composed **only** of a heading
+plus a control, so once the generic rules hide the control an **orphaned
+heading band** is left on the display:
+
+- the event's **"Add a to-do to this event"** card (heading + hint + the
+  POST form);
+- the event's **RSVP** card (the "RSVP" heading + the Going/Maybe/No form,
+  and the owner-only responses list when comments are ON); and
+- the **"Translations:"** selector band (the "Translations" label + the
+  language-swap chips, whose buttons the generic rule already hides).
+
+This amendment adds three shell-hide rules in `site.css` (right after the
+existing `.head-row > .d-flex` kiosk rule, before the `kmb-discussion`
+rule):
+
+- `body.kmb-kiosk .kmb-detail-card:has(> .card-body > form)` — hides the
+  whole card when its **direct** child is a `card-body` that itself
+  directly holds a `<form>` (the pure-composer shape). It is
+  deliberately the **direct-child** `> .card-body > form` shape, **not**
+  `:has(form)`: a content card (event / post / page / to-do title + body)
+  carries the ⋮ actions dropdown whose menu holds forms (Delete,
+  translation remove), so a broad `:has(form)` would hide the whole
+  title + body card — a regression. No content card matches the
+  direct-child shape (audited: `Event/Detail`, `Posts/Detail`,
+  `Page/Show`, `Projects/ProjectDetail`, `Projects/TodoDetail`,
+  `Directory/Detail`, `Document/Detail`, `Inventory/Detail`,
+  `Announcement/Detail`), so this hides only the composer.
+- `body.kmb-kiosk .kmb-detail-card:has(form.kmb-rsvp)` — hides the RSVP
+  card (its form sits one level deeper, after the heading). The existing
+  `body.kmb-kiosk:not(.kmb-kiosk-comments) .kmb-discussion` rule already
+  hides it when the entry opts comments ON; this rule covers the
+  comments-OFF case, and hides the responses list too when comments are ON
+  (a wall display does not take input).
+- `body.kmb-kiosk .d-flex:has(> [data-translation-chip])` — hides only the
+  row that carries the translation chips (the `d-flex` whose direct child
+  is a `[data-translation-chip]` button), never the surrounding content
+  card. Every surface's chip row is a `d-flex` with the chips as direct
+  children (event, announcement, post, group post, page, board, project,
+  to-do, `_PostReply`).
+
+`KioskControllerTests.ADR0285_PlaybackAndCommentsWiring_IsInPlace` pins the
+three selectors in `site.css` (the house convention for kiosk CSS pins).
+All 1249 Web tests pass (xunit.v3 in-process runner).

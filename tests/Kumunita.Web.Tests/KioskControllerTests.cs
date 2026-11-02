@@ -412,6 +412,11 @@ public class KioskControllerTests
         // … site.css hides the discussion sections without it …
         var css = File.ReadAllText(Path.Combine(RepoRoot, "src", "Kumunita.Web", "wwwroot", "css", "site.css"));
         Assert.Contains("body.kmb-kiosk:not(.kmb-kiosk-comments) .kmb-discussion", css);
+        // The control-only shell-hide rules (the "Add a to-do" composer card,
+        // the RSVP card, the "Translations:" chip row).
+        Assert.Contains("body.kmb-kiosk .kmb-detail-card:has(> .card-body > form)", css);
+        Assert.Contains("body.kmb-kiosk .kmb-detail-card:has(form.kmb-rsvp)", css);
+        Assert.Contains("body.kmb-kiosk .d-flex:has(> [data-translation-chip])", css);
 
         // … and every detail page with a discussion marks it.
         foreach (var (folder, view) in new[]
