@@ -288,7 +288,12 @@ delta**, the per-resident shape preserved.
   viewport edge-to-edge (the ADR 0104 `body.kmb-page-expanded` chrome-hide
   idiom, applied in the view's inline `<style>`). The per-slide chrome (inside
   the iframe) is already hidden by the layout's `body.kmb-embed` rules (the
-  `Sec-Fetch-Dest: iframe` signal) — unchanged.
+  `Sec-Fetch-Dest: iframe` signal) — unchanged. The notice strip (ADR 0176) is
+  hidden as a whole: `.kmb-notices` (the `.kmb-notices-more` "+N" badge is a
+  direct child of the strip, so hiding the strip covers the badge too — the
+  individual-notice rules alone left the badge stranded visible on the host
+  page, which is not itself `kmb-kiosk` and so was out of reach of the
+  per-slide `body.kmb-kiosk .kmb-notices` rule in `site.css`).
 - **`KioskDisplayMode` enum + `KioskPlaylist.DisplayMode`.** A new
   `KioskDisplayMode` enum (`FullPage` | `FullScreen`) and a new
   `KioskPlaylist.DisplayMode` member (the 5-member ceiling), **display-only,
