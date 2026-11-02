@@ -11,31 +11,6 @@ superseded_by: [adr-0161]
 updated: 2026-11-02
 ---
 
-# ADR 0040 — Pages: system vs user (blog) kinds, and the per-resident blog feed
-
-Status: Accepted
-Date: 2026-09-17
-Amends: **0039** (the Pages lane standing matrix, §3.7 — the
-"community-Moderator-authored pages" and "Moderator-scoped write lanes" are
-**retired**; the standing matrix is re-shaped into a **two-kind** matrix),
-**0006** (the frozen `CanAsync` / `CanSeeAsync` signatures are untouched —
-the `PageToAuditableResource` adapter from ADR 0039 is unchanged; what
-changes is *which standing* the `PageService` write lanes enforce before
-that adapter is reached). Additive on **0004** (the `Kind` field is a new
-additive document column — delta-detected, idempotent, **zero
-migrations** — the ADR 0004 §B pattern) and on **0037** (the draft idiom is
-carried onto blog pages unchanged; a blog page's draft is still its
-author's).
-
-This ADR is a **follow-on refinement within the open `PG` lane** (ADR 0039),
-not a new lane and not the "close the lane" step. It settles the three
-requirements raised after the PG surface shipped: (1) the **composer's
-parent picker must differentiate** between platform (system) pages and a
-resident's personal (blog) pages; (2) a **GlobalAdmin may add new
-sub-levels under a `system/` root** (e.g. `system/about`, `system/help`);
-and (3) a **per-resident blog feed page** that lists a resident's own pages,
-so a page can be the thing a post links to.
-
 ## Context
 
 ADR 0039 shipped one unified tree and one standing matrix, but it was
@@ -249,49 +224,3 @@ the new `User` kind.
   `MilestonesTests.cs` pins — the ordered `Ids` list, the
   single-in-progress pin, the `Shipped_Milestones_Are_Marked_Done` list —
   are all unchanged by this ADR).
-
-## Tests
-
-- **Core (`Kumunita.Core.Tests`, DB-backed)** — `PageServiceTests`:
-  the ADR 0040 two-kind standing matrix (create / edit / translate /
-  move / delete standing for each kind, with a community Moderator
-  denied on every lane), the two namespace guards (a `System` page under a
-  `User` parent is refused, and vice-versa), the ownership guard (a
-  resident may not nest under another resident's blog), the root-slug
-  collision scoped by `(Kind, AuthorId)` (two residents may both have a
-  root blog page of the same slug; one resident may not have two), the
-  seeder's `system`-root creation + re-parent + `Kind` normalization, and
-  the blog read lanes (`GetBlogRootAsync` / `GetBlogPagesAsync` /
-  `IsUnderBlogAsync`).
-- **Web (`Kumunita.Web.Tests`)** — `BlogControllerTests` (NSubstitute
-  `IPageService` + `IUserInfoService`, no live Postgres — the
-  `StaticPagesControllerPgTests` shape): `GET /blog` signed-in → redirect
-  to the actor's own feed; `GET /blog` signed-out → redirect to
-  `Directory`; `GET /blog/{userId}` → the resident's `User` pages, newest-
-  first, each linking to its derived `/pages/{path}`; the draft gate (a
-  draft absent from another resident's feed, badged on the author's own);
-  `IsOwner` true only when `userId == actorId`; the empty-feed shape
-  (not a 404). `StaticPagesControllerPgTests` (the `system/{slug}`
-  primary path + the `{slug}` fallback) and the `MLUI_FacesTests` /
-  `PublicLocaleAndAboutTests` present/absent cases (the `about`
-  product-story degrade) are updated to plant at `system/{slug}`.
-- **`KwLRegistryConsistencyTests`** — the new `blog.*` keys are registered
-  (the view↔registry invariant holds); the `pages.none` value is
-  registered and matches the view's inner text.
-- **`MilestonesTests.cs`** — unchanged (this ADR does not add a lane or
-  flip a status; `PG` stays `Planned`, `M4` stays the single in-progress).
-
-## Non-decisions
-
-- **No machine translation** of a blog page (ADR 0005 C stands — a
-  translation is a user-added row, the ADR 0029 shape; a `User` page's
-  translation standing is GlobalAdmin ∪ Translator, never the author).
-- **No blog-level moderation or community-scoping** — a blog is personal
-  content; the `Audience` doc is still reusable on a `User` page (a
-  resident may restrict a page to a community) but the *standing* is
-  author ∪ GlobalAdmin, not community-scoped.
-- **No "close the PG lane" step** — this ADR refines the open `PG` lane;
-  closing it (the `PG` → `StatusDone` + `M4` → the active work flip, and
-  the design-doc / plan-set move) is a separate, deliberate step when the
-  lane's remaining work is green, per the repo's "no destructive step
-  until green" discipline (the `GA` / `RE` / `DM` precedent).

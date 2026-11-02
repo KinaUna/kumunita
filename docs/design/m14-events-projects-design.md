@@ -1031,3 +1031,79 @@ own milestone)
    event the actor **cannot** see (or a soft-deleted / absent target)
    **omits** the chip / the row — never a 404/403 for the source surface,
    and the target's title / id are **not leaked** (C-M14·2).
+
+
+---
+
+## ADR 0115 — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Projects/TodoItem.cs` — the one additive `EventId?`
+  field (D1).
+- `src/Kumunita.Core/ProjectDocTypes.cs` — the one additive `(EventId)` index
+  (D1).
+- `src/Kumunita.Core/Projects/IProjectService.cs` +
+  `src/Kumunita.Core/Projects/ProjectService.cs` — the two additive seams
+  (`ListTodosForEventAsync` D2, `SetTodoEventAsync` D3) + their
+  implementations.
+- `src/Kumunita.Core/Events/TodoIcsWriter.cs` — new (the pure `VTODO`
+  emitter; the only new Core type; D4).
+- `src/Kumunita.Web/Models/ProjectTodoViewModels.cs` —
+  `TodoDetailViewModel` additive event-link fields + the
+  `TodoEventPicker` picker model (D2/D3).
+- `src/Kumunita.Web/Models/EventEditorModel.cs` —
+  `EventDetailViewModel` additive `LinkedTodos` + the `LinkedTodoRow`
+  record (D2).
+- `src/Kumunita.Web/Controllers/ProjectsController.cs` — the to-do
+  detail's event-link resolve (D2); the `POST /projects/todos/{id}/set-
+  event` action + picker seed (D3); the two `.ics` actions (D4).
+- `src/Kumunita.Web/Controllers/EventController.cs` — the event detail's
+  `LinkedTodos` population (D2).
+- `src/Kumunita.Web/Views/Projects/Todo/Detail.cshtml` — the "linked
+  event" chip (D2) + the event picker `<form>` (D3) + the "Add to
+  calendar" `<a>` (D4).
+- `src/Kumunita.Web/Views/Projects/Todo/Index.cshtml` — the "Calendar
+  feed (iCal)" `<a>` (D4).
+- `src/Kumunita.Web/Views/Events/Detail.cshtml` — the "linked to-dos"
+  section (D2).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four
+  locale files — the six `kw-l` keys in en/de/fr/da (D4 affordances).
+- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
+  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` —
+  the M14 → `StatusDone` / M15 → `StatusNext` flip (D8), in one unit.
+- **New tests** (the D7 pins): `tests/Kumunita.Core.Tests/` — the
+  `ListTodosForEventAsync` pins (U01, 4), the `SetTodoEventAsync` pins
+  (U02, 3), the `TodoIcsWriter` pure pins (U05, 4), and the three
+  acceptance tests + the cross-surface read-shape pins (U07); the Web
+  parity pins (U03 / U04 / U06).
+
+
+---
+
+## ADR 0065 — moved content (D11 trim, 2026-11-02)
+
+## Pins
+
+| # | Pin |
+|---|-----|
+| C-MINE·1 | **Non-leaky union** — `ListMineAsync` returns the actor's `EventRsvp` rows (any `RsvpStatus`) ∪ their authored events; a non-author can only hold an RSVP row on an event they may already read (the write lanes gate standing first), so the read needs no per-row access decision. |
+| C-MINE·2 | **Upcoming + live, drafts included** — `Start > now` (strictly future) and `!IsDeleted`; a draft authored event is in the list (the actor's own row, ADR 0037 author-only). The feed's unconditional draft exclusion does not apply here. |
+| C-MINE·3 | **`MineCap = 50`, `Start` ascending, no paging** — the result-count backstop + the feed-ordering index; the section does not page. |
+| C-MINE·4 | **No `AccessAudit` row, no `IAuthorizationService` call** — the `GetMyRsvpAsync` posture: the write lanes committed their decisions; this read re-decides nothing. An empty actor is a `403` before store access. |
+| C-MINE·5 | **The section renders only when non-empty, above the feed** — an empty `MyEvents` (default) leaves the page byte-identical to the pre-lane page; the section reuses the feed's `airy-ann-*` markup and the two `events.mine.*` keys (× 4 languages, registry parity). |
+
+
+## Test coverage
+
+- **Core** (`EventServiceTests`, Testcontainers): `ListMineAsync` returns the
+  union (a `Maybe` RSVP, a `No` RSVP, an authored event, and a draft authored
+  event all appear, ordered `Start` ascending); a stranger's RSVP on the
+  actor's events does not change the list; past + soft-deleted events are
+  excluded; an actor with no rows gets an empty list; an empty / null actor
+  throws `UnauthorizedAccessException` and **no `AccessAudit` row** lands.
+- **Web** (`EventControllerTests`, NSubstitute): `Index` calls
+  `ListMineAsync(actorId)` and surfaces `MyEvents` with the same author /
+  component display-name read shape as the feed rows; the empty case leaves
+  the feed unchanged and `MyEvents` empty; a `ListMineAsync` denial maps to a
+  clean `ForbidResult` (the 403 split).

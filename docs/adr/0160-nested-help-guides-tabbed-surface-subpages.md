@@ -11,32 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0160 — Nested help guides: each tabbed surface's sub-pages become child guides under their top-level guide (the UG guide tree gains a second level)
-
-Status: Accepted
-Date: 2026-10-10
-Amends: **0057** (the resident-guide surface — this ADR extends the flat
-`help/` guide tree to a two-level tree: top-level guides stay direct children
-of the canonical `help` page exactly as ADR 0057 D1 pinned them, and a new
-closed set of *nested* guides hangs one level deeper, each under its
-top-level surface guide). **Additive** on **0039** (the `Page` doc + the
-`(ParentId, Slug)` unique index — a nested guide is a normal `Page` row whose
-`ParentId` is a guide's id rather than `help`'s; the index and the ancestor
-chain are reused verbatim), **0040** (`PageKind.System` + the `system/`
-namespace — a nested guide inherits the system-page standing matrix, and the
-namespace guard still holds: a guide under a guide under `help` under
-`system`, a resident's `User` page never under the guide tree), **0042 D1**
-(the `en` code-owned / non-`en` community-owned split — a nested guide's `en`
-body is code-owned by the `GuidePages()` floor; its `de` / `fr` / `da`
-baselines ship hand-curated, seeded once and then community-owned — the same
-shape as the top-level guides' baselines, ADR 0057 D2, never machine-translated
-per **0005 C**),
-**0058** (the reset-to-seeded lane — a nested guide resets exactly like a
-top-level one, because it is found by `AllSeededSlugs` / `FindSeededPageText`
-over the whole tree), and **0128** (the `/admin/help` status probe — a nested
-guide is listed and reset identically). No amendment to the storage pins of
-any of those — this ADR is additive on their decisions exactly as written.
-
 ## Context
 
 ADR 0057 gave the platform a resident-facing guide for every *top-level*
@@ -219,25 +193,3 @@ than re-nests. Total guide tree: the original 23 top-level guides + `settings`
   baselines hand-curated in the same lane as the `en` floor (D4) — the same
   ADR 0057 D2 shape the original 23 top-level guides use, and now the default
   for any new guide. This is the ADR 0042 D1 split held at the new level.
-
-## Amendments
-
-### 2026-10-10 — the non-`en` baselines ship with the guides (the default going forward)
-
-The original wording of D4 deferred the 17 nested guides' `de` / `fr` / `da`
-baselines to a later human Translator lane (the guides shipped `en`-only on
-first boot). User sign-off (2026-10-10) reverses that: **the hand-curated
-`de` / `fr` / `da` baselines for all 17 nested guides + the `settings` index
-now ship in the same lane as the `en` floor** — added to `DeGuidePages()` /
-`FrGuidePages()` / `DaGuidePages()`, seeded create-if-missing by
-`SeedGuideTranslationsAsync` and backfilled by
-`BackfillGuideTranslationsAsync` (which was fixed to walk the two-level guide
-subtree, not just `help`'s direct children). D4 is re-stated accordingly, and
-the count is corrected to **17 nested** (the original D2 prose said "18" — the
-table, `GuideParentMap()`, and the code all agree on 17).
-
-This makes "a guide ships its `en` floor *and* its `de` / `fr` / `da`
-hand-curated baselines" the **default for any new guide**, mirroring the
-four-surface set and the original top-level guides (ADR 0057 D2). The
-"never machine-translated" clause (ADR 0005 C) is unchanged — the baselines
-are hand-written prose, not machine output.

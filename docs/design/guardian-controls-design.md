@@ -752,3 +752,18 @@ read; it is exercised only on the `IUserInfoService` management lanes.
   separate admin-shell lane, not a GU one (ADR 0028 §C, the §D G·5 valve).
 - **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane
   discipline: GU is not a renumber).
+
+---
+
+## ADR 0018 — moved content (D11 trim, 2026-11-02)
+
+## Related
+
+- **ADR 0005** — multilingual support (platform text; §C UGC "never
+  translated" is *unchanged* by this ADR).
+- **ADR 0004 §B.1** — additive schema-evolution pattern this field follows.
+- **ADR 0013** — group posts (the `Post` document this tag rides on).
+- **ADR 0014 / 0016** — post edit lanes this tag is **editable** on
+  (amended 2026-09-13) and the reply edit lane it stays **frozen** on
+  (body-only, create-time tag).
+- **ADR 0017** — announcement edit lane this tag is **editable** on.

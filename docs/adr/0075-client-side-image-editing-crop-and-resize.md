@@ -11,14 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0075 — Client-side image editing (crop + resize) for avatars and inline images
-
-Status: Accepted
-Date: 2026-09-24
-Amends: 0025 (resolves its "server-side image transforms" non-decision as a client-side lane)
-Relates: 0011 (media/file storage), 0025 (rich content), 0031 (WYSIWYG editor, `tsc`-only)
-Design: docs/design/image-editor-design.md (`IM` lane — invariants IM·1–IM·3, FACES IM1–IM4)
-
 ## Context
 
 Residents upload images for two surfaces: **avatars** (`POST /profile/avatar`,
@@ -125,16 +117,3 @@ Markdown value, and the audit row all key off the *id*, not the bytes.
   `IMediaStore.PutAsync`, and the content-addressing + `IsSafeImageSrc` +
   serializer still all work against the id. This ADR deliberately does **not**
   add that seam now; it keeps the lane client-side and dependency-free.
-
-## Not decided here
-
-- **Rotation / flip / filter / draw** — the editor does crop + resize only.
-  A more capable editor (a full image library) is a future lane and would
-  almost certainly move server-side (see *Revisit when*).
-- **A stored "display width" on the `MediaObject`** — deliberately **not**
-  adopted; the stored bytes *are* the display size, so the renderer /
-  serializer need no per-image metadata. This is the invariant that keeps the
-  frozen contracts untouched.
-- **Per-image alt-text / caption in the editor** — alt is still the
-  file-name-minus-extension, 40-char rule (the RE image convention); caption
-  is not a lane.

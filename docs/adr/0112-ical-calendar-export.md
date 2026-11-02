@@ -11,27 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0112 — iCal (calendar export of visible events)
-
-Status: Accepted
-Date: 2026-09-28
-Extends the **frozen `IEventService` read seams** (`GetAsync` /
-`ListUpcomingAsync`, the "a read is not a decision" posture, ADR 0054), the
-**M6 notification-link lane** (the "ride the cookie, not a token" posture,
-ADR 0085 / ADR 0095), the **attachment-serve shape** (`Content-Disposition`
-/ `X-Content-Type-Options` / `File(...)`, ADR 0034 / ADR 0108), the **`kw-l`
-closed-key registry + en/de/fr/da parity pins** (ADR 0015), the **WY·3
-closed-subset + tsc-only discipline** (ADR 0031), the **ADR 0044 tag
-display-name idiom** (`TagTranslation` → base `Name`), the **`Color` /
-`Audience` / RSVP author-only-visibility posture** (ADR 0054 §3.2 / ADR
-0028's "no standing to carry a secret"), and the **M0…M14 milestone-order
-pin** (ADR 0107 / the C-M11·8 precedent). This ADR gives residents **their
-calendar back**: the events a resident can already see on `/events` become a
-**standard iCal file** the resident's calendar app can import (per-event) or
-subscribe to (the feed) — a **read-only projection** of already-authorized
-content, with **zero new authorization surface, zero schema, and zero new
-dependencies**.
-
 ## Context
 
 M4 shipped events (ADR 0054); EV-CAL / EV-DWM / EV-NW (ADR 0063 / 0064 /
@@ -192,24 +171,3 @@ unit series U01–U05 executes it.
   (round-tripping calendar files **into** Kumunita — a write lane with its
   own schema/standing questions); **per-component feeds** (a scope
   generalization — the all-visible feed covers the common case).
-
-## Affected files
-
-- `src/Kumunita.Core/Events/IcsWriter.cs` — new (the pure emitter; the only
-  new Core type; D6).
-- `src/Kumunita.Web/Controllers/EventController.cs` — the two new actions
-  (`EventIcs` + `CalendarFeed`) + the `CATEGORIES` resolution (D3/D4).
-- `src/Kumunita.Web/Views/Event/Detail.cshtml` — the one "Add to calendar"
-  link row (D5).
-- `src/Kumunita.Web/Views/Event/Index.cshtml` +
-  `src/Kumunita.Web/Views/Event/Calendar.cshtml` — the one feed link each
-  (D5).
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` —
-  `events.ics.download` + `events.ics.feed` in en/de/fr/da (D5).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` —
-  the M12→`StatusDone` / M13→`StatusNext` flip (D8), in one unit.
-- **New tests** (the D7 pins): `tests/Kumunita.Core.Tests/IcsWriterTests.cs`
-  (the pure pins), `tests/Kumunita.Core.Tests/IcsFeedTests.cs` (the
-  composition pin), the Web route/surface pins, and the extended
-  `KnownTranslationKeys_ParityTests`.

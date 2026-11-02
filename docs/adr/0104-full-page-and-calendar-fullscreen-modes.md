@@ -11,11 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0104 — Full-page expand mode (board + calendar) and calendar full-screen
-
-Status: Accepted
-Date: 2026-09-26
-
 ## Context
 
 The Kanban board (M5, ADR 0067 et seq.) ships a **browser full-screen** mode:
@@ -118,24 +113,3 @@ So two display modes are wanted across the app:
   already pin the four new keys into all four dictionaries — they pass.
 - `Milestones.cs` / the README Roadmap / `MilestonesTests.cs` **untouched**
   (a display-mode polish, not a milestone).
-
-## Affected files
-
-- `src/Kumunita.Web/client/lib/expand-page.ts` (new)
-- `src/Kumunita.Web/client/lib/calendar-fullscreen.ts` (new)
-- `src/Kumunita.Web/wwwroot/js/lib/expand-page.js` (tsc output)
-- `src/Kumunita.Web/wwwroot/js/lib/calendar-fullscreen.js` (tsc output)
-- `src/Kumunita.Web/wwwroot/css/site.css` (expand-mode rules + calendar
-  `:fullscreen` rules)
-- `src/Kumunita.Web/Views/Projects/BoardDetail.cshtml` (expand toggle + close)
-- `src/Kumunita.Web/Views/Event/Calendar.cshtml` (expand toggle + close,
-  full-screen toggle + close in both branches, `calendar-fullscreen.js` load)
-- `src/Kumunita.Web/Views/Shared/_Layout.cshtml` (global `expand-page.js`)
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (4 new `common.*`
-  keys × 4 languages)
-- `docs/adr/README.md` (index)
-
-Additive on 0067 / 0070 (the board full-screen idiom it mirrors) + 0063 / 0064
-/ 0081 (the calendar surface) + 0031 (the tsc-only client pin) + 0015 (the
-`kw-l` registry). Amends nothing. No changes to `Kumunita.Core`'s service
-seams or schema; no new routes.

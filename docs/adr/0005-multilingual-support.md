@@ -11,11 +11,6 @@ superseded_by: [adr-0039, adr-0042, adr-0043, adr-0046, adr-0049, adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0005 — Multilingual support (UI & static pages)
-
-Status: Accepted
-Date: 2026-08-27
-
 ## Context
 
 Kumunita serves a single neighborhood whose residents may not all share the
@@ -132,57 +127,3 @@ Negative / accepted risks
   the per-language completeness view and per-string fallback (B, D).
 - Two people editing translations can collide — the standard optimistic-
   concurrency story applies (HTTP 409, see [data model — optimistic concurrency](../architecture/data-model.md)).
-
-## Revisit when
-
-- A community actually needs MT of UGC — then decide C as a **new trust
-  boundary**, not a feature flag, and update SECURITY.md §5/§6.
-- Federation arrives (ADR 0001-B): the *platform* language catalog may move
-  with the IdP, but per-instance languages and translations stay local.
-
-## Amendments
-
-### 2026-09-18 — bundled initial language pack (ADR 0042)
-
-§B's "every other language is community-provided" is amended: **`de` and
-`fr` additionally ship as bundled initial values** — the pristine-boot
-seeder (the `IsPristineAsync` gate, ADR 0015) materializes the `de` / `fr`
-catalog rows, the full UI-string baselines from the code's
-`KnownTranslationKeys` registries, and the `de` / `fr` bodies of the seeded
-`terms` / `help` system pages. They are **seeded once, then community-
-owned** — an in-app edit (GlobalAdmin ∪ Translator, ADR 0021) is never
-overwritten by a later deploy. **`en` remains the only code-owned language**
-(code-wins upsert + provider floor, ADR 0015 D1/D2, unchanged). See
-**ADR 0042** for the full locked text (ownership semantics, the register
-choice, the `about`-via-registry decision, the `about.*` key contract).
-
-### 2026-09-18 — system pages shipped + discoverable (ADR 0043)
-
-§B's **static-page coverage** scope is widened: on a fresh instance the
-seeded platform-page set is now the **five-surface set** — the `about`
-product-story **view** (not a `Page` doc, the ADR 0039 U05 drift pin carried
-forward) plus the four `Page`-backed surfaces **Terms**, **Help**, **Privacy
-Policy**, and **Code of Conduct** (the last two new in ADR 0043, D1) — each
-of the four `Page` docs carrying `en` / `de` / `fr` bodies. The `de` / `fr`
-bodies of the two new pages follow the **same** ADR 0042 D1 ownership
-semantics (seeded once, then community-owned; `en` code-owned). The two new
-routes (`/privacy` / `/conduct`) join the hard-coded static set with the 404
-floor (ADR 0043 D2). See **ADR 0043** for the full locked text (the
-five-surface set, the route contract, the ownership re-statement, the
-discoverability decision, the content scope, and the unchanged standing
-matrix).
-### 2026-09-19 — UGC default variant selection (ADR 0049)
-
-§C's "never automatic" clause is **re-scoped**: the default-*visible*
-variant on the post/reply/announcement detail surfaces and the
-pinned-announcement banner is now the **viewer's current language**
-(§B's resolution order, as amended by ADR 0046) **when a human-added
-translation of the item exists in it** — otherwise the authored-in
-variant remains default-visible (the ADR 0027 floor). This is a
-display-only *default selection* of content that already exists in the
-DOM; it is not, and does not enable, machine translation: the
-deferred-MT clause, the no-third-party-send rule, and the "never
-silently translated" guarantee for *generated* text are all unchanged.
-See **ADR 0049** for the full locked text (the surface list, the
-resolution chain it reuses, the ADR 0027 swap/return path that stays
-touched, and the out-of-scope surfaces).

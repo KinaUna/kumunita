@@ -11,26 +11,6 @@ superseded_by: [adr-0045, adr-0052]
 updated: 2026-11-02
 ---
 
-# ADR 0042 — Bundled initial language pack (de / fr ship on first boot)
-
-Status: Accepted
-Date: 2026-09-18
-Amends: **0005 §B** (the "every other language is community-provided"
-sentence — now "de / fr additionally ship as bundled initial values,
-editable in-app; `en` remains the only code-owned language"; the amendment
-note lives in ADR 0005, cross-referenced below). Builds on the frozen base
-of **0015** (the `<kw-l>` TagHelper, the `KnownTranslationKeys` registry,
-the provider floor, the hard exclusions), **0039 / 0040** (the system-page
-tree + the `PageTranslation` lane), and **0021** (the GlobalAdmin ∪
-Translator edit standing the baselines hand off to). No amendment to 0015,
-0039, 0040, or 0021 — this ADR is additive on their decisions exactly as
-written.
-
-This ADR is the **sign-off gate** of the `LS` (Languages Seeded) lane — the
-lane plan is `archive/lanes/languages-seeded/plan-languages-seeded.md`.
-Every later `LS` unit (U01–U06) codes against the *locked* text here;
-changing a decision below requires an amendment, not a unit-level override.
-
 ## Context
 
 A fresh instance boots with exactly **one** enabled language: the seeder
@@ -243,20 +223,3 @@ asymmetry); the `Milestones.cs` / README /
   and the ADR 0015 hard exclusions (attributes, JS, C#-built fragments)
   remain unchanged. The ADR 0015 exclusions list should be read with this
   ADR's D5 key list as the new scope of the `about` view.
-
-## Revisit when
-
-- A **warm-reseed or upgrade-push mechanism** for community-owned languages
-  is wanted (D1 asymmetry becomes a complaint) — decide it as a *new*
-  seeder path with its own ownership review, not as an `LS` extension.
-- **MT is introduced** (ADR 0005 C): the baselines are the natural *seed
-  material* for an opt-in, clearly-labeled suggestion surface — but that
-  is a trust-boundary decision with its own ADR and SECURITY.md review.
-- The community **adds a fourth language in-app** and wants *its* baseline
-  bundled in a future image: re-run the D2 bar for that language and
-  record the choice here by amendment (the register rule is per-language,
-  D2, so a new language picks its own).
-- If a **stats/counters band is ever re-added** to the about view with real
-  counts, new `about.*` keys would enter this D5 contract: extend the
-  table, the registry (en + de/fr baselines), and the D5 test pins
-  together, as one change.

@@ -526,3 +526,39 @@ satisfies the C-UP·6 single-in-progress contract and unblocks **M26 (Sorting)**
   *read-order* surface over the existing content lanes — the two do not
   collide on the seams named above. The C-SM·7 / C-SM·2 seams stay frozen for
   any M26 surface that wants the per-user or community-total figures.
+
+---
+
+## ADR 0135 — moved content (D11 trim, 2026-11-02)
+
+## Not decided here (explicit non-decisions)
+
+Each is a **future lane**, named — the ADR 0011 / 0034 precedent holds:
+
+- **Per-resident quota overrides** — the quota is a single community-wide value the
+  admin sets; a per-resident override (an admin picking a different quota for one
+  user) is a later lane (would widen `CommunityStorageSettings` to a per-resident
+  map).
+- **The admin *metrics* tables** — M24's surface (ADR 0134); M25 reuses its reads,
+  does not add another metrics view.
+- **Serve-time / edit-reference enforcement** — the gate is at the *byte-write*
+  boundary; serving an already-stored file and editing a *reference* are not quota
+  events (the document **edit** re-upload is the one exception, and it adopts the
+  gate).
+- **Any `IMediaStore` / `MediaObject` reshape** — no new field, no new method.
+
+
+## Revisit when
+
+- A deployment wants a **per-resident** quota (not community-wide) — widen
+  `CommunityStorageSettings` to a per-resident map; a new ADR, not an amendment to
+  this one.
+- The **`Media__MaxBytes`** env default needs to change (a different platform
+  ceiling) — it is the **fallback** now; the admin surface is the primary. A deploy
+  can still tune the floor via the env var.
+- A resident asks for a **richer self-view** (a per-file list, a per-resident
+  breakdown) — that is the M24 metrics half surfaced to the resident; a future
+  lane.
+- The **`statvfs`** M24 defect above is fixed (or the available-space read is
+  re-pointed to a portable seam) — the C-SM·2 seam M25 reuses for the community
+  total would then be stable under Linux containers.

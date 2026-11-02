@@ -964,3 +964,67 @@ them — D9, verbatim):
    lane is **upload-only** (the uploader's own document is visible to them via
    the owner branch); a soft-delete is the M14/M24 edit-lane carried to
    documents (a future ADR).
+
+---
+
+## ADR 0125 — moved content (D11 trim, 2026-11-02)
+
+## Follow-on lanes (each its own ADR — the ADR 0122 D9 lanes)
+
+- **Author soft-delete** (D9·7's remaining half) — the M14/M24 lane shape: a
+  delete + blob cleanup + the read-audit history question (a future ADR).
+- **Versioning / revision history** (D9·1) — a document's revision chain +
+  diff; ADR 0125's `Modified` stamp + the content-addressed blob store are the
+  building blocks (each replaced file is already a distinct `MediaId`).
+
+
+## Supersedes
+
+- **None.** ADR 0125 **adds the owner-only edit lane** to the ADR 0122
+  document surface; it does not supersede an earlier ADR. It *rides* ADR 0122
+  (the `Document` POCO, the `Read` path, the `IMediaStore` seam, the document
+  allowlist, the 404 posture — D1/D2/D3/D6/D7 all unchanged), ADR 0006
+  (the frozen `Read` path + the `Audience` deny-by-default + Core stays
+  HTTP-free), ADR 0001-B (the `Audience` written verbatim), ADR 0011 (the
+  `IMediaStore` content-addressed volume + the guards-before-write ordering),
+  ADR 0004 §B.1 (additive-surface discipline), and ADR 0014 / ADR 0016 (the
+  **author/owner-only** edit-lane precedent the standing is modeled on). The
+  ADR 0122 `Document` POCO, the frozen `IAuthorizationService` `Read` path,
+  the `IMediaStore`/`MediaObject` seams, and the document allowlists are
+  **unchanged**. This is stated explicitly so a later reader knows ADR 0125 is
+  an **additive edit surface over ADR 0122, not a correction** — no earlier
+  ADR's decisions are revised or re-scoped by this one.
+
+
+## Affected files
+
+- `src/Kumunita.Core/Documents/DocumentEdit.cs` — new (the edit draft record:
+  `Title` / `Summary` / `MediaId` / `Filename` / `ContentType` / `SizeBytes` /
+  `Audience` / `FileReplaced`) (D2/D3).
+- `src/Kumunita.Core/Documents/DocumentService.cs` — the new
+  `UpdateAsync(documentId, DocumentEdit, actorId, IDocumentSession)` owner-
+  only write lane (D1/D2/D3/D4).
+- `src/Kumunita.Web/Models/DocumentEditViewModel.cs` — new (the form-bound
+  model: `DocumentId` / `Title` / `Summary` / optional `File` / `Audience`)
+  (D2/D3).
+- `src/Kumunita.Web/Models/DocumentDetailViewModel.cs` — the added
+  `CanEdit` + `EditUrl` affordance (D5).
+- `src/Kumunita.Web/Controllers/DocumentController.cs` — the GET/POST
+  `/documents/{id}/edit` actions + the owner gate (404) + the guards-before-
+  write + the store-first ordering + the `Detail` action's `CanEdit` (D1/D3/D5).
+- `src/Kumunita.Web/Views/Document/Edit.cshtml` — new (the owner edit form —
+  the audience editor prefilled, the file optional); `Detail.cshtml` — the
+  "Edit" affordance (gated on `CanEdit`).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four locale
+  blocks — the closed `documents.edit.*` + `documents.flash_edited` `kw-l`
+  key set in en/de/fr/da (D6).
+- `tests/Kumunita.Core.Tests/Documents/DocumentServiceTests.cs` — the
+  `UpdateAsync` owner-gate / file-optional / non-owner / no-audit-row seam
+  tests (D1/D3/D4).
+- `tests/Kumunita.Web.Tests/DocumentControllerTests.cs` — the edit-lane
+  controller tests: owner GET prefilled, owner POST (file-optional / file-
+  replaced / 413 / 415 / malformed-audience), non-owner GET/POST → 404,
+  missing → 404 (D1/D3/D5).
+- `docs/design/m21-document-management-design.md` — §deferred item 7 (D9·7)
+  marked **partially resolved** by ADR 0125 (the edit-by-replacement half
+  shipped; the soft-delete half still deferred).

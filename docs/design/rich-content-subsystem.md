@@ -51,3 +51,40 @@ below it, and **re-anchors that base as frozen, unchanged** (RE re-anchors RC's
 R·1–R·7; WY re-anchors RE + RC; IE re-anchors WY + RE + RC). So a change to
 RC's render contract is a change to all four rows; a change to one extension's
 editor contract is local to that extension.
+
+
+---
+
+## ADR 0033 — moved content (D11 trim, 2026-11-02)
+
+## Not decided here (explicit non-decisions)
+
+Each is a **future lane** (WY-2, if it comes), named — the ADR 0011 / 0025 /
+0031 precedent holds:
+
+- **Nested lists** — the WY·3 subset is flat `<ul>`/`<ol>` + `<li>`.
+- **Blockquotes / tables / footnotes / strikethrough** — no branch in
+  `MarkdownRenderer`; not in the subset (adding one is a lane that extends
+  `MarkdownRenderer` **and** the client serializer in the same commit).
+- **`execCommand`-based undo/redo** — the browser's native `contenteditable`
+  undo is the floor; a custom undo/redo is a future lane.
+- **Mobile-specific editing UX**, **caret-mapping between the pane and the
+  code view**, **localStorage persistence of the editing preference** — see
+  the design doc §Named deferrals.
+- **A third-party editor** (ProseMirror/Quill/Tiptap) — **still out**
+  (WY·8 / RE·3 `tsc`-only). This ADR uses `contenteditable` on a hand-rolled
+  serializer, **not** an editor framework.
+
+
+## Revisit when
+
+- A resident asks for nested lists, tables, blockquotes, or a custom
+  undo/redo — open the named WY-2 lane (a design doc + ADR), **not** an
+  amendment to this ADR.
+- The **`tsc`-only / no-editor-dependency** stance is challenged (e.g. a
+  request to adopt ProseMirror/Quill/Tiptap) — that is the load-bearing
+  constraint of ADR 0031 D1; relaxing it is itself a new ADR that would
+  supersede this one.
+- The **byte-identical body** guarantee (RC R·3 / WY·5) is challenged — that
+  is RC's `ImageIds` source-parse; changing it is a new ADR, not a code
+  change.

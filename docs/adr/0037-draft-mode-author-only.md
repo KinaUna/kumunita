@@ -11,20 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0037 — Draft mode: saved-but-not-published, author-only (community posts, group posts, announcements)
-
-Status: Accepted
-Date: 2026-09-18
-Amends: none (additive). Builds on the frozen base of **0004 §B.1**
-(additive-field schema evolution — a new `bool` column is detected and
-added, no schema-file change), **0006** (the module boundary contracts and
-the frozen `CanAsync` / `CanSeeAsync` signatures the gate composes with),
-**0013** (the group-post membership lane), **0014 / 0016 / 0024** (the
-author-only lane precedent — a pure `AuthorId == actorId` ordinal gate, no
-role branch, and the no-audit-row convention for author's own content),
-and **0036** (the community-visible audience decision a published post is
-evaluated against).
-
 ## Context
 
 A resident composes a post, group post, or announcement, and it is often
@@ -192,51 +178,3 @@ of ADR 0014, extended from "edit" to "read a not-yet-published item."
   author soft-delete lane, which already respects `IsDraft`). Not part of
   this lane's scope; kept out so publishing and de-publishing stay the
   two explicit author acts.
-
-## Tests
-
-Behavior is pinned at the **core** seam (the sealed, un-substitutable
-`PostService` / `AnnouncementService` run against a real `postgres:18`
-via Testcontainers), in `tests/Kumunita.Core.Tests/PostDraftModeTests.cs`:
-
-- Feed exclusion for everyone — community feed, group feed, announcement
-  list, and pinned list all omit a draft from the author, a member, and a
-  `GlobalAdmin` alike, while a live item still surfaces to its audience.
-- **`Draft_TargetedCommunity_NotLeakedToGlobalAdmin`** — the precedence
-  pin: a community-targeted draft is absent even for the admin, asserting
-  the `&&`/`||` shape of `ListVisibleAsync`.
-- Detail author-only — `GetPostAsync`, `GetGroupPostAsync`, and
-  `AnnouncementService.GetAsync` return the draft to the author and
-  `null` to a non-author (incl. a `null` actor), with **no `AccessAudit`
-  row** written (the ADR 0014/0016/0024 no-audit-row convention).
-- Publish author-only / idempotent / throws — `PublishPostAsync` (both
-  community and group lanes) and `AnnouncementService.PublishAsync` flip
-  the flag for the author, deny a `GlobalAdmin` non-author
-  (`UnauthorizedAccessException`), throw on a missing id
-  (`KeyNotFoundException`), are idempotent on a live item (no re-stamp of
-  `Modified`), and preserve `Pinned` on the announcement.
-- `ListMyDraftsAsync` (both surfaces) returns **only** the actor's live
-  drafts — not another actor's, not a deleted draft.
-
-The Web thin-layer mapping is pinned in
-`tests/Kumunita.Web.Tests/AnnouncementControllerTests.cs` (the
-announcement lane is the interface-backed surface, substitutable via
-`IAnnouncementService`): `Publish` maps draft+author → publish + redirect
-to `Detail`, a non-author (even `GlobalAdmin`) → `ForbidResult` with no
-write, `UnauthorizedAccessException` → `ForbidResult`,
-`KeyNotFoundException` → `NotFoundResult`, anonymous → `UnauthorizedResult`;
-`Detail` flags `IsAuthor && IsDraft` for the author and `NotFound` for a
-non-author; `New` (POST) wires the `SaveAsDraft` checkbox onto the
-`Announcement.IsDraft` create field (checked → draft, unchecked → live).
-
-**Why there are no route-level Web tests for the post / group-post /
-My-Drafts lanes:** `PostService` is a `public sealed class` that returns
-`Marten.Linq.IMartenQueryable<T>` from `Query<T>()` — it cannot be faked
-under NSubstitute, so the announcement lane (interface-backed) is the
-substitutable Web surface. The post and group-post *behavior* (the exact
-draft gates, publish seam, and list filtering this ADR pins) is exhaustively
-covered at the core lane above; the Web post/group routes are thin
-`Result`-mapping wrappers over those already-pinned seams, and the
-`/my/drafts` index is a read-only projection of `ListMyDraftsAsync`. Pinning
-the core lane is therefore the behavior pin; the thin Web mapping is
-asserted on the interface-backed surface as the representative case.

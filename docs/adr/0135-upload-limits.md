@@ -11,53 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0135 — Upload limits (M25): admin-set per-file limit + per-user content quota over the content-addressed store; `Media__MaxBytes` demoted to the fallback; a pure-Core decision + a single Web gate adopted by every upload lane; a resident self-usage view
-
-Status: Accepted
-Date: 2026-10-03
-Amends: 0011 (its "`Media__MaxBytes` … the extension point" / "`In-app upload size
-enforcement` is the Web boundary's job reading `MediaOptions`" — the per-file cap is
-now **admin-set in-app** as a stored community doc, and the env `Media__MaxBytes`
-becomes the **fallback** when the admin has not set one; the per-user *quota* is
-entirely new); 0034 (its D5 "the **same** `Media__MaxBytes` cap … guards-before-
-write … ADR 0011's boundary verbatim" — the per-lane inline `> MaxBytes → 413` gate
-is **generalized** into a single `IUploadGate` adopted by every upload lane, with the
-size-vs-quota distinction added)
-Builds on: 0134 (the M24 storage-metrics lane — its `IStorageMetricsService.
-GetPerUserUsageBytesAsync` **C-SM·7** seam is **reused** for the per-user usage read,
-and its `GetSnapshotAsync` **C-SM·2** seam for the community-total in the admin view;
-M25 is the *enforcement* half, 0134 is the *metrics* half)
-
-The README roadmap names M25 exactly: "**Upload limits** — admin-set limits on the
-size of an individual file and on the total content a user may add; residents see
-how much space they are using and how much of their quota remains." ADR 0134 (M24)
-surfaces the **metrics** half — a read-only `GlobalAdmin` view of *how much* is on
-the box. M25 closes the enforcement gap: it makes two numbers **admin-set in-app**
-(they were previously only operator-tuned env / in-code) and surfaces one number
-**to the resident**. It is a **settings + enforcement** lane over the *existing*
-media byte store (ADR 0011): it adds **no** new store, **no** new catalog doc, **no**
-new `AccessAction`, and **no** new bounded context — it reuses `IMediaStore` +
-`MediaObject` (content-addressed, `SizeBytes`, `CreatedById`) and the existing
-`Kumunita.Core.Usage` context (ADR 0006-D — a bounded context per concern; M25 adds a
-second seam to the same context rather than opening one).
-
-The one thing the whole lane respects, and the two seams it composes rather than
-extends:
-
-- **`Core` stays HTTP-free AND the decision stays pure** (ADR 0006-D, C-UP·3): the
-  size/quota decision is a **pure function** on `(incoming, usage, settings,
-  envDefault) → StorageDecision`; the `ActionResult` (the single `413`) is
-  produced **only** in the Web layer. `IFormFile` / `Stream` / `IActionResult` never
-  cross the seam.
-- **The frozen ADR 0011 `IMediaStore` / `MediaObject` catalog** — M25 *reads*
-  `SizeBytes` / `CreatedById` to derive usage; it adds **no** field, **no** method,
-  **no** migration, **no** reshape (C-UP·1/4).
-- **The M24 C-SM·7 seam** (`IStorageMetricsService.
-  GetPerUserUsageBytesAsync(string, CancellationToken)`) — the
-  `Σ MediaObject.SizeBytes WHERE CreatedById == subjectId` read is **reused /
-  re-pointed to**, **not** re-implemented (the §2.6 drift-guard names it as the one
-  cross-milestone seam M25 depends on).
-
 ## Context
 
 The platform already has **two** relevant surfaces, and M25 sits *between* them:
@@ -302,34 +255,3 @@ by id and does not renumber or rename them:
   `dotnet test` run. It is a **separate lane** (the `statvfs_t` sizing / a portable
   disk-usage read), out of this ADR's scope — recorded so it is not mistaken for an
   M25 regression.
-
-## Not decided here (explicit non-decisions)
-
-Each is a **future lane**, named — the ADR 0011 / 0034 precedent holds:
-
-- **Per-resident quota overrides** — the quota is a single community-wide value the
-  admin sets; a per-resident override (an admin picking a different quota for one
-  user) is a later lane (would widen `CommunityStorageSettings` to a per-resident
-  map).
-- **The admin *metrics* tables** — M24's surface (ADR 0134); M25 reuses its reads,
-  does not add another metrics view.
-- **Serve-time / edit-reference enforcement** — the gate is at the *byte-write*
-  boundary; serving an already-stored file and editing a *reference* are not quota
-  events (the document **edit** re-upload is the one exception, and it adopts the
-  gate).
-- **Any `IMediaStore` / `MediaObject` reshape** — no new field, no new method.
-
-## Revisit when
-
-- A deployment wants a **per-resident** quota (not community-wide) — widen
-  `CommunityStorageSettings` to a per-resident map; a new ADR, not an amendment to
-  this one.
-- The **`Media__MaxBytes`** env default needs to change (a different platform
-  ceiling) — it is the **fallback** now; the admin surface is the primary. A deploy
-  can still tune the floor via the env var.
-- A resident asks for a **richer self-view** (a per-file list, a per-resident
-  breakdown) — that is the M24 metrics half surfaced to the resident; a future
-  lane.
-- The **`statvfs`** M24 defect above is fixed (or the available-space read is
-  re-pointed to a portable seam) — the C-SM·2 seam M25 reuses for the community
-  total would then be stable under Linux containers.

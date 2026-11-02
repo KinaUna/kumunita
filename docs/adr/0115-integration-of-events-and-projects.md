@@ -11,36 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0115 — Integration of Events and Projects (M14)
-
-Status: Accepted
-Date: 2026-09-29
-Extends the **frozen `IEventService` read seams** (`GetAsync` /
-`ListUpcomingAsync` / `ListMineAsync`, the "a read is not a decision"
-posture, ADR 0054), the **frozen `IProjectService` read + association
-lanes** (`ListTodosAsync` / `GetTodoAsync` / `SetTodoProjectAsync` /
-`ListBoardsForTodoAsync`, ADR 0067 / ADR 0086 / ADR 0087), the
-**`ProjectId` association field on `TodoItem`** (a feed filter, never a
-gate — C-M3·2, ADR 0086 D4), the **dangling-safe display idiom**
-(`ProjectLink` / `BlockerChip`, ADR 0086 D9 / ADR 0087), the **optional
-to-do dates `StartAt` / `DueAt`** (ADR 0079), the **`IcsWriter` BCL-only
-closed-subset emitter + the two iCal routes + the serve idiom** (ADR 0112
-/ ADR 0034 / ADR 0108), the **`kw-l` closed-key registry + en/de/fr/da
-parity pins** (ADR 0015), the **WY·3 closed-subset + tsc-only discipline**
-(ADR 0031), the **attachment / file-serve idiom** (ADR 0034 / ADR 0108),
-the **`ProjectDocTypes` additive-index surface** (ADR 0004 §B.1), the
-**module-boundary contract** (a bounded context per concern, ADR 0006),
-the **no-standing-to-carry-a-secret posture** (ADR 0028), the
-**author-only edit lanes** (ADR 0014 / ADR 0016 / ADR 0017), and the
-**M0…M18 milestone-order pin** (ADR 0107 / the C-M11·8 precedent). This ADR
-makes the **two coordination surfaces interlock** (the ARCHITECTURE.md M14
-value-chain row, verbatim): a to-do can now be **associated with an event**
-(the data interlock — D1–D3), and the to-dos' **optional dates become a
-standard iCal `VTODO` surface** (the calendar interlock — D4) — a
-read-only projection of already-authorized content, with **zero new
-authorization surface, one additive field + index (zero migration), and no
-recurrence of any kind** (C-M14·6 / D6 — that is M18's home).
-
 ## Context
 
 M4 shipped events (ADR 0054); EV-CAL / EV-DWM / EV-NW / EV-PAST (ADR 0063 /
@@ -319,44 +289,3 @@ milestone's decision record (U00); the unit series U01–U07 executes it.
   **per-component calendar feeds** (a `?component=` scoping of the `VTODO`
   feed — a scope generalization; the M14 feed is the actor's visible set,
   the ADR 0112 feed shape).
-
-## Affected files
-
-- `src/Kumunita.Core/Projects/TodoItem.cs` — the one additive `EventId?`
-  field (D1).
-- `src/Kumunita.Core/ProjectDocTypes.cs` — the one additive `(EventId)` index
-  (D1).
-- `src/Kumunita.Core/Projects/IProjectService.cs` +
-  `src/Kumunita.Core/Projects/ProjectService.cs` — the two additive seams
-  (`ListTodosForEventAsync` D2, `SetTodoEventAsync` D3) + their
-  implementations.
-- `src/Kumunita.Core/Events/TodoIcsWriter.cs` — new (the pure `VTODO`
-  emitter; the only new Core type; D4).
-- `src/Kumunita.Web/Models/ProjectTodoViewModels.cs` —
-  `TodoDetailViewModel` additive event-link fields + the
-  `TodoEventPicker` picker model (D2/D3).
-- `src/Kumunita.Web/Models/EventEditorModel.cs` —
-  `EventDetailViewModel` additive `LinkedTodos` + the `LinkedTodoRow`
-  record (D2).
-- `src/Kumunita.Web/Controllers/ProjectsController.cs` — the to-do
-  detail's event-link resolve (D2); the `POST /projects/todos/{id}/set-
-  event` action + picker seed (D3); the two `.ics` actions (D4).
-- `src/Kumunita.Web/Controllers/EventController.cs` — the event detail's
-  `LinkedTodos` population (D2).
-- `src/Kumunita.Web/Views/Projects/Todo/Detail.cshtml` — the "linked
-  event" chip (D2) + the event picker `<form>` (D3) + the "Add to
-  calendar" `<a>` (D4).
-- `src/Kumunita.Web/Views/Projects/Todo/Index.cshtml` — the "Calendar
-  feed (iCal)" `<a>` (D4).
-- `src/Kumunita.Web/Views/Events/Detail.cshtml` — the "linked to-dos"
-  section (D2).
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four
-  locale files — the six `kw-l` keys in en/de/fr/da (D4 affordances).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` —
-  the M14 → `StatusDone` / M15 → `StatusNext` flip (D8), in one unit.
-- **New tests** (the D7 pins): `tests/Kumunita.Core.Tests/` — the
-  `ListTodosForEventAsync` pins (U01, 4), the `SetTodoEventAsync` pins
-  (U02, 3), the `TodoIcsWriter` pure pins (U05, 4), and the three
-  acceptance tests + the cross-surface read-shape pins (U07); the Web
-  parity pins (U03 / U04 / U06).

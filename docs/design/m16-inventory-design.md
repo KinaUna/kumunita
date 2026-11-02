@@ -948,3 +948,62 @@ test **appends** to the §gate list and records the drift here. A change
 to any of the D1–D8 decisions, the C-M16·1–7 invariants, the §kw-l
 list, or the §gate names **after U00** is a **drift event** (this log is
 the witness).
+
+---
+
+## ADR 0117 — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Inventory/InventoryItem.cs` — new (the item
+  document; U01).
+- `src/Kumunita.Core/Inventory/InventoryCheckout.cs` — new (the
+  append-only usage record; U01).
+- `src/Kumunita.Core/Inventory/InventoryItemToAuditableResource.cs` —
+  new (the adapter — the exact M5 `ProjectToAuditableResource` 6-member
+  projection, `TargetKind = "inventory"`; U01).
+- `src/Kumunita.Core/Inventory/IInventoryService.cs` +
+  `src/Kumunita.Core/Inventory/InventoryService.cs` — new (the read
+  lanes `ListItemsAsync` / `GetItemAsync` / `GetHistoryAsync` — U02; the
+  write lanes `CreateItemAsync` / `EditItemAsync` / `DeleteItemAsync` /
+  `CheckOutAsync` / `CheckInAsync` + the D5 standing probes + the F1
+  atomic transition — U03).
+- `src/Kumunita.Core/Inventory/InventoryRequests.cs` — new (the
+  request DTOs — the sealed-record shape; U02).
+- `src/Kumunita.Core/InventoryDocTypes.cs` — new (the surface — the
+  `InventoryItem` `(ComponentId, Created)` + `(OwnerKind, Created)`
+  indexes; the `InventoryCheckout` `(ItemId, CheckedOutAt)` index + the
+  **unique partial index** on `(ItemId)` where `CheckedInAt IS NULL` —
+  the F1 witness; U01).
+- `src/Kumunita.Core/DependencyInjection.cs` — the
+  `AddTransient<IInventoryService>(…)` registration (the M5 / M9 shape —
+  **no** `INotificationService`, D8; U02).
+- `src/Kumunita.Web/Program.cs` — `InventoryDocTypes.Configure(opts);` added
+  to the `*DocTypes.Configure(opts)` block (after
+  `MessagingDocTypes.Configure(opts)`; U01).
+- `src/Kumunita.Web/Models/InventoryViewModels.cs` — new (the view
+  models; U04).
+- `src/Kumunita.Web/Controllers/InventoryController.cs` — new (the
+  list / detail / create — U04; the edit / delete / check-out /
+  check-in — U05).
+- `src/Kumunita.Web/Views/Inventory/List.cshtml` /
+  `Views/Inventory/Detail.cshtml` / `Views/Inventory/Create.cshtml`
+  (U04) + `Views/Inventory/Edit.cshtml` (U05) — new.
+- `src/Kumunita.Web/Views/Shared/` (the sidebar/nav partial) — the
+  "Inventory" nav entry (U05).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the
+  twenty `inv.*` keys × en/de/fr/da (the `projects.*` block shape — the
+  parity pins extend; U04).
+- `tests/Kumunita.Core.Tests/` — the U01 (the surface + the adapter) +
+  U02 (the read-lane) + U03 (the write-lane + the standing-probe) pins
+  (names verbatim in the design doc §Feedback loops) +
+  `tests/Kumunita.Web.Tests/` — the U04 (3) + U05 (4) pins + the U06
+  three acceptance gate tests (the design doc §gate:
+  `M16_Acceptance_ClosedLoop_CheckOutCheckInHistory` /
+  `M16_Acceptance_HandoffAuthorizationBoundary_PrivateAndShared` /
+  `M16_Acceptance_PartVsWholeAuditCompleteness`) + the D7 four-surface
+  docs-parity pins.
+- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
+  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
+  — the D7 four-surface flip (the U06 close, **in the same unit** —
+  C-M16·7).

@@ -871,3 +871,33 @@ the six-member close flip, the U09 carry-forward reconciled green, and the
 reconciled); `improve-check.ps1` **ALL GATES PASS**. The M29 milestone is
 shipped — the register stays at the top level, the 11 unit plans + handoff
 note move to `docs/archive/lanes/m29/`.
+
+
+---
+
+## ADR 0150 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+### 2026-10-22 — D3 save lane: upsert-on-missing (ADR 0170)
+
+D3's "The lane **upserts** the singleton — it never creates a second
+row (D6)" is preserved (still true — an upsert, not a second row), but
+the **no-op-on-missing-row** behavior the `ISiteContentService.SaveAsync`
+doc comment and the `SiteContentService.SaveAsync` code carried ("a
+missing row is a no-op — the lane never load-or-creates") is **retired**.
+A save on a missing row now **creates** the singleton with the caller's
+field set + the single `AccessAudit` row (the ADR 0164 `KioskService`
+"upsert vs. no-op" shape — the M35·2 pin), so a save is never a silent
+no-op (invariant C3/C4 are actually honored on the missing-row path).
+The M35·2 "upsert vs. no-op" divergence between the `SiteContent`
+template and `KioskService.SavePlaylistAsync` is **closed** — the two
+services are now on parity; the two other Kiosk divergences (caller's
+session, nullable read) remain. One new Core test
+(`SiteContentServiceTests.SaveAsync_MissingRow_CreatesSingleton`) pins
+the new behavior; the existing `SiteContentServiceTests` (which seed a
+row first) are unchanged. The sibling `SurfaceLabelsService` (ADR 0152,
+M29·6) carries the same no-op template and is **not** amended in this
+pass (D5 of ADR 0170 — a separate follow-up if the latent-bug class is
+confirmed there). See **ADR 0170** for the full locked text (the
+amendment, the D5 scope note, and the consequences).

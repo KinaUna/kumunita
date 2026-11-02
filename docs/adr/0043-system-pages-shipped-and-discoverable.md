@@ -11,28 +11,6 @@ superseded_by: [adr-0047]
 updated: 2026-11-02
 ---
 
-# ADR 0043 — System pages shipped + discoverable (SP)
-
-Status: Accepted
-Date: 2026-09-18
-Amends: **0005 §B** (the "static-page coverage on a fresh instance" scope —
-now the **five-surface set** — About view, Terms, Help, Privacy, Conduct —
-not the three routes; the amendment note lives in ADR 0005, cross-referenced
-below). Builds on the frozen base of **0042** (the ownership semantics this
-ADR re-states for two new pages), **0040** (the `PageKind` model, the
-`system/` root, and the §2 standing matrix the new pages inherit), **0015**
-(the `<kw-l>` TagHelper, the `KnownTranslationKeys` registry, the provider
-floor, the hard exclusions the new footer copy rides on), **0003** (the
-report-gated, audited moderation lane the `conduct` body points at), and
-**0021** (the GlobalAdmin ∪ Translator translation standing the baselines
-hand off to). No amendment to 0042, 0040, 0015, 0003, or 0021 — this ADR is
-additive on their decisions exactly as written.
-
-This ADR is the **sign-off gate** of the `SP` (System Pages shipped) lane —
-the lane plan is `archive/lanes/system-pages/plan-system-pages.md`.
-Every later `SP` unit (U01–U05) codes against the *locked* text here;
-changing a decision below requires an amendment, not a unit-level override.
-
 ## Context
 
 A fresh instance today serves **three** static-page routes. Two of them read
@@ -320,15 +298,3 @@ ships** (U05 owns it — the Consequences below).
   > `de` / `fr` / `da` rows. So under a `de` / `fr` / `da` preference the
   > body is now localised — this "en-body" line is the degradation case, not
   > the normal case. See ADR 0047 for the locked decision.
-
-## Revisit when
-
-- A **contact page** or a **separate cookie policy** is wanted — decide it
-  as a *new* lane (the D5 / D7 scope-out note is the standing position).
-- A **third-party cookie** is introduced (a future integration lane) — the
-  D5 "no third-party cookies exist or are planned" record must be amended
-  and SECURITY.md §2 / §5 re-reviewed (the ADR 0005 C trust-boundary
-  precedent).
-- The community **adds further `system/` pages at runtime** and wants them
-  in the footer column — the D4 "exactly five" record is the standing
-  position; extend it by amendment rather than by a unit-level override.

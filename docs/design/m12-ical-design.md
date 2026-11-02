@@ -940,3 +940,28 @@ an `RRULE`, a `VTODO`) moves the §ics list + the pinned-subset test
 **together**, and records the drift here. A future lane that adds a new
 `*DocTypes` event field that should reach the file moves the §field-map +
 the pinned tests **together**, and records the drift here.
+
+---
+
+## ADR 0112 — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Events/IcsWriter.cs` — new (the pure emitter; the only
+  new Core type; D6).
+- `src/Kumunita.Web/Controllers/EventController.cs` — the two new actions
+  (`EventIcs` + `CalendarFeed`) + the `CATEGORIES` resolution (D3/D4).
+- `src/Kumunita.Web/Views/Event/Detail.cshtml` — the one "Add to calendar"
+  link row (D5).
+- `src/Kumunita.Web/Views/Event/Index.cshtml` +
+  `src/Kumunita.Web/Views/Event/Calendar.cshtml` — the one feed link each
+  (D5).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` —
+  `events.ics.download` + `events.ics.feed` in en/de/fr/da (D5).
+- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
+  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` —
+  the M12→`StatusDone` / M13→`StatusNext` flip (D8), in one unit.
+- **New tests** (the D7 pins): `tests/Kumunita.Core.Tests/IcsWriterTests.cs`
+  (the pure pins), `tests/Kumunita.Core.Tests/IcsFeedTests.cs` (the
+  composition pin), the Web route/surface pins, and the extended
+  `KnownTranslationKeys_ParityTests`.

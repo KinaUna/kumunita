@@ -11,11 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0026 — Group & community name/description translations
-
-Status: Accepted
-Date: 2026-09-20
-
 ## Context
 
 ADR 0022 added a **user-added translation** lane for *posts* and *replies*:
@@ -195,17 +190,3 @@ Negative / accepted risks
 - The name in a **list** (group list, community feed grouping) is still shown
   in its authored language — only the detail / manage surface renders a
   translated name. A per-language list render is the accepted deferral.
-
-## Revisit when
-
-- A **remove** or **correct** lane is wanted for a bad translation — that is a
-  new seam (an `Update*TranslationAsync` / `Delete*TranslationAsync` pair), not
-  a change to this add-only shape.
-- A **list** surface (the group list, the feed's community grouping, the
-  composer's community picker) should show a name in the resident's preferred
-  language — then the detail-page-only render scope breaks and the name needs a
-  per-language resolution at read time (a `TranslationProvider`-style seam), a
-  much larger change than the detail-surface lane this ADR ships.
-- A **community** should have an *owner* standing (rather than
-  GlobalAdmin∪Translator) — then the community lane's standing matrix gains an
-  `Owner` branch, which is a new decision (communities have no owner today).

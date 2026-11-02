@@ -48,3 +48,34 @@ and the row is minimal** (C-M13·1/2) — a `UsageEvent` carries exactly
 leaves the instance. M34 is *additive on* M13's `Usage` surface (one new read
 seam, two new DTOs, the closed `analytics.trend.*` key set), not a re-shape of
 it.
+
+
+---
+
+## ADR 0114 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+### 2026-10-02 — D4 view path correction
+
+**View location.** The U05 deliverable placed the analytics view at
+`Views/Admin/Analytics.cshtml`, but the `AdminAnalyticsController` is
+its own controller class (the ADR 0062 section-split precedent, matching
+every other `Admin*Controller` in this codebase: `AdminDateFormat`,
+`AdminQuiet`, `AdminGuests`, `AdminSignup`, …). ASP.NET Core MVC's view
+lookup for `AdminAnalyticsController.Index` searches
+`Views/AdminAnalytics/Index.cshtml` then `Views/Shared/Index.cshtml`
+(the `/Views/{Controller}/{Action}.cshtml` + shared format) — neither of
+which existed at `Views/Admin/Analytics.cshtml`, so every request to
+`/admin/analytics` 500'd with `InvalidOperationException: The view
+'Index' was not found`.
+
+The view is relocated to `Views/AdminAnalytics/Index.cshtml` (the path
+MVC searches, and the convention every other section-split controller
+already follows), and the controller action uses plain `View(model)`
+as all its sibling controllers do. The `_AdminNav` partial — still
+housed in `Views/Admin/` — is referenced from the relocated view via
+the site-root-absolute form `~/Views/Admin/_AdminNav.cshtml` (the same
+idiom `Guardian/Index.cshtml` already uses for its cross-folder
+`~/Views/Locale/_SettingsTabs.cshtml` reference). All other decisions
+in this ADR are unchanged.

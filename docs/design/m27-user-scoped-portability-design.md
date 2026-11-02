@@ -833,3 +833,45 @@ satisfies the C-M27·7 zero-new-authorization-surface pin (U12 confirmed the
   seams stay frozen for any M28 schedule surface; M27's `IUserPortabilityService`
   seam (the M11 context, not a new bounded context — D7) is untouched by M28. M28's
   own register + unit plans follow the same sealed-unit shape as this one.
+
+---
+
+## ADR 0148 — moved content (D11 trim, 2026-11-02)
+
+## Alternatives considered
+
+1. **Auto-merge (a deterministic best-effort re-point on import).** Rejected:
+   it silently re-assigns the resident's content to a community/authorization
+   scope they did not choose, violating ADR 0001-B (the author's choice is
+   absolute). The README is explicit that the *user* resolves conflicts
+   "choosing per entity whether to add it elsewhere or discard it."
+
+2. **Scope-by-read (everything the resident can see).** Rejected: that is a
+   *read* scope (the audience decision), not an *ownership* scope. It would
+   let a resident import content they only had delegated/audience access to —
+   a privacy violation. M27 scopes to **what the resident authored/owns**
+   (C-M27·3), the privacy-correct reading of "their own data."
+
+3. **A new bounded context (`Kumunita.Core/Portability/` →
+   `Kumunita.Core/UserPortability/`).** Rejected: M27 is a lane **on** the M11
+   operator surface (the ADR 0109 "named lane on the shipped surface"
+   precedent), not a new bounded context. A new context would duplicate the
+   M11 archive reader/writer + manifest model + doc-type inventory, all of
+   which M27 reuses verbatim. The `UserPortabilityService` is a new file in
+   the **existing** `Kumunita.Core/Portability/` context (D7).
+
+4. **A new format version (`kumunita/portability/2`).** Rejected: the M27
+   archive is the **same** M11 format (C-M27·1). The resident scope is an
+   **additive optional** manifest field (`Scope?` + `ResidentSubjectId?`),
+   not a new format version. A new format version would break the
+   "a plain M11 archive still imports whole" invariant (C-M27·1) and would
+   require the M11 importer to be version-aware (the ADR 0098/0106
+   additive-frozen-surface precedent is the correct mechanism).
+
+5. **A CLI surface now (a `dotnet kumunita export` / `import` command).**
+   Rejected: the M11 surface is the resident's own Web surface (D5), not an
+   operator CLI. A CLI would be a separate surface with its own auth story,
+   its own audit lane, and its own kw-l keys — a follow-on lane if the
+   operator wants one (the M11 `pg_dump` alternative is already covered by
+   the operator's own tooling; M27 is the resident's surface).
+

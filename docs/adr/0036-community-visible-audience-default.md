@@ -11,17 +11,6 @@ superseded_by: [adr-0086, adr-0102]
 updated: 2026-11-02
 ---
 
-# ADR 0036 — Community-visible audience: the default for new community posts
-
-Status: Accepted
-Date: 2026-09-17
-Amends: none (additive). Builds on the frozen base of **0001-B**
-(audience written **verbatim** by the author), **0006** (the decision
-order, the empty-audience-denies invariant C1, the `CanAsync` /
-`CanSeeAsync` frozen signatures), and **0012** (the
-`GetCommunityIdsAsync` read seam — explicit `ComponentMembership` rows ∪
-enabled ∩ mandatory components).
-
 ## Context
 
 The post composer's bootstrap default audience was **owner-only**: a new
@@ -196,34 +185,3 @@ to be a **distinct grant**, independent of the list.
   never reaches the branch, so the flag is a no-op there. This is the
   safe default: a stray `Community: true` on a component-agnostic target
   cannot accidentally broaden visibility.
-
-## Tests
-
-- **Core (DB-backed, `AuthorizationServiceTests`)** — the `A0036_*`
-  family pins the branch end-to-end against the live `Decide()` path:
-  - `A0036_CommunityFlagAndMember_Allows_ViaCommunity` — flag on, member
-    of the component → **Allow**, `via Community` (not `Audience` — the
-    empty grant list would have denied; the branch short-circuits first).
-  - `A0036_CommunityFlagButNotMember_Denies` — flag on, **not** a member
-    → **Deny** (grant list empty → no fallback).
-  - `A0036_CommunityFlagButNullComponent_Inert` — flag on, `ComponentId`
-    null → **Deny** (the branch is inert without a component).
-  - `A0036_CommunityFlagFalse_EmptyGrants_OwnerOnly` — the pre-ADR-0036
-    shape (flag off, empty grants): a member who isn't the owner is
-    denied, the owner is allowed via `Owner` (the old behavior, pinned).
-  - `A0036_CommunityFlagPlusExplicitGrant_BothVisible` — flag on **and**
-    an explicit user grant: the community member sees it via `Community`,
-    the granted non-member sees it via `Audience` (the two grants
-    compose).
-- **Web (pure, `AudienceEditorModelCommunityTests`)** — the form-bound
-  `CommunityVisible` ↔ document `Community` round-trip, both directions:
-  - `BuildAudience_CommunityVisible_RoundTripsVerbatim` — checked /
-    unchecked both carry verbatim onto `Audience.Community`, with
-    `Mode` + `Grants` untouched.
-  - `BuildAudience_CommunityVisible_WithGrants_BothPreserved` — the flag
-    and the grant list are independent; both survive.
-  - `FromAudience_Community_RoundTripsVerbatim` — the edit-lane read
-    direction seeds `CommunityVisible` from `Audience.Community`; the
-    full build → from → build round-trip is stable (guards against a
-    regression that silently flips a community-visible post to
-    owner-only on the next edit save).

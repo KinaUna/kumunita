@@ -11,21 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0146 — Child accounts: the child owns the password (the guardian never sets it; the child sets it at the confirmation link)
-
-Status: Accepted
-Date: 2026-10-06
-Builds on: 0028 (the GU standing — the `GuardianLink` document, the
-`AccessVia.Guardian` value, and — critically — the design doc's own stated
-intent that "the parent does not need the child's credentials to supervise;
-supervision rides the link, not the password" and "a parent does not re-key a
-child's password"); 0001 (the M1 identity handoff — `RegisterAsync` +
-`VerifyWithTokenAsync`, the single designed email seam this lane extends);
-0006 (the §A frozen `IIdentityService` surface gains two *additive* methods;
-the §E compatible-ADD precedent); 0138 (the `ChangePasswordAsync` credential
-write + the `IsChangePasswordLockedForAsync` guard this lane's credential
-write reuses the shape of)
-
 ## Context
 
 ADR 0028 froze the GU surface and its design doc stated the intended
@@ -191,25 +176,6 @@ moved).
 - **No new `AccessVia` value, no new `GuardianLink` state, no schema
   change.** The two new seams are additive on `IIdentityService`; the
   token, the profile, the audit rows are the existing documents.
-
-## Invariants (pinned)
-
-- **C-0146·1 — The child account is created password-less.**
-  `RegisterChildAccountAsync` leaves the account's `PasswordHash` empty;
-  a `CheckPasswordAsync` against any candidate fails until the child sets
-  it. (Pinned by
-  `ChildAccountPasswordTests.RegisterChildAccount_CreatesAnUnverifiedAccountWithNoPassword`.)
-- **C-0146·2 — The child's credential is set by the child, at the link.**
-  `VerifyAndSetPasswordAsync` sets the password the child supplied, flips
-  `Verified`, and consumes the token in one commit; the child's password
-  then signs them in (a re-fetched `CheckPasswordAsync` succeeds) and the
-  token is single-use (a second presentation is refused). (Pinned by
-  `ChildAccountPasswordTests.VerifyAndSetPassword_SetsTheChildsOwnCredential_AndSignsIn`.)
-- **C-0146·3 — The self-serve lane is unchanged.** A resident who signed
-  up with a password gets the confirm-only verify link; the
-  `AddChildForm` pin is now three fields (no `Password`). (Pinned by
-  `GuardianViewModelsTests.AddChildForm_Is_Form_Model_With_Three_Fields`
-  and the unchanged `AccountController.Signup` behavior.)
 
 ## Consequences
 

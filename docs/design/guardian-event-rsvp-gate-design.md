@@ -214,3 +214,15 @@ The ADR 0144 §B–§G tables are the contract. The load-bearing pins:
   in isolation; a Docker test-container pressure flake, not a regression).
 - ADR 0144 + this design doc are the permanent record; the CONVENTIONS.md
   child-accounts row + the ADR README index are updated alongside.
+
+---
+
+## ADR 0144 — moved content (D11 trim, 2026-11-02)
+
+## Amendment history
+
+- 2026-10-05 — initial. The user asked (after the consent-text audit
+  surfaced the gap) to implement the event-attendance gate with **three
+  optional postures** and chose `GuardianApproves` as the default (the
+  consent text's literal promise, the most protective). The three postures
+  are the `EventRsvpMode` enum; the default is `GuardianApproves`.

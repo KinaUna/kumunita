@@ -1262,3 +1262,141 @@ The five deferred lanes verbatim (the register's D9), each with a one-line
    cadence, D6); a "next delivery time" estimate in the UI is a future UX lane
    (a new read surface + a new `kw-l` namespace — the §drift-guard's "add it to
    U06's closed set first" pin). A follow-up lane with its own ADR.
+
+
+---
+
+## ADR 0121 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+- **2026-09-30 — None.** The register's [PROPOSED] set (D1–D9) locked as-is.
+  No D# required a representation amendment (unlike M19's D2 array→`[Flags]`).
+  The D2 `NotificationQuietSchedule` document and the D6
+  `LocaleSettings.QuietCheckMinutes` field are authored verbatim as the
+  register's prose blocks. Status remains **Accepted**.
+
+
+## Supersedes
+
+- **None.** M20 **adds a time dimension to the M6 email half**; it does not
+  supersede an earlier ADR. It *rides* ADR 0076 (the M6 two-part notification
+  + D7 inbox-durability), ADR 0019 (the effective-zone chain), ADR 0054 §3.6
+  (the §6.4 durable-job shape), ADR 0050 (the admin-settled policy + one
+  audited write lane + `/admin` controller), ADR 0080 (the 4-section settings
+  split M20 extends to a 5th), ADR 0004 §B.1 (additive-surface discipline), and
+  ADR 0006 (zero new authorization surface). The ADR 0076 D7 inbox-durability
+  guarantee, the frozen `NotificationService`/`IMailerStage` seams, the ADR
+  0084 per-target subscription gate, and the ADR 0078 sample-suppression gate
+  are **unchanged** (C-M20·1/5). This is stated explicitly so a later reader
+  knows M20 is an **additive quiet-hours surface, not a correction** — no
+  earlier ADR's decisions are revised or re-scoped by this one.
+
+
+## Affected files
+
+- `src/Kumunita.Core/Notifications/QuietScheduleMode.cs` — new (the two-value
+  `QuietScheduleMode` enum) (D2).
+- `src/Kumunita.Core/Notifications/NotificationQuietSchedule.cs` — new (the
+  `NotificationQuietSchedule` document) (D2).
+- `src/Kumunita.Core/Notifications/QuietScheduleEvaluator.cs` — new (the pure
+  `IsQuietNow` evaluator) (D3).
+- `src/Kumunita.Core/Notifications/Notification.cs` — the additive
+  `EmailDeferred` `bool` (D1).
+- `src/Kumunita.Core/Notifications/NotificationService.cs` — the
+  `GetQuietScheduleAsync` / `SetQuietScheduleAsync` owner-scope seams (D2) +
+  the `QuietNowForAsync` helper + the `EmitAsync` quiet gate (D4).
+- `src/Kumunita.Core/Notifications/NotificationFlushService.cs` — new (the
+  §6.4 flush business logic) (D5).
+- `src/Kumunita.Core/NotificationDocTypes.cs` — the
+  `Notifications.NotificationQuietSchedule` registration (pinned to
+  `RecipientId`) (D2).
+- `src/Kumunita.Core/Localization/LocaleSettings.cs` — the additive
+  `QuietCheckMinutes` `int` (D6).
+- `src/Kumunita.Core/Localization/ILocalizationService.cs` +
+  `LocalizationService.cs` — the `GetQuietCheckMinutesAsync` +
+  `SetQuietCheckMinutesAsync` seams (the single audited write lane) (D6).
+- `src/Kumunita.Web/SideEffects/NotificationFlushHandler.cs` — new (the Web
+  adapter + `NotificationFlushTick`) (D5); `src/Kumunita.Web/Program.cs` — the
+  first-tick seed + DI wiring (D5).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four locale
+  files — the 15 `settings.quiet_*` / `admin.quiet_*` `kw-l` keys in
+  en/de/fr/da (D7, D8).
+- `src/Kumunita.Web/Controllers/LocaleController.cs` +
+  `src/Kumunita.Web/Views/Locale/Quiet.cshtml` + the `_SettingsTabs` sub-nav —
+  the 5th `/settings/quiet` resident section (D7, F1).
+- `src/Kumunita.Web/Controllers/AdminQuietController.cs` +
+  `src/Kumunita.Web/Views/AdminQuiet/Index.cshtml` + the `/admin` index
+  affordance — the `/admin/quiet` GlobalAdmin cadence surface (D8, F4).
+- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
+  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the
+  **two** milestone flips (U01 open: M20 → `StatusNext`; U08 close: M20 →
+  `StatusDone` + M21 promoted to `StatusNext`).
+- **New tests** (the GATE-1…6 pins): `tests/Kumunita.Core.Tests/` — the
+  `IsQuietNow` evaluator pins (U02, GATE-2 / GATE-3), the `EmitAsync` quiet
+  gate pin (U03, GATE-1), the `NotificationFlushService` pins (U04, GATE-4) +
+  the `SetQuietCheckMinutesAsync` seam pin (U04, GATE-6); `tests/Kumunita.Web.Tests/`
+  — the `AdminQuietController` GlobalAdmin-gate pins (U07, GATE-6) + the
+  `/settings/quiet` owner-scope pins (U06, C-M20·7).
+
+
+---
+
+## ADR 0078 — moved content (D11 trim, 2026-11-02)
+
+## Follow-ons
+
+- **Suppressing the M4 event-reminder e-mail for sample attendees** is
+  *not* covered by this gate: the §6.4 reminder is staged directly by
+  `EventReminderService` with its own `remind:{eventId}:{userId}` key
+  (ADR 0054) and does not route through `EmitAsync`. On a deployed demo
+  instance with sample RSVPs, those reminder e-mails still go out. That
+  is a narrow, acceptable consequence (the reminders are the one M4
+  lane that predates M6 and never adopted the M6 seam); if it becomes
+  noise it is a follow-on lane, its own ADR.
+
+
+---
+
+## ADR 0080 — moved content (D11 trim, 2026-11-02)
+
+## Amendment (2026-09-30)
+
+Two surface refinements supersede parts of the original four-section decision
+below; everything not restated here still stands.
+
+- **The Email &amp; notification language section (ADR 0061) is folded into
+  the Language tab.** Rationale: it is another "which language" choice and
+  lived awkwardly as a lone picker on its own page. Concretely:
+  - `Views/Locale/EmailLanguage.cshtml` is **deleted**; its email picker +
+    reset block and the **help/account mount-slot link** (ADR 0039 §3.8) are
+    merged into `Views/Locale/Index.cshtml` (the Language tab), which now
+    `@inject`s `IPageService`.
+  - `LocaleController.SettingsEmailLanguage()` (the
+    `GET /settings/email-language` route) is **retired as a page** and now
+    `RedirectToAction(nameof(Index))` — the route is kept so saved links and
+    deep references still land on the page that owns the section.
+  - `SaveEmailLanguage` (the `POST /settings/email-language` lane, signature
+    and fail-closed handling unchanged) now redirects to **`Index`** (the
+    Language tab) instead of `SettingsEmailLanguage`.
+  - The tab strip is now **three settings tabs + Children** (see the next
+    bullet); the `Email & notification language` tab row and its active-case
+    are removed from `_SettingsTabs.cshtml`.
+  - `SettingsSectionSplitTests` is updated: the email GET pin now asserts the
+    redirect to `Index`, and the `SaveEmailLanguage` subject-null pin asserts
+    a redirect to `Index`.
+  - This supersedes the table row
+    `/settings/email-language` | `EmailLanguage` and the "help/account
+    … renders at the bottom of `EmailLanguage.cshtml`" bullet.
+
+- **The Children page (ADR 0028) becomes a settings tab.** The "Children"
+  entry is removed from the account dropdown (`_AccountNav.cshtml`) and the
+  `Guardian/Index.cshtml` view now renders the shared `_SettingsTabs.cshtml`
+  sub-nav (active tab = Children). Because the Guardian page's action is also
+  named `Index` (as is the Language tab), `_SettingsTabs.cshtml`'s active-tab
+  detection is now **controller-aware** (`controller == "Guardian"` →
+  Children; otherwise the `LocaleController` action switch). The tab label
+  reuses the already-registered `nav.children` key, so no new translation key
+  is introduced. This supersedes the "active tab is derived from the current
+  action name" and "four tabs" wording in the Decision.
+

@@ -193,3 +193,59 @@ transforms, or a **server-enforced** ceiling (the client edit is skippable
 and bypassable) — at which point the transform belongs in `Kumunita.Web`
 between the `MaxBytes` guard and `PutAsync`, and this file's "Out" list and
 IM·1 are re-opened.
+
+---
+
+## ADR 0032 — moved content (D11 trim, 2026-11-02)
+
+## Not decided here (explicit non-decisions)
+
+Each is a **future lane**, named — the ADR 0011 / 0025 / 0031 precedent holds:
+
+- **localStorage persistence** — remember the resident's view preference
+  (source vs. pane) across sessions. A `localStorage` read on init + write
+  on toggle; a one-liner once the toggle is in.
+- **Keyboard shortcut** — a key binding (e.g. `Ctrl+Shift+E`) for the
+  toggle, discoverable via a tooltip or a `<kbd>` in the button's title.
+- **Caret mapping between views** — when the resident toggles from source
+  to pane, the caret/selection could map to the corresponding rendered
+  position (and vice versa). A power feature, not a floor; requires a
+  source-position → DOM-position mapping algorithm.
+- **Mobile-specific toggle UI** — a thumb-reachable toggle on small screens
+  (a floating action button, a bottom-sheet, or a sticky-positioned toggle).
+  A responsive CSS + JS concern.
+- **True `contenteditable` / third-party editor** (ProseMirror/Quill/Tiptap)
+  — **hard non-negotiable** out (D1, ADR 0031): it breaks `tsc`-only + the
+  no-HTML-round-trip stance + RC's `ImageIds` source parse. Not a deferral;
+  a separate-architecture decision that would supersede ADR 0031.
+
+
+## Revisit when
+
+- A resident asks to *remember* their view preference, or for a keyboard
+  shortcut / caret mapping — open the named IE-2 lane (a design doc + ADR),
+  not an amendment to this ADR.
+- The **`tsc`-only / no-editor-dependency** stance is challenged — that is the
+  load-bearing constraint of ADR 0031's D1; relaxing it is itself a new ADR,
+  not a code change.
+- The pane-only default proves *too* much of a shift (a resident repeatedly
+  can't find the source) — that is a UX tuning of the default, revisitable
+  without touching the source-of-truth (RE·1) or the renderer (RC R·1).
+
+
+---
+
+## ADR 0075 — moved content (D11 trim, 2026-11-02)
+
+## Not decided here
+
+- **Rotation / flip / filter / draw** — the editor does crop + resize only.
+  A more capable editor (a full image library) is a future lane and would
+  almost certainly move server-side (see *Revisit when*).
+- **A stored "display width" on the `MediaObject`** — deliberately **not**
+  adopted; the stored bytes *are* the display size, so the renderer /
+  serializer need no per-image metadata. This is the invariant that keeps the
+  frozen contracts untouched.
+- **Per-image alt-text / caption in the editor** — alt is still the
+  file-name-minus-extension, 40-char rule (the RE image convention); caption
+  is not a lane.

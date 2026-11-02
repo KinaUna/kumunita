@@ -11,11 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0021 — Translator role: delegate translation editing to non-admin residents
-
-Status: Accepted
-Date: 2026-09-16
-
 ## Context
 
 ADR 0005 introduced the multilingual lane: the platform's UI strings and
@@ -117,12 +112,3 @@ Negative / accepted risks
 - One more option in the Admin Index role dropdown and one more role to keep
   in the seeder / claim factory / `Roles` set in sync. Accepted — these are
   the same mechanical sites the other two elevated roles already live in.
-
-## Revisit when
-
-- Translation ownership needs to be **scoped** (per-language or per-key
-  "who owns this string") — then a scope row (the `ModeratorAssignment`
-  pattern) is the shape, not a blanket role.
-- A community needs a **review/approval** step between a `Translator`'s draft
-  and its going live (the current model is save-and-immediately-visible) —
-  that is a new workflow, not a role.

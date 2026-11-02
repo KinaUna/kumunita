@@ -11,14 +11,6 @@ superseded_by: [adr-0031, adr-0034, adr-0035, adr-0075, adr-0086, adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0025 — Rich content: Markdown bodies + in-content images
-
-Status: Accepted
-Date: 2026-09-14
-Amends: 0011 (the "follow-on lanes" non-decision is resolved for the
-post/reply/announcement/about lane specifically — group logos, badge icons,
-and other follow-on consumers remain future lanes, as ADR 0011 said)
-
 ## Context
 
 Two design questions were open in the platform:
@@ -123,38 +115,3 @@ their own owning resource, as ADR 0011 already said.
   `AccessAudit` rows by design (matching its body); platform-page images are
   public by construction and emit zero rows; every 404 path (store-miss,
   owner-miss, not-visible) emits zero rows.
-
-## Not decided here (explicit non-decisions)
-
-Each is a **future lane**, named, gated on its owning resource — the ADR
-0011 precedent holds:
-
-- **Video / audio attachment** — the `AllowedContentTypes` / `MaxBytes`
-  boundary is the seam; a future lane names them explicitly.
-- **Server-side image transforms** (crop / resize) — bytes are stored
-  as uploaded (the ADR 0011 stance); a future lane adds the transform.
-- **Multi-image reordering UI** — the body text is the order; a future
-  lane may add drag-drop if the plain-text order proves insufficient.
-- **Any WYSIWYG / third-party editor** — the `tsc`-only constraint
-  stands; the composer is a textarea with a Markdown hint.
-- **Tables / footnotes in the renderer** — the "intentionally out of
-  scope" set stays; the renderer's smallness is the point.
-
-(Group logos, badge icons, and other follow-on ADR 0011 consumers are
-already deferred by ADR 0011's own "not decided here" — this ADR's
-`Amends:` line resolves ADR 0011's "post attachments" lane for
-post/reply/announcement/about only; the rest remain future lanes, each
-gated on its *owning* resource's audience, as ADR 0011 said.)
-
-## Revisit when
-
-- A resident requests a feature in the "not decided here" list — open a
-  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment
-  to this ADR.
-- The **audit policy on Deny** changes for a follow-on lane — C-MED·2 is
-  the invariant; a change is itself a new ADR, not a code change (ADR
-  0011's own "revisit when" clause, unchanged).
-- The `src` allowlist needs a new accepted shape (e.g. a future lane
-  serves from a different route prefix) — extend `IsSafeImageSrc` in the
-  same commit as the route that earns it; a new *rejected* shape is not a
-  revisit (rejection is the default).

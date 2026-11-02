@@ -11,18 +11,6 @@ superseded_by: [adr-0032, adr-0033, adr-0086, adr-0107, adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0031 — WYSIWYG editor + toolbar over the RC Markdown lane
-
-Status: Accepted
-Date: 2026-09-15
-Amends: 0025 (the *"Any WYSIWYG / third-party editor — the `tsc`-only
-constraint stands; the composer is a textarea with a Markdown hint"* non-
-decision — the `tsc`-only constraint **stands unchanged**; what changes is
-that the *composer surface* is now a split-view + toolbar, still no editor
-dependency. Does **not** supersede 0025; 0025's read-side decisions — the
-one renderer, the `ImageIds` model, the `/content-image` routes — are the
-frozen base this ADR builds on.)
-
 ## Context
 
 ADR 0025 (the rich-content lane, `RC`) delivered the **read** half of its
@@ -150,41 +138,3 @@ render are untouched.
 - **The read path is unchanged** — `MarkdownRenderer` still renders every
   body; `PlainTextPreview` still strips the same markers; `ImageIds` is still
   derived server-side from the body text. RE regresses nothing RC shipped.
-
-## Not decided here (explicit non-decisions)
-
-Each is a **future lane**, named — the ADR 0011 / 0025 precedent holds:
-
-- **Undo/redo** (a custom history stack on the textarea) — the browser's
-  native `Ctrl+Z` is the floor; a lane names the history API explicitly.
-- **Blockquote (`> `) in the toolbar and preview** — requires extending
-  `MarkdownRenderer` **and** the client preview together (the RE·2 parity
-  holds only if both move in the same commit).
-- **WYSIWYG contenteditable / third-party editor** (ProseMirror/Quill/Tiptap)
-  — **hard non-negotiable** out (D1): it breaks `tsc`-only + the no-HTML-
-  round-trip stance + RC's `ImageIds` source parse. Not a deferral; a
-  separate-architecture decision.
-- **Tables / footnotes** in the toolbar or preview — RC's "intentionally out
-  of scope" set; a lane that adds them to `MarkdownRenderer` *and* the client
-  preview *together*.
-- **Drag-drop image reordering** — the body text is the order (RC stance); a
-  future lane may add it if the plain-text order proves insufficient.
-- **The gated image lanes** (un-gating the image button on Post Edit / Group
-  Edit / Announcement / replies) — **RC**, not RE. Each is a separate RC
-  follow-up with a different missing seam (the write-lane `ImageIds` seam
-  and/or the serve-branch adapter). Un-gating is a one-attribute removal, no
-  RE code.
-
-## Revisit when
-
-- A resident requests a feature in the "not decided here" list — open a
-  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment to
-  this ADR.
-- The **`tsc`-only / no-editor-dependency** stance is challenged — that is the
-  load-bearing constraint of D1; relaxing it is itself a new ADR, not a code
-  change.
-- The `src` allowlist needs a new accepted shape — extend
-  `MarkdownRenderer.IsSafeImageSrc` **and** the client mirror in the same
-  commit as the route that earns it (the ADR 0025 "revisit when" clause,
-  unchanged); a new *rejected* shape is not a revisit (rejection is the
-  default).

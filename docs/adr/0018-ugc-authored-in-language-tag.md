@@ -11,11 +11,6 @@ superseded_by: [adr-0027, adr-0086]
 updated: 2026-11-02
 ---
 
-# ADR 0018 — UGC authored-in language tag (posts, replies, announcements)
-
-Status: Accepted
-Date: 2026-09-14
-
 ## Context
 
 Announcements and community/group posts are user-generated content that is,
@@ -133,14 +128,3 @@ Negative / accepted risks
   the same `en` floor. (The `GetDefaultLanguageCodeAsync` seam is the single
   read path the Web uses; the Core services read `LocaleSettings` directly
   because they run inside a write session and already hold one.)
-
-## Related
-
-- **ADR 0005** — multilingual support (platform text; §C UGC "never
-  translated" is *unchanged* by this ADR).
-- **ADR 0004 §B.1** — additive schema-evolution pattern this field follows.
-- **ADR 0013** — group posts (the `Post` document this tag rides on).
-- **ADR 0014 / 0016** — post edit lanes this tag is **editable** on
-  (amended 2026-09-13) and the reply edit lane it stays **frozen** on
-  (body-only, create-time tag).
-- **ADR 0017** — announcement edit lane this tag is **editable** on.

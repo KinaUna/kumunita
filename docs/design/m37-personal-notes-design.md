@@ -844,3 +844,168 @@ outbound seams — the list links **back into** the platform (each row's
 `Link` is a same-origin detail route), never out. No tool handoff is
 created or depended on; the note is a pointer + a body into the surfaces
 the resident already crosses.
+
+---
+
+## ADR 0167 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+### 2026-10-16 — The inventory kind joins the closed set (the M16 parity lane)
+
+The M16 Inventory surface (ADR 0117) ships the **inventory item** detail
+page — a content surface a resident can see, pin, and note. The M37
+PersonalNotes closed set already carried ten kinds (post / grouppost /
+event / page / project / todo / board / document / directory /
+announcement) — but **not** `inventory`. The M17 bookmark surface's
+2026-10-16 project / board amendment (ADR 0118) closed the gap for
+project / board; this amendment closes the same gap for the M17 surface
+**and** for the M37 surface on the inventory kind.
+
+The amendment (the M37 PersonalNotes D3 / D5 shape re-applied — no new
+seam, no new decision, no new `AccessAction` / `AccessVia` / `Decide()`
+branch / adapter; the existing frozen `IInventoryService.GetItemAsync`
+read is reused, **exactly** the category the existing `board` /
+`document` / `directory` branches already establish):
+
+- **`PersonalNoteService.ClosedTargetKinds` gains one kind**: `inventory`
+  (the closed set is now **eleven** — the M5 `KanbanStatuses`
+  string-not-enum shape pin holds: string, not enum, closed,
+  drift-guarded). `ClosedTargetKindsOrdered` gains the one in the same
+  canonical order (after `announcement`).
+- **`PersonalNoteService` gains a new constructor dependency**: the
+  frozen `IInventoryService` (the M16 Inventory detail page's own read —
+  the same category of composition as the already-composed
+  `IProjectService`). The `IPersonalNoteService` public signature is
+  unchanged (C-M37·1 holds — the composition detail does not cross the
+  frozen seam).
+- **`PersonalNoteService.ResolveTargetAsync`** (the D3 write-lane check)
+  gains one branch: the `inventory` branch re-runs the frozen
+  `IInventoryService.GetItemAsync(targetId, actorId)` read (the same
+  call the `/inventory/{id}` detail page uses — C-M37·3: the target's
+  own audit row commits, M37 commits none of its own). Catches
+  `KeyNotFoundException` (404 on absent / soft-deleted / denied — the
+  C-M3·4 non-leaky shape) and `UnauthorizedAccessException`, degrading to
+  `Refused` — the M37 404-not-403 Web mapping (the M16 create-gate
+  posture).
+- **`PersonalNoteService.ResolveForListAsync`** (the D5 list resolution,
+  the C-M37·2 pure non-auditing doc load) gains one branch: the
+  `inventory` branch loads the `InventoryItem` doc directly and degrades
+  on `IsDeleted` (the ADR 0024 soft-delete flag; `InventoryItem` has no
+  `IsDraft` — D8a shape). Returns the target's `Name` + the canonical
+  detail URL (`/inventory/{id}`).
+- **The new `pn.list.kind.inventory` kw-l key** is registered in all
+  four language registries (en / de / fr / da) — the terminology matches
+  the M17 `bm.list.kind.inventory` label (one label, one word, across
+  all four languages). The closed `pn.*` key set grows from 29 to
+  **30 keys** (the
+  `KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages` pin
+  re-targets the count + the new key).
+- **`Views/Inventory/Detail.cshtml`** — the `_NoteButton` partial joins
+  the top-right affordance row (the `Projects/TodoDetail.cshtml`
+  ordering precedent: Bookmark first, Note second — the M17 surface's
+  same-day amendment adds the `_BookmarkButton` to the same row).
+- **`Views/Notes/Index.cshtml`** — the `_kinds` closed-set array gains
+  `inventory` (the list view now renders the new group when the owner
+  has noted one).
+- **`tests/Kumunita.Core.Tests/PersonalNoteServiceTests.cs`** — the
+  harness composes the `InventoryService` (so the new `inventory` branch
+  resolves).
+
+**The frozen surfaces are untouched** (C-M37·1 holds): the
+`IPersonalNoteService` public signature is unchanged; **no** new
+`AccessAction` / `AccessVia` / `Decide()` branch; **no** new method on
+`IAuthorizationService`. The only changes are in the **Core composition**
+(the two resolver switches gain one branch each — the same shape as the
+existing `board` / `document` / `directory` branches; the service gains
+a new `IInventoryService` constructor dependency), the **key registry**
+(one new `pn.list.kind.*` key × 4 languages), the **views** (the detail
+surface gains the existing `_NoteButton` partial; the list view's
+`_kinds` array gains one entry), and the **test harness** (the
+`InventoryService` composition). The drift-guard frozen list in the
+design doc is amended to count the closed set as **eleven kinds** (was
+ten) and to name `inventory` among the closed vocabulary. The §kw-l key
+list is amended to count **30 keys** (was 29).
+
+
+## Amendment — the page-level notes lane (2026-10-25)
+
+A resident can attach a note to **the page itself**, not just to the
+items on it — e.g. a note about the /announcements page ("needs a
+search box"), the /community feed, a group's page, an event listing, the
+projects / to-dos / boards pages, the inventory page, or the documents
+page. The amendment adds **ten new kinds** to the closed set (eight
+static page kinds + the two dynamic group / project page kinds), reuses
+the existing `PersonalNote` doc + `IPersonalNoteService` seam + the
+`_NoteButton` partial + the `note-modal.ts` module + the `/notes` list
+— **zero new bounded context, doc, or authorization surface**
+(C-M37·1 holds), **zero migrations** (the ten new kinds are rows in the
+existing `PersonalNote` table — the `(OwnerId, TargetKind, TargetId)`
+unique index already covers them).
+
+- **`PersonalNoteService.ClosedTargetKinds`** — the closed set grows
+  from eleven to **twenty-one** kinds: `page-announcements`,
+  `page-community`, `page-group`, `page-events`, `page-projects`,
+  `page-project`, `page-todos`, `page-boards`, `page-inventory`,
+  `page-documents`. The eight **static** kinds (announcements /
+  community / events / projects / to-dos / boards / inventory /
+  documents) are always visible — a page itself has no item-level
+  visibility to re-check; the D3 write-lane check is a closed-set
+  membership + a fixed title + a fixed link. The two **dynamic** kinds
+  (`page-group`, `page-project`) re-run the owning surface's own frozen
+  read (the same `IUserInfoService.GetGroupsForUserAsync` /
+  `IProjectService.GetProjectAsync` the detail pages use) — a group /
+  project the actor cannot see cannot be page-noted (the M16
+  create-gate posture — the D3 write-lane check re-applied).
+- **`PersonalNoteService.ResolveTargetAsync`** (the D3 write-lane) and
+  **`ResolveForListAsync`** (the D5 list resolution) each gain ten
+  branches — the same shape as the existing `board` / `document` /
+  `directory` branches. The `page-group` branch resolves to the fixed
+  title/link when the target id is `static` (the /groups index) and
+  looks up the group when it is a real group id (the group detail page);
+  `page-project` always looks up the project (the project detail page).
+- **`KnownTranslationKeys`** — ten new `pn.list.kind.page-*` keys × four
+  languages (en / de / fr / da), one label per page. The closed `pn.*`
+  key set grows from **30 to 40 keys** (the
+  `KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages` pin
+  re-targets the count + the ten new keys).
+- **`Views/Shared/_NoteButton.cshtml`** — the partial gains a
+  per-instance id (`data-note-instance`, an 8-hex random suffix) that
+  suffixes every modal element id (`note-modal-{inst}`,
+  `note-modal-textarea-{inst}`, etc.) so a page may render **multiple**
+  `_NoteButton` instances without id collisions (the project detail
+  page renders two: the item note + the page note).
+- **`client/lib/note-modal.ts`** — the module iterates over **every**
+  `[data-note-button]` anchor on the page (previously it assumed exactly
+  one) and wires each to its own modal via the `data-note-instance`
+  suffix; each instance carries its own closure state (the current
+  `noteId`), so saving one note does not affect the other.
+- **The ten list/detail views** — each gains the `_NoteButton` partial
+  (kind `page-*`, target id `static`, the page's own URL) right-aligned
+  below its header: `Announcement/Index.cshtml` (page-announcements),
+  `Posts/Index.cshtml` (page-community), `Groups/Index.cshtml`
+  (page-group, target id `static`), `Groups/Detail.cshtml` (page-group,
+  target id the group's id), `Event/Index.cshtml` (page-events),
+  `Projects/ProjectsIndex.cshtml` (page-projects),
+  `Projects/TodosIndex.cshtml` (page-todos),
+  `Projects/BoardIndex.cshtml` (page-boards), `Inventory/List.cshtml`
+  (page-inventory), `Document/Index.cshtml` (page-documents), and
+  `Projects/ProjectDetail.cshtml` (page-project, alongside the existing
+  item note). The `Groups/Index.cshtml` static `page-group` and the
+  `Groups/Detail.cshtml` dynamic `page-group` share one kind but carry
+  different target ids (a stable per-page identity for the note row).
+- **`Views/Notes/Index.cshtml`** — the `_kinds` closed-set array gains
+  the ten `page-*` kinds (the list view now renders the new groups when
+  the owner has page-noted them).
+
+**The frozen surfaces are untouched** (C-M37·1 holds): the
+`IPersonalNoteService` public signature is unchanged; **no** new
+`AccessAction` / `AccessVia` / `Decide()` branch; **no** new method on
+`IAuthorizationService`. The only changes are in the **Core composition**
+(the two resolver switches gain ten branches each — the same shape as
+the existing `board` / `document` / `directory` branches), the **key
+registry** (ten new `pn.list.kind.*` keys × 4 languages), the **shared
+partial + client module** (the multi-instance refactor), the **views**
+(ten list/detail surfaces gain the existing `_NoteButton` partial; the
+list view's `_kinds` array gains ten entries), and the **test pin**
+(the `pn.*` closed-set count re-targets to 40).

@@ -11,35 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0117 — M16: Inventory (check-out / check-in + usage history)
-
-Status: Accepted
-Date: 2026-09-29
-Extends the **M5 Projects bounded-context precedent** (the
-`Kumunita.Core.Projects` context, the `ProjectDocTypes` surface, the
-`ProjectToAuditableResource` 6-member adapter, the C-M5·6
-creator-vs-broad-standing split — ADR 0086 / ADR 0106), the **M9
-`MessagingDocTypes` parallel-surface + unique-index-as-witness precedent**
-(`convo_uidx_pair` — ADR 0105 D1), the **ADR 0004 §B.1
-delta-detected, idempotent, zero-migration document-surface shape**,
-the **frozen `IAuthorizationService` seam** (the 4-method surface + the
-`IDocumentSession` overloads, C3 — ADR 0006 §A), the **frozen
-`AccessAction` / `AccessVia` sets + the frozen `Decide()`** (ADR 0006 —
-the "M16 adds an *adapter*, not a *branch*" pin), the **ADR 0024
-soft-delete flag** (the item's delete lane), the **ADR 0018 authored-in
-`LanguageCode` tag** (the item's display tag), and the **closed
-`KnownTranslationKeys` registry + the en/de/fr/da parity pins** (ADR
-0015 / ADR 0052). This ADR makes the **neighborhood's shared,
-community-owned, or private things trackable** (the ARCHITECTURE.md M16
-value-chain row, verbatim): **check out / check in** a shared,
-community-owned, or private resource (equipment, clothes for sports
-teams, books, etc.), **track where items are** (the item's current
-holder), and **optionally track how much they are used by whom** (the
-append-only usage history) — a standalone core surface over **two
-documents, one new surface, one adapter, and zero new authorization
-surface** (C-M16·4), with **zero migrations for existing surfaces**
-(D1).
-
 ## Context
 
 The neighborhood today has a place for **tasks** (M5 to-dos) and
@@ -328,58 +299,3 @@ Wolverine handler for inventory; a nudge emission in M16.
 **This ADR is the milestone's decision record (U00); the unit series
 U01–U06 executes it, and the U06 close flips the docs parity surface
 (D7 — the C-M16·7 precedent, the M15/U10 docs-parity shape).**
-
-## Affected files
-
-- `src/Kumunita.Core/Inventory/InventoryItem.cs` — new (the item
-  document; U01).
-- `src/Kumunita.Core/Inventory/InventoryCheckout.cs` — new (the
-  append-only usage record; U01).
-- `src/Kumunita.Core/Inventory/InventoryItemToAuditableResource.cs` —
-  new (the adapter — the exact M5 `ProjectToAuditableResource` 6-member
-  projection, `TargetKind = "inventory"`; U01).
-- `src/Kumunita.Core/Inventory/IInventoryService.cs` +
-  `src/Kumunita.Core/Inventory/InventoryService.cs` — new (the read
-  lanes `ListItemsAsync` / `GetItemAsync` / `GetHistoryAsync` — U02; the
-  write lanes `CreateItemAsync` / `EditItemAsync` / `DeleteItemAsync` /
-  `CheckOutAsync` / `CheckInAsync` + the D5 standing probes + the F1
-  atomic transition — U03).
-- `src/Kumunita.Core/Inventory/InventoryRequests.cs` — new (the
-  request DTOs — the sealed-record shape; U02).
-- `src/Kumunita.Core/InventoryDocTypes.cs` — new (the surface — the
-  `InventoryItem` `(ComponentId, Created)` + `(OwnerKind, Created)`
-  indexes; the `InventoryCheckout` `(ItemId, CheckedOutAt)` index + the
-  **unique partial index** on `(ItemId)` where `CheckedInAt IS NULL` —
-  the F1 witness; U01).
-- `src/Kumunita.Core/DependencyInjection.cs` — the
-  `AddTransient<IInventoryService>(…)` registration (the M5 / M9 shape —
-  **no** `INotificationService`, D8; U02).
-- `src/Kumunita.Web/Program.cs` — `InventoryDocTypes.Configure(opts);` added
-  to the `*DocTypes.Configure(opts)` block (after
-  `MessagingDocTypes.Configure(opts)`; U01).
-- `src/Kumunita.Web/Models/InventoryViewModels.cs` — new (the view
-  models; U04).
-- `src/Kumunita.Web/Controllers/InventoryController.cs` — new (the
-  list / detail / create — U04; the edit / delete / check-out /
-  check-in — U05).
-- `src/Kumunita.Web/Views/Inventory/List.cshtml` /
-  `Views/Inventory/Detail.cshtml` / `Views/Inventory/Create.cshtml`
-  (U04) + `Views/Inventory/Edit.cshtml` (U05) — new.
-- `src/Kumunita.Web/Views/Shared/` (the sidebar/nav partial) — the
-  "Inventory" nav entry (U05).
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the
-  twenty `inv.*` keys × en/de/fr/da (the `projects.*` block shape — the
-  parity pins extend; U04).
-- `tests/Kumunita.Core.Tests/` — the U01 (the surface + the adapter) +
-  U02 (the read-lane) + U03 (the write-lane + the standing-probe) pins
-  (names verbatim in the design doc §Feedback loops) +
-  `tests/Kumunita.Web.Tests/` — the U04 (3) + U05 (4) pins + the U06
-  three acceptance gate tests (the design doc §gate:
-  `M16_Acceptance_ClosedLoop_CheckOutCheckInHistory` /
-  `M16_Acceptance_HandoffAuthorizationBoundary_PrivateAndShared` /
-  `M16_Acceptance_PartVsWholeAuditCompleteness`) + the D7 four-surface
-  docs-parity pins.
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
-  — the D7 four-surface flip (the U06 close, **in the same unit** —
-  C-M16·7).

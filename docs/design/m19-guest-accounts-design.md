@@ -963,3 +963,110 @@ The five deferred lanes verbatim (the register's D7), each with a one-line
    lane on the M13 analytics surface (which is resident-shaped — a **new**
    aggregation branch + a **new** admin surface). A follow-up lane with its
    own ADR.
+
+---
+
+## ADR 0120 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+- **2026-09-30 — D2 `AllowedSurfaces` shape annotation: array → `[Flags]`
+  scalar.** The register's D2 prose block originally read
+  `GuestSurface[] AllowedSurfaces`. The `GuestSurface` enum is `[Flags]` (a
+  closed bit-flag union — D4), so the document carries a single scalar
+  `GuestSurface AllowedSurfaces` (defaulting to `GuestSurface.None`, the
+  empty floor) rather than an array. U00 pinned the scalar form in the
+  design doc's §4 + §9 (the authoritative C#) and U01/U02/U04 all implement
+  it. **The D4 *decision* is unchanged** — only the field's representation
+  moved from an array to a `[Flags]` scalar. Status remains **Accepted**.
+
+
+## Supersedes
+
+- **None.** M19 **adds a standing**; it does not supersede an earlier ADR.
+  It *rides* ADR 0001-B (thin token / fat authorization), ADR 0030
+  (composable roles / claim append), ADR 0004 §B.1 (additive surface), and
+  ADR 0050 (the admin-settled policy + one audited write lane + `/admin`
+  controller shape). The frozen `IAuthorizationService` seams, the
+  `AccessAudit` lane, and the resident standing are **unchanged**
+  (C-M19·1/2/6). This is stated explicitly so a later reader knows M19 is an
+  **additive standing, not a correction** — no earlier ADR's decisions are
+  revised or re-scoped by this one.
+
+
+## Affected files
+
+- `src/Kumunita.Core/Identity/GuestSurface.cs` — new (the `[Flags]`
+  `GuestSurface` enum) (D4).
+- `src/Kumunita.Core/Identity/GuestAccess.cs` — new (the `GuestAccess`
+  document) (D2).
+- `src/Kumunita.Core/UserInfo/Profile.cs` — the additive `IsGuest` flag (D1).
+- `src/Kumunita.Core/Identity/IIdentityService.cs` — the `GetGuestAccessAsync`
+  + `SetGuestAccessAsync` ADD (D2).
+- `src/Kumunita.Core/Identity/IdentityService.cs` — the implementations of the
+  two new members (the `SetSignupOpenAsync` body pattern, the single audited
+  write lane) (D2).
+- `src/Kumunita.Core/CoreDocTypes.cs` — the `Identity.GuestAccess` registration
+  (D2).
+- `src/Kumunita.Core/Identity/ThinPrincipal.cs` — the `Roles.Guest` constant
+  (the `ClaimTypes.All` set **untouched**) (D5).
+- `src/Kumunita.Web/Security/KumunitaClaimsPrincipalFactory.cs` — the new
+  `IIdentityService` dependency + the `Guest` mint branch (D5).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four locale
+  files — the 10 `admin.guests_*` / `account.guest_welcome` `kw-l` keys in
+  en/de/fr/da (D6).
+- `src/Kumunita.Web/Controllers/AdminGuestsController.cs` +
+  `src/Kumunita.Web/Models/GuestAdminViewModel.cs` +
+  `src/Kumunita.Web/Views/AdminGuests/Index.cshtml` + the `/admin` index
+  affordance — the `/admin/guests` surface (D6, F1).
+- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
+  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` —
+  the **end-of-roadmap** re-pin (M19 → `StatusDone`; no `StatusNext` remains)
+  (U05 close, in one unit).
+- **New tests** (the GATE-1…4 pins): `tests/Kumunita.Core.Tests/` — the
+  `SetGuestAccessAsync` / `GetGuestAccessAsync` seam pins (U01, GATE-3 /
+  C-M19·4); `tests/Kumunita.Web.Tests/` — the `GuestClaimMint` pins (U02,
+  GATE-1 / GATE-4) and the `AdminGuestsController` pins (U04, GATE-3 / D6).
+
+
+---
+
+## ADR 0050 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+### 2026-10-05 — the default flips from open to **invitation-only** (`false` floor)
+
+The gate, its audited write lane, and the `/admin/signup` surface are **unchanged**.
+Only the **default** a fresh (or un-migrated) instance reads as is amended — from the
+original permissive `true` floor to a restrictive `false` floor — so that **a GlobalAdmin
+can set up the platform before any resident can self-register**, and open sign-up becomes
+the explicit opt-in it was always meant to be (this is exactly the long-term default the
+README *Deferred* section and SECURITY.md §6 A2 both committed the instance to, and the
+original ADR's own "Negative / accepted risks" already framed "closed" as the intended
+posture).
+
+- **`LocaleSettings.IsSignupOpen`** — the field initializer defaults to `false` (was
+  `true`).
+- **`IsSignupOpenAsync()`** — the read floor flips: a missing singleton or an unset
+  value now yield **closed** (the `settings is not null && settings.IsSignupOpen` shape,
+  the same `false`-floor posture as `IsSamplePasswordChangeLockedAsync`). Only an
+  explicit `true` opens sign-up.
+- **Why this is safe.** The platform's own accounts are not gated by this value: the
+  first-boot **GlobalAdmin is created by the seeder** (`userManager.CreateAsync`, not the
+  `/account/signup` lane) and first-boot completion is a **separate** check
+  (`IsFirstBootSetupCompleteAsync` / the setup-token lane). So a `false` floor can never
+  lock the platform's own admin out of the account-creation surface it needs.
+- **What changes for operators.** A fresh instance now boots with the sign-up nav affordance
+  hidden and the self-service write refused until an admin opens the gate at
+  `/admin/signup`. A development or demo deployment that wants open sign-up must flip it to
+  "Open" once (or, for the sample-data demo, rely on its pre-seeded admin rather than
+  self-registration).
+- **The pinned test flips.** `IdentityServiceSignupPolicyTests.
+  IsSignupOpen_FreshInstance_FloorsToFalse_NoAuditRow` now asserts `false` on a fresh
+  instance (was `…FloorsToTrue…`); the `SetSignupOpenAsync` write-lane, audit-row, and
+  re-open tests are unchanged (they drive the explicit value, not the floor).
+- **Out of scope (unchanged).** The invitation mechanism (the token / link an invited
+  resident self-serves a password with) is still the follow-on that makes "closed" a place
+  a resident is invited *to* — this amendment only changes which side of the gate the
+  platform starts on.

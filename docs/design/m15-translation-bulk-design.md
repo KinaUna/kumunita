@@ -808,3 +808,113 @@ and records the drift here. The six `translations.bulk.*` keys (D8) are
 the closed set — a future lane that adds a bulk affordance adds its key
 through the registry (the parity pins extend) and records the drift
 here.
+
+---
+
+## ADR 0116 — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Localization/TranslationBulkRow.cs` — new (the
+  matrix POCO — a projection, not a Marten document; U01).
+- `src/Kumunita.Core/Localization/TranslationBulkExporter.cs` — new (the
+  pure exporter; U01).
+- `src/Kumunita.Core/Localization/TranslationBulkImporter.cs` — new (the
+  pure importer + the sealed `TranslationBulkImportRefused` refusal
+  shape; U02).
+- `src/Kumunita.Core/Localization/ILocalizationService.cs` +
+  `src/Kumunita.Core/Localization/LocalizationService.cs` — the four
+  additive seams (`GetBulkTranslationMatrixAsync` U01,
+  `UpsertManyTranslationsAsync` U02, `SaveAllTranslationsAsync` U03,
+  `RecordTranslationExportAsync` U04).
+- `src/Kumunita.Web/Controllers/LanguagesController.cs` — the three new
+  routes under the existing class gate (D3): `GET
+  {code}/translations/bundle.csv` (U04), `POST
+  {code}/translations/import` (U04), `POST {code}/translations/save-all`
+  + the `GET Translations` `?batch=true` flag (U05) + the additive `Mode`
+  property on the nested public `TranslationEditorViewModel` (U05). The
+  `SaveTranslation` route + the per-row editor byte-identical (C-M15·7).
+- `src/Kumunita.Web/Views/Languages/Index.cshtml` — the per-language
+  "Download (CSV)" link (U04) + `Views/Languages/Translations.cshtml` —
+  the upload affordance block (U04) + the batch-mode toggle + batch form
+  (U05) — additive markup only.
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the six
+  `translations.bulk.*` keys × en/de/fr/da (the four file-facing in U04,
+  the three editor-facing in U05; the parity pins extend, D8).
+- `tests/Kumunita.Core.Tests/` — the U01 (4) + U02 (5) + U03 (2) pins +
+  `tests/Kumunita.Web.Tests/` — the U04 (3) + U05 (2) pins + the U06
+  three acceptance tests + the cross-surface pins (names verbatim in the
+  design doc §pinned tests / §gate).
+- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
+  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
+  — the M15 → `StatusDone` / M16 → `StatusNext` flip (D10), in one unit
+  (U06).
+
+
+---
+
+## ADR 0042 — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A **warm-reseed or upgrade-push mechanism** for community-owned languages
+  is wanted (D1 asymmetry becomes a complaint) — decide it as a *new*
+  seeder path with its own ownership review, not as an `LS` extension.
+- **MT is introduced** (ADR 0005 C): the baselines are the natural *seed
+  material* for an opt-in, clearly-labeled suggestion surface — but that
+  is a trust-boundary decision with its own ADR and SECURITY.md review.
+- The community **adds a fourth language in-app** and wants *its* baseline
+  bundled in a future image: re-run the D2 bar for that language and
+  record the choice here by amendment (the register rule is per-language,
+  D2, so a new language picks its own).
+- If a **stats/counters band is ever re-added** to the about view with real
+  counts, new `about.*` keys would enter this D5 contract: extend the
+  table, the registry (en + de/fr baselines), and the D5 test pins
+  together, as one change.
+
+
+---
+
+## ADR 0052 — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+`LS_U04_SeederTests.BackfillUiStrings_CreatesMissingDeFrDa_SkipsExisting_
+Idempotent` (Core): a warm-deployment state (the `en` floor for every
+key + all baselines except two simulated gaps — one key missing all
+three, one key missing only `fr` and carrying an admin-edited `de`
+row) → the backfill adds exactly the missing rows with the baseline
+text, leaves the admin-edited `de` row byte-identical, never touches
+the `en` rows, creates no duplicates, and a re-run is a no-op. The
+existing page-backfill test (ADR 0047 D2) is unchanged and still green.
+
+
+---
+
+## ADR 0022 — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A **remove** or **correct** lane is wanted for a bad translation — that is
+  a new seam (an `UpdatePostTranslationAsync` / `DeletePostTranslationAsync`
+  pair), not a change to this add-only shape.
+- Translation of a post/reply is needed **beyond** the parent's audience
+  (e.g. a translation is visible even where the original is not) — then the
+  "inherits the parent's Read" invariant breaks and the row needs its own
+  audience + moderation, which is a much larger change.
+- **Announcement** translations are requested — that is the ADR 0017 lane
+  extended, a separate decision.
+
+
+---
+
+## ADR 0021 — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- Translation ownership needs to be **scoped** (per-language or per-key
+  "who owns this string") — then a scope row (the `ModeratorAssignment`
+  pattern) is the shape, not a blanket role.
+- A community needs a **review/approval** step between a `Translator`'s draft
+  and its going live (the current model is save-and-immediately-visible) —
+  that is a new workflow, not a role.

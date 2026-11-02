@@ -11,11 +11,6 @@ superseded_by: [adr-0086]
 updated: 2026-11-02
 ---
 
-# ADR 0019 — Timezone: platform default (admin) + per-resident override
-
-Status: Accepted
-Date: 2026-09-15
-
 ## Context
 
 A neighborhood is a **local** thing, but its residents are **distributed in
@@ -217,20 +212,3 @@ Negative / accepted risks
   render (the `EffectiveTimezoneResolver.TryConvert` lookup) — but the
   resolver caches its first resolution per request, so this is a single lookup
   per request, not per timestamp.
-
-## Related
-
-- **ADR 0005** — multilingual support (the "platform default + user override"
-  shape this ADR mirrors; §C UGC "never translated" is *unchanged* by this
-  ADR — this is a *display* change, not a *translation*).
-- **ADR 0004 §B.1** — additive schema-evolution pattern both new fields
-  follow (no re-seed, no breaking change).
-- **ADR 0002** — deployment topology (single-deployment, single-neighborhood;
-  the "host's OS is the deployment's choice" risk in the Consequences is
-  scoped by this ADR's single-deployment assumption).
-- **ADR 0015** — UI view-localization mechanics (the `kw-l` TagHelper this
-  ADR's `kw-dt` TagHelper mirrors; the same "per-request value rendered across
-  many views" problem, the same solution).
-- **ADR 0018** — UGC authored-in language tag (a different axis: that ADR
-  stores *what language* a piece of UGC is in; this ADR stores *what time zone*
-  to render timestamps in — the two are orthogonal and compose cleanly).

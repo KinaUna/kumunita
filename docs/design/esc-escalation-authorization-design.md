@@ -986,3 +986,201 @@ record, do not silently re-shape):
   4-members (unchanged; `ConfiguredSource` is the single additive member,
   ESC·4);
 - the **`KUMUNITA_ESCALATION_ENDPOINT`** env-var fallback (preserved, ESC·4).
+
+
+---
+
+## ADR 0041 — moved content (D11 trim, 2026-11-02)
+
+## Rejected alternatives
+
+- **Leave the form as-is, just add an "All residents" option to the
+  Community `<select>`.** Rejected — the Community `<select>` is
+  semantically "the target community of the `Community` flag", not
+  "the scope of the page". Adding an "All residents" option to it
+  would be a *lie* (it would set `Community = true` + `ComponentId =
+  null`, which is the *inert* shape — the branch 4 short-circuits on
+  a null `ComponentId`). A top-level `Scope` dropdown is the honest
+  shape.
+
+- **Use `AudienceMode` for the new flag.** Rejected — `AudienceMode`
+  governs how the *grant list* combines (Any / All). The
+  `AllResidents` flag is a *distinct grant*, not a mode of the grant
+  list (the ADR 0036 precedent). Making it an `AudienceMode` value
+  would collide with the C1 invariant (empty-list semantics) and with
+  ADR 0006's "the grant list is the explicit set" contract.
+
+- **Retire the audience editor entirely.** Rejected — the "Individual
+  access" scope still needs it (a board memo for three specific people
+  is a legitimate page scope). The editor is retained, but only
+  revealed when the author explicitly picks "Individual access".
+
+- **Make "All residents" a *default* on the stored `Audience` (i.e.
+  flip the flag `true` for every new page's audience).** Rejected —
+  the flag is a *first-class grant* the author opts into, not a
+  bootstrap default. A page that was `Audience { Community = true }`
+  + `ComponentId = "x"` should *stay* community-scoped, not become
+  all-residents-visible. The default is a *form* default (the Scope
+  dropdown's initial selection), not a *stored-shape* default.
+
+
+## Migration
+
+The `Audience.AllResidents` flag is a new property on an existing
+document type (Marten's versioned schema). It is **additive**: existing
+documents round-trip with the flag `false` (the .NET default), so no
+data migration is required. The `PageComposeViewModel.CommunityId`
+field is removed from the *view model* (the form-bound shape), but the
+`Page.ComponentId` document field is **retained** (the stored shape
+still needs it for the community scope). The `_PageForm.cshtml`
+visibility card is restructured (the Scope dropdown + the
+conditional editor); the pre-ADR-0041 form shape (a Community
+`<select>` + a CommunityVisible checkbox) is gone.
+
+
+---
+
+## ADR 0036 — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+- **Core (DB-backed, `AuthorizationServiceTests`)** — the `A0036_*`
+  family pins the branch end-to-end against the live `Decide()` path:
+  - `A0036_CommunityFlagAndMember_Allows_ViaCommunity` — flag on, member
+    of the component → **Allow**, `via Community` (not `Audience` — the
+    empty grant list would have denied; the branch short-circuits first).
+  - `A0036_CommunityFlagButNotMember_Denies` — flag on, **not** a member
+    → **Deny** (grant list empty → no fallback).
+  - `A0036_CommunityFlagButNullComponent_Inert` — flag on, `ComponentId`
+    null → **Deny** (the branch is inert without a component).
+  - `A0036_CommunityFlagFalse_EmptyGrants_OwnerOnly` — the pre-ADR-0036
+    shape (flag off, empty grants): a member who isn't the owner is
+    denied, the owner is allowed via `Owner` (the old behavior, pinned).
+  - `A0036_CommunityFlagPlusExplicitGrant_BothVisible` — flag on **and**
+    an explicit user grant: the community member sees it via `Community`,
+    the granted non-member sees it via `Audience` (the two grants
+    compose).
+- **Web (pure, `AudienceEditorModelCommunityTests`)** — the form-bound
+  `CommunityVisible` ↔ document `Community` round-trip, both directions:
+  - `BuildAudience_CommunityVisible_RoundTripsVerbatim` — checked /
+    unchecked both carry verbatim onto `Audience.Community`, with
+    `Mode` + `Grants` untouched.
+  - `BuildAudience_CommunityVisible_WithGrants_BothPreserved` — the flag
+    and the grant list are independent; both survive.
+  - `FromAudience_Community_RoundTripsVerbatim` — the edit-lane read
+    direction seeds `CommunityVisible` from `Audience.Community`; the
+    full build → from → build round-trip is stable (guards against a
+    regression that silently flips a community-visible post to
+    owner-only on the next edit save).
+
+
+---
+
+## ADR 0015 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+### 2026-10-04 — context-reuse: accepted design choice (P2-4)
+
+**The 13 context-reuse keys.** A full drift scan of every `<kw-l>` against the
+registry `en` floor found 37 keys whose view fallback text differs from the
+registry value. 13 of these are **intentional context-reuse**: a single key
+carries per-entity or per-voice wording that is more accurate than the generic
+registry floor. Splitting each key into one-per-entity would multiply the
+closed set without adding information (the provider floor renders the generic
+form on a fresh `en` instance, which is correct for the *platform* copy; the
+view's per-entity fallback is the *user-visible* truth on a translated
+instance). The 13 keys are:
+
+| # | Key | Reuse pattern |
+|---|-----|---------------|
+| 1 | `events.community_hint` | "this event" (en) → "this board / goal / project" (×3 views) |
+| 2 | `posts.audience_all_members` | "Everyone in this community" (en) → "Everyone" (×7 non-post views) |
+| 3 | `posts.draft_note` | "under its audience" (en) → "to this group's members" (group view) |
+| 4 | `posts.language_hint` | "this post" (en) → "this event / board / goal / project" (×7 views) |
+| 5 | `posts.publish` | "Publish" (en) → "Open" (draft-list view) |
+| 6 | `posts.reply_language_note` | "replying" (en) → "commenting" (announcement view) |
+| 7 | `posts.title_hint` | "body-only post" (en) → "body-only entry" (group/event view) |
+| 8 | `projects.board.audience_default` | "this board" (en) → "this goal / project" (×2 views) |
+| 9 | `settings.dateformat_default_tail` | "you reset" (resident voice) → "a resident resets" (admin voice) |
+| 10 | `tag.input.hint` | "this post" (en) → "this event" (event view) / no tail (profile view) |
+| 11 | `grant.empty_groups` | curly vs. straight quotes in "under …" |
+| 12 | `grant.hint` | curly vs. straight quotes in "Select all" |
+| 13 | `profile.audience_off_note` | curly vs. straight quotes in "switch on …" |
+
+**Decision.** Context-reuse is an accepted pattern: the registry `en` value
+is the **generic platform form** (the floor a fresh `en` instance renders),
+and the view fallback is the **per-entity or per-voice form** that is more
+accurate for that specific context. The provider floor (D1) still resolves
+every registered key to its `en` text, so the generic form is always
+available; the view's fallback is an **opt-in refinement** for the one site
+where the generic wording would be misleading. No key is dead, no key is
+unregistered, and `KwLRegistryConsistencyTests` passes cleanly for all 13 —
+this amendment documents the design choice so a future audit does not flag
+them as drift.
+
+### 2026-09-12 — full-sweep + provider floor (the upgrade path)
+
+**Full sweep.** The registry is no longer a pilot surface: it now covers the
+*entire* platform UI (251 keys — every key is emitted by a `<kw-l>` in a view,
+and every registered key is emitted, so the M·12 completeness universe equals
+the view surface exactly). The wrapped surface spans the shared layout,
+Home, Posts, Groups (create/edit), Directory/Detail, Community/Manage,
+Moderation (queue + resolve), Account (verify / resend / denied), Admin
+(audit log + break-glass), Locale (settings + public picker), static pages,
+and the announcements lane (index / new / edit / detail + the two shared
+announcement partials). Deliberate exclusions, all recorded so they are not
+read as drift:
+
+- **The setup flow** (`AdminSetup/Setup`) — first-boot, single-admin,
+  pre-community; ADR 0005's seam never claimed it.
+- **The `about` product surface** (`StaticPages/About`) — *superseded for
+  this surface by ADR 0042 (2026-09-18), D3/D5*: its 17 `about.*` keys are
+  now registered and the view is wrapped in `<kw-l>` through the existing
+  mechanism; the exclusions below still hold for it.
+- **The FAQ placeholder** accordion — not platform UI yet (the FAQ content
+  is still `TODO(faq)`) — this exclusion stands.
+- **HTML attributes** (`placeholder`, `aria-label`, `title`) — the TagHelper
+  emits element *content*; attributes are out of its reach by design and are
+  left hardcoded.
+- **JS `confirm()` strings** — same reason; the dialog text is hardcoded.
+- **C#-built markup** (e.g. the grant-picker "select all" rows in
+  `Html.Raw`, and strings embedding inline `<code>` API identifiers or
+  inlined data values between words) — the `<kw-l>` element cannot wrap a
+  fragment inside a C# string, and registering a key whose rendered value
+  would drift from the actual output would make the registry a lie.
+- **`[Display(Name)]` model labels** — editor-internal, not platform copy.
+
+**Provider floor (the real upgrade mechanism).** The original design's
+"reseed to pick up new keys" premise turned out to be false in practice: the
+seeder runs **only** on a pristine DB (the `DbBootstrap.IsPristineAsync`
+gate), so a running instance whose code added keys would have kept rendering
+**raw keys** as the floor — which is exactly the regression this lane's
+first user-visible bug was. The floor was therefore tightened in code:
+`TranslationProvider.GetAsync` / `GetManyAsync` now resolve any
+registered-but-unseeded key to its `en` source text from
+`KnownTranslationKeys.EnValues`, with the raw key as the last resort for
+unregistered keys. Consequences:
+
+- **Code is the floor.** A registered key renders its English on *every*
+  instance — first-boot (seeder's rows present) or existing (floor from code)
+  — so upgrading the code is the entire upgrade path. **No reseed step
+  exists and none is needed.**
+- The seeder remains first-boot-only; its `en` rows are now a *stored copy*
+  of the registry, not the source of the floor.
+- The registry honesty invariant is now load-bearing: a key registered in
+  code but emitted by no view is dead weight, and a view emitting a key
+  missing from the registry renders a raw key. The final sweep holds the
+  invariant at 251 emitted = 251 registered, zero dead.
+
+
+---
+
+## ADR 0004 — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- Federation replaces local Identity with an OpenIddict IdP (the `identity` schema may
+  move to the IdP and be dropped here).
+- An Identity framework version changes store contracts enough to re-cost the Marten
+  store option.

@@ -1020,3 +1020,137 @@ carries the per-unit entries):
   allowlist, the closed inventory, the closed a11y lists, the one
   closed key) — a design that claims no cost has not priced it; this
   one does (§FACES check, the trade named).
+
+---
+
+## ADR 0107 — moved content (D11 trim, 2026-11-02)
+
+## Alternatives considered
+
+- **Ship the PWA push now** (the M6/M9 deferral's own ask) — rejected:
+  the push's surface is the M6 notification lane (the
+  `PushManager` registration + the `EmitAsync` push branch + the
+  admin's push-key management), a follow-on lane with its own ADR under
+  ADR 0076 and its own threat model (a push key is a secret the
+  platform would have to store — a Core surface M10 has no business
+  opening). M10 owns the prerequisite the deferral named, not the push
+  (D1).
+- **A global admin toggle for the PWA** (the ADR 0105 `MessagingEnabled`
+  shape) — rejected: the toggle exists to gate a *privacy-sensitive
+  opt-in*; the PWA substrate holds no resident data (C-M10·2), so the
+  knob has no gear. Shipping it would add a `LocaleSettings` field + a
+  service seam + an audit verb — a Core surface — to gate nothing
+  (D10, the recorded inverse of ADR 0105 D2).
+- **Tablet breakpoints in M10** (a `768–991 px` `md`-edge pass) —
+  rejected: D6's single-boundary rule pins the phone width; the site's
+  `container` + `col-*` system already handles the tablet range
+  acceptably, and a second boundary would double the closed inventory
+  U04/U05 have to fix + U06 has to pin. The tablet pass is a named
+  follow-on lane (Consequences), extendable under D6 without breaking
+  the M10 pin.
+- **A forced install banner** (a persistent "Install the app" strip or
+  modal) — rejected: the resident's device already gets the platform's
+  own nudge where the browser offers one (D5's one quiet button), and
+  iOS Safari's native share-sheet path is the fallback M10 does not
+  fight (F5). A banner would be a growth mechanic on a platform whose
+  value is the neighborhood's trust — the §Human-cost check's
+  "no persuasion" rule (C-M10·7's "quiet" pin).
+
+
+
+---
+
+## ADR 0043 — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A **contact page** or a **separate cookie policy** is wanted — decide it
+  as a *new* lane (the D5 / D7 scope-out note is the standing position).
+- A **third-party cookie** is introduced (a future integration lane) — the
+  D5 "no third-party cookies exist or are planned" record must be amended
+  and SECURITY.md §2 / §5 re-reviewed (the ADR 0005 C trust-boundary
+  precedent).
+- The community **adds further `system/` pages at runtime** and wants them
+  in the footer column — the D4 "exactly five" record is the standing
+  position; extend it by amendment rather than by a unit-level override.
+
+
+---
+
+## ADR 0160 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+### 2026-10-10 — the non-`en` baselines ship with the guides (the default going forward)
+
+The original wording of D4 deferred the 17 nested guides' `de` / `fr` / `da`
+baselines to a later human Translator lane (the guides shipped `en`-only on
+first boot). User sign-off (2026-10-10) reverses that: **the hand-curated
+`de` / `fr` / `da` baselines for all 17 nested guides + the `settings` index
+now ship in the same lane as the `en` floor** — added to `DeGuidePages()` /
+`FrGuidePages()` / `DaGuidePages()`, seeded create-if-missing by
+`SeedGuideTranslationsAsync` and backfilled by
+`BackfillGuideTranslationsAsync` (which was fixed to walk the two-level guide
+subtree, not just `help`'s direct children). D4 is re-stated accordingly, and
+the count is corrected to **17 nested** (the original D2 prose said "18" — the
+table, `GuideParentMap()`, and the code all agree on 17).
+
+This makes "a guide ships its `en` floor *and* its `de` / `fr` / `da`
+hand-curated baselines" the **default for any new guide**, mirroring the
+four-surface set and the original top-level guides (ADR 0057 D2). The
+"never machine-translated" clause (ADR 0005 C) is unchanged — the baselines
+are hand-written prose, not machine output.
+
+
+---
+
+## ADR 0111 — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — `nav.more` +
+  `nav_variant.{label,row,rail}` in en/de/fr/da.
+- `src/Kumunita.Web/Security/NavLayoutCookie.cs` — new (the `kumunita.nav`
+  preference cookie; `Read` defaults to B).
+- `src/Kumunita.Web/Controllers/NavLayoutController.cs` — new (`POST
+  /nav-layout`, CSRF-protected).
+- `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — the header branches on the
+  cookie (variant B default / variant C).
+- `src/Kumunita.Web/Views/Shared/_AccountNav.cshtml` — the nav-variant picker
+  sub-section in the account dropdown.
+- `src/Kumunita.Web/wwwroot/css/site.css` — the `kmb-rail*` / `kmb-topbar*`
+  surface + the fullbleed/expand extensions (responsive rules in the existing
+  media block).
+- **M11 (refined after ship):** `src/Kumunita.Web/wwwroot/sw.js` — the two
+  HTML shell pages go network-first so the switch renders immediately on
+  navigation (see the Service-worker interaction note above); the M10 design
+  doc `§SW` caching rule is updated to match. The switch's immediacy depends
+  on this strategy.
+
+
+---
+
+## ADR 0092 — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Web/wwwroot/css/site.css` (rename + comment)
+- `src/Kumunita.Web/Views/Announcement/Detail.cshtml`
+- `src/Kumunita.Web/Views/Event/Detail.cshtml`
+- `src/Kumunita.Web/Views/Groups/Detail.cshtml`
+- `src/Kumunita.Web/Views/Groups/PostDetail.cshtml`
+- `src/Kumunita.Web/Views/Page/Show.cshtml`
+- `src/Kumunita.Web/Views/Posts/Detail.cshtml` (post + reply triggers)
+- `src/Kumunita.Web/Views/Projects/BoardDetail.cshtml` (rename only)
+- `src/Kumunita.Web/Views/Projects/BoardIndex.cshtml`
+- `src/Kumunita.Web/Views/Projects/ProjectDetail.cshtml`
+- `src/Kumunita.Web/Views/Projects/TodoDetail.cshtml`
+- `src/Kumunita.Web/Views/Projects/TodosIndex.cshtml`
+- `docs/adr/0070-board-edit-lane-and-board-polish.md` (class name note)
+- `docs/adr/0082-content-actions-dropdown.md` (trigger shape)
+- `docs/adr/README.md` (index)
+
+Amends 0070 (the class's home — renamed) + 0082 (the trigger shape it
+prescribed); additive on 0069 / 0071 (the `⋮` menu convention, unchanged).
+No changes to `Kumunita.Core`, no new routes, no new `kw-l` keys, no new
+client modules.

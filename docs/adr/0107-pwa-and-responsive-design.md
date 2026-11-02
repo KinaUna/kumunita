@@ -11,28 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0107 — M10: PWA and responsive design (substrate-only PWA — an honest static manifest + the two new icon PNGs + one quiet localized install affordance; a GET-only closed-allowlist service worker that never caches signed-in content; one pinned breakpoint rule + a closed, split phone-width surface pass + two pinned a11y floors; zero Core change, zero new authorization surface, zero new audit verb, no `LocaleSettings` toggle)
-
-Status: Accepted
-Date: 2026-09-27
-Amends: **0031** (the `tsc`-only client pipeline — `pwa-install.ts` is
-the next self-wiring `client/lib` module in the ADR 0031 shape; no
-bundler, no new dependency, `package.json` stays typescript-only),
-**0015** (the closed `KnownTranslationKeys` registry — the one new
-`pwa.install` key joins it, all four languages, the
-`KnownTranslationKeys_ParityTests` invariant holds), **0076** +
-**0083** + **0084** (the M6/M9 deferral notes' "push / PWA push (M9 owns
-PWA)" — **superseded in the substrate only**: M10 owns the thing the
-deferral named as prerequisite — installability + the offline shell —
-and re-names the follow-on lane "PWA push notifications" (a
-`PushManager` lane under ADR 0076); the deferral's push itself is
-**unchanged** and stays deferred), **0092** (the borderless ⋮
-`.action-glyph-btn` — the class the D8a touch-target floor names as its
-densest fix target), **0105** (the ADR 0101 admin-toggle shape —
-**deliberately inverted**: M10 ships *no* `LocaleSettings` toggle, the
-recorded inverse of the `MessagingEnabled` shape, the design doc
-§install's "why it is not toggleable" pin).
-
 ## Context
 
 M1–M9 and the named lanes grew a full resident surface — directory,
@@ -244,37 +222,6 @@ make — the toggle would be a knob with no gear). *Forbids:* a second
 `kw-l` key, a `LocaleSettings` field, a `DependencyInjection.cs`
 registration, an `M*DocTypes` surface, an `AccessAudit` verb, or a file
 under `src/Kumunita.Core/` beyond the one closed-key registry entry.
-
-## Alternatives considered
-
-- **Ship the PWA push now** (the M6/M9 deferral's own ask) — rejected:
-  the push's surface is the M6 notification lane (the
-  `PushManager` registration + the `EmitAsync` push branch + the
-  admin's push-key management), a follow-on lane with its own ADR under
-  ADR 0076 and its own threat model (a push key is a secret the
-  platform would have to store — a Core surface M10 has no business
-  opening). M10 owns the prerequisite the deferral named, not the push
-  (D1).
-- **A global admin toggle for the PWA** (the ADR 0105 `MessagingEnabled`
-  shape) — rejected: the toggle exists to gate a *privacy-sensitive
-  opt-in*; the PWA substrate holds no resident data (C-M10·2), so the
-  knob has no gear. Shipping it would add a `LocaleSettings` field + a
-  service seam + an audit verb — a Core surface — to gate nothing
-  (D10, the recorded inverse of ADR 0105 D2).
-- **Tablet breakpoints in M10** (a `768–991 px` `md`-edge pass) —
-  rejected: D6's single-boundary rule pins the phone width; the site's
-  `container` + `col-*` system already handles the tablet range
-  acceptably, and a second boundary would double the closed inventory
-  U04/U05 have to fix + U06 has to pin. The tablet pass is a named
-  follow-on lane (Consequences), extendable under D6 without breaking
-  the M10 pin.
-- **A forced install banner** (a persistent "Install the app" strip or
-  modal) — rejected: the resident's device already gets the platform's
-  own nudge where the browser offers one (D5's one quiet button), and
-  iOS Safari's native share-sheet path is the fallback M10 does not
-  fight (F5). A banner would be a growth mechanic on a platform whose
-  value is the neighborhood's trust — the §Human-cost check's
-  "no persuasion" rule (C-M10·7's "quiet" pin).
 
 ## Consequences
 

@@ -823,3 +823,109 @@ them — D8, verbatim):
 6. **Bio image alt-text / captioning** — rides the ADR 0025/0011 image lane.
    *Why deferred:* M23 reuses the image lane as-is; a dedicated bio-image lane
    is a future lane.
+
+---
+
+## ADR 0123 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+- **2026-10-01 — One clarifying amendment, locked in U00 (design doc §1.a C1;
+  the register's [PROPOSED] set locked as-is, the unit plan's §2.4 gate wording
+  superseded in-unit):**
+  - **C1 — The D4 gate mechanism: locked at the **register's** single
+    `CanSeeAsync` pass.** The unit plan `m23-u00.md` §2.4 restated the D4 gate
+    as "**gate each survivor** by its `Profile.Visibility` (one `CanAsync` per
+    survivor via the existing `ProfileToAuditableResource`)"; the register's D4
+    (the tier-1 authority) locks it as "**gate the candidate set in ONE
+    `CanSeeAsync` pass** over `candidates.Select(p => new ProfileToAuditableResource(p))`
+    — **not** a per-profile `CanAsync` loop." **Locked at the register's
+    wording.** The `CanSeeAsync` bulk decision (the M3 `PostService.ListFeedAsync`
+    / M21 `DocumentService.ListAsync` idiom) returns a `VisibleSet`
+    (`Visible` ids + `HiddenCount`) and emits **exactly one aggregate**
+    `AccessAudit` row (`targetKind "directory"`, `visibleCount`/`hiddenCount`
+    set, `targetId = null`) — exactly the C-M23·4 shape. A per-survivor
+    `CanAsync` loop would emit **one decision row per profile** (the
+    "multiple rows" drift the §drift-guard forbids), and it would special-case
+    the owner branch (F3) that `CanSeeAsync` resolves internally. U03 implements
+    the **single `CanSeeAsync` pass**; the unit plan's per-survivor wording is
+    **superseded**. No D# text is rewritten — this is the single
+    D#-relevant clarification in the unit.
+
+- **2026-11-01 — F6 nav entry relocated from the top nav bar to a tab on the
+  Directory page.** The M23 find-people surface keeps its `/people` route and
+  the `nav.people` kw-l key (the label registry entry is untouched — a rename
+  never re-routes), but its **nav-bar entry** (the variant-B "More ▾" dropdown
+  item + the variant-C rail item beside Directory in `_Layout.cshtml`) is
+  removed. It is now reached through a **Directory · People tab strip**
+  (`src/Kumunita.Web/Views/Shared/_DirectoryTabs.cshtml`, the `_EventsTabs.cshtml`
+  nav-tabs idiom) that sits on **both** the Directory and the People landing
+  pages, so the two surfaces are sibling tabs of one section and a resident can
+  switch between them from either. Affected: `_Layout.cshtml` (the two
+  nav entries + the `_navPeople` label plumbing + the `/people` `activeNav`
+  mapping removed), the new `_DirectoryTabs.cshtml`, `Views/Directory/Index.cshtml`
+  and `Views/FindPeople/Index.cshtml` (the tab strip included), and
+  `M23FindPeopleTests`
+  (`Layout_Carries_APeopleNavEntry_InBothVariants` →
+  `Directory_Page_Carries_APeopleTab_LinkingTo_People`, pinning the tab strip
+  + its Directory inclusion instead of the nav entry). The `nav.people` key
+  stays registered in all four languages (the tab reuses it as its label
+  floor).
+
+
+## Supersedes
+
+- **None.** M23 **extends the existing `Profile` doc + adds one composition
+  service**; it does not supersede an earlier ADR. It *rides* ADR 0006 (the
+  frozen `Read` path + the two existing profile adapters + the deny-by-default
+  floor), ADR 0001-B (the `Visibility` audience + bio written verbatim), ADR
+  0004 §B.1 (the additive-field discipline — no new DocTypes surface, no
+  migration), ADR 0044 (the frozen `Tag` shared-id doc + the `ITagService`
+  create-or-get + the tag display-name resolution + the D5 global-enumeration
+  exclusion), ADR 0025/0031/0033 (the rich-content lane + the `bindRichEditor`
+  WYSIWYG + the single `MarkdownRenderer.RenderHtml` engine), and ADR 0090 D6 /
+  M8 D4 (the `PageSize = 30` idiom + the bio-substring engine). The two existing
+  profile adapters, the frozen ADR 0044 `Tag`/`ITagService` seams, and the
+  `CoreDocTypes` registration are **unchanged** (C-M23·2/6). This is stated
+  explicitly so a later reader knows M23 is an **additive profile + find-people
+  surface, not a correction** — no earlier ADR's decisions are revised or
+  re-scoped by this one.
+
+
+## Affected files
+
+- `src/Kumunita.Core/UserInfo/Profile.cs` — the two additive fields (`Bio`,
+  `TagIds`) (D1) + the `ProfileUpdate` extension (`Bio`, `TagIds`) (D3) (U01).
+- `src/Kumunita.Core/UserInfo/UserInfoService.cs` (`UpsertProfileAsync`) — the
+  bio verbatim write + the inlined ADR 0044 tag create-or-get, no profile-write
+  audit row, one `SaveChangesAsync` (D3) (U02).
+- `src/Kumunita.Core/UserInfo/IProfileFindService.cs` + `ProfileFindService.cs`
+  — new (the find-people read: `FindPeopleByTagAsync` / `FindPeopleByBioAsync`
+  + the `ProfileTagPage` / `ProfileBioPage` DTOs) (D4); `src/Kumunita.Web/
+  Program.cs` or `Kumunita.Core/DependencyInjection.cs` — the one
+  `AddScoped<IProfileFindService, ProfileFindService>` registration (the
+  `DirectoryService` shape) (D4) (U03).
+- `src/Kumunita.Web/Controllers/ProfileController.cs` — the `Edit` extension
+  (bio + tags surfaces) + the directory detail gate (bio + tags behind
+  `Visibility`) (D2/D3/D5) (U04).
+- `src/Kumunita.Web/Controllers/FindPeopleController.cs` — new (the `/people`
+  by-tag + by-bio find-people surface; the nav entry was moved to a tab on the
+  Directory page — see the 2026-11-01 amendment) (D4/D6) (U05).
+- `src/Kumunita.Web/Models/` + `src/Kumunita.Web/Views/` — the profile
+  editor/detail + find-people view models + views (U04/U05).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four locale
+  files — the 12 `profile.*` / `nav.people` `kw-l` keys in en/de/fr/da (U04 the
+  editor/detail/flash rows; U05 the find-people rows; the closed key set §7 of
+  the design doc).
+- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
+  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the
+  **one** milestone flip (U06 close: M23 → `StatusDone` + M22 promoted to
+  `StatusNext` + the pin re-pinned to `M22_Is_The_Single_InProgress_Milestone`).
+- **New tests** (the GATE-1…5 pins): `tests/Kumunita.Core.Tests/` — the
+  bio+tags-`Visibility`-gated/owner-sees-own + contact-block-independent pin
+  (GATE-1), the find-people visible-only + one-aggregate-row + no-leak pin
+  (GATE-2), the single-write-lane verbatim-bio + tag-creation + no-audit-row
+  pin (GATE-3), the zero-new-authorization-surface pin (GATE-4);
+  `tests/Kumunita.Web.Tests/` — the rich-render + null-safe bio pin (GATE-5) +
+  the `kw-l` closure pin (the `KwLRegistryConsistencyTests` /
+  `KnownTranslationKeys_ParityTests`).

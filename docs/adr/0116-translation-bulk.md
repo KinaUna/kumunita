@@ -11,38 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0116 — M15: Translation bulk (import/export, review & extend the platform's translations as a batch)
-
-Status: Accepted
-Date: 2026-09-29
-Extends the **`TranslationResource` store + the `(Key, LanguageCode)`
-unique index on `CoreDocTypes`** (ADR 0005 B), the **frozen
-`ILocalizationService` read/write seams** (`GetTranslationsForAsync` /
-`UpsertTranslationAsync` / `GetCompletenessAsync`, ADR 0005 D / the ML
-lane), the **closed `KnownTranslationKeys` registry + the en/de/fr/da
-parity pins** (ADR 0015 / ADR 0042 / ADR 0045 / ADR 0052), the **ADR
-0021 Translator standing split** (the `LanguagesController` class gate
-`[Authorize(Roles = "GlobalAdmin,Translator")]` — the bulk lanes ride it,
-the catalog mutations stay per-action GlobalAdmin-only), the **ADR 0048
-"blank = a remove decision" standing matrix** (C-M15·4 — a bulk file never
-carries a remove), the **M11 validate-then-apply fail-closed posture**
-(ADR 0108 D4 — copied to a file a resident can read), the **M13 CSV +
-one-audit-row precedent** (ADR 0114 — `analytics.export`), the **M12 serve
-idiom** (ADR 0112 / ADR 0034 — `Content-Disposition: attachment` +
-`Cache-Control: no-store`), the **`IcsWriter` / `TodoIcsWriter` BCL-only
-pure-emitter discipline** (ADR 0112 / ADR 0115 D4 — the
-`TranslationBulkExporter` / `TranslationBulkImporter` copy it), and the
-**C-M11·8 docs-parity precedent** (ADR 0108). This ADR makes the
-**platform's translations leave and re-enter the platform as one batch**
-(the ARCHITECTURE.md M15 value-chain row, verbatim): **export** the whole
-closed set (registry keys × catalog languages) into one plain-UTF-8 CSV,
-**import** the edited bundle back (present rows upserted, **blank =
-no-op**, a malformed file **refused before any write**), and **review /
-extend as a batch** in the editor (one save instead of N per-row saves) —
-a world-seam over one already-shipped store, with **zero new
-authorization surface, zero schema change, and zero new dependency**
-(C-M15·5/8).
-
 ## Context
 
 The `ML` / `ML-UI` lanes shipped the substrate (the store, the provider,
@@ -296,40 +264,3 @@ M15). All in **one** unit (the C-M11·8 precedent).
 **This ADR is the milestone's decision record (U00); the unit series
 U01–U06 executes it, and the U06 close flips the docs parity surface
 (D10 — the C-M11·8 precedent).**
-
-## Affected files
-
-- `src/Kumunita.Core/Localization/TranslationBulkRow.cs` — new (the
-  matrix POCO — a projection, not a Marten document; U01).
-- `src/Kumunita.Core/Localization/TranslationBulkExporter.cs` — new (the
-  pure exporter; U01).
-- `src/Kumunita.Core/Localization/TranslationBulkImporter.cs` — new (the
-  pure importer + the sealed `TranslationBulkImportRefused` refusal
-  shape; U02).
-- `src/Kumunita.Core/Localization/ILocalizationService.cs` +
-  `src/Kumunita.Core/Localization/LocalizationService.cs` — the four
-  additive seams (`GetBulkTranslationMatrixAsync` U01,
-  `UpsertManyTranslationsAsync` U02, `SaveAllTranslationsAsync` U03,
-  `RecordTranslationExportAsync` U04).
-- `src/Kumunita.Web/Controllers/LanguagesController.cs` — the three new
-  routes under the existing class gate (D3): `GET
-  {code}/translations/bundle.csv` (U04), `POST
-  {code}/translations/import` (U04), `POST {code}/translations/save-all`
-  + the `GET Translations` `?batch=true` flag (U05) + the additive `Mode`
-  property on the nested public `TranslationEditorViewModel` (U05). The
-  `SaveTranslation` route + the per-row editor byte-identical (C-M15·7).
-- `src/Kumunita.Web/Views/Languages/Index.cshtml` — the per-language
-  "Download (CSV)" link (U04) + `Views/Languages/Translations.cshtml` —
-  the upload affordance block (U04) + the batch-mode toggle + batch form
-  (U05) — additive markup only.
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the six
-  `translations.bulk.*` keys × en/de/fr/da (the four file-facing in U04,
-  the three editor-facing in U05; the parity pins extend, D8).
-- `tests/Kumunita.Core.Tests/` — the U01 (4) + U02 (5) + U03 (2) pins +
-  `tests/Kumunita.Web.Tests/` — the U04 (3) + U05 (2) pins + the U06
-  three acceptance tests + the cross-surface pins (names verbatim in the
-  design doc §pinned tests / §gate).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
-  — the M15 → `StatusDone` / M16 → `StatusNext` flip (D10), in one unit
-  (U06).

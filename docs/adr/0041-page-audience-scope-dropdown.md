@@ -11,17 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0041 — Page audience scope dropdown: "All residents" as a first-class flag
-
-Status: Accepted
-Date: 2026-09-17
-Amends: none (additive). Builds on the frozen base of **0006** (the
-decision order, the empty-audience-denies invariant C1, the `CanAsync` /
-`CanSeeAsync` frozen signatures), **0036** (the `Audience.Community` flag
-+ the 4th decision branch), and **0039 §3.4** (pages' audience editor is
-the M2 reusable `AudienceEditorModel` + `CommunityId` — the shape this
-ADR retires in favor of a top-level `Scope` dropdown).
-
 ## Context
 
 The page composer's "visibility" card (ADR 0039 §3.4, amended 2026-09-17
@@ -226,47 +215,3 @@ grants are *specific* user/group ids, not a set). It needed to be a
   exclusivity. The pre-ADR-0041 shape (a single "audience block" with
   a Community `<select>` + Mode radios + CommunityVisible checkbox +
   grant pickers) is gone.
-
-## Rejected alternatives
-
-- **Leave the form as-is, just add an "All residents" option to the
-  Community `<select>`.** Rejected — the Community `<select>` is
-  semantically "the target community of the `Community` flag", not
-  "the scope of the page". Adding an "All residents" option to it
-  would be a *lie* (it would set `Community = true` + `ComponentId =
-  null`, which is the *inert* shape — the branch 4 short-circuits on
-  a null `ComponentId`). A top-level `Scope` dropdown is the honest
-  shape.
-
-- **Use `AudienceMode` for the new flag.** Rejected — `AudienceMode`
-  governs how the *grant list* combines (Any / All). The
-  `AllResidents` flag is a *distinct grant*, not a mode of the grant
-  list (the ADR 0036 precedent). Making it an `AudienceMode` value
-  would collide with the C1 invariant (empty-list semantics) and with
-  ADR 0006's "the grant list is the explicit set" contract.
-
-- **Retire the audience editor entirely.** Rejected — the "Individual
-  access" scope still needs it (a board memo for three specific people
-  is a legitimate page scope). The editor is retained, but only
-  revealed when the author explicitly picks "Individual access".
-
-- **Make "All residents" a *default* on the stored `Audience` (i.e.
-  flip the flag `true` for every new page's audience).** Rejected —
-  the flag is a *first-class grant* the author opts into, not a
-  bootstrap default. A page that was `Audience { Community = true }`
-  + `ComponentId = "x"` should *stay* community-scoped, not become
-  all-residents-visible. The default is a *form* default (the Scope
-  dropdown's initial selection), not a *stored-shape* default.
-
-## Migration
-
-The `Audience.AllResidents` flag is a new property on an existing
-document type (Marten's versioned schema). It is **additive**: existing
-documents round-trip with the flag `false` (the .NET default), so no
-data migration is required. The `PageComposeViewModel.CommunityId`
-field is removed from the *view model* (the form-bound shape), but the
-`Page.ComponentId` document field is **retained** (the stored shape
-still needs it for the community scope). The `_PageForm.cshtml`
-visibility card is restructured (the Scope dropdown + the
-conditional editor); the pre-ADR-0041 form shape (a Community
-`<select>` + a CommunityVisible checkbox) is gone.

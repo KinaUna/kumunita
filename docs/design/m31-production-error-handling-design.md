@@ -873,3 +873,28 @@ Consequences that this design doc pins in detail. The ADR index
 hold). The full `Kumunita.Core.Tests` `ErrorReportServiceTests` class ran
 **8/8 green** (live Postgres via Testcontainers). **The M31 acceptance gate
 passes: 16/16, no drift pause, no still-open drift.**
+
+
+---
+
+## ADR 0023 — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A **reply-edit** surface is wanted that lets a resident edit their
+  own reply after a report is filed (ADR 0016 already lets the
+  author edit the body pre-report; post-report editing is a new
+  decision).
+- A **reply-removal** lane (distinct from the M3b post-hide /
+  post-remove) is wanted — today the F3/F4 lanes operate on the
+  post; a reply-own hide/remove is a new seam + a new `PostStatus`
+  value (or a new `PostReply` field) on the `PostReply` POCO.
+- **Announcement replies** (if/when announcements grow a reply
+  surface) are requested — today the report lane is post-scoped, and
+  an announcement reply would need its own discriminator + the same
+  two-negative filing-tag pin.
+- A **second target kind** (e.g. a translation row, a group
+  description edit) is reportable — the `Report` POCO would need a
+  `TargetKind` discriminator beyond post/reply, and the
+  `Action` / `TargetKind` audit-row convention established here
+  would extend to the new kind.

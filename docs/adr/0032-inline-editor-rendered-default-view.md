@@ -11,19 +11,6 @@ superseded_by: [adr-0033]
 updated: 2026-11-02
 ---
 
-# ADR 0032 — Inline editor: the rendered pane is the default view
-
-Status: Accepted
-Date: 2026-09-15
-Amends: 0031 (D1's *layout* — the "toolbar, source textarea, and preview each
-sit on their own full-width row, **all three visible at once**" split view.
-The `tsc`-only constraint, D1's no-`contenteditable` / no-HTML-round-trip /
-textarea-is-the-source-of-truth stance, D2's toolbar-as-Markdown-splice, D3's
-client-preview-mirrors-RC, and the no-second-renderer / no-new-server-surface
-consequences all **keep binding**. Does **not** supersede 0031; it changes
-which of the two already-shipped rows is the *default* one the resident lands
-on, and adds one toggle to switch between them.)
-
 ## Context
 
 ADR 0031 (the rich-editor lane, `RE`) shipped the split view: a toolbar row,
@@ -123,36 +110,3 @@ untouched.
   registered it but never emitted it through `<kw-l>` in any view. IE's
   `rc.editor.showPreview` is the canonical "show preview" label.
   (2026-09-15, post-close amendment.)
-
-## Not decided here (explicit non-decisions)
-
-Each is a **future lane**, named — the ADR 0011 / 0025 / 0031 precedent holds:
-
-- **localStorage persistence** — remember the resident's view preference
-  (source vs. pane) across sessions. A `localStorage` read on init + write
-  on toggle; a one-liner once the toggle is in.
-- **Keyboard shortcut** — a key binding (e.g. `Ctrl+Shift+E`) for the
-  toggle, discoverable via a tooltip or a `<kbd>` in the button's title.
-- **Caret mapping between views** — when the resident toggles from source
-  to pane, the caret/selection could map to the corresponding rendered
-  position (and vice versa). A power feature, not a floor; requires a
-  source-position → DOM-position mapping algorithm.
-- **Mobile-specific toggle UI** — a thumb-reachable toggle on small screens
-  (a floating action button, a bottom-sheet, or a sticky-positioned toggle).
-  A responsive CSS + JS concern.
-- **True `contenteditable` / third-party editor** (ProseMirror/Quill/Tiptap)
-  — **hard non-negotiable** out (D1, ADR 0031): it breaks `tsc`-only + the
-  no-HTML-round-trip stance + RC's `ImageIds` source parse. Not a deferral;
-  a separate-architecture decision that would supersede ADR 0031.
-
-## Revisit when
-
-- A resident asks to *remember* their view preference, or for a keyboard
-  shortcut / caret mapping — open the named IE-2 lane (a design doc + ADR),
-  not an amendment to this ADR.
-- The **`tsc`-only / no-editor-dependency** stance is challenged — that is the
-  load-bearing constraint of ADR 0031's D1; relaxing it is itself a new ADR,
-  not a code change.
-- The pane-only default proves *too* much of a shift (a resident repeatedly
-  can't find the source) — that is a UX tuning of the default, revisitable
-  without touching the source-of-truth (RE·1) or the renderer (RC R·1).

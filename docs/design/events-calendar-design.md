@@ -514,3 +514,101 @@ proof (C-EV·6). **All three gate tests PASS.**
   (`Assert.Empty` for the author). No other drift pause is open; §5.6's
   frozen pins were matched by every unit U02–U08 (each recorded **No
   drift** in the handoff note).
+
+---
+
+## ADR 0054 — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+- **Core (`Kumunita.Core.Tests`, DB-backed)** — `EventServiceTests`
+  (T01–T18, §3.7): the feed + audience branch family (`M4_*`, the
+  `A0036_*` family shape), the draft pin, the standing matrix, the
+  publish/delete lanes, the RSVP pins, the audit-row + adapter shapes.
+  `EventReminderServiceTests` (T19–T23): the Wolverine-free harness shape
+  of `AuditPurgeServiceTests` — window filter, `Going` filter, author
+  inclusion, idempotency-key shape, no-audit-row.
+- **Web (`Kumunita.Web.Tests`)** — `EventControllerTests` (NSubstitute
+  `IEventService`, no live Postgres — the `AnnouncementControllerTests`
+  shape): the route map, the 404-vs-403 split, the feed filter, the
+  composer/edit audience round-trip, the RSVP form.
+- **`MilestonesTests.cs`** — the `Ids` ordered list is **unchanged**
+  (`… PG, M4, M5, M6`); the `Shipped` set gains `"PG"`; the
+  single-in-progress pin is **renamed** `PG_Is_The_Single_InProgress_Milestone`
+  → `M4_Is_The_Single_InProgress_Milestone` (asserting `M4`) in the same
+  commit as the `Milestones.cs` + README status flips.
+
+
+---
+
+## ADR 0037 — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+Behavior is pinned at the **core** seam (the sealed, un-substitutable
+`PostService` / `AnnouncementService` run against a real `postgres:18`
+via Testcontainers), in `tests/Kumunita.Core.Tests/PostDraftModeTests.cs`:
+
+- Feed exclusion for everyone — community feed, group feed, announcement
+  list, and pinned list all omit a draft from the author, a member, and a
+  `GlobalAdmin` alike, while a live item still surfaces to its audience.
+- **`Draft_TargetedCommunity_NotLeakedToGlobalAdmin`** — the precedence
+  pin: a community-targeted draft is absent even for the admin, asserting
+  the `&&`/`||` shape of `ListVisibleAsync`.
+- Detail author-only — `GetPostAsync`, `GetGroupPostAsync`, and
+  `AnnouncementService.GetAsync` return the draft to the author and
+  `null` to a non-author (incl. a `null` actor), with **no `AccessAudit`
+  row** written (the ADR 0014/0016/0024 no-audit-row convention).
+- Publish author-only / idempotent / throws — `PublishPostAsync` (both
+  community and group lanes) and `AnnouncementService.PublishAsync` flip
+  the flag for the author, deny a `GlobalAdmin` non-author
+  (`UnauthorizedAccessException`), throw on a missing id
+  (`KeyNotFoundException`), are idempotent on a live item (no re-stamp of
+  `Modified`), and preserve `Pinned` on the announcement.
+- `ListMyDraftsAsync` (both surfaces) returns **only** the actor's live
+  drafts — not another actor's, not a deleted draft.
+
+The Web thin-layer mapping is pinned in
+`tests/Kumunita.Web.Tests/AnnouncementControllerTests.cs` (the
+announcement lane is the interface-backed surface, substitutable via
+`IAnnouncementService`): `Publish` maps draft+author → publish + redirect
+to `Detail`, a non-author (even `GlobalAdmin`) → `ForbidResult` with no
+write, `UnauthorizedAccessException` → `ForbidResult`,
+`KeyNotFoundException` → `NotFoundResult`, anonymous → `UnauthorizedResult`;
+`Detail` flags `IsAuthor && IsDraft` for the author and `NotFound` for a
+non-author; `New` (POST) wires the `SaveAsDraft` checkbox onto the
+`Announcement.IsDraft` create field (checked → draft, unchecked → live).
+
+**Why there are no route-level Web tests for the post / group-post /
+My-Drafts lanes:** `PostService` is a `public sealed class` that returns
+`Marten.Linq.IMartenQueryable<T>` from `Query<T>()` — it cannot be faked
+under NSubstitute, so the announcement lane (interface-backed) is the
+substitutable Web surface. The post and group-post *behavior* (the exact
+draft gates, publish seam, and list filtering this ADR pins) is exhaustively
+covered at the core lane above; the Web post/group routes are thin
+`Result`-mapping wrappers over those already-pinned seams, and the
+`/my/drafts` index is a read-only projection of `ListMyDraftsAsync`. Pinning
+the core lane is therefore the behavior pin; the thin Web mapping is
+asserted on the interface-backed surface as the representative case.
+
+
+---
+
+## ADR 0019 — moved content (D11 trim, 2026-11-02)
+
+## Related
+
+- **ADR 0005** — multilingual support (the "platform default + user override"
+  shape this ADR mirrors; §C UGC "never translated" is *unchanged* by this
+  ADR — this is a *display* change, not a *translation*).
+- **ADR 0004 §B.1** — additive schema-evolution pattern both new fields
+  follow (no re-seed, no breaking change).
+- **ADR 0002** — deployment topology (single-deployment, single-neighborhood;
+  the "host's OS is the deployment's choice" risk in the Consequences is
+  scoped by this ADR's single-deployment assumption).
+- **ADR 0015** — UI view-localization mechanics (the `kw-l` TagHelper this
+  ADR's `kw-dt` TagHelper mirrors; the same "per-request value rendered across
+  many views" problem, the same solution).
+- **ADR 0018** — UGC authored-in language tag (a different axis: that ADR
+  stores *what language* a piece of UGC is in; this ADR stores *what time zone*
+  to render timestamps in — the two are orthogonal and compose cleanly).

@@ -11,21 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0035 — Group-post media: the membership lane is the serve decision
-
-Status: Accepted
-Date: 2026-09-16
-Amends: 0025 (its *"content image"* serve decision — ADR 0025's R·4
-"the post's single `Read` decision" is the lane this ADR generalizes: for a
-group post the *single `Read` decision* is the **membership** lane, not the
-audience lane) and 0034 (its D4 serve-route decision — the same lane-choice
-generalization applies to the attachment lane; the post branch, the
-reply-parent branch, and the two serve routes now share one routing seam).
-Does **not** supersede 0013 (the group lane's invariants G·1–G·8 are the
-frozen base this ADR builds on) and does **not** touch 0011 (the byte store,
-the `MediaObject` catalog, the `MaxBytes` cap, and the guards-before-write
-ordering are all reused unchanged).
-
 ## Context
 
 Two shipped truths collide at the serve route:
@@ -144,36 +129,3 @@ G·1). This ADR records that decision and the shared seam that enforces it.
   `Kumunita.Web.Tests`), a separate infra decision. This ADR's 5 tests
   pin the *routing* (which the paused FACES depend on); a future lift of
   the paused FACES would build on this seam, not re-derive the routing.
-
-## Not decided here (explicit non-decisions)
-
-Each is a **future lane**, named — the ADR 0011 / 0025 / 0034 precedent
-holds:
-
-- **Lifting the 5 drift-paused Web serve FACES** (`AttachServe_F1…F5`,
-  `R4_Member_Allows_200`, etc.) — needs a drivable `PostService`
-  reverse-lookup seam (an interface) or a Testcontainers-backed
-  `Kumunita.Web.Tests` harness. A new-infra decision, its own unit
-  (ADR 0034 "revisit when" clause, unchanged).
-- **The image lane's reply-404 drift pause** (the
-  `PostReply.ImageIds` field still unpopulated by the reply write lanes;
-  `ContentImageController.Serve`'s reply branch still 404s) — this ADR
-  makes the *routing* group-aware (a group-post reply's image would route
-  to the membership lane *if* the field were populated), but does **not**
-  populate the field or lift the branch. A named follow-on lane
-  (ADR 0034 "not decided here", unchanged).
-- **Attachments on static/about pages (`LocalizedPage`)** — same seam,
-  own design doc + ADR (ADR 0034 "not decided here", unchanged).
-
-## Revisit when
-
-- A resident requests a feature in the "not decided here" list — open a
-  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment
-  to this ADR.
-- The **group lane's invariants G·1–G·8** change (e.g. a future lane adds
-  an audience grant to a group post) — the seam's routing would need to
-  re-derive; that is a new ADR (ADR 0013 amendment), not a code change.
-- The **audit policy on the group lane** changes (e.g. a future lane wants
-  a *second* audit row on the audience lane for a group post) — the
-  single-decision-path invariant (ADR 0006-D) is the one this ADR
-  preserves; a change is itself a new ADR, not a code change.

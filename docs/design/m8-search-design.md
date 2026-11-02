@@ -540,3 +540,32 @@ Append-only; each entry: date, unit, what diverged, the locked resolution.
 
 *End of design doc. Part 1 is the authority on why; Part 2 is the
 authority on shape. The ADR 0091 is the authority on the decision record.*
+
+---
+
+## ADR 0039 — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+- **Core (`Kumunita.Core.Tests`, DB-backed)** — `PageServiceTests`: the
+  standing matrix (create/edit/translate standing — GlobalAdmin /
+  community-Moderator / author / plain member), the `null`-audience-public
+  branch, the `Community` branch (the `A0036_*` family shape, a `PG_*`
+  family), the grants branch, the hierarchy cycle-guard + depth-cap, the
+  `GetByPath` resolution, the translation standing (the ADR 0029 matrix),
+  the soft-delete filter (a deleted page is absent from
+  `GetTreeAsync` / `GetByPathAsync`), the publish author-only pin.
+- **Web (`Kumunita.Web.Tests`)** — `PageControllerTests` (NSubstitute
+  `IPageService`, no live Postgres — the `AnnouncementControllerTests`
+  shape): the route map (`/pages`, `/pages/{path}`, `/about` → tree), the
+  404-vs-403 split, the tree filter, the mount-point resolution, the
+  composer/edit audience round-trip through the `AudienceEditorModel`.
+- **Renderer/editor parity** — a page body with the same Markdown markers a
+  post body uses renders identically (it does, by construction — one
+  `MarkdownRenderer`) and the `bindRichEditor` binding is byte-identical to
+  the post/announcement composer (it is — same
+  `textarea[data-rich-editor]`).
+- **`MilestonesTests.cs`** — the `Ids` ordered list gains `"PG"` (after
+  `"RE"`, before `"M4"`); the single-in-progress pin (M4) is unchanged; the
+  order + no-blank-title pins hold. The `Shipped_Milestones_Are_Marked_Done`
+  test is *not* affected (PG is `StatusPlanned`, not `StatusDone`).

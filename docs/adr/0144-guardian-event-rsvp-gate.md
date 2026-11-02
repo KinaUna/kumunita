@@ -11,32 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0144 — Guardian's event-attendance gate: the consent lane's missing promise made functional
-
-Status: Accepted
-Date: 2026-10-05
-Builds on: 0028 (the GU standing — the `GuardianLink` document, the
-`AccessVia.Guardian` value, the `GuardActiveLinkAsync` standing gate, and
-the G·1 cardinal rule: the lane never reads the child's content); 0038 (§F —
-the guardian consent text, `guardian.consent.duties_invitations`, which
-promises the guardian the power to "approve or deny all group and **event**
-invitations"; the consent gate is in place, but the *event* half of that
-promise had no enforcement lane — the gap this ADR closes); 0054 (M4 — the
-`Event` / `EventRsvp` documents, the `RsvpAsync` self-lane's last-write-wins
-shape, and the "no `AccessAudit` row on a routine RSVP" pin); 0013 (the
-group-invitation lane — the `GroupInvitation` `Pending → Accepted /
-Declined` request-row precedent, the "a re-request writes a fresh row, not a
-revival" shape, and the `guardian.group_invite` fan-out the new
-`guardian.event_request` kind mirrors); 0006 (the §A frozen-service
-rule — every new seam is an *additive* method on
-`IUserInfoService` / `IEventService`; no new bounded context, no new
-`AccessAction`, no branch in the frozen `IAuthorizationService`); 0004 (the
-persistence rule — one new `GuardianEventRequest` document on the
-`EventDocTypes` surface, one unique `(EventId, ChildId)` index, no EF); 0003
-(audit-by-default — the three guardian resolve lanes each write one
-`AccessAudit` row with `Via: Guardian`; the child's own self-lane writes
-**no** audit row, preserving the M4 pin)
-
 ## Context
 
 ADR 0038's consent text binds a guardian to "review and approve or deny all
@@ -336,11 +310,3 @@ inbox).
   `AuditsFor` query helpers) with the `EventDocTypes` surface added for the
   event documents — the 15 new Core tests + 8 new Web tests run in the
   same ~15-second window as the existing GU lane tests.
-
-## Amendment history
-
-- 2026-10-05 — initial. The user asked (after the consent-text audit
-  surfaced the gap) to implement the event-attendance gate with **three
-  optional postures** and chose `GuardianApproves` as the default (the
-  consent text's literal promise, the most protective). The three postures
-  are the `EventRsvpMode` enum; the default is `GuardianApproves`.

@@ -788,3 +788,78 @@ ctor call-site breaks in pre-existing test files — **repaired by U10**, not a
 drift pause; the `improve-check.ps1` gate (g) design-doc-Abstract blocker —
 **still open for U12**) are likewise **not §2.6 drift-pauses** (gate (g) is a
 close-flip task, not a frozen-pin violation). **No still-open §2.6 drift.**
+
+
+---
+
+## ADR 0281 — moved content (D11 trim, 2026-11-02)
+
+## Not covered (the 5 `SL·D` deferrals, verbatim)
+
+Each is a **named deferral** with a one-line `SL·D` follow-up candidate:
+
+- **Per-session `DeviceLabel`** — a resident-set label (rename "Chrome on
+  work laptop" to "My laptop"). A future `SL·D` lane adds the field + the
+  rename surface. *`SL·D` candidate: add `DeviceLabel?` to `SessionDoc` + a
+  `PATCH /sessions/{id}/label` action.*
+- **Per-session `Kiosk` flag** — a kiosk-mode session property. The kiosk is a
+  separate surface, not a session property. *`SL·D` candidate: the kiosk
+  surface declares its own session scope, not a `SessionDoc` field.*
+- **Admin "sign out all residents"** — a new `GlobalAdmin` action (kill every
+  resident's sessions platform-wide). Not a per-resident surface. *`SL·D`
+  candidate: a `GlobalAdmin` `POST /admin/sessions/kill-all` action over
+  `SessionService.*` with an `Admin` audit row (ADR 0006-E named lane).*
+- **Per-group / per-event session scoping** — sessions are per-account, not
+  per-resource. *`SL·D` candidate: a `SessionScope` document keyed to a
+  resource id, only if a M4/M5 surface genuinely needs it.*
+- **A session `Trust` / `Remember me` distinction** — the existing cookie
+  already carries a `Persistent` flag; no new surface in this lane. *`SL·D`
+  candidate: surface `Persistent` in the list if a resident asks.*
+
+
+## Deviations of record (the two documented deviations)
+
+1. **The U3 `SchemaBootstrap.cs` entry-read slip (a plan-documentation slip,
+   not a drift pause).** The plan's U3 "Entry reads" / "Deliverables" list
+   named `Kumunita.Core/Bootstrap/SchemaBootstrap.cs` as a place to add
+   `SessionDocTypes.Configure(opts);` "next to the existing
+   `CoreDocTypes.Configure` + `PostDocTypes.Configure` calls" there. That is
+   **factually wrong about this codebase**: `SchemaBootstrap.cs` contains
+   **no** `*DocTypes.Configure` calls at all — it only calls
+   `ApplyAllConfiguredChangesToDatabaseAsync()`, which picks up whatever
+   surfaces are already registered on the DI store's `StoreOptions` from
+   `Program.cs`. This codebase has **exactly one `StoreOptions`**, built once
+   in `Program.cs`; `SessionDocTypes.Configure` lives there (as it does for
+   every other context — `CoreDocTypes` / `PostDocTypes` / `MediaDocTypes` /
+   `PersonalNotesDocTypes` / etc.). U3 added the **single `Program.cs`
+   registration** (one line, after the existing `PostDocTypes.Configure`
+   line) and did **not** edit `SchemaBootstrap.cs` — following the codebase's
+   own documented, repeated precedent. This is recorded here so the ADR is the
+   source of the boot-wiring truth, not the plan's mis-stated file list.
+2. **The C3 same-transaction request-level deviation (see §Decision.4).**
+   The kill-all extension's two commits land in separate transactions within
+   the same request (the F5 Identity/EF path and the sessions Marten path do
+   not share a transaction); the `C3` pin is satisfied within each service
+   method + at the request level. The design doc §2.3 documents this deviation
+   and freezes it in §2.6 (U2's frozen-counts blockquote).
+
+
+## Close flip (U12, 2026-11-01)
+
+- `WhatsNew.cs` head = **`0.84.0`** / `2026-11-01` / ADR 0281 (the required
+  sixth close-flip member, the M27 lesson; the `WhatsNewTests` head-pin
+  bumped from `0.83.0` / ADR 0280 to `0.84.0` / ADR 0281).
+- [solution layout](../architecture/solution-layout.md) — the `Sessions/` line flipped to **`sessions` ✓ live**
+  with the gate summary (13/13 green).
+- `README.md` — the **`Sessions`** named-lane row added (mirroring the
+  **Prod-hardening** named-lane row — "a named lane, not a milestone");
+  `Milestones.cs` / `MilestonesTests.cs` **byte-identical**.
+- `STATUS.md` — the sessions-lane note (mirroring the prod-hardening named-
+  lane paragraph shape).
+- The design doc's first 15 lines now carry the `> **Abstract:**` blockquote
+  (the `improve-check.ps1` gate (g) — the 10-second "is this the right read"
+  gate — resolved; the doc is ~740 lines and over the 400-line ceiling).
+- `KnownTranslationKeys.cs` re-baselined **14885 → 14905** in
+  `improve-check.ps1` gate (a) by U9 (the 5 `settings.sessions.*` keys ×
+  en/de/fr/da = 20 entries); the ADR annotation for that re-baseline is this
+  ADR (ADR 0281), recorded in U9's handoff note.

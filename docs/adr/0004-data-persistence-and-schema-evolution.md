@@ -11,13 +11,6 @@ superseded_by: [adr-0011, adr-0037, adr-0105, adr-0108]
 updated: 2026-11-02
 ---
 
-# ADR 0004 — Data persistence & schema evolution
-
-Status: Accepted
-Date: 2026-08-26
-Amends: 0001 (Decision A — "Marten in place of EF Core"; Consequences — "no EF migration
-tooling")
-
 ## Context
 
 ADR 0001 chose Marten over EF Core, but ASP.NET Core Identity's default persistence *is*
@@ -158,10 +151,3 @@ Negative / accepted risks
 - Two migration systems — **scoped**: each confined to its own schema and tracking table.
 - ADR 0001's "Marten in place of EF Core" is amended to: Marten for the domain; EF
   strictly for the Identity tables.
-
-## Revisit when
-
-- Federation replaces local Identity with an OpenIddict IdP (the `identity` schema may
-  move to the IdP and be dropped here).
-- An Identity framework version changes store contracts enough to re-cost the Marten
-  store option.

@@ -300,3 +300,27 @@ directly. Do **not** make `FindTokenAsync` public to test it; keep the public su
   `hardening-handoff-notes.md` (the hash choice, the §6 compat rule, the §8 scope notes,
   and "Next unit = **F2.U2**") — **written before stopping**.
 - **F3 is NOT started** — it is the next clean-slate agent after F2 completes.
+
+---
+
+## ADR 0146 — moved content (D11 trim, 2026-11-02)
+
+## Invariants (pinned)
+
+- **C-0146·1 — The child account is created password-less.**
+  `RegisterChildAccountAsync` leaves the account's `PasswordHash` empty;
+  a `CheckPasswordAsync` against any candidate fails until the child sets
+  it. (Pinned by
+  `ChildAccountPasswordTests.RegisterChildAccount_CreatesAnUnverifiedAccountWithNoPassword`.)
+- **C-0146·2 — The child's credential is set by the child, at the link.**
+  `VerifyAndSetPasswordAsync` sets the password the child supplied, flips
+  `Verified`, and consumes the token in one commit; the child's password
+  then signs them in (a re-fetched `CheckPasswordAsync` succeeds) and the
+  token is single-use (a second presentation is refused). (Pinned by
+  `ChildAccountPasswordTests.VerifyAndSetPassword_SetsTheChildsOwnCredential_AndSignsIn`.)
+- **C-0146·3 — The self-serve lane is unchanged.** A resident who signed
+  up with a password gets the confirm-only verify link; the
+  `AddChildForm` pin is now three fields (no `Password`). (Pinned by
+  `GuardianViewModelsTests.AddChildForm_Is_Form_Model_With_Three_Fields`
+  and the unchanged `AccountController.Signup` behavior.)
+

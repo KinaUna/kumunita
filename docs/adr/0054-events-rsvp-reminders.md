@@ -11,27 +11,6 @@ superseded_by: [adr-0059, adr-0063, adr-0065, adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0054 — M4: Events, RSVPs & reminders (a new `Kumunita.Core.Events` context reusing the frozen authorization / audience / renderer / editor / email / §6.4-job seams)
-
-Status: Accepted
-Date: 2026-09-20
-Amends: **0001-B** (the `Audience` doc — *reused*, not extended),
-**0006** (the frozen `IAuthorizationService` / `IAuditableResource` surface
-— the new `EventToAuditableResource` adapter plugs into it, no signature
-change), **0036** (the `Audience.Community` branch — the composer seeds it
-`true` by default, verbatim the post convention), **0025** (the
-`MarkdownRenderer` + content-image idiom — the event `Body` is rendered by
-the *one* renderer), **0031** (the `bindRichEditor` — the event composer is
-the *one* editor), **0037** (the `IsDraft` flag + `/my/drafts` lane —
-carried onto `Event.IsDraft`), **0024** (the `IsDeleted` author
-soft-delete flag — carried onto `Event.IsDeleted`), **0018** (the authored-in
-language tag — carried onto `Event.LanguageCode`), **0044** (the `TagIds`
-idiom — carried onto `Event.TagIds`), **0034** (the attachment idiom —
-carried onto `Event.AttachmentIds`), **0019 / 0020** (the `kw-dt` TagHelper
-— every event timestamp renders through it), and **0014 / 0016 / 0017**
-(the author-only / author-of-record ∪ GlobalAdmin standing precedent — the
-event standing matrix reuses it).
-
 ## Context
 
 The roadmap arrows so far: **awareness** (M2 directory / groups),
@@ -271,22 +250,3 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   per-resident reminder settings (a follow-on lane), and the `VerifyDigest`
   §6.4 job (stays deferred). (The event-translation lane left out of M4's
   own scope shipped under **ADR 0059**.)
-
-## Tests
-
-- **Core (`Kumunita.Core.Tests`, DB-backed)** — `EventServiceTests`
-  (T01–T18, §3.7): the feed + audience branch family (`M4_*`, the
-  `A0036_*` family shape), the draft pin, the standing matrix, the
-  publish/delete lanes, the RSVP pins, the audit-row + adapter shapes.
-  `EventReminderServiceTests` (T19–T23): the Wolverine-free harness shape
-  of `AuditPurgeServiceTests` — window filter, `Going` filter, author
-  inclusion, idempotency-key shape, no-audit-row.
-- **Web (`Kumunita.Web.Tests`)** — `EventControllerTests` (NSubstitute
-  `IEventService`, no live Postgres — the `AnnouncementControllerTests`
-  shape): the route map, the 404-vs-403 split, the feed filter, the
-  composer/edit audience round-trip, the RSVP form.
-- **`MilestonesTests.cs`** — the `Ids` ordered list is **unchanged**
-  (`… PG, M4, M5, M6`); the `Shipped` set gains `"PG"`; the
-  single-in-progress pin is **renamed** `PG_Is_The_Single_InProgress_Milestone`
-  → `M4_Is_The_Single_InProgress_Milestone` (asserting `M4`) in the same
-  commit as the `Milestones.cs` + README status flips.

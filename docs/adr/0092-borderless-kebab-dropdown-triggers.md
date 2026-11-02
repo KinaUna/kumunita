@@ -11,11 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0092 — Borderless ⋮ dropdown triggers (all views)
-
-Status: Accepted
-Date: 2026-09-26
-
 ## Context
 
 The app's per-item action surfaces all use a single `⋮` Bootstrap dropdown
@@ -69,26 +64,3 @@ show first (the ADR 0082 motivation).
   the dropdown items, not the button class.
 - `Milestones.cs` / the README Roadmap / `MilestonesTests.cs`
   **untouched** (a surface polish, not a milestone).
-
-## Affected files
-
-- `src/Kumunita.Web/wwwroot/css/site.css` (rename + comment)
-- `src/Kumunita.Web/Views/Announcement/Detail.cshtml`
-- `src/Kumunita.Web/Views/Event/Detail.cshtml`
-- `src/Kumunita.Web/Views/Groups/Detail.cshtml`
-- `src/Kumunita.Web/Views/Groups/PostDetail.cshtml`
-- `src/Kumunita.Web/Views/Page/Show.cshtml`
-- `src/Kumunita.Web/Views/Posts/Detail.cshtml` (post + reply triggers)
-- `src/Kumunita.Web/Views/Projects/BoardDetail.cshtml` (rename only)
-- `src/Kumunita.Web/Views/Projects/BoardIndex.cshtml`
-- `src/Kumunita.Web/Views/Projects/ProjectDetail.cshtml`
-- `src/Kumunita.Web/Views/Projects/TodoDetail.cshtml`
-- `src/Kumunita.Web/Views/Projects/TodosIndex.cshtml`
-- `docs/adr/0070-board-edit-lane-and-board-polish.md` (class name note)
-- `docs/adr/0082-content-actions-dropdown.md` (trigger shape)
-- `docs/adr/README.md` (index)
-
-Amends 0070 (the class's home — renamed) + 0082 (the trigger shape it
-prescribed); additive on 0069 / 0071 (the `⋮` menu convention, unchanged).
-No changes to `Kumunita.Core`, no new routes, no new `kw-l` keys, no new
-client modules.

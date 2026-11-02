@@ -11,11 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0022 — User-added post & reply translations (the lane ADR 0018 deferred)
-
-Status: Accepted
-Date: 2026-09-17
-
 ## Context
 
 ADR 0018 (UGC authored-in language tag) deliberately scoped out a **separate
@@ -135,15 +130,3 @@ Negative / accepted risks
   seed rows), and the new UI keys are added to the **closed**
   `KnownTranslationKeys` registry (the seeder materializes their `en` rows and
   the provider's floor covers `en`), so no new provider seam is needed.
-
-## Revisit when
-
-- A **remove** or **correct** lane is wanted for a bad translation — that is
-  a new seam (an `UpdatePostTranslationAsync` / `DeletePostTranslationAsync`
-  pair), not a change to this add-only shape.
-- Translation of a post/reply is needed **beyond** the parent's audience
-  (e.g. a translation is visible even where the original is not) — then the
-  "inherits the parent's Read" invariant breaks and the row needs its own
-  audience + moderation, which is a much larger change.
-- **Announcement** translations are requested — that is the ADR 0017 lane
-  extended, a separate decision.

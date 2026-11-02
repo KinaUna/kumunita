@@ -1011,3 +1011,278 @@ service. The `KioskService.SavePlaylistAsync` code is **unchanged** (it
 was already the upsert shape); the M35·2 pin is preserved. The two other
 §2.2 divergences (caller's session vs. own session; nullable read vs.
 never-null read) remain. See **ADR 0170** for the full locked text.
+
+
+---
+
+## ADR 0164 — moved content (D11 trim, 2026-11-02)
+
+## Status
+
+**Draft.** M35 has not yet shipped — the six-member close flip (M35·11) is
+U10's responsibility, and **M35 is the last milestone** (the close promotes no
+successor). U10 flips this to `Accepted` at the close.
+
+
+## Tests
+
+- `KioskServiceTests` (6 tests, `Kumunita.Core.Tests`) — the seam's
+  invariants (no-row read → null, configured read → the row, read → zero audit
+  rows, write → one `kiosk.save` row, no-row write → upsert creates the
+  singleton, write → atomic in the caller's session), the M33
+  `StorageMetricsHistoryTests` `PostgresFixture` shape.
+- `KioskControllerTests` (6 tests, `Kumunita.Web.Tests`) — the display +
+  settings surface's behavior (signed-in sees the chrome-hidden first slide,
+  anonymous → sign-in redirect, denied slide → `kiosk.slide_denied` shape,
+  non-GlobalAdmin → 403, GlobalAdmin save → one audit row + persists, existing
+  surfaces render unchanged), the M33 `AdminStorageMetricsHistoryTests` shape.
+- `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` (the
+  closed `kiosk.*` key set's four-language parity — U06 adds the 8 keys).
+
+
+## References
+
+- ADR 0004 — persistence & schema evolution (the §B.1 additive singleton +
+  doc-type-surface idiom).
+- ADR 0006 — module boundary contracts (the "thin token, fat authorization"
+  posture + the Core HTTP-free D rule).
+- ADR 0015 — UI view-localization mechanics (the `kw-l` provider-floor
+  discipline + the closed key set).
+- ADR 0031 — the WYSIWYG editor + toolbar (the tsc-only, no-dep, no-`any`
+  JS pin the `kiosk.ts` mirrors).
+- ADR 0104 — the full-page + calendar-fullscreen modes (the
+  `body.kmb-page-expanded` chrome-hide idiom the kiosk reuses).
+- ADR 0110 — the `WhatsNew` registry (the required sixth close-flip member).
+- ADR 0114 — the M13 analytics surface (the `windowDays` "display-only, never
+  an access input" precedent the M35·4 intervals mirror).
+- ADR 0162 — analytics history (M34 — the "derived, not captured" precedent
+  M35 inverts to "new context + reused read seams").
+- ADR 0163 — home upcoming events & to-dos (the "display, not data" precedent
+  M35 shares for its signed-in display surface).
+
+
+## Amendment (2026-10-15) — per-resident playlist, moved out of admin
+
+The original decision was a **single GlobalAdmin-set** `KioskPlaylist`
+singleton (`Id = "kiosk"`) for one **shared** wall display, configured only at
+`/admin/kiosk` (the `[Authorize(Roles = GlobalAdmin)]` gate, `Via = Admin`
+audit row). A product decision has since moved the kiosk into the per-resident
+settings surface — a signed-in user should be able to configure **their own**
+`/kiosk` display. The following parts of this ADR are amended; the rest of the
+decision (the `Kiosk` bounded context, the `KioskPlaylist` / `KioskView` doc
+shapes, the `IKioskService` 2-method seam, the `GET /kiosk` +
+`GET /kiosk/slide` display, the `kiosk.ts` state machine, and the closed
+`kiosk.*` `kw-l` key set) is unchanged.
+
+- **Per-resident, not a shared singleton.** `KioskPlaylist.Id` is now the
+  **acting resident's subject id** (one row per user — the `LocaleSettings`
+  per-user preference shape, ADR 0004 §B.1), not the fixed `"kiosk"` sentinel.
+  The `SingletonId` constant is removed. The `/kiosk` display resolves the
+  **viewer's** playlist, and `/kiosk/slide` resolves the viewer's row. A
+  resident who has not configured one sees the `kiosk.empty` shape (the
+  M35-8 floor, unchanged).
+- **`IKioskService` keyed by actor.** `GetPlaylistAsync` now takes an
+  `actorId` argument (loads that resident's row). `SavePlaylistAsync` upserts
+  the row **keyed on `actorId`**.
+- **Settings surface: `/settings/kiosk`, any signed-in user.** The GlobalAdmin
+  gate is dropped — `KioskController.SettingsGet` / `SettingsPost` are now
+  `[Authorize]`d (class-level, no role), matching the `/settings/*` resident
+  convention. The M35-7 403 pin is replaced by a "no role gate" pin.
+- **Audit row: `Via = Owner`.** `KioskService.SavePlaylistAsync` now writes the
+  `kiosk.save` row with `Via = AccessVia.Owner` (the acting resident writes
+  their own playlist — the `timezone.set-default` per-resident standing, not
+  the `Admin` surface) and `TargetId = actorId`.
+- **Settings tabs + admin pointer.** The kiosk editor gains a tab in the
+  `/settings` strip (`_SettingsTabs.cshtml`), and the `/admin/platform` kiosk
+  row now points at `/settings/kiosk` (every resident configures their own).
+- **Retired address.** `GET /admin/kiosk` is kept as a redirect to
+  `/settings/kiosk` (the `/settings/email-language` → tab redirect precedent,
+  ADR 0080) so a saved link / bookmark / already-open old tab lands the user on
+  the new page rather than 404ing.
+- **Help.** A new resident guide `Kiosk` (nested under `settings`,
+  `GuideParentMap`) documents the per-resident `/settings/kiosk` + `/kiosk`
+  surface.
+- **Docs sync.** README roadmap + `STATUS.md` + the `WhatsNew` registry (a new
+  version row) reflect the per-resident move (the ADR 0110 sixth close-flip
+  member).
+
+
+## Amendment (2026-10-15) — display mode: full page vs. full screen
+
+The original M35 display hid the page chrome and let the stage fill the
+viewport, but in practice (a) some of the chrome the layout renders — the
+onboarding banner, the what's-new toast, and in the variant-C nav the icon-rail
++ topbar — was **not** in the chrome-hide list, so the `/kiosk` display still
+showed chrome above the stage; and (b) a resident operating a **wall-display
+TV** wanted the kiosk to own the **whole monitor** (the browser's tabs and
+address bar hidden too), not just the browser's window. This amendment makes
+the display **true full-page** and adds a **per-resident display-mode choice**.
+
+The bounded context, the `KioskPlaylist` / `KioskView` doc shapes (the
+5-member `KioskPlaylist` ceiling now includes `DisplayMode` — the original
+4-member ceiling is extended additively), the 2-method `IKioskService` seam
+(`SavePlaylistAsync` gains a `displayMode` parameter), the `GET /kiosk` +
+`GET /kiosk/slide` display, the `kiosk.ts` state machine, and the one
+`kiosk.save` audit row are **unchanged in shape** — this is an **additive
+delta**, the per-resident shape preserved.
+
+- **True full-page.** The `/kiosk` display's chrome-hide list is extended to
+  **every** chrome element the layout renders (both nav variants: the `.navbar`
+  row and the `.kmb-rail` + `.kmb-topbar` pair; plus the onboarding banner,
+  the what's-new toast, the flash toast, the pinned-announcement, the guest
+  notice, and the footer), and the stage is stretched to fill the browser
+  viewport edge-to-edge (the ADR 0104 `body.kmb-page-expanded` chrome-hide
+  idiom, applied in the view's inline `<style>`). The per-slide chrome (inside
+  the iframe) is already hidden by the layout's `body.kmb-embed` rules (the
+  `Sec-Fetch-Dest: iframe` signal) — unchanged. The notice strip (ADR 0176) is
+  hidden as a whole: `.kmb-notices` (the `.kmb-notices-more` "+N" badge is a
+  direct child of the strip, so hiding the strip covers the badge too — the
+  individual-notice rules alone left the badge stranded visible on the host
+  page, which is not itself `kmb-kiosk` and so was out of reach of the
+  per-slide `body.kmb-kiosk .kmb-notices` rule in `site.css`).
+- **`KioskDisplayMode` enum + `KioskPlaylist.DisplayMode`.** A new
+  `KioskDisplayMode` enum (`FullPage` | `FullScreen`) and a new
+  `KioskPlaylist.DisplayMode` member (the 5-member ceiling), **display-only,
+  never an access input** (M35·4 — a display preference, not an authorization
+  input). Default `FullPage` (a fresh row is the in-browser full-page shape).
+- **`IKioskService.SavePlaylistAsync` gains `displayMode`.** The
+  `SavePlaylistAsync` seam now takes the `displayMode` and persists it with the
+  row (the upsert shape is unchanged; the read returns it).
+- **Settings surface: the display-mode picker.** `GET/POST /settings/kiosk`
+  gains a **Display mode** picker (`kiosk.settings.display_mode` +
+  `.display_mode.full_page` + `.display_mode.full_screen` +
+  `.display_mode.hint` kw-l key set × en/de/fr/da — the closed `kiosk.*` key
+  set is extended from 8 to 12). The controller parses the form value and, on a
+  blank / invalid value, falls back to `FullPage` (a display preference is not
+  a validation gate — the M35·4 "display-only" precedent: the two interval
+  floors remain the only hard validations). The one `kiosk.save` audit row is
+  unchanged (still `Via = Owner`, keyed on the resident).
+- **`/kiosk` display: `data-display-mode` + the FullScreen buttons.** The
+  `#kiosk-stage` declares `data-display-mode` (`fullpage` / `fullscreen`). For
+  `Full screen`, the view renders an **enter-fullscreen button** (the board's
+  `.kanban-fullscreen-toggle` / calendar's `requestFullscreen` precedent — a
+  **user gesture** is required to enter the browser's Fullscreen API, so the
+  display degrades to `Full page` where the gesture is unavailable — Safari iOS
+  / the API's absence) + an **exit-fullscreen close** (shown only while
+  full-screen) + the `:fullscreen` stage rules (the stage owns the whole
+  monitor, edge to edge). The `✕` exit link (top-right, always) still exits the
+  kiosk itself; the browser's `Esc` also exits full screen.
+- **Tests.** The `KioskServiceTests` upsert pin now saves + reads back a
+  non-default `DisplayMode` (the round-trip pin); the `KioskControllerTests`
+  save-lane pin adds the `DisplayMode` form field + the `Arg.Any` / pinned
+  `KioskDisplayMode.FullScreen` delegation; the `KioskControllerTests`
+  chrome-hide string-pin is extended to the new chrome-hide selectors +
+  `data-display-mode`.
+- **Docs sync.** README roadmap + the `WhatsNew` registry (a new `0.64.0`
+  version row) + this ADR reflect the display-mode lane (the ADR 0110 sixth
+  close-flip member). The `Milestones.cs` / `MilestonesTests.cs` roadmap
+  order + shape are unchanged (M35 is still `Done` — the display-mode is a
+  refinement of the already-shipped M35 surface, not a new milestone).
+
+
+## Amendment (2026-10-25) — conditional refresh: only reload a slide when its content changed
+
+The original M35 `REFRESH` timer in `client/lib/kiosk.ts` re-rendered the
+current slide **unconditionally** on every `data-refresh-interval` tick — the
+iframe was re-pointed at its `src` (re-navigating, re-loading) even when the
+underlying board / calendar / to-do had **not changed**. On a wall display that
+is visibly disruptive: the slide flickers and re-loads on every tick regardless
+of whether anything happened. This amendment makes the refresh **conditional**:
+the slide is reloaded **only when its content fingerprint actually changed**.
+
+The mechanism reuses the **`GET /kiosk/slide`** endpoint the M35 design already
+reserved for the "check the current slide" fetch — it was declared but the
+`kiosk.ts` state machine shipped against the unconditional re-render instead.
+This amendment wires it up: the endpoint now returns a **content fingerprint**
+alongside the classification, and the state machine compares it to the last
+rendered fingerprint and **skips the iframe reload when they match**.
+
+The bounded context, the `KioskPlaylist` / `KioskView` doc shapes, the
+2-method `IKioskService` seam, the `GET /kiosk` display, the `kiosk.ts`
+state machine's shape (ADVANCE / REFRESH / denied-shape), and the one
+`kiosk.save` audit row are **unchanged in shape** — this is an **additive
+delta**, the per-resident shape preserved, and **no new** `AccessAction` /
+`AccessVia` / `Decide()` branch / `IAuditableResource` adapter (M35·1 /
+M35·3), **no** second `kiosk.*` `AccessAudit` row (M35·5), **no** new
+bounded context / doc / service (M35·9), **no** new dependency / build step
+(M35·7). The fingerprint is **display-only, never an access input** (M35·4):
+it is a change-detection signal computed from content the controller has
+already read through the frozen seams.
+
+- **Content fingerprint (display-only).** A new `KioskFingerprint.Of(string?)`
+  helper (`Models/KioskFingerprint.cs`) — a tiny, dependency-free **FNV-1a 32**
+  digest rendered as 8 lowercase hex characters — computes a stable digest of
+  the slide's display-relevant content (deterministic, no salt / randomness /
+  environment dependence — change detection only, **not** integrity or
+  signatures). The `KioskSlideViewModel` record gains a `Fingerprint` member;
+  the `KioskSlideRefreshViewModel` (the `/kiosk/slide` response) gains the same.
+- **Fingerprint builders (in the controller, over the already-read content).**
+  `KioskController` gains three private static builders, each producing a
+  canonical string from content the `Classify*` methods **already** loaded
+  through the frozen seams (so no new seam, no new read, no new audit row):
+  `BuildBoardFingerprint` (lane order + each card's id / title / status),
+  `BuildTodosFingerprint` (each row's id / title / status / `Modified` stamp),
+  and `BuildCalendarFingerprint` (the view unit + each in-range event's
+  id / title / start — the view unit is folded in so a day / week / month
+  rollover that keeps the same event set still re-renders). A **denied** slide
+  carries a fixed `"denied"` digest (distinct from any content digest by the
+  kind prefix), so a **visible↔denied flip is always detected** by the client's
+  equality check.
+- **`GET /kiosk/slide` returns the fingerprint.** The existing
+  `KioskSlideRefreshViewModel` response now carries the slide's `Fingerprint`
+  (the out-of-range branch returns the denied digest; the classified branch
+  returns the classified slide's digest). The CSRF-free GET + the `t` cache-bust
+  + the cookie-is-authorization shape are unchanged (the M12 iCal precedent).
+- **`kiosk.ts` REFRESH becomes conditional.** The `renderSlide` shape-paint is
+  split into a reusable `paintShape`; the state machine keeps a per-slide
+  `fingerprints` array (seeded from the slide meta's new `data-fingerprint`
+  attribute, index 0 pre-seeded from the server-rendered first slide). On each
+  `REFRESH` tick it **fetches** `GET /kiosk/slide?slide=N&t=…` and, when the
+  returned fingerprint equals the last rendered one, **skips the iframe reload
+  entirely** (no flicker, no re-navigation); when it differs (or the first
+  check), it re-renders (which also covers a visible↔denied flip) and stores the
+  new fingerprint. A `refreshing` guard prevents overlapping fetches, and a fetch
+  failure keeps the current slide and the next tick retries (a transient network
+  blip never drops the display). The ADVANCE cycle, the denied-shape, the
+  chrome-hidden stage, the display-mode, and the self-guard no-op are unchanged.
+- **The view emits the seed fingerprint.** `Views/Kiosk/Index.cshtml`'s
+  per-slide `.kmb-kiosk-slide-meta` divs gain a `data-fingerprint` attribute (the
+  slide's `Fingerprint`), so the state machine's initial slide (0) is stamped
+  with the server's first-render digest and the first `REFRESH` tick only
+  reloads if it genuinely changed.
+- **Tests.** The existing `KioskControllerTests` (the `GET /kiosk` /
+  `GET /kiosk/slide` surface pins) exercise the now-fingerprinted response and
+  continue to pass unchanged (the added members are additive; the response
+  `Single(...)` / `Json` shape pins are unaffected). The `WhatsNewTests` head
+  pin moves to the new `0.70.0` entry (the required sixth close-flip member).
+- **Docs sync.** The `WhatsNew` registry gains a `0.70.0` row (the
+  conditional-refresh lane); this ADR records the amendment. The
+  `Milestones.cs` / `MilestonesTests.cs` roadmap order + shape are unchanged
+  (M35 is still `Done` — the conditional refresh is a refinement of the
+  already-shipped M35 surface, not a new milestone).
+
+
+---
+
+## ADR 0104 — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Web/client/lib/expand-page.ts` (new)
+- `src/Kumunita.Web/client/lib/calendar-fullscreen.ts` (new)
+- `src/Kumunita.Web/wwwroot/js/lib/expand-page.js` (tsc output)
+- `src/Kumunita.Web/wwwroot/js/lib/calendar-fullscreen.js` (tsc output)
+- `src/Kumunita.Web/wwwroot/css/site.css` (expand-mode rules + calendar
+  `:fullscreen` rules)
+- `src/Kumunita.Web/Views/Projects/BoardDetail.cshtml` (expand toggle + close)
+- `src/Kumunita.Web/Views/Event/Calendar.cshtml` (expand toggle + close,
+  full-screen toggle + close in both branches, `calendar-fullscreen.js` load)
+- `src/Kumunita.Web/Views/Shared/_Layout.cshtml` (global `expand-page.js`)
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (4 new `common.*`
+  keys × 4 languages)
+- `docs/adr/README.md` (index)
+
+Additive on 0067 / 0070 (the board full-screen idiom it mirrors) + 0063 / 0064
+/ 0081 (the calendar surface) + 0031 (the tsc-only client pin) + 0015 (the
+`kw-l` registry). Amends nothing. No changes to `Kumunita.Core`'s service
+seams or schema; no new routes.

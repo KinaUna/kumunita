@@ -11,25 +11,6 @@ superseded_by: [adr-0040, adr-0057, adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0039 — Pages: a hierarchical, audience-restricted, translatable knowledge tree (absorbs the static-page lane)
-
-Status: Accepted
-Date: 2026-09-17
-Amends: **0005** (the static-page lane — `LocalizedPage`, `GetPageAsync`,
-`UpsertPageAsync`, `/terms`/`/help`/`/about` — is **absorbed** into the new
-`Pages` context and retired in U07), **0018** (the authored-in language tag
-carried onto `Page.LanguageCode`), **0022 / 0026 / 0029** (the user-added
-translation row shape carried onto `PageTranslation`), **0027** (the
-chip-swap display reused on the page post view), and **0037** (the draft
-idiom carried onto `Page.IsDraft`). **Additive** on **0001-B** (the `Audience`
-doc — *reused*, not extended), **0006** (the frozen `CanAsync` /
-`CanSeeAsync` signatures — the new `PageToAuditableResource` adapter
-plugs into them, no signature change), **0036** (the `Audience.Community`
-branch — reused verbatim for community-scoped pages), **0025** (the
-`MarkdownRenderer` + content-image idiom — the page body is rendered by the
-*one* renderer and edited by the *one* `bindRichEditor`), and **0034** (the
-attachment idiom — `Page.AttachmentIds`).
-
 ## Context
 
 The platform ships **one** resident-facing surface for long-form, admin-
@@ -289,28 +270,3 @@ repo's "no destructive step until green" discipline.
   readable until then. A fresh instance's `/about` / `/terms` / `/help`
   are byte-identical to today (the seeded pages carry the same `en`
   bodies), so nothing a resident can see is lost.
-
-## Tests
-
-- **Core (`Kumunita.Core.Tests`, DB-backed)** — `PageServiceTests`: the
-  standing matrix (create/edit/translate standing — GlobalAdmin /
-  community-Moderator / author / plain member), the `null`-audience-public
-  branch, the `Community` branch (the `A0036_*` family shape, a `PG_*`
-  family), the grants branch, the hierarchy cycle-guard + depth-cap, the
-  `GetByPath` resolution, the translation standing (the ADR 0029 matrix),
-  the soft-delete filter (a deleted page is absent from
-  `GetTreeAsync` / `GetByPathAsync`), the publish author-only pin.
-- **Web (`Kumunita.Web.Tests`)** — `PageControllerTests` (NSubstitute
-  `IPageService`, no live Postgres — the `AnnouncementControllerTests`
-  shape): the route map (`/pages`, `/pages/{path}`, `/about` → tree), the
-  404-vs-403 split, the tree filter, the mount-point resolution, the
-  composer/edit audience round-trip through the `AudienceEditorModel`.
-- **Renderer/editor parity** — a page body with the same Markdown markers a
-  post body uses renders identically (it does, by construction — one
-  `MarkdownRenderer`) and the `bindRichEditor` binding is byte-identical to
-  the post/announcement composer (it is — same
-  `textarea[data-rich-editor]`).
-- **`MilestonesTests.cs`** — the `Ids` ordered list gains `"PG"` (after
-  `"RE"`, before `"M4"`); the single-in-progress pin (M4) is unchanged; the
-  order + no-blank-title pins hold. The `Shipped_Milestones_Are_Marked_Done`
-  test is *not* affected (PG is `StatusPlanned`, not `StatusDone`).

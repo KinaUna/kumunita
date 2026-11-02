@@ -299,3 +299,429 @@ private async Task<IActionResult> ServeFile(string id, MediaObject stored)
   `MarkdownRendererTests.Attachment_Link_OpensInNewTab_OthersDoNot` (passing).
   This design records it as the preview affordance the inline branch enables —
   the two together are the feature; this lane is the disposition half.
+
+---
+
+## ADR 0122 — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+- **2026-10-01 — Two additive amendments, locked in U00 (design doc §1.a;
+  the register's [PROPOSED] set locked as-is, these two surfaces amended
+  in-unit):**
+  - **A1 — D5's upload standing: locked at `GlobalAdmin ∪ Moderator`** (the
+    register's proposed set, confirmed). The roadmap word *official* is an
+    authority act (the ADR 0017 announcements precedent — elevated standing,
+    not any-resident); `Moderator` is the standing the repo already treats as
+    the community-authority lane (`PostService.CreatePostAsync` admits
+    `GlobalAdmin` ∪ a component-`Moderator` to post, ADR 0003/0017/0021);
+    narrowing to GlobalAdmin-only would starve a one-neighborhood deployment,
+    and widening to "author-of-record ∪ GlobalAdmin" would re-introduce the
+    "any-resident upload" D5's *Forbids* tail rules out. U03 enforces the set
+    at the Web compose boundary; `DocumentService.UploadAsync` remains
+    standing-agnostic.
+  - **A2 — C-M21·7's upload audit-row: locked to *no* `AccessAudit` row.**
+    The register's C-M21·7 text said the upload "appends exactly one
+    `AccessAudit` row"; that is **amended** to "one standing-gated write, **no**
+    `AccessAudit` row" to match the live codebase, where **writes do not emit
+    audit rows — only `Read` decisions do** (verified: `PostService.
+    CreatePostAsync` "the audit row is the caller's job … does not append an
+    audit row"; `AttachmentController.Upload` "**No audit row**: the write is
+    authenticated, not an audience-restricted read"; `AnnouncementService`
+    create "announcements have no audit lane at all"). The mechanism confirms
+    it: `AccessAudit` rows are produced **only** by the frozen
+    `IAuthorizationService` `CanAsync`/`CanSeeAsync` seams. C-M21·7 and
+    GATE-6 are amended accordingly; the §drift-guard gains a line forbidding an
+    upload audit row.
+
+
+## Supersedes
+
+- **None.** M21 **adds a shared document repository**; it does not supersede an
+  earlier ADR. It *rides* ADR 0006 (the frozen `Read` path + the `Audience`
+  deny-by-default), ADR 0001-B (the `Audience` written verbatim), ADR 0011 (the
+  `IMediaStore` content-addressed volume + the `MediaObject` catalog + the
+  guards-before-write ordering), ADR 0034 (the serve-behind-decision pattern +
+  the `Content-Disposition: attachment` + RFC 6266 download shape), ADR 0017
+  (the authority-standing compose shape D5 generalizes), ADR 0004 §B.1
+  (additive-surface discipline), and ADR 0006-D (Core stays HTTP-free + feature
+  modules never re-derive access). The ADR 0011 `IMediaStore`/`MediaObject`
+  seams, the frozen `IAuthorizationService` `Read` path, and the
+  `AttachmentAllowedContentTypes` / `AllowedContentTypes` allowlists are
+  **unchanged** (C-M21·2/6). This is stated explicitly so a later reader knows
+  M21 is an **additive document-management surface, not a correction** — no
+  earlier ADR's decisions are revised or re-scoped by this one.
+
+
+## Affected files
+
+- `src/Kumunita.Core/Documents/Document.cs` — new (the `Document` catalog row)
+  (D1).
+- `src/Kumunita.Core/Documents/DocumentDocTypes.cs` — new (the additive doc
+  surface) (D1); `src/Kumunita.Web/Program.cs` — the one `AddMarten` boot line
+  + DI wiring (D1, D2).
+- `src/Kumunita.Core/Documents/DocumentToAuditableResource.cs` — new (the
+  adapter, `TargetKind = "document"`) (D2).
+- `src/Kumunita.Core/Documents/DocumentService.cs` — new (the `ListAsync` feed
+  + the `GetAsync` detail + the `UploadAsync` write lane + the `DocumentListResult`
+  / `DocumentDetailResult` / `DocumentUpload` DTOs) (D2/D4/D5).
+- `src/Kumunita.Core/Media/MediaOptions.cs` — the additive `DocumentAllowedContentTypes`
+  / `ResolvedDocumentAllowedTypes` / `IsDocumentAllowed` document lane (D3).
+- `src/Kumunita.Web/Controllers/DocumentController.cs` — new (the index /
+  detail / new / upload POST / download GET actions + the 5-step serve order +
+  the guards-before-write + the `GlobalAdmin ∪ Moderator` compose gate) (D5/D6/D7).
+- `src/Kumunita.Web/Models/` — the `DocumentIndexViewModel` /
+  `DocumentDetailViewModel` / `DocumentUploadForm` view models.
+- `src/Kumunita.Web/Views/Documents/*` — the `Index` / `Detail` / `New` views +
+  the nav entry (U04).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four locale
+  files — the 12 `documents.*` `kw-l` keys in en/de/fr/da (U04, the closed key
+  set §8 of the design doc).
+- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
+  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the
+  **one** milestone flip (U05 close: M21 → `StatusDone` + M22 promoted to
+  `StatusNext`).
+- **New tests** (the GATE-1…6 pins): `tests/Kumunita.Core.Tests/` — the
+  empty-audience deny/allow pin (GATE-1), the feed aggregate-row pin (GATE-2),
+  the zero-new-authorization-surface pin (GATE-4), the upload single-write /
+  no-audit-row / standing pin (GATE-6); `tests/Kumunita.Web.Tests/` — the
+  detail/download decision-row + 404-on-deny pin (GATE-3) + the ADR 0011
+  download-disposition + orphan-404 pin (GATE-5).
+
+
+---
+
+## ADR 0126 — moved content (D11 trim, 2026-11-02)
+
+## Follow-on lanes (each its own ADR)
+
+- **Document-lane inline preview** — ADR 0122/0125's D6 "download, never an
+  inline render" pin for authority-published documents is deliberate;
+  previewing a *previewable* official document (e.g. a PDF) is a separate
+  decision, its own ADR.
+- **Office / audio / video preview or streaming** — outside the previewable
+  set by construction (D3); any of them is a new type added to the allowlist
+  and, if it is to render, *explicitly* to the previewable set, in the lane
+  that earns it.
+- **In-page `<iframe>` preview (a lightbox on the content page)** — D4 forbids
+  it in this lane; a resident-facing "open preview on this page" affordance is
+  a future UI lane (it would need the iframe-isolation + the same `nosniff` /
+  declared-type discipline, and its own ADR).
+- **Lifting the ADR 0034 drift-paused Web serve tests** — the end-to-end
+  disposition pin belongs in `AttachmentServingTests`; lifting them (a
+  substitutable `PostService` seam or a Testcontainers-backed Web harness) is
+  the ADR 0034 "Revisit when" new-infra decision, not part of this lane.
+
+
+## Supersedes
+
+- **None.** ADR 0126 **amends ADR 0034** (D2 / C-ATT·2): the pin
+  "attachments are downloads, not renders" becomes "attachments are downloads,
+  **except the closed safe-renderable subset (D2/D3) which is served inline and
+  previewed in a new tab (D4)** — the explicit 'in-browser preview is a future
+  lane' deferral, now resolved for that subset." It does **not** supersede an
+  earlier ADR. It *rides* ADR 0034 (the serve route, the 5-step ordering, the
+  `Read` decision, the audit contract, the 404 posture — all unchanged), ADR
+  0011 (the `IMediaStore` content-addressed volume + `MediaObject` catalog,
+  unchanged), ADR 0006 (the frozen `Read` path + Core stays HTTP-free), ADR
+  0035 (the group-post membership decision the serve route resolves), and
+  ADR 0004 §B.1 (additive-surface discipline — the previewable set is a
+  `MediaOptions` member, not a schema field). The ADR 0034 `AttachmentIds`
+  fields, the `Find*ByAttachmentIdAsync` seams, the `IMediaStore` /
+  `MediaObject` seams, and the document + image lanes are **unchanged**. This
+  is stated explicitly so a later reader knows ADR 0126 is a **disposition
+  branch over ADR 0034, not a new storage or authorization surface** — no
+  earlier ADR's decisions are re-scoped by this one. **Implemented and
+  tested**: `MediaOptions.IsPreviewable` / `ResolvedPreviewableTypes` /
+  `PreviewableContentTypes` (D3) + the `AttachmentController.ServeFile`
+  disposition branch (D2) are in the tree; the F4 `IsPreviewable` pins land in
+  `tests/Kumunita.Core.Tests/Media/MediaOptionsPreviewableTests.cs` (8 pins,
+  passing). The end-to-end disposition-per-type serve pin (F1) remains in the
+  ADR 0034 drift-paused `AttachmentServingTests` harness (see Follow-on lanes).
+
+
+## Affected files
+
+- `src/Kumunita.Core/Media/MediaOptions.cs` — **additive**:
+  `PreviewableContentTypes` (optional config) + `ResolvedPreviewableTypes` +
+  `IsPreviewable(string?)`, mirroring the existing `IsAttachmentAllowed` /
+  `IsDocumentAllowed` idiom (the attachment + image + document members
+  unchanged).
+- `src/Kumunita.Web/Controllers/AttachmentController.cs` — `ServeFile` gains
+  the one disposition branch (D2): `inline` iff `IsPreviewable(stored.ContentType)`
+  else `attachment`; `nosniff` + the stored `Content-Type` unchanged.
+- `src/Kumunita.Web/Security/MarkdownRenderer.cs` — the
+  `IsAttachmentLink` helper + the `target="_blank" rel="noopener"` emission on
+  attachment links (D4) — **already in the tree** (shipped separately);
+  recorded here as the preview affordance the inline branch enables.
+- `tests/Kumunita.Core.Tests/…` — a pure `MediaOptions.IsPreviewable` pin
+  (the seven previewable types true; Office / zip / `text/html` / SVG false),
+  the `MediaOptions` allowlist-pin convention.
+- `tests/Kumunita.Web.Tests/AttachmentServingTests.cs` (or a new
+  `AttachmentPreviewTests`) — the disposition-per-type end-to-end pin, in the
+  ADR 0034 drift-paused harness (lifted with it) or the Web harness when it
+  lands.
+
+
+---
+
+## ADR 0011 — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A deployment wants **bytes off-box** (a shared VPS, a storage cost ceiling,
+  or a compliance requirement that the payload not sit on the app's disk) —
+  `IMediaFileStore` is the seam; a bucket-backed implementation replaces
+  `LocalVolumeFileStore` without touching `IMediaStore`, `MediaObject`, or
+  the serving route.
+- **Video / office docs / arbitrary downloads** ship (a follow-on lane) — the
+  `AllowedContentTypes` / `MaxBytes` boundary and the `ContentKind`-by-
+  content-type extension point are the seam this ADR is deliberately sized to
+  leave open, and the follow-on design doc should name them explicitly.
+- The **audit policy on Deny** changes (e.g. a follow-on lane wants to *not*
+  audit avatar denies) — C-MED·2 is the invariant; a change is itself a new
+  ADR, not a code change.
+
+
+## Amendment (2026-10-26)
+
+**Scope.** This amendment restates one consequence of the U8 "avatar form +
+`<img src="/profile/avatar/{subject}">` + monogram fallback" deliverable
+(§Decision "U8", §Consequences "Avatar is the reference consumer").
+Everything else in this ADR — the storage primitive, the HTTP-free seam,
+the content-hash integrity story, the FACES M1–M6 fail-closed 404 contract on
+the `GET /profile/avatar/{subjectId}` serving lane, the type/size boundary,
+and the two-restore-surface story — is unchanged.
+
+**What changed.** Previously every avatar slot in a Razor view shipped an
+`<img src="/profile/avatar/{subjectId}">` unconditionally and leaned on
+`client/lib/avatar.ts` (hiding the `<img>` and showing the `.avatar-mono`
+sibling on the browser's `error` event) to hide the broken image. That
+mechanism works but only *after* the browser has already made a request
+that the serving lane answers with 404 — the normal no-avatar case was a
+doomed fetch in the browser's network tab (and the dev-tools console) for
+every resident without an avatar. The serving lane's 404 is still the
+correct fail-closed contract for the *endpoint* (a direct URL request with
+no profile, a blocked profile, or no avatar set all 404 — FACES M3–M5);
+this amendment changes *how the views render*, not the endpoint.
+
+**The new mechanism.** Every avatar slot renders through the `<kw-avatar>`
+TagHelper (`src/Kumunita.Web/TagHelpers/AvatarTagHelper.cs`), which asks
+the `IAvatarPresenceChecker`
+(`src/Kumunita.Web/Security/AvatarPresenceChecker.cs`, a Web-layer read
+seam, **not** a frozen Core seam — Core stays HTTP-free, ADR 0006-D holds)
+whether the avatar actually resolves, and only then writes markup:
+
+- **Present** → the same `<img src="/profile/avatar/{subjectId}">` +
+  hidden `.avatar-mono` sibling the app always used (the `data-avatar-fallback`
+  + `client/lib/avatar.ts` swap stays as a belt-and-suspenders for the rare
+  render-then-delete race — the presence check is a read, the avatar could
+  be cleared between the check and the browser's fetch).
+- **Absent** → just the `.avatar-mono` circle (the resident's initial, or an
+  empty circle when the slot has no monogram channel), or nothing at all for
+  a slot that has neither — **no `<img>`, no request, no 404**.
+
+The presence check folds to `false` on exactly the set of conditions the
+serving lane 404s on (unknown profile, blocked profile, no `AvatarId`, or
+the media doc missing — the C-MED·7 "mt catalog and the volume are distinct"
+pin). The checker is a **read, never a decision** (ADR 0057 holds: the
+avatar lane is "all platform users"; no `IAuthorizationService.CanAsync`,
+no `AccessAudit` row, no new `AccessAction` / `AccessVia`), and it is
+**scoped** (one instance per request) so its per-subject cache makes a
+feed / comment list / board resolve one profile + media read per resident,
+not one per row (N+1 avoided; the "N+1 acceptable" precedent at the
+`PostsController` author display-name read is not reached here because the
+same reader serves every row on the page).
+
+**The reference-consumer consequence is restated.** ADR 0011's
+"Avatar is the reference consumer" pin (the follow-on lanes copy the
+C-MED·1/2/3/6 idiom) now applies to **both** the serving lane
+(`ProfileController.Avatar`, the frozen `GET /profile/avatar/{subjectId}`
+contract — unchanged) **and** the rendering lane (`<kw-avatar>` +
+`IAvatarPresenceChecker`). Follow-on lanes that need an avatar-style
+slot (e.g. the group-logo or badge-icon lanes named under
+"Follow-on lanes are a separate feature" above) should copy the
+`<kw-avatar>` idiom — present → `<img>` at the audited serving endpoint,
+absent → the slot's own placeholder — rather than shipping a raw `<img>`
+and leaning on a client-side error handler. `client/lib/avatar.ts` remains
+loaded in the layout (SECURITY.md §6 — no inline `on*`) as the
+secondary fallback for the present case; it is no longer the primary
+mechanism.
+
+**What did NOT change (explicit, so a future reader does not re-derive
+this from the code):**
+- The `GET /profile/avatar/{subjectId}` serving lane, its FACES M1–M6
+  outcomes, its `nosniff` header, and its "no audience decision / no audit
+  row" ADR 0057 shape — unchanged.
+- The `POST /profile/avatar` upload lane, its 400/413/415 guards, and its
+  store-first/profile-second ordering (C-MED·7) — unchanged.
+- The `IMediaStore` / `IMediaFileStore` seams, the `MediaObject` doc in
+  `mt`, the content-hash integrity story, and the two-restore-surface
+  (catalog + volume) backup contract — unchanged.
+- ADR 0057's "avatars are all platform users" pin — unchanged.
+
+
+---
+
+## ADR 0034 — moved content (D11 trim, 2026-11-02)
+
+## Not decided here (explicit non-decisions)
+
+Each is a **future lane**, named — the ADR 0011 / 0025 precedent holds:
+
+- **Attachments on static/about pages (`LocalizedPage`)** — same seam, own
+  design doc + ADR; this lane deliberately does not wire them (the
+  reverse-lookup has no `LocalizedPage` branch).
+- **Video / audio streaming** — files are download-only, never streamed or
+  previewed (in-browser preview is a future lane).
+- **Drag-and-drop multi-upload UI** — the button is the single affordance.
+- **File transformations** (thumbnail / conversion) — bytes are stored as
+  uploaded (the ADR 0011 stance).
+- **The image lane's reply-404 drift pause** (`PostReply.ImageIds` still
+  unpopulated by the reply write lanes; `ContentImageController.Serve`'s
+  reply branch still 404s) — this lane does **not** fix it; it makes the
+  *attachment* reply lane work. A named follow-on lane.
+
+
+## Revisit when
+
+- A resident requests a feature in the "not decided here" list — open a
+  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment to
+  this ADR.
+- The **audit policy on Deny** changes (e.g. a follow-on lane wants to *not*
+  audit a UGC Deny) — C-ATT·7/10 (inherited from C-MED·2) is the invariant;
+  a change is itself a new ADR, not a code change.
+- The **`AttachmentAllowedContentTypes`** allowlist needs a new accepted type
+  (e.g. a container format the neighborhood set does not cover) — extend the
+  pinned default in the same commit as the lane that earns it (the ADR 0011
+  "revisit when" clause, unchanged); a new *rejected* type is not a revisit
+  (rejection is the default).
+- The **5 drift-paused Web serve tests** are to be lifted — add a
+  substitutable `PostService` seam (an interface) or a
+  Testcontainers-backed `Kumunita.Web.Tests` harness, then un-pause
+  `AttachmentServingTests` (the intended bodies are preserved in its comment
+  blocks). A new-infra decision, its own unit.
+
+
+---
+
+## ADR 0031 — moved content (D11 trim, 2026-11-02)
+
+## Not decided here (explicit non-decisions)
+
+Each is a **future lane**, named — the ADR 0011 / 0025 precedent holds:
+
+- **Undo/redo** (a custom history stack on the textarea) — the browser's
+  native `Ctrl+Z` is the floor; a lane names the history API explicitly.
+- **Blockquote (`> `) in the toolbar and preview** — requires extending
+  `MarkdownRenderer` **and** the client preview together (the RE·2 parity
+  holds only if both move in the same commit).
+- **WYSIWYG contenteditable / third-party editor** (ProseMirror/Quill/Tiptap)
+  — **hard non-negotiable** out (D1): it breaks `tsc`-only + the no-HTML-
+  round-trip stance + RC's `ImageIds` source parse. Not a deferral; a
+  separate-architecture decision.
+- **Tables / footnotes** in the toolbar or preview — RC's "intentionally out
+  of scope" set; a lane that adds them to `MarkdownRenderer` *and* the client
+  preview *together*.
+- **Drag-drop image reordering** — the body text is the order (RC stance); a
+  future lane may add it if the plain-text order proves insufficient.
+- **The gated image lanes** (un-gating the image button on Post Edit / Group
+  Edit / Announcement / replies) — **RC**, not RE. Each is a separate RC
+  follow-up with a different missing seam (the write-lane `ImageIds` seam
+  and/or the serve-branch adapter). Un-gating is a one-attribute removal, no
+  RE code.
+
+
+## Revisit when
+
+- A resident requests a feature in the "not decided here" list — open a
+  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment to
+  this ADR.
+- The **`tsc`-only / no-editor-dependency** stance is challenged — that is the
+  load-bearing constraint of D1; relaxing it is itself a new ADR, not a code
+  change.
+- The `src` allowlist needs a new accepted shape — extend
+  `MarkdownRenderer.IsSafeImageSrc` **and** the client mirror in the same
+  commit as the route that earns it (the ADR 0025 "revisit when" clause,
+  unchanged); a new *rejected* shape is not a revisit (rejection is the
+  default).
+
+
+---
+
+## ADR 0035 — moved content (D11 trim, 2026-11-02)
+
+## Not decided here (explicit non-decisions)
+
+Each is a **future lane**, named — the ADR 0011 / 0025 / 0034 precedent
+holds:
+
+- **Lifting the 5 drift-paused Web serve FACES** (`AttachServe_F1…F5`,
+  `R4_Member_Allows_200`, etc.) — needs a drivable `PostService`
+  reverse-lookup seam (an interface) or a Testcontainers-backed
+  `Kumunita.Web.Tests` harness. A new-infra decision, its own unit
+  (ADR 0034 "revisit when" clause, unchanged).
+- **The image lane's reply-404 drift pause** (the
+  `PostReply.ImageIds` field still unpopulated by the reply write lanes;
+  `ContentImageController.Serve`'s reply branch still 404s) — this ADR
+  makes the *routing* group-aware (a group-post reply's image would route
+  to the membership lane *if* the field were populated), but does **not**
+  populate the field or lift the branch. A named follow-on lane
+  (ADR 0034 "not decided here", unchanged).
+- **Attachments on static/about pages (`LocalizedPage`)** — same seam,
+  own design doc + ADR (ADR 0034 "not decided here", unchanged).
+
+
+## Revisit when
+
+- A resident requests a feature in the "not decided here" list — open a
+  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment
+  to this ADR.
+- The **group lane's invariants G·1–G·8** change (e.g. a future lane adds
+  an audience grant to a group post) — the seam's routing would need to
+  re-derive; that is a new ADR (ADR 0013 amendment), not a code change.
+- The **audit policy on the group lane** changes (e.g. a future lane wants
+  a *second* audit row on the audience lane for a group post) — the
+  single-decision-path invariant (ADR 0006-D) is the one this ADR
+  preserves; a change is itself a new ADR, not a code change.
+
+
+---
+
+## ADR 0025 — moved content (D11 trim, 2026-11-02)
+
+## Not decided here (explicit non-decisions)
+
+Each is a **future lane**, named, gated on its owning resource — the ADR
+0011 precedent holds:
+
+- **Video / audio attachment** — the `AllowedContentTypes` / `MaxBytes`
+  boundary is the seam; a future lane names them explicitly.
+- **Server-side image transforms** (crop / resize) — bytes are stored
+  as uploaded (the ADR 0011 stance); a future lane adds the transform.
+- **Multi-image reordering UI** — the body text is the order; a future
+  lane may add drag-drop if the plain-text order proves insufficient.
+- **Any WYSIWYG / third-party editor** — the `tsc`-only constraint
+  stands; the composer is a textarea with a Markdown hint.
+- **Tables / footnotes in the renderer** — the "intentionally out of
+  scope" set stays; the renderer's smallness is the point.
+
+(Group logos, badge icons, and other follow-on ADR 0011 consumers are
+already deferred by ADR 0011's own "not decided here" — this ADR's
+`Amends:` line resolves ADR 0011's "post attachments" lane for
+post/reply/announcement/about only; the rest remain future lanes, each
+gated on its *owning* resource's audience, as ADR 0011 said.)
+
+
+## Revisit when
+
+- A resident requests a feature in the "not decided here" list — open a
+  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment
+  to this ADR.
+- The **audit policy on Deny** changes for a follow-on lane — C-MED·2 is
+  the invariant; a change is itself a new ADR, not a code change (ADR
+  0011's own "revisit when" clause, unchanged).
+- The `src` allowlist needs a new accepted shape (e.g. a future lane
+  serves from a different route prefix) — extend `IsSafeImageSrc` in the
+  same commit as the route that earns it; a new *rejected* shape is not a
+  revisit (rejection is the default).

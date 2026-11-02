@@ -585,3 +585,21 @@ and does not guess.
 > or larger set), the **2** tables (5 + 4 rows), and the **3** acceptance-gate
 > tests (closed-loop / handoff / part-vs-whole) are the *frozen counts* of
 > Part 2.
+
+---
+
+## ADR 0026 — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A **remove** or **correct** lane is wanted for a bad translation — that is a
+  new seam (an `Update*TranslationAsync` / `Delete*TranslationAsync` pair), not
+  a change to this add-only shape.
+- A **list** surface (the group list, the feed's community grouping, the
+  composer's community picker) should show a name in the resident's preferred
+  language — then the detail-page-only render scope breaks and the name needs a
+  per-language resolution at read time (a `TranslationProvider`-style seam), a
+  much larger change than the detail-surface lane this ADR ships.
+- A **community** should have an *owner* standing (rather than
+  GlobalAdmin∪Translator) — then the community lane's standing matrix gains an
+  `Owner` branch, which is a new decision (communities have no owner today).

@@ -11,25 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0052 — Warm-boot backfill of the UI-string `de` / `fr` / `da` baselines
-
-Status: Accepted
-Date: 2026-09-20
-Amends: **0042 D1** (the "no warm-reseed mechanism" decision and its
-recorded "new-key asymmetry" — the UI-string baselines **are** now
-backfilled on a warm boot, the same narrow-exception shape ADR 0047 D2
-already gave the four canonical pages' translation rows) and
-**0047 D2** (the exception is widened from "the four canonical pages'
-`PageTranslation` rows only" to "those rows **plus** the UI-string
-catalog's `TranslationResource` baselines"). Builds on **0042** (the
-ownership semantics: `en` code-owned forever, `de` / `fr` / `da`
-seeded-once-then-community-owned, an admin edit never overwritten),
-**0045** (the `da` baseline row), **0015** (the provider floor — why new
-keys' English already reaches a warm instance, isolating the gap to the
-non-`en` baselines), and **0048** (which surfaces gained edit/remove
-lanes — UI strings did not, a load-bearing difference for this ADR's
-safety argument).
-
 ## Context
 
 The UI-string catalog resolves per string through the provider's
@@ -169,14 +150,3 @@ warm, never both).
   community data owned by their authors (ADR 0005 B), not bundled
   baselines, and the two named exceptions above remain the only
   warm-boot write lanes on the translation rows.
-
-## Tests
-
-`LS_U04_SeederTests.BackfillUiStrings_CreatesMissingDeFrDa_SkipsExisting_
-Idempotent` (Core): a warm-deployment state (the `en` floor for every
-key + all baselines except two simulated gaps — one key missing all
-three, one key missing only `fr` and carrying an admin-edited `de`
-row) → the backfill adds exactly the missing rows with the baseline
-text, leaves the admin-edited `de` row byte-identical, never touches
-the `en` rows, creates no duplicates, and a re-run is a no-op. The
-existing page-backfill test (ADR 0047 D2) is unchanged and still green.

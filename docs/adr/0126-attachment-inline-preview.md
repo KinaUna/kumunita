@@ -11,11 +11,6 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0126 — Attachment inline preview: the safe-renderable subset renders in the browser
-
-Status: Accepted
-Date: 2026-10-02
-
 ## Context
 
 ADR 0034 shipped the file-attachment lane and pinned, as **C-ATT·2**, that
@@ -209,70 +204,3 @@ field, no new `IMediaStore` method, no migration.
 - **The PDF-JS guarantee is browser-side** (D1.4): safe in every modern
   browser's built-in viewer; the "open the downloaded PDF in a JS-executing
   desktop reader" path is outside the guarantee and is documented as such.
-
-## Follow-on lanes (each its own ADR)
-
-- **Document-lane inline preview** — ADR 0122/0125's D6 "download, never an
-  inline render" pin for authority-published documents is deliberate;
-  previewing a *previewable* official document (e.g. a PDF) is a separate
-  decision, its own ADR.
-- **Office / audio / video preview or streaming** — outside the previewable
-  set by construction (D3); any of them is a new type added to the allowlist
-  and, if it is to render, *explicitly* to the previewable set, in the lane
-  that earns it.
-- **In-page `<iframe>` preview (a lightbox on the content page)** — D4 forbids
-  it in this lane; a resident-facing "open preview on this page" affordance is
-  a future UI lane (it would need the iframe-isolation + the same `nosniff` /
-  declared-type discipline, and its own ADR).
-- **Lifting the ADR 0034 drift-paused Web serve tests** — the end-to-end
-  disposition pin belongs in `AttachmentServingTests`; lifting them (a
-  substitutable `PostService` seam or a Testcontainers-backed Web harness) is
-  the ADR 0034 "Revisit when" new-infra decision, not part of this lane.
-
-## Supersedes
-
-- **None.** ADR 0126 **amends ADR 0034** (D2 / C-ATT·2): the pin
-  "attachments are downloads, not renders" becomes "attachments are downloads,
-  **except the closed safe-renderable subset (D2/D3) which is served inline and
-  previewed in a new tab (D4)** — the explicit 'in-browser preview is a future
-  lane' deferral, now resolved for that subset." It does **not** supersede an
-  earlier ADR. It *rides* ADR 0034 (the serve route, the 5-step ordering, the
-  `Read` decision, the audit contract, the 404 posture — all unchanged), ADR
-  0011 (the `IMediaStore` content-addressed volume + `MediaObject` catalog,
-  unchanged), ADR 0006 (the frozen `Read` path + Core stays HTTP-free), ADR
-  0035 (the group-post membership decision the serve route resolves), and
-  ADR 0004 §B.1 (additive-surface discipline — the previewable set is a
-  `MediaOptions` member, not a schema field). The ADR 0034 `AttachmentIds`
-  fields, the `Find*ByAttachmentIdAsync` seams, the `IMediaStore` /
-  `MediaObject` seams, and the document + image lanes are **unchanged**. This
-  is stated explicitly so a later reader knows ADR 0126 is a **disposition
-  branch over ADR 0034, not a new storage or authorization surface** — no
-  earlier ADR's decisions are re-scoped by this one. **Implemented and
-  tested**: `MediaOptions.IsPreviewable` / `ResolvedPreviewableTypes` /
-  `PreviewableContentTypes` (D3) + the `AttachmentController.ServeFile`
-  disposition branch (D2) are in the tree; the F4 `IsPreviewable` pins land in
-  `tests/Kumunita.Core.Tests/Media/MediaOptionsPreviewableTests.cs` (8 pins,
-  passing). The end-to-end disposition-per-type serve pin (F1) remains in the
-  ADR 0034 drift-paused `AttachmentServingTests` harness (see Follow-on lanes).
-
-## Affected files
-
-- `src/Kumunita.Core/Media/MediaOptions.cs` — **additive**:
-  `PreviewableContentTypes` (optional config) + `ResolvedPreviewableTypes` +
-  `IsPreviewable(string?)`, mirroring the existing `IsAttachmentAllowed` /
-  `IsDocumentAllowed` idiom (the attachment + image + document members
-  unchanged).
-- `src/Kumunita.Web/Controllers/AttachmentController.cs` — `ServeFile` gains
-  the one disposition branch (D2): `inline` iff `IsPreviewable(stored.ContentType)`
-  else `attachment`; `nosniff` + the stored `Content-Type` unchanged.
-- `src/Kumunita.Web/Security/MarkdownRenderer.cs` — the
-  `IsAttachmentLink` helper + the `target="_blank" rel="noopener"` emission on
-  attachment links (D4) — **already in the tree** (shipped separately);
-  recorded here as the preview affordance the inline branch enables.
-- `tests/Kumunita.Core.Tests/…` — a pure `MediaOptions.IsPreviewable` pin
-  (the seven previewable types true; Office / zip / `text/html` / SVG false),
-  the `MediaOptions` allowlist-pin convention.
-- `tests/Kumunita.Web.Tests/AttachmentServingTests.cs` (or a new
-  `AttachmentPreviewTests`) — the disposition-per-type end-to-end pin, in the
-  ADR 0034 drift-paused harness (lifted with it) or the Web harness when it
-  lands.
