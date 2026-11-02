@@ -864,7 +864,7 @@ ships** (U05 owns it — the Consequences below).
 
 ### Superseded record (2026-09-19)
 
-> **Superseded 2026-09-19 by [ADR 0047](../../adr/0047-static-page-localization-and-backfill.md)
+> **Superseded 2026-09-19 by [ADR 0047](../adr/0047-static-page-localization-and-backfill.md)
 > (D1).** The "en-body by contract" record above was the state at U05 and
 > remains the **floor** (an absent translation still renders the `en`
 > body, and the ADR 0027 chip-swap is still *not* on the hard-coded
@@ -1008,3 +1008,343 @@ tab JS, no new dependency (the ADR 0031 tsc-only / no-dependency pin).
 The description **read** stays in the header (a group's blurb sits above
 the tabs, like a profile's bio); only the description **edit** form moves
 into Settings.
+
+
+---
+
+## ADR 0107 — M10 PWA + responsive design (moved detail)
+
+*Source: `docs/adr/0107-pwa-and-responsive-design.md`. Supersedes: ADR 0031.*
+
+### D2 — The SW allowlist (the 15-path closed set)
+
+The SW intercepts **only** same-origin `GET` responses whose path is on a
+closed 15-path allowlist (the app-shell floor: `/`, `/about`, the layout
+CSS, the manifest, and the signed-out shell's `client/lib` module subset).
+**Every other request — all signed-in pages, all `POST`s, `HEAD`/`OPTIONS`,
+any request carrying an `Authorization` header — passes through
+untouched** (the amended rule — a `return` without calling
+`event.respondWith()`, so the request never routes through the worker's
+own `fetch`; the original `event.respondWith(fetch(event.request))` form
+broke form submissions). This is the privacy pin (C-M10·2): the SW's cache
+partition can never hold a resident's feed, a conversation, an inbox, or a
+board. The negative pin (a signed-in route is not in the cache after a
+visit) is the U06 Playwright spec's
+`SignedIn_Route_Not_In_ServiceWorker_Cache`.
+
+### D3 — The manifest shape
+
+`wwwroot/manifest.webmanifest`: `name` / `short_name` / `start_url: "/"` /
+`display: "standalone"` / `background_color: "#fbfaf7"` +
+`theme_color: "#1c4532"` (read from `site.css` `:root` — `--bs-body-bg`
+line 78, `--bs-primary` line 106) / `icons` (192×192 `purpose: "any"` +
+512×512 `purpose: "any maskable"` with a safe-zone) / `id: "/"` /
+`scope: "/"`. **No `shortcuts`, no `screenshots`, no `categories`** —
+honesty over feature-creep. Linked from `_Layout.cshtml` `<head>` via
+`<link rel="manifest" href="~/manifest.webmanifest" />`.
+
+### D9 — The test split (the locked names)
+
+(a) `e2e-pwa-responsive.spec.ts` (U06) — the nine locked test names:
+manifest fetch + shape, the two icon files 200 + correct dimensions
+(asserted by reading the PNG IHDR bytes — no image-decode dependency), the
+SW registered in Chromium, the offline-shell revisit of `/`, the **negative
+pin** (a signed-in route is not in the SW cache after a visit), the 360 px
+viewport pass over the pinned surfaces with no horizontal overflow, and the
+two a11y floors. (b) One xUnit class `PwaManifestTests` —
+`manifest.webmanifest` parses as JSON with the required fields at the
+locked values, both icon paths exist in the repo, the `<link
+rel="manifest">` is in `_Layout.cshtml`, the `sw.js` allowlist
+string-matches the design doc §SW verbatim, the `pwa.install` key is
+registered in all four languages, and the `site.css` `@media` block
+boundary + count hold (four `max-width: 767.98px` blocks + one
+`prefers-reduced-motion` block).
+
+### D8 — The a11y floors (the closed element lists)
+
+(a) **touch targets** — the closed list: the `.navbar-toggler`, the
+`a#accountMenu` toggle, the `a#notifications-bell` anchor, the
+account-menu + language-picker `dropdown-item` rows, the flash toast's +
+the pinned announcement's `.btn-close`s (U04's half), and every
+`.action-glyph-btn` (ADR 0092 — U05's half) — each has a rendered hit area
+≥ **44×44 px** at the 360 px viewport. (b) **focus** — the closed list:
+the `.action-glyph-btn` `:focus-visible` ring + the `.kmb-flash-toast`
+`.btn-close` witness — a visible `:focus-visible` on every element on it.
+
+### Deferred lanes (each a named follow-on, own ADR)
+
+- **PWA push notifications** — a `PushManager` registration + the M6
+  `EmitAsync` lane's push branch + the admin's push-key management. Own
+  ADR, under ADR 0076. **This ADR supersedes the deferral's *substrate*
+  claim** and **re-names the follow-on lane "PWA push notifications"**;
+  the push itself stays deferred.
+- **Tablet responsive pass** — the `768–991 px` tablet range (Bootstrap's
+  `md` edge) is a follow-on polish lane. Own ADR.
+- **Offline authenticated pages** — a per-resident offline cache of
+  *their* feed, keyed on the `ActorId` + a per-device encryption envelope.
+  A follow-on lane with its own threat model + ADR.
+- **`maskable` icon refinement** — a per-OS adaptive icon set (Android's
+  `any` + `maskable` split, iOS's `apple-touch-icon` 180×180). A follow-on
+  polish lane.
+- **`screenshots` / `shortcuts` manifest enrichment** — the W3C optional
+  fields require per-language screenshot assets + the shortcut's target
+  routes. A follow-on lane.
+
+---
+
+## ADR 0156 — M33 Storage metrics history (moved detail)
+
+*Source: `docs/adr/0156-storage-metrics-history.md`.*
+
+### D2 — The `StorageMetricsSample` (the 8-member ceiling)
+
+The doc carries **exactly** 8 members (the `Id` + the 7-member sample
+shape mirroring the M24 `StorageMetricsSnapshot`, with `SampleDate`
+replacing `AsOf`): `Id` (string, **deterministic** — `"smh-" + yyyy-MM-dd`
+from the UTC `SampleDate`) · `SampleDate` (DateTimeOffset, UTC) ·
+`TotalUsedBytes` (long) · `TotalVolumeBytes` (long) · `FreeVolumeBytes`
+(long) · `UserContentUsedBytes` (long) · `TotalUniqueFiles` (int) ·
+`TotalDistinctUsers` (int). One sample **per UTC day**; the
+**deterministic `Id`** means a same-day re-capture **overwrites** the row
+(idempotent-by-construction; **no** dedup query needed). **Not** an
+`IAuditableResource` (the M13 C-M13·6 precedent, M33·4).
+
+### D5 — The capture lane (the full code shape)
+
+The `StorageMetricsCaptureService` (a **Wolverine-free static class** in
+`Kumunita.Core.Usage`, the `UsagePurgeService` house shape) carries
+`public const int RetentionDays = 365` +
+`public static async Task<int> CaptureAndPurgeAsync(IDocumentStore store,
+IStorageMetricsService metrics, DateTimeOffset now, CancellationToken ct =
+default)`. The impl: (1) computes the M24 snapshot via
+`metrics.GetSnapshotAsync(ct)`; (2) builds the `StorageMetricsSample` (the
+deterministic `Id` = `"smh-" + yyyy-MM-dd` from `now`'s UTC day; the 7
+data members mirroring the M24 `StorageMetricsSnapshot`, `SampleDate`
+replacing `AsOf`); (3) in **one write session** stores the sample +
+**purges** rows with `SampleDate < now − RetentionDays` (batched
+id-collection + delete, one `SaveChangesAsync`); (4) returns the purge
+count. **Zero** `AccessAudit` rows (M33·4). The
+`StorageMetricsCaptureTick`: `public sealed record
+StorageMetricsCaptureTick() : Wolverine.TimeoutMessage(TimeSpan.FromDays(1));`.
+The `StorageMetricsCaptureHandler` (Web `SideEffects/`):
+`public static async Task<IEnumerable<object>> Handle(
+StorageMetricsCaptureTick tick, IDocumentStore store,
+IStorageMetricsService metrics) { await
+StorageMetricsCaptureService.CaptureAndPurgeAsync(store, metrics,
+DateTimeOffset.UtcNow); return new[] { new StorageMetricsCaptureTick() }; }`.
+The **Program.cs boot seed**: next to
+`await bus.PublishAsync(new UsagePurgeTick());`,
+`await bus.PublishAsync(new StorageMetricsCaptureTick());`.
+
+### Named deferrals (each a future lane, own ADR)
+
+- **per-instance retention knob** (a `/admin/storage/settings` retention
+  field — M33 ships the `RetentionDays = 365` platform constant, M33·7).
+- **CSV export of the history** (the M13 "export = one audited row"
+  precedent — M33 v1 has **no** export lane, so **zero** `AccessAudit`
+  rows).
+- **capacity-projection / forecast** (a linear-regression "days until
+  full" estimate — M33 ships the trend, the operator reads the slope).
+- **per-user over-time history** (a per-user **over-time** breakdown).
+- **resident-facing history** (M33 is `GlobalAdmin`-gated — no resident
+  surface).
+- **the `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+  `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip** until the
+  milestone *ships* (U08 owns it — M33·12).
+
+---
+
+## ADR 0058 — Page "Reset to seeded text" lane (moved detail)
+
+*Source: `docs/adr/0058-page-reset-to-seeded-text-lane.md`.*
+
+### D2 — The seam (service lane + pure applier)
+
+- **`FirstBootSeeder.ResetSeededTextAsync(session, page, now, ct)`** — a
+  pure applier on the **seeder** that takes the already-loaded `Page`,
+  overwrites its `Title`/`Body` with the seeded English baseline, and
+  upserts (create-or-overwrite) the `de`/`fr`/`da` `PageTranslation` rows
+  from the seeded baselines. The seeder is the single source of the
+  seeded text, so the reset reads **the same** registries the seeder
+  writes on first boot. It throws `InvalidOperationException` if the
+  page's slug is not a seeded slug.
+- **`PageService.ResetToSeededAsync(pageId, actorId, actorRoles, session)`**
+  — the **service lane** that owns standing, the 404 contract, the audit
+  row, and the single `SaveChangesAsync`. It loads the page (null →
+  `KeyNotFoundException`), checks the edit standing (denied →
+  `UnauthorizedAccessException`), delegates the text applier to the seeder,
+  writes the audit row in the same session, and saves once.
+
+### D4 — Per-language behaviour
+
+- **A row that exists is overwritten** with the seeded baseline for that
+  language (the admin's customised wording is *replaced*).
+- **A row that is missing is created** (the seeded baseline fills it in).
+- **Languages the seeded baseline does not carry are untouched.** The reset
+  only ever writes the languages the code's seeded registries define for
+  that slug; any other `PageTranslation` row (a community-authored `es`
+  row, say) is **left alone**.
+
+The reset is **idempotent**: running it twice yields the same page; a second
+run does not create duplicate rows (the per-row `Id` is stable).
+
+### D7 — The Web surface
+
+- **Route:** `POST /pages/{id:guid}/reset-seeded` on the existing
+  `PageController`, `[Authorize]` + `[ValidateAntiForgeryToken]`.
+- **Mapping:** `UnauthorizedAccessException` → `403`,
+  `KeyNotFoundException` → `404`, `InvalidOperationException` (non-seeded
+  slug) → **`400`** with the exception message added to the model state.
+- **Button:** a single outline-danger "Reset to seeded text" form button
+  in the page edit form's action bar, rendered **only when** the form is
+  the edit view (`isEdit`) **and** `Model.CanReset` is true. It carries
+  the `confirm()` guard (D5) and an anti-forgery token.
+- **`CanReset`:** a `[BindNever]` view-model flag set by the Edit GET to
+  `FirstBootSeeder.HasSeededText(page.Slug)` — a **pure registry probe**.
+  A page with no seeded baseline simply hides the button.
+- **Localisation:** the button label uses the existing `kw-l` key
+  (`pages.resetSeeded`), added to the en/de/fr/da `KnownTranslationKeys`
+  registry.
+
+### Follow-on + References
+
+- **ADR 0128** — the **bulk** variant on top of this lane: an
+  `/admin/help` surface that surfaces *which* seeded pages have newer
+  shipped text and resets **every** seeded page in one audited action.
+  It reuses this lane's `ResetSeededTextAsync` applier and `page.reset`
+  audit verbatim.
+- **Code:** `FirstBootSeeder.ResetSeededTextAsync` +
+  `FirstBootSeeder.HasSeededText` (the applier + the pure probe),
+  `PageService.ResetToSeededAsync` (the service lane),
+  `PageController.ResetToSeeded` (the route),
+  `PageComposeViewModel.CanReset` (the `[BindNever]` flag),
+  `Views/Page/_PageForm.cshtml` (the button), `KnownTranslationKeys`
+  `pages.resetSeeded` (the UI string).
+- **Tests:** `PageServiceTests` `PG6_…` suite (the four-surface overwrite,
+  the create-absent-row case, the non-seeded-slug 400, the standing matrix,
+  the blog-author standing, idempotence, the missing-page 404, and the
+  `HasSeededText` probe).
+
+---
+
+## ADR 0115 — Integration of Events and Projects (M14) (moved detail)
+
+*Source: `docs/adr/0115-integration-of-events-and-projects.md`.*
+
+### D4 — The `VTODO` emitter (the closed pinned subset)
+
+The **closed, pinned `VTODO` subset**: the `VCALENDAR` envelope (the ADR
+0112 envelope verbatim — `VERSION:2.0`,
+`PRODID:-//Kumunita//community calendar//EN`, `CALSCALE:GREGORIAN`,
+`METHOD:PUBLISH`) + one `VTODO` per **dated** to-do (`DueAt != null ||
+StartAt != null`; neither ⇒ **skipped**) with the pinned order `UID` /
+`DTSTAMP` / `DUE` (cond.) / `DTSTART` (cond.) / `SUMMARY` /
+`DESCRIPTION` (cond.) / `STATUS:CANCELLED` (cond.). **`UID`** =
+`kw-todo-{todo.Id}@kumunita` (**stable**). **`DTSTAMP`** = the
+caller-passed `nowUtc`. **`SUMMARY`** = `Title`; **`DESCRIPTION`** = `Body`
+as **Markdown source** (not rendered HTML). **Never emitted** (the
+"never" list): `ORGANIZER` / `CREATED-BY` / `ATTENDEE`, `RRULE` /
+`RECURRENCE-ID`, `Audience` / grant / membership internals, `AuthorId` /
+`AssigneeId` / `ComponentId` / `ProjectId` / `EventId` / `ParentId` /
+`BlockedByTodoId` / `Status` / `LanguageCode` / `TagIds` / `ImageIds` /
+`AttachmentIds` / `Created`, and **any** `X-…` vendor property. CRLF
+endings; ≤ 75-octet fold (UTF-8-safe boundary + leading-space
+continuation); escaping (`\` → `\\` first, `;` → `\;`, `,` → `\,`,
+CR/LF → `\n`).
+
+### Consequences — "Not chosen" (the full list)
+
+- a **many-to-many `EventTodoLink` doc** (D1's 1:1 field is simpler +
+  matches the `ProjectId` "a to-do is *in* one project" precedent).
+- a **`Kumunita.Core.Events` → `Kumunita.Core.Projects` dependency** (the
+  ADR 0006 "a bounded context per concern" rule — the composition point is
+  the `EventController`).
+- a **new authorization surface** (C-M14·4 — the frozen `Read` decisions
+  already cover both surfaces).
+- a **subscription token** (a standing credential the resident would share
+  — the M6 link-lane posture, ADR 0085 / ADR 0095, wins).
+- an **`ORGANIZER` / `ATTENDEE`** property (it would leak the author /
+  assignee identity into a file that travels — the ADR 0028 posture wins).
+- a **`RRULE` / recurrence field** (C-M14·6 — **M18's** home, the source
+  of truth is `Milestones.cs`).
+
+### Superseded (stale forward-refs)
+
+ADR 0112's Consequences "Deferred … **recurring events** (`RRULE` —
+**M14** is the natural home)" and the `IcsWriter.cs` doc-comment "M14's
+home" ref. Both are superseded by this ADR: **`RRULE` / recurrence is
+M18's home** (D6), **not** M14's — M14's scope is the interlock, not
+recurrence.
+
+### Deferred lanes (each a named follow-on, own ADR / own milestone)
+
+- **recurring events / `RRULE`** (**M18** — the source of truth is
+  `Milestones.cs`).
+- **`RRULE` on the `VTODO` surface** (a to-do's recurrence rides M18's
+  recurrence concept).
+- **ICS import** (round-tripping calendar files **into** Kumunita).
+- **per-component calendar feeds** (a `?component=` scoping of the `VTODO`
+  feed).
+
+---
+
+## ADR 0064 — The events calendar DWM views (moved detail)
+
+*Source: `docs/adr/0064-events-calendar-dwm-views.md`. Supersedes: ADR 0063.*
+
+### D2 — The per-view window (the controller computation)
+
+`?view=day|week|month` on the **existing** `GET /events/calendar` route.
+The window is computed **in the controller**, in the effective zone (ADR
+0019): **`day`** — `[anchorLocalMidnightUtc, +1d)`; **`week`** — the
+anchor's **Monday-start** week: 7 days from the Monday on or before the
+anchor; **`month`** — the anchor's **calendar month**: from local midnight
+of the 1st to local midnight of the 1st of the next month (a real,
+variable span — the controller's `AddMonths(1)` handles it). **`month` is
+the default** — a missing `?view` renders exactly the shipped EV-CAL
+behavior reframed to the calendar month. An unparseable / out-of-set
+`?view` value **falls back to `month`** — a display fallback, not an error.
+
+### The invariants (C-DWM·1–C-DWM·9, pinned verbatim)
+
+- **C-DWM·1** — Zero Core change. No seam added, no `Event` / `EventRsvp` /
+  `EventTranslation` field, no `EventDocTypes` / boot-path change, no EF,
+  no new audit row shape. The only additive C# is the additive view-model
+  fields (`View` + `WindowDays`, `MonthLabel`→`Label`) and the `?view=`
+  param on the existing `Calendar` action.
+- **C-DWM·2** — Same visibility as EV-CAL. Each view shows *exactly* what
+  `ListInRangeAsync`'s `CanSeeAsync(Read)` gate allows for that window.
+- **C-DWM·3** — `?view=` is a display selector, never an access input. An
+  unparseable / missing / out-of-set `?view` **falls back to `month`**.
+- **C-DWM·4** — Overlap + time-positioning are client-side display concerns
+  over already-authorized data.
+- **C-DWM·5** — Week starts Monday; the zone is display-only, never an
+  authorization input.
+- **C-DWM·6** — Navigation is plain GET links, pre-rendered by the server;
+  no POST, no client state, no round-trip JS for nav.
+- **C-DWM·7** — Plain TS, zero deps; the existing
+  `client/lib/events-calendar.ts` is **not modified**.
+- **C-DWM·8** — Backward-compatible; `?view=month` is the default; the
+  list view is unchanged.
+- **C-DWM·9** — Localization parity: the 3 new `kw-l` keys
+  (`events.calendar.view.day/.week/.month`) are present in **all four**
+  seeded languages.
+
+### The 9 pinned tests
+
+**2 Core additive pins**
+(`tests/Kumunita.Core.Tests/EventCalendarSeamTests.cs`):
+`EV_Range_OneDayWindow_OnlyThatDay`, `EV_Range_SevenDayWindow_OnlyThoseDays`.
+
+**7 Web pins** (appended to
+`tests/Kumunita.Web.Tests/EventControllerTests.cs`):
+`Calendar_DefaultViewIsMonth_BackwardCompat`,
+`Calendar_ViewDay_WindowIsAnchorDayOnly`,
+`Calendar_ViewWeek_WindowIsAnchorWeek_MondayStart`,
+`Calendar_ViewMonth_WindowIsAnchorCalendarMonth`,
+`Calendar_InvalidViewFallsBackToMonth`,
+`Calendar_ViewRidesAlongInPrevNextNavLinks`,
+`Calendar_Label_IsViewAppropriate`.
+
+**The three-test acceptance gate** (recorded by the lane's U07):
+**closed loop**, **handoff**, and **part-vs-whole**.
