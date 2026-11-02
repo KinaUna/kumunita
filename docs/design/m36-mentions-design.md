@@ -1,3 +1,16 @@
+---
+id: design-m36-mentions
+title: "M36 — Mentions"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0076-notifications-inbox-and-recipient-email.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # M36 — @mentions (design doc)
 
 > **Abstract:** This design settles the **"reach a neighbor by name"** question

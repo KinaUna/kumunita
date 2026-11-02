@@ -1,4 +1,20 @@
+---
+id: design-tags
+title: "Tags (`TG`) — author-set subject labels"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0044-tags.md
+  - docs/adr/0013-group-posts-membership-lane.md
+updated: 2026-11-02
+---
+
 # Design Doc — Tags (`TG`): free author-set subject labels for posts and blog pages
+
+> **Abstract:** the **tags (`TG`)** design — **free author-set subject labels** for posts and blog pages: a shared `Tag` doc (author-created, reusable), the post/page `TagIds` reference, the tag picker, and the pinned seam-test names. Part 1 pins invariants + FACES; Part 2 the exact C# + tests. **Who is it for:** a developer touching the `Tag` doc or the `TagIds` reference; an agent that needs the shared-id shape. **When to read the rest:** before touching the tags context, the tag picker, or the `TagIds` field.
+
 
 > Part 1 of 2 (U1). Part 2 (U2) will append "Seams & contracts (Part 2, written
 > by U2)" with the exact C# shapes U3–U12 must match, the **pinned seam-test

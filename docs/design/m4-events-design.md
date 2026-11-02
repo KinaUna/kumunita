@@ -1,4 +1,21 @@
+---
+id: design-m4-events
+title: "M4 — Events, RSVPs & reminders"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0054-events-rsvp-reminders.md
+  - docs/adr/0037-draft-mode-author-only.md
+  - docs/adr/0024-author-soft-delete-lane.md
+updated: 2026-11-02
+---
+
 # M4 — Events, RSVPs & reminders — design
+
+> **Abstract:** the **M4 events** design — the first **content-with-time** milestone: a new bounded context (`Kumunita.Core.Events`) with `Event` + `EventRsvp`, the `IEventService` seam, the `EventToAuditableResource` adapter, the `EventController` + views, and the **`EventReminders` scheduled job** (day-before reminders). The **feed** (the neighborhood's upcoming events), **RSVPs** (attending / not / maybe), and **reminders** in one. **Who is it for:** a developer touching the `IEventService` read seams or the RSVP lane; an agent that needs the `Event` / `EventRsvp` field shapes. **When to read the rest:** before touching the events context, the RSVP seam, the reminder job, or the calendar / ICS surfaces that build on M4.
+
 
 > **Milestone.** `M4` — the **coordination** arrow (the `M0`–`M6` roadmap
 > letters stay fixed: M5 stays Projects, M6 stays Portability). **ADR 0054**

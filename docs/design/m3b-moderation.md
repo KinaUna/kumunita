@@ -1,3 +1,17 @@
+---
+id: design-m3b-moderation
+title: "M3b — Moderation"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+  - docs/adr/0003-roles-and-moderator-scoping.md
+updated: 2026-11-02
+---
+
 # Design Doc — M3b: Moderation (report workflow, `Via = Report`, `Post.Status`, reply route, e2e)
 
 > **Abstract:** *What it settles:* the **report workflow** (file / assign /

@@ -35,7 +35,7 @@ matter for *you* — the things to read before you touch code or docs.
 | [`docs/plans-milestones/improve-docs/plan-improve-docs.md`](../plans-milestones/improve-docs/plan-improve-docs.md) | The lane register for the current doc restructure — the `D`-units, the evidence, the target shape. The unit spec for your current task. |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The philosophy in one hour — the "why" behind the conventions, the integration argument that the seams are the point. |
 | [`docs/adr/`](../adr/README.md) | The ADR index — the deciding document for any non-obvious rule. The code cites ADR numbers ~9 600 times; the number is the stable key. |
-| [`docs/design/m3b-moderation.md`](../design/m3b-moderation.md) | A sample of the living design references — the current truth per subsystem (the `design/` folder; `D10` settles its status). |
+| [`docs/design/`](../design/m3b-moderation.md) | The current truth per subsystem (every doc `tier: reference` / `kind: design` + an Abstract, `D10`) — the **six subsystem hubs** are the doors in: [events](../design/events-subsystem.md) · [rich content](../design/rich-content-subsystem.md) · [notifications](../design/notifications-subsystem.md) · [storage metrics](../design/storage-metrics-subsystem.md) · [analytics](../design/analytics-subsystem.md) · [prod-hardening](../design/prod-hardening.md). |
 
 The per-audience entry pages live under [`start/`](../README.md#per-audience-entry-pages)
 — this page is one of them.

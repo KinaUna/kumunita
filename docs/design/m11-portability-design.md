@@ -1,4 +1,20 @@
+---
+id: design-m11-portability
+title: "M11 — Portability (import/export)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0108-portability-import-export.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M11 — Portability (import/export) — design
+
+> **Abstract:** the **portability (import/export)** design — a GlobalAdmin moves the **whole instance** in and out as one versioned `*.kumunita` archive (content + media bytes + the identity *graph* + instance identity) with a **fail-closed, atomic** restore. The load-bearing invariant is the **no-secret boundary** (the archive travels the identity graph, never the credential material). **Who is it for:** a developer touching the `Portability` extractor/re-creator; an agent that needs the closed content inventory. **When to read the rest:** before touching the import/export lanes, the archive format, or the media-byte verification.
+
 
 > **Milestone M11.** A GlobalAdmin moves the **whole instance** in and out,
 > as data: one portable, **versioned** `*.kumunita` archive (the whole

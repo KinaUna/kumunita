@@ -1,4 +1,21 @@
+---
+id: design-m17-bookmarks
+title: "M17 — Bookmarks"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0118-bookmarks.md
+  - docs/adr/0105-messaging.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M17 — Bookmarks (save posts, events, todos, etc. for quick personal
+
+> **Abstract:** the **bookmarks** design — the resident's **quick-access list**: a private pin of the content they care about (post / event / todo / announcement / page) into one returnable list. One new bounded context (`Kumunita.Core.Bookmarks`) + one `Bookmark` doc; **no adapter** (a personal-by-id record). **Who is it for:** a developer touching the `Bookmark` doc; an agent that needs the personal-by-id shape. **When to read the rest:** before touching the bookmarks context, the pin/unpin lane, or the `bm.*` keys.
+
 access) — design
 
 > **Milestone M17.** The resident's own **quick-access list**: a private,

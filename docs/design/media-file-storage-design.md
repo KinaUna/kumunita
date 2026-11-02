@@ -1,4 +1,20 @@
+---
+id: design-media-file-storage
+title: "File & media storage (content-addressed)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0011-media-and-file-storage.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # Design Doc — File & media storage (content-addressed local-volume store + profile-avatar reference lane)
+
+> **Abstract:** the **file & media storage** design — a **content-addressed local-volume store** (`IMediaFileStore` + `MediaObject` catalog on `mt`) + the **profile-avatar reference lane** that exercises it end-to-end. Two restore surfaces (the catalog rides the `pg_dump`; the payload rides the volume snapshot). **Who is it for:** a developer touching the `IMediaFileStore` / `IMediaStore` seams; an agent that needs the serving-lane contract. **When to read the rest:** before touching the media store, the `MediaObject` catalog, or the avatar reference lane.
+
 
 > **Part 1 of 2 (authored by the plan author).** Part 1 pins **scope** (the
 > content-addressed media store + the **profile-avatar reference lane** that

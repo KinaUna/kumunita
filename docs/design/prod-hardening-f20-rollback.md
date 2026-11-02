@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f20-rollback
+title: "F20 — one-step rollback + drilled (DEP-04)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # F20 — DEP-04: one-step rollback + drilled — Part-0 design pin
+
+> **Abstract:** the **F20 one-step rollback** design pin (Part-0, design-only) — **one-step rollback + drilled**: today OPS §3 (app rollback) + OPS §5 (DB restore) are **two separate procedures**, not a single one-step runbook, with no explicit schema-compat guard and no dated "last drilled" record. F20's code side is a `docs/ops/` runbook update; the owner-ops drill is an open item. Depends on F4 (PITR). Closes 2026-10-22 DEP-04. **Who is it for:** the owner-operator executing F20 U3; an agent that needs the one-step runbook shape. **When to read the rest:** before updating the rollback runbook, the schema-compat guard, or the F20 drill.
+
 
 > **Fix:** F20 (report row **DEP-04**) — kind **`code+ops`**, **dep: F4** (BKP-02
 > PITR / WAL archiving). F20's **DB-restore leg *is* a restore from F4's PITR** —

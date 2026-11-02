@@ -1,4 +1,21 @@
+---
+id: design-pl-goals-projects
+title: "Goals & Projects (`PL`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0086-goals-projects-lane.md
+  - docs/adr/0070-board-edit-lane-and-board-polish.md
+  - docs/adr/0087-todo-dependency-blocked-by-lane.md
+updated: 2026-11-02
+---
+
 # `PL` — Goals & Projects — design (Part 1 + Part 2)
+
+> **Abstract:** the **Goals & Projects (`PL`)** lane — the higher-level **goals/projects** page on top of the M5 to-do / board surface: a new `IProjectService` read seam, additive `ProjectDocTypes` shape, request DTOs, and the pinned seam-test names. **Who is it for:** a developer adding to the goals/projects surface; an agent that needs the exact `IProjectService` seam shape before changing it. **When to read the rest:** before touching the goals/projects reads, the `ProjectDocTypes` addition, or the PL tests.
+
 
 > **Named lane.** `PL` (short id **`PL`** = *Projects Lane*) — the higher-level
 > **goals** and **projects** page on top of the M5 to-do / board surface.

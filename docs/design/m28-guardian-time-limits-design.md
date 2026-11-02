@@ -1,4 +1,21 @@
+---
+id: design-m28-guardian-time-limits
+title: "M28 — Guardian time limits"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0151-guardian-time-limits.md
+  - docs/adr/0019-timezone-platform-default-and-resident-override.md
+  - docs/adr/0028-guardian-controls-account-scope-supervision.md
+updated: 2026-11-02
+---
+
 # M28 — Guardian time limits (design doc)
+
+> **Abstract:** the **guardian time limits** design — for a child's account, a guardian sets **when the child may use the platform** (allowed / blocked hours + days), a **hard sign-out** gate. The inverse of the M20 notification-quiet lane: it reuses M20's pure-evaluator shape but flips the owner (guardian), polarity (allowed/restricted), and effect (sign-out, not email deferral). One new `GuardianTimeLimitSchedule` doc. **Who is it for:** a developer touching the guardian time-limit gate; an agent that needs the allowed/restricted evaluator. **When to read the rest:** before touching the `GuardianTimeLimitSchedule` doc, the sign-out gate, or the time-limit evaluator.
+
 
 > **Milestone M28 — Guardian time limits.** The README M28 line, verbatim:
 > "**Guardian time limits — for a child's account, a parent/guardian sets

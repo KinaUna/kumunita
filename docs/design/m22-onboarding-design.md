@@ -1,4 +1,20 @@
+---
+id: design-m22-onboarding
+title: "M22 — Onboarding"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0132-onboarding.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M22 — Onboarding (design doc)
+
+> **Abstract:** the **onboarding** design — a **guided, non-blocking, localized walk-through** that takes a new resident through account setup (display name, avatar, UI language, time zone, date format, email language, contact + visibility) and records that they've been through it. Rides the frozen owner-scope lanes; one additive `Profile.OnboardingCompletedAt` + two seams + one controller. **Who is it for:** a developer touching the onboarding walk-through; an agent that needs the non-blocking / single-write invariants. **When to read the rest:** before touching the onboarding banner, the completion stamp, or the walk-through steps.
+
 
 > **Milestone M22 — Onboarding.** The README M22 line, verbatim:
 > "**Onboarding** — a guided walk-through that walks a new user through account

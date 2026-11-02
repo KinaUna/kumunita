@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f21-db-tls
+title: "F21 — app↔DB TLS (SRV-04)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # F21 — SRV-04: app↔DB TLS — Part-0 design pin
+
+> **Abstract:** the **F21 app↔DB TLS** design pin (Part-0, design-only) — **app↔DB TLS**: the Npgsql connection string carries **no `SslMode`** (default `Prefer`). F21's code side is a single Web-host env knob (a config read in `Program.cs` that appends `SslMode`/CA/trust to the one `ConnectionStrings:Kumunita` value); the owner-ops half (enable Postgres TLS on the prod addon) is an open item. Closes 2026-10-22 SRV-04. **Who is it for:** a developer executing F21 U2; an agent that needs the env-knob shape. **When to read the rest:** before touching the connection-string env knob, the `SslMode` config, or the F21 owner-ops step.
+
 
 > **Fix:** F21 (report row **SRV-04**) — kind **`code+ops`**, **dep: —** (no
 > code dependency). F21's **code side is a single Web-host env knob** — a config

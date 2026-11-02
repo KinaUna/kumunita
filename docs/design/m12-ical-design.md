@@ -1,4 +1,21 @@
+---
+id: design-m12-ical
+title: "M12 — iCal (calendar export)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0112-ical-calendar-export.md
+  - docs/adr/0044-tags.md
+  - docs/adr/0015-ui-view-localization-mechanics.md
+updated: 2026-11-02
+---
+
 # M12 — iCal (calendar export of visible events) — design
+
+> **Abstract:** the **iCal (calendar export)** design — the events a resident can already see become something their calendar app can subscribe to: a per-event file (`GET /events/{id}.ics`, one `VEVENT`) and a subscription feed (`GET /events.ics`). **Zero Core schema change**; the ICS is a pure function over already-authorized `Event` rows, and the **file never carries a decision**. **Who is it for:** a developer touching the `IcsWriter` or the ICS routes; an agent that needs the closed property set. **When to read the rest:** before touching the ICS writer, the two routes, or the property ceiling.
+
 
 > **Milestone M12.** A **resident-facing calendar world seam**: the events a
 > resident can already see on `/events` become something their calendar app

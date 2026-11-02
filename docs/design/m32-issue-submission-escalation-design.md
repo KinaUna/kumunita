@@ -1,3 +1,16 @@
+---
+id: design-m32-issue-submission-escalation
+title: "M32 — Issue submission & escalation"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0155-issue-submission-escalation.md
+  - docs/adr/0154-production-error-handling.md
+updated: 2026-11-02
+---
+
 # M32 — Issue submission & escalation (design doc)
 
 > **Abstract:** This design settles the **rest of the error-report

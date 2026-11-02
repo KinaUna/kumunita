@@ -1,3 +1,16 @@
+---
+id: design-esc-escalation-authorization
+title: "Escalation & authorization (`ESC`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0154-production-error-handling.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # ESC — Escalation authorization + receiving inbox (design doc)
 
 > **Abstract:** This design closes the **authorization + receiving** gap that

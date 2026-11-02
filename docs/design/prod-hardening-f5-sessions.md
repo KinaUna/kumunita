@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f5-sessions
+title: "F5 — session kill-all + invalidation (AUTH-04)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F5 — AUTH-04: session kill-all + invalidation — Part-0 design pin
+
+> **Abstract:** the **F5 session kill-all** design pin (Part-0, design-only) — **session kill-all + invalidation**: a resident who changes their password (or "signs out everywhere") is actually signed out of their other live sessions (the security-stamp invalidation is neutered today) + a kill-all surface. Server-side state + per-request resolution (no cookie claim). Closes 2026-10-22 AUTH-04. **Who is it for:** a developer executing F5 U2–U4; an agent that needs the kill-all / invalidation shape. **When to read the rest:** before touching the kill-all service, the security-stamp invalidation, or the F5 tests.
+
 
 > **Fix:** F5 (report row **AUTH-04**) — kind **`code`**, **dep F3 (complete)**.
 > **Status:** this is the **Part-0 design pin** (F5.U1). It is **design-only**:

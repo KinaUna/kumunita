@@ -1,4 +1,21 @@
+---
+id: design-guardian-event-rsvp-gate
+title: "Guardian's event-attendance gate"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0144-guardian-event-rsvp-gate.md
+  - docs/adr/0028-guardian-controls-account-scope-supervision.md
+  - docs/adr/0038-guardian-assignment.md
+updated: 2026-11-02
+---
+
 # Design Doc — Guardian's event-attendance gate (the consent lane's missing promise made functional)
+
+> **Abstract:** the **guardian's event-attendance gate** design — the **consent lane's missing promise made functional**: the guardian's event RSVP consent (the group half works via ADR 0028/0141; the event half had no enforcement lane). An **optional** gate (the product want) on the frozen M4 events surface + the GU lane. **Who is it for:** a developer touching the event-RSVP consent gate; an agent that needs the request-row + guardian-resolve shape. **When to read the rest:** before touching the RSVP consent lane, the gate toggle, or the guardian resolve.
+
 
 ADR: [0144](../adr/0144-guardian-event-rsvp-gate.md) — the authority for
 every seam name, default, and refuse shape in this document.

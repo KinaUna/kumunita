@@ -1,4 +1,21 @@
+---
+id: design-m27-user-scoped-portability
+title: "M27 — User-scoped portability"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0148-user-scoped-portability.md
+  - docs/adr/0088-projects-todos-boards-translations.md
+  - docs/adr/0108-portability-import-export.md
+updated: 2026-11-02
+---
+
 # M27 — User-scoped portability (resident self-export + per-entity conflict-resolution import) — design
+
+> **Abstract:** the **user-scoped portability** design — a **resident** moves their own authored data in and out as one portable `*.kumunita` archive (content + media + a minimal identity reference set, **no credential material**), with a **fail-closed, per-entity conflict-resolution** import. The load-bearing invariant is the **no-secret boundary** carried verbatim from M11. **Who is it for:** a developer touching the resident self-export/import lane; an agent that needs the per-entity conflict decision shape. **When to read the rest:** before touching the resident portability lane, the archive reference set, or the conflict UI.
+
 
 > **Milestone M27.** A **resident** moves **their own authored data** in and
 > out, as data: one portable `*.kumunita` archive (the resident's content +

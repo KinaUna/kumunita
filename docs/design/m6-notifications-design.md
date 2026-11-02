@@ -1,4 +1,21 @@
+---
+id: design-m6-notifications
+title: "M6 — Notifications"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0061-email-and-notification-language.md
+  - docs/adr/0076-notifications-inbox-and-recipient-email.md
+  - docs/adr/0096-notification-read-unread-per-row-toggle.md
+updated: 2026-11-02
+---
+
 # M6 — Notifications — design (Parts 1 + 2)
+
+> **Abstract:** the **notifications** design — the **shared awareness** arrow: a `Notification` inbox row (authoritative, always delivered in-app) + a **durable email half** (staged, flushed by a tick) that reaches the resident where they are. Two documents (`Notification`, `NotificationPreference`), the `NotificationKinds` closed set, the idempotency-key table, and the pinned seam tests. **Who is it for:** a developer touching the `NotificationService` or the email flush; an agent that needs the inbox-vs-email split. **When to read the rest:** before touching the notification lane, the email staging, or the `NotificationKinds` set.
+
 
 > **Milestone.** `M6` — the **shared awareness** arrow (the
 > [value-chain milestone table](../ARCHITECTURE.md): *"the platform reaches out to

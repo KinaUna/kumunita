@@ -1,3 +1,16 @@
+---
+id: design-m35-kiosk-mode
+title: "M35 — Kiosk mode"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0104-full-page-and-calendar-fullscreen-modes.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M35 — Kiosk mode (design doc)
 
 > **Abstract:** This design settles the **shared physical display** question

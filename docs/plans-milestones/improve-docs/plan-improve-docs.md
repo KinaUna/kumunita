@@ -136,7 +136,8 @@ a half-applied rule.
 - `D07` — ✅ (commit `46e46783`, 2026-11-02)
 - `D08` — ✅ (commit `ef416bb5`, 2026-11-02)
 - `D09` — ✅ (commit `518cc135`, 2026-11-02)
-- `D10`–`D14` — not started
+- `D10` — ✅ (2026-11-02)
+- `D11`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -402,10 +403,21 @@ a half-applied rule.
   `Kumunita.Core.Tests` 1682 passed / 0 failed / 2 pre-existing skips.
 
 ### `D10` — Design docs: living vs archived, abstracts, consolidation
-- // TODO ❓ the policy question for this unit: is a design doc the *current
-  truth* for its subsystem (kept up to date, `tier: reference`), or a
-  *snapshot of the lane that built it* (`tier: archive`, moves with the lane)?
-- Abstracts + front-matter for the 48 large docs without one.
+- **Resolved (2026-11-02):** a design doc is the **current truth for its
+  subsystem** — kept up to date in place, `tier: reference` / `kind: design`
+  (not a lane snapshot: the ADR's `related:` and the code's citations point at
+  it as the *live* seam, and "one fact, one place" wants a single maintained
+  home, exactly as `D09` settled the `architecture/` split at
+  `tier: reference`). The consolidation output is therefore a **per-subsystem
+  hub** (the "one living reference") that links the existing per-lane detail
+  docs — which stay as their own current-truth reference docs — not a content
+  merge (the detail docs are capability *chains* built on a frozen base; a
+  literal merge would produce >10 k-line docs, violating the DoD's "no living
+  doc > 300 lines without being a hub") and not a move to `archive/` (the
+  frozen lane history already lives in `docs/archive/lanes/<lane>/`).
+- Abstracts + front-matter for the large docs without one (the `>60`-line gate
+  target; the `48` figure was the `D00` baseline snapshot — the close gate
+  `D14` counts *all* `>60`-line docs).
 - Consolidation candidates (merge into one living reference, old files
   become stubs or archive):
   - `prod-hardening-f*.md` (18 files) → one hardening reference
@@ -414,6 +426,38 @@ a half-applied rule.
   - `rich-content` + `rich-editor` + `wysiwyg-editor` + `inline-editor`
   - `m6` notifications + `m20` quiet times
 - Each design doc links forward to its ADRs and back to its archived lane.
+- **Shipped 2026-11-02:** all **83** `docs/design/*.md` files now carry
+  front-matter (`tier: reference` / `kind: design` / the decision ADR in
+  `related:`) and an Abstract (the 69 that lacked one, each a grounded
+  3-line what / who / when drawn from the doc's own opening; the 14 that
+  already had one kept it). The six consolidation candidates each became a
+  **per-subsystem hub** (the "one living reference" the `Resolved` line above
+  names) that links the existing per-lane detail docs — which **stay** as
+  their own current-truth reference docs — plus their ADRs and archived
+  lanes: [`events-subsystem`](../../design/events-subsystem.md) (M4 base +
+  M18 recurring + EV-CAL + EV-DWM),
+  [`rich-content-subsystem`](../../design/rich-content-subsystem.md) (RC base +
+  RE + WY + IE), [`notifications-subsystem`](../../design/notifications-subsystem.md)
+  (M6 base + M20 quiet times),
+  [`storage-metrics-subsystem`](../../design/storage-metrics-subsystem.md)
+  (M24 base + M33 history), [`analytics-subsystem`](../../design/analytics-subsystem.md)
+  (M13 base + M34 history), and
+  [`prod-hardening`](../../design/prod-hardening.md) (the 18 `F#` findings,
+  each to its design pin + audit row). **No detail doc was deleted, merged,
+  or moved** — the hubs are *links and one-line reasons* (the entry-page
+  convention, extended to subsystems), so the "one fact, one place" rule
+  holds: the detail doc owns its facts, the hub owns the map. Housekeeping:
+  `docs/README.md`'s `design/` row now names the six hubs as the doors in,
+  `start/developer.md` + `start/agent.md`'s `design/` row points at the hub
+  set instead of the single sample, and this D10 Shipped note + the
+  `D10 — ✅ (2026-11-02)` progress line (the hash lands in the next commit,
+  matching `D00`–`D09`). Verified on 2026-11-02: `docs-report.ps1` —
+  broken links **3** (the ≤ 3 baseline; the three are pre-existing
+  `archive/` + `philosophy/` targets, none from D10), front-matter **683 →
+  772** (+89: the 83 design docs + the 6 hubs), abstract **639 → 709** (+70:
+  the 69 design docs + the 1 `>60`-line hub that needed one); `dotnet build`
+  0 errors; `Kumunita.Web.Tests` 1249 passed / 0 failed;
+  `Kumunita.Core.Tests` 1682 passed / 0 failed / 2 pre-existing skips.
 
 ### `D11` — ADRs: front-matter, cap, rationale out
 - Stamp front-matter on all 282 (`status`, `supersedes`, `superseded_by`,

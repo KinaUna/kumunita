@@ -1,3 +1,17 @@
+---
+id: design-m20-notification-quiet-times
+title: "M20 — Notification quiet times"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0121-notification-quiet-times.md
+  - docs/adr/0019-timezone-platform-default-and-resident-override.md
+  - docs/adr/0076-notifications-inbox-and-recipient-email.md
+updated: 2026-11-02
+---
+
 # M20 — Notification quiet times (design doc)
 
 > **Abstract:** *What it settles:* **per-resident quiet schedules** (allowed /

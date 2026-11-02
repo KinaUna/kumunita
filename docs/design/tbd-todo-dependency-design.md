@@ -1,4 +1,20 @@
+---
+id: design-tbd-todo-dependency
+title: "Todo dependency / "waiting on" (`TBD`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0087-todo-dependency-blocked-by-lane.md
+  - docs/adr/0086-goals-projects-lane.md
+updated: 2026-11-02
+---
+
 # `TBD` — Todo dependency ("waiting on") — design (Part 1 + Part 2)
+
+> **Abstract:** the **todo dependency / "waiting on" (`TBD`)** lane — the "waiting on" pointer on the M5 to-do surface: one optional `BlockedByTodoId` on `TodoItem`, a display chip, a feed filter, one write field + one picker read lane. **Who is it for:** a developer touching the to-do blocked-by seam; an agent that needs the `BlockedByTodoId` shape + the dangling-safe chip. **When to read the rest:** before touching `BlockedByTodoId`, the blocker chip, or the to-do feed filter.
+
 
 > **Named lane.** `TBD` (short id **`TBD`** = *Todo Blocked-By*) — the
 > "waiting on" pointer on the M5 to-do surface: one optional

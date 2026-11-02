@@ -1,3 +1,16 @@
+---
+id: design-m34-analytics-history
+title: "M34 — Analytics history"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0162-analytics-history.md
+  - docs/adr/0114-logging-and-usage-analytics.md
+updated: 2026-11-02
+---
+
 # M34 — Analytics history (design doc)
 
 > **Abstract:** This design settles the **over-time** half of the analytics

@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f10-errtrack
+title: "F10 — error tracker (OBS-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F10 — OBS-02: error tracker (Sentry) — Part-0 design pin
+
+> **Abstract:** the **F10 error tracker** design pin (Part-0, design-only) — **Sentry** as the error tracker: the `Sentry.AspNetCore` package + the **DSN-gated** `UseSentry` registration + a PII-scrubbing callback, so unhandled exceptions / handler faults are captured with no PII leak. The standing no-external-telemetry-by-default deferral is honored: **the DSN is unset by default**. Closes 2026-10-22 OBS-02. **Who is it for:** a developer executing F10 U2–U3; an agent that needs the DSN-gated + PII-scrub invariant. **When to read the rest:** before adding the Sentry package, the DSN gate, or the F10 tests.
+
 
 > **Fix:** F10 (report row **OBS-02**) — kind **`code+ops`**.
 > **Status:** this is the **Part-0 design pin** (F10.U1). It is **design-only**:

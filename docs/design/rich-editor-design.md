@@ -1,4 +1,20 @@
+---
+id: design-rich-editor
+title: "Rich editor (`RE`) — WYSIWYG authoring"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0031-wysiwyg-editor-and-toolbar.md
+  - docs/adr/0025-rich-content-markdown-and-content-images.md
+updated: 2026-11-02
+---
+
 # Rich editor (`RE`) — WYSIWYG authoring surface + toolbar over the RC Markdown lane
+
+> **Abstract:** the **rich editor (`RE`)** design — a **WYSIWYG authoring surface + toolbar** over the RC Markdown lane: a `renderPreview` mirror subset, a closed toolbar marker set (the ceiling), the client `IsSafeImageSrc` mirror, and the pinned tests. Built **on top of** RC (ADR 0025) — RC's R·1–R·7 bind unchanged. **Who is it for:** a developer touching the rich editor or the toolbar; an agent that needs the frozen-base + ceiling invariant. **When to read the rest:** before touching the editor surface, the toolbar markers, or the `renderPreview` mirror.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the RE lane:
 > it pins the invariant numbers (RE·1–RE·3), the FACES (RE1–RE5), the exact

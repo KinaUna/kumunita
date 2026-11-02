@@ -1,4 +1,21 @@
+---
+id: design-m21-document-management
+title: "M21 — Document management"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0122-document-management.md
+  - docs/adr/0011-media-and-file-storage.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # M21 — Document management (design doc)
+
+> **Abstract:** the **document management** design — a **shared repository of official documents** (contracts, minutes, bylaws…) where each carries its own `Audience` access control and is served as a download behind a per-document `Read` decision. Zero new authorization surface; one new bounded context (`Kumunita.Core.Documents`) + one `Document` doc + one adapter. **Who is it for:** a developer touching the `DocumentService` / `DocumentController`; an agent that needs the per-document `Read` contract. **When to read the rest:** before touching the documents context, the download route, or the allowed-content-types lane.
+
 
 > **Milestone M21 — Document management.** The README M21 line, verbatim:
 > "**Document management** — a shared repository for official documents,

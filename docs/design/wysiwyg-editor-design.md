@@ -1,4 +1,20 @@
+---
+id: design-wysiwyg-editor
+title: "WYSIWYG inline editing (`WY`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0033-wysiwyg-inline-editing.md
+  - docs/adr/0031-wysiwyg-editor-and-toolbar.md
+updated: 2026-11-02
+---
+
 # WYSIWYG inline editing (`WY`) — the rendered pane is the editable surface; the Markdown source is an editable source view (two-way sync)
+
+> **Abstract:** the **WYSIWYG inline editing (`WY`)** design — the **rendered pane is the editable surface**; the Markdown source is an editable source view (two-way sync). Invariants WY·1–WY·9, FACES WY1–WY10, the exact DOM / serializer / sanitizer / binder / CSS contracts, and the pinned tests. Built on RE (ADR 0031) + RC (ADR 0025). **Who is it for:** a developer touching the WYSIWYG inline editor or the two-way sync; an agent that needs the frozen-base invariant. **When to read the rest:** before touching the inline editor, the serializer, or the two-way sync.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the WY lane:
 > it pins the invariants (WY·1–WY·9), the FACES (WY1–WY10), the exact DOM /

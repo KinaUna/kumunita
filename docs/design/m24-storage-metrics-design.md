@@ -1,4 +1,20 @@
+---
+id: design-m24-storage-metrics
+title: "M24 — Storage metrics"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0134-storage-metrics.md
+  - docs/adr/0011-media-and-file-storage.md
+updated: 2026-11-02
+---
+
 # M24 — Storage metrics — design
+
+> **Abstract:** *What it settles:* the **storage metrics** design — a **read-only, GlobalAdmin-gated** admin view of the byte store (total used, available, user-content used, per-user) over the existing `MediaObject` catalog + the volume. *The one contract:* **read-only, zero-writes, HTTP-free** — it reads `MediaObject` + the volume, adds **no** new store/context/write. M25 (enforcement) is the *enforcement* half and builds on this lane's `GetPerUserUsageBytesAsync` seam. **Who is it for:** a developer touching the `IStorageMetricsService`; an agent that needs the read-only invariant. **When to read the rest:** before touching the storage-metrics service, the two `IMediaFileStore` read ADDs, or the `/admin/storage` surface.
+
 
 > **Milestone M24.** A **read-only admin feedback lane** over the *existing*
 > media byte store + catalog (ADR 0011). M24 surfaces **storage metrics** —

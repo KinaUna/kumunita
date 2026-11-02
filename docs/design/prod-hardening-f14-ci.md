@@ -1,4 +1,17 @@
+---
+id: design-prod-hardening-f14-ci
+title: "F14 — CI test gate on release (DEP-03)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+updated: 2026-11-02
+---
+
 # F14 — DEP-03: CI test gate on `release` — Part-0 design pin
+
+> **Abstract:** the **F14 CI gate** design pin (Part-0, design-only) — **CI test gate on `release`**: the repo has **no CI** (no `.github/workflows/`); tests run locally or by an agent. F14 makes a red test a **hard stop** for the `release` branch: one workflow file (`.github/workflows/ci.yml`) with the three pinned dotnet commands + the owner-executed Coolify wiring. Closes 2026-10-22 DEP-03. **Who is it for:** a developer executing F14 U2; an agent that needs the workflow + the dotnet-command pins. **When to read the rest:** before adding the CI workflow, the test gate, or the Coolify wiring.
+
 
 > **Fix:** F14 (report row **DEP-03**) — kind **`code+ops`** (U2 code here, U3
 > owner-ops).

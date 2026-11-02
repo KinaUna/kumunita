@@ -1,4 +1,21 @@
+---
+id: design-inline-editor
+title: "Inline editor (`IE`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0032-inline-editor-rendered-default-view.md
+  - docs/adr/0031-wysiwyg-editor-and-toolbar.md
+  - docs/adr/0025-rich-content-markdown-and-content-images.md
+updated: 2026-11-02
+---
+
 # Inline editor (`IE`) — the rendered view is the default editor; the Markdown source is hidden behind a toggle
+
+> **Abstract:** the **inline editor (`IE`)** design — the **rendered view is the default editor**; the Markdown source is hidden behind a toggle. Invariant IE·1, FACES IE1–IE5, the exact toggle contract, the CSS pin, the Razor button pin, and the pinned tests. Built on RE (ADR 0031) + RC (ADR 0025). **Who is it for:** a developer touching the inline editor or the source toggle; an agent that needs the frozen-base invariant. **When to read the rest:** before touching the inline editor, the source toggle, or the IE tests.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the IE lane:
 > it pins the invariant (IE·1), the FACES (IE1–IE5), the exact toggle

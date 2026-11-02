@@ -1,4 +1,20 @@
+---
+id: design-m26-sorting
+title: "M26 — Sorting"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0090-pagination-and-filtering.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # M26 — Sorting — design (Part 1)
+
+> **Abstract:** the **sorting** design — one canonical `SortSpec` value object + a per-surface **closed allowlist** of sort keys, threaded as an additive, default-preserving `SortSpec?` through the 18 paged list/search seams M7 paged, plus one shared Web `_Sort` control. **Who is it for:** a developer adding sorting to a paged seam; an agent that needs the `SortSpec` / `SortKeys` shape. **When to read the rest:** before touching `SortSpec`, a surface's sort allowlist, or the `_Sort` control.
+
 
 > **Milestone M26.** The one canonical **sorting** contract (a pure Core
 > `SortSpec` value object + a per-surface **closed allowlist** of sort keys)

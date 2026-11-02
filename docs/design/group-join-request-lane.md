@@ -1,4 +1,20 @@
+---
+id: design-group-join-request-lane
+title: "Resident join-request lane for public groups"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0094-group-join-request-lane.md
+  - docs/adr/0028-guardian-controls-account-scope-supervision.md
+updated: 2026-11-02
+---
+
 # Design Doc — Resident join-request lane for public groups (ADR 0094)
+
+> **Abstract:** the **resident join-request** design — a **join-request lane for public groups**: a resident requests to join a public group, the owner reviews/accepts/declines. **Supersedes the m2b deferral** *for public groups only* (the private-group owner∪member model ADR 0010 protected is untouched). Single-part unit doc pinning invariants JR·1..3, FACES F21–F26, and the seam shapes. **Who is it for:** a developer touching the join-request lane; an agent that needs the owner-review shape. **When to read the rest:** before touching the join-request doc, the accept/decline lane, or the F21–F26 faces.
+
 
 > **Single-part unit doc** (the m3b two-part split is unnecessary at this
 > lane's size). This doc pins **scope**, the **invariants** (`JR·1..3` + the

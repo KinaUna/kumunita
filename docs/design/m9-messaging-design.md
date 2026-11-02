@@ -1,4 +1,21 @@
+---
+id: design-m9-messaging
+title: "M9 — Messaging"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0076-notifications-inbox-and-recipient-email.md
+  - docs/adr/0101-announcement-comments-lane.md
+  - docs/adr/0090-pagination-and-filtering.md
+updated: 2026-11-02
+---
+
 # M9 — Messaging — design
+
+> **Abstract:** the **messaging** design — **1:1 signed-in resident messaging**: open a conversation with another resident, exchange length-capped immutable messages, both see read state, the other gets the M6 `message.new` nudge, and a GlobalAdmin can enable/disable it instance-wide (default OFF). **Participant-by-id** access: exactly the two participants may read; a non-participant gets a non-leaky 404. **Who is it for:** a developer touching the `Conversation` / `Message` seams; an agent that needs the participant-by-id rule. **When to read the rest:** before touching the messaging context, the conversation lane, or the read-state.
+
 
 > **Milestone M9.** One bounded context, two documents, one service, one
 > admin toggle, two resident views. **1:1 signed-in resident messaging**:

@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f17-bounce
+title: "F17 — bounce/complaint suppression (MAIL-03)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0078-sample-account-notification-suppression-in-production.md
+updated: 2026-11-02
+---
+
 # F17 — MAIL-03: bounce/complaint suppression — Part-0 design pin
+
+> **Abstract:** the **F17 bounce suppression** design pin (Part-0, design-only) — **bounce/complaint suppression**: a new `SuppressedAddress` doc (in the `Notifications` namespace) + the bounce/complaint detection that adds an address to it, so a bounced/complained recipient stops receiving the email half (the inbox row is unaffected). Closes 2026-10-22 MAIL-03. **Who is it for:** a developer executing F17 U2–U3; an agent that needs the `SuppressedAddress` doc shape. **When to read the rest:** before touching the `SuppressedAddress` doc, the bounce detection, or the F17 tests.
+
 
 > **F17.U1** design pin (Tier 1). F17.U2 and F17.U3 execute against this file.
 > No code, no build, no test run — the pin is the deliverable.

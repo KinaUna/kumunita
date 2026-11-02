@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f18-mailalarms
+title: "F18 — bounce/complaint/volume alarms (MAIL-06)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F18 — MAIL-06: bounce/complaint/volume alarms — Part-0 design pin
+
+> **Abstract:** the **F18 mail alarms** design pin (Part-0, design-only) — **bounce/complaint/volume alarms**: mostly **owner-ops** (the provider's bounce/complaint/volume metrics + alarms), with a thin in-repo cross-check tick as the code leg. The pin exists so the owner-ops step is a **verbatim checklist**, not a design decision at ops time. Depends on F12. Closes 2026-10-22 MAIL-06. **Who is it for:** the owner-operator executing F18 U3; an agent that needs the metrics source + the cross-check tick. **When to read the rest:** before configuring the provider's alarms, or running the F18 cross-check.
+
 
 > **F18.U1** design pin (Tier 1). F18.U2 and F18.U3 execute against this file.
 > No code, no build, no test run — the pin is the deliverable.

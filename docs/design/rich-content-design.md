@@ -1,4 +1,21 @@
+---
+id: design-rich-content
+title: "Rich content (`RC`) — Markdown + content images"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0025-rich-content-markdown-and-content-images.md
+  - docs/adr/0011-media-and-file-storage.md
+  - docs/adr/0018-ugc-authored-in-language-tag.md
+updated: 2026-11-02
+---
+
 # Rich content (`RC`) — Markdown bodies + in-content images
+
+> **Abstract:** the **rich content (`RC`)** design — **Markdown bodies + in-content images** for posts / replies / announcements / static pages: a closed safe-HTML render, a content-image lane over the frozen media store, and the `rc.*` key set. Invariants R·1–R·7, FACES R1–R8, the exact C# of every seam, and the pinned tests. **Who is it for:** a developer touching the `renderMarkdown` lane or the content-image seam; an agent that needs the safe-render invariant. **When to read the rest:** before touching the rich-content render, the content-image lane, or the `rc.*` keys.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the RC lane:
 > it pins the invariant numbers (R·1–R·7), the FACES (R1–R8), the exact C#

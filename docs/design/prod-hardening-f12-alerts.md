@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f12-alerts
+title: "F12 — route alerts to a human (OBS-06)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F12 — OBS-06: route alerts to a human — Part-0 design pin
+
+> **Abstract:** the **F12 alert routing** design pin (Part-0, design-only) — **route alerts to a human**: the F11 `IAlertSink` seam fires, but the only binding is `NoopAlertSink` (does nothing). F12 gives the seam a **real channel** that reaches a human (a `SupportEmailAlertSink` Web binding). Depends on F11. Closes 2026-10-22 OBS-06. **Who is it for:** a developer executing F12 U2–U3; an agent that needs the `SupportEmailAlertSink` binding shape. **When to read the rest:** before touching the alert sink binding, the alert destination, or the F12 tests.
+
 
 > **Fix:** F12 (report row **OBS-06**) — kind **`code+ops`**.
 > **Status:** this is the **Part-0 design pin** (F12.U1). It is **design-only**:

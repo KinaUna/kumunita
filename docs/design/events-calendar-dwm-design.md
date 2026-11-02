@@ -1,4 +1,21 @@
+---
+id: design-events-calendar-dwm
+title: "Events calendar Day/Week/Month views (`EV-DWM`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0064-events-calendar-dwm-views.md
+  - docs/adr/0063-events-calendar-view.md
+  - docs/adr/0019-timezone-platform-default-and-resident-override.md
+updated: 2026-11-02
+---
+
 # Events calendar Day/Week/Month views (`EV-DWM`) — the three calendar views — design
+
+> **Abstract:** the **events calendar Day/Week/Month views (`EV-DWM`)** design — the **three calendar views** (day / week / month) over the frozen M4 events surface, with the exact view-model + controller + TS shapes, the 9 pinned test names, and the three-test acceptance gate. Mirrors `events-calendar-design.md`'s two-part shape. **Who is it for:** a developer touching the day/week/month views; an agent that needs the DWM view-model shape. **When to read the rest:** before touching the day/week/month views, their controllers, or the EV-DWM tests.
+
 
 > **Two parts.** Part 1 (U00) is "What this lane is / the existing surface /
 > the design decisions / the invariants / the FACES"; Part 2 (U01, §6 below)

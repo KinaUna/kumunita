@@ -1,4 +1,21 @@
+---
+id: design-m23-extended-profiles
+title: "M23 — Extended user profiles"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0123-extended-profiles.md
+  - docs/adr/0044-tags.md
+  - docs/adr/0025-rich-content-markdown-and-content-images.md
+updated: 2026-11-02
+---
+
 # M23 — Extended user profiles (biography + author-set tags + find-people) — design doc
+
+> **Abstract:** the **extended profiles** design — a **biography + free author-set tags** (skills, interests, expertise) on the existing `Profile` doc, plus a **find-people** read over them. Zero new authorization surface; two additive POCO fields (`Bio`, `TagIds`) + one extended upsert + one `IProfileFindService`. **Who is it for:** a developer touching the `Profile` bio/tags or the find-people read; an agent that needs the tag create-or-get shape. **When to read the rest:** before touching the `Bio` / `TagIds` fields, the find-people service, or the profile upsert.
+
 
 > **Milestone M23 — Extended user profiles.** The README M23 line, verbatim:
 > "**Extended user profiles** — a biography + free author-set tags (skills,

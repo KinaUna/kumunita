@@ -1,3 +1,17 @@
+---
+id: design-m33-storage-metrics-history
+title: "M33 — Storage metrics history"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0156-storage-metrics-history.md
+  - docs/adr/0134-storage-metrics.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M33 — Storage metrics history (design doc)
 
 > **Abstract:** This design settles the **over-time** half of the storage

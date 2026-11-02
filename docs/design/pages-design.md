@@ -1,4 +1,20 @@
+---
+id: design-pages
+title: "Pages (hierarchy + audiences, `PG`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0039-pages-hierarchy-audience-translations.md
+  - docs/adr/0040-pages-system-and-user-kinds-and-blog-feed.md
+updated: 2026-11-02
+---
+
 # Pages (hierarchy + audiences + translations) — design
+
+> **Abstract:** the **Pages** design (`PG`) — generalizes the static-page lane into a **hierarchical, audience-restricted, translatable knowledge tree**: resident blog pages (`PageKind.User`) + operator `System` pages, a parent/child hierarchy, per-page `Audience`, and user-added translations. One new bounded context (`Kumunita.Core.Pages`). **Who is it for:** a developer touching the `Page` doc or the page hierarchy; an agent that needs the page-kind + audience shape. **When to read the rest:** before touching the pages context, the hierarchy, or the page translations.
+
 
 > **Lane.** `PG` — a **named lane** (the `ML` / `GP` / `RC` / `RE` convention: a
 > short ID, *not* a renumber). M4 / M5 / M6 stay Events / Projects /

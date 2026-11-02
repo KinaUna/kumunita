@@ -1,4 +1,21 @@
+---
+id: design-m15-translation-bulk
+title: "M15 — Translation bulk (import/export)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0116-translation-bulk.md
+  - docs/adr/0021-translator-role-delegated-translation-editing.md
+  - docs/adr/0005-multilingual-support.md
+updated: 2026-11-02
+---
+
 # M15 — Translation bulk (import/export, review & extend as a batch) — design
+
+> **Abstract:** the **translation bulk** design — a GlobalAdmin/Translator takes the platform's **UI-string translations** out and back as **one plain-text CSV bundle**: export the whole closed set, import it back (present rows upserted, blank = no-op, malformed file refused before any write), and review/extend as a batch. Zero schema change; rides the existing translator class gate. **Who is it for:** a developer touching the translation import/export; an agent that needs the frozen-seam boundary. **When to read the rest:** before touching the CSV export/import, the batch-review save, or the `LanguagesController` gate.
+
 
 > **Milestone M15.** A GlobalAdmin or Translator takes the platform's
 > **UI-string translations** out of the platform and back again as **one

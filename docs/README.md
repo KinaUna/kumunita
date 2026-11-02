@@ -49,13 +49,14 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | [`philosophy/`](philosophy/README.md) | the trust model and the integration argument (unchanged shape) |
 | [`guides/`](guides/CONVENTIONS.md) | the in-app guide registry and writing conventions |
 | [`adr/`](adr/README.md) | short decision records (~80-line cap, index generated from front-matter) |
-| [`design/`](design/m3b-moderation.md) | living design references (the current truth per subsystem) |
+| [`design/`](design/m3b-moderation.md) | the current truth per subsystem (every doc `tier: reference` / `kind: design` + an Abstract, `D10`); the **six subsystem hubs** are the doors in — [`events`](design/events-subsystem.md), [`rich content`](design/rich-content-subsystem.md), [`notifications`](design/notifications-subsystem.md), [`storage metrics`](design/storage-metrics-subsystem.md), [`analytics`](design/analytics-subsystem.md), [`prod-hardening`](design/prod-hardening.md) |
 | [`archive/`](archive/README.md) | lane history (the former `plans-milestones/done/`), moved in `D02` |
 
 Folders still marked "split in `D…`" don't exist yet — the lanes are running in
 order; the entry pages link to the *intended* paths so the seams stay green.
 (`ops/` landed in `D04`; `deploy/coolify/` in `D05`; `dev/` in `D06`;
-`product/` in `D07`; `security/` in `D08`; `architecture/` in `D09`.)
+`product/` in `D07`; `security/` in `D08`; `architecture/` in `D09`; the
+`design/` front-matter + abstracts + the six subsystem hubs in `D10`.)
 
 ## Per-audience entry pages
 
@@ -82,5 +83,7 @@ tier), `D04` (the ops split), `D05` (the Coolify split), `D06` (slimming
 `AGENTS.md` into [`dev/`](dev/README.md)), `D07` (slimming `README.md` into
 [`product/`](product/roadmap.md)), `D08` (splitting the security docs into
 [`security/`](security/why-first.md) + the audit program + the VDP at the repo
-root) and `D09` (splitting `ARCHITECTURE.md` into
-[`architecture/`](architecture/identity-access.md) + the hub) are done.
+root), `D09` (splitting `ARCHITECTURE.md` into
+[`architecture/`](architecture/identity-access.md) + the hub), and `D10`
+(landing the [`design/`](design/m3b-moderation.md) front-matter + abstracts +
+the six subsystem hubs) are done.

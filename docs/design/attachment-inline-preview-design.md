@@ -1,4 +1,20 @@
+---
+id: design-attachment-inline-preview
+title: "File-attachment inline preview"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0126-attachment-inline-preview.md
+  - docs/adr/0034-file-attachments-posts-replies-announcements.md
+updated: 2026-11-02
+---
+
 # File-attachment inline preview — design
+
+> **Abstract:** the **file-attachment inline preview** design — the **inline preview** of the safe-renderable subset of the ADR 0034 attachment lane: the serve route sets `Content-Disposition: inline` iff the stored `Content-Type` is in a **closed, declared `MediaOptions` previewable set** (the seven browser-displayable types), `attachment` otherwise. ADR 0126 is the decision; this is the implementation design it points at. **Who is it for:** a developer touching the preview serve branch; an agent that needs the closed previewable set. **When to read the rest:** before touching the `IsPreviewable` predicate, the serve branch, or the previewable types.
+
 
 > **Status: Implemented (ADR 0126).** This is the design for the **inline
 > preview of the safe-renderable subset** of the ADR 0034 attachment lane — the

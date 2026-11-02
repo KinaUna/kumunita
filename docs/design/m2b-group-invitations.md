@@ -1,4 +1,20 @@
+---
+id: design-m2b-group-invitations
+title: "M2b — Owner-invited group membership"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+  - docs/adr/0003-roles-and-moderator-scoping.md
+updated: 2026-11-02
+---
+
 # Design Doc — M2b: owner-invited group membership (invite → accept/decline)
+
+> **Abstract:** the **M2b owner-invited group membership** design — an **invite → accept/decline** flow on the M2 groups surface: the group owner sends an invitation, the invitee accepts/declines; the immediate add/remove surface is kept side-by-side. Single-part unit doc pinning invariants C-M2b·1..3, FACES F16–F20, and the seam shapes. **Who is it for:** a developer touching the `GroupInvitation` lane; an agent that needs the accept/decline shape. **When to read the rest:** before touching the invitation doc, the accept/decline lane, or the F16–F20 faces.
+
 
 > **Single-part unit doc** (the m3b two-part split is unnecessary at m2b's
 > size). Part A pins **scope**, **invariants** (`C-M2b·1..3` + carried M2/M3

@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f2-token-hash
+title: "F2 — hash auth tokens at rest (AUTH-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0146-child-account-child-owns-password.md
+updated: 2026-11-02
+---
+
 # F2 — AUTH-02: hash auth tokens at rest (Part-0 design pin)
+
+> **Abstract:** the **F2 token-hash** design pin (Part-0, design-only) — **hash auth tokens at rest**: the single-use auth tokens `IdentityService` stores in cleartext (verify / setup) become hashed on write + compared on read, so a leaked DB does not expose usable tokens. Closes 2026-10-22 AUTH-02. **Who is it for:** a developer executing F2 U2; an agent that needs the hash-on-write / compare-on-read shape + the one scope note (the setup mint). **When to read the rest:** before touching the token write/read in `IdentityService`, or the F2 tests.
+
 
 **Fix:** F2 (report row **AUTH-02** — "hash tokens at rest"), severity bucket **data
 exposure**. **Kind:** `code`.

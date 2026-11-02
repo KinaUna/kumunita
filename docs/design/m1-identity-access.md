@@ -1,4 +1,20 @@
+---
+id: design-m1-identity-access
+title: "M1 — Identity, groups, delegation, authorization"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+  - docs/adr/0001-core-stack-and-identity-model.md
+updated: 2026-11-02
+---
+
 # Design Doc — M1: Identity, groups, delegation, authorization
+
+> **Abstract:** the **M1 identity** design — the **access model** every later milestone hangs off: identity lifecycle (signup, verify, setup-token bootstrap), the **audience / grant / delegation** documents, always-on `AccessAudit`, and the Wolverine side effects (`OutboxEmail`, `AuditPurge`), frozen by ADR 0006. **Who is it for:** a developer touching the `IdentityService` / authorization seams; an agent that needs the access-model invariants. **When to read the rest:** before touching the identity lane, the audience/grant/delegation docs, or the audit side effects.
+
 
 > The "Seams & contracts" section is mandatory. Three tests run and
 > recorded at the end.

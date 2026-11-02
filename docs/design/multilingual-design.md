@@ -1,4 +1,20 @@
+---
+id: design-multilingual
+title: "Multilingual (UI & platform texts, `ML`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0005-multilingual-support.md
+  - docs/adr/0021-translator-role-delegated-translation-editing.md
+updated: 2026-11-02
+---
+
 # Design Doc — Multilingual (UI & platform texts)
+
+> **Abstract:** the **multilingual** design (`ML`) — UI + platform strings as **closed `kw-l` registry keys** (not free text) with a **provider floor** (the platform's own strings are always available in every catalog language), over the `LanguageCatalog` / `LocaleSettings` singletons. Invariants M·1–M·9, FACES M1–M13, the exact C# of every seam, and the 19 pinned seam-test names. **Who is it for:** a developer touching the `kw-l` provider or the language catalog; an agent that needs the closed-key registry shape. **When to read the rest:** before touching the translation provider, the catalog, or the `LocaleSettings` singleton.
+
 
 > **Primary reference tier** for the multilingual lane (`ML`, ADR 0005). This doc
 > is **authored in full up front** (unlike group posts, whose Part 2 was written by

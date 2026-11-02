@@ -1,3 +1,16 @@
+---
+id: design-sessions-per-session-revocation
+title: "Per-session revocation"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0281-session-doc-and-per-session-revocation.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # Design Doc — sessions: per-session list + revoke one device
 
 > **Abstract:** *What it settles:* the **per-session model** — F5 (the

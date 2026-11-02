@@ -1,4 +1,20 @@
+---
+id: design-m10-pwa-responsive
+title: "M10 — PWA and responsive design"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0107-pwa-and-responsive-design.md
+  - docs/adr/0031-wysiwyg-editor-and-toolbar.md
+updated: 2026-11-02
+---
+
 # M10 — PWA and responsive design — design
+
+> **Abstract:** the **PWA + responsive** design — an installable app shell (web manifest + icons + a quiet install affordance), a **GET-only allowlist** service worker that caches the shell and **never** touches signed-in content (a privacy boundary), and one deliberate 360-px phone-width pass over a closed surface inventory. **Who is it for:** a developer adding to the client pipeline or touching the service worker / responsive CSS; an agent that needs the allowlist and the no-auth-caching invariant. **When to read the rest:** before adding a `client/lib` module, the service worker, or phone-width rules.
+
 
 > **Milestone M10.** Front-end-only, greenfield: an installable app
 > shell (web manifest + two icon PNGs + one quiet localized install

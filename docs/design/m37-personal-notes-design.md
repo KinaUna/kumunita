@@ -1,4 +1,21 @@
+---
+id: design-m37-personal-notes
+title: "M37 — Personal notes"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0167-personal-notes.md
+  - docs/adr/0105-messaging.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M37 — Personal notes (a private note a resident attaches to any content
+
+> **Abstract:** the **personal notes** design — a private note a resident attaches to any content entity (post / event / page / project / to-do / document / directory), organizable into a **personal folder tree** + free author-set tags, author-only. One new bounded context (`Kumunita.Core.PersonalNotes`) + two docs; **no adapter** (a personal-by-id record). **Who is it for:** a developer touching `PersonalNote` / `NoteFolder`; an agent that needs the folder-tree depth bound and the tags rule. **When to read the rest:** before touching the notes context, the folder tree, or the author-set tags.
+
 entity; organizable: a personal folder tree + free author-set tags;
 author-only) — design
 

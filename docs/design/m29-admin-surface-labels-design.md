@@ -1,3 +1,16 @@
+---
+id: design-m29-admin-surface-labels
+title: "M29 — Admin surface labels"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0150-site-content-customization.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # M29 — Admin surface labels (`SurfaceLabels`) — design
 
 > **Abstract:** M29 makes the 13 top-navigation items + their page headers

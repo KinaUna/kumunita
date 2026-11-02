@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f15-lifecycle
+title: "F15 — byte-store lifecycle / retention (UPL-04)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F15 — UPL-04: byte-store lifecycle / retention — **Part-0 design pin**
+
+> **Abstract:** the **F15 byte-store lifecycle** design pin (Part-0, design-only) — **byte-store lifecycle / retention**: a recurring housekeeping job (the same "tick + Wolverine-free service + thin web handler + boot seed" shape as the five existing jobs) that **deletes the `MediaObject` catalog rows + their volume bytes older than the retention cutoff**. Re-uses F1's byte-delete seam. Closes 2026-10-22 UPL-04. **Who is it for:** a developer executing F15 U2–U3; an agent that needs the lifecycle-tick shape. **When to read the rest:** before touching the `MediaLifecycleTick` job, the retention cutoff, or the F15 tests.
+
 
 **Lane:** prod-hardening (in-progress). **Fix F15** = the `code` fix for the
 2026-10-22 audit row **UPL-04** (byte-store lifecycle/retention — "no

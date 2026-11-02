@@ -1,4 +1,20 @@
+---
+id: design-m2-directory-profiles-groups
+title: "M2 — Directory, profiles, groups"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+  - docs/adr/0003-roles-and-moderator-scoping.md
+updated: 2026-11-02
+---
+
 # Design Doc — M2: Directory, profiles, groups
+
+> **Abstract:** the **directory, profiles, groups** design — M1's stored access documents become three resident-facing surfaces: a **directory** of residents (each deciding what they share), a **profile editor** (visibility + contact visibility), and **groups** (membership / privacy / organizing unit). Part 1 pins scope + invariants + FACES; Part 2 the exact C# + test list. **Who is it for:** a developer touching the `Profile` / `Group` / `GroupMembership` seams; an agent that needs the candidate-filter rule. **When to read the rest:** before touching the directory, the profile editor, or the groups surface.
+
 
 > Part 1 of 2 (U1). Part 2 (U2) will append "Seams & contracts" and the test list.
 > Part 1 is scope, invariants, and FACES. Both parts pin the invariant numbers

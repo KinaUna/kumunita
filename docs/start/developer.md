@@ -36,7 +36,7 @@ You write code in this repo. The docs below are the ones that matter for
 | [`docs/README.md`](../README.md) | The docs map — where things live, the tier model, the entry pages. |
 | [`docs/plans-milestones/improve-docs/plan-improve-docs.md`](../plans-milestones/improve-docs/plan-improve-docs.md) | The lane register for the current doc restructure — the `D`-units, the evidence, the target shape. |
 | [`docs/adr/`](../adr/README.md) | The ADR index — the deciding document for any non-obvious rule. |
-| [`docs/design/m3b-moderation.md`](../design/m3b-moderation.md) | A sample of the living design references — the current truth per subsystem (the `design/` folder; `D10` settles its status). |
+| [`docs/design/`](../design/m3b-moderation.md) | The current truth per subsystem (every doc `tier: reference` / `kind: design` + an Abstract, `D10`) — the **six subsystem hubs** are the doors in: [events](../design/events-subsystem.md) · [rich content](../design/rich-content-subsystem.md) · [notifications](../design/notifications-subsystem.md) · [storage metrics](../design/storage-metrics-subsystem.md) · [analytics](../design/analytics-subsystem.md) · [prod-hardening](../design/prod-hardening.md). |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The philosophy in one hour — the "why" behind the conventions. |
 
 The per-audience entry pages live under [`start/`](../README.md#per-audience-entry-pages)

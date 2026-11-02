@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f9-signup
+title: "F9 — signup bot challenge + disposable-email (AUTH-15)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F9 — AUTH-15: signup bot challenge + disposable-email blocklist — Part-0 design pin
+
+> **Abstract:** the **F9 signup** design pin (Part-0, design-only) — **signup bot challenge + disposable-email blocklist** on the self-service signup lane (which today has no bot challenge and no blocklist; the only anti-flood control is an unattached rate-limit policy). Core write-lane check (Core stays HTTP-free) + a Web-localized message. Closes 2026-10-22 AUTH-15. **Who is it for:** a developer executing F9 U2–U4; an agent that needs the Core-check / Web-message split. **When to read the rest:** before touching the signup lane, the blocklist check, or the bot-challenge seam.
+
 
 > **Fix:** F9 (report row **AUTH-15**) — kind **`code`**.
 > **Status:** this is the **Part-0 design pin** (F9.U1). It is **design-only**:

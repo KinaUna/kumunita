@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f4-pitr
+title: "F4 — PITR / WAL archiving (BKP-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0011-media-and-file-storage.md
+updated: 2026-11-02
+---
+
 # F4 — BKP-02: PITR / WAL archiving — Part-0 design pin
+
+> **Abstract:** the **F4 PITR** design pin (Part-0, design-only) — **PITR / WAL archiving** over the scheduled `pg_dump -Fc` logical dump: the recovery-point objective is today the dump interval (up to 24 h); F4 adds WAL archiving for point-in-time recovery between dumps. A pure-ops tool (no code); the owner-ops steps are pinned as open items, never assumed done. Closes 2026-10-22 BKP-02. **Who is it for:** the owner-operator executing F4 U3; an agent that needs the PITR shape + the owner-ops checklist. **When to read the rest:** before enabling WAL archiving, or running the F4 restore drill.
+
 
 > **Fix:** F4 (report row **BKP-02**) — kind **`code+ops`**.
 > **Status:** this is the **Part-0 design pin** (F4.U1). It is **design-only**:

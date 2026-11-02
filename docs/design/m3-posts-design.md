@@ -1,4 +1,20 @@
+---
+id: design-m3-posts
+title: "M3 — Posts, component lists"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+  - docs/adr/0001-core-stack-and-identity-model.md
+updated: 2026-11-02
+---
+
 # Design Doc — M3: Posts, component lists (moderation deferred to M3b)
+
+> **Abstract:** the **posts** design — posts, one-level replies, and the component feeds (Safety / Maintenance / Social / Governance), with an author audience grant, reply-inherits-audience, and the component-list moderation seam (moderation itself is deferred to M3b). Part 1 pins scope + invariants + FACES; Part 2 pins the exact C# shapes and the seeded-invariants tests. **Who is it for:** a developer touching the `Post` / `PostReply` seams; an agent that needs the candidate-filter / reply-inherits rule. **When to read the rest:** before touching the posts context, the reply lane, or the component feeds.
+
 
 > Part 1 of 2 (U1). Part 2 (U2) will append "Seams & contracts (Part 2)" with the
 > exact C# shapes U3–U11 must match, the **seeded-invariants test list**, the

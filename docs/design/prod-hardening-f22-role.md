@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f22-role
+title: "F22 — demote the app role (DB-18)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0171-least-privilege-db-role.md
+updated: 2026-11-02
+---
+
 # F22 — DB-18: demote the app role (least-privilege) — Part-0 design pin
+
+> **Abstract:** the **F22 app-role demotion** design pin (Part-0, design-only) — **demote the app role** (least-privilege): today the app role is the **database owner** (`CREATE DATABASE kumunita OWNER kumunita`) — it can `ALTER`/`DROP` its own DB + create/drop any schema. F22 splits it into a least-privilege app role + a separate owner role, gated on owner acceptance of **ADR 0171**. The lane's last fix (its U3 is the close-flip). Closes 2026-10-22 DB-18. **Who is it for:** a developer executing F22 U2; an agent that needs the two-role DDL + the ADR 0171 gate. **When to read the rest:** before touching the `dev-db-init/01-app-role.sql` split, the boot-ownership path, or the ADR 0171 reconciliation.
+
 
 > **Fix:** F22 (report row **DB-18**) — kind **`code+ops`**, **dep: —** (no code
 > dependency, but **high risk**). **F22 is the lane's last fix** — its **U3** is

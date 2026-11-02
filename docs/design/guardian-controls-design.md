@@ -1,4 +1,21 @@
+---
+id: design-guardian-controls
+title: "Guardian controls (account-scope supervision, `GU`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0028-guardian-controls-account-scope-supervision.md
+  - docs/adr/0012-community-membership-mandatory-and-moderator.md
+  - docs/adr/0013-group-posts-membership-lane.md
+updated: 2026-11-02
+---
+
 # Design Doc — Guardian controls (account-scope supervision of a child's account)
+
+> **Abstract:** the **guardian controls** design — **account-scope supervision of a child's account**: a guardian creates the child's account, suspends/locks it, curates its community + group memberships, approves a group invitation, and dissolves the link. A named lane (`GU`) pulled forward ahead of M4. **Who is it for:** a developer touching the GU guardian surface; an agent that needs the supervision invariants. **When to read the rest:** before touching the `GuardianLink` doc, the supervision lanes, or the consent shape.
+
 
 > The "Seams & contracts" section is mandatory. The three tests
 > (closed-loop? handoff? part-vs-whole?) are run and recorded at the end.

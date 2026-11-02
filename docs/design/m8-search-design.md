@@ -1,4 +1,21 @@
+---
+id: design-m8-search
+title: "M8 — Search"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0091-search.md
+  - docs/adr/0090-pagination-and-filtering.md
+  - docs/adr/0018-ugc-authored-in-language-tag.md
+updated: 2026-11-02
+---
+
 # M8 — Search — design (Part 1 + Part 2)
+
+> **Abstract:** the **M8 search** design — the **first text search**: one nav search box, one `/search` surface over four content surfaces (posts, events, pages, announcements), community + group scopes, composed entirely on the **frozen** authorization seams and the M7 paging idiom. Part 1 pins scope + invariants + FACES; Part 2 the exact C# + pinned tests. **Who is it for:** a developer touching the search seam or the `/search` surface; an agent that needs the search-over-frozen-seams shape. **When to read the rest:** before touching the search service, the `/search` route, or the M7 paging reuse.
+
 
 > **Milestone M8.** The first text search: one nav search box, one `/search`
 > surface over four content surfaces (posts, events, pages, announcements),

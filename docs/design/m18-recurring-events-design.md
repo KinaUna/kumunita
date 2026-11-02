@@ -1,3 +1,17 @@
+---
+id: design-m18-recurring-events
+title: "M18 — Recurring events"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0119-recurring-events.md
+  - docs/adr/0014-post-edit-lane-author-only.md
+  - docs/adr/0112-ical-calendar-export.md
+updated: 2026-11-02
+---
+
 # M18 — Recurring events (design doc)
 
 > **Abstract:** *What it settles:* **recurring events over the frozen M4 events

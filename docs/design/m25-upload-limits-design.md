@@ -1,4 +1,20 @@
+---
+id: design-m25-upload-limits
+title: "M25 — Upload limits"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0134-storage-metrics.md
+  - docs/adr/0011-media-and-file-storage.md
+updated: 2026-11-02
+---
+
 # M25 — Upload limits · design
+
+> **Abstract:** the **upload limits** design — the **enforcement** half M24 left open: an admin-set **per-file size limit** + a **per-user total content quota**, the upload-time enforcement of both, and the **resident self-usage view** ("how much of my quota remains"). Builds on M24's `GetPerUserUsageBytesAsync` seam; one additive `MediaOptions` lane. **Who is it for:** a developer touching the upload-limit enforcement; an agent that needs the per-file + quota invariant. **When to read the rest:** before touching the `MaxBytes` / quota lane, the upload-time check, or the resident self-usage view.
+
 
 > **M25 (Upload limits)** is a **settings + enforcement** lane over the *existing*
 > media byte store (ADR 0011). It does **not** add a new store, catalog doc,

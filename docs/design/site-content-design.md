@@ -1,4 +1,20 @@
+---
+id: design-site-content
+title: "Site content customization (`SITE`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0149-home-intro-hide-preference.md
+  - docs/adr/0050-admin-managed-signup-gate-open-or-invitation-only.md
+updated: 2026-11-02
+---
+
 # Site content customization (`SITE`) — design
+
+> **Abstract:** the **site content customization (`SITE`)** design — a `SiteContent` singleton the community can edit (community name, about/help text, …) with per-field `Audience` access, a single audited write lane, and a best-effort read. Built on the `LocaleSettings` singleton and the single-write-lane shape; **additive** (no reshape of the frozen singletons). **Who is it for:** a developer touching the `SiteContent` doc or the site-content surface; an agent that needs the field-set ceiling. **When to read the rest:** before touching the `SiteContent` field set, the write lane, or the site-content routes.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the SITE
 > lane: it pins the invariants (SITE·1–SITE·9), the FACES (SITE1–SITE10),

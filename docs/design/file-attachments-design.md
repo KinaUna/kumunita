@@ -1,4 +1,20 @@
+---
+id: design-file-attachments
+title: "File attachments (posts / replies / announcements)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0034-file-attachments-posts-replies-announcements.md
+  - docs/adr/0011-media-and-file-storage.md
+updated: 2026-11-02
+---
+
 # File attachments (`ATT`) — posts / replies / announcements
+
+> **Abstract:** the **file attachments** design — resident-uploaded **file attachments** on posts / replies / announcements: a closed allowed-content-types set, a per-attachment `Audience` gate, and the serve route over the frozen media store. Additive over the frozen media + post seams; zero new bounded context. **Who is it for:** a developer touching the attachment lane or the serve route; an agent that needs the allowed-content-types invariant. **When to read the rest:** before touching the attachment doc, the serve route, or the allowed-types set.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the
 > file-attachments lane: it pins the invariant numbers (C-ATT·1–10), the

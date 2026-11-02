@@ -1,4 +1,21 @@
+---
+id: design-m30-admin-onboarding
+title: "M30 — Admin onboarding"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0153-admin-onboarding.md
+  - docs/adr/0150-site-content-customization.md
+  - docs/adr/0132-onboarding.md
+updated: 2026-11-02
+---
+
 # M30 — Admin onboarding (design doc)
+
+> **Abstract:** the **admin onboarding** design — the M22 resident walk-through shape extended to a new **GlobalAdmin**: a stateless guided walk-through that *rides the frozen admin lanes* for each of the seven settings, a single completion-stamp as its only write, a non-blocking dismissible banner, and a closed `kw-l` key set. **Who is it for:** a developer touching the `AdminOnboarding` doc or the `/admin/onboarding` surface; an agent that needs the invariants before changing the walk-through. **When to read the rest:** before touching the `AdminOnboarding` context, the banner eligibility, or the seven admin routes it links into.
+
 
 > **Milestone M30 — Admin onboarding.** The README / `Milestones.cs` line,
 > verbatim: "**Admin onboarding** — a guided walk-through for a new

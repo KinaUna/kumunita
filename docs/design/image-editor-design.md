@@ -1,4 +1,20 @@
+---
+id: design-image-editor
+title: "Simple image editor (`IM`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0075-client-side-image-editing-crop-and-resize.md
+  - docs/adr/0025-rich-content-markdown-and-content-images.md
+updated: 2026-11-02
+---
+
 # Simple image editor (`IM`) — client-side crop + resize for avatars and inline images
+
+> **Abstract:** the **simple image editor (`IM`)** design — **client-side crop + resize** for avatars and inline images: one `client/lib/image-editor.ts` module, wired into the avatar upload + the editor's Image button, one CSS block, and the spec-mirror tests. No document / schema / route / package change; the RC (ADR 0025) + RE (ADR 0031) frozen base is unchanged. **Who is it for:** a developer touching the image-editor module; an agent that needs the export-ceiling invariant. **When to read the rest:** before touching the image editor, the crop/resize, or the export ceiling.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the IM lane:
 > it pins the invariant numbers (IM·1–IM·3), the FACES (IM1–IM4), the exact

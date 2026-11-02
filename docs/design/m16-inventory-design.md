@@ -1,4 +1,20 @@
+---
+id: design-m16-inventory
+title: "M16 — Inventory (check-out / check-in)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0117-inventory.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M16 — Inventory (check-out / check-in + usage history) — design
+
+> **Abstract:** the **inventory** design — a neighborhood's shared/private things (equipment, clothes, books) become **trackable**: a check-out / check-in transition (who it's with) + an append-only usage history. One new bounded context (`Kumunita.Core.Inventory`) + two docs + one adapter on the frozen authorization service. **Who is it for:** a developer touching `InventoryItem` / `InventoryCheckout`; an agent that needs the check-out/check-in seam. **When to read the rest:** before touching the inventory context, the usage-history append, or the check-out/check-in transition.
+
 
 > **Milestone M16.** The neighborhood's **shared, community-owned, or
 > private things** (equipment, sports-team clothes, books, …) become

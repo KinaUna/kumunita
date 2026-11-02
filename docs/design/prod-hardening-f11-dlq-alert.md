@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f11-dlq-alert
+title: "F11 — alert on dead-letter exhaustion (JOB-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F11 — JOB-02: alert on dead-letter exhaustion — Part-0 design pin
+
+> **Abstract:** the **F11 dead-letter alert** design pin (Part-0, design-only) — **alert on dead-letter exhaustion**: the durable email path's terminal failure writes the `EmailDeadLetter` row + drives `/health` degraded, but **no alert fires** (the only signal is a `/health` poll). F11 adds the `IAlertSink` Core seam + the `AlertEvent` payload + the `NoopAlertSink` default + the `HandleFault` trigger wiring. Depends on F10. Closes 2026-10-22 JOB-02. **Who is it for:** a developer executing F11 U2–U3; an agent that needs the `IAlertSink` seam shape. **When to read the rest:** before touching the `IAlertSink` seam, the `AlertEvent` payload, or the F11 tests.
+
 
 > **Fix:** F11 (report row **JOB-02**) — kind **`code+ops`**.
 > **Status:** this is the **Part-0 design pin** (F11.U1). It is **design-only**:

@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f19-e2e
+title: "F19 — E2E suite (TEST-03)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0050-admin-managed-signup-gate-open-or-invitation-only.md
+updated: 2026-11-02
+---
+
 # F19 — TEST-03: E2E suite (signup → verify → login → write) — Part-0 design pin
+
+> **Abstract:** the **F19 E2E suite** design pin (Part-0, design-only) — the **E2E suite** (signup → verify → login → write) as a **new** test concern with its own runner (Playwright) + project location, no C# seam to pin (the only pure-`code` fix in the lane that does not touch `src/`). The pin makes the flow, ports, selectors, and spec names concrete. Closes 2026-10-22 TEST-03. **Who is it for:** a developer executing F19 U2–U4; an agent that needs the runner + the spec-name pins. **When to read the rest:** before adding the E2E suite, the Playwright runner, or the spec names.
+
 
 > **F19.U1** design pin (Tier 1). F19.U2 and F19.U3 execute against this file;
 > F19.U4 is the CI-wiring open item.

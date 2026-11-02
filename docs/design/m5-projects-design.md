@@ -1,3 +1,17 @@
+---
+id: design-m5-projects
+title: "M5 — Projects (to-dos + Kanban)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0067-m5-projects-todos-and-kanban.md
+  - docs/adr/0001-core-stack-and-identity-model.md
+  - docs/adr/0014-post-edit-lane-author-only.md
+updated: 2026-11-02
+---
+
 # M5 — Projects (to-dos + Kanban boards) — design (Part 1)
 
 > **Abstract:** *What it settles:* the **outcome arrow** — assignable,

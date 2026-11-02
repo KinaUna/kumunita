@@ -1,4 +1,20 @@
+---
+id: design-group-posts
+title: "Group posts (membership-scoped)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0013-group-posts-membership-lane.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # Design Doc — Group posts (membership-scoped group channel)
+
+> **Abstract:** the **group posts** design — a **membership-scoped group channel**: posts addressed to a group through the group's membership (not an audience grant), with replies inheriting the group's scope, lane-exclusivity, and the pinned seam-test names. Part 1 pins invariants + FACES; Part 2 the exact C# + the 19 pinned tests. **Who is it for:** a developer touching the group-post lane; an agent that needs the lane-exclusivity / reply-inherits rule. **When to read the rest:** before touching the group-post surface, the membership gate, or the group-post tests.
+
 
 > Part 1 of 2 (U1). Part 2 (U2) will append "Seams & contracts (Part 2,
 > written by U2)" with the **exact C#** U4–U9 must match, the **19 pinned

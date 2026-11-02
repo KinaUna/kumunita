@@ -1,4 +1,19 @@
+---
+id: design-sec-remediation
+title: "Security-audit remediation (`SEC`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # SEC — Security-audit remediation — design doc
+
+> **Abstract:** the **security-audit remediation** design — closes each finding of the 2026-10-30 static review (3 High, 5 Medium, 8 Low) with **one named regression test**, in units small enough for a fresh agent. Part 1 (this) pins context, scope, invariants, and the findings register; Part 2 the fix shapes + acceptance gate. **Who is it for:** a developer executing a SEC finding; an agent that needs the findings register + the one-test-per-finding rule. **When to read the rest:** before touching a SEC finding, its regression test, or the drift-guard.
+
 
 > Part 1 (this): Context, Scope, Invariants, Findings register. Written by U1.
 > Part 2 (fix shapes, config keys, signatures, test names, acceptance gate,

@@ -1,4 +1,20 @@
+---
+id: design-group-events
+title: "Group events (membership-scoped)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0089-group-events-membership-lane.md
+  - docs/adr/0013-group-posts-membership-lane.md
+updated: 2026-11-02
+---
+
 # Group events — membership-scoped group events lane — design doc
+
+> **Abstract:** the **group events** design — a **membership-scoped group events** lane: events addressed to a group through the group's membership (not the community audience), with the group's RSVP / reminder / ICS surface. A companion to ADR 0089; invariants GE·1–GE·8, FACES GE1–GE13, the frozen C# of every seam, and the pinned tests. **Who is it for:** a developer touching the group-events lane; an agent that needs the membership-gate shape. **When to read the rest:** before touching the group-events surface, the membership gate, or the group-events tests.
+
 
 Companion to **ADR 0089** (`docs/adr/0089-group-events-membership-lane.md`, the
 authority on *why*) and the lane register

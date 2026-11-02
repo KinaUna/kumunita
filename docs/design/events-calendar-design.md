@@ -1,4 +1,21 @@
+---
+id: design-events-calendar
+title: "Events calendar (`EV-CAL`) — month-anchored overview"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0063-events-calendar-view.md
+  - docs/adr/0054-events-rsvp-reminders.md
+  - docs/adr/0019-timezone-platform-default-and-resident-override.md
+updated: 2026-11-02
+---
+
 # Events calendar (`EV-CAL`) — a month-anchored overview of visible events — design
+
+> **Abstract:** the **events calendar (`EV-CAL`)** design — a **month-anchored overview of visible events**: the calendar's month view over the frozen M4 events surface, with the exact seam signatures, the 13 pinned test names, and the three-test acceptance gate. A named lane on the already-shipped M4 events. **Who is it for:** a developer touching the month-view calendar seam; an agent that needs the calendar view-model + controller shape. **When to read the rest:** before touching the month view, the calendar controller, or the EV-CAL tests.
+
 
 > **Two parts.** Part 1 (U00) is "What this lane is / the existing surface /
 > the design decisions / the invariants"; Part 2 (U01, §5 below) is "The seams

@@ -1,4 +1,20 @@
+---
+id: design-m7-pagination-filtering
+title: "M7 — Pagination & filtering"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0090-pagination-and-filtering.md
+  - docs/adr/0052-warm-boot-ui-string-baseline-backfill.md
+updated: 2026-11-02
+---
+
 # M7 — Pagination & filtering — design (Part 1 + Part 2)
+
+> **Abstract:** the **pagination & filtering** design — one canonical paging contract (a `HasMore` signal on every paged Core seam, honest `Total`, one shared `_Pager` partial, one `PagedViewModel`) wired into **every** paged list surface. **Who is it for:** a developer adding paging/filtering to a list; an agent that needs the `HasMore` / `_Pager` / `PagedViewModel` shape. **When to read the rest:** before touching a paged seam, the `_Pager` partial, or the filter params.
+
 
 > **Milestone M7.** The one canonical paging contract (a `HasMore` signal on
 > every paged Core seam, honest `Total` where a total is already computed,

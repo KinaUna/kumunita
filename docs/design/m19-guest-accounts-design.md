@@ -1,4 +1,21 @@
+---
+id: design-m19-guest-accounts
+title: "M19 — Guest accounts"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0120-guest-accounts.md
+  - docs/adr/0050-admin-managed-signup-gate-open-or-invitation-only.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M19 — Guest accounts (design doc)
+
+> **Abstract:** the **guest accounts** design — a last-milestone, limited-privilege account for community-adjacent roles (consultants, coaches, speakers), with an admin-set **closed surface set** and a **time-bounded** window, as data (not config). Zero new authorization surface; one additive `Profile.IsGuest` + one `GuestAccess` doc + one `GuestSurface` enum. **Who is it for:** a developer touching the `GuestAccess` doc or the guest surface set; an agent that needs the closed `GuestSurface` ceiling. **When to read the rest:** before touching the guest lane, the time-bounded window, or the guest surface allowlist.
+
 
 > **Milestone M19 — the *last* milestone in `Milestones.All`.** **Guest
 > accounts** (the README M19 row, verbatim: "limited-privilege accounts for

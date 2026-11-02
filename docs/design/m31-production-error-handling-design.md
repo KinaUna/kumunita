@@ -1,3 +1,16 @@
+---
+id: design-m31-production-error-handling
+title: "M31 — Production error handling"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0154-production-error-handling.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M31 — Production error handling (design doc)
 
 > **Abstract:** This design settles how a resident reports a platform error

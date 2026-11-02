@@ -1,4 +1,20 @@
+---
+id: design-guardian-assignment
+title: "Guardian assignment (`GA`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0038-guardian-assignment.md
+  - docs/adr/0028-guardian-controls-account-scope-supervision.md
+updated: 2026-11-02
+---
+
 # Design Doc — Guardian assignment (`GA`)
+
+> **Abstract:** the **guardian assignment (`GA`)** design — the *second* guardian on a child's account (one or two guardians, each an active `GuardianLink` row): the assignment lane on the GU surface that lets a second active guardian be added (not just the one who created the account). A named lane pulled forward ahead of M4. **Who is it for:** a developer touching the `GuardianLink` multi-row shape; an agent that needs the active-row resolution. **When to read the rest:** before touching the `GuardianLink` doc, the multi-guardian lane, or the active-row resolution.
+
 
 > The "Seams & contracts" section is mandatory. The three tests
 > (closed-loop? handoff? part-vs-whole?) are run and recorded at the end.

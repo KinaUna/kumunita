@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f16-scan
+title: "F16 — scan uploads before serving (UPL-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F16 — UPL-02: scan uploads before serving — **Part-0 design pin**
+
+> **Abstract:** the **F16 upload scan** design pin (Part-0, design-only) — **scan uploads before serving**: the repo today serves media with `Content-Disposition: attachment` + `nosniff` as its **only** anti-malware mitigation (the browser-side control). F16 adds the **content-side** control: one small `IVirusScanner` Core seam + one `MediaObject.Quarantined` bool + one gate at the serve lane (a 404 refusal). The scanner is **ClamAV via the store** (a local daemon, not a third-party provider). Closes 2026-10-22 UPL-02. **Who is it for:** a developer executing F16 U2–U3; an agent that needs the `IVirusScanner` seam + the serve-lane gate. **When to read the rest:** before touching the `IVirusScanner` seam, the quarantine flag, or the F16 tests.
+
 
 **Lane:** prod-hardening (in-progress). **Fix F16** = the `code+ops` fix for
 the 2026-10-22 audit row **UPL-02** ("no scan step; files served

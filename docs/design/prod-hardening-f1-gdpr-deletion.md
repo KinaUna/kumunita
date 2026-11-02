@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f1-gdpr-deletion
+title: "F1 — complete GDPR deletion (DB-13)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0022-user-added-post-reply-translations.md
+updated: 2026-11-02
+---
+
 # Prod-hardening F1 — complete GDPR deletion — Part-0 design pin
+
+> **Abstract:** the **F1 GDPR deletion** design pin (Part-0, design-only) — makes a deleted account leave **no resident-authored content, no media bytes, no `MediaObject` catalog rows**: the closed list of content docs a deletion must remove per resident, the byte-store delete seam, the `MediaObject` owner field, the invariants, and the four pinned test names. Closes the 2026-10-22 audit DB-13. **Who is it for:** a developer executing F1 U2–U5; an agent that needs the closed delete list + the owner-field ground truth. **When to read the rest:** before touching the `DeleteAccountAsync` lane, the byte-store delete seam, or the F1 tests.
+
 
 > **Unit F1.U1 (design-only).** This is the Tier-1 pin that U2–U5 execute
 > mechanically against. It names the exact content-doc closed list, the

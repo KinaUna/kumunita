@@ -1,3 +1,17 @@
+---
+id: design-m13-logging-analytics
+title: "M13 — Logging and analytics"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0114-logging-and-usage-analytics.md
+  - docs/adr/0108-portability-import-export.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M13 — Logging and analytics — design
 
 > **Abstract:** *What it settles:* the **operator's feedback loop**, in two

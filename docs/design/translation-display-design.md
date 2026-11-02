@@ -1,4 +1,21 @@
+---
+id: design-translation-display
+title: "Translation display (`TD`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0024-author-soft-delete-lane.md
+  - docs/adr/0022-user-added-post-reply-translations.md
+  - docs/adr/0018-ugc-authored-in-language-tag.md
+updated: 2026-11-02
+---
+
 # Translation display (`TD`) — authored-in as a first-class variant + click-to-swap
+
+> **Abstract:** the **translation display (`TD`)** design — the **authored-in** language (ADR 0018's `Post.LanguageCode` / `PostReply.LanguageCode`) as a **first-class variant** + **click-to-swap**: the one language the item is written in becomes visible + switchable, over the ADR 0022 user-added-translation chip row. Invariants TD·1–TD·8, FACES TD1–TD8, the exact C# of the VM ADDs, the `data-*` set, and the pinned tests. **Who is it for:** a developer touching the translation-display surface; an agent that needs the variant-container shape. **When to read the rest:** before touching the `data-*` attributes, the click-to-swap, or the TD tests.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the TD lane:
 > it pins the invariant numbers (TD·1–TD·8), the FACES (TD1–TD8), the exact

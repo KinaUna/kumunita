@@ -1,4 +1,21 @@
+---
+id: design-m14-events-projects
+title: "M14 — Integration of Events and Projects"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0115-integration-of-events-and-projects.md
+  - docs/adr/0112-ical-calendar-export.md
+  - docs/adr/0086-goals-projects-lane.md
+updated: 2026-11-02
+---
+
 # M14 — Integration of Events and Projects — design
+
+> **Abstract:** how the **Events (M4) and Projects (M5) surfaces interlock** — a to-do can be associated with an event (one additive `EventId?`, a reverse read seam, a dedicated write lane, both-direction display links), and the to-dos' optional dates become a **standard `VTODO` iCal surface** (a pure `TodoIcsWriter` + two routes). **Who is it for:** a developer touching the to-do ↔ event seam or the to-do ICS writer; an agent that needs the exact additive shape before changing either surface. **When to read the rest:** before touching `TodoItem`, the `ListTodosForEventAsync` / `SetTodoEventAsync` seams, or the to-do ICS routes.
+
 
 > **Milestone M14.** The **two coordination surfaces interlock**: the Events
 > (M4) and Projects (M5) surfaces — which a neighborhood uses as one thing —
@@ -1014,4 +1031,3 @@ own milestone)
    event the actor **cannot** see (or a soft-deleted / absent target)
    **omits** the chip / the row — never a 404/403 for the source surface,
    and the target's title / id are **not leaked** (C-M14·2).
-

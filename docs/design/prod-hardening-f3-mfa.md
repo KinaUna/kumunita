@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f3-mfa
+title: "F3 — MFA for GlobalAdmin (AUTH-03)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # F3 — AUTH-03: MFA for `GlobalAdmin` (Part-0 design pin)
+
+> **Abstract:** the **F3 MFA** design pin (Part-0, design-only) — **MFA for `GlobalAdmin`** over the ASP.NET Identity 10.0.13 classic `UserManager` TOTP + recovery-code API (not the new `TwoFactor` surface): the TOTP provider + token store, the enroll/verify surface, the enforcement, and the tests. Closes 2026-10-22 AUTH-03. **Who is it for:** a developer executing F3 U2–U5; an agent that needs the Identity two-factor API ground truth. **When to read the rest:** before touching the GlobalAdmin MFA lane, the token store, or the F3 tests.
+
 
 **Fix:** F3 (report row **AUTH-03** — "MFA for `GlobalAdmin`"), severity bucket **data
 exposure**. **Kind:** `code`.
