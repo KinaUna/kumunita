@@ -44,7 +44,7 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | `security/` | threat model, control map, audit checklists (split from `SECURITY.md` in `D08`) |
 | [`ops/`](ops/) | one runbook per procedure (split from the [`OPS.md`](OPS.md) hub in `D04`) |
 | [`deploy/coolify/`](deploy/coolify/00-plan.md) | the Coolify guide, one step per file (split from the [`COOLIFY.md`](COOLIFY.md) hub in `D05`) |
-| `dev/` | running locally, tests, CI cheatsheet, Razor doctrine, terminal/browser quirks |
+| [`dev/`](dev/README.md) | the working doctrine — Razor verification, testing + CI, live-server debugging, sandbox quirks (split from `AGENTS.md` in `D06`) |
 | `product/` | features, roadmap, deferred-by-design (from `README.md` in `D07`) |
 | [`philosophy/`](philosophy/README.md) | the trust model and the integration argument (unchanged shape) |
 | [`guides/`](guides/CONVENTIONS.md) | the in-app guide registry and writing conventions |
@@ -77,4 +77,5 @@ register, [`plans-milestones/improve-docs/plan-improve-docs.md`](plans-milestone
 Each unit `D00`–`D14` is one small, self-documenting commit (or a short
 series for the mechanical batches). `D00` (conventions + harness), `D01`
 (this map + the entry pages), `D02` (the archive move), `D03` (the archive
-tier) and `D04` (the ops split) are done.
+tier), `D04` (the ops split), `D05` (the Coolify split) and `D06` (slimming
+`AGENTS.md` into [`dev/`](dev/README.md)) are done.

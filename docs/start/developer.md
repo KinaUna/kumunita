@@ -8,6 +8,7 @@ audiences: [developer]
 related:
   - AGENTS.md
   - docs/README.md
+  - docs/dev/README.md
   - docs/DOCS-CONVENTIONS.md
   - docs/philosophy/START-HERE.md
   - docs/plans-milestones/improve-docs/plan-improve-docs.md
@@ -27,7 +28,8 @@ You write code in this repo. The docs below are the ones that matter for
 
 | Link | Why |
 |---|---|
-| [`AGENTS.md`](../../AGENTS.md) | The must-knows for working in this repo — the shape of the code, the conventions, the test-runner quirk, the CI cheatsheet, the Razor doctrine. Loaded into every agent session; read it before your first commit. |
+| [`AGENTS.md`](../../AGENTS.md) | The must-knows for working in this repo — the shape of the code, the conventions, the doc-sync rule, and a pointer to the working doctrine. Loaded into every agent session; read it before your first commit. |
+| [`docs/dev/`](../dev/README.md) | The working doctrine — the Razor verification traps, the test-runner quirk + CI cheatsheet, the live-server debugging conventions, and the sandbox quirks. Read it when verifying a bug, running tests, reading CI, or debugging the live server. |
 | [`docs/DOCS-CONVENTIONS.md`](../DOCS-CONVENTIONS.md) | The shared rules every doc in this repo follows — the front-matter schema, the abstract rule, the ADR cap, the linking rule. Read before your first doc change. |
 | [`README.md`](../../README.md) | What Kumunita is, the tech stack, the Running instructions, the Roadmap. |
 | [`docs/README.md`](../README.md) | The docs map — where things live, the tier model, the entry pages. |

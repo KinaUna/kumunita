@@ -132,7 +132,8 @@ a half-applied rule.
 - `D03` — ✅ (commit `d89163f7`, 2026-11-02)
 - `D04` — ✅ (commit `782eca22`, 2026-11-02)
 - `D05` — ✅ (commit `b55513e5`, 2026-11-02)
-- `D06`–`D14` — not started
+- `D06` — ✅ (2026-11-02)
+- `D07`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -248,7 +249,7 @@ a half-applied rule.
   `ops/environments.md` + `ops/tls-domain.md` refs that just point at the hub
   stay as-is.
 
-### `D06` — Slim `AGENTS.md`
+### `D06` — Slim `AGENTS.md` ✅
 - `AGENTS.md` is loaded into every agent session, so **its length is a
   per-session cost**. Keep: start here, shape of the code, the one thing to
   internalize, conventions, don't-pause rule, doc-sync rule — as short
@@ -258,6 +259,32 @@ a half-applied rule.
   gotcha, browser quirk, terminal-command safety.
 - Re-check the `.github/copilot-instructions.md` de-duplication (IMPROVE U03 /
   gate `c`) — the copilot file should *link* to the same `docs/dev/` pages.
+- **Shipped 2026-11-02:** `AGENTS.md` went from 468 to 119 lines — it keeps the
+  six must-know sections (start here, shape of the code, the one thing to
+  internalize, conventions, don't-pause, doc-sync) and now *links* out to
+  `docs/dev/` instead of carrying the doctrine. `docs/dev/` landed with a
+  [`README.md`](../../dev/README.md) hub + four topic files, each with
+  front-matter + Abstract: [`razor-verification.md`](../../dev/razor-verification.md)
+  (the rendered-HTML rule, the known Razor traps, live-server startup),
+  [`testing-and-ci.md`](../../dev/testing-and-ci.md) (the xunit.v3 test-runner
+  quirk, the CI known-failure cheatsheet, the by-design gates / anti-regression
+  pins), [`live-server-debugging.md`](../../dev/live-server-debugging.md)
+  (the `mt_doc_` / `kumunita`-DB / `pgcrypto` conventions, the `/admin/setup`
+  404), and [`agent-environment-quirks.md`](../../dev/agent-environment-quirks.md)
+  (the git-state gotcha, the browser trusted-folder quirk + `.tmp/` harness,
+  the WSL2/Copilot terminal-command safety rules). The doctrine moved *verbatim*
+  (the traps, commands and gotchas are the evidence — they were not rewritten);
+  the only re-home was "Postgres diagnostics + `/admin/setup`" (from the live-
+  server section) and the four sandbox sections consolidated into one
+  `agent-environment-quirks.md` (the git, browser, and terminal rules are the
+  same WSL2/Copilot sandbox surface). `.github/copilot-instructions.md` now
+  *links* to those `docs/dev/` pages (the U03 / gate-`c` de-dup) instead of
+  restating them. Housekeeping: `docs/README.md`'s folder table points `dev/`
+  at the real hub, and `start/developer.md` + `start/agent.md` gained a
+  `docs/dev/` row. Verification: `docs-report` broken links 9 → 9 (unchanged),
+  front-matter 656 → 661, abstracts 621 → 624; `dotnet build` 0 errors;
+  Web.Tests 1249/0 failed, Core.Tests 1682/0 failed (2 expected skips);
+  `AGENTS.md` 119 lines (≤120).
 
 ### `D07` — Slim `README.md`
 - Keep: what Kumunita is, status (one paragraph + link), principles (3 lines +
