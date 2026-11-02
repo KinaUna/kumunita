@@ -138,7 +138,8 @@ a half-applied rule.
 - `D08` — ✅ (commit `ef416bb5`, 2026-11-02)
 - `D09` — ✅ (commit `518cc135`, 2026-11-02)
 - `D10` — ✅ (commit `1a1bb409`, 2026-11-02)
-- `D11`–`D14` — not started
+- `D11` — ✅ (commit `757413e3`, 2026-11-02)
+- `D12`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -473,6 +474,30 @@ a half-applied rule.
 - New `docs/adr/TEMPLATE.md` and an "ADR or handoff note?" rule of thumb
   (an ADR decides something a future change could get wrong; a copy/CSS
   decision is a handoff-note line).
+- **Shipped 2026-11-02:** all **285** ADRs (`docs/adr/0*.md`, excluding the
+  `README.md` index and `TEMPLATE.md`) now carry front-matter and sit **≤250
+  lines** — `docs-report.ps1` §5 ADR histogram **285 / 0 / 0** (≤250 / 251–400
+  / >400); the moved detail (options analysis, test lists, implementation
+  notes) lives in the shared
+  [`docs/design/adr-handoffs.md`](../../design/adr-handoffs.md) (each `## ADR
+  NNNN` section holds the trimmed content; the ADR body keeps Status / Context
+  / Decision / Consequences and points to it). Front-matter was **not**
+  restamped in the trim batches — every ADR's YAML block is byte-identical to
+  the pre-trim state (the D11 batches only rewrote the *body*). `docs/adr/TEMPLATE.md`
+  (the "ADR or handoff note?" rule of thumb) landed. Verification: `docs-report.ps1`
+  — broken links **3** (unchanged from the D10 baseline; the three are the
+  pre-existing `archive/lanes/improve/` + `philosophy/templates/` targets,
+  `D12` scope), front-matter **1059**, ADR histogram **285/0/0**; `dotnet
+  build` 0 errors / 0 warnings; `Kumunita.Core.Tests` 1682 passed / 0 failed /
+  2 pre-existing skips; `Kumunita.Web.Tests` 1249 total — the
+  `ImproveCheck_Gate_Passes` test is **RED on gate `g`** (16 `docs/design/*.md`
+  files over 400 lines without an Abstract, `new beyond the U07 baseline`:
+  `m13`, `m18`, `m20`, `m29`…`m36`, `m5`, `m3b`, `rich-editor`, `sessions`,
+  `esc`, `attachment-inline-preview`), which is **pre-existing** (D11 only
+  touched `docs/adr/*.md` + `adr-handoffs.md`) and **out of D12's scope** —
+  adding those Abstracts is the D14 "retire the baselines" close work, not
+  the D12 linking pass (this note records it so the D12 close isn't mistaken
+  for the fix).
 
 ### `D12` — Linking pass
 - Script: convert backtick mentions of existing doc paths and `ADR NNNN`
