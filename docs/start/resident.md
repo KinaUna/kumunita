@@ -32,7 +32,7 @@ events. The docs below are the ones that matter for *you*.
 | [`docs/guides/CONVENTIONS.md`](../guides/CONVENTIONS.md) | The in-app guide registry — the how-to guides you'll actually read on the platform (the canonical home for resident-facing how-tos). |
 | [`docs/philosophy/everyday-life.md`](../philosophy/everyday-life.md) | The platform's philosophy in everyday examples — what we optimize for and why. |
 | [`SECURITY.md`](../../SECURITY.md) | How your data is protected, who can see what, and what you can do about it. |
-| [`docs/product/roadmap.md`](../product/roadmap.md) | What's coming next in the platform (the pending `D07` home for the roadmap). |
+| [`docs/product/roadmap.md`](../product/roadmap.md) | What's done and what's deliberately deferred — the roadmap home (the source of truth for the milestone list is `src/Kumunita.Web/Milestones.cs`). |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The philosophy in one hour, if you want the full argument. |
 
 If none of those is what you need, the docs map at

@@ -44,8 +44,8 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | `security/` | threat model, control map, audit checklists (split from `SECURITY.md` in `D08`) |
 | [`ops/`](ops/) | one runbook per procedure (split from the [`OPS.md`](OPS.md) hub in `D04`) |
 | [`deploy/coolify/`](deploy/coolify/00-plan.md) | the Coolify guide, one step per file (split from the [`COOLIFY.md`](COOLIFY.md) hub in `D05`) |
-| [`dev/`](dev/README.md) | the working doctrine — Razor verification, testing + CI, live-server debugging, sandbox quirks (split from `AGENTS.md` in `D06`) |
-| `product/` | features, roadmap, deferred-by-design (from `README.md` in `D07`) |
+| [`dev/`](dev/README.md) | the working doctrine — running locally, Razor verification, testing + CI, live-server debugging, sandbox quirks (split from `AGENTS.md` in `D06`; running-locally in `D07`) |
+| [`product/`](product/roadmap.md) | features, roadmap, deferred-by-design (split from `README.md` in `D07`) |
 | [`philosophy/`](philosophy/README.md) | the trust model and the integration argument (unchanged shape) |
 | [`guides/`](guides/CONVENTIONS.md) | the in-app guide registry and writing conventions |
 | [`adr/`](adr/README.md) | short decision records (~80-line cap, index generated from front-matter) |
@@ -54,7 +54,8 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 
 Folders still marked "split in `D…`" don't exist yet — the lanes are running in
 order; the entry pages link to the *intended* paths so the seams stay green.
-(`ops/` landed in `D04`; `deploy/coolify/` in `D05`; the rest follow.)
+(`ops/` landed in `D04`; `deploy/coolify/` in `D05`; `dev/` in `D06`;
+`product/` in `D07`; `security/` + `architecture/` follow in `D08`–`D09`.)
 
 ## Per-audience entry pages
 

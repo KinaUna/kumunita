@@ -38,12 +38,12 @@ Re-running the seeder is a no-op once the admin exists.
 > — create-if-missing, idempotent, and never overwriting a Translator's in-app edit
 > (ADR 0060), so an instance whose first boot predates the event-translation lane
 > picks them up on the next redeploy. Two postures: in `Development`
-> it uses the documented weak demo credentials (README §Running table); on a deployed
+> it uses the documented weak demo credentials (the [Running-locally](../dev/running-locally.md) table); on a deployed
 > demo site (`Production` + the flag) the seed admin keeps its `SeedAdmin__`
 > setup-token lane, the other demo accounts get random high-entropy passwords, and a
 > single credentials summary is emailed to the seed admin's address through the
 > durable outbox. The demo logins are `@examplium.com` (kept distinct from the real
-> `kumunita.com`). See the README §Running "Sample data & demo accounts" table, and
+> `kumunita.com`). See the [Running-locally](../dev/running-locally.md) "Sample data & demo accounts" table, and
 > [deploy a demo site](demo-site.md) for the step-by-step.
 
 **Languages are in-app data, not config.** Supported languages, the default language,

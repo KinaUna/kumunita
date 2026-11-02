@@ -33,6 +33,7 @@ one fact, one place (the [linking rule](../DOCS-CONVENTIONS.md)).
 
 | File | What it covers |
 |---|---|
+| [`running-locally.md`](running-locally.md) | How to run the app locally — the dev container, the no-app-container loop, the sample-data / demo accounts, and the prod topology (split from the `README.md` Running section in `D07`). |
 | [`razor-verification.md`](razor-verification.md) | "The rendered HTML is the evidence" rule, the known Razor traps in this codebase, and how to get a live server to verify against. |
 | [`testing-and-ci.md`](testing-and-ci.md) | The xunit.v3 test-runner quirk, the CI known-failure cheatsheet, and the by-design CI gates / anti-regression pins. |
 | [`live-server-debugging.md`](live-server-debugging.md) | The Postgres conventions that trip you up (`mt_doc_` naming, the `kumunita` vs `postgres` DB, `pgcrypto`, the `/admin/setup` 404). |

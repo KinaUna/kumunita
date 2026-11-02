@@ -133,7 +133,8 @@ a half-applied rule.
 - `D04` — ✅ (commit `782eca22`, 2026-11-02)
 - `D05` — ✅ (commit `b55513e5`, 2026-11-02)
 - `D06` — ✅ (commit `40f390e6`, 2026-11-02)
-- `D07`–`D14` — not started
+- `D07` — ✅ (2026-11-02)
+- `D08`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -286,12 +287,42 @@ a half-applied rule.
   Web.Tests 1249/0 failed, Core.Tests 1682/0 failed (2 expected skips);
   `AGENTS.md` 119 lines (≤120).
 
-### `D07` — Slim `README.md`
+### `D07` — Slim `README.md` ✅
 - Keep: what Kumunita is, status (one paragraph + link), principles (3 lines +
   link to philosophy), quickstart, "where to go next" (→ `docs/start/`).
 - Move: Features (120 lines) → `docs/product/features.md`; Roadmap + Deferred
   → `docs/product/roadmap.md` (link to `Milestones.cs`/`STATUS.md` as the
   source of truth instead of restating it); Running → `docs/dev/running-locally.md`.
+- **Shipped 2026-11-02:** `README.md` went from 441 to **95 lines** (the front
+  page keeps what Kumunita is, a one-paragraph status, the 5 principles, a
+  one-line "what it does", the tech stack, a short architecture + deployment
+  pointer, a quickstart, and a "where to go next" block that links into
+  `docs/start/`). `docs/product/` landed with
+  [`features.md`](../../product/features.md) (the Features bullet list, the
+  M4/M5 "see the Roadmap" notes re-pointed to the sibling) and
+  [`roadmap.md`](../../product/roadmap.md) (a *pointer* — it names
+  `src/Kumunita.Web/Milestones.cs` as the **source of truth** and
+  `docs/STATUS.md` as the narrative, and does **not** restate the 76-line
+  milestone list — the "one fact, one place" rule; it also carries the
+  `## Deferred (future, by design)` list, which `STATUS.md` does not own);
+  `docs/dev/` gained
+  [`running-locally.md`](../../dev/running-locally.md) (the Running section,
+  its `OPS.md` refs re-pointed to the `docs/ops/` runbooks). Each new file has
+  front-matter (`tier: living`) + Abstract. The doc-sync contract re-pointed:
+  `AGENTS.md`'s sync bullet now names `Milestones.cs` as the source of truth
+  (rendered home page) and `docs/product/roadmap.md` + `docs/STATUS.md` as the
+  pointing docs (no longer "README Roadmap"); `MilestonesTests.cs` (the pin) is
+  untouched, and the milestone order is unchanged (the user's constraint). The
+  inbound `README §Running` refs (the coolify `step-5` overview + the three
+  `docs/ops/` runbooks) now link into `docs/dev/running-locally.md`. Entry pages
+  updated: `start/developer.md` (a `docs/product/` row + the dev row notes
+  running-locally), `start/resident.md` (the roadmap row is no longer the
+  "pending D07" home); `community-admin.md` / `agent.md` already point at the
+  front page + map, so unchanged. Verification: `docs-report` broken links
+  9 → 8 (one `ops/` ref now resolves; the rest are pre-existing `SECURITY.md`
+  / philosophy links, `D08`/`D13` scope), front-matter 661 → 664, abstracts
+  624 → 627; `dotnet build` 0 errors; Web.Tests 1249/0 failed, Core.Tests
+  1682/0 failed (2 pre-existing skips); `README.md` 95 lines (≤120).
 
 ### `D08` — Security docs → `docs/security/`
 - `SECURITY.md` split: why-first, trust boundaries, data classes, adversaries,

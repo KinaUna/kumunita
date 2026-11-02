@@ -29,9 +29,10 @@ You write code in this repo. The docs below are the ones that matter for
 | Link | Why |
 |---|---|
 | [`AGENTS.md`](../../AGENTS.md) | The must-knows for working in this repo — the shape of the code, the conventions, the doc-sync rule, and a pointer to the working doctrine. Loaded into every agent session; read it before your first commit. |
-| [`docs/dev/`](../dev/README.md) | The working doctrine — the Razor verification traps, the test-runner quirk + CI cheatsheet, the live-server debugging conventions, and the sandbox quirks. Read it when verifying a bug, running tests, reading CI, or debugging the live server. |
+| [`docs/dev/`](../dev/README.md) | The working doctrine — running locally, the Razor verification traps, the test-runner quirk + CI cheatsheet, the live-server debugging conventions, and the sandbox quirks. Read it when running the app, verifying a bug, running tests, reading CI, or debugging the live server. |
 | [`docs/DOCS-CONVENTIONS.md`](../DOCS-CONVENTIONS.md) | The shared rules every doc in this repo follows — the front-matter schema, the abstract rule, the ADR cap, the linking rule. Read before your first doc change. |
-| [`README.md`](../../README.md) | What Kumunita is, the tech stack, the Running instructions, the Roadmap. |
+| [`README.md`](../../README.md) | What Kumunita is — the front page (one-paragraph status, principles, quickstart, where to go next). |
+| [`docs/product/`](../product/roadmap.md) | What Kumunita does — the [feature list](../product/features.md) and the [roadmap + deferred-by-design](../product/roadmap.md) home (the source of truth for the milestone list is `src/Kumunita.Web/Milestones.cs`). |
 | [`docs/README.md`](../README.md) | The docs map — where things live, the tier model, the entry pages. |
 | [`docs/plans-milestones/improve-docs/plan-improve-docs.md`](../plans-milestones/improve-docs/plan-improve-docs.md) | The lane register for the current doc restructure — the `D`-units, the evidence, the target shape. |
 | [`docs/adr/`](../adr/README.md) | The ADR index — the deciding document for any non-obvious rule. |

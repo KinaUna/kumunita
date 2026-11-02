@@ -33,7 +33,7 @@ What makes it a *demo* instance (vs. a real one) is the env set, not the image:
 **deploy posture** the seed admin keeps its `SeedAdmin__` setup-token lane, the other
 demo accounts get random high-entropy passwords, and a single credentials summary is
 emailed to the seed admin's address through the durable outbox — no weak credential is
-stored on the public instance (the README §Running table is the **Development**
+stored on the public instance (the [Running-locally](../dev/running-locally.md) table is the **Development**
 credential set, not this one).
 
 1. Provision a fresh app + dedicated Postgres exactly as [Procedure: provision](provision.md), but with the

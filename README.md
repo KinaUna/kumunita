@@ -1,52 +1,30 @@
 # Kumunita
 
-A self-hosted community platform for a single neighborhood. Residents can find and
-get to know one another, share announcements and events, discuss topics in functional
-areas, and work on projects together — with privacy-first, user-controlled access.
+A self-hosted community platform for a single neighborhood. Residents can find
+and get to know one another, share announcements and events, discuss topics in
+functional areas, and work on projects together — with privacy-first,
+user-controlled access.
 
 Each deployment serves **one neighborhood**. The same codebase is deployed
-independently per community (its own container + its own Postgres), so there is no
-multi-tenant data model: scaling to many neighborhoods is a *configuration* concern,
-not a code concern.
+independently per community (its own container + its own Postgres), so there is
+no multi-tenant data model: scaling to many neighborhoods is a *configuration*
+concern, not a code concern.
 
-**Naming.** *Kumunita* is the platform (this repository). Each deployed instance shows its own community name (e.g. "Maplewood Residents"), set via `Community__Name`.
+**Naming.** *Kumunita* is the platform (this repository). Each deployed
+instance shows its own community name (e.g. "Maplewood Residents"), set via
+`Community__Name`.
 
 ## Status
 
-**M19 is done** (guest accounts — limited-privilege, time-bounded, admin-settled standing for consultants, coaches, teachers, speakers, entertainers, etc.; ADR 0120); M1–M19
-and all named lanes are done — identity,
-groups & delegation, directory & profiles, posts + moderation, multilingual
-(`ML`/`ML-UI`), rich content (`RC`), guardian controls (`GU`), pages (`PG`),
-events + calendar (`M4`/`GE`/`EV-DWM`), projects (`M5`), notifications
-(`M6`), pagination (`M7`), search (`M8`), messaging (`M9`), PWA + responsive
-design (`M10`), and portability (import/export) (`M11`), on one
-server-rendered stack over a single Postgres. **M20 is done** —
-notification quiet times (per-resident quiet schedules on the M6 notification
-lane + the admin-set check cadence for pending notifications; ADR 0121). **M21 is done** —
-document management (a shared repository for official documents, contracts, etc., with per-document access controls; ADR 0122).
-**M23 is done** — extended user profiles (a biography + free author-set tags for skills, interests, knowledge, and expertise, to make it easier to find people with something in common; ADR 0123).
-**M22 is done** — onboarding (a guided walk-through that walks a new user through account setup; ADR 0132).
-**`M9-PR` is done** — per-resident messaging controls (the resident's own opt-in on a `/settings/messaging` tab + the guardian's ceiling over a supervised child, composed on top of M9's instance-level master gate; ADR 0139).
-**M24 is done** — storage metrics (an admin view of storage: total used space, available space, user-content used space, and space used per user; ADR 0134).
-**M25 is done** — upload limits (admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains; ADR 0135).
-**Documents organization is done** — tags + folders on the M21 document repository (a Page-style folder forest + the TG tag convention; ADR 0137).
-**M26 is done** — sorting (feeds, lists & search results are sortable by various properties in increasing or decreasing order; ADR 0145).
-**M27 is done** — user-scoped portability (a resident exports / backs up their own data; imports resolve conflicts per entity; ADR 0148).
-**M28 is done** — guardian time limits (for a child's account, a parent/guardian sets when the child may use the platform — allow or block certain hours of each day and days of the week; ADR 0151).
-**IMPROVE is done** — the platform's own integration pass (a *named lane*, not a milestone): the codebase is measurably smaller, the docs measurably more navigable, the seams measurably more tested, and the existing tests still pass — **no new feature** (the close of the IMPROVE lane, U00–U09).
-**M29 is done** — admin surface labels (a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice, so a rename stays consistent across the surface; a per-item label, not a re-route; ADR 0152).
-**M30 is done** — admin onboarding (a guided walk-through for a new GlobalAdmin through the seven most important initial settings — community name, languages, moderation, notifications, storage limits, site content, issue escalation — a links-only walk-through on the M22 / SITE lane's shape, not a new write path; ADR 0153).
-**M31 is done** — production error handling (a report-an-issue form on the 500 error page so a resident can say what went wrong, plus a GlobalAdmin triage surface at /admin/error-reports; one new bounded context, one new doc, one new service; ADR 0154).
-**M32 is done** — issue submission & escalation (a resident submits an issue at /issues/new + a GlobalAdmin resolves it locally or forwards it to a configurable escalation endpoint; the M31 ErrorReports surface extended additively — the resolved TriageStatus value + the Origin/ResolvedAt/ResolvedBy/ResolutionNote fields + the MarkResolvedAsync seam + the IEscalationForwarder + the closed issue.* / errorreport.resolve.* / errorreport.escalate.* kw-l key set; ADR 0155).
-**M33 is done** — storage metrics history (the M24 /admin/storage surface gains a trend view over time — a daily capture tick stores one StorageMetricsSample, a 365-day retention prunes it, and a per-day table + inline sparkline render a pinned 30/90/180/365-day window — so an operator can estimate whether the instance's capacity is sufficient in the future; the M24 Usage surface extended additively — the StorageMetricsSample doc + the StorageHistoryDocTypes surface + the GetHistoryAsync read seam + the StorageMetricsCaptureService tick + the closed storage.trend.* kw-l key set; ADR 0156).
-**M34 is done** — analytics history (the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve — a derived read over the existing UsageEvent rows, one UsageDailyTotal per UTC day over a pinned window, + a per-day table + an inline sparkline; the M13 Usage surface extended additively — the UsageDailyTotal + UsageHistoryResult DTOs + the GetHistoryAsync read seam + the closed analytics.trend.* kw-l key set; ADR 0162).
-**M35 is done** — kiosk mode (a full-page / full-screen display that automatically cycles a signed-in user's own preset list of views — e.g. Kanban board A, calendar week, Kanban board B, calendar today, todos — on a set interval, refreshing each view's content on a separate, faster interval; the playlist is **per-resident** (one row per user, edited at **Settings → Kiosk** `/settings/kiosk` by any signed-in user — the ADR 0164 amendment, moved out of the admin area; the `/kiosk` display resolves the *viewer's* playlist); the frozen board / calendar / todos read seams + render partials are reused, not re-shape; ADR 0164).
-**M36 is done** — @mentions (a cross-surface `@<resident>` reference token: type a resident's directory display name after an @, the platform resolves it against the resident directory and notifies the mentioned resident on that surface — posts, replies, pages, events, to-dos, group posts, announcements, messages — and renders the name as a link to their directory page; the ADR 0076 D2 "follow-on lane" now wired: the reserved `post.mention` goes live on posts + replies, and six sibling kinds join the closed vocabulary; one new shared Core module `Kumunita.Core.Mentions` + the `MentionRenderer` post-render pass over the frozen `MarkdownRenderer` + the closed mention `kw-l` key set (7 kinds × 4 keys) × en/de/fr/da; zero new bounded context / doc / EF migration; zero new `AccessAction` / `AccessVia` / `Decide()` branch / adapter — a mention is a *personal read*; the author is never notified of their own mention and an ambiguous or blocked name is inert; detection runs on the publish lane, not draft-save; ADR 0165).
-**M37 is done** — personal notes (a private note a resident attaches to any content entity — posts, group posts, events, pages, projects, to-dos, boards, documents, people — **or to a page itself** — `/announcements`, `/community`, the groups index / a group's detail page, `/events`, `/projects`, a project's detail page, `/projects/todos`, `/projects/boards`, `/inventory`, `/documents` — the 2026-10-25 page-level amendment, ten `page-*` `TargetKind` kinds — ADR 0167 amendment — so a developer / site admin / user can jot what needs improving on that page) — like M17 bookmarks but the notes are *organizable*: the author nests them into a personal folder tree (categories, bounded in depth ≤ 2) and adds free author-set tags; author-only — invisible to every other resident and to any `GlobalAdmin` who is not the author; one new bounded context `Kumunita.Core.PersonalNotes` (the `PersonalNote` + `NoteFolder` docs on the new `PersonalNotesDocTypes` surface — additive, delta-detected, zero migrations for existing surfaces) + the `IPersonalNoteService` seam (the 8 note-method + 4 folder-tree methods over the frozen `IDocumentStore` + the owning surfaces' frozen read seams + the frozen `MarkdownRenderer`) + the `POST /notes/attach` write lane (the D3 write-lane visibility check — the target's own frozen `CanAsync(Read)` decision; Deny / absent / soft-deleted ⇒ 404, no row survives — the M16 create-gate posture) + the `GET /notes` list (the D2 personal read, zero `AccessAudit` rows, zero `CanSeeAsync` passes over the note rows — the ADR 0105 "operator has no read standing" precedent) + the `GET /notes/has/{targetKind}/{targetId}` F1 witness + the `_NoteButton` partial wired into the nine target detail surfaces + the `/notes` list view + the `pn.nav` entry in the top nav + the closed 24-key `pn.*` `kw-l` key set × en/de/fr/da; zero new `AccessAction` / `AccessVia` / `Decide()` branch / `IAuthorizationService` method — a note is a *personal-by-id* record, never an audience decision; M37 is the **last** milestone on the roadmap — there is no M38 to promote; ADR 0167).
-(see the "Roadmap" below).
-
-The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
-milestone-by-milestone breakdown is in the Roadmap below.
+M1–M37 and every named lane are **done** — identity, groups & delegation,
+directory & profiles, posts + moderation, multilingual, rich content, guardian
+controls, pages, events + calendar, projects, notifications, messaging, PWA,
+portability, storage, analytics, kiosk, @mentions, personal notes, and the
+`IMPROVE` + prod-hardening integration lanes — on one server-rendered stack
+over a single Postgres. The detailed, milestone-by-milestone report lives in
+[`docs/STATUS.md`](docs/STATUS.md); the roadmap's source of truth is
+[`src/Kumunita.Web/Milestones.cs`](src/Kumunita.Web/Milestones.cs) (narrated at
+[`docs/product/roadmap.md`](docs/product/roadmap.md)).
 
 ## Principles
 
@@ -54,131 +32,17 @@ milestone-by-milestone breakdown is in the Roadmap below.
 - **Privacy-first.** The author's choice of audience is absolute by default.
 - **Audit by default.** Access to restricted content is always logged.
 - **Boring where it can be.** Server-rendered pages, plain TypeScript, one database.
-- **Integration over features.** A neighborhood's life is fragmented — people,
-  knowledge, trust, problems. Kumunita's value is the *linkage* that turns those
-  parts into a whole, not the count of parts. This is the spine of our
-  development philosophy: see [`docs/philosophy/`](docs/philosophy/).
+- **Integration over features.** A neighborhood's life is fragmented — Kumunita's
+  value is the *linkage* that turns those parts into a whole. The full argument
+  is in [`docs/philosophy/`](docs/philosophy/).
 
-## Features
+## What it does
 
-- Resident directory (profiles, opt-in contact details)
-- Announcements & discussions, organized by **functional components** (Safety, Maintenance, Social, Governance, …)
-- Events with RSVP and reminders *(M4 — done, ADR 0054; see the "Roadmap" below)*
-- Collaborative projects (goals, tasks, contributors) *(M5 — done, ADR 0067; see the "Roadmap" below)*
-- **Groups** — public groups power reusable access lists; **private groups**
-  (ADR 0010) are a membership/organizing unit for a family or circle, and stay
-  out of the audience pickers
-- **Delegation** — owners grant family/caretakers scoped access
-- **Guardian controls** — a parent adds an account for a child and supervises it
-  at the account level: suspend/lock, curate the child's community & group
-  memberships, and approve a group invitation sent to the child — with **no
-  standing to read the child's private content** (ADR 0028; the child's account
-  is handed over to independence when the child comes of age)
-- **Avatars & media** — profile avatar upload + serving on a content-addressed
-  local-volume byte store behind an HTTP-free seam (ADR 0011). Group logos and
-  badge icons are **follow-on lanes reusing the same seam** — each with its own
-  design doc, not this one. (Post / reply / announcement attachments have
-  shipped — the **File attachments** bullet below.)
-- **File attachments** — attach a file (PDF / Office docs / text / csv / zip +
-  the raster image types) to a **post, group post, reply, or
-  announcement**: a body link `[label](/attachment/{id})` that **downloads**
-  (`Content-Disposition:
-  attachment`, not an inline render) on the **same** content-addressed byte
-  store as images, under a **separate** file allowlist (SVG excluded) and the
-  owning resource's `Read` decision (a reply resolves its parent post's); an
-  "Attach file" toolbar button on every composer (ADR 0034). Follow-on lanes
-  (own design doc + ADR): attachments on static/about pages; video/audio;
-  in-browser preview.
-- **Group posts** — the post channel *inside* a group (`/groups/{id}/posts`):
-  a membership-scoped feed, detail, composer and replies (ADR 0013). Members
-  only — a non-member (moderator or admin alike) neither sees nor posts; the
-  audience lane is never evaluated, and replies inherit the parent's single
-  membership decision.
-- **Group events** — the event channel *inside* a group
-  (`/groups/{id}/events`): a membership-scoped feed, detail, composer and
-  RSVPs, exactly the ADR 0013 membership lane applied to the M4 event surface
-  (ADR 0089, the `GE` lane). A group event is always a draft until its author
-  publishes it; members only (a non-member — moderator or admin alike —
-  neither sees nor creates one); edit and publish are author-only (no
-  GlobalAdmin override, no break-glass); RSVPs and reminders inherit the M4
-  lane as-is; and group events never reach the community feed or calendar.
-- **Tags** — free author-set **subject labels** on posts (community + group)
-  and blog pages: a lightweight, multi-valued, non-access label that closes
-  the "what is a post about" gap (a component is *where* a post lives, a tag
-  is *what it's about*). Display names are per-language and creator-owned —
-  the creator (or a `GlobalAdmin`) may reword a tag, a later attacher may
-  not. One **access-scoped** read seam serves the tag list, the by-tag
-  browse, and composer autocomplete; a tag is computed over content a viewer
-  may already read, so a tag used only on unread content never surfaces
-  (ADR 0044).
-- **Drafts** — a post, group post, or announcement can be **saved but not
-  made public yet**: a "Save as draft" option on every composer. A draft is
-  the author's private scratchpad — excluded from every feed and the pinned
-  list, invisible to everyone **including a `GlobalAdmin`** who is not the
-  author (no audit row, not subject to the audience decision), and visible
-  only to its author, who can edit it, find it at `/my/drafts`, and publish
-  it with one action (publishing is author-only too). Editing a draft never
-  publishes it (ADR 0037).
-- Moderation with component-scoped moderators and full audit
-- **Multilingual** — UI and platform texts (terms, help) are translatable,
-  resolved per request (user preference → instance default → `en`, with
-  per-string / per-page fallback). The admin manages the language catalog +
-  instance default in `/admin/languages` (audited), and residents pick their
-  language on the settings page (a cookie, never a claim). A non-English-speaking
-  neighborhood can run its platform in its own language with no code change or
-  deploy (ADR 0005). The `ML-UI` lane (ADR 0015) then makes it **real in the
-  UI**: a resident **sees** the platform in their language (every in-scope view
-  resolves per request, with a seeded `en` floor that is always present), the
-  admin edits the **closed** key list per language (no hand-typed key), a
-  **signed-out** visitor can pick a language at `/language`, and `/about` renders
-  an admin-authored page or the product story. The `TR` lane (ADR 0021) then
-  delegates the editing: a GlobalAdmin can grant a **`Translator`** role to a
-  resident, who may update and add the UI strings and static pages but holds
-  none of the GlobalAdmin's other standing (the catalog — add / enable /
-  reorder / set-default / remove — stays GlobalAdmin-only). The `LS` lane
-  (ADR 0042) then ships a **bundled initial pack**: a first-boot instance has
-  German and French enabled with complete UI-string and about/terms/help
-  baselines (English stays the default and the only code-owned language);
-  per-string fallback still lands on the en floor. The `SP` lane (ADR 0043)
-  then ships the **platform-page set as five surfaces** — About / Terms / Help
-  / Privacy / Code of conduct — complete in en/de/fr and reachable from the
-  footer + the admin shell.
-- **Timezone** — the platform carries a **default time zone** the admin sets
-  once (`/admin/timezone`, audited); each resident can override it in their
-  own settings page (the time-zone section of `/settings/language`). Every
-  timestamp renders in the
-  effective zone (resident override → platform default → `UTC` floor) via the
-  `kw-dt` TagHelper — the same per-request resolution shape as multilingual,
-  data-driven, no rebuild (ADR 0019).
-- **Date & time format** — the platform carries a **default date-time format**
-  the admin sets once (`/admin/dateformat`, audited) and each resident can
-  override in their own settings page (the date-format section of
-  `/settings/language`). A short preset list (Long / Short / ISO / Day-first)
-  plus a free-text **custom** format; the unambiguous Long format is the floor.
-  Every timestamp renders in the effective format (resident override → platform
-  default → Long floor) via the `kw-dt` TagHelper — the same per-request
-  resolution shape as timezone and multilingual, data-driven, no rebuild
-  (ADR 0020).
-- **Search** — one nav search box (anonymous + signed-in) over the **ten**
-  resident content surfaces: posts (community **and** group), events
-  (community + group), pages, and announcements (the original four, ADR 0091)
-  **plus** projects, boards, todos, inventory, documents, and people (the six
-  extended by ADR 0124). `/search` renders `all`
-  (top 5 hits per surface — a search-box answer, no pager) or a single-surface
-  paged list on the M7 `HasMore` / `_Pager` discipline (pager links carry
-  `q` + `surface` + `scope`); the `groups` scope is signed-in-only and rides
-  the **frozen** ADR 0013 group seams (a group you can't see contributes no
-  hit and no count; anonymous silently degrades to community — no 403).
-  The six extended surfaces are signed-in-only (their canonical feeds are
-  gated; anonymous sees the original four). Drafts, soft-deletes, and hidden
-  content are never hits; every decided visit audits (one aggregate row per
-  (query, surface, scope), `TargetKind = "search:<surface>"`); the render
-  surface is hits + `HasMore` only — never a count. Case-insensitive substring
-  match over authored-in `Title` + `Body`, **and** the names of a document's
-  own tags (a tag is a label, never a gate — C-TG·1); the people surface
-  matches `DisplayName` + `Bio` + profile tags. Zero schema change;
-  language-scoped search and `tsvector` full-text are the named deferred
-  lanes (ADR 0018's own consequence; ADR 0091 + ADR 0124).
+The current feature surface — resident directory, announcements & discussions,
+groups & delegation, guardian controls, multilingual, rich content, events,
+projects, messaging, and more — is listed in
+[`docs/product/features.md`](docs/product/features.md).
+
 ## Tech stack
 
 - **ASP.NET Core 10** — MVC + Razor, server-rendered
@@ -190,252 +54,42 @@ milestone-by-milestone breakdown is in the Roadmap below.
 
 ## Architecture
 
-A **modular monolith**. Identity and access are split into three in-process bounded
-contexts behind interfaces — extractable later, not separate services today:
-
-- **IdentityModule** — lean authentication; issues a thin principal (`subjectId`,
-  `isVerifiedResident`, base roles). Nothing relational in the token.
-- **UserInfoModule** — who people are: profiles, groups, delegation grants.
-- **AuthorizationModule** — what they may do: audience evaluation + policy. Always audits.
-
-The guiding rule: **thin token, fat authorization service.** "Can this person see that
-post?" is never a claim — it's a query resolved per request — so the identity story
-stays trivial and the authorization rules can grow freely.
-
-### Access model
-
-- An **audience** is a set of grants to **users** and/or **groups**, combined with
-  **Any** (union, default) or **All** (intersection).
-- **Groups** are the reuse unit — grant a post to a group once; membership changes ripple everywhere. **Private groups** (ADR 0010) are a membership/organizing unit *not* in the reuse unit — they do not appear in the audience pickers (decluttering) and are intended for the group's own members, e.g. a family or a close circle.
-- **Delegation** lets an owner grant another person scoped access; the system resolves an *effective principal* for that actor.
-- **Moderator access** to audience-restricted content is **off by default**. A filed **report** grants the assigned moderator audited access to that item; an admin can enable standing moderator visibility per scope.
-- **Audit** of access decisions is always on.
-
-### Roles
-
-- **GlobalAdmin** — full control; manages moderators, the language catalog, and every other control-plane action.
-- **Moderator** — scoped to one or more functional components.
-- **Translator** (ADR 0021) — may edit the platform's UI strings and static pages; holds none of the GlobalAdmin's other standing.
-- **Member** — verified resident.
+A **modular monolith**. Identity and access are split into three in-process
+bounded contexts — **Identity** (lean authentication), **UserInfo** (who people
+are: profiles, groups, delegation), **Authorization** (what they may do:
+audience + policy, always auditing) — behind interfaces, extractable later.
+The guiding rule: **thin token, fat authorization** — "may this actor see that?"
+is a query resolved per request, never a claim. The full map (data model,
+module boundaries, the CQRS/Wolverine convention, the extension seams) is in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Deployment
 
-- One instance per neighborhood, on a **VPS via Coolify**.
-- Docker multi-stage build (compile TS with `tsc`, publish, runtime) + **Postgres**.
-- Config via environment: community name, SMTP, seeded admin.
-- TLS via Coolify / Let's Encrypt; `/health` endpoint; scheduled Postgres backups.
+One instance per neighborhood, on a **VPS via Coolify**: a Docker multi-stage
+build (compile TS with `tsc`, publish, runtime) + a dedicated Postgres, config
+via environment (community name, SMTP, seeded admin), TLS via Let's Encrypt, a
+`/health` endpoint, and scheduled backups. The runbooks are in
+[`docs/ops/`](docs/ops/) and the deployment guide in
+[`docs/deploy/coolify/`](docs/deploy/coolify/00-plan.md).
 
-## Roadmap
+## Quickstart
 
-- **M0** — Deployable scaffold: solution, Docker, Coolify deploys "hello" with a live DB.
-- **M1** — Identity, groups, delegation, and the authorization model above.
-- **M2** — Directory & profiles with visibility rules.
-- **M3** — Posts/announcements in components; moderation + reports.
-- **Multilingual** (`ML`, ADR 0005) — UI + platform texts (terms, help)
-  translatable; admin-managed language catalog & default; `/admin/languages`
-  surface + `/terms`/`/help` static pages. **Done.**
-- **Multilingual — live UI** (`ML-UI`, ADR 0015) — in-scope views resolve per request; seeded en floor; key-managed admin editor; public language picker; /about static page. **Done.**
-- **Languages seeded** (`LS`, ADR 0042) — a first-boot instance ships German and French enabled with complete UI-string and about/terms/help baselines (English stays the default and the only code-owned language); per-string fallback still lands on the en floor. **Done.**
-- **System pages** (`SP`, ADR 0043) — the five platform surfaces (About, Terms, Help, Privacy, Code of conduct) ship complete in en/de/fr and are reachable: an unconditional footer "Platform" column (all five) + a /admin "Platform pages" section (preview + edit). Privacy and Code of conduct are the two new seeded pages (privacy is a platform-level statement from the operator's data-controller position — the operator completes it in-app; the single locale cookie is named, no third-party cookies); about stays the product-story view, not a Markdown page. **Done.**
-- **Timezone** (`TZ`, ADR 0019) — platform-default time zone (admin-set); per-resident override in personal settings; all timestamps rendered in the effective zone (`kw-dt`). **Done.**
-- **Date & time format** (`DF`, ADR 0020) — platform-default date-time format (admin-set); per-resident override in personal settings; presets (Long / Short / ISO / Day-first) + custom format; all timestamps rendered in the effective format (`kw-dt`). **Done.**
-- **Translator** (`TR`, ADR 0021) — a GlobalAdmin can grant the `Translator` role to a resident, who then may edit the platform's UI strings and static pages; catalog management (add/enable/reorder/set-default/remove) stays GlobalAdmin-only. **Done.**
-- **Rich content** (`RC`, ADR 0025) — Markdown bodies + in-content images on posts, replies, announcements & static pages. **Done.**
-- **Translation display** (`TD`, ADR 0027) — the authored-in language (ADR 0018) is the first, default-visible variant chip on the post/reply detail surface (both lanes); added translations are clickable chips that swap the title+body / body in place; the "add a …" lane excludes the authored-in language; soft-deleted rows show no swap. Display-only — no data, schema, or auto-translation change. **Done.**
-- **Guardian controls** (`GU`, ADR 0028) — a parent adds an account for a child and supervises it at the account level: suspend/lock, curate the child's community & group memberships, and approve a group invitation sent to the child — with **no standing to read the child's private content**; the child's account is handed over to independence when the child comes of age. **Done.**
-- **Guardian assignment** (`GA`, ADR 0038 §F) — an existing guardian **invites** a **second** guardian to a child's account (email-driven; one `IIdentityService` ADD + the `GuardianController.Assign` action + the Detail view's assign form + the "other guardians" list); the invited guardian **accepts (with the same consent to the child-account terms the creating guardian accepts on the AddChild form)** or **declines** (the ADR 0038 §F acceptance lane — the §E "no acceptance/consent step" deferral, now implemented); they hold **no standing over the child until they accept**; the assigned guardian's standing is **identical in kind** to the creator's (the five GU actions, no content read); the conferrer's Detail page shows a "pending" badge next to an assignee who has not yet acted (the assignee's accept or decline is visible on the very next read, G·2/C4); the assignee's Index page shows a "Guardian requests awaiting your acceptance" card (the pending-requests card, with a consent block wrapping the Accept button); a duplicate assignment is a no-op (idempotent); self-assignment is refused. **Done.**
-- **Rich editor** (`RE`, ADR 0031) — a WYSIWYG authoring surface over the RC Markdown lane: a split-view live preview beside the source `<textarea>` and a Markdown-splice toolbar (bold / italic / code / headings / lists / link / image) in one `tsc`-only module. No editor dependency, no second renderer, no new route — the saved body is byte-identical Markdown the RC read path already renders. **Done.**
-- **Inline editor** (`IE`, ADR 0032) — the rendered view is the default editor; the Markdown source is hidden behind a single toolbar toggle (and stays a one-click split view when revealed). Additive and client-only — no new dependency, no new route, no re-shape of the RE pure functions; the saved body is byte-identical Markdown the RC read path already renders. **Done.**
-- **File attachments** (`ATT`, ADR 0034) — attach files (PDF / Office docs / text / csv / zip + the raster image types) to **posts, group posts, replies, and announcements**: a body link `[label](/attachment/{id})` that **downloads** (`Content-Disposition: attachment`, not an inline render); a **separate** file allowlist (`Media__AttachmentAllowedContentTypes`, SVG excluded) under the **same** content-addressed byte store as the image lane (one store, one volume, one catalog); served only through an audited app endpoint under the owning resource's `Read` decision (a reply resolves its **parent post's**); an "Attach file" toolbar button on every composer (incl. reply composers). Follow-on lanes (own design doc + ADR): attachments on **static/about pages**; video/audio; in-browser preview. **Done.**
-- **Image editor** (`IM`, ADR 0075) — a simple client-side **crop + resize** editor for **avatars** (a square crop, drag-to-frame, default 512px stored) and **inline post images** (a free crop, width presets 400/800/1200) in one new `tsc`-only module (`client/lib/image-editor.ts`, the `rich-editor.ts` / `avatar-upload.ts` convention): the resident's chosen resize is the **stored** byte size (a canvas re-encode — **no** per-image display metadata, the frozen `MarkdownRenderer` / `renderPreview` / `dom-to-markdown` / `IsSafeImageSrc` untouched); **always optional** — "Use original" / close uploads the raw file; **zero server change** (no new route / package / `IMediaStore` method, `Kumunita.Core` stays HTTP-free, `package.json` stays `typescript`-only) — the content-addressed store (ADR 0011) makes an edited blob a new `MediaObject` for free. **Done.**
-- **Drafts** (`DM`, ADR 0037) — a post, group post, or announcement can be **saved but not made public yet**: a "Save as draft" option on every composer. A draft is the author's private scratchpad — excluded from every feed and the pinned list, invisible to **everyone else (a `GlobalAdmin` included)** (no audit row, not run through the audience decision), visible only to its author, who edits it, finds it at `/my/drafts`, and publishes it (publishing is author-only too); editing a draft never publishes it. **Done.**
-- **Tags** (`TG`, ADR 0044) — free author-set **subject labels** on posts (community + group) and blog pages: a lightweight, multi-valued, non-access label that closes the "what is a post about" gap (components/groups are *where* content lives, tags are *what it's about*). `Slug` is the language-neutral business key; display names are per-language and creator-owned (the creator ∪ `GlobalAdmin` may reword; a later attacher may not). One **access-scoped** read seam serves the tag list + by-tag browse + autocomplete — a tag is computed *over* content a viewer may already read, so a tag behind unread content **never surfaces** (it grants no access and leaks no subject). **Done.**
-- **Pages** (`PG`, ADR 0039) — a **hierarchical, audience-restricted, translatable** knowledge tree: a `Page` doc with a `ParentId` + `Slug` (a forest of roots, a derived path — not a stored one), the **exact** post `Audience` (`null` = public; non-null = grants / community — ADR 0001-B / 0036, *reused*, not extended), an authored-in language (ADR 0018) + `PageTranslation` rows (the ADR 0022/0026/0029 shape), a `MountPoint` string for UI slots (`footer/community` for the about page, `help/account` for a change-password help page), and a standing matrix (GlobalAdmin ∪ community-Moderator ∪ author). Served by `PageController` (`/pages` tree browse + `/pages/{path}` post view + WYSIWYG composer); the **one** `MarkdownRenderer` + the **one** `bindRichEditor` render/edit it; the **one** `IAuthorizationService` decides access (via a `PageToAuditableResource` adapter — *no* new `AccessAction`, *no* new `AccessVia`, *no* new authorization branch). **Absorbs and retires** the `LocalizedPage` static-page lane (ADR 0005 A) — the old `/about`/`/terms`/`/help` routes keep resolving (now from the tree); the seeded default pages carry the same `en` floor a fresh instance has today. The old `LocalizedPage` surface is retired last (U07), after the new surface is proven. The `LocalizedPage` retirement is the **only** destructive step in the lane, and it is sequenced last. **Done.**
-- **User guides** (`UG`, ADR 0057) — resident-facing how-to guides living in the `help/` subtree of the page tree: a **closed, code-owned, `en`-only registry** in the seeder (a `Page` doc under the existing `help` page — the existing editor, renderer, translator, and authorization are *reused*, not duplicated), with a **three-layer consistency loop** that keeps them honest as features change — **where** (they sit in the page tree, so the standing matrix applies), **when** (a resident-facing change's lane must ship its guide update as part of its Definition of Done), and **how often** (a periodic GlobalAdmin review, `OPS.md` §13). Non-`en` guide bodies are community-owned through the existing translation lane — never machine-translated. Guides are seeded on first boot **and backfilled on upgrade** (`BackfillUserGuidesAsync`, create-if-missing) so an existing instance gets them without a reseed; a community-edited guide is never clobbered. **Done.**
-- **Reset to seeded text** (`RS`, ADR 0058) — a "Reset to seeded text" button on the page editor (edit lane only, and only for a page whose slug is one of the **seeded** platform pages / guides) that overwrites that page's `en` title/body **and** its `de`/`fr`/`da` translation rows with the code-owned seeded baseline (the same registries the seeder writes on first boot) — so, as new features land, an admin can re-seed a help page to the latest shipped text in one click, then re-customize on top of it. **Destructive by design** (a customized body / translation is *replaced* — the button's `confirm()` is the guard; the standing is the **edit standing**, ADR 0040 §3.7: a system page is GlobalAdmin-only, a blog page is author ∪ GlobalAdmin). A page with no seeded baseline has nothing to reset to (the button is hidden; a hand-crafted POST is a 400 form error). One `SaveChangesAsync` + a `page.reset` audit row. **Done.**
-- **M4** — Events, RSVPs, reminders: a `Event` + `EventRsvp` doc in a new `Kumunita.Core.Events` context; the upcoming-events feed, the detail view (the one `MarkdownRenderer` body, the `kw-dt` timestamps), the WYSIWYG composer, the audience (ADR 0001-B / 0036 *reused*), the draft / soft-delete / tag / media / authored-in-language lanes (*reused*, not extended), the last-write-wins RSVP (owner-only list), and the day-before reminder email through the M1 durable-email trio (the `EventReminders` §6.4 self-rescheduling job). **Done** (ADR 0054). *Deliberately not in M4 (follow-on lanes, own ADRs): group events (the `GE` lane below), per-resident reminder settings, iCal export (M6). Event translations left out of M4's own scope shipped as the `ET` lane (ADR 0059) below.*
-- **Group events** (`GE`, ADR 0089) — the ADR 0013 membership lane applied to the M4 event surface, *inside* a group (`/groups/{id}/events`): a membership-scoped feed, detail, composer, and RSVPs on the group's detail page — **zero new authorization surface** (the frozen ADR 0013 group seams `CanSeeGroupAsync` / `CanSeeGroupFeedAsync` are reused verbatim; the audience lane is never evaluated and the event's `Audience` is written non-null *empty*). A group event is always a **draft** until its author publishes it (ADR 0037, author-only); **members only** (a non-member — a moderator or a GlobalAdmin alike — neither sees nor creates one; **no** break-glass, **no** moderator branch, edit and publish are **author-only**); the create gate is the group-lane decision (Deny ⇒ 404, the Deny row survives); the community feed (`ListUpcomingAsync`) and calendar (`ListInRangeAsync`) exclude group events by an explicit `GroupId == string.Empty` filter; RSVPs + reminders inherit the M4 lane as-is (keyed by `EventId`, no group branch); one additive `Event.GroupId` field (delta-detected, no new index). `groups.*` `kw-l` keys × 4 languages; the `M` roadmap milestones stay untouched (a **named lane**, not a milestone — the group-posts precedent). **Done.**
-- **Event translations** (`ET`, ADR 0059) — the **user-added translation lane** (ADR 0022 / 0029 / 0048) carried to the events surface: an `EventTranslation` doc (title + body) on the `EventDocTypes` surface with a `(EventId, LanguageCode)` unique index, four `IEventService` seams (read / add / **update** / **remove** — the full lane, the ADR 0048 shape), the standing **author ∪ `Translator` ∪ `GlobalAdmin`** (ADR 0021 / 0030; **no** component-moderator branch — events have none, ADR 0054 §5), one `eventtranslation.*` audit row per write, the ADR 0027 chip-swap + ADR 0049 default-visible variant on the detail page, and the ADR 0051 viewer-language selection on the `/events` feed. **Done.** A `SampleData__Enabled` instance whose first boot predates this lane gets the sample events' `de`/`fr`/`da` rows backfilled on the next warm boot — create-if-missing, idempotent, never overwriting a Translator's edit (ADR 0060).
-- **Events calendar** (`EV-CAL`, ADR 0063) — a month-anchored, display-only overview of the caller's visible events over a rolling 30-day window: overlap pairs highlighted client-side, prev/next/today navigation to go back in time; one additive read seam (`IEventService.ListInRangeAsync`) + one view + one `client/lib` TS module (tsc-only, no dependency); zero document / schema / seeding changes; M5 stays Projects; M6 stays Portability. **Done.**
-- **Events calendar day/week/month views** (`EV-DWM`, ADR 0064) — the same `GET /events/calendar` surface turned into the **three named views** residents expect (Day / Week / Month): one additive `?view=` selector on the existing route + a view-appropriate anchor window computed in the controller (1 day / the anchor's Monday-start week / the anchor's calendar month); Day + Week as time-ruler grids (a new `client/lib/events-calendar-time.ts`, tsc-only, zero dependencies) and Month reframed to a true calendar month (the existing `events-calendar.ts` reused untouched); **zero Core change** — the `ListInRangeAsync` seam is reused unchanged, already window-agnostic; M5 stays Projects; M6 stays Portability. **Done.**
-- **Events calendar quick-create + week default** (`EV-NW`, ADR 0081) — the calendar **defaults to the week view** (was month; the day/week/month views + the window-agnostic seam are unchanged, only the absent/out-of-set `?view=` fallback and the model default become `week`); a **"New event" button** (reusing the M4 `events.new_event` label, all four languages) + **clicking an empty calendar slot** opens a **quick-create modal** (title + start + end + optional location) that posts the **existing** `POST /events/new` route — no new create lane, no new service seam, zero Core / schema / migration change; the modal posts a hidden `QuickCreate=true` **shape signal** (a new `EventEditorModel` property, never a gate) that `CreatePost` reads before the `IsValid` gate to seed the body from the title when blank, plus `SaveAsDraft=true` (the ADR 0037 floor) + the community-visible default audience (ADR 0001-B / 0036); the click→time mapping is a new plain-`tsc`-only self-wiring `client/lib/events-calendar-new.ts` (day/week time-ruler column maps the click's vertical fraction to an hour, snapped to 30 min; a month cell seeds a default 09:00; events are not slot-clickable); the **month grid** tightens to single-line separators with no inter-cell margin; **zero new translation keys** (`events.new_event` + `common.optional` reused). **Done.**
-- **M5** — Projects (goals, tasks, contributors). **Done.**
-- **M6** — Notifications. **Done.** (ADR 0076 — a `Notification` + `NotificationPreference` doc in a new `Kumunita.Core.Notifications` context; the personal inbox (a flat, 50-row-capped list, "mark all read") + per-kind email preferences (lean-default) + the layout bell (a 30-second poller) + the per-recipient `Profile.EmailLanguage` outbound email through the M1 durable-email trio — inbox is the durable record, email is the best-effort nudge; **no** `IAuthorizationService` (a personal read, not an `AccessAction` decision). *Deliberately not in M6 (follow-on lanes, own ADRs):* push / PWA push (M9), daily / weekly digests, per-kind inbox sub-filters, group / community `todo.assign`, notification to the assigned guardian (GU / GA — still deferred), read receipts / delivery confirmation, cross-neighborhood federation.)
-- **Goals & Projects** (`PL`, ADR 0086) — the higher-level **goals** and **projects** page on top of the M5 to-do / board surface: two new documents (`ProjectGoal` + `Project`) in the **existing** `Projects` context (additive on `ProjectDocTypes`, zero migration), the **creator ∪ GlobalAdmin** standing (ADR 0070), the `GET /projects` landing feed (goals + standalone projects) + the **Projects** nav tab, the goal / project detail + composer + edit views, the project picker + "Project:" link on the to-do / board surface, the goal link + picker on the project surface, and the ADR 0024 soft-delete lanes (a goal's / project's delete **never deletes** its associated to-dos / boards — the association dangles, the link stops showing); `pl.*` `kw-l` keys × 4 languages; additive and reusing — no new `AccessAction` / `AccessVia` / authorization branch, no hard delete, `M7` stays the single in-progress milestone (a named lane, not a milestone). **Done.**
-- **Todo dependency** (`TBD`, ADR 0087) — the "waiting on" lane on top of M5: one optional `BlockedByTodoId?` on `TodoItem` (additive on `ProjectDocTypes`, zero migration) — a **hint, never a gate** (it never changes the to-do's own `Audience` decision, a write, or a hard-delete cascade); a "Blocked by" chip on the to-do detail (access-scoped — an unreadable / absent / soft-deleted blocker degrades to a generic label, no title / link), the blocker picker on the to-do create / edit forms (select a to-do or "None" to clear — the `ClearBlockedBy` flag), and a `?blockedOnly=true` feed filter (a filter, never a gate, the `unassignedOnly` / `projectId` discipline); the **creator ∪ assignee ∪ GlobalAdmin** standing (C-M5·6) is re-checked server-side in the write lane, and the only refusal this lane adds is one cycle guard (self + transitive); additive and reusing — no new `AccessAction` / `AccessVia` / authorization branch, no hard delete, `todo.*` `kw-l` keys × 4 languages, `M7` stays the single in-progress milestone (a named lane, not a milestone). **Done.**
-- **M7** — Pagination and filtering: the one canonical paging contract — a `HasMore` signal on every paged seam, the `FeedResult.Total` correction (candidate count, not page count), the shared `PagedViewModel` + `_Pager` partial, the pager wired into the 11 list surfaces, and the D7 filter-reset pin (the filter set is frozen — text search is M8). **Done** (ADR 0090).
-- **M8** — Search: one `/search` surface (a nav search box, anonymous + signed-in) over the four resident content surfaces (community + group posts, community + group events, pages, announcements): `all` renders the top 5 hits per surface (a search-box answer, no pager); a single surface renders a paged list on the M7 `HasMore` signal + the shared `_Pager` partial (the ADR 0090 hand-off — no new pager idiom); the `groups` scope is signed-in-only and rides the **frozen** ADR 0013 group seams (`CanSeeGroupAsync` / `CanSeeGroupFeedAsync` — a group the viewer can't see contributes no hit and no count; anonymous degrades silently to community, no 403); case-insensitive substring match over authored-in `Title` + `Body` with a truncated, HTML-escaped context window — **zero schema change** (no index, no migration, ADR 0004 §B untouched); zero new authorization surface (no new `AccessAction` / `AccessVia` / adapter); one aggregate audit row per (query, surface, scope) decision (`TargetKind = "search:<surface>"`, zero-candidate visits emit no row); the render surface is hits + `HasMore` only — never a `Total`/`HiddenCount`. **Done** (ADR 0091). *Deliberately not in M8 (follow-on lanes, own ADRs): search over UGC translations (ADR 0018's "language-scoped search" consequence), `tsvector` full-text search (a versioned migration by construction), the project-family surfaces (M5's scope — a one-line predicate when wanted).*
-- **M9** — Messaging: 1:1 resident messaging — a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; a new `Conversation` + `Message` doc in a new `Kumunita.Core.Messaging` context, participant-only access (no `Audience`, no `GlobalAdmin` break-glass — the `RecipientId`-style personal read, ADR 0076 D3 shape), a per-recipient read state, a "new message" nudge through the M6 `Notification` lane, one `LocaleSettings` admin toggle (a GlobalAdmin can enable or disable the surface instance-wide, the ADR 0101 shape), `message.*` `kw-l` keys × 4 languages, zero new `AccessAction` / `AccessVia` / adapter. **Done.** (ADR 0105). *Per-resident controls — the resident's own opt-in + the guardian's ceiling over a supervised child (composed on top of the instance-level master gate): ADR 0139, two additive `Profile` fields, zero migrations, zero new authorization surface. **Group messaging (`GM`) is done** — multi-participant chat threads (the N:1 generalization of the 1:1 surface): a new `GroupConversation` + `GroupMessage` + `GroupMessagingInvitation` doc in a new `Kumunita.Core.GroupMessaging` bounded context (a parallel context, the M9 context untouched), the resident picks **multiple recipients** for a new thread (the multi-recipient selector) — the creator is the only initial member and the rest get a **pending invitation** to **accept or decline** (a nudge with Accept / Decline links, the community-group invitation pattern reshaped for chat threads), **any participant can invite** more residents to the group, a **Members** roster on the thread lists the accepted members plus any pending invitees (marked "(pending)"), a per-participant read marker (each member's unread state is independent), a `group.message.new` / `group.message.mention` / `group.message.invite` nudge through the M6 `Notification` lane (the three new kinds join the closed `NotificationKinds.Known` set 28 → 31), an **optional group name** (so threads stay separated and easy to find at a glance — a nameless group falls back to a "N people" label), and the `/group-messages` surface as a **Direct · Group tab strip** on the Messages page (the same instance toggle + per-actor gate as the 1:1 entry, kept differentiated from it) — rides the **same** M9 master gate, zero re-shape of M9, zero migrations (ADR 0278 + the invitation-flow amendment).*
-- **M10** — PWA and responsive design. **Done.** (ADR 0107)
-- **M11** — Portability (import/export). **Done.** (ADR 0108)
-- **M12** — iCal: a **resident-facing calendar world seam** — a per-event file (`GET /events/{id}.ics`, one `VEVENT`) + a subscription feed (`GET /events.ics`, the caller's visible upcoming set), both `[Authorize]` (no subscription token — authorization rides the cookie, re-run on every fetch), served `text/calendar; charset=utf-8` + `Content-Disposition: attachment` + `Cache-Control: no-store`; the hand-written BCL-only `IcsWriter` (a pure function over already-authorized `Event` rows, the RFC 5545 pinned subset — CRLF, 75-octet fold, full escaping, stable `UID`s, `PRODID: -//Kumunita//community calendar//EN`) — **zero Core schema change**, **zero new dependency**, zero new authorization surface; two `kw-l` affordances (the detail page's "Add to calendar" + the feed/calendar "Calendar feed (iCal)") × en/de/fr/da. **Done.** (ADR 0112)
-- **M13** — Logging and analytics: the BCL-only file log sink (the `Kumunita.Core.Logging` surface — `FileLoggerProvider` / `FileLogger` / `LogLine` JSON-lines writer / `RollingFileSink` daily rotation + boot retention), the `UsageEvent` capture lane (one `UsageEvent` doc per recognized request in the new `Kumunita.Core.Usage` context; the pure `UsageCapturePolicy` + `SurfaceKey` closed-list mapper; the thin `UsageCaptureMiddleware` — a capture failure never fails the request), the `IUsageAnalyticsService` aggregation seam (7/30/90-day windows over `Total` / `AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` / `SurfaceRanking`), the `/admin/analytics` GlobalAdmin surface (the surface-rank table + the CSV export with one `AccessAudit` row), and the 365-day retention tick (`UsagePurgeService` + `UsagePurgeHandler` + `UsagePurgeTick`); **zero new authorization surface**, **zero per-account rendered data**, **zero third-party telemetry** (the C-M13·1/3/6 invariants). **Done.** (ADR 0114)
-- **M14** — Integration of Events and Projects: the `TodoItem.EventId?` association (a feed filter / association, **never a gate** — C-M14·1), the `ListTodosForEventAsync` reverse read seam + the `SetTodoEventAsync` set-event write lane (creator ∪ assignee ∪ GlobalAdmin, one `todo.set_event` audit row, a missing / unreadable event refused 404 — the frozen seam as truth), the both-direction display links (the to-do detail's event chip + the event detail's "linked to-dos" section, both access-scoped + dangling-safe — an unreadable / absent / soft-deleted event omits the chip, never a 404/403, no title / id leak — C-M14·2), and the VTODO iCal surface (the `TodoIcsWriter` pure emitter over the closed RFC-5545 subset + the two `GET /projects/todos.ics` / `GET /projects/todos/{id}.ics` routes — no `RRULE` / recurrence, C-M14·6); **zero new authorization surface** (C-M14·4 — the frozen `AccessAction` set is unchanged, `EventId` rides the read seams, never a decision). **Done.** (ADR 0115)
-- **M15** — Translation bulk: import/export, review, and extend the platform's translations as a batch — instead of working through them one translation at a time — so they can easily be checked, updated, and extended with new languages. **Done.** (ADR 0116)
-- **M16** — Inventory: check-out / check-in shared, community-owned, or private resources (equipment, clothes for sports teams, books, etc.), track where items are, and optionally how much they are used by whom. **Done.** (ADR 0117)
-- **M17** — Bookmarks: save posts, events, todos, announcements, pages, **projects, and boards** for quick personal access, and organize them into a personal folder tree (depth ≤ 2, unique name per owner's tree; a folder's deletion moves its bookmarks to the root — the bookmark is never lost — the M37 notes folder-tree shape re-applied to the bookmark surface). **Done.** (ADR 0118 + ADR 0168)
-- **M18** — Repeating / recurring events over the M4 events surface (the `RRULE` home deferred by ADR 0112). **Done.** (ADR 0119)
-- **M19** — Guest accounts: limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, and similar community-adjacent roles who need a place in the platform without full resident standing; admins set the limits on what a guest may access and for how long. **Done.** (ADR 0120)
-- **M20** — Notification quiet times: a per-resident quiet schedule over the M6 notification lane — allowed/blocked hours of day and days of the week for how (or whether) notifications are delivered; admins set how often the system checks for pending notifications. **Done.** (ADR 0121)
-- **M21** — Document management: a shared repository for official documents, contracts, and similar community-owned files, with per-document access controls. **Done.** (ADR 0122)
-- **Document edit lane** (`DOC-EDIT`, ADR 0125) — the **owner-only** edit-by-replacement half of M21's D9·7 (the uploader, `full stop` — a non-owner GlobalAdmin/Moderator is **denied**, the ADR 0014/0016 author-only precedent; non-owner → **404, not 403** — the ADR 0122 D7 "no existence leak" posture): re-choose **who can access it** (the `Audience`, written verbatim via the M2 single deserialization site, prefilled via `FromAudience`) and/or **replace the file** (optional — a blank file keeps the stored blob, a present file stores **first** through the frozen ADR 0011 `IMediaStore` with the same guards-before-write, orphan-safe); `Title` / `Summary` editable alongside (a label, never a gate); `Id` / `OwnerId` / `Created` **immutable**, `Modified` stamped; **one write, no `AccessAudit` row** (the write-lane convention, ADR 0122 A2); **zero new authorization surface** (rides the frozen `Read` path's owner branch through the unchanged `DocumentToAuditableResource` adapter). The **author soft-delete** half of D9·7 remains deferred (a future ADR). **Done.**
-- **M23** — Extended user profiles: a resident biography + free author-set tags (skills, interests, knowledge, and expertise) to make it easier to find people with something in common. **Done** (ADR 0123).
-- **M22** — Onboarding: a guided walk-through that walks a new user through account setup on first sign-in. **Done** (ADR 0132).
-- **M24** — Storage metrics: an admin view of storage — total used space, available space, user-content used space, and space used per user. **Done.** (ADR 0134)
-- **M25** — Upload limits: admin-set limits on the size of an individual file and on the total content a user may add; residents see how much space they are using and how much of their quota remains. **Done.** (ADR 0135)
-- **Documents organization** — tags + folders on the M21 document repository (a Page-style folder forest + the TG tag convention). **Done.** (ADR 0137)
-- **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **Done** (ADR 0145).
-- **M27** — User-scoped portability: a resident exports / backs up their own data. Imports may not fit the community's structure and authorization settings (communities, groups, pages, …), so on import the user manually resolves conflicts, choosing per entity whether to add it elsewhere or discard it. **Done** (ADR 0148).
-- **Site content** (`SITE`, ADR 0150) — the two landing surfaces' hero text is admin-editable (the home + about heroes' eyebrow, lead, **and the home hero's two supporting lines** — the "scope" + "FIG" paragraphs) and every other section is show/hide (a GlobalAdmin chooses which sections appear at all, from `/admin/site`). The defaults are byte-identical to the shipped text, so a fresh instance that never touches the surface looks exactly the same as it does today; a hidden section is not in the DOM at all (a screen reader never sees it). **Done.**
-- **Site content hero translations** (`SITE-2`, ADR 0157) — the SITE lane's ADR 0150 §D5 "future SITE-2 translation lane": a GlobalAdmin adds / edits / removes translations of the two heroes' eyebrow + lead **and the home hero's two supporting lines** (home + about) into any enabled language from `/admin/site` — a **language-chip preview** (switch between the English default and each translation) + a **⋮ add / edit / remove menu** (the posts/announcements pattern), and a resident reading in that language sees the translated hero text (a blank hero field falls back to the singleton's value, then to the shipped `kw-l` floor). The `SiteContentTranslation` row (one row per language, the `SiteContentDocTypes` surface) + the `GetTranslationsAsync` / `Add` / `Update` / `RemoveTranslationAsync` seams (GlobalAdmin-only, one `sitetranslation.*` audit row per write) + the hero render overlay on `/` and `/about`. **Done.**
-- **M28** — Guardian time limits: for a child's account, a parent/guardian sets when the child may use the platform — allow or block certain hours of each day and days of the week. A child-scoped schedule on the GU guardian-controls lane (ADR 0028), distinct from the per-resident M20 notification quiet times (these gate the child's whole platform access, not just notifications). **Done** (ADR 0151).
-- **Integration audit** (`IMPROVE`) — the platform's own *integration* pass, not a new capability: the four largest files are differentiated (the shared composer trio extracted to one helper, the two longest views split into named partials, the translation-key registry split into per-surface groups), the ADR index no longer has missing rows, the two agent-instruction docs no longer duplicate, the long handoff notes + design docs open with a 10-second summary, and the security & privacy seam is audited with who + why on every row. The close flip lands the `IMPROVE` entry here + in `Milestones.cs` / `STATUS.md` / `ARCHITECTURE.md` / `MilestonesTests.cs` / `WhatsNew.cs` (the six-member contract, `AGENTS.md`). **Done** (the close of U00–U09; the audit ledger + reduction baseline are in `docs/archive/lanes/improve/improve-audit.md`).
-- **M29** — Admin surface labels: a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice, so a rename stays consistent across the surface (a label store on the SITE lane's shape — a per-item label, not a re-route). **Done.** (ADR 0152)
-- **M30** — Admin onboarding: a guided walk-through for a new GlobalAdmin through the most important initial settings (community name, languages, moderation, notifications, storage limits, site content, issue escalation) — the M22 onboarding lane extended to the admin surface (a links-only walk-through on the M22 / SITE lane's shape — a singleton completion flag, not a new write path). **Done.** (ADR 0153)
-- **M31** — Production error handling: a first-class report-an-issue affordance on error pages so a resident can easily say what went wrong, plus a GlobalAdmin surface listing the reports so they can triage and act. **Done.** (ADR 0154)
-- **M32** — Issue submission & escalation: a resident submits an issue; a GlobalAdmin resolves it locally if instance-specific, or forwards it to a configurable escalation endpoint (an environment variable — so a fork or multi-instance operator can redirect where escalations land). **Done.** (ADR 0155)
-- **ESC** — Escalation authorization + receiving inbox: a receiving GlobalAdmin generates labeled, individually-revocable tokens (shown once, hashed at rest) and hands them to origin platforms; an origin GlobalAdmin sets their endpoint + token; when they escalate, the receiving platform validates the token and only then accepts the issue as an 'escalated' row in the same admin list (the M32 ErrorReports surface extended additively). **Done.** (ADR 0159)
-- **M33** — Storage metrics history: the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future. **Done.** (ADR 0156)
-- **M34** — Analytics history: the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve. **Done.** (ADR 0162)
-- **M35** — Kiosk mode: a full-page / full-screen display that automatically navigates between a preset list of views (e.g. Kanban board A, calendar week, Kanban board B, calendar today, todos), changing view on a set interval and refreshing each view's content on a separate, faster interval. The playlist is **per-resident** — any signed-in user configures their own `/kiosk` display at **Settings → Kiosk** (`/settings/kiosk`, the ADR 0164 amendment, moved out of the admin area), and the `/kiosk` display resolves the *viewer's* playlist. The display is **true full-page** (all page chrome hidden, the stage fills the browser viewport) and the resident picks the **display mode** at **Settings → Kiosk**: **Full page** (fill the browser window, the default) or **Full screen** (the browser's Fullscreen API — the stage owns the whole monitor, a wall-display TV; a user gesture is needed to enter it, so it degrades to Full page where unavailable). **Reworked (ADR 0285):** a playlist entry can be almost any item the resident can see — a Kanban board (as the board or as a list of its to-dos), a to-do, a project, the community calendar (Day / Week / Month, all communities or one), an event, a page, an announcement, a community or group post — picked with a search box; each entry has its own duration, a scroll behaviour (none, or automatic scrolling at a playlist-wide Slow / Medium / Fast speed) and a "show comments" switch. **Done.** (ADR 0164, ADR 0285)
-- **M36** — @mentions: a cross-surface `@<resident>` reference token — type a resident's **directory display name** after an `@`, the platform **resolves it against the frozen M2 resident directory** and (a) **notifies the mentioned resident** on that surface (a mention notification kind per surface — the ADR 0076 D2 "follow-on lane" now wired: the reserved `post.mention` goes live on posts + replies, and six sibling kinds join the closed vocabulary for group posts, pages, events, to-do comments, announcements, and messages) and (b) **renders the name as a link** to the resident's directory page (a **post-render pass** over the **frozen** `MarkdownRenderer` — the one-renderer pin preserved; unresolved / ambiguous / self tokens stay plain text). One new shared Core module `Kumunita.Core.Mentions` (the pure `MentionTokens` parser + the `IMentionService` read seam over the frozen `IDirectoryService` — the M34 "derived, not captured" shape) + an additive mention-emitter step in each surface's frozen write lane (signatures + audit rows untouched) + the `MentionRenderer` render pass + the closed mention `kw-l` key set (7 kinds × 4 keys) × en/de/fr/da; **zero** new bounded context / doc / EF migration (a mention is **derived**, not captured); **zero** new `AccessAction` / `AccessVia` / `Decide()` branch / adapter (a mention is a *personal read*); the author is never notified of their own mention and an ambiguous or blocked name is inert; detection runs on the **publish** lane, not draft-save. **Done.** (ADR 0165)
-- **M37** — Personal notes: a private note a resident attaches to **any content entity** (posts, group posts, events, pages, projects, to-dos, boards, documents, people) — like **M17 bookmarks**, but the notes are *organizable*: the author **nests them into a personal folder tree** (categories) and adds **free author-set tags**. **Author-only** (a personal, access-scoped read — invisible to every other resident and to any `GlobalAdmin` who is not the author; the M17 bookmarks / drafts shape). One new bounded context `Kumunita.Core.PersonalNotes` (the `PersonalNote` + `NoteFolder` docs on the new `PersonalNotesDocTypes` surface — additive, delta-detected, **zero migrations** for existing surfaces; the unique `pn_uidx_owner_target` index is the F1 idempotency witness; the unique `nf_uidx_owner_parent_name` index is the D6 unique-name witness) + the `IPersonalNoteService` seam (the 8 note-method + 4 folder-tree methods over the frozen `IDocumentStore` + the owning surfaces' frozen read seams + the frozen `MarkdownRenderer` — the D4 body-render pin) + the `POST /notes/attach` write lane (the D3 write-lane visibility check re-run at the Web layer — the target's own frozen `CanAsync(Read)` decision, never a note-row decision; Deny / absent / soft-deleted ⇒ 404, no row survives — the M16 create-gate posture) + the `GET /notes` list (the D2 personal read, C-M37·2: zero `AccessAudit` rows, zero `CanSeeAsync` passes over the note rows — the ADR 0105 "operator has no read standing" precedent; a `GlobalAdmin` who is not the author gets a non-leaky 404) + the `GET /notes/has/{targetKind}/{targetId}` F1 witness + the `_NoteButton` partial wired into the nine target detail surfaces (the closed `TargetKind` set — `post` / `grouppost` / `event` / `page` / `project` / `todo` / `board` / `document` / `directory`) + the `/notes` list view (grouped by `TargetKind` + nested under the owner's folder tree, the `pn.list.degraded` label on dangling rows, per-row edit / move / tag / delete controls, the tag chips) + the `pn.nav` entry in the top nav + the closed 24-key `pn.*` `kw-l` key set × en/de/fr/da; **zero** new `AccessAction` / `AccessVia` / `Decide()` branch / `IAuthorizationService` method (C-M37·1 — the surface adds **no** new authorization surface; a note is a *personal-by-id* record, never an audience decision) **+ the page-level notes amendment** (2026-10-25 — the closed `TargetKind` set grows from 11 to **21** kinds: ten `page-*` kinds let a resident attach a note to a *page itself* — `/announcements`, `/community`, the `/groups` index, a group's detail page, `/events`, `/projects`, a project's detail page, `/projects/todos`, `/projects/boards`, `/inventory`, `/documents` — so a developer / site admin / user can jot what needs improving on that page; the `_NoteButton` + `note-modal.ts` surface gains multi-instance support (a `data-note-instance` random suffix per partial) so a page can carry both a page-level and an item-level note — e.g. a project's detail page; the closed `pn.*` `kw-l` key set grows from 30 to **40** keys — ten `pn.list.kind.page-*` × en/de/fr/da; **zero** new bounded context / doc / migration / `AccessAction` / `Decide()` branch — the amendment composes only the frozen `IPersonalNoteService` + read seams; ADR 0167 amendment). **M37 is the last milestone on the roadmap** — there is no M38 to promote (the M36·10 / M35·11 "last milestone, no successor" framing, re-applied). **Done.** (ADR 0167)
-- **First day of week** (`FDW`, ADR 0169) — a **per-resident display preference** (default **Monday**) that orders the Quiet-hours and Guardian time-limit day pickers and anchors the events calendar's week/month grid to the resident's preferred first day: one additive `Profile.FirstDayOfWeek` field (the ADR 0004 §B.1 shape — delta-detected, idempotent, **zero migration**), the pure `WeekAnchor` resolver (`Default` = Monday; `Resolve` floors out-of-range values; `OrderDays` is a permutation of 0–6, so the *submitted* picker value is unchanged), the single owner-scope write lane `SetProfileFirstDayOfWeekAsync` (the `SetProfilePageSizeAsync` shape — fail-closed, **zero** audit rows), the "First day of week" radio group on the **Date & time format** page (the reset form leaves the preference untouched), the localized `settings.dateformat_firstday.*` `kw-l` keys × en/de/fr/da, the day pickers reordered to named labels (the numeric-day-name fix), and the calendar re-anchored (the **Monday default path is byte-identical** to the shipped formula); **zero** new `AccessAction` / `AccessVia` / `Decide()` branch / `IAuthorizationService` method — a display preference is not an audience decision. A **named lane** — `Milestones.cs` / README Roadmap milestone ordering / `MilestonesTests.cs` are **byte-identical** (the ADR 0013 `GP` / ADR 0011 `M4-adjacent` precedent). **Done.** (ADR 0169)
-- **Prod-hardening** (a **named lane**, not a milestone — the 2026-10-22 production-readiness audit's FAIL rows, closed in **F1–F22**): the platform's own hardening pass — **no new feature** (the lane reuses no milestone letter; the M0–M37 + named-lane roadmap is **byte-identical**): **complete GDPR deletion** (F1 — the resident's authored content docs + their media bytes + the `MediaObject` catalog rows are removed in the same `DeleteAccount` session, the `DeleteIfExistsAsync` byte-delete seam is idempotent + orphan-safe); **tokens hashed at rest** (F2 — SHA-256 hex, one `Sha256Hex` helper, no new column); **MFA for `GlobalAdmin`** (F3 — the ASP.NET Identity 10.x TOTP provider + recovery codes + a per-request gate on the `Login` / `LoginMfa` actions, `GlobalAdminLogin_RequiresMfaChallenge` / `GlobalAdminRecoveryCode_WorksOnce` / `NonAdmin_MfaOptional`); **PITR / WAL archiving** (F4 — pgBackRest (or WAL-G), the RPO is no longer the dump interval but the WAL stream (≤ 5 min once `archive_command` is live); the OPS §4/§5 runbook + the `pgbackrest check` self-test + the F12 human-channel alert wiring; the "Last tested" line is **recorded, not assumed done** — the owner runs it on the prod box); **password-hash posture** (F6 — PBKDF2 (HMAC-SHA256) at the ASP.NET Identity default work factor, **no custom `PasswordHasher`** — a *confirmation* of the already-decided `SECURITY.md` §6 "Password storage" control (2026-08-27), **no code change**; the 2026-10-25 fix pass recorded it as **ADR 0172** because the lane's first-pass `## Summary` had closed the row on an unsound rationale ("superseded by the F2 SHA-256 token-hash lane") — the F2 lane hashes one-time tokens, not passwords; the revisit trigger is the `SECURITY.md` §1 shared-VPS assumption / an offline-DB-exposure event, not a defect today); **session kill-all + invalidation** (F5 — the `/settings/security/sessions` list + `POST …/kill-all` + a per-request `RevocationStampMiddleware` gate, `PasswordChange_InvalidatesOtherSessions` / `KillAllSessions_SignsOutAll`); **global `nosniff` + `Referrer-Policy`** (F7 — both set in the CSP `app.Use(…)` block in `Program.cs`, every response carries them, the global floor under the per-controller `nosniff` on the serve/download lanes — the 2026-10-25 fix pass added these; the first pass had claimed the CSP middleware "already ships the two headers" but the code did not back that up); **upload-lane rate limiting** (F8 — a new `upload` fixed-window policy, 10 / 15 min per IP, in the `AddRateLimiter` block, attached via `[EnableRateLimiting("upload")]` to all four upload POSTs (`/attachment`, `/content-image`, `/documents`, `/profile/avatar`) — the `IUploadGate` is the size/quota guard, this is the *rate* guard; the 2026-10-25 fix pass added this, the same one-line-per-action pattern F9.U2 established for signup); **signup bot challenge + disposable-email blocklist** (F9 — the `disposable-emails.txt` embedded list + the Turnstile seam, OFF by default until the owner's site key is set); **error tracker** (F10 — `Sentry.AspNetCore` DSN-gated + a PII-scrubbing filter, `Error_TrackerRegisteredWhenDsnSet`); **dead-letter alert** (F11 — the `IAlertSink` seam + the `NoopAlertSink` default + the Wolverine fault-path trigger, `DeadLetter_FiresAlert`); **route alerts to a human** (F12 — the `SupportEmailAlertSink` Web channel over `CommunityOptions.SupportEmail`, `Alert_RoutedToConfiguredChannel`); **`security.txt` + VDP** (F13 — `GET /.well-known/security.txt` + `docs/SECURITY-VDP.md`, `SecurityTxt_ReturnsValidFields`); **CI test gate on `release`** (F14 — `.github/workflows/ci.yml` runs the two `dotnet exec` test-dll jobs, no `dotnet test`); **byte-store lifecycle/retention** (F15 — the `MediaLifecycleTick` Wolverine recurring job reusing F1's `DeleteIfExistsAsync`, `Lifecycle_DeletesExpiredBytes`); **scan uploads before serving** (F16 — the `IVirusScanner` seam + the quarantine flag on the `MediaObject` doc + the serve-lane gate, fail-open by default, `InfectedUpload_NotServed`); **bounce/complaint suppression** (F17 — the `SuppressedAddress` doc + the `ISuppressionService` gate + the `POST /api/mail/suppress` ingest route, `SuppressedAddress_NotMailed` / `SuppressedAddress_NotPresent_EmailStillSent`); **bounce/complaint/volume alarms** (F18 — the `MailAlarmsTick` code leg, the T4 volume alarm, the T1–T3 provider-side legs recorded as owner-ops); **E2E suite** (F19 — the standalone `e2e/` Playwright project + `signup_verify_login.e2e.ts` / `post_write.e2e.ts` driving the compose app on :5080 + Mailpit on :8025, the CI `e2e` job in `ci.yml`); **one-step rollback + drilled** (F20 — the `docs/OPS.md` §5 runbook + the "last drilled" line, the drill itself is owner-executed); **app↔DB TLS** (F21 — the `DbTls__SslMode` + `DbTls__CaPath` env-knob pair in `Program.cs`, byte-identical to the baseline when unset); **least-privilege DB role** (F22 — the two-role split: `kumunita_migrate` owns the DB + `mt` + `identity` schemas and carries the DDL-creation capability; `kumunita` is demoted to DML + `mt` schema-level `CREATE` (the forced exception for Wolverine + Marten's `app.StartAsync()` DDL), refused `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE` (SQLSTATE `42501`), the `ConnectionStrings:KumunitaMigrate` env key, the `AppRole_CannotDropSchema` witness, **ADR 0171 Accepted** + the Implementation addendum, amending ADR 0004 §B's boot-ownership invariant). The lane's owner-ops open items (the ops half of each `code+ops` fix — provision `kumunita_migrate` + set `ConnectionStrings:KumunitaMigrate` on prod; the `SENTRY_DSN`; the Turnstile site key; the ClamAV daemon; the provider bounce/complaint webhook + alarms; the PITR / WAL archiving; the rollback drill; the prod Postgres TLS + CA bundle; the Coolify CI-gate wiring; the live E2E verification; the live F5 sign-out verification; the F7 live header snapshot + F8 429-after-N leg (both 2026-10-25 fix pass — the code + pinned source tests are the in-repo evidence, the rendered bytes are the owner's per the Razor-verification doctrine)) are **recorded, not assumed done** — see the `## Summary` table in `docs/archive/lanes/prod-hardening/hardening-handoff-notes.md`. **Done** (F1–F22; ADR 0171, ADR 0172).
-- **Sessions** (a **named lane**, not a milestone — the `sessions` lane, "M37-adjacent", the **first session-data milestone**, on top of F5's whole-account stamp rotation (F5's `SecurityStamp` column + `RevocationStampMiddleware` are **unchanged**; the two mechanisms coexist and are independent — the stamp is the whole-account kill, `SessionDoc.RevokedAt` is the per-session kill)): a **per-session list + revoke one device** — the resident can now **see** their active sessions (each row a device + IP + signed-in time + last-active) and **revoke one** at a time (a device they may no longer have), or revoke **all-but-current** via the extended kill-all. The **current session is never revocable by the per-row action** (use *Sign out everywhere* to end it); revoking a session signs that device out immediately (the `SessionRevocationMiddleware` enforces it on the next request, the C-S1·2 / C4 strong-consistency pin). One new bounded context `Kumunita.Core.Sessions` (the `SessionDoc` — 7 fields: `Id` GUID / `UserId` / `UserAgent` / `Ip` / `CreatedAt` / `LastActive` / `RevokedAt?` — the active/revoked discriminator — the **only** new document; Marten-native on the new `SessionDocTypes` parallel surface, ADR 0004 §B.1, **no seeding**) + the **single** composition point `SessionService` (the frozen 5-method surface — create / list / revoke / revoke-all-but-current / touch; the middleware + controller are thin callers, the M3 `PostService` pattern) + the `kumunita.sid` cookie item (a cookie item, not a claim — the F5 `kumunita.stamp` precedent) + the `SessionRevocationMiddleware` (the per-session analog of `RevocationStampMiddleware`, registered **after** it) + the `SecuritySettingsController` extension (the `GET /sessions` list + `POST /sessions/{id}/revoke` + the kill-all extension) + the `Sessions.cshtml` sessions table (the "This session" badge on the current row; the per-row "Revoke" form on every *other* row; the `data-confirm` attribute + `client/lib/confirm.ts`, the existing kill-all card kept) + five `settings.sessions.*` `kw-l` keys × en/de/fr/da. **Zero** new `AccessAction` / `AccessVia` / `Decide()` branch / `IAuthorizationService` method (the `session.revoke` / `session.revoke_all_but_current` audit `Action` strings are a new row shape, not a new enum member — the C-S1·3 owner-scoped pin is a single `userId == currentSubject` check at the owner boundary, the C-S1·1 409-current-session pin lives in the controller, the C-S1·3 404-cross-user pin lives in the service, the C-S1·5 `LastActive` rate-limit (the `Kumunita:Sessions:TouchIntervalSeconds` config key, default 60) lives in the middleware); **zero migrations** (delta-detected, idempotent); 13 tests (12 seam + 1 kill-all extension), **gate 13/13 green, 0 failed** (the F5 e2e is *recorded, not assumed done* — the `STATUS.md` prod-hardening owner-ops item). A **named lane** — `Milestones.cs` / README Roadmap milestone ordering / `MilestonesTests.cs` are **byte-identical** (the ADR 0013 `GP` / ADR 0171 `FDW` precedent; the M4/M5/M6 roadmap stays Events/Projects/Portability). 5 `SL·D` deferrals (per-session `DeviceLabel` / `Kiosk` flag / admin "sign out all residents" / per-group-per-event session scoping / a session `Trust` / `Remember me` distinction). **Done.** (ADR 0281)
+*Dev (Docker):* `docker compose up -d --build` — Postgres on `localhost:5433`,
+the app on `http://localhost:5080` (the `mt` schema auto-applies on a fresh
+database). Smoke test: `GET /health` → `{"status":"ok","database":"ok",…}`.
+The full local loop, sample data + demo accounts, and the prod topology are in
+[`docs/dev/running-locally.md`](docs/dev/running-locally.md).
 
-## Deferred (future, by design)
+## Where to go next
 
-- **Machine translation of user-generated content** — optional and opt-in if it
-  ever ships: per-item, clearly labeled, and the MT provider becomes a third-party
-  boundary (ADR 0005 C, SECURITY.md §6). Until then UGC is rendered as authored.
-- **Geographic zones** as metadata + display filtering (not part of the core access model).
-- **Cross-neighborhood federation** — a standalone OpenIddict IdP; global identity, local authorization.
-- **Group helpers** — suggest/populate groups (neighbors from addresses, family from household).
-- **MCP**, calendar integration, cross-neighborhood data migration.
-- **Invitation-only sign-up** — the **gate** is now admin-managed (ADR 0050),
-  and a fresh instance ships **invitation-only** (ADR 0050, amended 2026-10-05):
-  a GlobalAdmin sets up the platform before any resident can self-register,
-  then opens the gate to **open** (residents may self-register) from
-  `/admin/signup` — closing it back to **invitation-only** (closed to new
-  self-service accounts) at any time. The `/account/signup` write lane and the
-  nav/login sign-up affordances are all authoritative — existing residents are
-  unaffected. What remains to land is the **invitation mechanism** the gate
-  closes the door *to*: an invited resident self-serves their password from an
-  admin-sent invitation link (token lifecycle, expiry, admin UX) rather than
-  registering on their own — so "closed" is a place a resident is invited *to*,
-  not a dead end. Land it before the community is open beyond the development
-  circle (SECURITY.md §6 open items — the control that answers adversary A2,
-  the signup bot).
+Start from the entry page for *you* — links and one-line reasons only, so they
+cannot drift:
 
-## Running
+- **Resident** (a person in the neighborhood) → [`docs/start/resident.md`](docs/start/resident.md)
+- **Community admin** (a moderator / global admin) → [`docs/start/community-admin.md`](docs/start/community-admin.md)
+- **Platform maintainer** (operates the deployment) → [`docs/start/platform-maintainer.md`](docs/start/platform-maintainer.md)
+- **Developer** (writes code in this repo) → [`docs/start/developer.md`](docs/start/developer.md)
+- **Agent** (an AI assistant working in this repo) → [`docs/start/agent.md`](docs/start/agent.md)
 
-*Dev (Docker):* `docker compose up -d --build` — Postgres on
-`localhost:5433`, the app on `http://localhost:5080` (built from `Dockerfile`,
-running `Development` so the `mt` schema auto-applies on a fresh database —
-ADR 0004), and Mailpit for SMTP (`localhost:1025`, UI at `http://localhost:8025`).
-Logins survive container rebuilds: the data-protection keyring persists in the
-`kumunita_dpkeys` named volume (same `/data/dataprotection-keys` container
-path as prod — COOLIFY §5.2), so `--build` recreations don't wipe session/
-antiforgery state.
-Smoke test: `GET /health` → `{"status":"ok","database":"ok","build":"<sha>",…}` and `/`
-renders the configured `Community__Name`. On a **fresh** database the versioned boot block
-initializes the `mt` schema with no operator step (ADR 0004) — the log shows **First boot**
-exactly once, and subsequent boots are a no-op.
-
-**Sample data & demo accounts.** On a **fresh** database, the first-boot lane can seed a
-mock neighborhood so an instance is immediately exercisable — residents, groups, community
-+ group posts with replies, events with RSVPs, tags, a resident blog, and de/fr/da event
-translations (ADR 0055, extended by ADR 0056). It is **opt-in via `SampleData__Enabled=true`**
-and first-boot only, so a real deployment that never sets the flag can never see it. A
-`SampleData__Enabled` instance that was already booted also gets the **missing** sample
-event `de` / `fr` / `da` translations backfilled on every warm boot — create-if-missing,
-idempotent, never overwriting a Translator's in-app edit (ADR 0060). Two postures, one
-seeder (ADR 0056):
-
-- **Development** (local dev loop, `appsettings.Development.json` / `docker-compose.yml`
-  already set the flag) — the documented weak demo credentials below, printed to the log;
-  the seed admin keeps its `SeedAdmin__` setup-token lane *plus* a weak demo password.
-- **Deployed demo site** (a Coolify `Production` instance with `SampleData__Enabled=true`)
-  — the seed admin **keeps only its `SeedAdmin__` setup-token lane** (no weak password),
-  the other demo accounts get **random high-entropy passwords**, and a single credentials
-  summary is **emailed to the seed admin's address** through the durable outbox. No weak
-  credential is stored on the public instance; the operator's admin inbox is the only place
-  the random passwords appear.
-
-The Development-posture demo logins (all `examplium.com`, a deliberately-fictional domain
-kept distinct from the real `kumunita.com`):
-
-| Account | E-mail | Password | Standing |
-|---|---|---|---|
-| Admin | `admin@examplium.com` | `Admin123!` | `GlobalAdmin` (the seeded first-boot admin, now with a password) |
-| Maria | `moderator@examplium.com` | `Mod1234!` | `Moderator` scoped to Safety + Social |
-| Sophie | `translator@examplium.com` | `Trans123!` | `Translator` (authors the de/fr/da translation rows) |
-| Anna | `anna@examplium.com` | `Resident123!` | resident; contact-opted-in; Warsaw timezone |
-| Ben | `ben@examplium.com` | `Resident123!` | resident |
-| Carla | `carla@examplium.com` | `Resident123!` | resident; contact-opted-in; owns the public "Street Green" group |
-| David | `david@examplium.com` | `Resident123!` | resident; Prague timezone |
-
-**Deployed demo site recipe (ADR 0056).** A Coolify `Production` app + dedicated Postgres,
-with `SampleData__Enabled=true`, the `examplium.com` `Community__*` / `SeedAdmin__*` names,
-and a **fresh** DB → first boot seeds the full neighborhood. The seed admin signs in with
-its one-time `SeedAdmin__` setup token (as on any real deployment), and the demo
-credentials (random per account) arrive as a single e-mail to that admin's address —
-the table above is the **Development** credential set, not the deployed one. The full
-step-by-step (including the disposable-DB caveat) is [OPS.md Procedure 12](docs/OPS.md).
-
-Wipe everything with `docker compose down -v` and rebuild — the seeder re-seeds on the
-next first boot (it is idempotent: keyed by e-mail, and the pristine gate keeps it from
-ever re-running its content on a warm database — the only warm-boot write is the
-create-if-missing sample-event translation backfill, ADR 0060).
-
-**Locking sample-account password changes (ADR 0138) and two-factor (MFA) (ADR 0194).** A
-demo site's sample accounts are *shared* credentials — anyone who signs in as "Anna" signs in
-as the *same* account — so a visitor testing the demo could change one of those passwords (or
-enable two-factor, minting a TOTP secret + recovery codes that break the shared credential)
-and break the credential for the everyone else who uses it. On a `SampleData__Enabled`
-instance (and **only** there — a real deployment never carries the flag, so this surface is
-unreachable by construction), a `GlobalAdmin` can turn on a **change-password lock** (ADR
-0138) and a **two-factor (MFA) lock** (ADR 0194) at `/admin/platform` → **Sample data** →
-`/admin/sample`: the demo accounts (the closed sample set) are then locked out of the
-resident self-serve "Change password" surface and the MFA settings surface
-(`/settings/security/mfa` — enrollment / recovery-rotation / disable), **except the sample
-`GlobalAdmin`**, whose own credential and MFA lane the admin must still be able to keep
-(ADR 0138 / 0194 sample-admin exemption). Real (non-sample) accounts are never affected. The
-two locks are independent `GlobalAdmin`-settled instance values (audited,
-`sample.set-password-lock` + `sample.set-mfa-lock`) and plain read decisions
-(`IsChangePasswordLockedForAsync` + `IsMfaLockedForAsync`), so the resident form, the locked
-notice, and the write-path guards agree by construction. The sample `GlobalAdmin` is also
-exempt from the login leg 1.5b forced-MFA enrollment redirect (the
-`IsSampleDataAccountAsync` seam) so a locked instance still lets the demo admin sign in with
-the shared password (a real, non-sample `GlobalAdmin` is still forced to enroll MFA).
-
-*Dev (no app container):* `docker compose up -d db`,
-`npm run build` in `src/Kumunita.Web/`, copy
-`src/Kumunita.Web/appsettings.Development.Local.json.example` to
-`appsettings.Development.Local.json` (git-ignored — carries the dev DB
-password; default `kumunita`), then
-`dotnet run --project src/Kumunita.Web` (settings from
-`appsettings.Development.json` + `appsettings.Development.Local.json`,
-DB on `localhost:5433`).
-
-*Prod:* one neighborhood per instance — identical image + dedicated Postgres +
-env per the [OPS.md configuration reference](docs/OPS.md), TLS via
-Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
-
-## Documentation
-
-- `docs/philosophy/how-it-works.md` — **how the platform works, in plain
-  language** — for residents who aren't technical collaborators: what it does,
-  how privacy and moderation actually behave, and how to give feedback that
-  helps. No code background needed.
-- `docs/philosophy/` — **our development philosophy**: why the platform exists (it links a
-  neighborhood's fragmented life into a whole) and how we build accordingly. Start at
-  [`docs/philosophy/START-HERE.md`](docs/philosophy/START-HERE.md)
-- `docs/SECURITY.md` — **security & privacy: the top priority** — threat model, data classes, control map
-- `docs/SECURITY-AUDIT.md` — **security audit program** — the cadence, owners, and run-anywhere checklists (code / deployment / platform-admin / recurring) that verify the SECURITY.md controls actually hold
-- `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
-- `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
-- `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
-- `docs/adr/` — architecture decision records (0001–0027)
-- `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization; media: [`docs/design/media-file-storage-design.md`](docs/design/media-file-storage-design.md) — the media & file-storage lane, ADR 0011, profile avatar as the reference lane)
+The full docs map — tiers, conventions, and every folder — is in
+[`docs/README.md`](docs/README.md).
