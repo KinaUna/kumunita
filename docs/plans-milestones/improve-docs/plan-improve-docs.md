@@ -129,7 +129,9 @@ a half-applied rule.
 - `D00` — ✅ (commit `264acf36`, 2026-11-02)
 - `D01` — ✅ (2026-11-02)
 - `D02` — ✅ (2026-11-02)
-- `D03`–`D14` — not started
+- `D03` — ✅ (commit `d89163f7`, 2026-11-02)
+- `D04` — ✅ (2026-11-02)
+- `D05`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -195,7 +197,7 @@ a half-applied rule.
 - `docs/archive/README.md`: one row per lane — milestone, one-line outcome,
   design doc, ADRs, handoff note — **as real links**.
 
-### `D04` — Split `docs/OPS.md` → `docs/ops/`
+### `D04` — Split `docs/OPS.md` → `docs/ops/` ✅
 - One file per procedure (the 13 `###` sections map 1:1: provision, first
   boot, upgrade, backups, restore, TLS, SMTP, monitoring, privacy operations,
   hardening checklist, incident response, demo site, guide review) +
@@ -203,6 +205,25 @@ a half-applied rule.
 - `OPS.md` becomes the ops hub: abstract + table of procedures (when to use each).
 - Watch the "Upgrade" (150 lines) and "Hardening checklist" (90 lines) sections —
   candidates to link to `docs/security/` instead of restating it.
+- **Shipped 2026-11-02:** the 13 procedures + `environments.md` +
+  `configuration-reference.md` landed under `docs/ops/`, each with
+  front-matter (`tier: reference` / `kind: runbook`) + Abstract; `OPS.md` is
+  now the 62-line hub (abstract + "when to use each" table, all real links).
+  Cross-references inside the split became real relative links (e.g. the
+  one-step rollback's R3 leg now *calls* `docs/ops/backups.md` /
+  `docs/ops/restore.md` instead of "§4/§5").
+- **Resolved (2026-11-02):** the two big sections link to the **current**
+  security home (`docs/SECURITY.md` + `docs/SECURITY-AUDIT.md`), not a
+  guessed `docs/security/` path — `D08` will build that folder and re-point
+  these links (the "link, don't backtick" rule means the seam is green today,
+  not a TODO).
+- **Note on `git mv`:** the split is a *restructure* (13 sections + 2 new
+  files out of one monolith, with a new hub + inter-file links + front-matter
+  added), so git sees it as modify `OPS.md` + add `docs/ops/*` rather than a
+  pure rename — `git log --follow` on the procedure text still resolves the
+  original content in `OPS.md` history. `docs-report.ps1` exits 0; broken
+  links unchanged (9); front-matter 625 → 641, abstracts 606 → 616
+  (the 15 new files + the rewritten hub).
 
 ### `D05` — Split `docs/COOLIFY.md` → `docs/deploy/coolify/`
 - One file per numbered step (0 plan … 6 verify) + troubleshooting; step 5

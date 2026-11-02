@@ -29,7 +29,7 @@ the platform for one community. The docs below are the ones that matter for
 
 | Link | Why |
 |---|---|
-| [`docs/OPS.md`](../OPS.md) | The ops runbook — every procedure (provision, upgrade, backup, restore, TLS, SMTP, monitoring, incident response). The hub; `D04` splits it into one file per procedure. |
+| [`docs/OPS.md`](../OPS.md) | The ops runbook — the hub: a "when to use each" table linking into [`docs/ops/`](../ops/) (one file per procedure, split in `D04`). |
 | [`docs/COOLIFY.md`](../COOLIFY.md) | The Coolify deployment guide, step by step. The hub; `D05` splits it into one file per step. |
 | [`SECURITY.md`](../../SECURITY.md) | The privacy model and threat model — the authoritative constraint on the controls you operate. `D08` splits this into `docs/security/`. |
 | [`SECURITY-AUDIT.md`](../../SECURITY-AUDIT.md) | The audit cadence and the checklists (C / D / P / R) — the "did we do the thing" loop. `D08` splits this too. |

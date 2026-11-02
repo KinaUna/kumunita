@@ -42,7 +42,7 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | [`start/`](start/) | per-audience entry pages (links + one-line reasons only) |
 | `architecture/` | `ARCHITECTURE.md` split by section (the hub stays at `docs/ARCHITECTURE.md`) |
 | `security/` | threat model, control map, audit checklists (split from `SECURITY.md` in `D08`) |
-| `ops/` | one runbook per procedure (split from `OPS.md` in `D04`) |
+| [`ops/`](ops/) | one runbook per procedure (split from the [`OPS.md`](OPS.md) hub in `D04`) |
 | `deploy/coolify/` | the Coolify guide, one step per file (split from `COOLIFY.md` in `D05`) |
 | `dev/` | running locally, tests, CI cheatsheet, Razor doctrine, terminal/browser quirks |
 | `product/` | features, roadmap, deferred-by-design (from `README.md` in `D07`) |
@@ -52,8 +52,9 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | [`design/`](design/m3b-moderation.md) | living design references (the current truth per subsystem) |
 | [`archive/`](archive/README.md) | lane history (the former `plans-milestones/done/`), moved in `D02` |
 
-Folders marked "split in `D…`" don't exist yet — the lanes are running in
+Folders still marked "split in `D…`" don't exist yet — the lanes are running in
 order; the entry pages link to the *intended* paths so the seams stay green.
+(`ops/` landed in `D04`; the rest follow.)
 
 ## Per-audience entry pages
 
@@ -75,4 +76,5 @@ The unit-by-unit work driving the restructure is tracked in the lane
 register, [`plans-milestones/improve-docs/plan-improve-docs.md`](plans-milestones/improve-docs/plan-improve-docs.md).
 Each unit `D00`–`D14` is one small, self-documenting commit (or a short
 series for the mechanical batches). `D00` (conventions + harness), `D01`
-(this map + the entry pages) and `D02` (the archive move) are done.
+(this map + the entry pages), `D02` (the archive move), `D03` (the archive
+tier) and `D04` (the ops split) are done.
