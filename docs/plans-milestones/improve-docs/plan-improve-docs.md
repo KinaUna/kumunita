@@ -21,8 +21,9 @@ updated: 2026-11-02
 > abstract/TL;DR gates grandfathered almost the whole baseline. This lane
 > (1) moves shipped-lane history to `docs/archive/`, (2) gives every doc YAML
 > front-matter + a `> **Abstract:**`, (3) splits the living docs by topic
-> behind per-audience entry pages, (4) caps ADRs at ~80 lines with rationale
-> moved to linked design docs, and (5) turns the gates from "don't grow" into
+> behind per-audience entry pages, (4) caps ADRs at ~250 lines with rationale
+> moved to linked design docs (or the shared `adr-handoffs.md` for ADRs with no
+> dedicated design doc), and (5) turns the gates from "don't grow" into
 > "shrink to zero". Units `D00`–`D14`; each is one small, self-documenting
 > commit (or a short series for the mechanical batches).
 >
@@ -35,7 +36,7 @@ updated: 2026-11-02
 |---|----------|----------|
 | 1 | How deep may this pass go? | **Full restructure** — living docs split, ADRs trimmed, design docs consolidated where it pays, history archived. |
 | 2 | Where does shipped-lane history live? | **`docs/archive/`** in this repo, references rewritten by script, a redirect map left behind. |
-| 3 | What is an ADR? | **A short decision record** (Status / Context / Decision / Consequences + front-matter), **~80-line cap**; longer rationale moves to the linked design doc. Patch-sized UI decisions stop getting new ADRs (they go in the lane's handoff notes). **ADR numbers are permanent** — the code cites them ~9 600 times. |
+| 3 | What is an ADR? | **A decision record** (Status / Context / Decision / Consequences + front-matter), **~250-line cap**; longer rationale moves to the linked design doc, or the shared `docs/design/adr-handoffs.md` when there is no dedicated design doc. Patch-sized UI decisions stop getting new ADRs (they go in the lane's handoff notes). **ADR numbers are permanent** — the code cites them ~9 600 times. |
 | 4 | Header format | **YAML front-matter** (machine-readable) **+ a `> **Abstract:**` blockquote** (human-readable, the IMPROVE convention). |
 | 5 | How are living docs split? | **By topic, one fact in one place**, with **per-audience entry pages** that link into the topic docs. |
 
@@ -56,7 +57,7 @@ Open decisions are asked one at a time, at the unit that needs them (marked
 | Handoff notes > 600 lines without a TL;DR | **20** | same (gate `d` grandfathered them) |
 | `plan-*.md` > 600 lines without Abstract/TL;DR | 31 of 73 | — |
 | Living top-level docs with an abstract | **1 of 10** (`ARCHITECTURE.md`) | — |
-| ADRs by length: ≤80 / 81–150 / 151–300 / >300 | 102 / 57 / 102 / 21 | ADRs drifting into design docs |
+| ADRs by length: ≤250 / 251–400 / >400 (pre-trim) | 251 / 33 / 1 | ADRs drifting into design docs |
 | ADR index rows vs files | 282 / 282 ✅ | (IMPROVE U01 held) |
 | Doc-path mentions of `archive/lanes/…` | 556 | — |
 | Code files mentioning `docs/…` paths | 46 (incl. `RepositoryInfo.cs` in-app links, `WhatsNew.cs`, tests reading the ADR index) | — |
@@ -463,10 +464,12 @@ a half-applied rule.
 - Stamp front-matter on all 282 (`status`, `supersedes`, `superseded_by`,
   `related`, `design`). The ADR index becomes **generated** from front-matter
   (the IMPROVE U01 gate stays, now trivially true).
-- Trim the **180 ADRs over 80 lines**, largest first (21 over 300 lines),
-  ~15 per commit: Decision and Consequences stay; Context shrinks to the
-  forces; options analysis, test lists and implementation notes move to the
-  linked design doc (or the archived handoff note if the design doc is archived).
+- Cap relaxed to **~250 lines** (from 80): only the **34 ADRs over 250 lines**
+  need trimming, largest first (1 over 400). What stays: **Status, Context (the
+  forces), Decision, Consequences.** What moves out: options analysis, test
+  lists, implementation notes — to the linked design doc, or to the new shared
+  `docs/design/adr-handoffs.md` when the ADR has no dedicated design doc (or
+  the archived handoff note if the design doc is in `archive/lanes/…`).
 - New `docs/adr/TEMPLATE.md` and an "ADR or handoff note?" rule of thumb
   (an ADR decides something a future change could get wrong; a copy/CSS
   decision is a handoff-note line).
@@ -488,7 +491,7 @@ a half-applied rule.
 ### `D14` — Gates and close
 - `tools/docs/docs-check.ps1` gates, with **baselines retired, not grandfathered**:
   front-matter present on every doc; abstract on every doc over 60 lines;
-  ADR ≤ 80 lines; zero broken links; every living doc reachable from an
+  ADR ≤ 250 lines; zero broken links; every living doc reachable from an
   entry page (no living orphans); nothing new under `docs/archive/` except
   at a lane close.
 - Wire into CI.

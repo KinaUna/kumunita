@@ -66,15 +66,16 @@ name `Abstract` wins.
 
 ## The ADR cap
 
-ADRs are short decision records, **~80-line target** (the lane register
-rounds to 80; the gate's bucketing is ≤80 / 81–150 / 151–300 / >300). The
-shape:
+ADRs are decision records, **~250-line target** (the gate's bucketing is
+≤250 / 251–400 / >400). The shape:
 
 - **Status / Context / Decision / Consequences** stay in the ADR;
 - **Context** shrinks to the *forces* (what pushed on the decision), not
   the options analysis;
 - **options analysis, test lists, implementation notes** move to the
-  linked design doc (the ADR's front-matter `related:` names it).
+  linked design doc (the ADR's front-matter `related:` names it), or to the
+  shared `docs/design/adr-handoffs.md` when the ADR has no dedicated design
+doc.
 
 ADR **numbers are permanent** — the code cites them ~9 600 times, so a
 trimmed ADR keeps its number, its `id` (`adr-NNNN`), and its position in

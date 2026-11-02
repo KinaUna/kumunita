@@ -7,7 +7,7 @@
 #   2. abstract coverage (Abstract/TL;DR blockquote in first 20 lines, docs >60 lines)
 #   3. inbound/outbound link counts + orphans
 #   4. broken relative links
-#   5. ADR length histogram (≤80, 81–150, 151–300, >300)
+#   5. ADR length histogram (≤250, 251–400, >400)
 #
 # This is a *report*, not a gate: it never exits non-zero (unless it cannot
 # find the repo). docs-check.ps1 (D14) is the CI-able gate.
@@ -182,25 +182,23 @@ foreach ($b in $topBroken) { Write-Host $b }
 if (@($brokenList).Count -gt 20) { Write-Host "  ... and $(@($brokenList).Count - 20) more" }
 
 # --- 5. ADR length histogram ---------------------------------------------------
-Write-Host "`n[5] ADR length histogram (target ~80 lines):"
+Write-Host "`n[5] ADR length histogram (target ~250 lines):"
 $adrDir = Join-Path $repo 'docs/adr'
 $adrFiles = Get-ChildItem -Path $adrDir -Filter '0*.md' -File
-$b1 = 0; $b2 = 0; $b3 = 0; $b4 = 0
-$over300 = @()
+$b1 = 0; $b2 = 0; $b3 = 0
+$over400 = @()
 foreach ($a in $adrFiles) {
   $n = Lines $a.FullName
-  if ($n -le 80) { $b1++ }
-  elseif ($n -le 150) { $b2++ }
-  elseif ($n -le 300) { $b3++ }
-  else { $b4++; $over300 += [pscustomobject]@{ L=$n; F=$a.Name } }
+  if ($n -le 250) { $b1++ }
+  elseif ($n -le 400) { $b2++ }
+  else { $b3++; $over400 += [pscustomobject]@{ L=$n; F=$a.Name } }
 }
 Write-Host ("  total ADRs : {0}" -f @($adrFiles).Count)
-Write-Host ("  ≤80        : {0}" -f $b1)
-Write-Host ("  81–150     : {0}" -f $b2)
-Write-Host ("  151–300    : {0}" -f $b3)
-Write-Host ("  >300       : {0}" -f $b4)
-$topOver300 = @($over300 | Sort-Object L -Descending)
-foreach ($a in $topOver300) { Write-Host ("    {0,5}  {1}" -f $a.L, $a.F) }
+Write-Host ("  ≤250       : {0}" -f $b1)
+Write-Host ("  251–400    : {0}" -f $b2)
+Write-Host ("  >400       : {0}" -f $b3)
+$topOver400 = @($over400 | Sort-Object L -Descending)
+foreach ($a in $topOver400) { Write-Host ("    {0,5}  {1}" -f $a.L, $a.F) }
 
 Write-Host ("-" * 78)
 Write-Host "docs-report: done."

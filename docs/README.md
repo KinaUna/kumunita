@@ -48,7 +48,7 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | [`product/`](product/roadmap.md) | features, roadmap, deferred-by-design (split from `README.md` in `D07`) |
 | [`philosophy/`](philosophy/README.md) | the trust model and the integration argument (unchanged shape) |
 | [`guides/`](guides/CONVENTIONS.md) | the in-app guide registry and writing conventions |
-| [`adr/`](adr/README.md) | short decision records (~80-line cap, index generated from front-matter) |
+| [`adr/`](adr/README.md) | decision records (~250-line cap, index generated from front-matter) |
 | [`design/`](design/m3b-moderation.md) | the current truth per subsystem (every doc `tier: reference` / `kind: design` + an Abstract, `D10`); the **six subsystem hubs** are the doors in — [`events`](design/events-subsystem.md), [`rich content`](design/rich-content-subsystem.md), [`notifications`](design/notifications-subsystem.md), [`storage metrics`](design/storage-metrics-subsystem.md), [`analytics`](design/analytics-subsystem.md), [`prod-hardening`](design/prod-hardening.md) |
 | [`archive/`](archive/README.md) | lane history (the former `plans-milestones/done/`), moved in `D02` |
 

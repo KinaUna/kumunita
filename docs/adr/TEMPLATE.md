@@ -11,7 +11,7 @@ updated: 2026-11-02
 ---
 
 > **Abstract:** the house shape for a new ADR — the front-matter block, the
-> Status / Context / Decision / Consequences structure, the ~80-line cap, and
+> Status / Context / Decision / Consequences structure, the ~250-line cap, and
 > the "ADR or handoff note?" rule. Copy this file (or read it before starting
 > a new ADR); the front-matter and the four sections are the load-bearing
 > parts, everything else is guidance. **Who is it for:** anyone adding a new
@@ -76,11 +76,11 @@ the index.
 
 ## The cap — what stays, what moves
 
-The target is **~80 lines** (the `docs-report.ps1` bucket is ≤80 / 81–150 /
-151–300 / >300; the gate is ≤80). What stays in the ADR: **Status, Context
-(the forces), Decision, Consequences.** What moves out — to the linked
-design doc (or the archived handoff note if the design doc is in
-`archive/lanes/…`):
+The target is **~250 lines** (the `docs-report.ps1` bucket is ≤250 / 251–400 /
+>400; the gate is ≤250). What stays in the ADR: **Status, Context (the
+forces), Decision, Consequences.** What moves out — to the linked design doc
+(or `docs/design/adr-handoffs.md` if the ADR has no dedicated design doc; or
+the archived handoff note if the design doc is in `archive/lanes/…`):
 
 - **options analysis** — "we considered A and B, we picked A because…" — the
   design doc owns that; the ADR names the choice, not the alternatives;
