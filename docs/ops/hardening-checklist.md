@@ -71,7 +71,8 @@ be true, that document says
     write a volume byte each and are the byte-flood surface.
     **Proxy requirement:** the reverse proxy must forward `X-Forwarded-For` and the app
     must honor it (trusted-proxy config); otherwise every request shares one bucket.
-    Verify in the M0/M1 smoke test. Rationale & revisit triggers: [SECURITY.md](../SECURITY.md) §6.
+    Verify in the M0/M1 smoke test. Rationale & revisit triggers:
+    [the rate-limiting & proxy-trust decisions](../security/decisions-open-items.md#decisions).
   - **Account lockout (decided):** ASP.NET Identity's built-in per-account lockout,
     enabled with the default thresholds (5 failed attempts → 30-minute lockout).
     **Division of labor:** lockout stops one attacker hammering *one known account*;
@@ -96,7 +97,7 @@ be true, that document says
     inline `style=` attributes are Bootstrap utility patterns, not a script
     vector). `img-src` adds `data:`/`blob:` (the WYSIWYG local-preview pane).
     Any future third-party script: scoped `script-src` entry + SRI, decided per
-    case ([SECURITY.md](../SECURITY.md) §6). **Two more global headers ride the same block (F7 /
+    case ([the CSP decision](../security/decisions-open-items.md#decisions)). **Two more global headers ride the same block (F7 /
     WEB-07):** `X-Content-Type-Options: nosniff` (every response — the global
     floor under the per-controller `nosniff` on the serve/download lanes) and
     `Referrer-Policy: no-referrer` (no cross-origin referrer leakage). Set in

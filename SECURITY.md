@@ -1,3 +1,25 @@
+---
+id: security-vdp
+title: "Vulnerability Disclosure Policy"
+tier: living
+kind: security
+status: current
+audiences: [resident, community-admin, platform-maintainer]
+related:
+  - docs/SECURITY.md
+  - docs/security/control-map.md
+updated: 2026-11-02
+---
+
+> **Abstract:** how to report a security issue to a Kumunita instance in good
+> faith, and how reports are handled — scope, the response timeline, and the
+> safe-harbor / no-reprisal commitment. This is the policy GitHub recognizes at
+> the repo root; the machine-readable companion is served at
+> `GET /.well-known/security.txt`. **Who is it for:** the researcher reporting
+> an issue, and the operator who will handle it. **When to read the rest:**
+> when reporting or receiving a report; for the *why* behind a control, read
+> [the security model](docs/SECURITY.md).
+
 # Kumunita — Vulnerability Disclosure Policy (VDP)
 
 Kumunita is a **self-hosted, single-community platform**: each deployment
@@ -100,6 +122,6 @@ law.
 ---
 
 *This policy is part of the Kumunita platform's security posture
-(`docs/SECURITY.md` describes the full threat model and access-control
+([`docs/SECURITY.md`](docs/SECURITY.md) describes the full threat model and access-control
 rules). The machine-readable companion is served at
 `GET /.well-known/security.txt` (RFC 9116).*

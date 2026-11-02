@@ -30,7 +30,7 @@ the platform behaving. The docs below are the ones that matter for *you*.
 |---|---|
 | [`README.md`](../../README.md) | What Kumunita is and what it does — the front page. |
 | [`docs/guides/CONVENTIONS.md`](../guides/CONVENTIONS.md) | The in-app guide registry — the canonical home for the how-to guides you'll share with residents (the `admins`, `moderators`, `audience` rows are the ones you'll cite most). |
-| [`SECURITY.md`](../../SECURITY.md) | The privacy model, the threat model, and the access-control rules — the authoritative constraint on what you may and may not see. |
+| [`SECURITY.md`](../SECURITY.md) | The privacy model, the threat model, and the access-control rules — the authoritative constraint on what you may and may not see (the model hub; the [control map](../security/control-map.md) and [adversaries](../security/adversaries.md) are the pages to read when you enforce a rule). |
 | [`docs/philosophy/everyday-life.md`](../philosophy/everyday-life.md) | The philosophy in everyday examples — the "why" behind the design choices you're enforcing. |
 | [`docs/adr/`](../adr/README.md) | The ADR index — when you need the *deciding* document for a rule (e.g. ADR 0003 for moderator scoping, ADR 0010 for private groups). |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The full philosophy argument, one hour. |

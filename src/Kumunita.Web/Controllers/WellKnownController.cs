@@ -11,17 +11,18 @@ namespace Kumunita.Web.Controllers;
 /// This is a **tiny additive surface with no bounded context** (the F13 plan
 /// row): one anonymous, dependency-light GET that returns the machine-readable
 /// security.txt (RFC 9116) companion to the VDP prose in
-/// <c>docs/SECURITY-VDP.md</c>. The prose is the canonical human-readable
-/// policy; this route is the machine-readable one (the contract the
-/// <c>SecurityTxt_ReturnsValidFields</c> test pins — F13.U2).
+/// <c>SECURITY.md</c> at the repo root. The prose is the canonical
+/// human-readable policy; this route is the machine-readable one (the contract
+/// the <c>SecurityTxt_ReturnsValidFields</c> test pins — F13.U2).
 /// </para>
 /// <para>
 /// **Routing mechanism (F13.U1 judgment call, pinned here):** a **controller
 /// action** (the repo idiom — the <c>StaticPagesController</c> absolute-route
 /// precedent, e.g. <c>[HttpGet("/terms")]</c>), not <c>app.MapGet</c>. The body
 /// is **built inline** (no file read at request time): the VDP doc
-/// (<c>SECURITY-VDP.md</c>) is the canonical prose for humans / the repo, and
-/// this route carries the RFC 9116 <em>fields</em> — a single source of truth
+/// (<c>SECURITY.md</c>, the repo root) is the canonical prose for humans / the
+/// repo, and this route carries the RFC 9116 <em>fields</em> — a single source
+/// of truth
 /// per artifact, no startup-file-read dependency, and no <c>wwwroot</c> file
 /// that a deployer could accidentally shadow (a <c>wwwroot/.well-known/</c>
 /// file is not in the repo today, so there is no shadowing risk either way,
@@ -59,7 +60,7 @@ public sealed class WellKnownController : Controller
     /// <summary>
     /// <c>GET /.well-known/security.txt</c> (RFC 9116, OPS-05) — the
     /// machine-readable security.txt companion to the VDP
-    /// (<c>docs/SECURITY-VDP.md</c>). Returns **200** with
+    /// (<c>SECURITY.md</c> at the repo root). Returns **200** with
     /// <c>text/plain</c> and the RFC 9116 fields (<c>Contact</c>,
     /// <c>Expires</c> — a future date, at least 12 months out,
     /// <c>Preferred-Languages</c>, <c>Policy</c>, <c>Hints</c>).

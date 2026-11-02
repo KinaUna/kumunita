@@ -134,7 +134,8 @@ a half-applied rule.
 - `D05` — ✅ (commit `b55513e5`, 2026-11-02)
 - `D06` — ✅ (commit `40f390e6`, 2026-11-02)
 - `D07` — ✅ (commit `46e46783`, 2026-11-02)
-- `D08`–`D14` — not started
+- `D08` — ✅ (2026-11-02)
+- `D09`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
@@ -324,7 +325,7 @@ a half-applied rule.
   624 → 627; `dotnet build` 0 errors; Web.Tests 1249/0 failed, Core.Tests
   1682/0 failed (2 pre-existing skips); `README.md` 95 lines (≤120).
 
-### `D08` — Security docs → `docs/security/`
+### `D08` — Security docs → `docs/security/` ✅
 - `SECURITY.md` split: why-first, trust boundaries, data classes, adversaries,
   control map, decisions & open items — one file each.
 - `SECURITY-AUDIT.md` split: rules + cadence (hub), checklists C / D / P / R,
@@ -333,6 +334,31 @@ a half-applied rule.
   for the vulnerability policy); keep `/.well-known/security.txt` pointing at it.
 - Every control-map row links to the code seam and the ADR that decided it
   (this is the prep for the later security/privacy integration pass).
+- **Shipped 2026-11-02:** the model split into six concern files under
+  `docs/security/` (`why-first`, `trust-boundaries`, `data-classes`,
+  `adversaries`, `control-map`, `decisions-open-items`); `docs/SECURITY.md` is
+  now the model hub (abstract + a concern table, all real links). The audit
+  program split into `docs/security/audit-checklists` (C/D/P/R),
+  `audit-annual-trigger` (A-1…A-3 + the trigger table) and `audit-log` (the
+  append-only record + the SEC remediation per-finding rows);
+  `docs/SECURITY-AUDIT.md` is now the audit hub (rules + cadence, all real
+  links). `docs/SECURITY-VDP.md` moved to **repo-root `SECURITY.md`** via
+  `git mv` (rename history intact), gaining front-matter + an Abstract; the
+  `WellKnownController` comments re-pointed at the new home, and
+  `docs-report.ps1`'s top-level list dropped the two moved monoliths.
+  **Name-collision watch:** the currently-broken `docs/start/*` inbound links
+  (`../../SECURITY*`) re-pointed at the model/audit hubs and the root VDP —
+  not left at the new root `SECURITY.md` (that's the VDP, the wrong doc);
+  the `SECURITY.md §N` prose in `docs/ops/` that meant a model section re-pointed
+  to the concern file that now owns it. The [control map](../../security/control-map.md)
+  gained a **Decided by** column (code seam + ADR per row) — the prep for the
+  security/privacy integration pass. `docs/README.md`'s folder table points
+  `security/` at the real folder; `start/platform-maintainer.md`'s D08 rows link
+  the real files. Verification: `docs-report` broken links 8 → 3 (the five
+  `docs/start/*` → `../../SECURITY*` links resolved; the 3 remaining are the
+  pre-existing `improve`-lane + template links, `D13` scope), front-matter
+  664 → 676, abstracts 627 → 633; `dotnet build` 0 errors; Web.Tests 1249/0
+  failed, Core.Tests 1682/0 failed (2 pre-existing skips).
 
 ### `D09` — `ARCHITECTURE.md` → `docs/architecture/`
 - Keep the hub (it already has an abstract): philosophy link, stack, and a

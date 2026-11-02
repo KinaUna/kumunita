@@ -41,7 +41,7 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 |---|---|
 | [`start/`](start/) | per-audience entry pages (links + one-line reasons only) |
 | `architecture/` | `ARCHITECTURE.md` split by section (the hub stays at `docs/ARCHITECTURE.md`) |
-| `security/` | threat model, control map, audit checklists (split from `SECURITY.md` in `D08`) |
+| [`security/`](security/why-first.md) | threat model, control map, audit checklists (the concern files, split from the [`SECURITY.md`](SECURITY.md) model hub in `D08`) |
 | [`ops/`](ops/) | one runbook per procedure (split from the [`OPS.md`](OPS.md) hub in `D04`) |
 | [`deploy/coolify/`](deploy/coolify/00-plan.md) | the Coolify guide, one step per file (split from the [`COOLIFY.md`](COOLIFY.md) hub in `D05`) |
 | [`dev/`](dev/README.md) | the working doctrine — running locally, Razor verification, testing + CI, live-server debugging, sandbox quirks (split from `AGENTS.md` in `D06`; running-locally in `D07`) |
@@ -55,7 +55,7 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 Folders still marked "split in `D…`" don't exist yet — the lanes are running in
 order; the entry pages link to the *intended* paths so the seams stay green.
 (`ops/` landed in `D04`; `deploy/coolify/` in `D05`; `dev/` in `D06`;
-`product/` in `D07`; `security/` + `architecture/` follow in `D08`–`D09`.)
+`product/` in `D07`; `security/` in `D08`; `architecture/` follows in `D09`.)
 
 ## Per-audience entry pages
 
@@ -78,5 +78,8 @@ register, [`plans-milestones/improve-docs/plan-improve-docs.md`](plans-milestone
 Each unit `D00`–`D14` is one small, self-documenting commit (or a short
 series for the mechanical batches). `D00` (conventions + harness), `D01`
 (this map + the entry pages), `D02` (the archive move), `D03` (the archive
-tier), `D04` (the ops split), `D05` (the Coolify split) and `D06` (slimming
-`AGENTS.md` into [`dev/`](dev/README.md)) are done.
+tier), `D04` (the ops split), `D05` (the Coolify split), `D06` (slimming
+`AGENTS.md` into [`dev/`](dev/README.md)), `D07` (slimming `README.md` into
+[`product/`](product/roadmap.md)) and `D08` (splitting the security docs into
+[`security/`](security/why-first.md) + the audit program + the VDP at the repo
+root) are done.

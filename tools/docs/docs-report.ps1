@@ -50,7 +50,7 @@ function Lines([string]$path) { @((Get-Content -LiteralPath $path)).Count }
 # --- collect the doc set -----------------------------------------------------
 $docs = @()
 $docs += Get-ChildItem -Path (Join-Path $repo 'docs') -Recurse -Filter '*.md' -File
-foreach ($top in @('README.md', 'AGENTS.md', 'SECURITY.md', 'SECURITY-AUDIT.md', 'SECURITY-VDP.md')) {
+foreach ($top in @('README.md', 'AGENTS.md', 'SECURITY.md')) {
   $p = Join-Path $repo $top
   if (Test-Path $p) { $docs += [pscustomobject]@{ FullName = $p } }
 }

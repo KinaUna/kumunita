@@ -31,9 +31,9 @@ the platform for one community. The docs below are the ones that matter for
 |---|---|
 | [`docs/OPS.md`](../OPS.md) | The ops runbook — the hub: a "when to use each" table linking into [`docs/ops/`](../ops/) (one file per procedure, split in `D04`). |
 | [`docs/COOLIFY.md`](../COOLIFY.md) | The Coolify deployment guide — the hub: an ordered checklist (0 → 6) linking into [`docs/deploy/coolify/`](../deploy/coolify/00-plan.md) (one file per step, split in `D05`). |
-| [`SECURITY.md`](../../SECURITY.md) | The privacy model and threat model — the authoritative constraint on the controls you operate. `D08` splits this into `docs/security/`. |
-| [`SECURITY-AUDIT.md`](../../SECURITY-AUDIT.md) | The audit cadence and the checklists (C / D / P / R) — the "did we do the thing" loop. `D08` splits this too. |
-| [`SECURITY-VDP.md`](../../SECURITY-VDP.md) | The vulnerability disclosure policy — how to report and how reports are handled. `D08` moves this to repo-root `SECURITY.md`. |
+| [`SECURITY.md`](../SECURITY.md) | The privacy model and threat model — the authoritative constraint on the controls you operate (the model hub, split into the concern files under [`docs/security/`](../security/why-first.md) in `D08`). |
+| [`SECURITY-AUDIT.md`](../SECURITY-AUDIT.md) | The audit cadence and the checklists (C / D / P / R) — the "did we do the thing" loop (the audit hub, split into [`audit-checklists`](../security/audit-checklists.md) / [`audit-annual-trigger`](../security/audit-annual-trigger.md) / [`audit-log`](../security/audit-log.md) in `D08`). |
+| [`SECURITY.md`](../../SECURITY.md) | The vulnerability disclosure policy — how to report and how reports are handled (moved to repo-root `SECURITY.md` in `D08`; the machine-readable companion is served at `GET /.well-known/security.txt`). |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The platform's philosophy — the trust model and the integration argument that the controls are built to hold. |
 | [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) | The architecture map — the stack, the bounded contexts, the CQRS convention, the extension seams. |
 
