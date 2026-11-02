@@ -131,7 +131,7 @@ a half-applied rule.
 - `D02` — ✅ (2026-11-02)
 - `D03` — ✅ (commit `d89163f7`, 2026-11-02)
 - `D04` — ✅ (commit `782eca22`, 2026-11-02)
-- `D05` — ✅ (2026-11-02)
+- `D05` — ✅ (commit `b55513e5`, 2026-11-02)
 - `D06`–`D14` — not started
 
 ### `D00` — Baseline, conventions, harness
