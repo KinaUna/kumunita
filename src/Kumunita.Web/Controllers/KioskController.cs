@@ -411,9 +411,18 @@ public sealed class KioskController : Controller
         // unless the entry shows them; the flag rides to the framed page as a
         // query parameter that _Layout turns into the kmb-kiosk-comments body
         // class (display-only — the framed route's own read is unchanged).
-        var href = entry.ShowComments && HasDiscussion(entry.Type)
-            ? AppendQuery(baseHref, CommentsQueryKey, "1")
-            : baseHref;
+        //
+        // ADR 0285 D7 — every slide also carries ?kiosk=1, which _Layout turns
+        // into the kmb-kiosk body class. This is the AUTHORITATIVE kiosk signal:
+        // it is part of the framed route's URL, so it arrives intact regardless
+        // of the site's global Referrer-Policy: no-referrer (F7), which means a
+        // slide iframe sends NO Referer header and the old referrer-based test
+        // in _Layout never fired — so the kiosk CSS never activated. The
+        // onboarding modal's iframes do NOT carry this param, so they stay
+        // interactive (the kmb-embed floor still applies to both).
+        var href = AppendQuery(baseHref, KioskQueryKey, "1");
+        if (entry.ShowComments && HasDiscussion(entry.Type))
+            href = AppendQuery(href, CommentsQueryKey, "1");
 
         return new KioskSlideViewModel(
             index, entry.Type, entry.Label, href, Denied: false,
@@ -423,6 +432,14 @@ public sealed class KioskController : Controller
             ShowComments: entry.ShowComments,
             Title: resolved.Title);
     }
+
+    /// <summary>The query parameter the kiosk appends to EVERY slide href to
+    /// mark the framed page as a kiosk slide (ADR 0285 D7; _Layout turns it into
+    /// the kmb-kiosk body class). It is the authoritative kiosk signal — part of
+    /// the URL, so it survives the global Referrer-Policy: no-referrer (F7) that
+    /// suppresses the Referer header a referrer-based test would have relied on.
+    /// The onboarding modal's iframes never carry it, so they stay interactive.</summary>
+    public const string KioskQueryKey = "kiosk";
 
     /// <summary>The query parameter that asks a framed page to keep its
     /// comments / replies / RSVP list visible (ADR 0285 D5; read by _Layout).</summary>

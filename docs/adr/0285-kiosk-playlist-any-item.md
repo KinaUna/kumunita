@@ -20,9 +20,9 @@ What already exists and is kept:
 - Each slide iframes the item's **own route** (ADR 0164 M35·6). The route
   re-runs its own read decision on every load (M35·3), so the kiosk never
   needs an access branch of its own.
-- `_Layout` marks a page framed by `/kiosk` with `body.kmb-kiosk` (the
-  `Sec-Fetch-Dest: iframe` + `/kiosk` referrer test); site.css then hides
-  buttons, forms, tabs and nav.
+- `_Layout` marks a page framed by `/kiosk` with `body.kmb-kiosk` (originally
+  a `Sec-Fetch-Dest: iframe` + `/kiosk` referrer test, now the `?kiosk=1`
+  URL signal per **D7**); site.css then hides buttons, forms, tabs and nav.
 - `/kiosk/slide?slide=N` returns the slide's href and a content fingerprint;
   `kiosk.ts` reloads the iframe only when the fingerprint changes.
 - The iframe is same-origin, so the kiosk page can scroll it.
@@ -104,6 +104,37 @@ under their lane headings, from the same `GetBoardAsync` data (so the
 kiosk's board fingerprint applies unchanged). It is an ordinary view mode
 of the board page, also reachable outside the kiosk.
 
+### D7 — Kiosk detection by URL signal, not by referrer
+
+The kiosk signal that lets `_Layout` mark a framed page `body.kmb-kiosk`
+is the **`?kiosk=1` query parameter the kiosk appends to every slide href**
+(`KioskController.KioskQueryKey`). It is read from the request URL — not
+from the `Referer` header — because the site sets
+`Referrer-Policy: no-referrer` globally (the F7 prod-hardening floor, kept),
+which means a slide iframe **sends no `Referer` header at all**: the
+original `Sec-Fetch-Dest: iframe` + `Referer.Contains("/kiosk")` test in
+`_Layout` therefore **never fired in a real browser**, so `body.kmb-kiosk`
+was never applied and **none of the kiosk CSS activated** (all the control
+shells stayed visible on a wall display). The bug was invisible to
+`curl`-based checks, which set the `Referer` header manually.
+
+Concretely: `Classify` (the one path both `Index` and `Slide` build their
+slides through) always appends `?kiosk=1` to the resolved href
+(`AppendQuery(baseHref, "kiosk", "1")`), ahead of the D5 `?kioskComments=1`
+flag. `_Layout` now sets `kmb-kiosk` from `kmbEmbed && Query["kiosk"]=="1"`,
+with the referrer test retained only as a harmless fallback. Because the
+param is part of the framed route's URL, it survives `no-referrer`.
+
+The onboarding walk-through modal (which iframes **interactive** settings
+pages where the controls are the point) does **not** append `?kiosk=1`, so
+its framed pages keep only the shared `kmb-embed` chrome floor and stay
+fully interactive — the kiosk stays the only thing that strips them.
+
+`KioskControllerTests` pins both ends: every slide href now carries
+`?kiosk=1` (the board, calendar and D5 `kioskComments` cases) and
+`ADR0285_PlaybackAndCommentsWiring_IsInPlace` asserts the controller
+emits the param and `_Layout` reads it from the query string.
+
 ## Consequences
 
 - `KioskView` / `KioskViewKind` / `ViewIntervalSeconds` are removed;
@@ -180,3 +211,41 @@ rule):
 `KioskControllerTests.ADR0285_PlaybackAndCommentsWiring_IsInPlace` pins the
 three selectors in `site.css` (the house convention for kiosk CSS pins).
 All 1249 Web tests pass (xunit.v3 in-process runner).
+
+## Amendment (2026-11-02) — calendar slide: hide the control clusters, fit the grid to the frame
+
+On a kiosk calendar slide the read-only doctrine also strips the calendar's
+own control clusters (the M35 "fit the whole month/day to the frame" rules
+already existed for the grid height). Two gaps remained:
+
+**The control clusters** — the generic kiosk rules hide the individual
+`button` / `.btn` / `form` / `select` / `input` / `.nav` leaves, but the
+calendar page groups them inside non-interactive wrappers whose bands remain
+on the wall display. Explicit cluster-hide rules were added (after the
+`.head-row > .d-flex` rule, before the `kmb-discussion` rule):
+
+- `body.kmb-kiosk .lede-row .d-flex` — the **Full page / Full screen**
+  toggle pair (the `.d-flex` cluster beside the lede's `<p>`; the title +
+  date-range lede are kept, only the button cluster goes).
+- `body.kmb-kiosk .head-row > .d-flex` — the right header cluster: the
+  **Day/Week/Month** view toggle (`.events-view-toggle`) + the **New event**
+  button (`.events-new-event-btn`) + the **Calendar feed (iCal)** link.
+- `body.kmb-kiosk .d-flex.mb-3` — the **Prev / Today / Next** nav links +
+  the **Filter** form (the Community select). The only `.d-flex.mb-3` row on
+  the calendar page.
+- `body.kmb-kiosk .kmb-tab-under-navbar` — the **Events / Calendar** tab
+  strip (also a `.nav`, so doubly covered).
+
+All four are scoped to `body.kmb-kiosk`, so the other ~20 pages that reuse
+`.kmb-tab-under-navbar` / `.d-flex.mb-3` are unaffected.
+
+**The grid height** — `body.kmb-kiosk #events-calendar .events-time-body
+{ height: auto !important }` re-pins the Day/Week 24-hour body (base
+`height: calc(24 * 3rem)` at ~line 3252) to `auto`, so a frame shorter than
+72rem does not leave a vertical scrollbar; the flex-fill chain hands the
+height down and the %-positioned event blocks + background hour-lines scale
+proportionally (the M35 amendment doctrine — no JS change).
+
+`KioskControllerTests.ADR0285_PlaybackAndCommentsWiring_IsInPlace` pins the
+four cluster selectors + the height rule. All 1249 Web tests pass (xunit.v3
+in-process runner).

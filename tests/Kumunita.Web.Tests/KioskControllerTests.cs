@@ -91,7 +91,9 @@ public class KioskControllerTests
         Assert.True(model.HasSlides);
         var first = model.FirstSlide!;
         Assert.False(first.Denied);
-        Assert.Equal("/projects/boards/board-1", first.Href);
+        // D7: the slide href carries ?kiosk=1 — the authoritative kiosk signal
+        // the layout turns into the kmb-kiosk body class (survives no-referrer).
+        Assert.Equal("/projects/boards/board-1?kiosk=1", first.Href);
         Assert.Equal("Board A", first.Title);
         Assert.Equal(25, first.DurationSeconds);
         Assert.Equal(KioskScrollBehavior.Auto, first.Scroll);
@@ -173,7 +175,8 @@ public class KioskControllerTests
         var vm = Assert.IsType<KioskSlideRefreshViewModel>(Assert.IsType<JsonResult>(action).Value);
 
         Assert.False(vm.Denied);
-        Assert.Equal("/events/calendar?view=day&componentId=comp-1", vm.Href);
+        // D7: the base href already has a query, so ?kiosk=1 rides as &kiosk=1.
+        Assert.Equal("/events/calendar?view=day&componentId=comp-1&kiosk=1", vm.Href);
         await events.Received(1).ListInRangeAsync(
             Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), "comp-1", Subject, Arg.Any<CancellationToken>());
     }
@@ -371,10 +374,15 @@ public class KioskControllerTests
     // ── ADR 0285 D4 / D5 — playback attributes and the comments toggle ─────
 
     [Theory]
-    [InlineData(KioskItemType.Announcement, true, "/announcements/a-1", "/announcements/a-1?kioskComments=1")]
-    [InlineData(KioskItemType.Announcement, false, "/announcements/a-1", "/announcements/a-1")]
-    [InlineData(KioskItemType.Page, true, "/pages/bins", "/pages/bins")]                   // no discussion on a page
-    [InlineData(KioskItemType.Todo, true, "/projects/todos/t-1", "/projects/todos/t-1?kioskComments=1")]
+    // D7: every slide href carries ?kiosk=1 (the authoritative kiosk signal,
+    // which _Layout turns into the kmb-kiosk body class — it survives the
+    // global Referrer-Policy: no-referrer that a referrer-based test would
+    // have failed under). D5: where the entry shows comments on a discussion
+    // surface, &kioskComments=1 rides after it.
+    [InlineData(KioskItemType.Announcement, true, "/announcements/a-1", "/announcements/a-1?kiosk=1&kioskComments=1")]
+    [InlineData(KioskItemType.Announcement, false, "/announcements/a-1", "/announcements/a-1?kiosk=1")]
+    [InlineData(KioskItemType.Page, true, "/pages/bins", "/pages/bins?kiosk=1")]          // no discussion on a page
+    [InlineData(KioskItemType.Todo, true, "/projects/todos/t-1", "/projects/todos/t-1?kiosk=1&kioskComments=1")]
     public async Task ADR0285_ShowComments_AddsTheQueryFlag_OnlyWhereThereIsADiscussion(
         KioskItemType type, bool showComments, string resolvedHref, string expectedHref)
     {
@@ -409,6 +417,20 @@ public class KioskControllerTests
         Assert.Contains("kmb-kiosk-comments", layout);
         Assert.Contains("kioskComments", layout);
 
+        // D7 — the authoritative kiosk signal: the kiosk appends ?kiosk=1 to
+        // EVERY slide href (KioskController always does), and _Layout turns it
+        // into the kmb-kiosk body class. This is what actually activates the
+        // kiosk CSS in the browser — it survives the global
+        // Referrer-Policy: no-referrer (F7) that suppresses the Referer header
+        // a referrer-based test relied on (the bug that left kiosk controls
+        // visible). Pinned on both ends: the controller emits it on every slide,
+        // and the layout reads it from the query string.
+        var controllerSrc = File.ReadAllText(Path.Combine(RepoRoot, "src", "Kumunita.Web", "Controllers", "KioskController.cs"));
+        Assert.Contains("KioskQueryKey = \"kiosk\"", controllerSrc);
+        Assert.Contains("AppendQuery(baseHref, KioskQueryKey, \"1\")", controllerSrc);
+        Assert.Contains("Query[\"kiosk\"]", layout);
+        Assert.Contains("kmb-kiosk", layout);
+
         // … site.css hides the discussion sections without it …
         var css = File.ReadAllText(Path.Combine(RepoRoot, "src", "Kumunita.Web", "wwwroot", "css", "site.css"));
         Assert.Contains("body.kmb-kiosk:not(.kmb-kiosk-comments) .kmb-discussion", css);
@@ -417,6 +439,13 @@ public class KioskControllerTests
         Assert.Contains("body.kmb-kiosk .kmb-detail-card:has(> .card-body > form)", css);
         Assert.Contains("body.kmb-kiosk .kmb-detail-card:has(form.kmb-rsvp)", css);
         Assert.Contains("body.kmb-kiosk .d-flex:has(> [data-translation-chip])", css);
+        // The calendar cluster-hide rules (the Full page / Full screen
+        // toggle row, the view-toggle + New event + iCal feed row, the
+        // Prev/Today/Next/Filter nav row, the Events/Calendar tab strip).
+        Assert.Contains("body.kmb-kiosk .lede-row .d-flex", css);
+        Assert.Contains("body.kmb-kiosk .head-row > .d-flex", css);
+        Assert.Contains("body.kmb-kiosk .d-flex.mb-3", css);
+        Assert.Contains("body.kmb-kiosk .kmb-tab-under-navbar", css);
 
         // … and every detail page with a discussion marks it.
         foreach (var (folder, view) in new[]

@@ -290,30 +290,17 @@
     // kmb-embed class above is SHARED with the onboarding walk-through modal,
     // which frames INTERACTIVE settings pages where the buttons ARE the point
     // — the kiosk is the opposite: a read-only wall display that wants ONLY
-    // the title / subtitle / content. The differentiator is the referrer: a
-    // kiosk iframe navigates from the /kiosk document, while the onboarding
-    // modal iframes from whatever page hosts the walk. Same-origin, so the
-    // Referer arrives intact; we match on the /kiosk path (the leading slash
-    // keeps it from over-matching e.g. /kiosk-admin). A header read failure
-    // degrades to "not kiosk" (the floor — the full page renders, exactly the
-    // kmb-embed "the safe floor is the full page" doctrine). The kmb-kiosk
-    // body class then drives the site.css kiosk rules (hide buttons / tabs /
-    // nav, stretch the content to fill the frame, tight margins).
-    bool kmbKiosk = kmbEmbed;
-    if (kmbKiosk)
-    {
-        try
-        {
-            var referrer = Context.Request.Headers["Referer"].ToString();
-            var qIndex = referrer.IndexOf('?');
-            var refPath = (qIndex >= 0 ? referrer.Substring(0, qIndex) : referrer);
-            kmbKiosk = refPath.Contains("/kiosk");
-        }
-        catch
-        {
-            kmbKiosk = false; // missing context — not kiosk (the floor).
-        }
-    }
+    // the title / subtitle / content. So the differentiator is "did /kiosk
+    // frame it?", answered by the ?kiosk=1 query param the kiosk appends to
+    // every slide href (ADR 0285 D7) — a URL value that arrives intact under
+    // the site's Referrer-Policy: no-referrer (F7), which suppresses the
+    // Referer a referrer test would need. The onboarding modal's iframes never
+    // carry ?kiosk=1, so they stay interactive (kmb-embed floor on both). A
+    // read failure degrades to "not kiosk" (the floor — full page renders).
+    // The kmb-kiosk class then drives the site.css kiosk rules (hide buttons /
+    // tabs / nav, stretch content, tight margins).
+    bool kmbKiosk = kmbEmbed
+        && string.Equals(Context.Request.Query["kiosk"].ToString(), "1", StringComparison.Ordinal);
     // ADR 0285 D5 — a kiosk slide hides comment threads, replies and RSVP
     // lists unless its playlist entry shows them; the kiosk passes
     // ?kioskComments=1 on the framed route, and the kmb-kiosk-comments class

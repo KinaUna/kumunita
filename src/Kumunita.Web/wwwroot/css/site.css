@@ -843,6 +843,47 @@ body.kmb-kiosk .kanban-divided-menu {
 body.kmb-kiosk .head-row > .d-flex {
   display: none !important;
 }
+/* ── Calendar surface (the M35 / ADR 0285 kiosk lane) — the explicit
+   cluster-hide rules. The generic button / .btn / form / select / input
+   / .nav rules above already hide the individual controls; these rules
+   additionally hide the CONTROL CLUSTERS (their wrappers) so no orphaned
+   button-band / gap is left on the wall display. The kiosk KEEPS the
+   "Calendar" title (h1) + the date-range lede (the doctrine "keep title
+   + subtitle + content") — so these target the button clusters inside
+   the header, not the header itself:
+   • .lede-row .d-flex — the Full page / Full screen toggle pair (the
+     .d-flex cluster next to the lede's <p>, which stays).
+   • .head-row > .d-flex — the right cluster: the Day/Week/Month view
+     toggle (.events-view-toggle) + the New event button
+     (.events-new-event-btn) + the Calendar feed (iCal) link. (The
+     to-do-surface rule above already carries this selector; it is
+     re-listed here so the calendar's own hide is self-contained and
+     does not depend on the to-do rule surviving a refactor.)
+   • .d-flex.mb-3 — the Prev / Today / Next nav links + the Filter form
+     (the .ms-auto d-flex that holds the Community select). The only
+     .d-flex.mb-3 row on the calendar page, so nothing else is hit.
+   • .kmb-tab-under-navbar — the Events / Calendar tab strip (a nav
+     control, calendar-specific class).
+   The grid (#events-calendar) + its event blocks / chips stay. */
+body.kmb-kiosk .lede-row .d-flex,
+body.kmb-kiosk .head-row > .d-flex,
+body.kmb-kiosk .d-flex.mb-3,
+body.kmb-kiosk .kmb-tab-under-navbar {
+  display: none !important;
+}
+/* ── Calendar height: the whole grid must fit the frame with no internal
+   scroll (the M35 "fit the whole month/day to the frame" amendment).
+   The block above (lines ~747–800) already sets overflow:hidden + the
+   flex-fill chain + the grid-row compression. The one rule that can
+   still leave a scrollbar is the .events-time-body's fixed
+   height: calc(24 * 3rem) (line 3252) — when the frame is shorter than
+   72rem the body overflows. Re-pin it to auto so the flex chain hands
+   the height down and the % positioning of event blocks + the
+   background hour-lines scale proportionally (no JS change needed —
+   the same doctrine as the verified block above). */
+body.kmb-kiosk #events-calendar .events-time-body {
+  height: auto !important;
+}
 /* ADR 0285 D5 — the interactive-only shells on the detail surfaces. The
    generic hide rules above already strip the inner buttons / forms / chips,
    but three cards are composed ONLY of controls (a heading + hint + form),
