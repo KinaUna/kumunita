@@ -2285,3 +2285,693 @@ translation exists, else the authored-in text. **Dependencies:**
 `ProjectsController` gains an optional `ITranslationProvider?` constructor
 parameter (last position, defaulting to `null`) + a private
 `SeedLanguageName(code)` helper + a `SeedLanguagePickerAsync()` mirror.
+
+## ADR 0063 — The events calendar (`EV-CAL`) (moved detail)
+
+From `docs/adr/0063-events-calendar-view.md` (the ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+
+**D2 — The one seam: `ListInRangeAsync` (full, moved).** Declared directly
+after `ListUpcomingAsync`:
+
+```csharp
+Task<IReadOnlyList<Event>> ListInRangeAsync(
+    DateTimeOffset windowStartUtc,
+    DateTimeOffset windowEndUtc,
+    string? componentId,
+    string actorId,
+    CancellationToken ct = default);
+```
+
+- **Parameter order + types (locked):** `(windowStartUtc, windowEndUtc,
+  componentId, actorId, ct)` — the window bounds lead (the query's primary
+  predicate), with the feed's own two args (`componentId`, `actorId`)
+  trailing; the bounds are `DateTimeOffset`, matching `Event.Start` /
+  `Event.End`. The window replaces `ListUpcomingAsync`'s `page`.
+- **Predicate:** `Start >= windowStartUtc && Start < windowEndUtc` —
+  inclusive start, exclusive end; an event is in the window on the day it
+  *starts* (a multi-day event's chip repetition across columns is a *display*
+  concern — D5).
+- **Candidate filter + gate (verbatim the `ListUpcomingAsync` body, C-EV·1):**
+  `!IsDeleted && !IsDraft`, the optional `componentId` filter (C-M3·2 — a
+  filter, never a gate), `OrderBy(Start)`, the **single**
+  `CanSeeAsync(Read, …)` over `EventToAuditableResource` (standalone form),
+  then the `visibleIds` filter.
+- **Cap:** `Take(30)` via a private `const int WindowCap = 30;` on
+  `EventService` next to `PageSize`. The **30-day span lives in the
+  controller** (`windowEndUtc = windowStartUtc.AddDays(30)`) — the service's
+  `Take(30)` is a **backstop**, not a policy (the service stays window-span-
+  agnostic).
+- **Audit (C-EV·2):** one aggregate `AccessAudit` row per render,
+  `TargetKind = "event"`, from the single `CanSeeAsync` call — verbatim the
+  feed's audit shape. No other `IEventService` / `EventService` method
+  changes.
+
+**D3 — The route + anchor + window (full, moved).** `GET
+/events/calendar` with `?from=YYYY-MM-DD` (the month anchor **in the viewer's
+effective timezone**, the `EffectiveTimezoneResolver`'s zone, ADR 0019;
+default = the zone's today) and `?componentId=…` (the feed's filter reused
+verbatim — a filter, never a gate, C-M3·2). Window = `[anchorLocalStartUtc,
+anchorLocalStartUtc + 30d)` where `anchorLocalStartUtc` = the anchor date at
+**local midnight** in the effective zone, converted to UTC (the server-side
+math, in the controller — C-EV·5). Prev/next = the anchor shifted **±1
+month**, pre-rendered as plain GET links by the server (C-EV·7 — no client
+nav code). Unparseable / missing `from` falls back to the zone's today (a
+display fallback, not an error).
+
+**D4 — Overlap is client-side display-only (full, moved).** Two events
+overlap iff their `[startUtc, endUtc)` half-open intervals intersect. Computed
+in the TS module **over the already-authorized row list** the view ships (each
+chip carries `data-start-utc` / `data-end-utc`); the flag drives a CSS class
+(a ring / highlight) + the `kw-l` "overlaps" hint (`title` attribute) — the
+hint is **registry-localized**: `Calendar.cshtml` resolves the existing
+`events.calendar.overlap_hint` key server-side (the `kw-l` provider path) and
+ships it as `data-overlap-hint` on `#events-calendar`; the TS module reads it
+and falls back to the key's en source text when the attribute is absent (the
+2026-09-23 follow-up replaced the U06 hardcoded-English-only hint). It writes
+**no** row, calls **no** seam, is **never persisted**, and is **never an
+access decision** (C-EV·4).
+
+**D5 — The view shape (full, moved).** `Views/Event/Calendar.cshtml` over
+`EventCalendarViewModel`: a **7-column day grid** of the 30 window-days
+(Bootstrap shape, mirroring `Index.cshtml`); each event = **one chip per
+day-column it touches** (the TS module distributes by local day via
+`Intl.DateTimeFormat` + the effective zone id the view ships as a **display
+value only** — C-EV·5); a chip = the event title (link to the detail page) +
+the `kw-dt`-rendered time; empty days show the date label only. The header
+carries the month label, the prev/next/today nav links, the `componentId`
+filter form (reused from the feed), the "List" cross-link (C-EV·8), and an
+empty state when the window has no visible events.
+
+**D6 — The `kw-l` keys (moved).** Eight new keys under `events.calendar.*` in
+**all four** seeded languages (en/de/fr/da) in `KnownTranslationKeys.cs`:
+`events.calendar.title`, `.prev`, `.next`, `.today`, `.overlap_hint`, `.empty`,
+`.list_view`, `.from` — each with an en floor text. The `events.*` block is
+the host; the `tags.*` block is the precedent (ADR 0015).
+
+**D7 — Out of scope (future lanes, moved).** No year view; no event creation
+from the calendar; no RSVP from the calendar (the detail page owns it); no
+drag-to-reschedule; no iCal export (**M6** owns iCal); no recurring-event
+model; no new notifications; no server-side overlap API (overlap stays a D4
+display flag). Any of these landing later is a **new named lane**, not an
+extension of this one.
+
+**The Web shape (full, moved).** **`EventRow`** gains exactly **two
+additive, defaulted** fields: `StartUtc` (`DateTimeOffset`, `= default`) +
+`EndUtc` (`DateTimeOffset`, `= default`) — the overlap + day-distribution
+inputs (C-EV·6). The feed action's existing call site compiles unchanged
+(the fields default); the calendar path sets them explicitly.
+**`EventCalendarViewModel`** (a new sealed record next to
+`EventIndexViewModel`): `(IReadOnlyList<EventRow> Events, string FromAnchor,
+string? PrevAnchor, string? NextAnchor, string MonthLabel, string?
+CurrentComponentId, IReadOnlyList<(string Id, string Name)> Components,
+string TimeZoneId)` — `PrevAnchor` / `NextAnchor` are `yyyy-MM-dd` strings
+(the ±1-month nav targets), `MonthLabel` is a UI-culture display string, and
+`TimeZoneId` is the effective zone id — a **display** input only, never an
+authorization input (C-EV·5). **`EventController.Calendar(string? from,
+string? componentId)`** — `[HttpGet("/events/calendar")]` under the
+controller's `[Authorize]`, thin: parse `from` in the effective zone (default
+today) → local midnight → UTC → `+30d`; call `ListInRangeAsync`; map rows to
+`EventRow`s setting `StartUtc` / `EndUtc` explicitly + the display names
+(read lookups, never a gate); build the view model. **No other action
+changes.**
+
+**The 13 pinned tests (full list, moved).** **10 seam tests**
+(`tests/Kumunita.Core.Tests/EventCalendarSeamTests.cs`):
+`EV_Range_IncludesEventStartingInWindow`,
+`EV_Range_ExcludesEventStartingBeforeWindow`,
+`EV_Range_ExcludesEventStartingOnWindowEnd_Exclusive`,
+`EV_Range_DraftInvisibleToNonAuthor`, `EV_Range_DraftVisibleToAuthor`,
+`EV_Range_DeletedExcludedForEveryone`, `EV_Range_AudienceMemberSeesEvent`,
+`EV_Range_NonMemberDenied_NoLeak`,
+`EV_Range_AggregateAuditRowShape_TargetKindEvent`,
+`EV_Range_ComponentFilterIsFilterNotGate`. **3 Web pins** (appended to
+`tests/Kumunita.Web.Tests/EventControllerTests.cs`):
+`Calendar_DefaultFromIsTodayInEffectiveZone`,
+`Calendar_FromShiftsWindow_AndPrevNextLinks`,
+`Calendar_PassesComponentFilter_ToSeam`. **The three-test acceptance gate**
+(recorded by the lane's U09): **closed loop** (an author's published event in
+the window appears in their calendar with the right chip + one aggregate
+row), **handoff** (a group member added to the audience sees the event on the
+next render — the non-member's calendar still excludes it), and **part-vs-
+whole** (the 13 pinned tests pass together with the full M4
+`EventServiceTests` suite still green — the lane is additive, nothing
+regressed).
+
+## ADR 0116 — M15: Translation bulk (moved detail)
+
+From `docs/adr/0116-translation-bulk.md` (the ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+
+**D1 — The bundle is a projection over the closed set (full, moved).** Export
+reads the *stored* `TranslationResource` rows (via the frozen
+`GetTranslationsForAsync` per language + `KnownTranslationKeys.AllKeys`) and
+renders the **registry keys × catalog languages** matrix: a key with no stored
+row for a language is an **empty cell** (the completeness split, the M·12
+floor — never null, never a synthetic row). Import writes back **only rows the
+file presents** (present key ∩ catalog language × non-blank text). The store
+shape (`TranslationResource`, the unique index, the seeder floor) is untouched.
+*Forbids:* a bundle document, a bundle table, a second translation store.
+
+**D2 — One plain-UTF-8 CSV bundle (full, moved).** Line 1 is the marker
+`# kumunita-translation-bundle/1`; line 2 the column header
+`key,source,en,<code1>,<code2>,…` — `source` is the **registry's `en` floor
+text** (`KnownTranslationKeys.EnValues`, read-only reference — the import
+**ignores** it), `en` is the **stored** `en` row, then each **enabled +
+disabled** catalog language in `SortOrder`. Body rows =
+`KnownTranslationKeys.AllKeys` in declaration order. CRLF, UTF-8 (no BOM),
+commas quoted per RFC 4180, built with plain BCL string code (no CSV package —
+the `IcsWriter` "hand-written, closed subset" discipline). Import **requires**
+the exact marker — a file without it is **refused** (the M11 `manifest.json`
+`format` pin, ADR 0108 D1). *Forbids:* a new dependency (no CSV package), a
+format the marker does not own, and a bundle whose columns are not the
+catalog's.
+
+**D3 — Standing (full, moved).** The three new routes join
+`LanguagesController`'s existing `[Authorize(Roles = "GlobalAdmin,
+Translator")]` class gate (ADR 0021). No new `AccessAction`, no new
+`AccessVia`, no `Decide()` branch, no new role, no new adapter — the surface
+is an **operator action over platform text** the way the existing editor is
+(the ADR 0108 "operator plane, zero new authorization surface" posture).
+
+**D4 — Audit (full, moved).** `translation.export` (`TargetId` = the language
+codes joined — the M13 analytics-CSV precedent, ADR 0114), `translation.import`
+(`TargetId` = the count of upserted rows, as a string — the *aggregate* the
+ADR 0005 M·6 `translation.save` per-key row becomes in batch form), and
+`translation.save_all` (the batch editor's one row, `TargetId` = the language
+code) — each **exactly one** row, `Via = AccessVia.Admin`, `Outcome = Allow`,
+committed in the same session as the writes (C3). A **refused** import writes
+**no row** (the M11 fail-closed pin). *Forbids:* N audit rows for N upserts,
+and an audit row on a rejected file.
+
+**D5 — Import is validate-then-apply, fail-closed, never destructive (full,
+moved).** **Validate** (pure, over the parsed model, **before any write**):
+the format marker is exact; the file is non-empty; every key in the body is in
+`KnownTranslationKeys.AllKeys`; every language column is a catalog code; the
+`source` column is ignored. **Any failure ⇒ zero writes, no audit row**; the
+controller surfaces the refusal as a **422** with the first offending row (the
+M11 "rejected archive writes nothing" posture, ADR 0108 D4). **Apply**: each
+present row (non-blank text, key ∩ catalog) upserts **through the frozen
+`UpsertTranslationAsync`'s row write** (the batch lane is a loop over the
+*same* row store in one session, not a second store) and commits with the one
+audit row. *Forbids:* a "best-effort partial import", and a blank cell that
+erases (the ADR 0048 pin — C-M15·4).
+
+**D6 — The batch editor (full, moved).** `GET
+/admin/languages/{code}/translations?batch=true` renders the same closed key
+list (D1) with **one input per row + one save button** (a batch form,
+`translation.save_all`); without the flag the existing per-row editor renders
+**unchanged** (the `SaveTranslation` route + the ML-UI U6 view stay byte-
+identical — C-M15·7). A blank input in the batch form is the *same* no-op as
+the import (C-M15·4). *Forbids:* a second `Translations` view file, a re-shape
+of `SaveTranslation`, and a batch form that can blank a row.
+
+**D7 — "Extend with new languages" (full, moved).** A GlobalAdmin adds a
+language through the **existing** catalog surface (ADR 0005/0021/0042); the
+next **export** shows the new column; the translator fills the file **or** the
+batch editor; the **import** / **save_all** lands the rows. M15 adds **zero**
+catalog surface — the "new language" story is *composition of the existing
+seams*. *Forbids:* a "new language + fill it in one step" mega-lane.
+
+**D8 — The six `kw-l` keys (moved).** `translations.bulk.export` ("Download
+translations (CSV)"), `translations.bulk.import` ("Upload translations (CSV)"),
+`translations.bulk.import_hint` (the blank-no-op + refused-file rule in one
+line), `translations.bulk.save_all` ("Save all"),
+`translations.bulk.mode_batch` ("Batch editing"),
+`translations.bulk.mode_single` ("Edit one at a time") — registered in
+`KnownTranslationKeys` (en/de/fr/da) so the
+`KnownTranslationKeys_ParityTests` + `KwLRegistryConsistencyTests` pins extend
+automatically (ADR 0015 / ADR 0052).
+
+**D9 — Zero schema change, frozen seams (full, moved).** The
+`TranslationResource` doc, its `(Key, LanguageCode)` index, the seeder floors,
+and the frozen `ILocalizationService` one-row lanes are **byte-identical**
+after M15. The exporter/importer are **pure functions** (in
+`Kumunita.Core/Localization/`, the `IcsWriter` / `TodoIcsWriter` "BCL-only,
+pure, closed subset" discipline — no session, no audit, no HTTP: the service
+composes them). The two new service seams (`UpsertManyTranslationsAsync` +
+`SaveAllTranslationsAsync`, plus the read seam `GetBulkTranslationMatrixAsync`
++ the audit seam `RecordTranslationExportAsync`) are **additive** on
+`ILocalizationService` (the ADR 0005 M·4 ADD shape).
+
+**D10 — Docs parity at the flip (U06, moved).** `Milestones.cs` M15 →
+`StatusDone` + M16 → `StatusNext`; README Roadmap (M15 → done, M16 → in
+progress); `docs/STATUS.md`; `docs/ARCHITECTURE.md` (the value-chain table
+gains the M15 row); `MilestonesTests.cs` re-pin (rename
+`M15_Is_The_Single_InProgress_Milestone` →
+`M16_Is_The_Single_InProgress_Milestone` + extend the shipped list with M15).
+All in **one** unit (the C-M11·8 precedent).
+
+**Consequences — Neutral / cost (moved).** **Precision for batch** (the named
+FACES trade): one save covers the whole language, so a mistaken paste is N rows
+in one commit, not one row per commit. Bounded: the audit row records the
+*count* (D4), the per-row lane stays one commit away (D6), and the previous
+export is the rollback (C-M15·2). One more read seam + two write seams + one
+audit seam on `ILocalizationService` (the ADR 0084/0085 additive-frozen-surface
+idiom honoured). The **marker is the format authority** (D2) — a future version
+that changes the marker refuses old bundles (fail-closed), and hand-edited
+files that drop the marker are refused with a named row (F5).
+
+**Consequences — Not chosen (moved).** A second translation store / a bundle
+document (C-M15·1). A new authorization surface (C-M15·5). N audit rows for N
+upserts (C-M15·6). A blank-erases semantic (C-M15·4). A CSV package (C-M15·8).
+
+**Consequences — Deferred to their own lanes (moved).** **UGC translation
+bulk** (the D2 scope pin — M15's bundle is **platform text only**; posts /
+replies / announcements / events / pages / group+community name+description
+translations are **per-parent rows with their own standing matrix** — own lane,
+own ADR). **A remove/blank lane in the bundle** (the D5 blank-no-op pin).
+**Machine translation** (the README §Deferred pin, ADR 0005 C). **A "new
+language + fill it in one step" mega-lane** (the D7 composition note). **Other
+i18n formats** (XLIFF / PO / …). **Per-key ownership / review workflow** (ADR
+0021 "Revisit when").
+
+## ADR 0285 — Kiosk playlist: any item, per-entry duration, scroll and comments (moved detail)
+
+From `docs/adr/0285-kiosk-playlist-any-item.md` (the ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+**No design doc exists for this ADR** — the handoff note is the moved-detail
+home.
+
+**D1 — Item types (full table, moved).** `KioskItemType` is a closed set:
+`Board`, `Todo`, `Project`, `Calendar`, `Event`, `Page`, `Announcement`,
+`CommunityPost`, `GroupPost`. The old `Todos` list kind is dropped (no live
+deployments, so no migration; old playlist rows load as empty playlists
+because the `Views` field is gone).
+
+| Type | Item | Extra | Slide route |
+|---|---|---|---|
+| Board | board id | Board or List view | `/projects/boards/{id}` (`?view=list`) |
+| Todo | to-do id | | `/projects/todos/{id}` |
+| Project | project id | | `/projects/projects/{id}` |
+| Calendar | component id, or none = All | Day / Week / Month | `/events/calendar?view=…&componentId=…` |
+| Event | event id (+ group id for a group event) | | `/events/{id}` or `/groups/{g}/events/{id}` |
+| Page | page id | | `/pages/{path}` |
+| Announcement | announcement id | | `/announcements/{id}` |
+| CommunityPost | post id | | `/posts/{id}` |
+| GroupPost | post id + group id | | `/groups/{g}/posts/{id}` |
+
+The calendar stays the community calendar ("All" or one component). Group
+calendars and a combined calendar are a possible follow-up: no group calendar
+view exists, and the calendar's query excludes group events.
+
+**D2 — The item picker (full, moved).** After choosing a type, the resident
+picks the item from a search box with suggestions. `GET
+/settings/kiosk/items?type=…&q=…` returns at most 20 items the resident can
+see: the most recent when `q` is blank, a case-insensitive title / body match
+otherwise. The endpoint composes existing reads only (`IKioskItemCatalog`, a
+Web-side service): the M8 search surfaces
+(`ISearchService.SearchSurfaceAsync`), a new
+`ISearchService.BrowseSurfaceAsync` (the same per-surface read with no text
+filter — same canonical pre-filter, same frozen decision, same
+`"search:<surface>"` audit row), and the enabled component list for the
+calendar. Event searches both the community and the group scope. No new
+`AccessAction`, `Decide()` branch or adapter.
+
+**D4 — Scroll behaviour (full, moved).** Each entry has `Scroll`: `None` or
+`Auto`. Auto scrolls the framed page at a fixed readable speed, with a pause
+at the top and the bottom. The duration is a **minimum**: if the scroll needs
+longer, the slide stays until it has finished. If the scroll finishes early,
+the page scrolls back to the top and stays there until the duration ends (no
+second pass, which could overrun the duration). The speed is one playlist-
+wide setting, `ScrollSpeed`: Slow / Medium / Fast, because a readable speed
+depends on the screen and the viewing distance, not on the item. A content
+change detected while a slide is scrolling is applied when the slide next
+comes round, so the scroll is never reset half-way.
+
+**D5 — Comments and RSVP lists (full, moved).** Each entry has `ShowComments`
+(default off). When off, comment threads, replies and event RSVP lists are
+hidden on the slide; comment composers are always hidden in kiosk mode. The
+flag travels to the framed page as a query parameter that `_Layout` turns into
+a body class, and site.css hides the `.kmb-discussion` sections in kiosk mode
+unless the class is present. No detail controller changes.
+
+**D6 — Board list view (full, moved).** `/projects/boards/{id}?view=list`
+renders the board's to-dos as rows grouped under their lane headings, from the
+same `GetBoardAsync` data (so the kiosk's board fingerprint applies unchanged).
+It is an ordinary view mode of the board page, also reachable outside the
+kiosk.
+
+**D7 — Kiosk detection by URL signal, not by referrer (full, moved).** The
+kiosk signal that lets `_Layout` mark a framed page `body.kmb-kiosk` is the
+**`?kiosk=1` query parameter the kiosk appends to every slide href**
+(`KioskController.KioskQueryKey`). It is read from the request URL — not from
+the `Referer` header — because the site sets `Referrer-Policy: no-referrer`
+globally (the F7 prod-hardening floor, kept), which means a slide iframe
+**sends no `Referer` header at all**: the original `Sec-Fetch-Dest: iframe` +
+`Referer.Contains("/kiosk")` test in `_Layout` therefore **never fired in a
+real browser**, so `body.kmb-kiosk` was never applied and **none of the kiosk
+CSS activated** (all the control shells stayed visible on a wall display).
+The bug was invisible to `curl`-based checks, which set the `Referer` header
+manually. Concretely: `Classify` (the one path both `Index` and `Slide` build
+their slides through) always appends `?kiosk=1` to the resolved href
+(`AppendQuery(baseHref, "kiosk", "1")`), ahead of the D5 `?kioskComments=1`
+flag. `_Layout` now sets `kmb-kiosk` from `kmbEmbed && Query["kiosk"]=="1"`,
+with the referrer test retained only as a harmless fallback. The onboarding
+walk-through modal (which iframes **interactive** settings pages) does **not**
+append `?kiosk=1`, so its framed pages keep only the shared `kmb-embed` chrome
+floor and stay fully interactive. `KioskControllerTests` pins both ends.
+
+**Consequences — full (moved).** `KioskView` / `KioskViewKind` /
+`ViewIntervalSeconds` are removed; `KioskEntry` + the new playlist members
+replace them. `IKioskService.SavePlaylistAsync` takes a `KioskPlaylistDraft`.
+`/settings/kiosk` becomes a JavaScript editor (add, remove, reorder, search).
+Without scripts the stored entries still render and save, but the item search
+does not work. Every refresh tick still calls the item's read seam (one
+decision row per tick for audited types). New translation keys under
+`kiosk.settings.*` (en / de / fr / da; de / fr / da machine-written, native
+review pending). The `improve-check.ps1` gate (a) baseline re-baselined on
+2026-11-01: `KnownTranslationKeys.cs` **14905 → 15157** and
+`ProjectsController.cs` **5370 → 5373** (annotated in `improve-check.ps1` gate
+(a) and here).
+
+**Delivery (moved).** Patches 110–113: item search (110), board list view
+(111), playlist model and editor (112), playback and the comments toggle
+(113). Each compiles on its own.
+
+**Amendment (2026-11-02) — hide the control-only shells on a slide (full,
+moved).** A wall display is read-only: it shows the item's **content**, not
+the chrome that does something. Three cards are composed **only** of a
+heading plus a control, so once the generic rules hide the control an
+**orphaned heading band** is left: the event's **"Add a to-do to this event"**
+card; the event's **RSVP** card; and the **"Translations:"** selector band.
+Three shell-hide rules were added in `site.css`:
+`body.kmb-kiosk .kmb-detail-card:has(> .card-body > form)` (the pure-composer
+shape — deliberately the **direct-child** `> .card-body > form`, **not**
+`:has(form)`, so a content card carrying the ⋮ dropdown's menu forms is not
+hidden); `body.kmb-kiosk .kmb-detail-card:has(form.kmb-rsvp)` (the RSVP card,
+covering the comments-OFF case); and `body.kmb-kiosk .d-flex:has(>
+[data-translation-chip])` (only the chip row, never the surrounding content
+card). `KioskControllerTests.ADR0285_PlaybackAndCommentsWiring_IsInPlace` pins
+the three selectors.
+
+**Amendment (2026-11-02) — calendar slide: hide the control clusters, fit the
+grid to the frame (full, moved).** The calendar page groups its controls inside
+non-interactive wrappers whose bands remain on the wall display. Four cluster-
+hide rules were added (all scoped to `body.kmb-kiosk`, so the other ~20 pages
+that reuse `.kmb-tab-under-navbar` / `.d-flex.mb-3` are unaffected):
+`body.kmb-kiosk .lede-row .d-flex` (the **Full page / Full screen** toggle
+pair); `body.kmb-kiosk .head-row > .d-flex` (the right header cluster —
+**Day/Week/Month** view toggle + **New event** + **Calendar feed (iCal)**);
+`body.kmb-kiosk .d-flex.mb-3` (the **Prev / Today / Next** nav links + the
+**Filter** form); `body.kmb-kiosk .kmb-tab-under-navbar` (the **Events /
+Calendar** tab strip). The grid height: `body.kmb-kiosk #events-calendar
+.events-time-body { height: auto !important }` re-pins the Day/Week 24-hour
+body to `auto`, so a frame shorter than 72rem does not leave a vertical
+scrollbar (the M35 amendment doctrine — no JS change).
+`KioskControllerTests.ADR0285_PlaybackAndCommentsWiring_IsInPlace` pins the
+four cluster selectors + the height rule.
+
+## ADR 0278 — Group messaging: multi-participant chat threads (the N:1 generalization of M9) (moved detail)
+
+From `docs/adr/0278-group-messaging-n1-lane.md` (the ADR body is condensed;
+the Status/Context/Decision/Consequences record stays there with pointers
+here).
+
+**The two documents' full field sets (moved).** **`GroupConversation`** —
+`Id` (surrogate, the M6 convention), `CreatorId`, `Title` (an **optional**
+user-chosen name for the group — null/blank means the group is unnamed and
+the UI falls back to the participant-count label; set at open time, capped at
+`GroupMessagingService.MaxTitleChars` = 120 chars), `Created`,
+`LastMessageAt` (stamped by `SendAsync`), and `Participants` (a sorted,
+de-duped `List<string>` — the creator is always one of them; two or more
+entries are invariant, a one-person "group" is a 1:1 the M9 surface covers).
+**No unique pair index** — a group is *not* canonical (the same members may
+legitimately form two groups: a work group and a social group), so the F1
+idempotency witness the M9 `convo_uidx_pair` index provides has no N:1
+analogue; the de-dup is social, not DB-level. A `Participants` membership
+index supports the `ListGroupsAsync` participant-set query (the array-contains
+shape, the Postgres `@>` clause). **`GroupMessage`** — the M9 `Message` shape
+generalized: `Id`, `ConversationId`, `SenderId`, `Body` (≤ 2000 chars, the M9
+D7 cap), `Created`, `LanguageCode` (the ADR 0018 authored-in tag), and
+`ReadBy` (a **set** of reader ids, sorted — the per-participant read marker;
+a message is *unread for the actor* when `ReadBy` does not contain the actor's
+id and `SenderId != actorId`). The `(ConversationId, Created)` thread-ordering
+index matches the `GetConversationAsync` thread read's order (the M9
+`Message` index shape).
+
+**`IGroupMessagingService` — full seam list (moved).** The M9
+`IMessagingService` shape generalized: `IsMessagingEnabledAsync` (the same
+`LocaleSettings.MessagingEnabled` read — the shared master gate),
+`OpenGroupAsync(actorId, recipientIds, title = null)` (creates the group with
+the actor + the recipients, sorted, and the optional user-chosen `Title`;
+fewer than two distinct participants is an `ArgumentException` — a one-person
+group is a 1:1; a title over `MaxTitleChars` is the same `ArgumentException`
+shape), `AddMembersAsync(conversationId, actorId, newMemberIds)` (the
+any-participant-can-add rule; a non-participant actor is the non-leaky 404;
+one `group.members.add` audit row), `GetConversationAsync` (the non-leaky 404
+for a non-participant), `ListGroupsAsync` (the actor's groups, newest-
+activity-first, the ADR 0090 `HasMore` paging signal), `SendAsync` (every
+participant except the sender gets exactly one `group.message.new`
+notification, deduped by the stable idempotency key
+`notification:group.message.new:{messageId}`; one `group.message.send` audit
+row), and `MarkReadAsync` (the per-participant read marker — appends the
+actor's id to `ReadBy` on the actor's unread messages only; the sender's own
+messages and the other participants' read state are never touched).
+
+**`GroupMessagesController` — full surface (moved).** The M9
+`MessagesController` shape generalized: `GET /group-messages` (the group list
+— each row shows the group's name, falling back to a "N people" label when it
+has none — + the new-group multi-recipient picker with the optional
+**group-name** field), `POST /group-messages/open` (open a new group with the
+picked residents + the optional name), `GET /group-messages/{id}` (the thread
+— the header shows the group's name, falling back to "N people" — + composer
++ unread markers + the add-member picker), `POST /group-messages/{id}/send`,
+and `POST /group-messages/{id}/members` (the any-participant-can-add rule).
+The F5 toggle gate + the per-actor gate run **before any list call** on every
+action (the M9 U04 shape carried to the N:1 surface); the blank body on
+`Send` renders the error state **without any service call** (the M9 U06 shape
+carried); the rate limiter is the existing `"message"` window (20 req / 15
+min — the M9 composer's limiter, reused).
+
+**The messages tab strip (moved).** `_MessagesTabs.cshtml`, the Bootstrap
+nav-tabs idiom from `_ProjectsTabs.cshtml` / ADR 0062 — the resident's entry
+point into the two messaging surfaces. The account nav keeps a single
+**Messages** entry (`/messages`, the M9 1:1 surface, the
+`IsMessagingEnabledAsync` + `IsMessagingAllowedForAsync` gate); the group
+lane is **not** a separate account-menu entry — it lives as a **Direct ·
+Group** tab strip rendered on all four messaging views (`Messages/Index`,
+`Messages/Thread`, `GroupMessages/Index`, `GroupMessages/Thread`). The strip
+self-gates on the **same** `IsMessagingEnabledAsync` +
+`IsMessagingAllowedForAsync` composite the account menu used (a disallowed
+resident sees no tabs, the same non-leaky shape as an off instance — the
+C-M9·2 "enforced in the service, not only the view" pin carried to the N:1
+surface), and the active tab is derived from the current controller name
+(Messages → Direct, GroupMessages → Group) so the two surfaces stay
+differentiated.
+
+**Notification kinds (moved).** Two new notification kinds
+(`NotificationKinds.GroupMessageNew` / `.GroupMessageMention`, the
+`group.message.new` / `group.message.mention` constants) — the M9
+`message.new` / `message.mention` kinds generalized to the N:1 surface,
+resident-facing opt-OUT (the M9 / M36 posture), joined to the closed
+`NotificationKinds.Known` set (the 28 → 30 re-baseline, the
+`NotificationsControllerTests` closed-set pin annotated). **Pins re-based**
+(the same re-baseline-and-annotate doctrine): the `KnownTranslationKeys.cs`
+gate baseline (14707 → 14815, the 15 `group_message.*` UI keys + the 8
+`notification*.group.message.*` kind keys × en/de/fr/da); the
+`NotificationsControllerTests` closed-set pin (28 → 30, the two new kinds).
+
+**Amendment — the invitation flow (2026-10-30) (full, moved).** The first
+shape added "add members" directly (the `AddMembersAsync` seam appended to
+`Participants` immediately; the recipients picked at open time were added to
+`Participants` too). The user's follow-up ask reshapes that: *the thread
+should list its members, and adding a resident should be treated like a group
+invitation — the recipient gets a nudge to accept or reject joining.* Three
+design choices (confirmed with the user): (1) **The invitation flow is always
+on** — including when opening a new group. The **creator is the only initial
+participant**; everyone else (picked at open time *or* added later) gets a
+**pending invitation** to accept or decline before joining the thread. (2)
+**Pending invitees are visible** — the thread's member roster lists the
+**accepted** participants plus the **pending** invitees (marked "(pending)").
+A pending invitee is *not* a participant: they cannot read / send in the
+thread until they accept. (3) **No cancel action in v1** — an invitation
+stays pending until the recipient responds (the community-group
+`GroupInvitation` posture minus the `Cancelled` state).
+
+The reshaped seams (the community-group `UserInfoService` invitation pattern,
+ADR 0083, carried to the N:1 surface): **`GroupMessagingInvitation`** (a
+third document in the context, the `UserInfo/GroupInvitation.cs` shape
+generalized) — `Id`, `ConversationId`, `InvitedId`, `InvitedBy`, `Status` (a
+`GroupMessagingInvitationStatus` enum: `Pending` / `Accepted` / `Declined` —
+**no** `Cancelled` state), `InvitedAt`, `ResolvedAt?`, `ResolvedBy?`.
+Business key `(ConversationId, InvitedId)` — a **unique** pair index (one row
+per (thread, invitee); a re-invite after a resolution resets the existing row
+to a fresh Pending, the C-M2b·3 re-stamp convention).
+**`GroupConversation.Participants`** is now the **accepted** member set (the
+authorization boundary for read / send). It holds the creator alone at open
+time, and grows as invitees accept. A pending invitee is **not** in
+`Participants`. **`OpenGroupAsync`** — the creator is the only participant;
+each distinct recipient gets a `GroupMessagingInvitation` Pending row + a
+`group.message.invite` nudge (the accept / decline deep-links, the ADR 0095
+`AcceptPath` / `DeclinePath` shape). **`InviteMembersAsync`** (replaces
+`AddMembersAsync`) — the any-participant-can-invite rule; each invitee (de-
+duped against the participant set) gets a Pending row + nudge; one
+`group.message.invite` audit row. **`AcceptInviteAsync(conversationId,
+actorId)`** — the self-lane (the actor must be the invitee; an already-
+resolved row is the C-M2b·3 wall). The row moves Pending → Accepted; the actor
+is appended to `Participants` (sorted, de-duped) — they become a participant
+on the very next read (invariant C4); one `group.message.invite.accept` audit
+row. **`DeclineInviteAsync(conversationId, actorId)`** — the self-lane. The
+row moves Pending → Declined; **no** participant set is touched (the invitee
+never becomes a member); one `group.message.invite.decline` audit row.
+**`GetMembersAsync(conversationId, actorId)`** — the thread's member roster:
+the accepted participants + the pending invitees (each with a `Pending` flag
++ resolved display name). A non-participant actor is the non-leaky 404 (a
+non-participant cannot see the roster — that would leak the pending invitees'
+presence). **`GetPendingInvitationsForUserAsync(userId)`** — the self-lane
+gate seam the Web uses to map a non-invitee to a non-leaky 404 before calling
+accept / decline (the `UserInfoService.GetPendingInvitationsForUserAsync`
+precedent). **`GroupMessagesController`** — the new surface:
+`GET|POST /group-messages/{id}/invitations/accept` and
+`GET|POST /group-messages/{id}/invitations/decline` (the GET forms are the
+inbox accept / decline-button deep-links, no anti-forgery token — the M1
+`/account/verify` one-time-link precedent; the POST forms carry the token).
+The `Thread` view renders a **Members** section (the accepted + pending
+roster, pending marked "(pending)") and the add-member picker becomes the
+**invite-people** picker. The "Send" nudge universe is the **accepted**
+participants only (a pending invitee is not nudged until they accept).
+**`NotificationKinds.GroupMessageInvite`** (the `group.message.invite`
+constant) — the invitation nudge kind, resident-facing opt-OUT, joined to the
+closed `NotificationKinds.Known` set (the 30 → 31 re-baseline, the
+`NotificationsControllerTests` closed-set pin annotated). **Pins re-based**
+(the same doctrine): the `KnownTranslationKeys.cs` gate baseline (14823 →
+14863, the 7 new `group_message.*` UI keys — `members` / `pending` /
+`invite_sent` / `invite_accepted` / `invite_declined` /
+`invite_not_pending` — + the 3 `notification*.group.message.invite.*` kind
+keys × en/de/fr/da); the `NotificationsControllerTests` closed-set pin (30 →
+31, the new kind).
+
+## ADR 0123 — Extended user profiles (moved detail)
+
+From `docs/adr/0123-extended-profiles.md` (the ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+
+**D1 — `Profile` gains two additive fields (full, moved).** The M1-registered
+`Profile` doc (`Kumunita.Core.UserInfo`) gains exactly two **additive POCO
+fields** (the `Post.Status` / `Post.TagIds` / `Profile.AvatarId` /
+`Profile.TimeZone` history — delta-detected, idempotent, **no re-seed**, **no
+EF migration**, **no new `*DocTypes` surface** — `Profile` already registers in
+`CoreDocTypes`): `public string? Bio { get; set; }` (null/empty ⇒ no bio
+block) and `public string[] TagIds { get; set; } = []` (a `string[]` of
+**`Tag.Id`** values referencing the **frozen ADR 0044 `Tag`** — the
+`Post.TagIds` / `Page.TagIds` idiom verbatim; M23 adds `Profile` as a **third
+referencer**, creating **no** new tag type). *Forbids:* a new `ProfileBio` /
+`ProfileTag` document, a new `M23DocTypes` surface, a new relational table, a
+second `Tag` doc type for profiles, or storing the bio as a separate doc.
+
+**D2 — Bio + tags gated by the existing `Profile.Visibility` audience (full,
+moved).** Bio + tags render on the directory detail **only** when the viewer's
+`Visibility` decision allows (one `CanAsync` via the **existing**
+`ProfileToAuditableResource`; the **owner branch** lets the author always see
+their own). The contact block (email/phone/address) **stays** on the
+**existing** `ContactVisibility` audience + `ContactVisibilityResource`
+decision — **two independent gates, two `CanAsync` calls, two `AccessAudit`
+rows**; a **self-view** short-circuits both (owner branch); a `null`/absent
+`ContactVisibility` short-circuits the contact gate with no row (the existing
+C-M2·1 shape). *Forbids:* a **new** `AccessAction` / `AccessVia` / `Decide()`
+branch, a new `IAuditableResource` adapter (the two existing ones are reused),
+a new `TargetKind` (`"directory"` is reused), a **per-field** audience (bio
+and tags share the *one* `Visibility` gate), or folding the contact gate into
+the bio/tags gate.
+
+**D3 — Write through the existing single `UpsertProfileAsync` lane (full,
+moved).** `ProfileUpdate` gains **two additive optional trailing fields**
+(`string? Bio = null`, `IReadOnlyCollection<string>? TagIds = null` — the
+`Address` precedent, "appended with a default after the frozen shape so
+existing positional call sites compile unchanged"; `null` ⇒ don't touch).
+`UpsertProfileAsync` writes `Profile.Bio` **verbatim** (ADR 0001-B; a `null`
+patch leaves it) and resolves `Profile.TagIds` to `Tag.Id` values via the
+**frozen ADR 0044 create-or-get idiom** (inlined in the `UserInfoService`
+session — the `TagService.AttachToPostAsync` shape; a missing `Slug` **
+creates** a `Tag` with `CreatedBy = actorId` + one `tag.create` row; a present
+`Slug` **reuses** the existing `Tag`, no row). The profile write itself emits
+**no** `AccessAudit` row (a Profile field write, not an access decision); the
+**only** audit rows are the **frozen TG-lane** `tag.create` rows, one per
+newly created tag (C-TG·9). **All in the caller's session, one
+`SaveChangesAsync`** (C3). *Forbids:* a **new** `IUserInfoService` write
+method for profile tags/bio, a **new** `ITagService` profile method, a
+separate "profile tag editor" controller, or an unaudited direct
+`session.Store` from a controller.
+
+**D4 — The new composition service `IProfileFindService` (full, moved).**
+`IProfileFindService` + `ProfileFindService` live in `Kumunita.Core.UserInfo`
+(alongside `DirectoryService`), registered in `DependencyInjection.cs` the
+same way `DirectoryService` is. It composes **only** the frozen seams —
+`IUserInfoService` (the candidate set via the existing `GetProfilesAsync`),
+`IAuthorizationService` (the per-profile `Visibility` decision), the **frozen
+ADR 0044 `ITagService`** (tag display-name resolution) + its own
+`IDocumentStore`. Two **paged** read methods (`PageSize = 30`, the M7/ADR
+0090 D6 idiom): `FindPeopleByTagAsync(slug, actorId, page)` (the C-TG·2 base
+query, carried to profiles) and `FindPeopleByBioAsync(q, actorId, page)` (a
+case-insensitive bio substring, the M8 D4 engine). Both: candidate set =
+`GetProfilesAsync(false)` (non-blocked); filter by the match; **gate the
+candidate set in ONE `CanSeeAsync` pass** over
+`candidates.Select(p => new ProfileToAuditableResource(p))` (the frozen bulk
+decision — **not** a per-profile `CanAsync` loop; the owner branch resolves
+internally); return survivors + `HasMore`; the **one aggregate
+`AccessAudit` row** (`targetKind "directory"`, `visibleCount`/`hiddenCount`
+set, `targetId = null`) is **emitted by `CanSeeAsync` itself** (its own
+commit), **not hand-written**. A blank `q` / a missing tag returns an empty
+page with **no** decision and **no** row. *Forbids:* a new bounded context, a
+new DocTypes surface, a new document, a new `AccessAction`/`AccessVia`, a
+**per-profile `CanAsync` loop**, a **hand-written aggregate `AccessAudit`
+row**, a find-people read that surfaces a profile the viewer cannot see, or a
+find-people read that emits **no** aggregate audit row.
+
+**D5 — Rich-content bio + reused editor (full, moved).** The profile editor
+(`/profile/edit`) adds a **bio** field (the ADR 0031/0033 WYSIWYG editor, or
+a Markdown textarea, over a `string` field — exactly the surface
+posts/announcements/pages use) + a **tags** input (the **frozen ADR 0044 tag
+input** — the composer's tag picker + `ITagService.SuggestAsync` autocomplete).
+The existing two audience editors (`Visibility` + `ContactVisibility`) are
+**unchanged**. The directory detail renders the bio via the **existing**
+`MarkdownRenderer.RenderHtml` helper (the "single Markdown engine") —
+`null`/empty bio ⇒ no bio block (no placeholder). Profile tags render as
+chips (the ADR 0044 tag display-name idiom, resolved per-viewer). *Forbids:*
+a **new** editor subsystem, a **new** tag-management surface for profiles,
+inline WYSIWYG editing on the detail view (the ADR 0032/0033 lane — deferred,
+D8·1), or a bio rendered as plain text.
+
+**D6 — Privacy-pin (full, moved).** Find-people results are computed over
+profiles the viewer may **already see**; a match is a *feed organizer*, never
+a gate; a profile the viewer cannot see never surfaces and its bio/tag never
+leaks (the ADR 0044 D5 global-enumeration exclusion carried to profiles).
+Both reads filter the candidate set by the match, **then** gate each survivor
+by its `Visibility`; a denied profile **never** appears and its `Bio`/`TagIds`
+are never a match artifact. The tag's *display name* may surface (it is a
+label, ADR 0044 D5) but only as part of a profile the viewer may already see.
+A **global tag enumeration** over profiles is excluded by design. Each read
+emits **one** aggregate `AccessAudit` row. *Forbids:* a bio/tag match that
+returns a profile the viewer cannot see, a global profile-tag enumeration that
+leaks a subject, or an unaudited find-people read.
+
+**D8 — Deferred lanes (full list, moved).** (1) **Inline WYSIWYG editing of
+the bio on the detail view** (the ADR 0032/0033 inline-edit lane). (2) **Bio
+full-text / semantic search** (beyond substring). (3) **A people-discovery
+*surface*** (facet browse, "people in common," a `/people/skills/{tag}`
+taxonomy, shared-interests). (4) **A "new bio/tags set" notification** — rides
+M6 (ADR 0076); M23 stages **no** email. (5) **Profile-tag curation by an
+admin** (a moderator/global-admin manages another resident's tags) — M23 is
+author-self-edit only (the ADR 0003 SoD lane is untouched). (6) **Bio image
+alt-text / captioning** — rides the ADR 0025/0011 image lane; M23 reuses it
+as-is.
+
+**Consequences — Neutral / cost (moved).** **The named trade — a *resident
+biography + free author-set tags + a find-people read* for zero new
+authorization surface:** M23 buys *a resident's biography + free author-set
+tags (skills/interests/knowledge/expertise) and a find-people read over them —
+the "find people with something in common" promise* with **zero new
+authorization surface + two additive fields on the existing `Profile` doc +
+one composition service + one extended write lane + a closed `kw-l` set**
+(12 keys × en/de/fr/da), in exchange for **no new document, no new context,
+no new DocTypes surface, no inline-edit, no full-text search, no people-
+discovery surface, no admin curation** (D8): M23 is *the profile's bio + its
+tags + a find-people read*, **not** a profile management system or a people
+network. **Two independent gates** (D2, C-M23·1): bio + tags are gated by the
+**one** existing `Visibility` audience; the contact block **stays** on the
+**one** existing `ContactVisibility` audience — **two audiences, two gates,
+zero new ones**. **The find-people read is over visible profiles only**
+(D6, C-M23·4): a match is a feed organizer, never a gate; a denied profile's
+bio/tag never leaks; one aggregate audit row per read (emitted by the frozen
+`CanSeeAsync`, not hand-written).
