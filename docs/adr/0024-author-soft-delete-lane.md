@@ -11,7 +11,7 @@ superseded_by: [adr-0086]
 updated: 2026-11-02
 ---
 
-# ADR 0024 — Author soft-delete lane (posts + replies, community + group)
+# ADR [0024](0024-author-soft-delete-lane.md) — Author soft-delete lane (posts + replies, community + group)
 
 Status: Accepted
 Date: 2026-09-12
@@ -23,7 +23,7 @@ Two shipped truths collide:
 - **The platform has a moderator hide/remove surface but no author "take it
   down."** M3b (C-M3b·3, F3/F4) gives a `Moderate`-gated write lane
   (`HidePostAsync` / `RemovePostAsync`) that sets `PostStatus.Hidden` or
-  `PostStatus.Removed` — the *moderator's* lever. ADR 0014 / 0016 give an
+  `PostStatus.Removed` — the *moderator's* lever. ADR [0014](0014-post-edit-lane-author-only.md) / 0016 give an
   author-only *edit* lane. But the **author has no way to remove their own
   content**: a post that was a mistake, a reply that was out of turn, a
   comment that has become outdated. The only way to "delete" is a hard
@@ -39,20 +39,20 @@ Two shipped truths collide:
   in principle* (a future admin restore lane could clear `DeletedAt`).
 
 A new lane on a frozen module surface is a deliberate, reviewable decision
-(ADR 0006-E). This ADR records the decision; the code is the authority on
+(ADR [0006](0006-module-boundary-contracts.md)-E). This ADR records the decision; the code is the authority on
 shape.
 
 ## Decision
 
 - **The lane is author-only — no moderator, no GlobalAdmin, no break-glass.**
-  A direct sibling of the ADR 0014 (component) and ADR 0016 (group) edit
+  A direct sibling of the ADR [0014](0014-post-edit-lane-author-only.md) (component) and ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) (group) edit
   lanes. The sole decision is `post.AuthorId == actorId` (ordinal
   comparison); a non-author is denied (`UnauthorizedAccessException`) even at
   GlobalAdmin. The Web layer maps the exception to its lane's failure shape
-  (403 component, 404 group — the non-leaky pin, ADR 0014 / 0016).
+  (403 component, 404 group — the non-leaky pin, ADR [0014](0014-post-edit-lane-author-only.md) / 0016).
 
 - **The write is a single field: `DeletedAt` (nullable `DateTimeOffset`).**
-  Additive (ADR 0004 §B.1 — delta-detected by Marten, idempotent, no re-seed,
+  Additive (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 — delta-detected by Marten, idempotent, no re-seed,
   no schema-file change). Set on delete; `null` while live. Distinct from
   `PostStatus` (the M3b *moderator* surface): an author delete does not touch
   `Status` at all, so a post can be `Active` (from the moderator's view) and
@@ -80,7 +80,7 @@ shape.
   didn't delete it).
 
 - **No `AccessAudit` row.** The author is acting on their own content (the
-  ADR 0014 / 0016 edit-lane precedent: content changes by the author are not
+  ADR [0014](0014-post-edit-lane-author-only.md) / 0016 edit-lane precedent: content changes by the author are not
   audited). The audit lane is for *decisions about others'* content, not for
   an author managing their own.
 
@@ -98,7 +98,7 @@ shape.
 
 ## Consequences
 
-- **Additive schema (ADR 0004 §B.1).** `Post.DeletedAt` and
+- **Additive schema (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).** `Post.DeletedAt` and
   `PostReply.DeletedAt` are nullable `DateTimeOffset` fields. Marten's
   schema builder picks them up on the existing doc-type surface
   (`PostDocTypes.Configure` already registers `For<Post>()` /
@@ -125,6 +125,6 @@ shape.
 
 - **No new bounded context, no new doc-type surface, no new authorization
   seam.** The lane is a write seam on the existing `PostService` (the same
-  surface ADR 0014 / 0016 / 0022 added their seams to). The authorization
+  surface ADR [0014](0014-post-edit-lane-author-only.md) / 0016 / 0022 added their seams to). The authorization
   decision is the ordinal author check, not a call to `IAuthorizationService`
   (the author owns their own content — no cross-context call needed).

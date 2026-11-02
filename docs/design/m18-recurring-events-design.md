@@ -15,7 +15,7 @@ updated: 2026-11-02
 # M18 — Recurring events (design doc)
 
 > **Abstract:** *What it settles:* **recurring events over the frozen M4 events
-> surface** (the `RRULE` home deferred by ADR 0112 + ADR 0115 C-M14·6) — the
+> surface** (the `RRULE` home deferred by ADR [0112](../adr/0112-ical-calendar-export.md) + ADR [0115](../adr/0115-integration-of-events-and-projects.md) C-M14·6) — the
 > author declares a series (daily / weekly / monthly / yearly, optional count or
 > end date) and the platform **materializes it as concrete `Event` rows at write
 > time**, so every other surface (read seams, RSVP, reminders, ICS, calendar,
@@ -26,10 +26,10 @@ updated: 2026-11-02
 > `RecurrenceRule`). *Out of scope:* zero new bounded context / `AccessAction`
 > / `AccessVia` / adapter / `Decide()` branch, no per-occurrence override, no
 > `RRULE` line in the ICS output, no versioned migration, no `RecurrenceSeries`
-> doc (C-M18·5, D8). LOCKED in ADR 0119.
+> doc (C-M18·5, D8). LOCKED in ADR [0119](../adr/0119-recurring-events.md).
 
 > **Milestone M18.** **Repeating / recurring events over the M4 events surface**
-> (the `RRULE` home deferred by ADR 0112 + ADR 0115 C-M14·6): the author
+> (the `RRULE` home deferred by ADR [0112](../adr/0112-ical-calendar-export.md) + ADR [0115](../adr/0115-integration-of-events-and-projects.md) C-M14·6): the author
 > declares that a series of events repeats daily / weekly / monthly / yearly,
 > with an optional count or end date; the platform materializes the series as
 > **concrete `Event` rows** at write time, so **every other surface — read
@@ -47,7 +47,7 @@ updated: 2026-11-02
 > + the head-edit cascade (D4) + the author-only skip / undelete lanes (D5)
 > + the 14 `events.recurrence.*` / `events.series.*` `kw-l` keys × en/de/fr/da
 > (D9, C-M18·7) + the four GATE acceptance tests
-> (GATE-1…GATE-4) are locked in **ADR 0119 (Accepted, 2026-09-30)**.
+> (GATE-1…GATE-4) are locked in **ADR [0119](../adr/0119-recurring-events.md) (Accepted, 2026-09-30)**.
 >
 > **The ICS / reminder / RSVP / search / bookmark / group-feed surfaces are
 > byte-identical** (C-M18·1/3/6/10 — the read seam concrete-only pin, the
@@ -57,7 +57,7 @@ updated: 2026-11-02
 >
 > **Status.** **LOCKED.** The decisions D1–D11, the invariants
 > C-M18·1…8, the FACES F1–F7 + the named trade, the §kw-l key list, and the
-> §gate test names are locked in **ADR 0119 (Accepted, 2026-09-30)**. The
+> §gate test names are locked in **ADR [0119](../adr/0119-recurring-events.md) (Accepted, 2026-09-30)**. The
 > `[PROPOSED]` set in the register
 > `docs/plans-milestones/in-progress/plan-m18-recurring-events.md` is the
 > locked set this doc restates **verbatim** (the U00 handoff entry records
@@ -68,7 +68,7 @@ updated: 2026-11-02
 > seams** — the frozen `IEventService` read seams (U02 / U04 ride the
 > existing `CreateAsync` / `UpdateAsync` write lanes; U03 adds two
 > author-only seams **alongside** the existing ones, with the standing the
-> ADR 0014 / 0016 / 0017 edit lanes already established) + the frozen
+> ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 / 0017 edit lanes already established) + the frozen
 > `EventToAuditableResource` adapter + the frozen `IAuthorizationService`
 > (the author ∪ GlobalAdmin matrix). It does **not** add a new `AccessAction`,
 > a new `AccessVia`, a new `Decide()` branch, a new adapter, a new
@@ -83,12 +83,12 @@ updated: 2026-11-02
 ## 0 — Scope & non-scope
 
 **What M18 does (README verbatim):** M18 is "Repeating / recurring events
-over the M4 events surface (the `RRULE` home deferred by ADR 0112)." The
-M4 events surface (ADR 0054) already ships a full event context — `Event`
+over the M4 events surface (the `RRULE` home deferred by ADR [0112](../adr/0112-ical-calendar-export.md))." The
+M4 events surface (ADR [0054](../adr/0054-events-rsvp-reminders.md)) already ships a full event context — `Event`
 doc, `EventRsvp` (per-`Event`-row RSVP), the frozen `IEventService`
 read/write seams, the `EventReminderService` "remind the day before" job,
 the `EventToAuditableResource` adapter, the `IcsWriter` (M12), the calendar
-+ detail pages, the ADR 0059 translation trio. **M18 adds the one thing
++ detail pages, the ADR [0059](../adr/0059-event-translations.md) translation trio. **M18 adds the one thing
 that surface does not yet have: recurrence** — the ability for an author to
 declare that a series of events repeats daily / weekly / monthly / yearly,
 with an optional count or end date.
@@ -136,7 +136,7 @@ links back to the head row; `null` on the head itself and on all
 non-recurring events) and `RecurrenceRule: EventRecurrenceRule?` (non-null
 **only on the head row**, carrying the author's rule so a later edit can
 re-expand). No new doc type, no new index, no `EventDocTypes` change — both
-fields are additive on the existing `Event` POCO (the ADR 0004 §B "additive
+fields are additive on the existing `Event` POCO (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B "additive
 surface" shape — the `ComponentId` / `TagIds` / `ImageIds` / `AttachmentIds`
 precedent). *Forbids:* a unit reaching for a new `RecurrenceSeries` doc, a
 new `EventDocTypes` surface, a versioned migration, or a read-time expansion
@@ -181,7 +181,7 @@ one occurrence: `IsDeleted = true`; the head's `RecurrenceRule` is
 untouched, siblings untouched) and `UndeleteOccurrenceAsync(eventId,
 actorId, ct)` (un-soft-delete: `IsDeleted = false`). Both ride the
 **frozen** `EventToAuditableResource` + `IAuthorizationService` seams with
-the existing `event.edit`-shaped standing (the ADR 0014 / 0016 / 0017
+the existing `event.edit`-shaped standing (the ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 / 0017
 author-only edit precedent). A non-author actor gets a 404 (the frozen
 seam's "absent" shape — no leak). *Forbids:* a unit adding a new
 `AccessAction`, a unit that lets a non-author skip, or a unit that
@@ -217,7 +217,7 @@ re-materializes — D4 — but there is no separate "delete series" button).
 **D8 — Zero new authorization surface.** M18 adds **no** new
 `AccessAction`, **no** new `AccessVia`, **no** new adapter. The skip /
 undelete lanes (D5) ride the **existing** `EventToAuditableResource` +
-`IAuthorizationService.Decide()` seams with the standing the ADR 0014 /
+`IAuthorizationService.Decide()` seams with the standing the ADR [0014](../adr/0014-post-edit-lane-author-only.md) /
 0016 / 0017 edit lanes already established (author ∪ GlobalAdmin). The
 read seams, RSVP, reminder, and ICS surfaces are **unchanged** — they
 already see concrete rows. *Forbids:* a unit adding a `recurrence.skip` /
@@ -237,7 +237,7 @@ buttons), `events.series.part_of` (1 — the "Part of a series" chip on
 non-head rows). **14 keys × 4 languages = 56 strings**, added to **all
 four** of the closed dictionaries in `src/Kumunita.Core/Localization/
 KnownTranslationKeys.cs` — `EnValues` (the `en` floor, the canonical
-source text), `DeValues`, `FrValues`, `DaValues` (the ADR 0005 / 0015
+source text), `DeValues`, `FrValues`, `DaValues` (the ADR [0005](../adr/0005-multilingual-support.md) / 0015
 `en`-floor / per-key shape: the seeder materializes each key's `en` row on
 first boot; the non-`en` rows are the localized text). *Forbids:* a unit
 reaching for a new `kw-l` namespace, an English-only key (a key present in
@@ -276,7 +276,7 @@ a unit implementing any of these inside an M18 unit.
   additive-surface precedent it cites — `ComponentId: string?`) and recorded
   the deviation in the handoff notes (the `## U01` section). This entry
   records the annotation correction; **the D1 decision is unchanged** — only
-  the type annotation moved from `Guid?` to `string?`. ADR 0119's
+  the type annotation moved from `Guid?` to `string?`. ADR [0119](../adr/0119-recurring-events.md)'s
   `## Amendments` section records the same correction.
 
 ## 2 — Invariants (C-M18·1 … C-M18·8)
@@ -305,7 +305,7 @@ as any concrete event does. No series-level "RSVP to the whole series"
 affordance.
 
 **C-M18·4 (standing matrix).** The skip / undelete lanes (D5) are
-**author ∪ GlobalAdmin only** — the exact standing the ADR 0014 / 0016 /
+**author ∪ GlobalAdmin only** — the exact standing the ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 /
 0017 edit lanes established. A non-author, non-GlobalAdmin actor gets a
 404 (the frozen seam's "absent" shape), not a 403. The head-edit cascade
 (D4) is **author ∪ GlobalAdmin only** — the existing `UpdateAsync`
@@ -469,7 +469,7 @@ public sealed record EventRecurrenceRule(
 ```
 
 The two additive `Event` fields (the §9 block is the authoritative pin —
-they are additive on the existing POCO, the ADR 0004 §B "additive
+they are additive on the existing POCO, the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B "additive
 surface" shape, the `ComponentId` / `TagIds` / `ImageIds` /
 `AttachmentIds` precedent):
 
@@ -638,7 +638,7 @@ public static class EventRecurrenceExpander
 
 The exact `IEventService` extension U03 / U04 implement (the §9 block is
 the authoritative pin). The standing (C-M18·4) is **author ∪ GlobalAdmin
-only** — the exact standing the ADR 0014 / 0016 / 0017 edit lanes
+only** — the exact standing the ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 / 0017 edit lanes
 established. A non-author, non-GlobalAdmin actor gets a 404 (the frozen
 seam's "absent" shape — no leak, C-M18·4).
 
@@ -818,7 +818,7 @@ block is the authoritative pin):
 - An **`Interval` number input** (≥ 1, default 1 — the D2
   `EventRecurrenceRule.Interval` field; the composer's HTML `min="1"`
   + the service's validation (U02 / U04 — a value < 1 is **refused**
-  with the composer's existing validation error shape, the ADR 0054
+  with the composer's existing validation error shape, the ADR [0054](../adr/0054-events-rsvp-reminders.md)
   composer's standing).
 - A **radio** for "Ends after" (the `Count` number input — the D2
   `EventRecurrenceRule.Count` field) vs. "Ends on" (the `Ends` date
@@ -832,7 +832,7 @@ block is the authoritative pin):
   validation (U02 / U04 — a `Count` < 2 is **refused** with the
   composer's existing validation error shape)).
 - The **`Ends` date input** (a `DateTimeOffset` — the composer's
-  existing date input shape, the ADR 0019 / 0020 `kw-dt` floor; the
+  existing date input shape, the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020 `kw-dt` floor; the
   composer's `min` is the head's `Start` — a `Ends` before the head's
   `Start` is **refused** with the composer's existing validation
   error shape).
@@ -870,12 +870,12 @@ a **series chip** when the row is part of a series
   composer's `events.recurrence.{type}` key + a locale-specific
   singular — the §8 list's `events.recurrence.{type}` key is the
   plural label; the chip's `{unit}` is a locale-specific singular the
-  Web layer renders from the type, the ADR 0015 `kw-l` floor); the
+  Web layer renders from the type, the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) `kw-l` floor); the
   `{Count} occurrences` is the `events.recurrence.count` key with the
   `Count` value interpolated; the "until {date}" is the
   `events.recurrence.until` key with the `Ends` date interpolated
   (the `kw-dt` TagHelper renders the date in the resident's effective
-  time zone + date-time format, the ADR 0019 / 0020 floor).
+  time zone + date-time format, the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020 floor).
 - A **non-head row** additionally shows the "Part of a series" chip
   (the D9 `events.series.part_of` key).
 - The chip is shown on **every** row in a series (head and non-head
@@ -925,7 +925,7 @@ The exact 14 keys from D9. All under `events.*` (the M4 events namespace
 namespace). Added to **all four** of the closed dictionaries in
 `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — `EnValues`
 (the `en` floor, the canonical source text), `DeValues`, `FrValues`,
-`DaValues` (the ADR 0005 / 0015 `en`-floor / per-key shape: the seeder
+`DaValues` (the ADR [0005](../adr/0005-multilingual-support.md) / 0015 `en`-floor / per-key shape: the seeder
 materializes each key's `en` row on first boot; the non-`en` rows are
 the localized text).
 
@@ -948,7 +948,7 @@ the localized text).
 
 **The closed set is 14 keys × 4 languages = 56 strings.** The
 `KnownTranslationKeys_ParityTests` enforces the 4-language set +
-non-empty values; the ADR 0015 / 0052 warm-boot backfill seeds them
+non-empty values; the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) / 0052 warm-boot backfill seeds them
 idempotently. The M15 `TranslationBulk` surface sees the new keys on
 its next run (no M18 change to the M15 surface, C-M18·7).
 
@@ -1187,7 +1187,7 @@ A **drift event** is any of: a unit changing a D# / invariant / FACES /
 key list in the design doc or ADR outside U00; a unit adding a file
 outside its own Deliverables; a unit extending a frozen seam
 (`IAuthorizationService` / `Decide()` / `AccessAction` / `AccessVia`
-/ the ADR 0059 trio / `IMailerStage`); a unit adding a
+/ the ADR [0059](../adr/0059-event-translations.md) trio / `IMailerStage`); a unit adding a
 `RecurrenceSeries` doc, a new `EventDocTypes` surface, a versioned
 migration, a `BYDAY`/`BYMONTHDAY`/`BYSETPOS`/`EXRULE` rule, a
 per-occurrence override surface, a group-event recurrence surface, a
@@ -1212,8 +1212,8 @@ one-line "why it is deferred":
    ADR (the §drift-guard's "no per-occurrence override surface" pin).
 2. **Group-event recurrence** (the M7 `CreateGroupEventAsync` surface)
    — deferred because the M7 group-event surface has its **own**
-   standing matrix (the ADR 0089 GE·4 "author-only" pin) + its **own**
-   membership scope (the ADR 0013 membership lane); M18's D1
+   standing matrix (the ADR [0089](../adr/0089-group-events-membership-lane.md) GE·4 "author-only" pin) + its **own**
+   membership scope (the ADR [0013](../adr/0013-group-posts-membership-lane.md) membership lane); M18's D1
    materialized-occurrences model is community-event-shaped (the M4
    surface's shape), and extending it to the group surface would
    require a **new** group-scope branch in the expansion algorithm

@@ -17,8 +17,8 @@ Residents upload images for two surfaces: **avatars** (`POST /profile/avatar`,
 the `ProfileController.AvatarUpload` lane) and **inline post images**
 (`POST /content-image`, the `ContentImageController.Upload` lane — the
 Image button in the WYSIWYG editor). Both lanes are frozen and correct, but
-they store the **bytes exactly as uploaded** (ADR 0011's stance, carried into
-ADR 0025's "Not decided here": *"Server-side image transforms (crop /
+they store the **bytes exactly as uploaded** (ADR [0011](0011-media-and-file-storage.md)'s stance, carried into
+ADR [0025](0025-rich-content-markdown-and-content-images.md)'s "Not decided here": *"Server-side image transforms (crop /
 resize) — bytes are stored as uploaded; a future lane adds the transform."*).
 
 That leaves two real gaps a resident hits immediately:
@@ -35,7 +35,7 @@ That leaves two real gaps a resident hits immediately:
 The transform has to be **optional** (a resident may upload a perfectly
 sized image and not want to fiddle with it) and it must not change the
 **contract** either surface already depends on: the `MediaObject` id is the
-SHA-256 of the payload (the content-addressed store, ADR 0011), so the
+SHA-256 of the payload (the content-addressed store, ADR [0011](0011-media-and-file-storage.md)), so the
 `/content-image/{id}` URL, the `IsSafeImageSrc` seam, the `![alt](...)`
 Markdown value, and the audit row all key off the *id*, not the bytes.
 
@@ -64,7 +64,7 @@ Markdown value, and the audit row all key off the *id*, not the bytes.
   file. No resident is forced to edit.
 - **Client-side only — no new dependencies, no server change.**
   - The canvas API and Bootstrap's modal are already in the page; the module
-    is `tsc`-only (ADR 0031's `package.json` stays `typescript`-only). No
+    is `tsc`-only (ADR [0031](0031-wysiwyg-editor-and-toolbar.md)'s `package.json` stays `typescript`-only). No
     new npm package.
   - No new .NET image library (there is no ImageSharp / SixLabors in the
     repo). `Kumunita.Core` stays HTTP-free; `IMediaStore` / `MediaObject` /

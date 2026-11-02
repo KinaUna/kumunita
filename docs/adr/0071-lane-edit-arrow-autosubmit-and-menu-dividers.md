@@ -11,7 +11,7 @@ superseded_by: [adr-0074]
 updated: 2026-11-02
 ---
 
-# ADR 0071 — Kanban lane / card editing: modals, autosubmit status, menu dividers
+# ADR [0071](0071-lane-edit-arrow-autosubmit-and-menu-dividers.md) — Kanban lane / card editing: modals, autosubmit status, menu dividers
 
 Status: Accepted
 Date: 2026-09-24
@@ -19,7 +19,7 @@ Amends: 0068, 0069
 
 ## Context
 
-ADR 0068 gave the M5 Kanban board (ADR 0067) its lane action menu: the lane
+ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md) gave the M5 Kanban board (ADR [0067](0067-m5-projects-todos-and-kanban.md)) its lane action menu: the lane
 head's ⋮ dropdown carried the Rename form, the Set limit form, the Set status
 form, and the Move left / Move right reorder forms (each a POST form to the
 lane-update or lane-reorder route), and the card's ⋮ dropdown carried Edit /
@@ -53,15 +53,15 @@ Two already-accepted decisions constrain this lane:
   authority, and the `CheckBoardStanding` creator ∪ GlobalAdmin matrix gates
   it. This ADR adds **no new controller or service seam** — it changes how
   the existing route is *driven*.
-- **The tsc-only / zero-dependency pin** (ADR 0031) holds: the autosubmit
+- **The tsc-only / zero-dependency pin** (ADR [0031](0031-wysiwyg-editor-and-toolbar.md)) holds: the autosubmit
   ships in the board's existing plain-TS module, reusing its existing
   `postAndRedirect` + `getAntiForgeryToken` shape.
 
 ## Decision
 
 - **The lane keeps its single ⋮ dropdown; the named buttons become → icons
-  inside it.** The lane head's one ⋮ dropdown (the ADR 0068 shape, the
-  ADR 0070 borderless `kanban-glyph-btn` trigger, `ms-auto` at the head's
+  inside it.** The lane head's one ⋮ dropdown (the ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md) shape, the
+  ADR [0070](0070-board-edit-lane-and-board-polish.md) borderless `kanban-glyph-btn` trigger, `ms-auto` at the head's
   right edge) holds every lane action in one menu, now reshaped. The single
   field forms to the U08 lane-update route (`POST
   /projects/boards/{id}/lanes/{laneId}`, the `LaneEditorModel` shape — a
@@ -81,7 +81,7 @@ Two already-accepted decisions constrain this lane:
     was asked to move to a modal.
   - **Set status** — the `Status` select, with **no submit button at all**
     (see the autosubmit below); hidden `Title` likewise.
-  The **Move left / Move right** reorder forms (the ADR 0068 reorder routes,
+  The **Move left / Move right** reorder forms (the ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md) reorder routes,
   the service's `MoveLaneAsync`) stay in the same menu, after a divider, and
   render **only when a neighbor exists** (`hasLeft` / `hasRight` from the
   lane's `Order`) — an edge lane's ⋮ menu is just the three edit rows. The
@@ -103,7 +103,7 @@ Two already-accepted decisions constrain this lane:
   explicit submit affordance.
 
 - **The card menu's "Add subtask" row opens a Bootstrap modal.** The
-  ADR 0068 card ⋮ menu's Add-subtask row — formerly a cramped inline `Title`
+  ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md) card ⋮ menu's Add-subtask row — formerly a cramped inline `Title`
   input + a named submit button — is now a **menu button opening a modal**
   (the same first-use-of-modals as the lane Rename, above). The modal posts
   the to-do subtask route (`POST /projects/todos/{id}/subtasks`, the
@@ -144,7 +144,7 @@ Two already-accepted decisions constrain this lane:
   `GET` actions each gain one **additive** `SeedGrantPickerOptionsAsync()`
   call (the `Create` / `BoardNew` views' idiom) so their Add-subtask
   modal's Assignee picker has options. No new controller action, no
-  `IProjectService` addition (the frozen-surface rule of ADR 0067 §2.3 is
+  `IProjectService` addition (the frozen-surface rule of ADR [0067](0067-m5-projects-todos-and-kanban.md) §2.3 is
   untouched), no new route. The lane-update + lane-reorder lanes and the
   to-do subtask lane are reused as-is.
 - The lane ⋮ menu is still one menu: **Rename** opens a modal, **Max items**

@@ -16,11 +16,11 @@ updated: 2026-11-02
 A fresh instance boots with exactly **one** enabled language: the seeder
 writes the `en` catalog row, `LocaleSettings.DefaultLanguageCode = "en"`,
 the `en` `TranslationResource` rows for every registered key (the
-`en` floor, ADR 0015 D2), and the `en` bodies of the seeded `terms` /
-`help` system pages. Every other language is community-provided (ADR 0005
+`en` floor, ADR [0015](0015-ui-view-localization-mechanics.md) D2), and the `en` bodies of the seeded `terms` /
+`help` system pages. Every other language is community-provided (ADR [0005](0005-multilingual-support.md)
 §B) — an admin adds it under `/admin/languages` and a GlobalAdmin /
 Translator fills the ~370 UI strings by hand. The result is that the
-platform's headline feature (multilingual UI, ADR 0005 A) is **invisible
+platform's headline feature (multilingual UI, ADR [0005](0005-multilingual-support.md) A) is **invisible
 until somebody sits down and types a few hundred strings**. A first-boot
 instance should *demonstrate* the feature end-to-end: three languages in
 the picker, a full UI in any of them, and the completeness view showing
@@ -30,13 +30,13 @@ This lane ships a **curated initial pack** — German and French — inside
 the image: the pristine-boot seeder materializes the `de` / `fr` catalog
 rows, the full UI-string baselines, and the `de` / `fr` bodies of the
 seeded system pages. The `about` product surface is the one in-scope
-surface that is *not* yet behind `<kw-l>` (it is an ADR 0015 deliberate
+surface that is *not* yet behind `<kw-l>` (it is an ADR [0015](0015-ui-view-localization-mechanics.md) deliberate
 exclusion: "the product-story landing — not platform UI yet"); this lane
 pulls it in *through the existing mechanism* (a registry entry + a `<kw-l>`
-wrap per ADR 0015's "Cost" paragraph) rather than inventing a new one.
+wrap per ADR [0015](0015-ui-view-localization-mechanics.md)'s "Cost" paragraph) rather than inventing a new one.
 
 **Out of scope (future lanes, not this ADR's decisions):** machine
-translation of anything (ADR 0005 C — a deferred trust boundary, unchanged);
+translation of anything (ADR [0005](0005-multilingual-support.md) C — a deferred trust boundary, unchanged);
 additional languages (an admin adds them in-app — that is the design); a
 warm-reseed / upgrade-push mechanism for the baselines (the new-key
 asymmetry in the Decision below *is* the decision about that); and the
@@ -50,20 +50,20 @@ seeded once, then community-owned
 
 - **`en` is code-owned, forever.** `KnownTranslationKeys.EnValues` is the
   single source of truth for the English strings. The seeder upserts `en`
-  rows with **code-wins** semantics (ADR 0015 D2, unchanged), and the
+  rows with **code-wins** semantics (ADR [0015](0015-ui-view-localization-mechanics.md) D2, unchanged), and the
   provider floor resolves any registered key to the registry's `en` text
-  (ADR 0015 D1, unchanged). Nothing in this lane changes that path.
+  (ADR [0015](0015-ui-view-localization-mechanics.md) D1, unchanged). Nothing in this lane changes that path.
 - **`de` / `fr` are seeded-once, then community-owned.** The baselines
   ship with the code as **initial values**. The seeder writes them **only
   on a pristine DB** (the `DbBootstrap.IsPristineAsync` gate — the seeder
-  never runs on a warm instance; ADR 0015 "Cost"). After first boot, the
-  in-app editor (GlobalAdmin ∪ Translator, ADR 0021) is the **only** write
+  never runs on a warm instance; ADR [0015](0015-ui-view-localization-mechanics.md) "Cost"). After first boot, the
+  in-app editor (GlobalAdmin ∪ Translator, ADR [0021](0021-translator-role-delegated-translation-editing.md)) is the **only** write
   path for `de` / `fr` rows, and **an admin edit is never overwritten** —
   the seeder's `de` / `fr` upserts are first-boot-only *by construction*,
   not by an extra guard.
 - **The new-key asymmetry (recorded, deliberate):** a key added to the
   registry in a later code release renders its `en` text on *every*
-  instance (the provider floor — ADR 0015's upgrade path, unchanged). But a
+  instance (the provider floor — ADR [0015](0015-ui-view-localization-mechanics.md)'s upgrade path, unchanged). But a
   `de` / `fr` baseline for that key does **not** appear in an existing
   instance's database until a GlobalAdmin / Translator types it in-app
   (the M·12 completeness view shows it missing). This is **asymmetric with
@@ -72,13 +72,13 @@ seeded once, then community-owned
   community-owned" meeting "no warm-reseed mechanism exists" — **a
   recorded decision, not a bug to fix**. The lane deliberately does not add
   a reseed path; the completeness view is the review surface.
-  > **Narrow exception recorded 2026-09-19 (ADR 0047 D2):** the *four
+  > **Narrow exception recorded 2026-09-19 (ADR [0047](0047-static-page-localization-and-backfill.md) D2):** the *four
   > canonical system pages'* `de` / `fr` / `da` `PageTranslation` rows
   > **are** backfilled on a warm boot (create-if-missing, idempotent, never
   > overwriting an admin edit or the `en` body) — the resident-visible seam
-> ADR 0043 / 0047 D1 makes user-visible in the effective language.
+> ADR [0043](0043-system-pages-shipped-and-discoverable.md) / 0047 D1 makes user-visible in the effective language.
 >
-> **Second narrow exception recorded 2026-09-20 (ADR 0052):** the
+> **Second narrow exception recorded 2026-09-20 (ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md)):** the
 > **UI-string** baselines (`de` / `fr` / `da` `TranslationResource` rows)
 > **are** likewise backfilled on a warm boot — the same create-if-missing,
 > idempotent, never-overwrite shape; the `en` row stays pristine-boot-only,
@@ -91,7 +91,7 @@ seeded once, then community-owned
 
 The baselines are a **careful first pass, editable later** — the
 in-app editor + the M·12 completeness view are the review surface, and the
-ADR 0021 standing (GlobalAdmin ∪ Translator) is the review authority. The
+ADR [0021](0021-translator-role-delegated-translation-editing.md) standing (GlobalAdmin ∪ Translator) is the review authority. The
 quality bar locked here:
 
 - **Idiomatic, not calqued.** Word-for-word calques from the English are
@@ -116,11 +116,11 @@ quality bar locked here:
 
 The `about` surface joins the translatable surface **through the existing
 mechanism only**: its strings are `EnValues` entries (registered, exact
-current English copy — the ADR 0015 invariant that registry values are the
+current English copy — the ADR [0015](0015-ui-view-localization-mechanics.md) invariant that registry values are the
 exact rendered strings the view emits), and the view is wrapped in `<kw-l>`
-against those keys (ADR 0015 D1). No new TagHelper, no new provider path,
+against those keys (ADR [0015](0015-ui-view-localization-mechanics.md) D1). No new TagHelper, no new provider path,
 no new document type, no new `AccessAction` / `AccessVia`, no authorization
-change, no schema change, no migration. The ADR 0015 **hard exclusions
+change, no schema change, no migration. The ADR [0015](0015-ui-view-localization-mechanics.md) **hard exclusions
 hold unchanged**: the TagHelper emits element *content* only — HTML
 attributes (`placeholder` / `aria-label` / `title`), JS strings, and
 C#-built markup fragments stay hardcoded.
@@ -128,7 +128,7 @@ C#-built markup fragments stay hardcoded.
 ### D4 — The default language stays `en`
 
 `LocaleSettings.DefaultLanguageCode` remains `"en"`; the source language
-remains `"en"` (ADR 0005 §B); the picker's first entry remains English
+remains `"en"` (ADR [0005](0005-multilingual-support.md) §B); the picker's first entry remains English
 (sort 0). This lane is about *available* languages at first boot, **not**
 about switching the default. The catalog seeded on first boot is exactly:
 `en` (sort 0) / `de` (sort 1) / `fr` (sort 2), all enabled, default `en`.
@@ -174,11 +174,11 @@ removed from the view and the keys deregistered.
 
 **In:** the `about.*` keys (D5) registered in `EnValues`; `DeValues` /
 `FrValues` baselines at **full registry parity** (every key in
-`EnValues`, no dead weight — the ADR 0015 honesty invariant extended to
+`EnValues`, no dead weight — the ADR [0015](0015-ui-view-localization-mechanics.md) honesty invariant extended to
 the two new dictionaries); the `de` / `fr` catalog rows in the seeder
 (D4); the `de` / `fr` `TranslationResource` rows in the seeder (D1); the
 `de` / `fr` bodies of the seeded `terms` / `help` system pages (D2, via
-`PageTranslation` rows in the ADR 0039/0040 PG U06 lane shape, attached to
+`PageTranslation` rows in the ADR [0039](0039-pages-hierarchy-audience-translations.md)/0040 PG U06 lane shape, attached to
 the **terms / help page's own `Id`** — the read path
 `PageController` → `IPageService.GetTranslationsAsync(page.Id)` queries by
 the page's own id, so the `system` root container's id is *not* a valid
@@ -187,7 +187,7 @@ in `<kw-l>` (D3); and
 the test pins (first-boot state, completeness 100%, provider resolution,
 per-string fallback, warm-boot no-op, Web surface).
 
-**Out:** machine translation (ADR 0005 C); additional languages (in-app by
+**Out:** machine translation (ADR [0005](0005-multilingual-support.md) C); additional languages (in-app by
 an admin — the design); a warm-reseed / upgrade-push mechanism (D1
 asymmetry); the `Milestones.cs` / README /
 `MilestonesTests` trio until the lane ships.
@@ -207,7 +207,7 @@ asymmetry); the `Milestones.cs` / README /
   *initial values*, not *owned strings*: the first admin edit of any
   `de` / `fr` row supersedes the shipped text, and no later deploy can
   revert it (D1). The in-app editor and the completeness view are the
-  standing review surface (ADR 0021).
+  standing review surface (ADR [0021](0021-translator-role-delegated-translation-editing.md)).
 - **Cost — first drafts are first drafts.** The baselines ship at the
   D2 bar (idiomatic, register-held, token-preserved), not at a published
   translation's polish. Accepted: the D1 ownership semantics make the
@@ -218,8 +218,8 @@ asymmetry); the `Milestones.cs` / README /
   complete in `en` and incomplete in `de` / `fr` on existing instances
   until a human types the translation. Recorded as a feature of the
   code-owned / community-owned split, not a gap to close.
-- **The `about` surface exits the ADR 0015 deliberate-exclusions list**
+- **The `about` surface exits the ADR [0015](0015-ui-view-localization-mechanics.md) deliberate-exclusions list**
   with no new mechanism — the registry + `<kw-l>` are the only tools used,
-  and the ADR 0015 hard exclusions (attributes, JS, C#-built fragments)
-  remain unchanged. The ADR 0015 exclusions list should be read with this
+  and the ADR [0015](0015-ui-view-localization-mechanics.md) hard exclusions (attributes, JS, C#-built fragments)
+  remain unchanged. The ADR [0015](0015-ui-view-localization-mechanics.md) exclusions list should be read with this
   ADR's D5 key list as the new scope of the `about` view.

@@ -11,29 +11,29 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0168 — Bookmarks: a personal folder tree (the M17 §deferred "bookmark
+# ADR [0168](0168-bookmark-folders.md) — Bookmarks: a personal folder tree (the M17 §deferred "bookmark
 folders" lane, now settled)
 
 Status: Accepted
 Date: 2026-10-14
-Extends the **M17 `Bookmark` personal-by-id precedent** (ADR 0118 — the
+Extends the **M17 `Bookmark` personal-by-id precedent** (ADR [0118](0118-bookmarks.md) — the
 owner's own bookmark list is a **personal read** with **zero audit
 surface**, the non-owner 404 commits **no row**, the **unique-index-
 as-witness** idiom on `(OwnerId, TargetKind, TargetId)`), the **M37
-`NoteFolder` shape** (ADR 0167 D6 — a **personal folder tree, bounded in
+`NoteFolder` shape** (ADR [0167](0167-personal-notes.md) D6 — a **personal folder tree, bounded in
 depth ≤ 2, unique in name within the owner's tree**, a folder's deletion
 **moves** its children to the root so the content is never lost — the
 *primary* precedent this ADR re-applies to the bookmark surface), the
-**ADR 0105 (M9 messaging) participant-by-id shape** (a personal-by-id
+**ADR [0105](0105-messaging.md) (M9 messaging) participant-by-id shape** (a personal-by-id
 record whose access story is **identity comparison**, never an audience
-decision), the **ADR 0004 §B.1 delta-detected, idempotent, zero-migration
+decision), the **ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 delta-detected, idempotent, zero-migration
 document-surface shape** (the additive `BookmarkDocTypes` surface), the
 **frozen `IAuthorizationService` seam** (the 4-method surface + the
-`IDocumentSession` overloads, C3 — ADR 0006 §A), the **frozen
-`AccessAction` / `AccessVia` sets + the frozen `Decide()`** (ADR 0006 —
+`IDocumentSession` overloads, C3 — ADR [0006](0006-module-boundary-contracts.md) §A), the **frozen
+`AccessAction` / `AccessVia` sets + the frozen `Decide()`** (ADR [0006](0006-module-boundary-contracts.md) —
 "adds **no adapter at all**" pin), and the **closed
-`KnownTranslationKeys` registry + the en/de/fr/da parity pins** (ADR 0015
-/ ADR 0052). This ADR makes **a resident's organized bookmarks real**: the
+`KnownTranslationKeys` registry + the en/de/fr/da parity pins** (ADR [0015](0015-ui-view-localization-mechanics.md)
+/ ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md)). This ADR makes **a resident's organized bookmarks real**: the
 `/bookmarks` list is now **nestable into a personal folder tree** (the same
 organizing affordance M37 already gave to notes), with **zero new
 authorization surface** (C-M17·6) and **zero migrations for existing
@@ -45,7 +45,7 @@ M17 (Bookmarks) shipped the **personal-pin** world: one row per
 (resident, target), one flat list, one toggle. Its design doc
 (`m17-bookmarks-design.md`) scoped **folders explicitly as §deferred**
 ("Bookmark folders / manual ordering" — *each its own ADR*). M37 (Personal
-notes, ADR 0167) then shipped the exact organizing affordance this lane
+notes, ADR [0167](0167-personal-notes.md)) then shipped the exact organizing affordance this lane
 needs — a **personal folder tree** on the *sibling* surface
 (`NoteFolder`, the depth-≤-2 / unique-name / delete-moves-to-root invariants,
 the C-M37·6 pin, the `NoteFolder` doc on the `PersonalNotesDocTypes`
@@ -67,7 +67,7 @@ The constraint that keeps it safe is the one that already keeps M17 safe
 extends them by adding nothing** (C-M17·6) — no new `AccessAction`, **no**
 new `AccessVia`, **no** branch in `Decide()`, **no** method on
 `IAuthorizationService`, and **no** adapter at all (a bookmark folder is a
-*personal-by-id* record, the ADR 0105 shape, not an audience decision).
+*personal-by-id* record, the ADR [0105](0105-messaging.md) shape, not an audience decision).
 The **one rule that keeps the tree safe** (D2): a bookmark folder is
 **personal, bounded, and owner-scoped** — a bookmark can only live in a
 folder *the owner* created, and a folder's deletion **moves** its
@@ -80,7 +80,7 @@ family.** This lane adds **one document** — `BookmarkFolder`
 (`OwnerId`, `ParentId?`, `Name`, `Created`) — to the existing
 `Kumunita.Core.Bookmarks` context, and an **additive field**
 `Bookmark.FolderId?` (the M37 `PersonalNote.FolderId` shape re-applied).
-Both ride the **existing `BookmarkDocTypes` surface** (the ADR 0004 §B.1
+Both ride the **existing `BookmarkDocTypes` surface** (the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1
 shape — delta-detected and applied idempotently at boot, **zero
 migrations** for existing surfaces; no new `*DocTypes` surface needed —
 the surface already exists, the docs are additive on it). The new indexes:
@@ -127,7 +127,7 @@ The frozen `BookmarksController` gains the folder-tree write lanes —
 /bookmarks/folders/{folderId}/rename`, `POST
 /bookmarks/folders/{folderId}/delete`, and the per-row
 `GET`/`POST /bookmarks/{targetKind}/{targetId}/move` — each a *thin* HTTP
-layer (ADR 0006-D: routes + authz + shape) that never re-derives access;
+layer (ADR [0006](0006-module-boundary-contracts.md)-D: routes + authz + shape) that never re-derives access;
 the frozen `IBookmarkService` seam is the sole reader/writer, and a
 non-owner (a `GlobalAdmin` included) gets a non-leaky **404** (the ADR
 0105 "operator has no read standing" precedent). The `/bookmarks` list
@@ -140,13 +140,13 @@ affordance + the `bm.folder.empty` state. Three new views
 `Bookmarks/BookmarkMove.cshtml`) mirror the M37 folder views.
 
 **D5 — The closed `bm.*` `kw-l` key set gains five keys × en/de/fr/da.**
-The `bm.*` closed set (14 keys, ADR 0118 + the obs-2 `bm.toggle.*`
+The `bm.*` closed set (14 keys, ADR [0118](0118-bookmarks.md) + the obs-2 `bm.toggle.*`
 amendment) gains **five** — `bm.folder.new`, `bm.folder.rename`,
 `bm.folder.delete`, `bm.folder.empty`, `bm.bookmark.move` (the M37
 `pn.folder.*` / `pn.note.move` key names re-applied to the bookmark
 surface — 19 total) — registered in **all four** languages
-(`EnValues` / `DeValues` / `FrValues` / `DaValues`; the ADR 0015 /
-ADR 0052 parity pin). The `BookmarksControllerTests`
+(`EnValues` / `DeValues` / `FrValues` / `DaValues`; the ADR [0015](0015-ui-view-localization-mechanics.md) /
+ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) parity pin). The `BookmarksControllerTests`
 `BmKeys_AreTheClosedFourteenKeySet` pin is re-pinned to the **19-key**
 closed set.
 
@@ -157,7 +157,7 @@ This lane adds **no adapter at all** (D2), **no** new `AccessAction`,
 assignment) is a *personal-by-id* record, never an audience decision. The
 owner's own bookmark list load commits **zero** `AccessAudit` rows and
 runs **zero** `CanSeeAsync` passes over the bookmark rows (C-M17·2 — the
-M6-inbox / M17-bookmark personal-read shape, the ADR 0105 "operator has no
+M6-inbox / M17-bookmark personal-read shape, the ADR [0105](0105-messaging.md) "operator has no
 read standing" precedent). The frozen seams are **byte-identical** after
 this lane (§drift-guard).
 
@@ -166,13 +166,13 @@ Roadmap / `MilestonesTests.cs` are untouched.** The bookmark folder tree
 settles the M17 §deferred "bookmark folders" question (a new capability
 that settles a design question → an ADR, per AGENTS.md) but is **not** a
 roadmap letter (M17 already shipped as **Done**; this is an additive
-capability within the M17 surface, the ADR 0013 `GP` group-posts / ADR 0011
+capability within the M17 surface, the ADR [0013](0013-group-posts-membership-lane.md) `GP` group-posts / ADR [0011](0011-media-and-file-storage.md)
 `M4-adjacent` media precedent). The close flip touches the **doc-sync
 pair** that *does* apply to a named lane: the README **Roadmap M17 row**
-+ `docs/STATUS.md` (the M17 entry gains the folder-tree note) +
-`docs/ARCHITECTURE.md`'s value-chain M17 row (gains the folder-tree note)
++ [`docs/STATUS.md`](../STATUS.md) (the M17 entry gains the folder-tree note) +
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)'s value-chain M17 row (gains the folder-tree note)
 + `src/Kumunita.Web/WhatsNew.cs` (the **required** version entry — ADR
-0110, the M27-shipped-without-entry drift guard) + `docs/adr/README.md`
+0110, the M27-shipped-without-entry drift guard) + [`docs/adr/README.md`](README.md)
 (index row). `Milestones.cs` / README **Roadmap milestone ordering** /
 `MilestonesTests.cs` stay **byte-identical** (M17 is already Done; the
 "last milestone, no successor" pin is unchanged).

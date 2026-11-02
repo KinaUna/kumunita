@@ -13,10 +13,10 @@ updated: 2026-11-02
 
 # Group events — membership-scoped group events lane — design doc
 
-> **Abstract:** the **group events** design — a **membership-scoped group events** lane: events addressed to a group through the group's membership (not the community audience), with the group's RSVP / reminder / ICS surface. A companion to ADR 0089; invariants GE·1–GE·8, FACES GE1–GE13, the frozen C# of every seam, and the pinned tests. **Who is it for:** a developer touching the group-events lane; an agent that needs the membership-gate shape. **When to read the rest:** before touching the group-events surface, the membership gate, or the group-events tests.
+> **Abstract:** the **group events** design — a **membership-scoped group events** lane: events addressed to a group through the group's membership (not the community audience), with the group's RSVP / reminder / ICS surface. A companion to ADR [0089](../adr/0089-group-events-membership-lane.md); invariants GE·1–GE·8, FACES GE1–GE13, the frozen C# of every seam, and the pinned tests. **Who is it for:** a developer touching the group-events lane; an agent that needs the membership-gate shape. **When to read the rest:** before touching the group-events surface, the membership gate, or the group-events tests.
 
 
-Companion to **ADR 0089** (`docs/adr/0089-group-events-membership-lane.md`, the
+Companion to **ADR [0089](../adr/0089-group-events-membership-lane.md)** ([`docs/adr/0089-group-events-membership-lane.md`](../adr/0089-group-events-membership-lane.md), the
 authority on *why*) and the lane register
 (`docs/plans-milestones/in-progress/group-events/plan-group-events.md`, the
 authority on *what, in what order*). This doc is the authority on **exact
@@ -27,41 +27,41 @@ pause`), per the group-posts U1 drift-guard.
 
 ## Context
 
-M4 (ADR 0054) shipped a full event surface — a `ComponentId` feed organizer,
+M4 (ADR [0054](../adr/0054-events-rsvp-reminders.md)) shipped a full event surface — a `ComponentId` feed organizer,
 an `Audience` boundary, drafts, RSVPs, day-before reminders, and user-added
 translations — but **every event lives on the community surface.** A group
-(ADR 0010/0013) has a *posts* channel (a private channel, ADR 0013) but no
+(ADR [0010](../adr/0010-private-groups.md)/0013) has a *posts* channel (a private channel, ADR [0013](../adr/0013-group-posts-membership-lane.md)) but no
 *events* surface: a group's page shows posts and members, and the "create an
 event" affordance only ever reaches the community feed. `how-it-works.md`
 already promises "when membership changes, all your past posts reach exactly
 the right people"; a group's events should carry the same membership
-guarantee. ADR 0013's membership lane is the proven answer, and the M4 event
-surface is the proven *target*. Group events = **the ADR 0013 membership
+guarantee. ADR [0013](../adr/0013-group-posts-membership-lane.md)'s membership lane is the proven answer, and the M4 event
+surface is the proven *target*. Group events = **the ADR [0013](../adr/0013-group-posts-membership-lane.md) membership
 lane applied to the M4 event surface**, reusing the frozen group seams
 verbatim (zero new authorization surface).
 
 ## Scope
 
 **In:**
-- `Event.GroupId` (`string`, default `string.Empty`) — one additive, ADR 0004 §B.1, the `Post.GroupId` precedent; **no new index** (the `Post.GroupId` precedent has none).
-- The four group-event seams on `IEventService` (`ListGroupEventsAsync`, `GetGroupEventAsync`, `CreateGroupEventAsync`, `UpdateGroupEventAsync`) — ADR 0006-E compatible ADDs; **publish reuses the existing lane-neutral `PublishAsync`**, RSVP reuses `RsvpAsync`/`GetMyRsvpAsync`/`GetRsvpsAsync`, and the ADR 0059 `EventTranslation` seams are reused as-is (all keyed by `EventId`, no group branch).
+- `Event.GroupId` (`string`, default `string.Empty`) — one additive, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1, the `Post.GroupId` precedent; **no new index** (the `Post.GroupId` precedent has none).
+- The four group-event seams on `IEventService` (`ListGroupEventsAsync`, `GetGroupEventAsync`, `CreateGroupEventAsync`, `UpdateGroupEventAsync`) — ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible ADDs; **publish reuses the existing lane-neutral `PublishAsync`**, RSVP reuses `RsvpAsync`/`GetMyRsvpAsync`/`GetRsvpsAsync`, and the ADR [0059](../adr/0059-event-translations.md) `EventTranslation` seams are reused as-is (all keyed by `EventId`, no group branch).
 - The **explicit** `GroupId == string.Empty` filter added to the existing `ListUpcomingAsync` / `ListInRangeAsync` candidate predicates (service-internal, no signature change — the one change that keeps group events off the community feed/calendar).
 - `GroupEventDraft` / `GroupEventUpdate` records (types, not seams); `GroupEventFeedResult` record.
 - Web: a group-page **events channel** — an events section on the group detail (feed + "New event"), and routes mirroring the group-post routes (composer, detail, edit, publish, RSVP) under `/groups/{id}/events`; a non-member gets a 404.
-- `kw-l` strings in **all four** active languages (`en`, `de`, `fr`, `da`) — the ADR 0005 "all keys in every language" rule; no `?? "fallback"` escape hatch.
+- `kw-l` strings in **all four** active languages (`en`, `de`, `fr`, `da`) — the ADR [0005](../adr/0005-multilingual-support.md) "all keys in every language" rule; no `?? "fallback"` escape hatch.
 - The pinned seam tests (`Kumunita.Core.Tests/GroupEventServiceTests.cs`) + the Web controller 404 tests; the recorded acceptance gate.
-- **ADR 0089.**
+- **ADR [0089](../adr/0089-group-events-membership-lane.md).**
 
-**Out (deferred, each named — see ADR 0089 Consequences):**
+**Out (deferred, each named — see ADR [0089](../adr/0089-group-events-membership-lane.md) Consequences):**
 - Soft-delete on group events (the community lane's `DeleteAsync` is not mirrored on the group lane in this iteration).
 - A group-scoped calendar (`EV-CAL` stays community-scoped).
 - A cross-group "my group events" surface (`ListMineAsync` stays community-scoped).
 - Notifications on *new* group events (M6-scope, like the group-post deferral).
 
-**Explicitly NOT available (privacy-first — recorded in ADR 0089, *not*
+**Explicitly NOT available (privacy-first — recorded in ADR [0089](../adr/0089-group-events-membership-lane.md), *not*
 deferrals):** break-glass on group events; moderator peek; non-member
 authoring; GlobalAdmin edit/publish override on group events. Changing any
-requires an ADR 0089 amendment.
+requires an ADR [0089](../adr/0089-group-events-membership-lane.md) amendment.
 
 ## Invariants (pinned for group events)
 
@@ -81,8 +81,8 @@ requires an ADR 0089 amendment.
   **before** `throw UnauthorizedAccessException` so it survives; Web renders
   **404**). The owner creates **as** a member — no owner-skip.
 - **GE·4 — nobody peeks; author-only write lanes.** No break-glass, no
-  moderator branch, no GlobalAdmin override (C5 / ADR 0003 / G·4 strictest
-  reading). Edit and publish are **author-only** (the ADR 0016 / ADR 0037
+  moderator branch, no GlobalAdmin override (C5 / ADR [0003](../adr/0003-roles-and-moderator-scoping.md) / G·4 strictest
+  reading). Edit and publish are **author-only** (the ADR [0016](../adr/0016-group-post-and-reply-edit-lane-author-only.md) / ADR [0037](../adr/0037-draft-mode-author-only.md)
   group-lane precedent): sole decision `AuthorId == actorId`; a non-author is
   denied (`UnauthorizedAccessException` → Web 404).
 - **GE·5 — audit per lane, always on, in-transaction (C3).** Feed = **one
@@ -98,7 +98,7 @@ requires an ADR 0089 amendment.
 - **GE·6 — delegation is action-scoped (C2).** An in-scope `read` grant lets
   the delegate act with the **owner's** standing (they see the group's events
   iff the **owner** is a member), `Via = Delegation`; an out-of-scope grant
-  still denies. Reused from the ADR 0013 `DecideGroupAsync` — **no new**
+  still denies. Reused from the ADR [0013](../adr/0013-group-posts-membership-lane.md) `DecideGroupAsync` — **no new**
   authorization surface.
 - **GE·7 — RSVP + reminders are membership-inherited, not re-derived.** The
   existing `RsvpAsync` / `GetMyRsvpAsync` / `GetRsvpsAsync` are reused as-is
@@ -107,11 +107,11 @@ requires an ADR 0089 amendment.
   events and the Going-RSVP set, so group events are reminded **with no
   change** (the recipient set is membership-derived by construction). No new
   reminder surface, no new notification kind, no audit row (a side effect, not
-  an access decision — ADR 0054 §3.6).
+  an access decision — ADR [0054](../adr/0054-events-rsvp-reminders.md) §3.6).
 - **GE·8 — a group event's write shape is pinned.** `CreateGroupEventAsync`
   writes `GroupId` (the lane marker), `ComponentId = string.Empty`,
   `Audience = new Audience()` (non-null empty — grantable-by-nothing, GE·1).
-  `EventService`'s constructor is **unchanged** (ADR 0006-D: it calls the
+  `EventService`'s constructor is **unchanged** (ADR [0006](../adr/0006-module-boundary-contracts.md)-D: it calls the
   frozen group seams and never reads `GroupMembership`/`DelegationGrant`
   itself).
 
@@ -187,7 +187,7 @@ public sealed record GroupEventUpdate(
     bool? ReminderEnabled = null);
 ```
 
-### `IEventService` ADDs (frozen M4 signatures untouched — ADR 0006-E lane)
+### `IEventService` ADDs (frozen M4 signatures untouched — ADR [0006](../adr/0006-module-boundary-contracts.md)-E lane)
 
 ```csharp
 // ── Group events lane (ADR 0089) — members see via the frozen group seams; non-member ⇒ null / empty ──
@@ -248,7 +248,7 @@ actions).
 15. `Feed_AggregateAuditRowShape_GroupEvent`
 16. `Detail_DecisionAuditRowShape_ViaGroup`
 17. `Detail_DecisionAuditRowShape_ViaDelegation`
-18. `Draft_NonAuthorSeesNothing_GetGroupEvent` (the ADR 0037 draft gate, before membership)
+18. `Draft_NonAuthorSeesNothing_GetGroupEvent` (the ADR [0037](../adr/0037-draft-mode-author-only.md) draft gate, before membership)
 19. `EventService_MakesNoModerateOrBreakGlassCallOnGroupEvents`
 
 Acceptance gate: **closed loop** (a member creates a group event → it lands in
@@ -283,9 +283,9 @@ entry reads, each line re-verified at close.
 |---|---|---|
 | **seams** | `Event.GroupId` present (U04) — `src/Kumunita.Core/Events/Event.cs`, `public string GroupId { get; set; } = string.Empty;` · the four `IEventService` ADDs (U04) — `ListGroupEventsAsync` / `GetGroupEventAsync` / `CreateGroupEventAsync` / `UpdateGroupEventAsync`, implemented in `EventService.cs` (ctor unchanged) · `GroupEventFeedResult` / `GroupEventDraft` / `GroupEventUpdate` (U04) — `src/Kumunita.Core/Events/GroupEventDraft.cs` · the `ListUpcomingAsync` / `ListInRangeAsync` `GroupId == string.Empty` filter (U04) · every symbol grep'd, each named with its file, **all present** | **PASS** |
 | **tests** | the 19 seam-test names all present in `tests/Kumunita.Core.Tests/GroupEventServiceTests.cs`, 19 `[Fact]`s, none missing / none extra vs §seams · the 13 `GroupsControllerGroupEventTests` 404 tests present in `tests/Kumunita.Web.Tests/GroupsControllerGroupEventTests.cs` · the U08 gate line (Core 851/851 + Web 466/466) still **PASS** per the recorded section above | **PASS** |
-| **close docs** | `README.md` — the **Group events** Features bullet + the Roadmap **Group events (`GE`, ADR 0089)** lane bullet (a shipped non-lettered lane lives in both; M4/M5/M6 Roadmap lines untouched) · `docs/adr/README.md` — the **0089** register row (`Accepted`) · `src/Kumunita.Web/Milestones.cs` **untouched** (a named lane, not a milestone — the ADR 0086 `PL` / ADR 0088 precedent) | **PASS** |
-| **kw-l** | the nine `groups.*` `kw-l` keys present in `en`/`de`/`fr`/`da` (the ADR 0005 "all keys in every language" rule) — `groups.back` · `groups.events_heading` · `groups.new_event` · `groups.events_empty_can` · `groups.events_empty` · `groups.new_event_title` · `groups.new_event_lead` · `groups.new_event_submit` · `groups.edit_event_title` | **PASS** |
-| **folders** | `docs/archive/lanes/group-events/plan-group-events.md` present (moved from `in-progress/`) · the design doc's gate + close sections recorded above | **PASS** |
+| **close docs** | [`README.md`](../../README.md) — the **Group events** Features bullet + the Roadmap **Group events (`GE`, ADR [0089](../adr/0089-group-events-membership-lane.md))** lane bullet (a shipped non-lettered lane lives in both; M4/M5/M6 Roadmap lines untouched) · [`docs/adr/README.md`](../adr/README.md) — the **0089** register row (`Accepted`) · `src/Kumunita.Web/Milestones.cs` **untouched** (a named lane, not a milestone — the ADR [0086](../adr/0086-goals-projects-lane.md) `PL` / ADR [0088](../adr/0088-projects-todos-boards-translations.md) precedent) | **PASS** |
+| **kw-l** | the nine `groups.*` `kw-l` keys present in `en`/`de`/`fr`/`da` (the ADR [0005](../adr/0005-multilingual-support.md) "all keys in every language" rule) — `groups.back` · `groups.events_heading` · `groups.new_event` · `groups.events_empty_can` · `groups.events_empty` · `groups.new_event_title` · `groups.new_event_lead` · `groups.new_event_submit` · `groups.edit_event_title` | **PASS** |
+| **folders** | [`docs/archive/lanes/group-events/plan-group-events.md`](../archive/lanes/group-events/plan-group-events.md) present (moved from `in-progress/`) · the design doc's gate + close sections recorded above | **PASS** |
 | **drift** | no drift pause recorded — the 19 pinned names landed verbatim (master verified 1:1, no renames, count 19 ✓) — **clean** | **PASS** |
 
 **Outcome: all six lines PASS — no hard failure. The group-events lane is
@@ -294,59 +294,59 @@ closed.** The `## Group events — Gate` line above is the recorded run
 
 ---
 
-## ADR 0005 — moved content (D11 trim, 2026-11-02)
+## ADR [0005](../adr/0005-multilingual-support.md) — moved content (D11 trim, 2026-11-02)
 
 ## Revisit when
 
 - A community actually needs MT of UGC — then decide C as a **new trust
   boundary**, not a feature flag, and update SECURITY.md §5/§6.
-- Federation arrives (ADR 0001-B): the *platform* language catalog may move
+- Federation arrives (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B): the *platform* language catalog may move
   with the IdP, but per-instance languages and translations stay local.
 
 
 ## Amendments
 
-### 2026-09-18 — bundled initial language pack (ADR 0042)
+### 2026-09-18 — bundled initial language pack (ADR [0042](../adr/0042-bundled-initial-language-pack.md))
 
 §B's "every other language is community-provided" is amended: **`de` and
 `fr` additionally ship as bundled initial values** — the pristine-boot
-seeder (the `IsPristineAsync` gate, ADR 0015) materializes the `de` / `fr`
+seeder (the `IsPristineAsync` gate, ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) materializes the `de` / `fr`
 catalog rows, the full UI-string baselines from the code's
 `KnownTranslationKeys` registries, and the `de` / `fr` bodies of the seeded
 `terms` / `help` system pages. They are **seeded once, then community-
-owned** — an in-app edit (GlobalAdmin ∪ Translator, ADR 0021) is never
+owned** — an in-app edit (GlobalAdmin ∪ Translator, ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md)) is never
 overwritten by a later deploy. **`en` remains the only code-owned language**
-(code-wins upsert + provider floor, ADR 0015 D1/D2, unchanged). See
-**ADR 0042** for the full locked text (ownership semantics, the register
+(code-wins upsert + provider floor, ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1/D2, unchanged). See
+**ADR [0042](../adr/0042-bundled-initial-language-pack.md)** for the full locked text (ownership semantics, the register
 choice, the `about`-via-registry decision, the `about.*` key contract).
 
-### 2026-09-18 — system pages shipped + discoverable (ADR 0043)
+### 2026-09-18 — system pages shipped + discoverable (ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md))
 
 §B's **static-page coverage** scope is widened: on a fresh instance the
 seeded platform-page set is now the **five-surface set** — the `about`
-product-story **view** (not a `Page` doc, the ADR 0039 U05 drift pin carried
+product-story **view** (not a `Page` doc, the ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md) U05 drift pin carried
 forward) plus the four `Page`-backed surfaces **Terms**, **Help**, **Privacy
-Policy**, and **Code of Conduct** (the last two new in ADR 0043, D1) — each
+Policy**, and **Code of Conduct** (the last two new in ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md), D1) — each
 of the four `Page` docs carrying `en` / `de` / `fr` bodies. The `de` / `fr`
-bodies of the two new pages follow the **same** ADR 0042 D1 ownership
+bodies of the two new pages follow the **same** ADR [0042](../adr/0042-bundled-initial-language-pack.md) D1 ownership
 semantics (seeded once, then community-owned; `en` code-owned). The two new
 routes (`/privacy` / `/conduct`) join the hard-coded static set with the 404
-floor (ADR 0043 D2). See **ADR 0043** for the full locked text (the
+floor (ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md) D2). See **ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md)** for the full locked text (the
 five-surface set, the route contract, the ownership re-statement, the
 discoverability decision, the content scope, and the unchanged standing
 matrix).
-### 2026-09-19 — UGC default variant selection (ADR 0049)
+### 2026-09-19 — UGC default variant selection (ADR [0049](../adr/0049-default-language-variant-selection.md))
 
 §C's "never automatic" clause is **re-scoped**: the default-*visible*
 variant on the post/reply/announcement detail surfaces and the
 pinned-announcement banner is now the **viewer's current language**
-(§B's resolution order, as amended by ADR 0046) **when a human-added
+(§B's resolution order, as amended by ADR [0046](../adr/0046-default-language-browser-accept-language-match.md)) **when a human-added
 translation of the item exists in it** — otherwise the authored-in
-variant remains default-visible (the ADR 0027 floor). This is a
+variant remains default-visible (the ADR [0027](../adr/0027-post-reply-translation-display-and-swap.md) floor). This is a
 display-only *default selection* of content that already exists in the
 DOM; it is not, and does not enable, machine translation: the
 deferred-MT clause, the no-third-party-send rule, and the "never
 silently translated" guarantee for *generated* text are all unchanged.
-See **ADR 0049** for the full locked text (the surface list, the
-resolution chain it reuses, the ADR 0027 swap/return path that stays
+See **ADR [0049](../adr/0049-default-language-variant-selection.md)** for the full locked text (the surface list, the
+resolution chain it reuses, the ADR [0027](../adr/0027-post-reply-translation-display-and-swap.md) swap/return path that stays
 touched, and the out-of-scope surfaces).

@@ -12,14 +12,14 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0118 — M17: Bookmarks (save posts, events, todos, etc. for quick personal access)
+# ADR [0118](0118-bookmarks.md) — M17: Bookmarks (save posts, events, todos, etc. for quick personal access)
 
 Status: Accepted
 Date: 2026-09-29
 
 > **Abstract:** M17 makes a resident's quick-access list real — a standalone core
 > surface over one document, one new surface, one service seam, and zero new
-> authorization surface. A bookmark is a *personal-by-id* record (the ADR 0105 M9
+> authorization surface. A bookmark is a *personal-by-id* record (the ADR [0105](0105-messaging.md) M9
 > shape), not an audience decision; it grants nothing and is a subset of the
 > visible world. **Who is it for:** a developer touching `Kumunita.Core.Bookmarks`
 > or `/bookmarks`. **When to read the rest:** before adding a `TargetKind` or
@@ -29,9 +29,9 @@ Date: 2026-09-29
 
 The neighborhood has everywhere to **find** content but nowhere to say *these are
 mine to come back to* (the README M17 row). The shape is already proven by M5 (a
-standalone core surface on its own `*DocTypes` surface, ADR 0004 §B.1) and M9 (a
+standalone core surface on its own `*DocTypes` surface, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1) and M9 (a
 *participant-by-id* record whose access story is identity comparison, never an
-audience decision — ADR 0105). The constraint: **compose the frozen seams, never
+audience decision — ADR [0105](0105-messaging.md)). The constraint: **compose the frozen seams, never
 extend them** — no new `AccessAction` / `AccessVia` / `Decide()` branch /
 `IAuthorizationService` method / adapter. One rule keeps it safe: you may only
 bookmark **what you can see**, and a bookmark **grants nothing**.
@@ -46,7 +46,7 @@ bookmark **what you can see**, and a bookmark **grants nothing**.
   idempotency index.
 - **D2 — A bookmark is a personal-by-id record, never an audience decision.** No
   adapter, no `AccessAction` / `AccessVia` / `Decide()` branch /
-  `IAuthorizationService` method (the ADR 0105 shape); the owner's own list is a
+  `IAuthorizationService` method (the ADR [0105](0105-messaging.md) shape); the owner's own list is a
   personal read — no `CanSeeAsync` pass, no `AccessAudit` row.
 - **D3 — Bookmarking requires visibility; bookmarking grants nothing.** The write
   lane re-runs the target's **own** frozen `CanAsync(Read)` (the same call the
@@ -57,7 +57,7 @@ bookmark **what you can see**, and a bookmark **grants nothing**.
   soft-deleted, or no longer visible renders as the closed `bm.list.degraded` label
   (no title, link, or id) and remains removable.
 - **D6 — M17 is a core surface, not a lane.** No off-by-default admin toggle (the
-  ADR 0101 admin-toggle shape **inverted**).
+  ADR [0101](0101-announcement-comments-lane.md) admin-toggle shape **inverted**).
 - **D7 — No notification lane (deferred).** M17 composes only the frozen
   `IAuthorizationService` + the owning surfaces' read seams; the "nudge the
   author" lane is a follow-on with its own ADR.

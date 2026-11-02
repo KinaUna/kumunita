@@ -11,12 +11,12 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0140 — Guardian community block-and-hide (the per-child ceiling on the ADR 0028 surface)
+# ADR [0140](0140-guardian-community-block-and-hide.md) — Guardian community block-and-hide (the per-child ceiling on the ADR [0028](0028-guardian-controls-account-scope-supervision.md) surface)
 
 Status: Accepted
 Date: 2026-10-04
 
-The ADR 0028 GU surface ("manage a child account", `/me/children/{childId}`)
+The ADR [0028](0028-guardian-controls-account-scope-supervision.md) GU surface ("manage a child account", `/me/children/{childId}`)
 ships a guardian's supervision of a child. Two of its community lanes were
 product mistakes, fixed here:
 
@@ -27,7 +27,7 @@ product mistakes, fixed here:
   forms are **removed** from the curation view (and the `CurateCommunity`
   add/remove community lane is retired).
 - **"Removing a child from a community" was a silent no-op for a mandatory
-  community.** ADR 0012's mandatory communities grant *implicit* membership
+  community.** ADR [0012](0012-community-membership-mandatory-and-moderator.md)'s mandatory communities grant *implicit* membership
   to every resident, and the removal lanes (`RemoveCommunityMemberAsync`
   refuses, `ClearCommunityMembershipAsync` skips) will not remove it — so a
   guardian's "remove" did nothing exactly where it was wanted. The guardian's
@@ -35,39 +35,39 @@ product mistakes, fixed here:
   **block access to, and hide, the community from the child**.
 
 This ADR adds that control — a **per-child community block** — the
-`Profile.MessagingRestricted` guardian-ceiling precedent (ADR 0139) carried
+`Profile.MessagingRestricted` guardian-ceiling precedent (ADR [0139](0139-per-resident-messaging-controls.md)) carried
 from a single flag to a per-community set. It rides frozen seams, extending
 none:
 
-- **The ADR 0028 guardian standing** — the new
+- **The ADR [0028](0028-guardian-controls-account-scope-supervision.md) guardian standing** — the new
   `SetChildCommunityBlockAsync` write lane reuses the `GuardActiveLinkAsync`
   standing gate (G·2/G·3 deny-by-default) verbatim; the `guardian.
   community_block` / `guardian.community_unblock` audit rows are the
   `guardian.suspend` / `guardian.messaging_restrict` shape.
-- **The ADR 0012 mandatory-membership invariant** — a mandatory community's
+- **The ADR [0012](0012-community-membership-mandatory-and-moderator.md) mandatory-membership invariant** — a mandatory community's
   *membership* is untouched (the child remains an implicit member; the raw
   `GetCommunityIdsAsync` read and the `/admin` per-account diff are
   byte-identical). The block is a *restriction on the child's own access*,
   not a membership change — which is precisely why it works where "remove"
   cannot.
-- **The ADR 0004 §B.1 additive-surface discipline** — the new
+- **The ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive-surface discipline** — the new
   `Profile.BlockedCommunityIds` field is *additive* to the existing
   `Profile` document; **zero migrations**, no re-seed, no new `*DocTypes`
   surface.
 
 ## Context
 
-ADR 0012 (mandatory communities) makes every verified resident an implicit
+ADR [0012](0012-community-membership-mandatory-and-moderator.md) (mandatory communities) makes every verified resident an implicit
 member of the mandatory set; nobody may be removed (the removal lanes refuse
 /skip it) and nobody may leave (the self-leave route is gated on the flag).
-The ADR 0028 GU surface layered "membership curation" on top — a guardian
-add/removing the child to/from a community — which collided with ADR 0012
+The ADR [0028](0028-guardian-controls-account-scope-supervision.md) GU surface layered "membership curation" on top — a guardian
+add/removing the child to/from a community — which collided with ADR [0012](0012-community-membership-mandatory-and-moderator.md)
 for the mandatory set: the guardian's remove was a silent no-op. The product
 correction is to stop offering "remove" for a mandatory community and instead
 give the guardian a way to **hide** the community from the child (block its
-access), which is a different kind of control that ADR 0012 does not forbid.
+access), which is a different kind of control that ADR [0012](0012-community-membership-mandatory-and-moderator.md) does not forbid.
 
-The ADR 0139 messaging ceiling is the closest precedent: an additive
+The ADR [0139](0139-per-resident-messaging-controls.md) messaging ceiling is the closest precedent: an additive
 `Profile` field, a single guardian-scope write lane gated on an active
 `GuardianLink`, one audit row, and a read seam the enforcement surfaces read
 through. This ADR follows that shape exactly, with one difference — the
@@ -90,13 +90,13 @@ which to block.
 
 **D1 — The block is an *additive* `Profile` field.** The new
 `Profile.BlockedCommunityIds` (`IReadOnlyList<string>`, default `[]`) is an
-additive field on the existing `Profile` document (ADR 0004 §B.1 —
+additive field on the existing `Profile` document (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 —
 delta-detected, idempotent, no re-seed, no EF migration, no new `*DocTypes`
 surface — the `Profile.TagIds` / `Profile.MessagingRestricted` precedent).
 For an unsupervised resident it stays empty, so every read below reduces to
 the ordinary membership. *Forbids:* a new `CommunityBlock` table or a new
 `GuardianLink` field (the restriction is on the *child's* profile, not on
-the link — the ADR 0139 "ceiling is on the child, not the link" pin).
+the link — the ADR [0139](0139-per-resident-messaging-controls.md) "ceiling is on the child, not the link" pin).
 
 **D2 — The write lane is a *single-write* guardian-scope seam.** The new
 `IUserInfoService.SetChildCommunityBlockAsync(string childId, string
@@ -115,7 +115,7 @@ community_unblock` (when lifting), `TargetKind = "community"`,
 consistency (C4): the toggle is live on the very next read. *Forbids:* a
 block write on a (guardian, child) pair with no active link (the G·3
 deny-by-default pin); touching the child's `ComponentMembership` row at all
-(the block is a restriction, not a membership change — the ADR 0012
+(the block is a restriction, not a membership change — the ADR [0012](0012-community-membership-mandatory-and-moderator.md)
 "cannot remove" invariant is preserved, not bypassed at the membership
 layer).
 
@@ -134,7 +134,7 @@ regardless of a guardian's restriction: the guardian's own curation view
 (`GuardianController.Detail` still reads `Model.CommunityIds` from the raw
 read, so a mandatory community still appears for the guardian to block) and
 the `/admin` per-account community diff. A missing profile degrades to the
-raw membership (the ADR 0139 `MessagingRestricted` null-safe floor).
+raw membership (the ADR [0139](0139-per-resident-messaging-controls.md) `MessagingRestricted` null-safe floor).
 *Forbids:* a default-open drift (a community the guardian blocked must not
 leak into the child's effective set on any surface); a `Profile` read on a
 non-community decision path (the effective-set read happens only where
@@ -154,14 +154,14 @@ was the removed form + the per-community "Remove" button). The group's
 removing a child from a *group* is meaningful (groups have no implicit
 membership). *Forbids:* a new "add a community" surface; re-adding a
 "remove child from a mandatory community" button (a silent no-op under
-ADR 0012 — the block is the correct control).
+ADR [0012](0012-community-membership-mandatory-and-moderator.md) — the block is the correct control).
 
 **D5 — The community surface is a per-community block/unblock toggle on the
 existing `/me/children/{childId}` curation view.** The new
 `GuardianController.SetChildCommunityBlock` POST action (the route
 `me/children/{childId}/communities/{communityId}`, `[ValidateAntiForgeryToken]`,
 the `SetChildMessaging` idiom verbatim) reads the `ActiveLinkAsync` standing
-gate first (a non-guardian is a 404, the ADR 0028 shape), then calls the D2
+gate first (a non-guardian is a 404, the ADR [0028](0028-guardian-controls-account-scope-supervision.md) shape), then calls the D2
 write lane. The `Detail.cshtml` community section is rewritten from the
 "list + Remove + Add form" to a **list of the child's communities** (the
 raw `Model.CommunityIds`) each with a **state-picked button**: not-blocked
@@ -171,7 +171,7 @@ child's current block set is exposed on `ViewData["BlockedCommunityIds"]`
 (the `MembershipEditorModel` is a pinned 5-field record —
 `GuardianViewModelsTests.MembershipEditorModel_Is_Exact_Five_Field_
 Projection` forbids a 6th field — so the block state rides `ViewData`, the
-ADR 0139 `MessagingRestricted` / `_AudienceEditor` precedent for non-model
+ADR [0139](0139-per-resident-messaging-controls.md) `MessagingRestricted` / `_AudienceEditor` precedent for non-model
 view data). The **single-community feed** (`PostsController.Index` on
 `/community/{componentId}`) gains a pre-feed 404 gate: a non-admin,
 non-moderator viewer whose effective set does not include the community sees
@@ -196,7 +196,7 @@ perturbing the parity tests' closed-set assertions.
 
 - A guardian can hide a mandatory community from a child — the exact case
   the old "remove" lane could not handle — without touching the child's
-  membership (ADR 0012's invariant intact; `/admin` and the guardian's own
+  membership (ADR [0012](0012-community-membership-mandatory-and-moderator.md)'s invariant intact; `/admin` and the guardian's own
   curation list are unchanged).
 - The child's effective community set (directory, feed, posting, community
   post/announcement visibility) excludes a blocked community; admin and the
@@ -207,10 +207,10 @@ perturbing the parity tests' closed-set assertions.
   a store that does not register `Profile` (the `InventoryServiceTests`
   minimal `InventoryDocTypes`-only store) must register `CoreDocTypes`, the same as
   its `PostServiceTests` / `ProjectServiceTests` siblings.
-- Frozen seams (`GetCommunityIdsAsync`, `ComponentMembership`, the ADR 0012
+- Frozen seams (`GetCommunityIdsAsync`, `ComponentMembership`, the ADR [0012](0012-community-membership-mandatory-and-moderator.md)
   mandatory lanes) are **byte-identical**; the new surface is three seams
   (one field, one write, one read) + one Web action + a rewritten view
-  section, all following the ADR 0139 / ADR 0028 idiom.
+  section, all following the ADR [0139](0139-per-resident-messaging-controls.md) / ADR [0028](0028-guardian-controls-account-scope-supervision.md) idiom.
 
 ## Pinned seams / tests
 
@@ -222,7 +222,7 @@ perturbing the parity tests' closed-set assertions.
 - `GuardianCommunityBlockTests` (Web): `SetChildCommunityBlock_NonGuardian-
   _Returns404_NoWrite`, `SetChildCommunityBlock_Guardian_BlockedTrue_Block-
   Live_AuditedViaGuardian`, `SetChildCommunityBlock_BlockedFalse_LiftsBlock`
-  (the D5 Web surface + the ADR 0028 deny-by-default shape, mirroring
+  (the D5 Web surface + the ADR [0028](0028-guardian-controls-account-scope-supervision.md) deny-by-default shape, mirroring
   `GuardianMessagingRestrictionTests`).
 - `GuardianViewModelsTests`: `MembershipEditorModel_Is_Exact_Five_Field_
   Projection` (unchanged — the block state rides `ViewData`, not the model).

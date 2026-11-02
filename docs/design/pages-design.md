@@ -18,14 +18,14 @@ updated: 2026-11-02
 
 > **Lane.** `PG` — a **named lane** (the `ML` / `GP` / `RC` / `RE` convention: a
 > short ID, *not* a renumber). M4 / M5 / M6 stay Events / Projects /
-> Portability; **no roadmap letter moves**. **ADR 0039** (the next number after
+> Portability; **no roadmap letter moves**. **ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md)** (the next number after
 > 0038) is this lane's decision record. This file is the **primary reference
 > tier** (the exact seams every unit codes against); the sealed-unit register
-> is `docs/archive/lanes/pages/plan-pages.md`.
+> is [`docs/archive/lanes/pages/plan-pages.md`](../archive/lanes/pages/plan-pages.md).
 >
-> **Status.** Accepted (ADR 0039, 2026-09-17). All decisions marked
-> **[DECIDED]** are locked in ADR 0039. The former **[PROPOSED]** markers have
-> been resolved to **[DECIDED — ADR 0039]**; the ADR is the authoritative
+> **Status.** Accepted (ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md), 2026-09-17). All decisions marked
+> **[DECIDED]** are locked in ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md). The former **[PROPOSED]** markers have
+> been resolved to **[DECIDED — ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md)]**; the ADR is the authoritative
 > record, this doc is the primary reference tier for implementation.
 
 ## 1. What this lane is
@@ -40,11 +40,11 @@ knowledge tree**:
 - **System (platform) + resident-blog pages** — a `System` page is
   admin-authored ("how the platform works", "what's coming"); a `User` (blog)
   page is a **resident's own blog** — their own prose, nested under their own
-  root (ADR 0040).
+  root (ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md)).
 - **Audiences like community posts** — a page is **private** (a subset of
   users/groups), **community-visible** (all members of a component), or
   **public** (everyone) — reusing the exact `Audience` mechanism posts use
-  (ADR 0001-B / ADR 0006 / ADR 0036), *not* a second flat scope.
+  (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / ADR [0006](../adr/0006-module-boundary-contracts.md) / ADR [0036](../adr/0036-community-visible-audience-default.md)), *not* a second flat scope.
 - **A hierarchy** — pages nest like folders/files (`parent_id`), listed as a
   tree and rendered like blog posts. **Special root nodes** (the "mount points")
   name **where a page appears in the UI**: `footer/community` (the about page),
@@ -58,12 +58,12 @@ knowledge tree**:
 existing lane and reuses every settled mechanism** — the `Audience` doc (no
 second scope enum), the `IAuthorizationService.CanAsync(…Read…)` decision path
 (through a `PageToAuditableResource` adapter, mirroring `PostToAuditableResource`),
-the user-added-translation row shape (ADR 0022/0026/0029), the `MarkdownRenderer`
-+ `bindRichEditor` authoring surface (ADR 0025 / ADR 0031), the content-image /
-attachment idiom (ADR 0025 / ADR 0034), and the ADR 0004 §B.1 **additive-field**
+the user-added-translation row shape (ADR [0022](../adr/0022-user-added-post-reply-translations.md)/0026/0029), the `MarkdownRenderer`
++ `bindRichEditor` authoring surface (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)), the content-image /
+attachment idiom (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md)), and the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 **additive-field**
 rule (delta-detected, idempotent, no seed reset, zero migrations for new fields).
 **No new `AccessAction`** (the existing `Read` is enough), **no new
-`AccessVia` value** (pages use the settled `Owner` / `Admin` branches — ADR 0040
+`AccessVia` value** (pages use the settled `Owner` / `Admin` branches — ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md)
 retires the community-Moderator lane, so `Moderator` is never a page standing),
 **no new bounded-context authorization path** (it goes through the frozen
 `IAuthorizationService`).
@@ -98,7 +98,7 @@ Read directly, not assumed:
    `ReplyTranslation` / `AnnouncementTranslation` / `GroupTranslation` /
    `CommunityTranslation`, all `(ParentId, LanguageCode)` unique-indexed,
    standing = GlobalAdmin ∪ Translator (the community-Moderator lane is
-   retired on pages by ADR 0040), display via the ADR 0027 chip-swap.
+   retired on pages by ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md)), display via the ADR [0027](../adr/0027-post-reply-translation-display-and-swap.md) chip-swap.
 7. **Reference-from-UGC is free** — `MarkdownRenderer` renders
    `[label](url)` under the `IsSafeUrl` whitelist (relative paths accepted), so
    a `[About](/pages/about)` link in a post body already works end-to-end with
@@ -118,7 +118,7 @@ re-renders** to the same tree. Rationale:
   systems. Two systems would give two editors, two renderers, two translation
   lanes, and a `/about` that is special-cased forever. Absorbing makes
   `/about` an *ordinary page* with a mount point.
-- It keeps **one** `MarkdownRenderer` (ADR 0005 A's "single page engine"),
+- It keeps **one** `MarkdownRenderer` (ADR [0005](../adr/0005-multilingual-support.md) A's "single page engine"),
   **one** editor (`bindRichEditor`), **one** translation-row shape, **one**
   decision path — the "lean" / "boring" principle.
 - **Additive, not destructive:** the seeded pages keep the *same* `en` floor
@@ -136,15 +136,15 @@ re-renders** to the same tree. Rationale:
 > model; parallel is only a retreat if the migration is judged too risky for
 > the deployment.
 
-### 3.2 Document shape  **[DECIDED — ADR 0039]**
+### 3.2 Document shape  **[DECIDED — ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md)]**
 
 A **`Page`** POCO (`Kumunita.Core.Pages`) — the **body/structure** of a page
 (authored-in language, hierarchy, audience, author). Body text is stored
 **once per authored-in language**, and **translations are separate rows**
 (`PageTranslation`), exactly mirroring `Post` + `PostTranslation`. This matches
 how the platform already stores every other translatable UGC surface (ADR
-0018 authored-in tag + ADR 0022 separate translation rows), and it is what lets
-the ADR 0027 chip-swap display work unchanged.
+0018 authored-in tag + ADR [0022](../adr/0022-user-added-post-reply-translations.md) separate translation rows), and it is what lets
+the ADR [0027](../adr/0027-post-reply-translation-display-and-swap.md) chip-swap display work unchanged.
 
 ```csharp
 // Kumunita.Core.Pages
@@ -185,15 +185,15 @@ public sealed class Page
 | Field | Source idiom | Note |
 |---|---|---|
 | `ParentId` / `Slug` | *new, this lane* | the hierarchy. `Slug` is **unique per parent** (a `(ParentId, Slug)` unique index, the `GroupMembership` business-key convention). The full path is *derived* (`/pages/a/b/c`) — not stored — so a subtree moves in one column write. |
-| `Title` / `Body` / `LanguageCode` | `Post` / `Announcement` (ADR 0018) | authored-in tag + Markdown body; rendered by the single `MarkdownRenderer`. |
-| `Audience` | `Post.Audience` (ADR 0001-B / 0036) | **`null` = public** (Decide branch 5); non-null = grant list / `Community` flag. Reuses the `AudienceEditorModel` form surface verbatim. |
-| `Kind` | *new, ADR 0040* | `System` (a platform page) vs `User` (a resident's blog) — the standing matrix in §3.7 keys off this. |
-| `AuthorId` / `ComponentId` | `Post` / `Announcement` | the `Owner` branch (a blog page's author) + a community-scoped audience's `ComponentId` — a *read* scope, **not** a standing seam (ADR 0040 retires the Moderator lane). |
-| `MountPoint` | *new, this lane* | a **nullable string tag** (e.g. `"footer/community"`). A UI slot reads "the page mounted at X". It is a *display* concern (where to surface a link), **not** an access boundary — access is always the `Audience` + `CanAsync(Read)`. **ADR 0040:** a **system-page** concept only — a blog page surfaces solely in its own `/blog` feed, so the write lane clears it on `Kind = User` pages and the composer hides the field. |
-| `IsDraft` | `Announcement.IsDraft` (ADR 0037) | the author-only draft pin, reused for "admin drafting a blog post before publishing". |
+| `Title` / `Body` / `LanguageCode` | `Post` / `Announcement` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)) | authored-in tag + Markdown body; rendered by the single `MarkdownRenderer`. |
+| `Audience` | `Post.Audience` (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036) | **`null` = public** (Decide branch 5); non-null = grant list / `Community` flag. Reuses the `AudienceEditorModel` form surface verbatim. |
+| `Kind` | *new, ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md)* | `System` (a platform page) vs `User` (a resident's blog) — the standing matrix in §3.7 keys off this. |
+| `AuthorId` / `ComponentId` | `Post` / `Announcement` | the `Owner` branch (a blog page's author) + a community-scoped audience's `ComponentId` — a *read* scope, **not** a standing seam (ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md) retires the Moderator lane). |
+| `MountPoint` | *new, this lane* | a **nullable string tag** (e.g. `"footer/community"`). A UI slot reads "the page mounted at X". It is a *display* concern (where to surface a link), **not** an access boundary — access is always the `Audience` + `CanAsync(Read)`. **ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md):** a **system-page** concept only — a blog page surfaces solely in its own `/blog` feed, so the write lane clears it on `Kind = User` pages and the composer hides the field. |
+| `IsDraft` | `Announcement.IsDraft` (ADR [0037](../adr/0037-draft-mode-author-only.md)) | the author-only draft pin, reused for "admin drafting a blog post before publishing". |
 | `ImageIds` / `AttachmentIds` | `Announcement` (RC U03 / ATT U3) | the content-image + attachment idiom, byte-store + reverse-lookup serving reused. |
 
-### 3.3 Hierarchy model  **[DECIDED — ADR 0039]**
+### 3.3 Hierarchy model  **[DECIDED — ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md)]**
 
 - **Nesting is by `ParentId`; the path is derived.** A page's canonical
   path is the chain of ancestor `Slug`s: `Page("/a/b/c")` ⇒ `a` (root) → `b`
@@ -225,7 +225,7 @@ public sealed class Page
   for a knowledge tree (the RC lane has the same property). *[PROPOSED — note
   as a known consequence.]*
 
-### 3.4 Audiences  **[DECIDED — reuses ADR 0001-B / 0036; no new mechanism]**
+### 3.4 Audiences  **[DECIDED — reuses ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036; no new mechanism]**
 
 A page's `Audience` is **exactly** a post's: `null` = public; non-null =
 `Mode` + `Grants` (users/groups) + `Community` flag. This means:
@@ -235,7 +235,7 @@ A page's `Audience` is **exactly** a post's: `null` = public; non-null =
   still applies to the *grant list*; the owner branch still lets the author see
   their own empty-audience page (the draft/author pin).
 - **Community page** — `Audience.Community = true`, `ComponentId` set, `Grants`
-  empty ⇒ visible to that component's members (ADR 0036's branch, *unchanged*).
+  empty ⇒ visible to that component's members (ADR [0036](../adr/0036-community-visible-audience-default.md)'s branch, *unchanged*).
 - **Public page** — `Audience = null` ⇒ everyone, including unauthenticated
   (Decide branch 5, *unchanged*).
 - **The decision path is the frozen `IAuthorizationService.CanAsync(…Read…)`**,
@@ -250,36 +250,36 @@ A page's `Audience` is **exactly** a post's: `null` = public; non-null =
   C6 no-drift, aggregate-audit bulk decision posts use) so a resident only
   *sees* pages they can read — the tree does not leak the *existence* of a
   private page they cannot open.
-- **The default is the author's choice, verbatim** (ADR 0001-B) — the composer
-  seeds the `AudienceEditorModel` **exactly as the post composer does** (ADR 0036's
+- **The default is the author's choice, verbatim** (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B) — the composer
+  seeds the `AudienceEditorModel` **exactly as the post composer does** (ADR [0036](../adr/0036-community-visible-audience-default.md)'s
   "community-visible by default"): **pages default non-public,
   community-visible**, consistent with posts. ~~[PROPOSED]: public
   (`Audience = null`)~~ — **reversed 2026-09-17** to keep pages consistent with
   posts (a page is meant to be read; the author opts into public when they want
-  it world-readable). **[DECIDED — ADR 0039, amended 2026-09-17]**
+  it world-readable). **[DECIDED — ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md), amended 2026-09-17]**
 
-### 3.5 Translations  **[DECIDED — reuses ADR 0018 / 0022 / 0026 / 0027 / 0029]**
+### 3.5 Translations  **[DECIDED — reuses ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) / 0022 / 0026 / 0027 / 0029]**
 
 - A **`PageTranslation`** row (`Kumunita.Core.Pages`): `Id`, `PageId`,
   `LanguageCode`, `Title?`, `Body`, `AuthorId`, `Created` — **registered
   alongside `Page`** (a new `PageDocTypes` surface, or added to `PostDocTypes`
   — the register's U01 picks the surface; the shape is fixed). `(PageId,
   LanguageCode)` unique index, the settled business-key convention.
-- **Authored-in** is `Page.LanguageCode` (ADR 0018) — the base body is
+- **Authored-in** is `Page.LanguageCode` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)) — the base body is
   authored in one language; the `PageTranslation` rows are **user-added**
-  (never machine-translated — ADR 0005 C stands).
-- **Standing = GlobalAdmin ∪ Translator** (ADR 0021/0022), **on either page
-  kind** (ADR 0040 — the community-Moderator lane is retired on pages).
-  Add-only (ADR 0022); a wrong translation is corrected by the same standing
+  (never machine-translated — ADR [0005](../adr/0005-multilingual-support.md) C stands).
+- **Standing = GlobalAdmin ∪ Translator** (ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md)/0022), **on either page
+  kind** (ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md) — the community-Moderator lane is retired on pages).
+  Add-only (ADR [0022](../adr/0022-user-added-post-reply-translations.md)); a wrong translation is corrected by the same standing
   adding the right one, the unique index preventing a duplicate.
-- **Display = the ADR 0027 chip-swap**, reused verbatim: the authored-in
+- **Display = the ADR [0027](../adr/0027-post-reply-translation-display-and-swap.md) chip-swap**, reused verbatim: the authored-in
   variant is the default visible one, a chip per `PageTranslation`, click to
   swap. The page view (`/pages/{path}`) renders exactly like the
   post/announcement/reply detail translation surface. **No new display rule.**
 - **Seeded default pages ship with an `en` floor** (the existing
   `about`/`terms`/`help` bodies become the `en` authored-in body of the seeded
   pages) so a fresh instance is byte-identical to today for those three pages,
-  and a Translator can add `fr`/`de`/… rows the ADR 0027 surface already renders.
+  and a Translator can add `fr`/`de`/… rows the ADR [0027](../adr/0027-post-reply-translation-display-and-swap.md) surface already renders.
 
 ### 3.6 Reference-from-UGC  **[DECIDED — free, the RC/ATT idiom]**
 
@@ -294,9 +294,9 @@ separate `Read` decision that can 403/404. No `ImageIds`-style population is
 needed (a page reference is a URL, not an in-body media id — the RC reverse
 lookup is for media bytes, not for page links).
 
-### 3.7 Write lanes + standing  **[DECIDED — ADR 0039, amended by ADR 0040]**
+### 3.7 Write lanes + standing  **[DECIDED — ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md), amended by ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md)]**
 
-ADR 0040 splits a page into a **`PageKind`** — `System` (a platform page, e.g.
+ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md) splits a page into a **`PageKind`** — `System` (a platform page, e.g.
 About/Terms/Help) or `User` (a **resident's blog**, a page authored by and under
 that resident's own root) — and retires the community-Moderator lane entirely.
 Standing now depends on the kind (a **community Moderator has no standing on
@@ -307,36 +307,36 @@ either kind** — the §3.7 Moderator lane is retired):
 | **Create** | GlobalAdmin | any signed-in resident (becomes the **author**, under their own blog root — the ownership guard keeps it there) | `Admin` / `Owner` |
 | **Edit** body / audience / hierarchy | GlobalAdmin | the `AuthorId` ∪ GlobalAdmin | `Admin` / `Owner` |
 | **Add a translation** | GlobalAdmin ∪ Translator | GlobalAdmin ∪ Translator (same on either kind) | `Admin` |
-| **Publish** a draft | the `AuthorId` only (ADR 0037 pin) | the `AuthorId` only (ADR 0037 pin) | `Owner` |
+| **Publish** a draft | the `AuthorId` only (ADR [0037](../adr/0037-draft-mode-author-only.md) pin) | the `AuthorId` only (ADR [0037](../adr/0037-draft-mode-author-only.md) pin) | `Owner` |
 | **Move / rename / delete** | GlobalAdmin | the `AuthorId` ∪ GlobalAdmin (within their own blog root — the namespace + ownership guards) | `Admin` / `Owner` |
 
 - **`AccessVia.Moderator` is never written for a page** — the `Moderator`
   audit tag is gone from this lane; the standing is the kind + the author
   identity. A `Page.ComponentId` still names the community a *community-scoped
-  audience* reads the page for (ADR 0036), but it is **not** a standing seam
-  (ADR 0040 retires its ADR 0039 §3.7 use).
+  audience* reads the page for (ADR [0036](../adr/0036-community-visible-audience-default.md)), but it is **not** a standing seam
+  (ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md) retires its ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md) §3.7 use).
 
 - The standing is **enforced server-side** in the `PageService` (the
   `AnnouncementService.CreateAsync` scope-vs-role re-check pattern, C3), not
   only by a Web `[Authorize(Roles=…)]` — the Web attribute is a convenience
   pre-gate; the service is the single source of truth (the M3b convention).
 - **Every write lane** stores its `AccessAudit` row in the caller's session
-  (invariant C3, ADR 0006), `TargetKind = "page"`, `Action`
+  (invariant C3, ADR [0006](../adr/0006-module-boundary-contracts.md)), `TargetKind = "page"`, `Action`
   `page.create`/`page.update`/`page.translation.add`/`page.publish`/
   `page.delete`/`page.move`.
-- **Delete** is a **hard delete** (like announcements, ADR 0017) or an
-  **author soft-delete** (ADR 0024) — **[PROPOSED: soft-delete via an
-  `IsDeleted` flag + `CanSeeAsync` filter — **[DECIDED — ADR 0039]**], so an
+- **Delete** is a **hard delete** (like announcements, ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md)) or an
+  **author soft-delete** (ADR [0024](../adr/0024-author-soft-delete-lane.md)) — **[PROPOSED: soft-delete via an
+  `IsDeleted` flag + `CanSeeAsync` filter — **[DECIDED — ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md)]**], so an
   accidental delete of a seeded page is recoverable and a page's children are
   not orphaned mid-tree.
 
-### 3.8 The Web surface  **[DECIDED — ADR 0039]**
+### 3.8 The Web surface  **[DECIDED — ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md)]**
 
 - **`PageController`** (`Kumunita.Web.Controllers`):
   - `GET /pages` — the **tree browse** (folders/files), `CanSeeAsync(Read)`-
     filtered.
   - `GET /pages/{**path**}` — the **post view** (title + rendered body +
-    ADR 0027 translations), `CanAsync(Read)`-gated; 404 on absent, 403 on
+    ADR [0027](../adr/0027-post-reply-translation-display-and-swap.md) translations), `CanAsync(Read)`-gated; 404 on absent, 403 on
     denied (the announcement 404-vs-403 split).
   - `GET /pages/new` + `POST /pages/new` — compose (title, body, parent,
     audience editor, language) — WYSIWYG (`bindRichEditor`).
@@ -354,9 +354,9 @@ either kind** — the §3.7 Moderator lane is retired):
   `bindRichEditor` + RC content-image + ATT attachment wiring — the composer
   is the *same* editor posts/announcements use, pointed at a `Page` body.
 
-### 3.9 Data migration (absorb)  **[DECIDED — ADR 0039 — the one real migration in the lane]**
+### 3.9 Data migration (absorb)  **[DECIDED — ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md) — the one real migration in the lane]**
 
-1. Create the `Page` + `PageTranslation` tables (new doc types, ADR 0004 §B.1).
+1. Create the `Page` + `PageTranslation` tables (new doc types, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 2. **Seed the three default pages** — `about`, `terms`, `help` — as `Page`
    docs carrying the **current** `LocalizedPage` `en` bodies/titles, `Audience
    = null` (public), `MountPoint` set (`about` → `footer/community`),
@@ -371,7 +371,7 @@ either kind** — the §3.7 Moderator lane is retired):
    "absorb, don't yank" discipline — nothing is removed until the replacement
    is proven.
 4. **No seed reset, no schema file change** for the new *fields* — they are
-   ADR 0004 §B.1 additive on the *new* `Page` doc (new table, so a clean
+   ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive on the *new* `Page` doc (new table, so a clean
    create), and the migration above is the only data move.
 
 ## 4. What this lane is deliberately *not* (non-decisions)
@@ -379,14 +379,14 @@ either kind** — the §3.7 Moderator lane is retired):
 - **Not a CMS with its own permissions engine.** Standing is the *existing*
   role matrix (GlobalAdmin / Translator) + the page's own authorship, re-checked
   per action; there is no page-specific role, and a community Moderator has no
-  page standing (ADR 0040).
+  page standing (ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md)).
 - **Not a comment / discussion surface.** A page is *about* content; discussion
   belongs in posts/replies that *reference* the page (the RC link idiom).
 - **Not search.** A page-listing *filter* box may ship; full-text search over
   the tree is a **future lane** (the M6 portability/search milestone owns
   search).
 - **Not version history / revision diffing.** `Modified` + the audit log is the
-  "who changed what, when" record (the ADR 0017/0024 convention); a full
+  "who changed what, when" record (the ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md)/0024 convention); a full
   revision store is out of scope.
 - **Not multi-tree.** There is one forest, not per-community trees; a page's
   `ComponentId` + `Audience` is what scopes it, not a separate tree per
@@ -421,7 +421,7 @@ either kind** — the §3.7 Moderator lane is retired):
   member), the `null`-audience-public vs. community vs. grants branches through
   the real `Decide()` (the `A0036_*` family shape, a `PG_*` family), the
   hierarchy cycle-guard, the soft-delete filter, and the `PageTranslation`
-  standing (the ADR 0029 matrix).
+  standing (the ADR [0029](../adr/0029-announcement-translations.md) matrix).
 - **Web (`Kumunita.Web.Tests`)** — `PageControllerTests` (NSubstitute
   `IPageService`, no live Postgres): the route map (`/pages`, `/pages/{path}`,
   `/about`→tree), the 404-vs-403 split, the mount-point resolution, and the
@@ -436,12 +436,12 @@ either kind** — the §3.7 Moderator lane is retired):
 
 ---
 
-## ADR 0040 — moved content (D11 trim, 2026-11-02)
+## ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md) — moved content (D11 trim, 2026-11-02)
 
 ## Tests
 
 - **Core (`Kumunita.Core.Tests`, DB-backed)** — `PageServiceTests`:
-  the ADR 0040 two-kind standing matrix (create / edit / translate /
+  the ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md) two-kind standing matrix (create / edit / translate /
   move / delete standing for each kind, with a community Moderator
   denied on every lane), the two namespace guards (a `System` page under a
   `User` parent is refused, and vice-versa), the ownership guard (a
@@ -472,8 +472,8 @@ either kind** — the §3.7 Moderator lane is retired):
 
 ## Non-decisions
 
-- **No machine translation** of a blog page (ADR 0005 C stands — a
-  translation is a user-added row, the ADR 0029 shape; a `User` page's
+- **No machine translation** of a blog page (ADR [0005](../adr/0005-multilingual-support.md) C stands — a
+  translation is a user-added row, the ADR [0029](../adr/0029-announcement-translations.md) shape; a `User` page's
   translation standing is GlobalAdmin ∪ Translator, never the author).
 - **No blog-level moderation or community-scoping** — a blog is personal
   content; the `Audience` doc is still reusable on a `User` page (a
@@ -488,21 +488,21 @@ either kind** — the §3.7 Moderator lane is retired):
 
 ---
 
-## ADR 0027 — moved content (D11 trim, 2026-11-02)
+## ADR [0027](../adr/0027-post-reply-translation-display-and-swap.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
-### 2026-09-19 — default-visible variant is the viewer's current language (ADR 0049)
+### 2026-09-19 — default-visible variant is the viewer's current language (ADR [0049](../adr/0049-default-language-variant-selection.md))
 
 Decision (a)'s "default-visible" clause is amended: the **default-visible**
 variant on the post/reply detail surfaces (and, mirroring, the announcement
 detail surface and the pinned-announcement banner) is now the **viewer's
-current language** — the ADR 0005 §B resolution order as amended by ADR 0046
+current language** — the ADR [0005](../adr/0005-multilingual-support.md) §B resolution order as amended by ADR [0046](../adr/0046-default-language-browser-accept-language-match.md)
 (cookie → `Accept-Language` match → instance default → `en`) — **when a
 user-added translation of the item exists in it**; otherwise the authored-in
 variant stays default-visible exactly as locked above. The rest of (a) is
 unchanged: every variant remains in the DOM, the chip row is the same, and
 the click-to-swap + guaranteed path back (now starting from a different
 initial variant) is untouched. Display-only; zero Core / schema / view-model
-change; the JS-off degradation path is preserved. See **ADR 0049** for the
+change; the JS-off degradation path is preserved. See **ADR [0049](../adr/0049-default-language-variant-selection.md)** for the
 full locked text.

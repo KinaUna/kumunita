@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0199 — Admin: shared look
+# ADR [0199](0199-admin-shared-look.md) — Admin: shared look
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-28
-Relates to: ADR 0198 (account pages), ADR 0191 (list rows), ADR 0185 (forms)
+Relates to: ADR [0198](0198-account-pages.md) (account pages), ADR [0191](0191-inventory.md) (list rows), ADR [0185](0185-post-detail.md) (forms)
 
 ## Decision
 
@@ -30,7 +30,7 @@ CSS only (`palettes.css`), no markup changes, so all ~20 admin screens move at o
 - List groups use surface rows, soft hairlines, and an accent + tint hover on action items.
 - Row-level destructive buttons: `.table .btn-danger` renders as an outline red button (solid on hover and focus); solid
   `btn-danger` stays for confirmations and standalone pages such as Delete account.
-- The admin tab strip already follows the accent tab strip from ADR 0191.
+- The admin tab strip already follows the accent tab strip from ADR [0191](0191-inventory.md).
 
 ## Side effects (intentional)
 
@@ -41,7 +41,7 @@ Onboarding, Notifications, Messages, Home, Guardian, Tag pages, Community manage
 
 - Not previewed: the preview account is not an admin. Verify /admin, /admin/accounts, /admin/audit, /admin/analytics and
   one list-group page (Notifications) in both palettes, light and dark, and at phone width (table scrolls inside its card).
-- Admin forms rely on the form look (ADR 0185); modal and inline forms are not covered.
+- Admin forms rely on the form look (ADR [0185](0185-post-detail.md)); modal and inline forms are not covered.
 - `alert-*` colours and standalone `btn-danger` are untouched; verified live on /admin/accounts (Ember dark) before this follow-up.
 
 ## Follow-up: Forest / light-mode check (2026-10-28)

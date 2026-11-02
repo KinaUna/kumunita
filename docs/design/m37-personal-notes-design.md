@@ -33,7 +33,7 @@ author-only) — design
 > `PersonalNotesDocTypes`** surface (the M17 `BookmarkDocTypes` / M9
 > `MessagingDocTypes` precedent — additive, idempotent, **zero migrations**
 > for existing surfaces), **no adapter at all** (a personal note is a
-> *personal-by-id* record, the M17 `Bookmark` / M9 ADR 0105 shape — D2), and
+> *personal-by-id* record, the M17 `Bookmark` / M9 ADR [0105](../adr/0105-messaging.md) shape — D2), and
 > the **`pn.*`** `kw-l` registry block (the §kw-l below).
 > **Zero new authorization surface** (C-M37·1): no new `AccessAction`, no
 > new `AccessVia`, no branch in `Decide()`, no method on
@@ -43,7 +43,7 @@ author-only) — design
 >
 > **Status.** **LOCKED.** The decisions D1–D9, the invariants
 > C-M37·1…8, the FACES F1–F5 + the named trade, the §kw-l key list, the §gate
-> test names, and the §drift-guard are locked in **ADR 0167 (Accepted,
+> test names, and the §drift-guard are locked in **ADR [0167](../adr/0167-personal-notes.md) (Accepted,
 > 2026-10-14)**. The `[PROPOSED]` set in the register
 > `docs/plans-milestones/plan-m37-personal-notes.md` is the locked set this
 > doc restates **verbatim** (the U00 handoff entry records the lock; **no
@@ -71,19 +71,19 @@ resident's own writing** attached to the target (a *note*, not a pointer),
 and the notes are **organizable** — the resident **nests them into a
 personal folder tree** (categories, bounded in depth) and adds **free
 author-set tags**. A note is **author-only** by construction
-(privacy-first; ADR 0001-B) — a `GlobalAdmin` who is not the author gets a
-non-leaky **404** and **no audit row** (the M17 / ADR 0105 shape).
+(privacy-first; ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B) — a `GlobalAdmin` who is not the author gets a
+non-leaky **404** and **no audit row** (the M17 / ADR [0105](../adr/0105-messaging.md) shape).
 
 The precedents M37 composes:
 
-1. **The frozen `IAuthorizationService`** (ADR 0006 §A) — `CanAsync(Read)`
+1. **The frozen `IAuthorizationService`** (ADR [0006](../adr/0006-module-boundary-contracts.md) §A) — `CanAsync(Read)`
    (detail) over an `IAuditableResource`, the `IDocumentSession`
    overloads for C3 same-transaction audits. The frozen surface is
    4-method + the group lane; the frozen `AccessAction` set is
    `Read` / `Moderate`; the frozen `AccessVia` set is Owner / Admin (+
    the existing values). **M37 adds none of these — it adds no adapter
    at all** (C-M37·1 / D2).
-2. **The ADR 0105 (M9 messaging) participant-by-id shape** — the
+2. **The ADR [0105](../adr/0105-messaging.md) (M9 messaging) participant-by-id shape** — the
    *primary* precedent (D2 / C-M37·1 / C-M37·2): a **personal-by-id
    record** whose access story is **identity comparison in the service**,
    never an audience decision. A non-owner — an operator included — gets a
@@ -99,7 +99,7 @@ The precedents M37 composes:
 4. **The `*DocTypes` parallel-surface shape** (`BookmarkDocTypes` /
    `MessagingDocTypes`) — `opts.Schema.For<T>()` + named indexes;
    `ApplyAllConfiguredChangesToDatabaseAsync()` delta-detects and
-   applies the new tables **idempotently** at boot (ADR 0004 §B.1) —
+   applies the new tables **idempotently** at boot (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1) —
    **zero migrations for existing surfaces**.
 5. **The closed-string-set idiom** (the M5 `KanbanStatuses` shape) —
    `TargetKind` is a **string** restricted to the closed set
@@ -108,22 +108,22 @@ The precedents M37 composes:
    `*ToAuditableResource` adapters and the `AccessAudit` rows already
    emit** — D1.
 6. **The `pn.*` `kw-l` block in `KnownTranslationKeys`** (the
-   closed-key registry, ADR 0015) — the `pn.*` block it joins (the
+   closed-key registry, ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) — the `pn.*` block it joins (the
    `KnownTranslationKeys_ParityTests` + `KwLRegistryConsistencyTests`
    pins extend automatically — §kw-l).
-7. **The M31 / ADR 0031 frozen `MarkdownRenderer`** (the one-renderer pin)
+7. **The M31 / ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) frozen `MarkdownRenderer`** (the one-renderer pin)
    — the D4 body render path: the body is stored as raw text and
    Markdown-rendered on read via the **frozen** `MarkdownRenderer`.
-8. **The M26 `Tag` doc's `Name` normalization shape** (ADR 0044) — the
+8. **The M26 `Tag` doc's `Name` normalization shape** (ADR [0044](../adr/0044-tags.md)) — the
    D5 tag normalization (lowercase, trimmed, deduped, sorted) is the
    M26 `Name` idempotency-witness idiom, re-applied to *personal*
    labels (a different shape than the M26 *shared* vocabulary — D5).
-9. **The M14 / M16 author-only edit-lane shape** (ADR 0014 / ADR 0016) —
+9. **The M14 / M16 author-only edit-lane shape** (ADR [0014](../adr/0014-post-edit-lane-author-only.md) / ADR [0016](../adr/0016-group-post-and-reply-edit-lane-author-only.md)) —
    the D4 body-revision shape: the body is **never** mutated in place;
    edit is a **new revision** and the `Modified` timestamp is the witness.
 10. **The M5 `projects.*` core-surface precedent** (D8) — M37 is a
     **milestone**, not a **lane**: always available, **no**
-    off-by-default admin toggle (the inverse of the ADR 0101/0105
+    off-by-default admin toggle (the inverse of the ADR [0101](../adr/0101-announcement-comments-lane.md)/0105
     `LocaleSettings` toggle shape — C-M37·7).
 
 The gap M37 closes is the README row itself: the neighborhood today has a
@@ -137,8 +137,8 @@ new authorization surface (C-M37·1 / D2).
 M37 builds entirely on **frozen, verified seams** (the list above). This
 is a **milestone** (a roadmap letter, not a named lane) and the **last**
 milestone on the roadmap (no `M38` to promote — D9): the close unit (U06)
-flips `Milestones.cs` / the README Roadmap / `docs/STATUS.md` /
-`docs/ARCHITECTURE.md` + `MilestonesTests.cs` **+** `src/Kumunita.Web/WhatsNew.cs`
+flips `Milestones.cs` / the README Roadmap / [`docs/STATUS.md`](../STATUS.md) /
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `MilestonesTests.cs` **+** `src/Kumunita.Web/WhatsNew.cs`
 (the **six-member** close flip — the AGENTS.md doc↔code parity contract —
 D9). This design doc (authored U00, **LOCKED**) is the **primary tier**;
 the register `docs/plans-milestones/plan-m37-personal-notes.md` is the
@@ -155,7 +155,7 @@ secondary tier; the scratch handoff note is
   TargetKind, TargetId)` — the D3/F1 witness; the non-unique `(OwnerId,
   Created)` list-ordering index; the non-unique `(OwnerId, FolderId)`
   folder-tree index; `NoteFolder`'s **unique** `(OwnerId, ParentId, Name)`
-  index — the D6 witness; ADR 0004 §B.1 additive, **zero migrations** for
+  index — the D6 witness; ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive, **zero migrations** for
   existing surfaces).
 - `IPersonalNoteService` + `PersonalNoteService` — the note-CRUD seams
   (`CreateNoteAsync` / `GetNoteAsync` / `ListNotesAsync` /
@@ -240,7 +240,7 @@ Verbatim from the register.
   **no** `AccessAudit` row for the owner's own list, **no** owner-check
   bypass. A **non-owner** (a `GlobalAdmin` included) gets a non-leaky
   **404** — and that 404 commits **no** `AccessAudit` row either (the
-  ADR 0105 "operator has no read standing" precedent).
+  ADR [0105](../adr/0105-messaging.md) "operator has no read standing" precedent).
 - **C-M37·3 — Note-attaching requires visibility; note-attaching grants
   nothing.** The write lane re-runs the target's frozen `Read` decision
   **before** creating the note row; Deny ⇒ **404** (not 403), and the note
@@ -276,11 +276,11 @@ Verbatim from the register.
   The M37 close (U06) flips the six surfaces — `Milestones.cs` (M37 →
   done, **no** M38), `MilestonesTests.cs` (re-pinned to the "last
   milestone, no successor" pin), the README Roadmap/Status,
-  `docs/STATUS.md`, `docs/ARCHITECTURE.md` value-chain M37 row, **and**
-  `src/Kumunita.Web/WhatsNew.cs` (the required sixth member — ADR 0110)
+  [`docs/STATUS.md`](../STATUS.md), [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) value-chain M37 row, **and**
+  `src/Kumunita.Web/WhatsNew.cs` (the required sixth member — ADR [0110](../adr/0110-platform-versioning-and-whats-new.md))
   — **in the same unit** (D9).
 
-## Decisions (D1–D9, locked — ADR 0167)
+## Decisions (D1–D9, locked — ADR [0167](../adr/0167-personal-notes.md))
 
 Verbatim from the register, each with its `*Forbids:*` tail.
 
@@ -306,12 +306,12 @@ Verbatim from the register, each with its `*Forbids:*` tail.
 - **D2 — A personal note is a personal-by-id record, never an audience
   decision.** M37 adds **no adapter**, **no** new `AccessAction`, **no**
   new `AccessVia`, **no** branch in `Decide()`, **no** method on
-  `IAuthorizationService` (the M17 `Bookmark` / M9 ADR 0105 shape). The
+  `IAuthorizationService` (the M17 `Bookmark` / M9 ADR [0105](../adr/0105-messaging.md) shape). The
   **owner's** own note list is a personal read (like the M6 inbox / M17
   bookmark list): **no** `CanSeeAsync` pass over the note rows, **no**
   `AccessAudit` row for the owner's own list. A **non-owner** (a
   `GlobalAdmin` included) gets a non-leaky **404** — and that 404 commits
-  **no** `AccessAudit` row either (the ADR 0105 "operator has no read
+  **no** `AccessAudit` row either (the ADR [0105](../adr/0105-messaging.md) "operator has no read
   standing" precedent). *Forbids:* a `PersonalNoteToAuditableResource`;
   running the owner's own note list through `IAuthorizationService`; a new
   `AccessAction`/`AccessVia`.
@@ -329,7 +329,7 @@ Verbatim from the register, each with its `*Forbids:*` tail.
 - **D4 — A note is *content*, not a pointer: it carries a body, and the
   body is owned by the author.** `PersonalNote` carries `Body` (the
   resident's own writing, stored as raw text, Markdown-rendered on read
-  via the **frozen** `MarkdownRenderer` — the M31 / ADR 0031 shape) +
+  via the **frozen** `MarkdownRenderer` — the M31 / ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) shape) +
   `Modified` (the body's revision witness). M17's `Bookmark` has **no**
   body; M37's `PersonalNote` **does**. The body is **never** mutated in
   place — edit is a **new revision** (the M14 post-edit / M16 group-post-
@@ -389,16 +389,16 @@ Verbatim from the register, each with its `*Forbids:*` tail.
   `StatusNext` → `StatusDone` (and **no** `M38` row); `MilestonesTests.cs`
   re-pinned to the **"last milestone, no successor"** pin (M37 → done,
   **no** successor — the M36 close's pin shape); the README **Roadmap**
-  (M37 → done) + the M37 **Status** line; `docs/STATUS.md`;
-  `docs/ARCHITECTURE.md`'s value-chain table gains the **M37 row**; **and**
+  (M37 → done) + the M37 **Status** line; [`docs/STATUS.md`](../STATUS.md);
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)'s value-chain table gains the **M37 row**; **and**
   `src/Kumunita.Web/WhatsNew.cs` gains the **M37 entry** (the
-  **required sixth member** — ADR 0110; the M36 close's "six-member
+  **required sixth member** — ADR [0110](../adr/0110-platform-versioning-and-whats-new.md); the M36 close's "six-member
   close flip" shape). All six ship **in the same unit** (the M36
   close-flip precedent). *Forbids:* reordering M37; adding an `M38` row;
   editing a shipped milestone's text; breaking the `MilestonesTests`
   pins; flipping one surface and not the others; **omitting the
   `WhatsNew.cs` entry** (the M27-shipped-without-entry drift, caught in
-  review — the ADR 0110 "required sixth member" pin).
+  review — the ADR [0110](../adr/0110-platform-versioning-and-whats-new.md) "required sixth member" pin).
 
 ## FACES (F1–F5) + the named trade
 
@@ -450,7 +450,7 @@ and it depends on **exactly** the frozen set named in §2.1–§2.7. It does
 moderator scope): a personal note is **not** an audience, an `AccessVia`,
 or a standing — it is *content the author owns* (C-M37·1 / D2). There is
 **no migration path** to plan: the `PersonalNotesDocTypes` surface is
-delta-detected and applied idempotently at boot (ADR 0004 §B.1), and the
+delta-detected and applied idempotently at boot (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), and the
 **only** audited call in the milestone is the D3 write-lane check, which
 is the **target's own** frozen `CanAsync(Read)` (the target's own audit
 row, in the target's own transaction — M37 commits none of its own,
@@ -798,11 +798,11 @@ is the priced cost.
 ## Rollout & rollback
 
 Deploy: the `PersonalNotesDocTypes` surface delta-detects and applies at
-boot (ADR 0004 §B.1 — idempotent, **zero migrations** for existing
+boot (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — idempotent, **zero migrations** for existing
 surfaces); no seeder step, no data migration, no feature flag (D8 — there
 is **nothing to roll back**: removing the `PersonalNote` + `NoteFolder`
 tables + the `PersonalNotesDocTypes` registration restores the pre-M37
-state; no row is referenced by anything). See `docs/OPS.md`.
+state; no row is referenced by anything). See [`docs/OPS.md`](../OPS.md).
 
 ## Risks
 
@@ -847,18 +847,18 @@ the resident already crosses.
 
 ---
 
-## ADR 0167 — moved content (D11 trim, 2026-11-02)
+## ADR [0167](../adr/0167-personal-notes.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
 ### 2026-10-16 — The inventory kind joins the closed set (the M16 parity lane)
 
-The M16 Inventory surface (ADR 0117) ships the **inventory item** detail
+The M16 Inventory surface (ADR [0117](../adr/0117-inventory.md)) ships the **inventory item** detail
 page — a content surface a resident can see, pin, and note. The M37
 PersonalNotes closed set already carried ten kinds (post / grouppost /
 event / page / project / todo / board / document / directory /
 announcement) — but **not** `inventory`. The M17 bookmark surface's
-2026-10-16 project / board amendment (ADR 0118) closed the gap for
+2026-10-16 project / board amendment (ADR [0118](../adr/0118-bookmarks.md)) closed the gap for
 project / board; this amendment closes the same gap for the M17 surface
 **and** for the M37 surface on the inventory kind.
 
@@ -891,7 +891,7 @@ read is reused, **exactly** the category the existing `board` /
 - **`PersonalNoteService.ResolveForListAsync`** (the D5 list resolution,
   the C-M37·2 pure non-auditing doc load) gains one branch: the
   `inventory` branch loads the `InventoryItem` doc directly and degrades
-  on `IsDeleted` (the ADR 0024 soft-delete flag; `InventoryItem` has no
+  on `IsDeleted` (the ADR [0024](../adr/0024-author-soft-delete-lane.md) soft-delete flag; `InventoryItem` has no
   `IsDraft` — D8a shape). Returns the target's `Name` + the canonical
   detail URL (`/inventory/{id}`).
 - **The new `pn.list.kind.inventory` kw-l key** is registered in all

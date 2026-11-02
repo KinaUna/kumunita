@@ -34,7 +34,7 @@ updated: 2026-11-02
 > number is a snapshot.
 >
 > **The anti-pattern vocabulary** used here is the one from
-> [`docs/philosophy/anti-patterns.md`](../../philosophy/anti-patterns.md) —
+> [`docs/philosophy/anti-patterns.md`](../../../philosophy/anti-patterns.md) —
 > the eight names are portable, the Kumunita symptom is local.
 
 ## How to read this ledger

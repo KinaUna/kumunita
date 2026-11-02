@@ -83,7 +83,7 @@ the source file** — and the user's report outranks your source reading.
     client module (`rich-editor.ts`, `tag-suggest.ts`, `kiosk.ts`,
     `note-modal.ts`, `onboarding-modal.ts`, `notifications-bell.ts`,
     `image-editor.ts`) was silently falling back to the English floor
-    strings. It now uses the correct `@Html.Raw(...)` form. The ADR 0195
+    strings. It now uses the correct `@Html.Raw(...)` form. The ADR [0195](../adr/0195-kanban-card-edit-modal.md)
     `#card-edit-prefills` block uses the same form.
 - A URL or link that shows a **literal `@Model.X`** (404s, `/groups/@Model.GroupId/posts`)
 is the same class of bug — an uninterpolated Razor attribute value, not a

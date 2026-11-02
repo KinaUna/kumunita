@@ -33,7 +33,7 @@ updated: 2026-11-02
 > `DeviceLabel`, per-session `Kiosk` flag, admin "sign out all residents",
 > per-group / per-event session scoping, a session `Trust` / `Remember me`
 > distinction. Gate: 13/13 green (the `### Run result` section below). LOCKED
-> in ADR 0281.
+> in ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md).
 
 > Part 1 of 2 (U1). Part 2 (U2) will append "Seams & contracts (Part 2)" with the
 > exact C# shapes U3–U11 must match, the **pinned seam-test names**, the
@@ -109,7 +109,7 @@ rule living in a comment, not in the invariant list).
   surface (analogous to M3's `PostDocTypes`). U3 wires it into both boot
   paths (`Kumunita.Core/Bootstrap/SchemaBootstrap.cs` +
   `Kumunita.Web/Program.cs`). **No seeding** (sessions are created on
-  sign-in, never seeded — ADR 0004 §B.1).
+  sign-in, never seeded — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 - `SessionService` (Kumunita.Core) — the **single** composition point owning
   the `SessionDoc` store. Five-method surface (Part 2 §2.1 pins the exact
   C#): `CreateSessionAsync`, `GetSessionsForUserAsync`,
@@ -117,7 +117,7 @@ rule living in a comment, not in the invariant list).
   middleware and the controller are **thin callers** of `SessionService`
   (the M3 `PostService` pattern — the controller is route + authz + shape,
   never a re-derivation). `SessionService` is the **only** caller of the
-  `SessionDoc` store (ADR 0006-D "the authorization path is unique" analog —
+  `SessionDoc` store (ADR [0006](../adr/0006-module-boundary-contracts.md)-D "the authorization path is unique" analog —
   here the *session* path is unique).
 - The `OnSigningIn` hook (`Kumunita.Web/Program.cs`, the same place F5 sets
   `kumunita.stamp`) — **adds** a `SessionDoc` row + stamps its `Id` into
@@ -148,8 +148,8 @@ rule living in a comment, not in the invariant list).
   **one** Web test (`Kumunita.Web.Tests/SessionsKillAllExtTests.cs`) — test
   **names** are pinned by Part 2 §2.4; this part pins the invariants / FACES
   they must anchor to.
-- **ADR 0281** (`docs/adr/0281-session-doc-and-per-session-revocation.md`),
-  the `WhatsNew.cs` row, the `ARCHITECTURE.md` flip (U12's close).
+- **ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md)** ([`docs/adr/0281-session-doc-and-per-session-revocation.md`](../adr/0281-session-doc-and-per-session-revocation.md)),
+  the `WhatsNew.cs` row, the [`ARCHITECTURE.md`](../ARCHITECTURE.md) flip (U12's close).
 
 **Out of scope — `SL·D` deferral (this section is the lane's M1-style close)**
 
@@ -165,7 +165,7 @@ Each is a **named deferral** with a one-line `SL·D` follow-up candidate:
 - **Admin "sign out all residents"** — a new `GlobalAdmin` action (kill
   every resident's sessions platform-wide). Not a per-resident surface.
   *`SL·D` candidate: a `GlobalAdmin` `POST /admin/sessions/kill-all` action
-  over `SessionService.*` with an `Admin` audit row (ADR 0006-E named lane).*
+  over `SessionService.*` with an `Admin` audit row (ADR [0006](../adr/0006-module-boundary-contracts.md)-E named lane).*
 - **Per-group / per-event session scoping** — sessions are per-account, not
   per-resource. *`SL·D` candidate: a `SessionScope` document keyed to a
   resource id, only if a M4/M5 surface genuinely needs it.*
@@ -190,17 +190,17 @@ Each is a **named deferral** with a one-line `SL·D` follow-up candidate:
 
 ## Invariants (pinned for the lane)
 
-The lane is a **caller** of the ADR 0006 invariants at the *owner* boundary
+The lane is a **caller** of the ADR [0006](../adr/0006-module-boundary-contracts.md) invariants at the *owner* boundary
 (per-account, not per-audience), and **owns** five new invariants
 (C-S1·1/2/3/4/5 — the five behavioral rules this lane is the first surface to
 need: current-session protection, immediate invalidation, owner-scoping,
-sign-in-unchanged, touch-rate-limit). The ADR 0006 invariants + two companion
+sign-in-unchanged, touch-rate-limit). The ADR [0006](../adr/0006-module-boundary-contracts.md) invariants + two companion
 ADRs **must keep holding for the lane's surfaces**, and the seam tests (Part
 2 §2.4) will name each by id.
 
 > **Plan-count note (U1):** the plan § U1 headline says **"11 invariants"**
 > but its bullet list enumerates **12** (five lane-owned C-S1·1–5, five ADR
-> 0006 caller-pins C1/C3/C4/C5/C6, ADR 0001-B, ADR 0004 §B.1). This doc pins
+> 0006 caller-pins C1/C3/C4/C5/C6, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1). This doc pins
 > **all 12 from the body** (the body is authoritative) — the **exact** slip
 > M3's U1 hit (M3's headline said "12", body had 11; M3 pinned the 11 from
 > the body and flagged it as a plan-documentation slip, *not* a drift
@@ -213,25 +213,25 @@ ADRs **must keep holding for the lane's surfaces**, and the seam tests (Part
 | **C-S1·1** (lane-owned) | The **current session is never revoked by the per-row action.** `POST /sessions/{id}/revoke` **refuses** (409) to revoke the session whose id is in the current `kumunita.sid` cookie item. Kill-all **does** still sign out the current browser (the F5 behavior is unchanged — kill-all is "all-but-current" for the *other* sessions, but the current browser is signed out). | The per-row action's single guard: the controller reads `currentSessionId` from the `kumunita.sid` cookie item and compares to the `id` route value before calling `SessionService.RevokeSessionAsync`. A mismatch is **not** a 404 (that would leak the current session's id) — it is a **409** with the "This is the session you are using — use 'Sign out everywhere' to end it" message. This is what keeps the "I revoked my own device and got locked out" bug out of the surface — and is the reason the per-row button is **absent** on the current row in the view (F4). |
 | **C-S1·2** (lane-owned) | A revoked session is **immediately** invalid. `SessionRevocationMiddleware` signs out the holder on the **next** request — strong consistency, mirroring F5's `RevocationStampMiddleware` (which reads the DB stamp fresh per request, not a projection). | Per-request enforcement: the middleware reads `kumunita.sid` from the cookie, loads the `SessionDoc` by id from the live store, and if `RevokedAt is not null` signs out + redirects to `/Account/Login?error=session-revoked` (the **same response** as `RevocationStampMiddleware`'s stale-stamp path — no new response shape is invented). A revoke committed in one request is enforced on the *very next* request from that session — no refresh, no stale projection. |
 | **C-S1·3** (lane-owned) | Session revocation is **owner-scoped**: a resident can only revoke their **own** sessions; cross-user revoke is **denied**. The controller checks `userId == currentSubject` before calling `SessionService.RevokeSessionAsync`; a mismatch is a **404** (not a 403 — to avoid leaking the existence of another user's session ids). The service enforces the same rule: `RevokeSessionAsync` does **nothing** when `doc.UserId != userId`. | Two layers, both cheap: the controller (the HTTP boundary) returns 404 before the service is even called for a cross-user id; the service (the Core boundary) re-checks `doc.UserId != userId` and no-ops if it disagrees. A non-owner probing `/sessions/{someOtherSessionId}/revoke` gets a 404 — indistinguishable from "no such session," so the resident cannot enumerate other users' session ids by 403-vs-404. |
-| **C-S1·4** (lane-owned) | The existing sign-in flow is **unchanged**: password verification, MFA, the F3/F5 stamp rotation on password change are all preserved. This lane **adds** a `SessionDoc` row + the `kumunita.sid` cookie item on sign-in; it does **not** change the sign-in challenge. The `OnSigningIn` hook (the only reliable place to set `AuthenticationProperties.Items`, per the F5 doc-comment) is the **only** place the `SessionDoc` row is created. If `CreateSessionAsync` throws (a DB outage), the sign-in **must not fail** (catch + log + continue without the `kumunita.sid` item — the session is created on the next sign-in). | The `OnSigningIn` handler is the single write path for `SessionDoc` creation — the middleware, the controller, and the service all **read** (or touch / revoke) an existing doc, but only `OnSigningIn` **creates** one. This is what makes "a session exists iff a sign-in happened" the invariant: no background seeder, no migration backfill, no `FirstBootSeeder` row (ADR 0004 §B.1 "no seeding"). |
+| **C-S1·4** (lane-owned) | The existing sign-in flow is **unchanged**: password verification, MFA, the F3/F5 stamp rotation on password change are all preserved. This lane **adds** a `SessionDoc` row + the `kumunita.sid` cookie item on sign-in; it does **not** change the sign-in challenge. The `OnSigningIn` hook (the only reliable place to set `AuthenticationProperties.Items`, per the F5 doc-comment) is the **only** place the `SessionDoc` row is created. If `CreateSessionAsync` throws (a DB outage), the sign-in **must not fail** (catch + log + continue without the `kumunita.sid` item — the session is created on the next sign-in). | The `OnSigningIn` handler is the single write path for `SessionDoc` creation — the middleware, the controller, and the service all **read** (or touch / revoke) an existing doc, but only `OnSigningIn` **creates** one. This is what makes "a session exists iff a sign-in happened" the invariant: no background seeder, no migration backfill, no `FirstBootSeeder` row (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 "no seeding"). |
 | **C-S1·5** (lane-owned) | `LastActive` is touched **at most once per 60 s per session** (the `Kumunita:Sessions:TouchIntervalSeconds` config key, default `60`). The middleware does a single Marten read per request (the `SessionDoc` by id) + a touch write **only when due** (`UtcNow - doc.LastActive >= touchInterval`). The rate-limit is enforced by the **middleware** (the smart gate), not the service (the service is the dumb write — `TouchSessionAsync` does not check the interval). | One read per authenticated request (the same cost profile as `RevocationStampMiddleware`'s one EF read per authenticated request) + one write per 60 s per session. At this platform's scale (one neighborhood) the cost is negligible — the write-amplification this guards against is a *correctness* concern (a 1000 rps loop must not rewrite `LastActive` 1000 times a second) as much as a cost one. |
-| **C1** (ADR 0006) | Empty audience denies. | This lane is **per-account, not per-audience** — there is no `Audience` field on `SessionDoc` and no `CanSeeAsync` call in the session path. C1 applies at the **owner** boundary: a non-owner cannot revoke (C-S1·3). The ADR 0006 "empty audience denies" rule is satisfied trivially — there is no audience to be empty. |
-| **C3** (ADR 0006) | Audit always on — Allow *and* Deny; the audit row commits in the **same transaction** as the domain write. | Two new `AccessAudit` `Action` strings: `session.revoke` (targetKind `"session"`, `Subject = userId`, `Object = sessionId`) committed in the **same** `IDocumentSession` as the `SessionDoc.RevokedAt` write; `session.revoke_all_but_current` (targetKind `"session"`, `Subject = userId`, `Object = currentSessionId`) committed in the **same** session as the bulk `RevokedAt` writes. **No silent, unaudited revoke.** The `session.kill_all` row (F5, unchanged) is committed in the same *request* as the kill-all extension (the C3 pin is satisfied at the **request** level for the two-mechanism case — see the design doc §2.3 deviation note; the F5 row is the whole-account kill's audit, the `session.revoke_all_but_current` row is the per-session kill's audit — the two rows together answer "who did this, by what right, to which session"). |
-| **C4** (ADR 0006) | Strong-consistency resolution against live documents — a change takes effect on the **very next** request. | A revoke (or a kill-all) is visible on the **next** request from the affected session — `SessionRevocationMiddleware` reads the `SessionDoc` fresh per request (no projection in the enforcement path). The `LastActive` touch is a *write* that is itself strong-consistent (the next read sees the new value), but it is not an *access* decision — C4's access-decision rule is about the `RevokedAt` read, not the `LastActive` write. |
-| **C5** (ADR 0006) | Moderator default-OFF on audience-restricted content. | This lane has **no moderator surface**: the per-row revoke is owner-only (C-S1·3); there is no `Moderate`-on-session action, no `/admin` session surface, no moderator "peek" at another resident's sessions. **No `Moderate`-on-session call.** Tests assert the **absence** (a GlobalAdmin probing another resident's session id gets the same 404 as any non-owner — C-S1·3 + C5 together). |
-| **C6** (ADR 0006) | One matching pass shared by `CanAsync` and `CanSeeAsync` — the paths cannot drift. | This lane is per-account (owner-scoped), not per-audience — the "matching pass" is a single `userId == currentSubject` check at the controller + a single `doc.UserId != userId` check in the service. **No `IAuthorizationService` call** in the session path (the session is not an `IAuditableResource`; it is the *actor's own* record). The two checks cannot drift because they check the *same* field (`UserId`) against the *same* value (`currentSubject`); a refactor that splits them is a drift event (§2.6). |
-| **ADR 0001-B** | The resident's choice is absolute. | A resident can revoke **any** of their own sessions (including the one signed in 3 months ago on a phone they no longer have); the platform does **not** auto-retain sessions, does **not** require a "reason" for a revoke, and does **not** second-guess a resident's choice to revoke a session that still looks active. The C-S1·1 guard (current-session protection) is the **only** "extra" the platform imposes, and it is there to prevent the resident from locking themselves out, not to limit their choice. |
-| **ADR 0004 §B.1** | Marten-native document registration (POCOs, conventional `string Id`), delta-detected, idempotent, **no seeding**. | `SessionDoc` is registered in **`Kumunita.Core/SessionDocTypes.Configure(StoreOptions)`** — a new parallel surface analogous to M3's `PostDocTypes` (one line: `opts.Schema.For<SessionDoc>();`). **No seeding** (sessions are created on sign-in, never seeded — C-S1·4). Delta-detected + idempotent is inherited from `ApplyAllConfiguredChangesToDatabaseAsync`. *Open veto:* the plan does not name a hand-rolled `FeatureSchemaBase` for this lane (unlike M3's `PostDocTypes`, which shipped Marten-native); if U3 finds a reason to flip, it records a `## U3 — Drift pause` and the decision lands in ADR 0281. |
+| **C1** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Empty audience denies. | This lane is **per-account, not per-audience** — there is no `Audience` field on `SessionDoc` and no `CanSeeAsync` call in the session path. C1 applies at the **owner** boundary: a non-owner cannot revoke (C-S1·3). The ADR [0006](../adr/0006-module-boundary-contracts.md) "empty audience denies" rule is satisfied trivially — there is no audience to be empty. |
+| **C3** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Audit always on — Allow *and* Deny; the audit row commits in the **same transaction** as the domain write. | Two new `AccessAudit` `Action` strings: `session.revoke` (targetKind `"session"`, `Subject = userId`, `Object = sessionId`) committed in the **same** `IDocumentSession` as the `SessionDoc.RevokedAt` write; `session.revoke_all_but_current` (targetKind `"session"`, `Subject = userId`, `Object = currentSessionId`) committed in the **same** session as the bulk `RevokedAt` writes. **No silent, unaudited revoke.** The `session.kill_all` row (F5, unchanged) is committed in the same *request* as the kill-all extension (the C3 pin is satisfied at the **request** level for the two-mechanism case — see the design doc §2.3 deviation note; the F5 row is the whole-account kill's audit, the `session.revoke_all_but_current` row is the per-session kill's audit — the two rows together answer "who did this, by what right, to which session"). |
+| **C4** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Strong-consistency resolution against live documents — a change takes effect on the **very next** request. | A revoke (or a kill-all) is visible on the **next** request from the affected session — `SessionRevocationMiddleware` reads the `SessionDoc` fresh per request (no projection in the enforcement path). The `LastActive` touch is a *write* that is itself strong-consistent (the next read sees the new value), but it is not an *access* decision — C4's access-decision rule is about the `RevokedAt` read, not the `LastActive` write. |
+| **C5** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Moderator default-OFF on audience-restricted content. | This lane has **no moderator surface**: the per-row revoke is owner-only (C-S1·3); there is no `Moderate`-on-session action, no `/admin` session surface, no moderator "peek" at another resident's sessions. **No `Moderate`-on-session call.** Tests assert the **absence** (a GlobalAdmin probing another resident's session id gets the same 404 as any non-owner — C-S1·3 + C5 together). |
+| **C6** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | One matching pass shared by `CanAsync` and `CanSeeAsync` — the paths cannot drift. | This lane is per-account (owner-scoped), not per-audience — the "matching pass" is a single `userId == currentSubject` check at the controller + a single `doc.UserId != userId` check in the service. **No `IAuthorizationService` call** in the session path (the session is not an `IAuditableResource`; it is the *actor's own* record). The two checks cannot drift because they check the *same* field (`UserId`) against the *same* value (`currentSubject`); a refactor that splits them is a drift event (§2.6). |
+| **ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B** | The resident's choice is absolute. | A resident can revoke **any** of their own sessions (including the one signed in 3 months ago on a phone they no longer have); the platform does **not** auto-retain sessions, does **not** require a "reason" for a revoke, and does **not** second-guess a resident's choice to revoke a session that still looks active. The C-S1·1 guard (current-session protection) is the **only** "extra" the platform imposes, and it is there to prevent the resident from locking themselves out, not to limit their choice. |
+| **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** | Marten-native document registration (POCOs, conventional `string Id`), delta-detected, idempotent, **no seeding**. | `SessionDoc` is registered in **`Kumunita.Core/SessionDocTypes.Configure(StoreOptions)`** — a new parallel surface analogous to M3's `PostDocTypes` (one line: `opts.Schema.For<SessionDoc>();`). **No seeding** (sessions are created on sign-in, never seeded — C-S1·4). Delta-detected + idempotent is inherited from `ApplyAllConfiguredChangesToDatabaseAsync`. *Open veto:* the plan does not name a hand-rolled `FeatureSchemaBase` for this lane (unlike M3's `PostDocTypes`, which shipped Marten-native); if U3 finds a reason to flip, it records a `## U3 — Drift pause` and the decision lands in ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md). |
 
 **ADRs the lane must respect (not pinned as invariants, but the code must not
 violate):**
 
-- **ADR 0003 §Separation of duties** — the per-row revoke is *owner-scoped to
+- **ADR [0003](../adr/0003-roles-and-moderator-scoping.md) §Separation of duties** — the per-row revoke is *owner-scoped to
   the resident*; a `GlobalAdmin` revoking another resident's session is
   **not** in scope (the `SL·D` "admin sign out all residents" deferral owns
   that surface). A `GlobalAdmin` reading *their own* sessions in this lane
   has the **same** owner standing as any resident (C-S1·3 + C5 together).
-- **ADR 0006-D** (dependency direction) — `SessionService` (Core) depends only
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-D** (dependency direction) — `SessionService` (Core) depends only
   on `IDocumentStore` (Marten); it never reads `GroupMembership` /
   `DelegationGrant` / `Profile` for its own decisions, and the
   `Kumunita.Web` layer is a thin controller (mirroring M3's `PostController`
@@ -239,40 +239,40 @@ violate):**
   `ctx.HttpContext.RequestServices` (the per-request scoped provider — the
   `RevocationStampMiddleware` "Dependency scoping" doc-comment, the "captive
   dependency" pitfall).
-- **ADR 0006-E** (change management) — `SessionService` is a **new** public
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-E** (change management) — `SessionService` is a **new** public
   surface on `Kumunita.Core` (a compatible addition to the owning module —
   the ADR's *named here* list grows by exactly one line in the lane's close
   — U12). The `session.revoke` + `session.revoke_all_but_current` `Action`
   strings are **new** audit-row shapes (a compatible addition to the
-  `AccessAudit` vocabulary — ADR 0006-C "adding an `AccessAction` case — new
+  `AccessAudit` vocabulary — ADR [0006](../adr/0006-module-boundary-contracts.md)-C "adding an `AccessAction` case — new
   actions deny by default on audience-restricted resources" does **not**
   apply here because sessions are not audience-restricted resources; the
   two new strings are *owner-scoped* actions, the same position as F5's
   `session.kill_all`).
-- **ADR 0005 / ADR 0015 / ADR 0052** (i18n parity) — the new
+- **ADR [0005](../adr/0005-multilingual-support.md) / ADR [0015](../adr/0015-ui-view-localization-mechanics.md) / ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md)** (i18n parity) — the new
   `settings.sessions.*` keys (the 7 per-row keys U9 adds) must be registered
   in `KnownTranslationKeys.cs` *and* seeded in all four languages
   (en/de/fr/da) in `FirstBootSeeder.cs`. The existing F5 keys
   (`settings.sessions.kill_heading` / `kill_desc` / `kill_confirm`) are
   **unchanged**. The `improve-check.ps1` gate (d) re-baselines the
-  `KnownTranslationKeys.cs` line count + annotates ADR 0281 in the same
+  `KnownTranslationKeys.cs` line count + annotates ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md) in the same
   commit (the AGENTS.md "CI gates and anti-regression pins" rule).
 
 ## FACES (pinned, 6)
 
 Each row is a *resident-visible outcome* (or a *resident-absence* outcome)
 that the lane's seam tests (Part 2 §2.4) and the lane's e2e (the F5 e2e
-shape, the `STATUS.md` owner-ops item) must cover. "Pinned" means the
+shape, the [`STATUS.md`](../STATUS.md) owner-ops item) must cover. "Pinned" means the
 invariant in the right column is the single authority for the outcome; the
 test names Part 2 pins must reference that pin by id.
 
 | # | Outcome (what a resident sees / can do) | Pinned by |
 |---|---|---|
-| F1 | A resident **signs in** (password + MFA, unchanged) and a `SessionDoc` row is created with a GUID `Id` + correct `CreatedAt` / `LastActive` timestamps + `RevokedAt = null`; the `kumunita.sid` cookie item is set to that `Id`. The sign-in **succeeds** even if the `SessionDoc` write fails (the guard — the resident is not locked out by a DB outage during the session-creation step). | C-S1·4 (sign-in unchanged; `OnSigningIn` is the only create path; the guard on `CreateSessionAsync` failure) + ADR 0001-B (the resident's sign-in is not gated by the lane) |
+| F1 | A resident **signs in** (password + MFA, unchanged) and a `SessionDoc` row is created with a GUID `Id` + correct `CreatedAt` / `LastActive` timestamps + `RevokedAt = null`; the `kumunita.sid` cookie item is set to that `Id`. The sign-in **succeeds** even if the `SessionDoc` write fails (the guard — the resident is not locked out by a DB outage during the session-creation step). | C-S1·4 (sign-in unchanged; `OnSigningIn` is the only create path; the guard on `CreateSessionAsync` failure) + ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (the resident's sign-in is not gated by the lane) |
 | F2 | A resident opens `/settings/security/sessions` and sees their **active** sessions, **most-recent-first** (ordered by `LastActive` descending), each row a `UserAgent` / `Ip` / `CreatedAt` / `LastActive`; the row where `id == kumunita.sid` carries the "This session" badge. Revoked sessions are **not** in the list (F3). | C-S1·4 (the list is the user's own sessions; no audience / moderator surface) + C-S1·3 (owner-scoped — the list is *this* resident's sessions, not a shared surface) |
 | F3 | A resident's session list **excludes** revoked sessions (a `SessionDoc` with `RevokedAt != null` is not in the list); an **unknown user** (a `userId` with no `SessionDoc` rows) sees an **empty** list (not an error). A resident who has revoked session X on device A does not see session X in the list on device B on the next render (strong consistency — F5's `RevocationStampMiddleware` precedent). | C-S1·2 (revoked = immediately invalid, visible on the next request) + C-S1·3 (owner-scoped — a non-owner probing the list for another user's `userId` is not a surface; the list is keyed by the current subject) |
-| F4 | A resident revokes **one** of their sessions (a device they may no longer have) from the list: the `SessionDoc.RevokedAt` is set, a `session.revoke` audit row is committed in the **same transaction**, and the revoked session is **invalid on its next request** (C-S1·2). The per-row action **refuses** (409) to revoke the **current** session (`id == kumunita.sid` — C-S1·1) with the "This is the session you are using — use 'Sign out everywhere' to end it" message. A **cross-user** revoke (`userId != currentSubject`) is a **404** (C-S1·3). A **double-revoke** (revoking the same session twice) is a **no-op** (idempotent — the second call sees `RevokedAt != null` and does nothing). The current row in the list has **no** "Revoke" button (the C-S1·1 guard is visible in the view, not just in the controller). | C-S1·1 (current-session protection) + C-S1·3 (owner-scoped; cross-user = 404) + C3 (audit in the same transaction) + ADR 0001-B (the resident's choice to revoke *another* of their own sessions is absolute) |
-| F5 | A resident clicks **"Sign out everywhere"** (the F5 surface, extended): the F5 stamp rotation + `session.kill_all` audit row are committed (F5 unchanged), **and now also** every **other** session's `SessionDoc.RevokedAt` is set + one `session.revoke_all_but_current` audit row is committed; the **current** session's `SessionDoc.RevokedAt` stays `null` (the resident's *current* `SessionDoc` is not revoked by the per-session mechanism), but the current **browser is still signed out** (the F5 "local sign-out" behavior — the `SignInManager.SignOutAsync` + redirect). If the `kumunita.sid` cookie item is **unknown** (a session minted before this lane shipped, or a sign-in path that never hit the `OnSigningIn` hook), **all** of the resident's sessions are revoked (the "current" is not identifiable, so the all-but-current degrades to all — the same position as F5's "no stamp in the cookie" backward-compat rule, which lets the session through *until the cut-off*; here the all-but-current has no current to preserve). | C3 (the two audit rows — `session.kill_all` for the F5 whole-account kill + `session.revoke_all_but_current` for the per-session kill — are both committed, the C3 pin at the **request** level) + ADR 0001-B (the resident's choice to end *every* session is absolute) + C-S1·4 (the sign-in flow is unchanged — the F5 stamp rotation is the higher-priority gate, the per-session kill is the lower-priority one) |
+| F4 | A resident revokes **one** of their sessions (a device they may no longer have) from the list: the `SessionDoc.RevokedAt` is set, a `session.revoke` audit row is committed in the **same transaction**, and the revoked session is **invalid on its next request** (C-S1·2). The per-row action **refuses** (409) to revoke the **current** session (`id == kumunita.sid` — C-S1·1) with the "This is the session you are using — use 'Sign out everywhere' to end it" message. A **cross-user** revoke (`userId != currentSubject`) is a **404** (C-S1·3). A **double-revoke** (revoking the same session twice) is a **no-op** (idempotent — the second call sees `RevokedAt != null` and does nothing). The current row in the list has **no** "Revoke" button (the C-S1·1 guard is visible in the view, not just in the controller). | C-S1·1 (current-session protection) + C-S1·3 (owner-scoped; cross-user = 404) + C3 (audit in the same transaction) + ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (the resident's choice to revoke *another* of their own sessions is absolute) |
+| F5 | A resident clicks **"Sign out everywhere"** (the F5 surface, extended): the F5 stamp rotation + `session.kill_all` audit row are committed (F5 unchanged), **and now also** every **other** session's `SessionDoc.RevokedAt` is set + one `session.revoke_all_but_current` audit row is committed; the **current** session's `SessionDoc.RevokedAt` stays `null` (the resident's *current* `SessionDoc` is not revoked by the per-session mechanism), but the current **browser is still signed out** (the F5 "local sign-out" behavior — the `SignInManager.SignOutAsync` + redirect). If the `kumunita.sid` cookie item is **unknown** (a session minted before this lane shipped, or a sign-in path that never hit the `OnSigningIn` hook), **all** of the resident's sessions are revoked (the "current" is not identifiable, so the all-but-current degrades to all — the same position as F5's "no stamp in the cookie" backward-compat rule, which lets the session through *until the cut-off*; here the all-but-current has no current to preserve). | C3 (the two audit rows — `session.kill_all` for the F5 whole-account kill + `session.revoke_all_but_current` for the per-session kill — are both committed, the C3 pin at the **request** level) + ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (the resident's choice to end *every* session is absolute) + C-S1·4 (the sign-in flow is unchanged — the F5 stamp rotation is the higher-priority gate, the per-session kill is the lower-priority one) |
 | F6 | A resident's `LastActive` is touched **at most once per 60 s** (the `Kumunita:Sessions:TouchIntervalSeconds` config key, default `60`): on a request within the 60 s window since the last touch, **no** write occurs (the middleware checks the interval before calling `TouchSessionAsync`); on a request at or past the window, the `LastActive` is updated to `UtcNow`. A **revoked** session is **never** touched (the middleware / service short-circuit on `RevokedAt != null` — a revoked session's `LastActive` is frozen at its last active moment, which is exactly what the list's "most-recent-first" ordering needs to keep honest). | C-S1·5 (the rate-limit is the middleware's, not the service's) + C-S1·2 (a revoked session is not touched — the `RevokedAt != null` short-circuit) |
 
 **FACES count: 6.** This count (and the invariant-pin per row) is the input
@@ -290,7 +290,7 @@ and `RevokesOthersWhenCurrentUnknown` that straddle F4/F5).
   the same commit and appends a one-line drift note to
   `docs/plans-milestones/in-progress/sessions/sessions-handoff-notes.md`
   (the `## U<m> — Drift pause` form, per the unit-series rule §6).
-- The invariant *numbers* — ADR 0006's **C1, C3, C4, C5, C6**; the five
+- The invariant *numbers* — ADR [0006](../adr/0006-module-boundary-contracts.md)'s **C1, C3, C4, C5, C6**; the five
   lane-owned **C-S1·1, C-S1·2, C-S1·3, C-S1·4, C-S1·5**; ADR **0001-B**;
   ADR **0004 §B.1** — are stable for the rest of the lane. Adding a new
   lane-owned invariant (C-S1·6+) requires an ADR amendment plus a
@@ -316,7 +316,7 @@ and `RevokesOthersWhenCurrentUnknown` that straddle F4/F5).
   the lane: a unit that lands a `SL·D` item (e.g. the `DeviceLabel` field)
   is **out of scope** for this lane and must open its own `SL·D` lane with its
   own design doc. The five deferrals are the lane's **close boundary** —
-  U12's ADR 0281 records them verbatim.
+  U12's ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md) records them verbatim.
 
 ## Seams & contracts (Part 2, written by U2)
 
@@ -476,7 +476,7 @@ public sealed class SessionService
 ### 2.2 New lane-owned Core types (exact C#)
 
 Namespace `Kumunita.Core.Sessions`. The `SessionDoc` is a **Marten-native**
-POCO with the conventional `string Id` identity (ADR 0004 §B.1; the carve-out
+POCO with the conventional `string Id` identity (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1; the carve-out
 for a hand-rolled `FeatureSchemaBase` is **not** used in this lane — the
 `SessionDoc` is the **only** new document, registered in the new
 `SessionDocTypes` surface, mirroring `CoreDocTypes` / `PostDocTypes`).
@@ -593,7 +593,7 @@ F5 "local sign-out" behavior):
 > committed before the response is sent). This is a **documented deviation**
 > from the strict "one transaction" reading — the F5 stamp rotation is in the
 > Identity/EF module, not the Marten module, and the two modules do not share
-> a transaction. The ADR 0281 (U12) records this.
+> a transaction. The ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md) (U12) records this.
 
 ### 2.4 Pinned seam tests (exact names)
 
@@ -606,7 +606,7 @@ FACE — F4 carries 4, F5 carries 2, F3 carries 2, F1/F2/F6 carry 1 each):
 
 | # | Test name | FACES | Invariant pin |
 |---|---|---|---|
-| 1 | `F1_CreateSession_ReturnsDocWithGuidIdAndTimestamps` | F1 | C-S1·4 (the `OnSigningIn` hook is the only create path; the guard on `CreateSessionAsync` failure) + ADR 0001-B (the resident's sign-in is not gated by the lane) |
+| 1 | `F1_CreateSession_ReturnsDocWithGuidIdAndTimestamps` | F1 | C-S1·4 (the `OnSigningIn` hook is the only create path; the guard on `CreateSessionAsync` failure) + ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (the resident's sign-in is not gated by the lane) |
 | 2 | `F2_GetSessionsForUser_ReturnsOnlyActiveSessionsMostRecentFirst` | F2 | C-S1·4 (the list is the user's own sessions) + C-S1·3 (owner-scoped) |
 | 3 | `F3_GetSessionsForUser_ExcludesRevokedSessions` | F3 | C-S1·2 (revoked = immediately invalid, excluded from the list) + C-S1·3 (owner-scoped) |
 | 4 | `F3_GetSessionsForUser_ReturnsEmptyForUnknownUser` | F3 | C-S1·3 (owner-scoped — a non-owner probing the list for another user's `userId` is not a surface; the list is keyed by the current subject) |
@@ -614,7 +614,7 @@ FACE — F4 carries 4, F5 carries 2, F3 carries 2, F1/F2/F6 carry 1 each):
 | 6 | `F4_RevokeSession_DoesNotTouchCurrentSession` | F4 | C-S1·1 (the current session is never revoked by the per-row action — the controller's 409 guard; the service does not enforce this, the controller does) |
 | 7 | `F4_RevokeSession_DeniesCrossUser` | F4 | C-S1·3 (owner-scoped; cross-user = 404 at the controller; the service no-ops when `doc.UserId != userId`) + C5 (no moderator surface — a GlobalAdmin probing another resident's session id gets the same 404) |
 | 8 | `F4_RevokeSession_IsIdempotent` | F4 | C-S1·2 (a double-revoke is a no-op — the second call sees `RevokedAt is not null` and does nothing) |
-| 9 | `F5_RevokeAllButCurrent_RevokesOthersKeepsCurrent` | F5 | C3 (the `session.revoke_all_but_current` audit row + the bulk writes in the same transaction) + ADR 0001-B (the resident's choice to end every *other* session is absolute) + C-S1·4 (the current `SessionDoc` is preserved) |
+| 9 | `F5_RevokeAllButCurrent_RevokesOthersKeepsCurrent` | F5 | C3 (the `session.revoke_all_but_current` audit row + the bulk writes in the same transaction) + ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (the resident's choice to end every *other* session is absolute) + C-S1·4 (the current `SessionDoc` is preserved) |
 | 10 | `F5_RevokeAllButCurrent_RevokesOthersWhenCurrentUnknown` | F5 | C-S1·4 (the all-but-current degrades to all when `kumunita.sid` is unknown — the backward-compat rule, the `RevocationStampMiddleware` "No stamp in the cookie" precedent) + C3 (the audit row is still committed) |
 | 11 | `F6_TouchSession_UpdatesLastActiveWhenDue` | F6 | C-S1·5 (the rate-limit is the middleware's; the service is the dumb write — `TouchSessionAsync` sets `LastActive = UtcNow` when called) |
 | 12 | `F6_TouchSession_SkipsWhenNotDue` | F6 | C-S1·5 (the middleware checks the interval before calling `TouchSessionAsync`) + C-S1·2 (a revoked session is **never** touched — the `RevokedAt is not null` short-circuit) |
@@ -640,7 +640,7 @@ not a second `Can*` call):
 
 **The gate is recorded by U11** (per the plan register: U10 is "seam tests
 (12 + 1)"; U11 is "run + record the lane's acceptance gate + the F5 e2e pass
-count"). U12 (the ADR 0281 + `WhatsNew.cs` row + `ARCHITECTURE.md` flip +
+count"). U12 (the ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md) + `WhatsNew.cs` row + [`ARCHITECTURE.md`](../ARCHITECTURE.md) flip +
 the `SL·D` deferral note) is the close unit, the M3 U12 analog.
 
 ### 2.6 Drift-guard (frozen once written)
@@ -648,8 +648,8 @@ the `SL·D` deferral note) is the close unit, the M3 U12 analog.
 The following pins are **frozen** in this doc, and any violation is a `## U<m>
 — Drift pause` per unit-series rule §6 (unit-series rule in the plan):
 
-- The **12** invariants from Part 1 (C-S1·1/2/3/4/5, ADR 0006 C1/C3/C4/C5/C6,
-  ADR 0001-B, ADR 0004 §B.1) — the *numbers* (not the prose) are stable for
+- The **12** invariants from Part 1 (C-S1·1/2/3/4/5, ADR [0006](../adr/0006-module-boundary-contracts.md) C1/C3/C4/C5/C6,
+  ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1) — the *numbers* (not the prose) are stable for
   the rest of the sessions lane; rename / renumber is a breaking change
   (Part 1 already pins this; it repeats here because Part 2's own §2.4 /
   §2.5 names hang off them). The plan's U1 "11 invariants" headline is a
@@ -712,7 +712,7 @@ The following pins are **frozen** in this doc, and any violation is a `## U<m>
   — frozen once written. A unit that finds a way to make the two commits
   share a transaction (e.g. a shared `IDocumentSession`) is a drift event in
   the **positive** direction (the C3 pin is strengthened, not weakened) and
-  must record the change in ADR 0281 (U12).
+  must record the change in ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md) (U12).
 
 > **U2 records, here, the `11 vs 12` plan-documentation slip as closed:**
 > the **12** invariants (not 11) are the pin, confirmed against U1's body.
@@ -748,9 +748,9 @@ Record (shape mirrored from M3's `### Run result (M3 acceptance gate —
 | 2 | **Handoff** (the kill-all extension revokes **all-but-current**: the current `SessionDoc` is kept, the others are revoked, and the F5 stamp rotation + local sign-out coexist independently) | `SessionServiceTests.F5_RevokeAllButCurrent_RevokesOthersKeepsCurrent` (F5 — all-but-current revoked, the current `SessionDoc.RevokedAt` stays `null`), `SessionServiceTests.F5_RevokeAllButCurrent_RevokesOthersWhenCurrentUnknown` (F5 — the degrade-to-all shape when the `kumunita.sid` is unknown, §2.3 shape 4), `SessionsKillAllExtTests.KillAllExt_RevokesOthersKeepsCurrent` (the Web-layer handoff — the extended `POST /sessions/kill-all` action: the F5 `session.kill_all` audit row **and** the `session.revoke_all_but_current` row both committed, the current session kept, the other revoked — the two mechanisms coexist and are independent, the C3 same-transaction pin at the request level per the §2.3 documented deviation). |
 | 3 | **Part-vs-whole** (the 12-test list in §2.4 is the **whole**; the closed-loop + handoff tests are the **parts**; all 12 — plus the kill-all extension test — pass together) | U10's 12 pinned `[Fact]`s in `tests/Kumunita.Core.Tests/SessionServiceTests.cs` (`F1_CreateSession_ReturnsDocWithGuidIdAndTimestamps` · `F2_GetSessionsForUser_ReturnsOnlyActiveSessionsMostRecentFirst` · `F3_GetSessionsForUser_ExcludesRevokedSessions` · `F3_GetSessionsForUser_ReturnsEmptyForUnknownUser` · `F4_RevokeSession_SetsRevokedAtToUtcNow` · `F4_RevokeSession_DoesNotTouchCurrentSession` · `F4_RevokeSession_DeniesCrossUser` · `F4_RevokeSession_IsIdempotent` · `F5_RevokeAllButCurrent_RevokesOthersKeepsCurrent` · `F5_RevokeAllButCurrent_RevokesOthersWhenCurrentUnknown` · `F6_TouchSession_UpdatesLastActiveWhenDue` · `F6_TouchSession_SkipsWhenNotDue`) — all 12 green, **plus** `SessionsKillAllExtTests.KillAllExt_RevokesOthersKeepsCurrent` — **13/13 passed, 0 failed** in this run. **Drift check (§2.6):** all 12 §2.4 names landed **verbatim** in `SessionServiceTests.cs` (confirmed by U11's direct read of the `[Fact]` list) — no rename, no §2.6 drift. |
 
-**E2E status.** The F5 e2e (the `STATUS.md` prod-hardening owner-ops item
+**E2E status.** The F5 e2e (the [`STATUS.md`](../STATUS.md) prod-hardening owner-ops item
 "live E2E + F5 sign-out verifications") is **recorded, not assumed done** —
-same shape as the other prod-hardening owner-ops items in `STATUS.md`. The
+same shape as the other prod-hardening owner-ops items in [`STATUS.md`](../STATUS.md). The
 standalone `e2e/` Playwright project **is present** in the repo (F19 — `e2e/
 package.json` + `playwright.config.ts` + the two F19 specs
 `signup_verify_login.e2e.ts` / `post_write.e2e.ts`), but **no sessions spec is
@@ -758,7 +758,7 @@ authored** in `e2e/specs/` (U10's handoff note confirms "no e2e authored
 (U11's lane)"; U11's own unit-series rule (1) forbids me from authoring
 outside my Deliverables), and the prod-hardening owner-ops list — which
 **owns** the live F5 sign-out verification — is explicitly "recorded, not
-assumed done" in `STATUS.md`. Per the plan's U11 fallback path ("if the e2e
+assumed done" in [`STATUS.md`](../STATUS.md). Per the plan's U11 fallback path ("if the e2e
 runtime … is not yet present, the spec is authored (mirroring F5's U13) and
 *not run* — the gap is recorded in the design doc and the next unit who lands
 the runtime records the pass count"): the **gate is evidenced at the
@@ -767,7 +767,7 @@ seam-test layer** by the 12 `SessionServiceTests` + the 1
 by* those (rows 1 and 2 cite the F1/F2/F3/F4/F5 pins; row 3 is the 13 itself).
 **This is not a gate fail** — 13/13 green, 0 failed, re-confirmed in this
 unit. **The owner-ops item that lands** the live F5 + sessions sign-out
-verification (the `STATUS.md` "live E2E + F5 sign-out verifications" line,
+verification (the [`STATUS.md`](../STATUS.md) "live E2E + F5 sign-out verifications" line,
 owner-ops scope, not a U12 unit deliverable) records the pass count in a
 subsequent `### Run result (sessions e2e — <date>)` section of this doc.
 
@@ -782,7 +782,7 @@ already uses), and U9 (the `improve-check.ps1` gate (a) vs (d) label — the
 `KnownTranslationKeys.cs` line-count pin actually lives in gate (a)'s
 `$aBaselineSizes`, not gate (d) as the plan labels it) are all flagged as
 **not `## U<m> — Drift pause`s** and **do not affect the frozen pins**; they
-are carried into U12's close (the ADR 0281 author) for the record. The two
+are carried into U12's close (the ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md) author) for the record. The two
 pre-existing blockers U9 inherited (the 4 `CS7036` `SecuritySettingsController`
 ctor call-site breaks in pre-existing test files — **repaired by U10**, not a
 drift pause; the `improve-check.ps1` gate (g) design-doc-Abstract blocker —
@@ -792,7 +792,7 @@ close-flip task, not a frozen-pin violation). **No still-open §2.6 drift.**
 
 ---
 
-## ADR 0281 — moved content (D11 trim, 2026-11-02)
+## ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md) — moved content (D11 trim, 2026-11-02)
 
 ## Not covered (the 5 `SL·D` deferrals, verbatim)
 
@@ -808,7 +808,7 @@ Each is a **named deferral** with a one-line `SL·D` follow-up candidate:
 - **Admin "sign out all residents"** — a new `GlobalAdmin` action (kill every
   resident's sessions platform-wide). Not a per-resident surface. *`SL·D`
   candidate: a `GlobalAdmin` `POST /admin/sessions/kill-all` action over
-  `SessionService.*` with an `Admin` audit row (ADR 0006-E named lane).*
+  `SessionService.*` with an `Admin` audit row (ADR [0006](../adr/0006-module-boundary-contracts.md)-E named lane).*
 - **Per-group / per-event session scoping** — sessions are per-account, not
   per-resource. *`SL·D` candidate: a `SessionScope` document keyed to a
   resource id, only if a M4/M5 surface genuinely needs it.*
@@ -846,15 +846,15 @@ Each is a **named deferral** with a one-line `SL·D` follow-up candidate:
 
 ## Close flip (U12, 2026-11-01)
 
-- `WhatsNew.cs` head = **`0.84.0`** / `2026-11-01` / ADR 0281 (the required
+- `WhatsNew.cs` head = **`0.84.0`** / `2026-11-01` / ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md) (the required
   sixth close-flip member, the M27 lesson; the `WhatsNewTests` head-pin
-  bumped from `0.83.0` / ADR 0280 to `0.84.0` / ADR 0281).
+  bumped from `0.83.0` / ADR [0280](../adr/0280-change-password-into-security-tab.md) to `0.84.0` / ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md)).
 - [solution layout](../architecture/solution-layout.md) — the `Sessions/` line flipped to **`sessions` ✓ live**
   with the gate summary (13/13 green).
-- `README.md` — the **`Sessions`** named-lane row added (mirroring the
+- [`README.md`](../../README.md) — the **`Sessions`** named-lane row added (mirroring the
   **Prod-hardening** named-lane row — "a named lane, not a milestone");
   `Milestones.cs` / `MilestonesTests.cs` **byte-identical**.
-- `STATUS.md` — the sessions-lane note (mirroring the prod-hardening named-
+- [`STATUS.md`](../STATUS.md) — the sessions-lane note (mirroring the prod-hardening named-
   lane paragraph shape).
 - The design doc's first 15 lines now carry the `> **Abstract:**` blockquote
   (the `improve-check.ps1` gate (g) — the 10-second "is this the right read"
@@ -862,4 +862,4 @@ Each is a **named deferral** with a one-line `SL·D` follow-up candidate:
 - `KnownTranslationKeys.cs` re-baselined **14885 → 14905** in
   `improve-check.ps1` gate (a) by U9 (the 5 `settings.sessions.*` keys ×
   en/de/fr/da = 20 entries); the ADR annotation for that re-baseline is this
-  ADR (ADR 0281), recorded in U9's handoff note.
+  ADR (ADR [0281](../adr/0281-session-doc-and-per-session-revocation.md)), recorded in U9's handoff note.

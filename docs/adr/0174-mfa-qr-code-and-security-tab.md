@@ -11,16 +11,16 @@ superseded_by: [adr-0280]
 updated: 2026-11-02
 ---
 
-# ADR 0174 — MFA enrollment: QR code pairing + first-class Security tab
+# ADR [0174](0174-mfa-qr-code-and-security-tab.md) — MFA enrollment: QR code pairing + first-class Security tab
 
 Status: Accepted
 Date: 2026-10-26
 
 Extends the **per-resident MFA enrollment surface** (F3, AUTH-03, the
 `SecuritySettingsController` at `/settings/security/mfa`, shipped in the
-prod-hardening lane, ADR 0171 context), the **settings-tab shape** (ADR 0080,
+prod-hardening lane, ADR [0171](0171-least-privilege-db-role.md) context), the **settings-tab shape** (ADR [0080](0080-settings-surface-split.md),
 the `_SettingsTabs.cshtml` sub-nav strip), and the **closed
-`KnownTranslationKeys` registry + en/de/fr/da parity pins** (ADR 0015 / ADR
+`KnownTranslationKeys` registry + en/de/fr/da parity pins** (ADR [0015](0015-ui-view-localization-mechanics.md) / ADR
 0052). This ADR makes the MFA enrollment surface **reachable from the
 settings strip** (a new **Security** tab, alongside Language / Time zone /
 Date & time format / Items per page / Home page / Quiet hours / Messaging /
@@ -43,12 +43,12 @@ POSTs. The surface is functional and battle-tested (the F3.U5 pinned tests:
 Two gaps persisted after the prod-hardening lane closed:
 
 1. **No first-class navigation entry.** The `_SettingsTabs.cshtml` sub-nav
-   strip (ADR 0080 shape) lists Language, Time zone, Date & time format,
+   strip (ADR [0080](0080-settings-surface-split.md) shape) lists Language, Time zone, Date & time format,
    Items per page, Home page, Quiet hours, Messaging, Children, Change
    password, My data, Kiosk — but **no Security tab**. A resident who wanted
    to set up or change MFA had to know the URL and type it. The surface was
    discoverable only via the deep link in the admin help guide, which is
-   precisely the "reachability is the feature" problem the ADR 0080 tab
+   precisely the "reachability is the feature" problem the ADR [0080](0080-settings-surface-split.md) tab
    shape exists to close.
 
 2. **Pairing an authenticator app was a copy-the-key affair.** The
@@ -82,7 +82,7 @@ Rationale:
 
 - **No client JS required.** The QR appears as a plain `<img>` tag; the
   page works with scripts disabled. (The repo's "no client JS" preference
-  — ADR 0031, the tsc-only pin — is preserved; the QR is a static image,
+  — ADR [0031](0031-wysiwyg-editor-and-toolbar.md), the tsc-only pin — is preserved; the QR is a static image,
   not a JS-rendered canvas.)
 - **No new static asset.** The data URI is self-contained; there is no
   `/wwwroot/images/mfa-qr.png` to ship, cache, or version.
@@ -137,7 +137,7 @@ recovery codes, not pairing a new app.
 
 ### D3 — the Security tab: a first-class settings strip entry
 
-A new **Security** tab is added to `_SettingsTabs.cshtml` (the ADR 0080
+A new **Security** tab is added to `_SettingsTabs.cshtml` (the ADR [0080](0080-settings-surface-split.md)
 sub-nav strip), linking to `/settings/security/mfa`. The tab's active
 detection covers the full `SecuritySettingsController` action family
 (`Mfa`, `MfaRecovery`, `MfaRotateRecovery`, `MfaDisable`, `Sessions`),
@@ -145,9 +145,9 @@ matching the controller-aware active-detection idiom already in use
 (`("Guardian", _) => "Children"`, `("Kiosk", "SettingsGet") => "Kiosk"`,
 etc.).
 
-The tab's label is the new `settings.security.title` kw-l key (ADR 0015
+The tab's label is the new `settings.security.title` kw-l key (ADR [0015](0015-ui-view-localization-mechanics.md)
 registry, × en/de/fr/da). The key is registered in all four language
-dictionaries (the ADR 0015 / ADR 0052 parity pins: `DeValues` / `FrValues`
+dictionaries (the ADR [0015](0015-ui-view-localization-mechanics.md) / ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) parity pins: `DeValues` / `FrValues`
 / `DaValues` must key-for-key match `AllKeys`).
 
 The Security tab is placed **after "Change password" and before "My data"**
@@ -174,7 +174,7 @@ would require a 4th file … which exceeds this unit's ≤3-file budget. The
 enforcement leg (F3.U4) and the multilingual close-flip may register the
 keys then; the surface works en-only today."). The tab *label* is
 translated because it appears in the shared settings strip (which is
-rendered on every settings page, not just the MFA page), and the ADR 0015
+rendered on every settings page, not just the MFA page), and the ADR [0015](0015-ui-view-localization-mechanics.md)
 parity discipline requires a registered key for any kw-l usage in a Razor
 view.
 
@@ -202,10 +202,10 @@ view.
   the Security tab is inserted at its natural position, after "Change
   password" and before "My data").
 - **`KnownTranslationKeys.cs`** gains one key (`settings.security.title`)
-  in all four language dictionaries (en / de / fr / da) — the ADR 0015
+  in all four language dictionaries (en / de / fr / da) — the ADR [0015](0015-ui-view-localization-mechanics.md)
   parity is preserved.
 - **`WhatsNew.cs`** gains a new `0.72.0` entry (the required sixth
-  close-flip member, ADR 0110 / AGENTS.md). The `WhatsNewTests` head pin
+  close-flip member, ADR [0110](0110-platform-versioning-and-whats-new.md) / AGENTS.md). The `WhatsNewTests` head pin
   is updated (the `0.72.0` entry becomes the head; the `0.71.0` entry
   slides one row back).
 - **Zero** new `AccessAction` / `AccessVia` / `Decide()` branch /
@@ -214,6 +214,6 @@ view.
 - **Zero** migrations (no Marten doc, no EF Core table, no schema change).
 - **Zero** new bounded context (the `SecuritySettingsController` is
   unchanged in its bounded-context standing — F3's AUTH-03 surface, the
-  ADR 0006 "thin token, fat authorization" posture).
+  ADR [0006](0006-module-boundary-contracts.md) "thin token, fat authorization" posture).
 - **Zero** new `kw-l` keys beyond the one tab label (the MFA body text
   remains en-only, per the F3.U3 discipline).

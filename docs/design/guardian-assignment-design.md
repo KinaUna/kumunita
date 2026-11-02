@@ -20,18 +20,18 @@ updated: 2026-11-02
 > (closed-loop? handoff? part-vs-whole?) are run and recorded at the end.
 >
 > **This is a named lane (`GA`), not an M-letter** — the same convention as
-> `GP`, `ML`, `GU`, `RE`, `TR`, `RC` (ADR 0013's "named capability, not a
+> `GP`, `ML`, `GU`, `RE`, `TR`, `RC` (ADR [0013](../adr/0013-group-posts-membership-lane.md)'s "named capability, not a
 > milestone letter"). It is **pulled forward ahead of M4** (Events),
 > mirroring how `GU` was pulled forward in 2026-09-14. M4/M5/M6 stay
 > Events / Projects / Portability.
 
 ## Context
 
-The GU lane (ADR 0028) shipped the **account-level supervision** surface for
+The GU lane (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)) shipped the **account-level supervision** surface for
 a child's account: a parent *creates* the child's account (the usual
 confirm-email lane), suspends/locks it, curates the child's community and
 group memberships, approves a group invitation sent to the child, and
-dissolves the link (independence). ADR 0028 §B already records that **"a
+dissolves the link (independence). ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §B already records that **"a
 child may have one or two guardians (each an active row)"** — the
 `GuardianLink` *document* and the `IUserInfoService.CreateGuardianLinkAsync`
 *seam* both already support multiple active rows for the same `ChildId` (one
@@ -45,17 +45,17 @@ to get standing over an **existing** child account. Today the only path to
 child's account must be **created** in the same commit (G·4: formation is
 creation-based). A mother who created her child's account **cannot** later
 add her ex-partner (or her co-parent, or a grandparent) as a second
-guardian — ADR 0028 §D G·4 explicitly records "no self-serve 'claim
+guardian — ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §D G·4 explicitly records "no self-serve 'claim
 guardianship over an existing account' lane."
 
 This lane fills exactly that gap: **an existing active guardian assigns a
 second guardian** to a child's account. The arrow moved from *supervision*
 (the GU lane) to *co-supervision* — but the standing conferred is the same
 standing. The platform is invitation-only, one neighborhood, privacy-first
-(`SECURITY.md` §1, ADR 0002): the assigned guardian's standing is
+([`SECURITY.md`](../../SECURITY.md) §1, ADR [0002](../adr/0002-deployment-topology.md)): the assigned guardian's standing is
 **identical in kind** to the creator's (the five GU actions, no content
 read, no "assigned" tier). The lane is small by design — the Core already
-supports multi-guardian standing (ADR 0028 §B); this lane adds **one
+supports multi-guardian standing (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §B); this lane adds **one
 `IIdentityService` ADD**, **one `GuardianController` action**, **one view
 model + one record + one record field**, and **two `Detail.cshtml`
 appends**. Nothing else moves.
@@ -69,7 +69,7 @@ Portability**.
 **In:**
 
 1. `IIdentityService.FindSubjectByEmailAsync(string email)` — the **one
-   new ADD** on the frozen `IIdentityService` surface (the ADR 0006-E
+   new ADD** on the frozen `IIdentityService` surface (the ADR [0006](../adr/0006-module-boundary-contracts.md)-E
    compatible lane; the M1 lifecycle ADD precedent). The email → subjectId
    resolution the assign form needs; a read (no audit row, no mutation);
    null on unknown email (the Web's user-presentable error surface).
@@ -84,22 +84,22 @@ Portability**.
 4. The `Detail.cshtml` two appends (the "other guardians" list + the assign
    form; the existing curation sections are untouched) + the
    `guardian.assign.*` / `guardian.otherGuardians.*` localization keys.
-5. ADR 0038 (the named decision that supersedes ADR 0028 G·4's
+5. ADR [0038](../adr/0038-guardian-assignment.md) (the named decision that supersedes ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) G·4's
    non-decision for the *existing active guardian* case).
 6. This design doc's pinned contract + the seam tests (8 pinned names) +
    the acceptance gate.
 7. The README / `Milestones.cs` / `MilestonesTests.cs` trio flip (U07, the
    AGENTS.md contract).
 
-**Out (named deferrals, ADR 0038 §E):**
+**Out (named deferrals, ADR [0038](../adr/0038-guardian-assignment.md) §E):**
 
 - **No remove path** — a co-guardian dissolving *another* co-guardian's
-  link, or the child dissolving a co-guardian's link. The ADR 0028 G·5
+  link, or the child dissolving a co-guardian's link. The ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) G·5
   safety valve (a GlobalAdmin dissolving any active link, audited `Via:
   Admin`) remains the **only** "dissolve any active link" path.
 - **No acceptance/consent step** on the assigned guardian — the standing
   is conferred by the assigning guardian's act, not the assigned
-  guardian's consent (the ADR 0028 "the standing is from the active link,
+  guardian's consent (the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) "the standing is from the active link,
   not from an acceptance" precedent).
 - **No bulk assign** — one email per form.
 - **No self-assignment** — a guardian cannot assign *themselves* as a
@@ -113,7 +113,7 @@ Portability**.
   / M1's verification lane is unchanged; the assigned guardian simply has
   standing on their next read.
 
-Each is *deferred*, not *denied* — each re-litigates as an ADR 0038
+Each is *deferred*, not *denied* — each re-litigates as an ADR [0038](../adr/0038-guardian-assignment.md)
 amendment when it earns its keep.
 
 ## Invariants (pinned for GA)
@@ -121,7 +121,7 @@ amendment when it earns its keep.
 - **G-A·1 — Standing is from the *assigning* guardian's active
   `GuardianLink` over the child, checked live.** The `ActiveLinkAsync`
   helper the `Dissolve` route already uses runs first; a non-guardian →
-  404 (the ADR 0012/0013 "a non-guardian learns nothing" shape). The GU
+  404 (the ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md)/0013 "a non-guardian learns nothing" shape). The GU
   lane's G·2 precedent, inherited.
 - **G-A·2 — The assigned guardian must have an account.** The email →
   subjectId resolution (the new `FindSubjectByEmailAsync` seam) returns
@@ -136,7 +136,7 @@ amendment when it earns its keep.
   The GA lane does **not** touch `IAuthorizationService`, does not touch
   `AccessVia`, does not touch the GU enforcement path. The `GuardianLink`
   POCO is **byte-identical** (no new field, no new enum value, no
-  renumbering). Inherits G·1 from ADR 0028.
+  renumbering). Inherits G·1 from ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md).
 - **G-A·4 — Idempotency.** A duplicate `(GuardianId, ChildId)` active row
   is a no-op — the row is left as-is, no second audit row. The
   `CreateGuardianLinkAsync` seam already enforces this (the GU lane's G·4
@@ -149,11 +149,11 @@ amendment when it earns its keep.
   user-presentable error ("You are already this child's guardian."), never
   a 500.
 - **G-A·6 — No remove path (a named deferral, not a denial).** The GA lane
-  does **not** add a "remove a co-guardian" surface. The ADR 0028 G·5
+  does **not** add a "remove a co-guardian" surface. The ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) G·5
   safety valve (a GlobalAdmin dissolving any active link, audited `Via:
   Admin`) remains the **only** "dissolve any active link" path. A
   co-guardian dissolving *another* co-guardian's link, or the child
-  dissolving a co-guardian's link, is a **future ADR 0038 amendment** (the
+  dissolving a co-guardian's link, is a **future ADR [0038](../adr/0038-guardian-assignment.md) amendment** (the
   "each re-litigates as an ADR amendment, not a toggle" precedent).
 
 ## FACES (pinned, 6)
@@ -165,7 +165,7 @@ amendment when it earns its keep.
   read — G-A·3
 - **F4** a duplicate assignment is a no-op (no second audit row) — G-A·4
 - **F5** self-assignment is refused (user-presentable error) — G-A·5
-- **F6** no remove path (the ADR 0028 G·5 safety valve is the only
+- **F6** no remove path (the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) G·5 safety valve is the only
   dissolve path) — G-A·6
 
 ## Pinned contract (U01 — finalizes for U02–U06)
@@ -390,7 +390,7 @@ authors) with exactly these **5**:
 
 And the **9th** (the acceptance gate's **handoff** leg, promoted from
 inference to a test on 2026-09-17 — see `## GA — Closed (recorded)`;
-ADR 0038 §Amendment): `tests/Kumunita.Core.Tests/` (the same Core file)
+ADR [0038](../adr/0038-guardian-assignment.md) §Amendment): `tests/Kumunita.Core.Tests/` (the same Core file)
 
 9. `Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild` — after the GA
    lane confers standing (a second active `GuardianLink` over the child,
@@ -401,7 +401,7 @@ ADR 0038 §Amendment): `tests/Kumunita.Core.Tests/` (the same Core file)
 
 **GA-AR (2026-09-17):** the pinned-test list is extended from 9 to
 **11** names (5 Core + 6 Web) by the GA-AR lane (the second-audit-row
-amendment, ADR 0038 §Amendment (2026-09-17, second)). The GA lane's 9
+amendment, ADR [0038](../adr/0038-guardian-assignment.md) §Amendment (2026-09-17, second)). The GA lane's 9
 original names are unchanged (one renamed — #8, above); the GA-AR lane
 adds:
 
@@ -417,7 +417,7 @@ adds:
 > authoritative; the 5/5 Core + 6/6 Web run results confirm the count.
 
 A test whose exact name is not in this list is a `## U<m> — Drift pause`.
-(A test added under this list — #9 — is an ADR 0038 amendment, not a
+(A test added under this list — #9 — is an ADR [0038](../adr/0038-guardian-assignment.md) amendment, not a
 drift pause; the lane's own rule.
 
 ### Acceptance gate (U07 records)
@@ -432,7 +432,7 @@ The three tests:
   un-suspend / curate / approve over the child — the five GU actions, no
   content read. **Proven** by the pinned test #9
   (`Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild`), not inferred
-  (2026-09-17, ADR 0038 §Amendment).
+  (2026-09-17, ADR [0038](../adr/0038-guardian-assignment.md) §Amendment).
 - **part-vs-whole** — the **11-test** list (5 Core + 6 Web, after the
   GA-AR rename + add) is the whole; closed-loop + handoff are the parts;
   all must pass together.
@@ -466,7 +466,7 @@ is a `## U<m> — Drift pause`.
 ## Verification + reconciliation (2026-09-17)
 
 A full code-vs-docs pass (plus the Fractal-Integration lens) confirmed the
-lane is complete and green and reconciled two drifts (ADR 0038 §Amendment
+lane is complete and green and reconciled two drifts (ADR [0038](../adr/0038-guardian-assignment.md) §Amendment
 (2026-09-17)):
 
 - **Gate (re-run 2026-09-17): 9/9 PASS** — 4 Core (`FindSubjectByEmail_*` ×3
@@ -477,14 +477,14 @@ lane is complete and green and reconciled two drifts (ADR 0038 §Amendment
   authoritative):** the `guardian.create` row's `ActorId` /
   `EffectivePrincipalId` record the **assigned** guardian (the
   standing-holder) — the GU byte-identical seam's shape. The earlier prose
-  ("both the assigning guardian") in this doc's §Scope / §D and in ADR 0038
+  ("both the assigning guardian") in this doc's §Scope / §D and in ADR [0038](../adr/0038-guardian-assignment.md)
   §D/§E did not match the code and is superseded; the **assigning**
   guardian's identity is **not persisted** on the row (named legibility
   limitation).
 - **Superseded (GA-AR, 2026-09-17):** the named legibility limitation
   (the assigning guardian not persisted) is **resolved** by the GA-AR
   lane — the `guardian.assign` audit row's `ActorId` is the assigning
-  guardian (ADR 0038 §Amendment (2026-09-17, second)). The
+  guardian (ADR [0038](../adr/0038-guardian-assignment.md) §Amendment (2026-09-17, second)). The
   `GuardianLink` POCO is still byte-identical (S·3) — the conferrer is
   in the **audit trail**, not the relationship document.
 - **Carried (unchanged):** the `name="Email"` (not `asp-for`) note and the
@@ -493,11 +493,11 @@ lane is complete and green and reconciled two drifts (ADR 0038 §Amendment
 
 ## GA — Closed (recorded) (2026-09-17)
 
-The GA lane (guardian assignment, ADR 0038) is **shipped**. The
+The GA lane (guardian assignment, ADR [0038](../adr/0038-guardian-assignment.md)) is **shipped**. The
 `IIdentityService.FindSubjectByEmailAsync` ADD + the `GuardianController.
 Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorModel.GuardianItems` VMs + the `Detail.cshtml` two appends + the `guardian.assign.*` / `guardian.otherGuardians.*` localization keys are live. Standing is **identical in kind** to the creator's — invariant **G-A·3** held: the assigned guardian's standing is the same five GU actions, **no content read**, no "assigned" tier; the `GuardianLink` POCO and the GU enforcement path are byte-identical.
 
-- **Decision record:** ADR 0038 (guardian assignment; amends 0028's G·4 non-decision for the existing-guardian case, 0006 one `IIdentityService` ADD, 0012/0013 the standing-gate + "a non-guardian learns nothing" 404 shape inherited).
+- **Decision record:** ADR [0038](../adr/0038-guardian-assignment.md) (guardian assignment; amends 0028's G·4 non-decision for the existing-guardian case, 0006 one `IIdentityService` ADD, 0012/0013 the standing-gate + "a non-guardian learns nothing" 404 shape inherited).
 - **Gate (U07's record — 2026-09-17):** the three tests (closed loop / handoff / part-vs-whole) are the 8 pinned seam tests below, all **PASS**:
   - **3 Core tests** (`tests/Kumunita.Core.Tests/GuardianAssignmentTests.cs`, U03 — `PostgresFixture`, the real M1 lifecycle `RegisterAsync` + `VerifyWithTokenAsync`, both EF `identity` + Marten `mt` stores over one fresh scratch Postgres DB):
     1. `FindSubjectByEmail_ReturnsSubjectIdForKnownEmail` — **PASS**
@@ -512,13 +512,13 @@ Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorMo
   - **Total:** 8/8 passed, 0 failed. **Closed loop** (the assigned guardian's standing is live on their next read) + **handoff** (the assigned guardian, now a full guardian, can suspend / un-suspend / curate / approve over the child) + **part-vs-whole** (all 8 pass together) — the gate holds.
 - **Drift pauses carried from U06 (named, not silently resolved):** (i) `Detail.cshtml` uses plain `name="Email"` (not `asp-for="Email"`) — the pinned `@model` is `MembershipEditorModel` (no `Email` property), so the `asp-for` TagHelper is uncompilable; the `Assign` action binds `AssignGuardianForm.Email` by its own property name on the POST, matching the existing curation-forms convention; (ii) the `guardian.create` audit row's `ActorId` is the **assigned** guardian (the `CreateGuardianLinkAsync(childId, guardianId)` seam sets `ActorId = guardianId`, and `guardianId` is the `assignedId` the `Assign` action passes) — the pinned contract §D prose says "assigning guardian", but the byte-identical GU seam (G-A·3 forbids a new seam) sets it to the assigned guardian; the tests assert the real behavior; (iii) `Kumunita.Web.Tests` now carries its own `PostgresFixture` (a byte-for-byte copy of `Kumunita.Core.Tests`'s) — the repo's documented convention ("Web.Tests is NSubstitute-only, Testcontainers lives in Core.Tests") is overridden by the explicit U06 requirement to run the 5 pinned tests against a real store.
 - **Cross-lane red surfaced (NOT in GA's deliverables, not fixed by GA):** `GuardianViewModelsTests.MembershipEditorModel_Is_Exact_Four_Field_Projection` (GU lane, pre-existing) asserts exactly `{ "ChildId", "CommunityIds", "GroupIds", "PendingInvitations" }`, but U04 legitimately added `GuardianItems` as the 5th field → that test is **red** in the full `Kumunita.Web.Tests` suite (1 failure out of 200 total). This is a cross-lane breakage outside GA's sealed scope — surfaced to the user as a decision (update the GU projection test to expect 5 fields vs. leave it) rather than silently fixed or ignored.
-- **Layout:** the `IIdentityService.FindSubjectByEmailAsync` ADD + the `GuardianController.Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorModel.GuardianItems` VMs + the `Detail.cshtml` two appends + the `guardian.assign.*` / `guardian.otherGuardians.*` localization keys ride the existing surface (ADR 0004 §B.1 additive; `CoreDocTypes` byte-identical — the `GuardianLink` line is already there, GU U02); the [solution layout](../architecture/solution-layout.md) `Identity/` + `UserInfo/` lines carry the surface (U07).
-- **Non-decisions (ADR 0038 §E, each named, carried forward):** no remove path (a co-guardian dissolving *another* co-guardian's link, or the child dissolving a co-guardian's link — the ADR 0028 G·5 safety valve remains the only "dissolve any active link" path); no acceptance/consent step on the assigned guardian; no bulk assign (one email per form); no self-assignment (refused, G-A·5, not a lane); no second audit verb (`guardian.create` is the one verb); no email notification to the assigned guardian. Each re-litigates as an ADR 0038 amendment, not a toggle.
+- **Layout:** the `IIdentityService.FindSubjectByEmailAsync` ADD + the `GuardianController.Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorModel.GuardianItems` VMs + the `Detail.cshtml` two appends + the `guardian.assign.*` / `guardian.otherGuardians.*` localization keys ride the existing surface (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive; `CoreDocTypes` byte-identical — the `GuardianLink` line is already there, GU U02); the [solution layout](../architecture/solution-layout.md) `Identity/` + `UserInfo/` lines carry the surface (U07).
+- **Non-decisions (ADR [0038](../adr/0038-guardian-assignment.md) §E, each named, carried forward):** no remove path (a co-guardian dissolving *another* co-guardian's link, or the child dissolving a co-guardian's link — the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) G·5 safety valve remains the only "dissolve any active link" path); no acceptance/consent step on the assigned guardian; no bulk assign (one email per form); no self-assignment (refused, G-A·5, not a lane); no second audit verb (`guardian.create` is the one verb); no email notification to the assigned guardian. Each re-litigates as an ADR [0038](../adr/0038-guardian-assignment.md) amendment, not a toggle.
 - **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane discipline: GA is not a renumber).
 
 ## GA-AR — Second audit row (implemented) (2026-09-17)
 
-The GA-AR lane (guardian assignment, second audit row; ADR 0038
+The GA-AR lane (guardian assignment, second audit row; ADR [0038](../adr/0038-guardian-assignment.md)
 §Amendment (2026-09-17, second)) is **shipped**. It resolves the §D
 named legibility limitation the GA lane's first amendment recorded
 (the assigning guardian not persisted) by adding a **second audit row**,
@@ -592,7 +592,7 @@ is now on the **audit trail**, not the relationship document — the
 
 ---
 
-## ADR 0038 — moved content (D11 trim, 2026-11-02)
+## ADR [0038](../adr/0038-guardian-assignment.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendment (2026-09-17)
 
@@ -623,13 +623,13 @@ non-decisions are unchanged.
 The named legibility limitation in §D — the assigning guardian's identity
 is not persisted on the row — is **resolved** by the GA-AR lane (the
 "guardian assignment, second audit row" lane, this ADR's §E "no second
-audit verb" deferral, now implemented). The GU lane (ADR 0028) and the
+audit verb" deferral, now implemented). The GU lane (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)) and the
 GA lane's shipped surface (the `GuardianLink` POCO, the
 `CreateGuardianLinkAsync` seam, the five GU actions, the `AccessVia`
 enum, the GU enforcement path) are all **byte-identical** (invariant
 S·2/S·3/S·4, inherited from G-A·3).
 
-1. **New seam (additive, ADR 0006-E compatible):**
+1. **New seam (additive, ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible):**
    `IUserInfoService.AssignGuardianLinkAsync(string childId, string
    guardianId, string assignedById)` — the conferral-based standing basis
    (vs. `CreateGuardianLinkAsync`'s creation-based basis). Writes the
@@ -691,7 +691,7 @@ S·2/S·3/S·4, inherited from G-A·3).
 Each of §E's other non-decisions (no remove path; no acceptance/consent
 step; no bulk assign; no self-assignment; no email notification) is
 **unchanged** — still *deferred*, not *denied*; each re-litigates as a
-future ADR 0038 amendment when it earns its keep.
+future ADR [0038](../adr/0038-guardian-assignment.md) amendment when it earns its keep.
 
 
 ## Amendment §F (2026-10-04)
@@ -709,7 +709,7 @@ This amendment **supersedes** three earlier invariants of this ADR —
 call them out explicitly so they are not accidentally re-invoked:
 
 - **S·3 (byte-identical POCO) is superseded:** the `GuardianLink` POCO
-  gains three fields — `ResolvedAt` / `ResolvedBy` (the ADR 0038 §F state
+  gains three fields — `ResolvedAt` / `ResolvedBy` (the ADR [0038](../adr/0038-guardian-assignment.md) §F state
   transition) + `AssignedById` (the conferrer, the "who conferred the
   standing" legibility §D named as a limitation, now on the row itself
   rather than only recoverable from the audit trail). The `CoreDocTypes.
@@ -760,7 +760,7 @@ call them out explicitly so they are not accidentally re-invoked:
 The standing gates (the Core `GuardActiveLinkAsync`, the Web
 `ActiveLinkAsync`, the Web `ActiveGuardiansAsync`) all query
 `Status == Active` exclusively — the `Pending` / `Declined` states confer
-**no standing** (the ADR 0028 G·3 deny-by-default shape applied to the
+**no standing** (the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) G·3 deny-by-default shape applied to the
 acceptance lane). The `ActiveChildrenAsync` read (the assignee's
 `/me/children` list) is likewise `Active`-only: a pending assignee sees
 the pending-requests card, NOT the child's row (their standing is not
@@ -778,7 +778,7 @@ Declined` + the `guardian.decline` audit row) + the **one new** read
 seam (`GetPendingGuardianRequestsForAssigneeAsync` — the assignee's
 pending requests, identity-gated by `GuardianId == caller's SubjectId`,
 not standing-gated because the assignee holds no standing yet — the
-ADR 0012/0013 "a non-guardian learns nothing" shape applied to the
+ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md)/0013 "a non-guardian learns nothing" shape applied to the
 identity axis) + the **one new** notification kind
 (`NotificationKinds.GuardianAssign` — the assignee's "a guardian has
 asked you to become a co-guardian" nudge; the LinkPath is
@@ -823,7 +823,7 @@ live on the very next read, G·2/C4).
 ### F.4. The i18n (the new key set, en/de/fr/da)
 
 The new key set (en baseline + the de / fr / da translations, the
-ADR 0042 / ADR 0047 / ADR 0048 "no English-only key" rule held):
+ADR [0042](../adr/0042-bundled-initial-language-pack.md) / ADR [0047](../adr/0047-static-page-localization-and-backfill.md) / ADR [0048](../adr/0048-translation-edit-and-remove-lanes.md) "no English-only key" rule held):
 `guardian.pending`, `guardian.pendingRequests.{title,lead,child,
 conferrer}`, `guardian.accept`, `guardian.accept.consent.{intro,
 duties_invitations,duties_chat,duties_data,checkbox,required}`,
@@ -877,10 +877,10 @@ _200_And_Toggles` — the closed kind set's count goes from 19 to 20
 ### F.6. The non-decisions (the §E "for now" set, updated)
 
 - **No remove path** — a co-guardian dissolving *another* co-guardian's
-  link, or the child dissolving a co-guardian's link. The ADR 0028 G·5
+  link, or the child dissolving a co-guardian's link. The ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) G·5
   safety valve (a GlobalAdmin dissolving any active link, audited `Via:
   Admin`) remains the only "dissolve any active link" path.
-- **No bulk assign** — one email per form (the ADR 0038 §E original,
+- **No bulk assign** — one email per form (the ADR [0038](../adr/0038-guardian-assignment.md) §E original,
   unchanged).
 - **No self-assignment** — refused (G-A·5, unchanged).
 - **No second audit verb on the assign** — the assign seam writes ONE
@@ -899,12 +899,12 @@ _200_And_Toggles` — the closed kind set's count goes from 19 to 20
 
 Each of §E's remaining non-decisions (no remove path; no bulk assign;
 no self-assignment) is **unchanged** — still *deferred*, not *denied*;
-each re-litigates as a future ADR 0038 amendment when it earns its keep.
+each re-litigates as a future ADR [0038](../adr/0038-guardian-assignment.md) amendment when it earns its keep.
 
 ### F.7. Consequences
 
 - **The family case gains a *co-supervision* lane that the assignee
-  must accept**, not just one the conferrer confers — the ADR 0028
+  must accept**, not just one the conferrer confers — the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)
   "the family case gains a supervision lane" precedent, extended two
   steps: a second adult can be brought into standing over an existing
   child's account without a GlobalAdmin in the loop and without creating
@@ -931,13 +931,13 @@ each re-litigates as a future ADR 0038 amendment when it earns its keep.
   the `guardian.accept` audit row (the assignee, the consent event)
   together answer *"who conferred the standing?"* AND *"who holds
   standing over this child?"* AND *"when was the standing minted, and
-  on what basis?"* — the ADR 0028 family legibility row, extended two
+  on what basis?"* — the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) family legibility row, extended two
   steps. The `GuardianLink.AssignedById` field surfaces the conferrer
   on the row itself (the §D named limitation is resolved for the GA
   lane; the GU formation lane's `AssignedById` is null — the creator's
   identity is on the `guardian.create` audit row, the GU seam's shape,
   S·2 held).
-- **The roadmap trio moves together** (AGENTS.md contract): `README.md`
+- **The roadmap trio moves together** (AGENTS.md contract): [`README.md`](../../README.md)
   Features + Roadmap's GA bullet is updated to reflect the acceptance
   lane (the "an existing guardian assigns a **second** guardian" prose
   is now "an existing guardian **invites** a **second** guardian, who

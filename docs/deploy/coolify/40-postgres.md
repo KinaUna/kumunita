@@ -16,7 +16,7 @@ updated: 2026-11-02
 > **Abstract:** the dedicated Postgres 18 addon for one neighborhood — the two-role split (`kumunita_migrate` + `kumunita`), the one-shot init script, and the ownership/permission shape. **Who is it for:** the host operator. **When to read the rest:** before first boot, once per neighborhood.
 
 # 4 — Postgres 18 (once per neighborhood)
-One **dedicated** Postgres per neighborhood (never shared — ADR 0002).
+One **dedicated** Postgres per neighborhood (never shared — ADR [0002](../../adr/0002-deployment-topology.md)).
 
 For more information see Coolify docs: [PostgreSQL](https://coolify.io/docs/databases/postgresql).
 
@@ -49,7 +49,7 @@ GRANT CONNECT ON DATABASE kumunita TO kumunita;
 CREATE SCHEMA mt AUTHORIZATION kumunita_migrate;
 GRANT USAGE, CREATE ON SCHEMA mt TO kumunita;
 ```
-This is the two-role split (**ADR 0171** / F22) in its entirety: `kumunita_migrate` owns the DB + the `mt` schema and is the only role that runs DDL; the app role `kumunita` is DML, with one **forced exception** — `CREATE` on the `mt` schema only (so Wolverine + Marten can create their `mt.wolverine_*` / `mt.mt_*` tables **as the app role** during `app.StartAsync()`). The `identity` schema is deliberately **not** pre-created here — the app's fresh-boot signal ("identity schema absent") must stay true; EF creates it at first boot as `kumunita_migrate` (the DB owner). The shape mirrors `dev-db-init/01-app-role.sql` + `dev-db-init/02-app-schemas.sh` (the dev-compose equivalent).
+This is the two-role split (**ADR [0171](../../adr/0171-least-privilege-db-role.md)** / F22) in its entirety: `kumunita_migrate` owns the DB + the `mt` schema and is the only role that runs DDL; the app role `kumunita` is DML, with one **forced exception** — `CREATE` on the `mt` schema only (so Wolverine + Marten can create their `mt.wolverine_*` / `mt.mt_*` tables **as the app role** during `app.StartAsync()`). The `identity` schema is deliberately **not** pre-created here — the app's fresh-boot signal ("identity schema absent") must stay true; EF creates it at first boot as `kumunita_migrate` (the DB owner). The shape mirrors `dev-db-init/01-app-role.sql` + `dev-db-init/02-app-schemas.sh` (the dev-compose equivalent).
 
 (The init script runs **once, on first boot only** — the postgres image executes its `/docker-entrypoint-initdb.d/` files only against a fresh, empty data directory. Ownership-by-migrate-role means DDL at boot needs no elevated/rights dance, and the app role is refused `CREATE SCHEMA` / `DROP SCHEMA` / `DROP DATABASE` (SQLSTATE `42501`). See the [hardening checklist](../../ops/hardening-checklist.md) "DB user".)
 

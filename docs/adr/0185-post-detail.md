@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0185 — Community post detail
+# ADR [0185](0185-post-detail.md) — Community post detail
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0184 (announcement detail), ADR 0175 (feed card)
+Relates to: ADR [0184](0184-announcement-detail.md) (announcement detail), ADR [0175](0175-palettes-and-feed-card.md) (feed card)
 
 ## Decision
 

@@ -11,14 +11,14 @@ superseded_by: [adr-0086]
 updated: 2026-11-02
 ---
 
-# ADR 0020 — Date & time format: platform default (admin) + per-resident override + custom
+# ADR [0020](0020-date-format-platform-default-and-resident-override.md) — Date & time format: platform default (admin) + per-resident override + custom
 
 Status: Accepted
 Date: 2026-09-13
 
 ## Context
 
-ADR 0019 (timezone) fixed **which zone** a timestamp is rendered in, but it left
+ADR [0019](0019-timezone-platform-default-and-resident-override.md) (timezone) fixed **which zone** a timestamp is rendered in, but it left
 **how the date is written** to the .NET `g` custom format — the `format="g"`
 attribute the `kw-dt` TagHelper was already applying. That format is
 `M/d/yyyy h:mm tt` (e.g. **`1/2/2026 3:04 PM`**), which is exactly the
@@ -26,8 +26,8 @@ ambiguity this feature exists to remove: **is `1/2/2026` January 2 or February
 1?** A resident who reads the feed has no way to tell, and there was no way to
 ask for a clearer rendering.
 
-The correct model is the **same three-tier fallback** ADR 0019 (timezone) and
-ADR 0005 (language) use — platform default + user override + a hard floor —
+The correct model is the **same three-tier fallback** ADR [0019](0019-timezone-platform-default-and-resident-override.md) (timezone) and
+ADR [0005](0005-multilingual-support.md) (language) use — platform default + user override + a hard floor —
 applied to the *format string* rather than the *zone*:
 
 - A **platform default** date-time format, set once by a GlobalAdmin, expresses
@@ -37,8 +37,8 @@ applied to the *format string* rather than the *zone*:
   individual with a different taste (or a different reading convention) see
   dates the way they expect.
 - A **hard floor** ensures the system never renders with a blank or unusable
-  format — the same `en` floor ADR 0005 uses for language and the `UTC` floor
-  ADR 0019 uses for time zone.
+  format — the same `en` floor ADR [0005](0005-multilingual-support.md) uses for language and the `UTC` floor
+  ADR [0019](0019-timezone-platform-default-and-resident-override.md) uses for time zone.
 
 This is the natural third member of the "instance default + user override"
 trio (language / time zone / **date format**). Like its two siblings it is
@@ -58,8 +58,8 @@ residents) can type a custom format."
   - `Kumunita.Core.Localization.LocaleSettings.DefaultDateFormat` (`string`,
     default `DateFormat.FloorFormat`) — the platform default, on the **same
     singleton** that holds `DefaultLanguageCode` and `DefaultTimezone` (ADR
-    0005 B / ADR 0019). One "platform locale defaults" document, not a fourth.
-  - Both are **additive** fields (ADR 0004 §B.1) — no migration file (Marten
+    0005 B / ADR [0019](0019-timezone-platform-default-and-resident-override.md)). One "platform locale defaults" document, not a fourth.
+  - Both are **additive** fields (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1) — no migration file (Marten
     applies the added `string` column automatically), exactly the shape of the
     `Profile.TimeZone` / `LocaleSettings.DefaultTimezone` additions.
 
@@ -92,7 +92,7 @@ residents) can type a custom format."
     `KeyNotFoundException` fail-closed (never load-or-create). `null` clears
     (fall back to the platform default). The user lane stores whatever it is
     given (no validation) — a bad value degrades gracefully at read time (see
-    resolution), the ADR 0019 posture.
+    resolution), the ADR [0019](0019-timezone-platform-default-and-resident-override.md) posture.
   - **Platform default:** `ILocalizationService.SetDefaultDateFormatAsync(
     formatString, actorId)` — the **single audited write lane** on the
     Localization side, the exact shape of `SetDefaultTimezoneAsync`: exactly
@@ -117,20 +117,20 @@ residents) can type a custom format."
   3. The **floor** (`DateFormat.FloorFormat` = Long).
 
   The resolution lives in the **Web layer** (`EffectiveDateFormatResolver`,
-  scoped, per-request, cached) — the exact companion to ADR 0019's
+  scoped, per-request, cached) — the exact companion to ADR [0019](0019-timezone-platform-default-and-resident-override.md)'s
   `EffectiveTimezoneResolver`. It walks the three tiers and returns the first
   one `DateFormat.IsValid` accepts (the floor is always valid, so it never
   returns null/blank) — the same "degrade to the next tier, never a throw"
   rule the timezone resolver applies to an unknown IANA id. Core never
   resolves; it only stores the two values. This is the exact split the ADR
-  0005 / ADR 0015 `TranslationProvider` / `ITranslationProvider` and the ADR
+  0005 / ADR [0015](0015-ui-view-localization-mechanics.md) `TranslationProvider` / `ITranslationProvider` and the ADR
   0019 resolver use (Core stores, Web resolves per request).
 
 - **Rendering (`kw-dt` TagHelper, unchanged contract for the views):**
   - The `<kw-dt dt="…" format="…"></kw-dt>` element now renders with the
     **effective format** resolved by `EffectiveDateFormatResolver`, applied
-    **after** the zone conversion (the two choices are independent: ADR 0019
-    zone, ADR 0020 format; neither is the culture — the render still uses the
+    **after** the zone conversion (the two choices are independent: ADR [0019](0019-timezone-platform-default-and-resident-override.md)
+    zone, ADR [0020](0020-date-format-platform-default-and-resident-override.md) format; neither is the culture — the render still uses the
     invariant culture, so the zone/format, not the host locale, is what the
     resident sees).
   - The `format` attribute is kept for backward compatibility but is
@@ -172,7 +172,7 @@ residents) can type a custom format."
 - **No config, no restart:** both values are **data** on `mt`-schema documents
   (a `Profile` field + a `LocaleSettings` field), not appsettings. A change is
   live on the very next request — the same "M·4: data, not config" posture as
-  ADR 0005's language default and ADR 0019's time zone.
+  ADR [0005](0005-multilingual-support.md)'s language default and ADR [0019](0019-timezone-platform-default-and-resident-override.md)'s time zone.
 
 ## Consequences
 
@@ -186,7 +186,7 @@ Positive
   a curated convenience over the same underlying type. Adding a preset is a
   one-line change and a migration-free edit (an additive `string` field + a
   `Presets` entry).
-- **Mirrors the ADR 0005 / ADR 0019 precedent exactly.** The "admin writes a
+- **Mirrors the ADR [0005](0005-multilingual-support.md) / ADR [0019](0019-timezone-platform-default-and-resident-override.md) precedent exactly.** The "admin writes a
   singleton + audited lane; resident writes their own setting; resolution is
   per-request" shape is the same, the seams are the same, the test pattern is
   the same. A developer who knows the timezone feature knows this one.
@@ -205,7 +205,7 @@ Negative / accepted risks
   from the views now that it is inert.
 - **The user lane does not validate (by design).** A resident's custom format
   is stored as-is; a malformed value degrades to the platform default / floor at
-  read time (the resolver's `IsValid` tier-walk, the ADR 0019 posture). Only
+  read time (the resolver's `IsValid` tier-walk, the ADR [0019](0019-timezone-platform-default-and-resident-override.md) posture). Only
   the **admin** lane fail-closes with a 409. This is the deliberate
   "resident is never blocked by their own typo; the admin sees a clear error"
   split the rest of the settings surface uses.
@@ -219,7 +219,7 @@ Negative / accepted risks
   path the Web uses; the Core service reads directly because it is in a write
   session.
 - **A `DateTimeOffset` rendered in a zone, formatted in the chosen format.**
-  The zone (ADR 0019) and the format (this ADR) are resolved independently and
+  The zone (ADR [0019](0019-timezone-platform-default-and-resident-override.md)) and the format (this ADR) are resolved independently and
   composed in the TagHelper (convert to zone first, then format). A resident
   who sets both a zone and a format gets the zone's wall-clock time written in
   the chosen format — the two choices do not interact, which is the point.

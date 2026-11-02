@@ -11,12 +11,12 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0225 — Palette choice cards in the admin Appearance form
+# ADR [0225](0225-palette-choice-cards.md) — Palette choice cards in the admin Appearance form
 
 Status: Accepted
 
 ## Context
-The platform-default palette was a bare `<select>` (ADR 0175 left "a live swatch preview next to the select" as a
+The platform-default palette was a bare `<select>` (ADR [0175](0175-palettes-and-feed-card.md) left "a live swatch preview next to the select" as a
 TODO). A native `<option>` cannot show a swatch.
 
 ## Decision

@@ -220,7 +220,7 @@ configured at the provider.
    **no new suppression list, no new sent-volume ledger, no new doc type, no
    new doc-surface registration** (the `NotificationDocTypes` surface is
    already booted; U2's tick is read-only over it).
-4. **Core stays HTTP-free (ADR 0006-D):** U2's tick is a Core Wolverine
+4. **Core stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D):** U2's tick is a Core Wolverine
    recurring handler (the F15 `MediaLifecycleTick` idiom — idempotent,
    lock-protected) that calls the Core `IAlertSink` seam; the channel
    (already Web, F12) is untouched. No HTTP types in Core.

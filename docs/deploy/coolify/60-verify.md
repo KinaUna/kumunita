@@ -40,7 +40,7 @@ config; none of the three checks below is covered by a unit test):
 2. `GET /health` → `{"status":"ok","database":"ok","build":"<sha>",…}` and
 `build` matches the deployed commit (`release` tip).
 3. **First boot** (fresh database): the `mt` schema initializes with no
-operator step (ADR 0004) — the log shows **First boot** exactly once;
+operator step (ADR [0004](../../adr/0004-data-persistence-and-schema-evolution.md)) — the log shows **First boot** exactly once;
 subsequent boots are a no-op.
 4. Seeded admin exists; log in **once** with the setup token → set password;
 the token invalidates on use. Then **remove `SeedAdmin__*` from env**

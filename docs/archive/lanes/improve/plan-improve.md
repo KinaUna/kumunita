@@ -21,7 +21,7 @@ updated: 2026-11-02
 > `GP`, `ML`, `LS`, `SP`, `TZ`, `DF`, `TR`, `RC`, `GU`, `GA`, `RE`, `TG`,
 > `PG`, …). The lane's purpose is not a new capability — it is the
 > *intentional* application of the philosophy in
-> [`../philosophy/README.md`](../philosophy/README.md) to the code and docs
+> [`../philosophy/README.md`](../../../philosophy/README.md) to the code and docs
 > we already have. Principle 6 says: **"Integration decays. ADRs, review,
 > audit, and retrospectives are how we close that decay."** This lane is
 > that closing pass, made visible and testable.

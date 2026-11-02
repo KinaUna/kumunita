@@ -11,7 +11,7 @@ superseded_by: [adr-0056]
 updated: 2026-11-02
 ---
 
-# ADR 0055 — Development sample data: a first-boot, Development-only mock neighborhood
+# ADR [0055](0055-development-sample-data-lane.md) — Development sample data: a first-boot, Development-only mock neighborhood
 
 Status: Accepted (the **gate** is amended by [ADR 0056](0056-sample-data-opt-in-and-deploy-posture.md):
 the seeder now runs on an explicit `SampleData__Enabled` opt-in rather than the `Development`
@@ -32,7 +32,7 @@ rows only).
 
 The dev loop is `docker compose down -v && docker compose up --build` — a
 pristine database every time. Out of the box a fresh instance is a login
-page: one tokenless `GlobalAdmin` (the `SeedAdmin__*` lane, ADR 0001/OPS
+page: one tokenless `GlobalAdmin` (the `SeedAdmin__*` lane, ADR [0001](0001-core-stack-and-identity-model.md)/OPS
 §2), the four components, the language catalog, and the canonical static
 pages. That is enough to *run*, but not enough to *work with* — there are no
 residents, no posts, no groups, no events, no translations, and nothing to
@@ -90,7 +90,7 @@ immediately exercisable. It must satisfy two hard constraints:
   — or colliding with — production accounts. All seeded identities
   (admin, moderator, translator, the four residents) and the dev
   `Community__SupportEmail` use `@examplium.com`.
-- **The visibility trick is ADR 0012, not a new mechanism.** The seeder
+- **The visibility trick is ADR [0012](0012-community-membership-mandatory-and-moderator.md), not a new mechanism.** The seeder
   marks all four components **`Mandatory`** through the sanctioned
   `IUserInfoService.SetCommunityMandatoryAsync(componentId, true, adminId,
   GlobalAdminRoles)` write lane (own session + its `AccessAudit` row), so
@@ -103,14 +103,14 @@ immediately exercisable. It must satisfy two hard constraints:
   private family group (`Kowalski Family`) + a public street group
   (`Street Green`) with memberships; a scoped moderator (`Maria`) with the
   `Moderator` EF role + two `ModeratorAssignment` rows (Safety + Social,
-  ADR 0003); tags (+ de/fr `TagTranslation`s); three announcements (a pinned
+  ADR [0003](0003-roles-and-moderator-scoping.md)); tags (+ de/fr `TagTranslation`s); three announcements (a pinned
   Public welcome, a Community-flat volunteer call, a Community-targeted
   safety alarm) with de/fr `AnnouncementTranslation`s; three community posts
   (Safety / Social / Governance) with replies, a de `PostTranslation` +
   `ReplyTranslation`, and tag assignments; a group-lane post under the
   public group; a de `GroupTranslation`; two published events (the `IsDraft =
   false` pin) with a Going/Maybe/No `EventRsvp` mix; and a resident blog
-  (a `PageKind.User` blog root + one child page, ADR 0040) with a de
+  (a `PageKind.User` blog root + one child page, ADR [0040](0040-pages-system-and-user-kinds-and-blog-feed.md)) with a de
   `PageTranslation`. A single `IDocumentSession` stores all `mt`-side rows
   and commits once (invariant C3). **No `OutboxEmail` is staged** — the
   seeder is not a user-facing sign-up, so it has no `IMailerStage`
@@ -119,7 +119,7 @@ immediately exercisable. It must satisfy two hard constraints:
 - **The credentials are a documented, printed constant.** The demo
   e-mails/passwords are `public const` on `SampleDataSeeder` (weak by
   design, matching the dev-DB-password convention), printed to the boot log
-  once, and **documented in `README.md` §Running and `docs/OPS.md`** so a
+  once, and **documented in [`README.md`](../../README.md) §Running and [`docs/OPS.md`](../OPS.md)** so a
   developer never has to dig through the log to pick one up. They are
   `Development`-only and never reach a real deployment.
 
@@ -129,8 +129,8 @@ immediately exercisable. It must satisfy two hard constraints:
   scoped-moderator / translator / four residents), multi-language (en +
   de + fr rows), multi-lane (groups, community + group posts, replies,
   events + RSVPs, tags, a resident blog, translations). The private group is
-  a natural ADR 0010 test fixture; the mandatory components are a natural
-  ADR 0012 / audience test fixture; the RSVP mix is a natural ADR 0054
+  a natural ADR [0010](0010-private-groups.md) test fixture; the mandatory components are a natural
+  ADR [0012](0012-community-membership-mandatory-and-moderator.md) / audience test fixture; the RSVP mix is a natural ADR [0054](0054-events-rsvp-reminders.md)
   fixture.
 - **Zero production risk by construction.** The `IsDevelopment()` wall is
   independent of the pristine wall; a `Production`/`Staging` deployment runs
@@ -148,5 +148,5 @@ immediately exercisable. It must satisfy two hard constraints:
   admin address means changing both.
 - **Out of scope (deliberate):** seeding media / avatars (needs the byte
   store + the `MediaObject` catalog, a heavier fixture), seeding a `Guardian`
-  link (ADR 0028) or a `DelegationGrant`, and any e-mail (no outbox). Those
+  link (ADR [0028](0028-guardian-controls-account-scope-supervision.md)) or a `DelegationGrant`, and any e-mail (no outbox). Those
   are follow-ons if a specific lane ever needs a seeded fixture.

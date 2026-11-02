@@ -36,7 +36,7 @@ updated: 2026-11-02
 > **recorded, not assumed done**). U2 is written so U3 has something concrete to
 > point at: a named, green-on-green/red-on-red CI check on the `release` branch.
 
-> **Repo doctrine applied (from `AGENTS.md` § "Running the tests (test-runner
+> **Repo doctrine applied (from [`AGENTS.md`](../../AGENTS.md) § "Running the tests (test-runner
 > quirk)"):** both test projects use **xunit.v3** (`Microsoft.Testing.Platform`),
 > and `global.json` declares `"test": { "runner": "Microsoft.Testing.Platform" }`
 > alongside `"sdk": { "version": "10.0.400", "rollForward": "latestFeature" }`.
@@ -56,12 +56,12 @@ updated: 2026-11-02
 - **No CI exists.** `.github/` contains only `copilot-instructions.md`. There is
   **no** `.github/workflows/` directory and **no** workflow file. A `release`
   push is **not** gated by any automated test run.
-- **The repo's documented reliable test path** (`AGENTS.md` § "Running the tests
+- **The repo's documented reliable test path** ([`AGENTS.md`](../../AGENTS.md) § "Running the tests
   (test-runner quirk)"): `dotnet build Kumunita.slnx -c Debug`, then **two**
   in-process `dotnet exec` runs — one per test assembly (`Kumunita.Web.Tests`,
   then `Kumunita.Core.Tests`). This is the path that **actually reports
   pass/fail** on the machine, and it is the path F14 pins.
-- **`Kumunita.Core.Tests` needs Docker (Testcontainers).** Per `AGENTS.md`, it
+- **`Kumunita.Core.Tests` needs Docker (Testcontainers).** Per [`AGENTS.md`](../../AGENTS.md), it
   "starts `postgres:18` via Testcontainers" and **leaves Docker containers behind
   if the process is killed** (cleanup: `docker container prune`). A CI runner is
   a **fresh ephemeral** environment each run (see §5), so this is a *local*
@@ -176,14 +176,14 @@ dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
   needed. (If the owner's Coolify runner is the CI host, U3's open item covers
   confirming Docker is present there.)
 - **Do NOT add `docker container prune -f` to the CI workflow.** Rationale (pinned
-  so U2 doesn't add it reflexively): `AGENTS.md`'s "leaves Docker containers
+  so U2 doesn't add it reflexively): [`AGENTS.md`](../../AGENTS.md)'s "leaves Docker containers
   behind if the process is killed — clean up with `docker container prune`" is a
   **local** concern (a killed local runner leaves orphan containers). A **CI
   runner is ephemeral** — each run gets a fresh container, and the runner is
   recycled after the run, so there is **no persistent leak to clean up** and the
   `prune` step is **unnecessary noise** (and, if added, would run in a context
   where it is a no-op). The `prune` stays a **local** instruction (already in
-  `AGENTS.md`), **not** a CI step.
+  [`AGENTS.md`](../../AGENTS.md)), **not** a CI step.
 - **The ~20 s Core run time is acceptable** for a per-push gate (the Web dll runs
   in < 1 s; total gate wall-clock is bounded by the build + the ~20 s Core
   Testcontainers startup). No timeout tuning is pinned (the default job timeout
@@ -245,7 +245,7 @@ Per the plan, there is **no xUnit test** in F14. U2 asserts:
 ## 8. Invariants + unit exit contract (this unit)
 
 - **Exactly 1 file delivered:** this design pin
-  (`docs/design/prod-hardening-f14-ci.md`). **No `src/**` change, no `.github/`
+  ([`docs/design/prod-hardening-f14-ci.md`](prod-hardening-f14-ci.md)). **No `src/**` change, no `.github/`
   change, no `<PackageReference>`, no migration, no `.slnx` change, no build
   run.**
 - **F14.U1 does NOT run the test dlls** (the repo-documented exit contract for a

@@ -29,14 +29,14 @@ sent → default components (Safety, Maintenance, Social, Governance) are seeded
 language catalog is seeded (source language `en` enabled and set as default).
 Re-running the seeder is a no-op once the admin exists.
 
-> **Sample data — opt-in (ADR 0055 / 0056 / 0060):** when `SampleData__Enabled=true` the
+> **Sample data — opt-in (ADR [0055](../adr/0055-development-sample-data-lane.md) / 0056 / 0060):** when `SampleData__Enabled=true` the
 > first-boot lane seeds a mock neighborhood (residents, groups, posts/replies,
 > events/RSVPs, tags, a blog, de/fr/da event translations) so a fresh instance is
 > immediately exercisable. It is gated on `SampleData__Enabled` **and** first-boot, so a
 > real deployment that never sets the flag never runs it. On a **warm** boot the same
 > flag additionally backfills any *missing* sample-event `de`/`fr`/`da` translations
 > — create-if-missing, idempotent, and never overwriting a Translator's in-app edit
-> (ADR 0060), so an instance whose first boot predates the event-translation lane
+> (ADR [0060](../adr/0060-event-translation-sample-backfill.md)), so an instance whose first boot predates the event-translation lane
 > picks them up on the next redeploy. Two postures: in `Development`
 > it uses the documented weak demo credentials (the [Running-locally](../dev/running-locally.md) table); on a deployed
 > demo site (`Production` + the flag) the seed admin keeps its `SeedAdmin__`
@@ -48,7 +48,7 @@ Re-running the seeder is a no-op once the admin exists.
 
 **Languages are in-app data, not config.** Supported languages, the default language,
 and all translations live in the DB (`mt` schema; admin-managed under
-`/admin/languages`, ADR 0005) — not env, not image config. They ride the existing
+`/admin/languages`, ADR [0005](../adr/0005-multilingual-support.md)) — not env, not image config. They ride the existing
 DB backup; nothing extra to provision.
 
 Operator steps:

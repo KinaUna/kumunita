@@ -17,14 +17,14 @@ updated: 2026-11-02
   of an existing one (M35·1).** M35 **creates** the one new `Kiosk` context
   (the M31 `ErrorReports` / M11 `Portability` / M13 `Usage` precedent) with
   one singleton doc (`KioskPlaylist`), one doc-type surface (`KioskDocTypes`,
-  the ADR 0004 §B.1 shape), and one service (`IKioskService`, the 2-method
+  the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 shape), and one service (`IKioskService`, the 2-method
   seam). It **reuses** the frozen M5 / M4 read seams (M35·3) and the existing
   board / calendar / todos render partials (M35·6). It adds **no** new
   `AccessAction`, **no** new `AccessVia`, **no** `Decide()` branch, and **no**
   `IAuditableResource` adapter (M35·1 / M35·3).
 - **D2 — The playlist is a GlobalAdmin-set singleton (M35·2).** The
   `KioskPlaylist` doc is a **singleton** (the `SiteContent` / `LocaleSettings`
-  shape, ADR 0004 §B.1) — the 4-member ceiling (`Id` sentinel `"kiosk"`,
+  shape, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1) — the 4-member ceiling (`Id` sentinel `"kiosk"`,
   `Views`, `ViewIntervalSeconds`, `RefreshIntervalSeconds`) + the `KioskView`
   entry's 5-member ceiling. The **standing to write it is GlobalAdmin**
   (enforced by the `[Authorize(Roles = GlobalAdmin)]` controller gate, not the
@@ -53,15 +53,15 @@ updated: 2026-11-02
 - **D6 — The existing render surface is reused, not re-authored (M35·6).** The
   kiosk's per-slide section renders the **same** board / calendar / todos Razor
   partials (the "integration over features" spine). The kiosk adds **only** a
-  chrome-hidden layout (the ADR 0104 `body.kmb-page-expanded` idiom) + the
+  chrome-hidden layout (the ADR [0104](0104-full-page-and-calendar-fullscreen-modes.md) `body.kmb-page-expanded` idiom) + the
   `client/lib/kiosk.ts` state machine + the `kiosk.*` `kw-l` keys.
 - **D7 — Zero new dependency, zero new npm package, zero build step
-  (M35·7).** The `client/lib/kiosk.ts` is **tsc-only** (the ADR 0031 pin). The
+  (M35·7).** The `client/lib/kiosk.ts` is **tsc-only** (the ADR [0031](0031-wysiwyg-editor-and-toolbar.md) pin). The
   auto-cycle + auto-refresh is a plain `setInterval` state machine.
   `package.json` stays `typescript`-only.
 - **D8 — Core stays HTTP-free + Wolverine-free (M35·8).** The `KioskService`
   is a plain store-composing service (the `AddTransient<IKioskService>` shape,
-  the M31 / M13 precedent). There is **no** `HttpClient` in Core (ADR 0006-D)
+  the M31 / M13 precedent). There is **no** `HttpClient` in Core (ADR [0006](0006-module-boundary-contracts.md)-D)
   and **no** outbound channel.
 - **D9 — No new bounded context beyond `Kiosk` (M35·9).** The M5 `Projects` +
   M4 `Events` contexts are **reused, not re-added** (the `ProjectDocTypes` /
@@ -78,7 +78,7 @@ updated: 2026-11-02
   singleton + one `KioskView` entry + one `KioskViewKind` enum + one
   `KioskDocTypes` surface + one `IKioskService` 2-method seam + one
   `KioskService` impl) — registered through the new `KioskDocTypes` surface,
-  not an EF table (ADR 0004 §B).
+  not an EF table (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B).
 - **A new signed-in display route** (`GET /kiosk` + `GET /kiosk/slide`) + a
   new GlobalAdmin settings surface (`GET/POST /admin/kiosk`).
 - **A new tsc-only state machine** (`client/lib/kiosk.ts`) + the `site.css`

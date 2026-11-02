@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 # WYSIWYG inline editing (`WY`) — the rendered pane is the editable surface; the Markdown source is an editable source view (two-way sync)
 
-> **Abstract:** the **WYSIWYG inline editing (`WY`)** design — the **rendered pane is the editable surface**; the Markdown source is an editable source view (two-way sync). Invariants WY·1–WY·9, FACES WY1–WY10, the exact DOM / serializer / sanitizer / binder / CSS contracts, and the pinned tests. Built on RE (ADR 0031) + RC (ADR 0025). **Who is it for:** a developer touching the WYSIWYG inline editor or the two-way sync; an agent that needs the frozen-base invariant. **When to read the rest:** before touching the inline editor, the serializer, or the two-way sync.
+> **Abstract:** the **WYSIWYG inline editing (`WY`)** design — the **rendered pane is the editable surface**; the Markdown source is an editable source view (two-way sync). Invariants WY·1–WY·9, FACES WY1–WY10, the exact DOM / serializer / sanitizer / binder / CSS contracts, and the pinned tests. Built on RE (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) + RC (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)). **Who is it for:** a developer touching the WYSIWYG inline editor or the two-way sync; an agent that needs the frozen-base invariant. **When to read the rest:** before touching the inline editor, the serializer, or the two-way sync.
 
 
 > **Three-tier contract.** This file is the **primary** tier of the WY lane:
@@ -35,8 +35,8 @@ updated: 2026-11-02
 > drift guard).
 >
 > **The frozen base.** This lane is built **on top of** the inline-editor
-> lane (`IE`, ADR 0032), the rich-editor lane (`RE`, ADR 0031), and the
-> rich-content lane (`RC`, ADR 0025). RC's **R·1–R·7**, RE's **RE·1–RE·3**,
+> lane (`IE`, ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)), the rich-editor lane (`RE`, ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)), and the
+> rich-content lane (`RC`, ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)). RC's **R·1–R·7**, RE's **RE·1–RE·3**,
 > and IE's **IE·1** all still bind **unchanged** (re-anchored in §Frozen base
 > below). WY adds **no** re-shape of `MarkdownRenderer`, `ContentImageIds`,
 > `IMediaStore`, the `ImageIds` fields, the `/content-image` routes, the
@@ -108,12 +108,12 @@ pane becomes the editable surface; the serializer keeps the two in sync;
 the code view (the `</>` toggle) is an **editable source** with two-way sync
 (typed Markdown re-renders the pane; pane edits update the code view).
 
-### The ADR 0033 reversal (load-bearing)
+### The ADR [0033](../adr/0033-wysiwyg-inline-editing.md) reversal (load-bearing)
 
-This lane **deliberately reverses** the "hard non-negotiable" in **ADR 0031
-D1 / ADR 0032** — *"true `contenteditable` / a third-party editor — hard
+This lane **deliberately reverses** the "hard non-negotiable" in **ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)
+D1 / ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)** — *"true `contenteditable` / a third-party editor — hard
 non-negotiable out."* The user has **explicitly approved** this reversal
-(**2026-09-15**). **ADR 0033** (drafted in U2, Accepted in U9) records the
+(**2026-09-15**). **ADR [0033](../adr/0033-wysiwyg-inline-editing.md)** (drafted in U2, Accepted in U9) records the
 reversal and **what still binds**: `Body` stays a Markdown `string`
 (RC R·7), the `tsc`-only constraint (RE·3 / WY·8), **no editor dependency**
 (`package.json` still `typescript`-only), **one renderer on the read path**
@@ -162,7 +162,7 @@ construction, the same `isSafeImageSrc` / `isSafeUrl` semantics.
 - The **code view rework** (the `data-ie-toggle` `</>` button reveals the
   Markdown source as an **editable** surface with two-way sync; the label
   swap is kept) — WY·7.
-- **ADR 0033** (the reversal + what still binds).
+- **ADR [0033](../adr/0033-wysiwyg-inline-editing.md)** (the reversal + what still binds).
 - **This design doc** (this file).
 - The **artifact-string pins** (the compiled JS contains
   `contenteditable` + `toMarkdown` + the sanitizer; the textarea is **not**
@@ -190,7 +190,7 @@ construction, the same `isSafeImageSrc` / `isSafeUrl` semantics.
 - **localStorage persistence of the editing preference** — remember the
   resident's view choice (pane vs. code view) across sessions.
 
-Each is a **future** lane, named, not a WY re-open (the ADR 0011 / 0025 /
+Each is a **future** lane, named, not a WY re-open (the ADR [0011](../adr/0011-media-and-file-storage.md) / 0025 /
 0031 precedent).
 
 ## Invariants (pinned for WY)
@@ -233,8 +233,8 @@ invariants.
 ## Assumptions
 
 - **The reversal is approved and recorded.** The user explicitly approved
-  reversing ADR 0031 D1 / ADR 0032's "hard non-negotiable" (2026-09-15).
-  ADR 0033 records the reversal and what still binds. **This is not a
+  reversing ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) D1 / ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)'s "hard non-negotiable" (2026-09-15).
+  ADR [0033](../adr/0033-wysiwyg-inline-editing.md) records the reversal and what still binds. **This is not a
   deferral; it is a new policy.**
 - **`Body` stays a Markdown `string`** (RC R·7 unchanged). The server still
   derives `ImageIds` by parsing the *body text* (RC R·3); the read path
@@ -262,7 +262,7 @@ invariants.
   the `insert-image.ts` convention — **no** new route, **no** second
   upload).
 - **The code view (the `</>` toggle) is an editable source.** The
-  `data-ie-toggle` button (IE, ADR 0032) is kept; it reveals the Markdown
+  `data-ie-toggle` button (IE, ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)) is kept; it reveals the Markdown
   source (the textarea) as an **editable** surface with **two-way sync**
   (code view → pane via `input` → `renderPane`; pane → code view via
   `syncTextarea`). The label swap (`</>` / `Preview`) is kept.
@@ -718,7 +718,7 @@ by a later unit is a `## U<m> — Drift pause` section in the handoff note
 - the **frozen base** (§2.1) — RC R·1–R·7 + RE·1–RE·3 + IE·1 + `tsc`-only +
   no editor dependency + `Body` as a Markdown `string` — **unchanged**.
 
-*— Part 2 (seams & contracts) authored by U2 (2026-09-15). ADR 0033 is
+*— Part 2 (seams & contracts) authored by U2 (2026-09-15). ADR [0033](../adr/0033-wysiwyg-inline-editing.md) is
 drafted in the same unit (U9 moves it to Accepted).*
 
 ### Run result (WY acceptance gate — 2026-09-16)
@@ -826,5 +826,5 @@ recorded here + in the U8 handoff section, **not** as a `## U<m> — Drift
 pause` unit-series pause — U8 has no code to block on it.
 
 *— U8 (2026-09-16). Recording unit: no code, no new tests, no CSS, no
-`.csproj` change. U9 closes the lane (ADR 0033 → Accepted + ADR index +
-`ARCHITECTURE.md` flip + the handoff `## Summary`).*
+`.csproj` change. U9 closes the lane (ADR [0033](../adr/0033-wysiwyg-inline-editing.md) → Accepted + ADR index +
+[`ARCHITECTURE.md`](../ARCHITECTURE.md) flip + the handoff `## Summary`).*

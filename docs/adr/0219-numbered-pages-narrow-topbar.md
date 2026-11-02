@@ -11,16 +11,16 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0219 — Numbered pager pages; the variant-B top row at 576–767px
+# ADR [0219](0219-numbered-pages-narrow-topbar.md) — Numbered pager pages; the variant-B top row at 576–767px
 
 Status: Accepted
 
 ## Context
-ADR 0218 found two things: the shared pager rendered only Newer/Older (so the active-page styling had nothing to
+ADR [0218](0218-hover-states.md) found two things: the shared pager rendered only Newer/Older (so the active-page styling had nothing to
 style), and at ~600px the top-row search shrank to ~50px with the link icons wrapping above their labels.
 
 ## Decisions
-1. **Numbered pages, count-free.** ADR 0090 D1 stands (the seam returns only `hasMore`; no `TotalPages`, no
+1. **Numbered pages, count-free.** ADR [0090](0090-pagination-and-filtering.md) D1 stands (the seam returns only `hasMore`; no `TotalPages`, no
    count query). `_Pager` now renders a window between Newer and Older: `1 … (n-1) [n] (n+1)` where `1` shows
    from page 3, the ellipsis from page 4 and `n+1` only when `HasNext`. The current page is
    `.page-item.active` with `aria-current="page"` and is not a link; the ellipsis is `aria-hidden`. Numerals

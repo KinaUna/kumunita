@@ -11,14 +11,14 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0155 — Issue submission & escalation (a general issue-submission lane + a GlobalAdmin resolution + escalation surface on the M31 ErrorReports surface)
+# ADR [0155](0155-issue-submission-escalation.md) — Issue submission & escalation (a general issue-submission lane + a GlobalAdmin resolution + escalation surface on the M31 ErrorReports surface)
 
 Status: Accepted
 Date: 2026-10-09
 
 ## Context
 
-M31 (ADR 0154) closed the **intake + triage** gap: a resident who hits a 500
+M31 (ADR [0154](0154-production-error-handling.md)) closed the **intake + triage** gap: a resident who hits a 500
 can say what went wrong (the 500 error page's report form —
 `POST /Home/Error/Report`), and the GlobalAdmin can mark the report triaged
 (`/admin/error-reports` + the `POST …/triage` idempotent action). But M31
@@ -51,20 +51,20 @@ redirect where escalations land **without a code or schema change**.
 - **M32 is a capability on the M31 `ErrorReports` surface, not a new
   context** (D1, M32·1). M32 **reuses** the M31 `ErrorReport` doc + the
   `Kumunita.Core.ErrorReports` context + the `IErrorReportService` seam and
-  **extends them additively** (ADR 0004 §B.1). **No new bounded context, no
+  **extends them additively** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1). **No new bounded context, no
   new doc, no new registration surface** (the additive fields **ride** the
   existing `ErrorReportDocTypes.Configure` surface — Marten-detected at
   boot, idempotent delta; the `Kumunita.Core` DI is **unchanged**). The
-  `Posts/Report` doc (ADR 0023) is **untouched** (M31·10 — separate docs in
+  `Posts/Report` doc (ADR [0023](0023-reply-report-target-lane.md)) is **untouched** (M31·10 — separate docs in
   separate contexts).
 - **The `TriageStatus` value set is extended additively, never re-shaped**
-  (D2, M32·2). The M31 set `{"new", "triaged"}` (ADR 0154 D2) gains
+  (D2, M32·2). The M31 set `{"new", "triaged"}` (ADR [0154](0154-production-error-handling.md) D2) gains
   `"resolved"` to make `{"new", "triaged", "resolved"}` (a string field —
-  ADR 0004 §B.1, no migration). The two M31 values keep their exact strings.
+  ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1, no migration). The two M31 values keep their exact strings.
   `resolved` is the **terminal** state (no re-open lane in M32 — a named
   deferral).
 - **The `ErrorReport` doc field set is extended additively to a 15-member
-  ceiling** (D3, M32·3). M31's 11 members (ADR 0154 D1) are **unchanged**
+  ceiling** (D3, M32·3). M31's 11 members (ADR [0154](0154-production-error-handling.md) D1) are **unchanged**
   (exact names, types, nullability); M32 adds **exactly four**: `Origin`
   (string, default `"error-page"`, **closed set** `{"error-page",
   "general"}` — D5), `ResolvedAt` (`DateTimeOffset?`, null until resolved),
@@ -74,7 +74,7 @@ redirect where escalations land **without a code or schema change**.
 - **The `IErrorReportService` surface gains one additive method** (D4,
   M32·8). `Task<ErrorReport?> MarkResolvedAsync(string reportId, string
   actorId, string? resolutionNote, CancellationToken ct = default)` — an
-  **idempotent single-write-lane** (the ADR 0006 C3 shape, the M31
+  **idempotent single-write-lane** (the ADR [0006](0006-module-boundary-contracts.md) C3 shape, the M31
   `MarkTriagedAsync` precedent verbatim): one write session storing the
   `ErrorReport` doc + **exactly one** `AccessAudit` row (`Via = Admin`,
   action `errorreport.resolve`, `TargetKind` "error-report"); returns
@@ -89,13 +89,13 @@ redirect where escalations land **without a code or schema change**.
   `[Authorize]` gate (the M31·2 precedent — anonymous-safe, non-blocking).
   A signed-in resident's submission sets `SubjectId` (`Via = Resident`);
   an anonymous visitor's leaves `SubjectId = ""` (`Via = Anonymous`, the
-  ADR 0154 D5 additive value, reused). The `POST` reuses
+  ADR [0154](0154-production-error-handling.md) D5 additive value, reused). The `POST` reuses
   `IErrorReportService.CreateAsync` with `Origin = "general"` and
   `ExceptionType = null`. A blank description is a **form-level** 400
   re-render, never a 500 (the M31·5 pin).
 - **The `/admin/error-reports/{id}` detail view + resolve + escalate
   actions** (D6, M32·10). All `[Authorize(Roles = GlobalAdmin)]` (the
-  standard admin gate, the ADR 0001-B thin-token rule, the M31·4 / M31·9
+  standard admin gate, the ADR [0001](0001-core-stack-and-identity-model.md)-B thin-token rule, the M31·4 / M31·9
   precedent — **no new `AccessAction`, no new `Decide()` branch, no new
   `IAuthorizationService` surface**). `GET …/{id}` renders the full report
   (the `AdminErrorReportDetailViewModel` + the `Detail.cshtml`). `POST
@@ -108,7 +108,7 @@ redirect where escalations land **without a code or schema change**.
   `new` / `triaged` chips are **unchanged**.
 - **The escalation forwarding is a Web-layer HTTP service** (D7, M32·5).
   `IEscalationForwarder` + the `EscalationForwarder` impl (namespace
-  `Kumunita.Web.Services`, **not** `Kumunita.Core` — ADR 0006-D "Core
+  `Kumunita.Web.Services`, **not** `Kumunita.Core` — ADR [0006](0006-module-boundary-contracts.md)-D "Core
   stays HTTP-free"; the repo's **first outbound HTTP**, the
   `IHttpClientFactory` registration in `Program.cs`). The interface:
   `Task<EscalationResult> ForwardAsync(string reportId, CancellationToken
@@ -140,11 +140,11 @@ redirect where escalations land **without a code or schema change**.
   list chip), each present, **non-empty, in all four** languages
   (en/de/fr/da), pinned by `KwLRegistryConsistencyTests` +
   `KnownTranslationKeys_ParityTests` (the M31·7 precedent). The `en` values
-  are the source text (the ADR 0015 D1 `kw-l` provider-floor discipline).
-  The M31 `errorreport.*` key set (ADR 0154 D8, 20 keys) is the **floor** —
+  are the source text (the ADR [0015](0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline).
+  The M31 `errorreport.*` key set (ADR [0154](0154-production-error-handling.md) D8, 20 keys) is the **floor** —
   **untouched** (M32·1).
 - **The M30 onboarding step-7 route re-points** (D11, M32·11). The M30
-  register (ADR 0153) pins step 7 ("issue escalation") to
+  register (ADR [0153](0153-admin-onboarding.md)) pins step 7 ("issue escalation") to
   `/admin/announcements` as a **known deferral** — "a future M32
   close-flip re-points this step card's route to the M32 surface". M32
   re-points it `/admin/announcements` → `/admin/error-reports` (the
@@ -171,16 +171,16 @@ redirect where escalations land **without a code or schema change**.
   state** — locally (with a note) or by escalation (forwarded to the
   operator's endpoint).
 - **The `TriageStatus` value set is `{"new", "triaged", "resolved"}` in
-  M32** — M32 **adds** `"resolved"` (ADR 0004 §B.1); the two M31 values are
+  M32** — M32 **adds** `"resolved"` (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1); the two M31 values are
   **untouched** (M32·2).
 - **The `ErrorReport` doc is the 15-member M32 ceiling** — the M31 11
   unchanged + the M32 4 additive (M32·3). **No EF migration** (the
   additive fields ride the existing `ErrorReportDocTypes.Configure`
-  surface — ADR 0004 §B.1 idempotent delta at boot).
+  surface — ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta at boot).
 - **One new Web-layer HTTP service** — `IEscalationForwarder` /
   `EscalationForwarder` (the repo's **first outbound HTTP**; the
   `IHttpClientFactory` + the singleton registration in `Program.cs`).
-  **`Kumunita.Core` stays HTTP-free** (M32·5, ADR 0006-D); the
+  **`Kumunita.Core` stays HTTP-free** (M32·5, ADR [0006](0006-module-boundary-contracts.md)-D); the
   `MarkResolvedAsync` seam does **no** outbound HTTP.
 - **The escalation endpoint is never persisted** — the
   `KUMUNITA_ESCALATION_ENDPOINT` env var is the fork/multi-instance

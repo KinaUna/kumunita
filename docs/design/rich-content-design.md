@@ -23,7 +23,7 @@ updated: 2026-11-02
 > drift guard. The register
 > (`docs/plans-milestones/plan-rich-content.md`) is the **secondary** tier
 > (unit-level deliverables + exit criteria).
-> `docs/archive/lanes/rich-content/rich-content-handoff-notes.md` is the
+> [`docs/archive/lanes/rich-content/rich-content-handoff-notes.md`](../archive/lanes/rich-content/rich-content-handoff-notes.md) is the
 > **scratch** tier (one short section per unit, appended, never rewritten).
 > When the three disagree, **this file wins for the pinned shapes**; the
 > register wins for *which files exist* and *what each unit does*.
@@ -41,9 +41,9 @@ The platform already ships the renderer: `MarkdownRenderer`
 terms / help) — headings, paragraphs, lists, bold/italic/code, and links —
 but **every UGC surface deliberately ignores it**.
 
-The ADR 0011 media store (`IMediaStore` / `MediaObject`, content-addressed,
+The ADR [0011](../adr/0011-media-and-file-storage.md) media store (`IMediaStore` / `MediaObject`, content-addressed,
 10 MiB cap, `image/jpeg|png|webp|gif`) has exactly **one** consumer: the
-profile avatar (`ProfileController.Avatar` / `AvatarUpload`). ADR 0011's
+profile avatar (`ProfileController.Avatar` / `AvatarUpload`). ADR [0011](../adr/0011-media-and-file-storage.md)'s
 "not decided here" explicitly names "post attachments" as a follow-on lane,
 gated on the owning resource's audience. **This lane is that follow-on lane.**
 
@@ -51,12 +51,12 @@ The constraints this lane must honor (all pre-existing, not new):
 
 - **XSS bar** — the renderer's escape-first construction (R·2).
 - **Audit-by-default** — every audience-restricted read is logged (R·4).
-- **`Core` stays HTTP-free** (ADR 0006-D) — `IFormFile`/`Stream` never cross
+- **`Core` stays HTTP-free** (ADR [0006](../adr/0006-module-boundary-contracts.md)-D) — `IFormFile`/`Stream` never cross
   into Core (R·5).
-- **Marten owns the domain documents** (ADR 0004 §B) — the `ImageIds`
+- **Marten owns the domain documents** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B) — the `ImageIds`
   fields are additive POCO fields, delta-detected, idempotent (R·7).
-- **Lean + Boring, one database** — no new rendering library (ADR 0025
-  decision (a)); no new `AccessAction`, no new `IMediaStore` method (ADR 0025
+- **Lean + Boring, one database** — no new rendering library (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)
+  decision (a)); no new `AccessAction`, no new `IMediaStore` method (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)
   decision (b); C-MED·1).
 
 ## Scope
@@ -70,7 +70,7 @@ The constraints this lane must honor (all pre-existing, not new):
   `IsSafeImageSrc` predicate (R·2, R·3).
 - The `GET /content-image/{id}` serving route: decision-deferred,
   404-orphan, no new `AccessAction` (R·4, R·5).
-- The `POST /content-image` upload lane: ADR 0011's boundary verbatim (R·6).
+- The `POST /content-image` upload lane: ADR [0011](../adr/0011-media-and-file-storage.md)'s boundary verbatim (R·6).
 - The composer image control on four surfaces: post, announcement,
   group-post, static-page editor (a `<textarea>` + "Insert image" button +
   live preview pane — **no WYSIWYG, no third-party editor**).
@@ -100,9 +100,9 @@ renumbering is a breaking change and is not allowed mid-lane.
 | **R·2** | **Escape-first stands:** the image extension does not weaken the existing construction (escape before inline rules; the `src` allowlist is **stricter** than the link whitelist — platform route shape only, no remote `src`). | **U02** |
 | **R·3** | **References are data, not URLs-in-prose:** an image in a body is `![alt](/content-image/{id})` where `id` is a `MediaObject.Id`, **and** the owning resource's `ImageIds` contains it. `ImageIds` is populated **server-side** by parsing the body's route-shaped links on every create/edit write lane (the Web layer's job — Core stays HTTP-free AND body-parse-free: the draft records carry `ImageIds`, the service writes them verbatim). A well-formed link with no matching owner renders as plain text (the renderer cannot know) and 404s if fetched (the route is the defense). | **U04** (the parse) · **U03** (the route) |
 | **R·4** | **The serving route defers to the owning resource's decision:** `GET /content-image/{id}` → `IMediaStore.GetAsync` (miss ⇒ 404, **zero** audit rows) → bounded reverse lookup across the four owners (miss ⇒ 404, **zero** rows — **orphan is inert, there is no GlobalAdmin branch**) → UGC owner: **one** frozen `CanAsync(Read)` on the owner (Allow **and** Deny each emit the seam's own one audit row, the owner's `TargetKind`); platform-page owner: **no call, zero rows** (public by construction). Deny ⇒ **404**, not 403 (existence doesn't leak — the avatar route's precedent). No new `AccessAction` id (C-MED·1). | **U03** |
-| **R·5** | **Core stays HTTP-free (C-MED·6 / ADR 0006-D):** the reverse lookup is a read seam on the existing services (`PostService` for `Post`/`PostReply`, `AnnouncementService` for `Announcement`, the `LocalizedPage`-owning service for `LocalizedPage`); `IFormFile`/`Stream` never cross into Core; the lookup itself is **un-audited** (the audit row belongs to the route's `CanAsync` call). | **U03** |
-| **R·6** | **Upload boundary is ADR 0011's, verbatim:** the same allowlist (`image/jpeg\|png\|webp\|gif` — SVG excluded), the same `MediaOptions.MaxBytes` cap (10 MiB default), the same guards-before-write ordering (empty → 400, oversize → 413, disallowed type → 415 — no file written on any guard), one `IMediaStore.PutAsync` write. | **U04** |
-| **R·7** | **Zero schema migrations:** `Body` stays a `string` on every document; the four `ImageIds` fields are additive (ADR 0004 §B.1 — delta-detected, idempotent, no seed reset); existing plain-text content re-renders under the Markdown rules (plain text is valid Markdown; the paragraph rule wraps it — strictly better than raw text). | **U03** (the fields) · **U06** (the switch) · **U07** (the regression pin) |
+| **R·5** | **Core stays HTTP-free (C-MED·6 / ADR [0006](../adr/0006-module-boundary-contracts.md)-D):** the reverse lookup is a read seam on the existing services (`PostService` for `Post`/`PostReply`, `AnnouncementService` for `Announcement`, the `LocalizedPage`-owning service for `LocalizedPage`); `IFormFile`/`Stream` never cross into Core; the lookup itself is **un-audited** (the audit row belongs to the route's `CanAsync` call). | **U03** |
+| **R·6** | **Upload boundary is ADR [0011](../adr/0011-media-and-file-storage.md)'s, verbatim:** the same allowlist (`image/jpeg\|png\|webp\|gif` — SVG excluded), the same `MediaOptions.MaxBytes` cap (10 MiB default), the same guards-before-write ordering (empty → 400, oversize → 413, disallowed type → 415 — no file written on any guard), one `IMediaStore.PutAsync` write. | **U04** |
+| **R·7** | **Zero schema migrations:** `Body` stays a `string` on every document; the four `ImageIds` fields are additive (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — delta-detected, idempotent, no seed reset); existing plain-text content re-renders under the Markdown rules (plain text is valid Markdown; the paragraph rule wraps it — strictly better than raw text). | **U03** (the fields) · **U06** (the switch) · **U07** (the regression pin) |
 
 ## FACES (pinned, 8)
 
@@ -139,12 +139,12 @@ Additive-field doc-comment convention (mirrors the existing `Status` /
 
 | Owner | Ordinal (documentation, not behavior) |
 |---|---|
-| `Post` | 5th additive field after `Status` (M3b), `GroupId` (ADR 0013), `LanguageCode` (ADR 0018), `DeletedAt` (ADR 0024) |
-| `PostReply` | 4th additive field after `Modified` (ADR 0016), `LanguageCode` (ADR 0018), `DeletedAt` (ADR 0024) |
+| `Post` | 5th additive field after `Status` (M3b), `GroupId` (ADR [0013](../adr/0013-group-posts-membership-lane.md)), `LanguageCode` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)), `DeletedAt` (ADR [0024](../adr/0024-author-soft-delete-lane.md)) |
+| `PostReply` | 4th additive field after `Modified` (ADR [0016](../adr/0016-group-post-and-reply-edit-lane-author-only.md)), `LanguageCode` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)), `DeletedAt` (ADR [0024](../adr/0024-author-soft-delete-lane.md)) |
 | `LocalizedPage` | 1st additive field (the existing set is `Id`/`Slug`/`LanguageCode`/`Title`/`Body`/`Updated`) |
 | `Announcement` | 1st additive field (the existing set is `Id`/`AuthorId`/`Title`/`Body`/`Scope`/`CommunityId`/`Pinned`/`Created`/`Modified`/`LanguageCode`) |
 
-Each doc-comment names R·3/R·7 and the ADR 0004 §B.1 additive path.
+Each doc-comment names R·3/R·7 and the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive path.
 
 ### Draft-record ADDs (U04/U05)
 
@@ -176,7 +176,7 @@ the only permitted post-U01 edit to this section.
 >    directly and pass it to `IAnnouncementService.CreateAsync` /
 >    `UpdateAsync`. R·3 population is the single shared seam in both:
 >    `ImageIds = ContentImageIds.ExtractContentImageIds(model.Body)`. There
->    is **no** `AnnouncementDraft` record — the announcement lane (ADR 0018)
+>    is **no** `AnnouncementDraft` record — the announcement lane (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md))
 >    writes the POCO verbatim.
 > 2. **`LocalizedPage` (static-page) write path = `ILocalizationService.
 >    UpsertPageAsync` (impl `Kumunita.Core.Localization.LocalizationService`),
@@ -201,7 +201,7 @@ the only permitted post-U01 edit to this section.
 >    pause — `UpdateGroupPostAsync` takes discrete fields, not a draft).
 >
 > `Announcement.ImageIds` is **present from U03** (the 2nd additive field,
-> after ADR 0018's `LanguageCode`) — **not** added here.
+> after ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)'s `LanguageCode`) — **not** added here.
 
 ### The serving route (U03)
 
@@ -246,7 +246,7 @@ response `Json(new { id = stored.Id })`.
 |---|---|
 | Post owner | `Task<Post?> PostService.FindPostByImageIdAsync(string mediaId)` |
 | Reply owner | `Task<PostReply?> PostService.FindReplyByImageIdAsync(string mediaId)` |
-| Announcement owner | `Task<Announcement?> IAnnouncementService.FindByImageIdAsync(string mediaId)` (added to the interface — a read seam, ADR 0006-E lane) |
+| Announcement owner | `Task<Announcement?> IAnnouncementService.FindByImageIdAsync(string mediaId)` (added to the interface — a read seam, ADR [0006](../adr/0006-module-boundary-contracts.md)-E lane) |
 | `LocalizedPage` owner | **Not pinned here** — the owning service is confirmed by U03's entry reads (which type owns `GetPageAsync`); recorded in a `§Pinned contract amendment (U03)` sub-line if the name differs from the obvious candidate |
 
 > **`§Pinned contract amendment (U03)`** — the `LocalizedPage`-owning service

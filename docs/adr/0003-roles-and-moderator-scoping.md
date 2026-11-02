@@ -11,7 +11,7 @@ superseded_by: [adr-0006]
 updated: 2026-11-02
 ---
 
-# ADR 0003 — Roles & moderator scoping
+# ADR [0003](0003-roles-and-moderator-scoping.md) — Roles & moderator scoping
 
 Status: Accepted
 Date: 2026-08-25
@@ -24,19 +24,19 @@ Date: 2026-08-25
 - Sensitive dimension: moderator access to *audience-restricted* (private) content. Privacy
   must be the default, yet private groups must not become unmoderatable.
 - Roles must be operable by a non-technical community volunteer, not a full policy engine.
-- Must compose with the audience / delegation / audit model (ADR 0001-B).
+- Must compose with the audience / delegation / audit model (ADR [0001](0001-core-stack-and-identity-model.md)-B).
 
 ## Decision
 
-- **Roles**: Member, Moderator, GlobalAdmin, and (ADR 0021) Translator.
+- **Roles**: Member, Moderator, GlobalAdmin, and (ADR [0021](0021-translator-role-delegated-translation-editing.md)) Translator.
   - **Member** — verified resident; participates within audiences that grant access.
-  - **Independent & composable** (ADR 0030) — a resident may hold any combination of the
+  - **Independent & composable** (ADR [0030](0030-role-independence-composable-elevated-roles.md)) — a resident may hold any combination of the
     elevated roles (e.g. GlobalAdmin + Translator) so someone can stand in temporarily and
     it can be toggled off later without losing their other standing.
   - **Moderator** — scoped to one or more functional components.
   - **GlobalAdmin** — full control; the only role that can manage roles, set moderator
     scope, toggle scope-level `moderatorAccess`, and read the audit log.
-  - **Translator** (ADR 0021, added later) — may edit the multilingual lane's
+  - **Translator** (ADR [0021](0021-translator-role-delegated-translation-editing.md), added later) — may edit the multilingual lane's
     translatable text (UI strings + static pages); holds none of the other
     standing.
 - **Component scoping.** A `ModeratorAssignment { id, userId, componentId, grantedBy, at }`

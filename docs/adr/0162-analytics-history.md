@@ -11,12 +11,12 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0162 — Analytics history (M34) — the M13 `/admin/analytics` admin surface gains a trend view over time so an operator can see usage patterns evolve
+# ADR [0162](0162-analytics-history.md) — Analytics history (M34) — the M13 `/admin/analytics` admin surface gains a trend view over time so an operator can see usage patterns evolve
 
 Status: Accepted
 Date: 2026-10-11
 
-> **Abstract:** M34 settles M13's **named deferral** (ADR 0114 §"deferred
+> **Abstract:** M34 settles M13's **named deferral** (ADR [0114](0114-logging-and-usage-analytics.md) §"deferred
 > lanes" item 1 — "Charts … the admin page is a table + a count for M13.
 > **Own lane**, own ADR.") on the M13 analytics surface: it adds a
 > **derived read** (one `UsageDailyTotal` per UTC day over a pinned window,
@@ -49,7 +49,7 @@ Date: 2026-10-11
 
 ## Context
 
-M13 (ADR 0114) closed the **point-in-time** analytics question: the
+M13 (ADR [0114](0114-logging-and-usage-analytics.md)) closed the **point-in-time** analytics question: the
 GlobalAdmin can see, at `/admin/analytics`, how the platform was used over a
 pinned 7/30/90-day window (the per-surface ranking, the
 authenticated/anonymous split, the distinct-actor count, and a CSV export
@@ -57,13 +57,13 @@ of the per-day-per-surface rows). A single window's count cannot answer the
 operator's **pattern** question: **is usage growing, flat, or seasonal?
 which surface is the *trend*, not just the count?** The operator today
 would have to pull the CSV by hand, bucket the `Date` column into days, and
-plot it in a spreadsheet to see the shape. ADR 0114 §"deferred lanes" item
+plot it in a spreadsheet to see the shape. ADR [0114](0114-logging-and-usage-analytics.md) §"deferred lanes" item
 1 named this exact gap as a deferral ("Charts … **Own lane**, own ADR.").
 M34 **is** that future lane, on the M13 analytics surface. It adds the
 **over-time** half in **one piece — a derived read + a trend view**,
 **reuses** the M13 `Usage` context + the `IUsageAnalyticsService` seam +
 the `UsageEvent` doc + the `UsagePurgeService` retention + the M13
-`UsageDocTypes` surface, and **mirrors** the M33 (ADR 0156) trend-view
+`UsageDocTypes` surface, and **mirrors** the M33 (ADR [0156](0156-storage-metrics-history.md)) trend-view
 shape (table + sparkline + pinned window + closed `kw-l` set) with the
 **derived, not captured** inversion.
 
@@ -73,7 +73,7 @@ shape (table + sparkline + pinned window + closed `kw-l` set) with the
   a new context — the history is *derived, not captured* (M34·1).** M34
   **reuses** the M13 `Usage` context + the `IUsageAnalyticsService` seam +
   the `UsageEvent` doc + the `UsagePurgeService` retention + the
-  `UsageDocTypes` surface and **extends them additively** (ADR 0004 §B.1).
+  `UsageDocTypes` surface and **extends them additively** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).
   **No new bounded context**. **No re-shape** of the 2 M13 methods (they
   are the **frozen by-name** seam M34 extends). **No new doc, no new
   doc-type surface, no capture tick / handler / boot-seed, no new retention
@@ -148,7 +148,7 @@ shape (table + sparkline + pinned window + closed `kw-l` set) with the
 - **`Kumunita.Core` stays HTTP-free + Wolverine-free (M34·6)** — the
   `GetHistoryAsync` impl is on the existing Wolverine-free read service;
   **no** new tick / handler / boot-seed; **no** `HttpClient` in Core
-  (ADR 0006-D); **no** outbound channel (M34·5).
+  (ADR [0006](0006-module-boundary-contracts.md)-D); **no** outbound channel (M34·5).
 - **The data never leaves the instance (M34·5)** — the `UsageEvent` rows
   are local Postgres documents; nothing M34 emits, stores, or renders leaves
   the box (the M13 C-M13·1 + SECURITY.md §5 no-third-party-telemetry

@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0284 — Home "What's new" feed for anonymous visitors
+# ADR [0284](0284-home-whats-new-feed-for-anonymous.md) — Home "What's new" feed for anonymous visitors
 
 Status: Accepted
 Date: 2026-11-01
@@ -91,9 +91,9 @@ shape the `/pages` browse writes for an anonymous visitor — an `Allow`
 row over the public candidates), no new translation key, no new
 `AccessAction` / `AccessVia` / `Decide()` branch. The
 `HomeUpcoming` section (the resident's `Profile.HomeShowUpcoming`
-preference, ADR 0163) stays **signed-in only** — it is a *personal*
+preference, ADR [0163](0163-home-upcoming-events-and-todos.md)) stays **signed-in only** — it is a *personal*
 surface ("your" upcoming events / to-dos) and an anonymous visitor has no
-subject to scope it against (the ADR 0163 pin is unchanged and is a
+subject to scope it against (the ADR [0163](0163-home-upcoming-events-and-todos.md) pin is unchanged and is a
 different section from the "What's new" feed).
 
 ## Verification

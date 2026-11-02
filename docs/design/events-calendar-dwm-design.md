@@ -27,7 +27,7 @@ updated: 2026-11-02
 > **Status.** **Closed** (lane opened by U01; closed by U07 — the three-test
 > acceptance gate is recorded in §6.6 below; the lane folder moved to
 > `archive/lanes/ev-dwm/`). Decisions **D1–D7** are
-> **locked — [DECIDED — ADR 0064]** (U01 authored **ADR 0064**, Accepted, and
+> **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]** (U01 authored **ADR [0064](../adr/0064-events-calendar-dwm-views.md)**, Accepted, and
 > flipped every marker). The ADR is the sign-off gate; this doc
 > is the primary reference tier for implementation. The lane plan register is
 > `plans-milestones/in-progress/ev-dwm/plan-ev-dwm.md`; the per-unit files
@@ -35,12 +35,12 @@ updated: 2026-11-02
 > `archive/lanes/ev-dwm/`.
 >
 > This is a **named lane** (`EV-DWM`) on the already-shipped **`EV-CAL`**
-> events calendar (ADR 0063) — not a milestone letter: **M5 stays Projects;
+> events calendar (ADR [0063](../adr/0063-events-calendar-view.md)) — not a milestone letter: **M5 stays Projects;
 > M6 stays Portability** (the `GP` / `TG` / `EV-CAL` named-lane precedent).
 
 ## 1. What this lane is
 
-EV-CAL (ADR 0063) shipped the time overview the feed cannot give: a
+EV-CAL (ADR [0063](../adr/0063-events-calendar-view.md)) shipped the time overview the feed cannot give: a
 month-anchored calendar at `GET /events/calendar` — a rolling **30-day chip
 grid**, client-side overlap highlighting, and prev/next/today navigation. But
 a resident opening that page expects the **three views every calendar app
@@ -75,7 +75,7 @@ display-only — zero Core change (D1).** It adds:
 - **additive view-model fields** on `EventCalendarViewModel` (`View`,
   `WindowDays`, and `MonthLabel` generalized to a view-appropriate `Label`);
 - **one new plain-TS module** — `client/lib/events-calendar-time.ts`
-  (tsc-only, zero dependencies — the ADR 0031 pin) for the Day/Week
+  (tsc-only, zero dependencies — the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) pin) for the Day/Week
   time-ruler grids; the existing `events-calendar.ts` is **untouched**
   (Month reuses it — C-DWM·7);
 - **a few `site.css` rules** (the time-grid + toggle styling);
@@ -86,14 +86,14 @@ lane, no new audit row shape, no new bounded context, **no seam on
 `IEventService` / `EventService`** (the `ListInRangeAsync` seam is *already*
 window-agnostic — D1), no new dependency. **The `?view=` selector and the
 window are *display* inputs — never an access decision.** M5 stays Projects;
-M6 stays Portability; the ADR 0063 surface is untouched except the additive
+M6 stays Portability; the ADR [0063](../adr/0063-events-calendar-view.md) surface is untouched except the additive
 view-model fields + the `?view=` param.
 
 ## 2. The existing surface this lane builds on (verified, 2026-09-23)
 
 Read directly, not assumed:
 
-1. **The `ListInRangeAsync` seam** (`Kumunita.Core.Events`, ADR 0063 D2) —
+1. **The `ListInRangeAsync` seam** (`Kumunita.Core.Events`, ADR [0063](../adr/0063-events-calendar-view.md) D2) —
    `IEventService.ListInRangeAsync(DateTimeOffset windowStartUtc,
    DateTimeOffset windowEndUtc, string? componentId, string actorId,
    CancellationToken ct = default)` — **already window-agnostic**: it
@@ -116,7 +116,7 @@ Read directly, not assumed:
    (`View`, `WindowDays`, `Label`) join (D2 / D4 / D5).
 4. **`EventController.Calendar(string? from, string? componentId)`**
    (`Kumunita.Web/Controllers`, `[HttpGet("/events/calendar")]`) — the thin
-   controller (ADR 0006-D): parses the anchor in the effective zone, computes
+   controller (ADR [0006](../adr/0006-module-boundary-contracts.md)-D): parses the anchor in the effective zone, computes
    `[anchorLocalStartUtc, +30d)`, calls `ListInRangeAsync`, maps rows,
    builds the view model, pre-renders the ±1-month nav anchors + the
    `MonthLabel`. This action is extended with the `?view=` param (D2 / D5);
@@ -141,10 +141,10 @@ Read directly, not assumed:
    view-agnostic, so **Month reuses the module as-is**, and the new
    `events-calendar-time.ts` **mirrors** (not modifies) its overlap logic
    (C-DWM·7).
-7. **`EffectiveTimezoneResolver`** (ADR 0019) — already in the controller's
+7. **`EffectiveTimezoneResolver`** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)) — already in the controller's
    constructor composition; the anchor→UTC window math reuses it per view.
    The zone id shipped to the TS is a **display** input only (C-DWM·5).
-8. **`kw-dt` TagHelper** (ADR 0019 / 0020) — every timestamp (chip times,
+8. **`kw-dt` TagHelper** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020) — every timestamp (chip times,
    day labels, the view-appropriate `Label`) renders through the one existing
    TagHelper in the UI culture.
 9. **The `kw-l` registry** (`Kumunita.Core/Localization/KnownTranslationKeys.cs`)
@@ -155,7 +155,7 @@ Read directly, not assumed:
     `.events-calendar-day`, `.event-chip`, `.event-chip-overlap`) are
     extended with the time-grid + toggle rules (D3 / D5).
 11. **`package.json`** — **tsc-only confirmed** (`"build": "tsc"`,
-    `typescript` the only devDependency, no bundler — the ADR 0031 pin).
+    `typescript` the only devDependency, no bundler — the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) pin).
     The new `events-calendar-time.ts` is plain TS, zero dependencies.
 12. **`Milestones.cs` + README Roadmap + `MilestonesTests.cs`** — the
     roadmap trio the `EV-DWM` named-lane row joins (U01 opens it, U07 closes
@@ -163,11 +163,11 @@ Read directly, not assumed:
 
 ## 3. The design decisions
 
-Each decision below is **locked — [DECIDED — ADR 0064]** (U01 authored
-**ADR 0064**, Accepted, and flipped every marker). U02–U06 code against this
+Each decision below is **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]** (U01 authored
+**ADR [0064](../adr/0064-events-calendar-dwm-views.md)**, Accepted, and flipped every marker). U02–U06 code against this
 locked text.
 
-### 3.1 Zero Core change (D1) **locked — [DECIDED — ADR 0064]**
+### 3.1 Zero Core change (D1) **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]**
 
 No field is added to `Event`, `EventRsvp`, or `EventTranslation`;
 `EventDocTypes` is untouched; no `FeatureSchemaBase` migration; the boot paths
@@ -181,11 +181,11 @@ additive `EventCalendarViewModel` fields (`View`, `WindowDays`, and
 on the existing `Calendar` action, and the view / TS / CSS / key changes
 (the C-DWM·1 pin).
 
-### 3.2 The `?view=` selector + per-view window (D2) **locked — [DECIDED — ADR 0064]**
+### 3.2 The `?view=` selector + per-view window (D2) **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]**
 
 `?view=day|week|month` on the **existing** `GET /events/calendar` route
 (no new route — C-DWM·8). The window is computed **in the controller**, in
-the effective zone (ADR 0019), as the anchor's local start → UTC:
+the effective zone (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)), as the anchor's local start → UTC:
 
 - **`day`** — `[anchorLocalMidnightUtc, +1d)`;
 - **`week`** — the anchor's **Monday-start** week: 7 days from the Monday
@@ -201,7 +201,7 @@ an error (C-DWM·3). The `?from=` anchor and `?componentId=` filter keep
 their EV-CAL semantics (`componentId` a filter, never a gate — C-M3·2 /
 C-EV·3).
 
-### 3.3 Day + Week as time-ruler grids (D3) **locked — [DECIDED — ADR 0064]**
+### 3.3 Day + Week as time-ruler grids (D3) **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]**
 
 Day and Week are **time-ruler grids**: a `00:00`–`24:00` hour-ruler column
 plus one day-column per shown day (Day = 1 column, Week = 7 columns,
@@ -217,7 +217,7 @@ interval touches, each clipped to its day's 24h range). All of it is a
 client-side display concern (C-DWM·4): it writes no row, calls no seam, is
 never persisted, and is never an access decision.
 
-### 3.4 Month reframed to a true calendar month (D4) **locked — [DECIDED — ADR 0064]**
+### 3.4 Month reframed to a true calendar month (D4) **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]**
 
 The anchor's **calendar month** as a **Monday-first grid** spanning the full
 month (the month's days plus the leading days of the previous month and the
@@ -232,7 +232,7 @@ shipped 30-day flat run becomes the calendar month — the backward-
 compatible default view (C-DWM·8), with the *data window* changing from a
 flat 30 days to the calendar month's span (D2).
 
-### 3.5 The Day/Week/Month toggle + navigation (D5) **locked — [DECIDED — ADR 0064]**
+### 3.5 The Day/Week/Month toggle + navigation (D5) **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]**
 
 The header carries **three view buttons** (Day / Week / Month), each a
 **plain GET link** with `?view=` + the current `?from=` + `?componentId=`
@@ -247,7 +247,7 @@ and the authorization re-runs per request (C-EV·7 carried). The view-appropriat
 month) is a computed display string rendered through the existing `kw-dt`
 TagHelper / UI culture — **not** a registry key (D6).
 
-### 3.6 The `kw-l` keys (D6) **locked — [DECIDED — ADR 0064]**
+### 3.6 The `kw-l` keys (D6) **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]**
 
 Exactly **3 new keys** under `events.calendar.view.*` in **all four** seeded
 languages (en/de/fr/da) in `KnownTranslationKeys.cs`:
@@ -255,15 +255,15 @@ languages (en/de/fr/da) in `KnownTranslationKeys.cs`:
 `events.calendar.view.month` — each with an en floor text (the fallback in
 every view; the en text is authoritative, the de/fr/da texts are U05's
 translations). The existing `events.calendar.*` block is the host; the
-ADR 0015 registry shape holds. The view **labels** (a full date / a date
+ADR [0015](../adr/0015-ui-view-localization-mechanics.md) registry shape holds. The view **labels** (a full date / a date
 range / a month name) are **computed display strings** rendered through
 `kw-dt` / the UI culture — dates, not UI nouns, so they are **not** registry
 keys (C-DWM·9).
 
-### 3.7 Out of scope (future lanes) (D7) **locked — [DECIDED — ADR 0064]**
+### 3.7 Out of scope (future lanes) (D7) **locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]**
 
 No event creation from the calendar; no RSVP from the calendar (the detail
-page owns RSVP — ADR 0063 D7 unchanged); no drag-to-reschedule; no iCal
+page owns RSVP — ADR [0063](../adr/0063-events-calendar-view.md) D7 unchanged); no drag-to-reschedule; no iCal
 export (**M6** owns iCal); no recurring-event model; no **year** view; no
 **multi-event column packing / overlap-lane algorithm** (overlapping blocks
 simply render side-by-side or stacked — a display nicety, a future lane);
@@ -277,8 +277,8 @@ these landing later is a **new named lane**, not an extension of this one.
 
 The invariants C-DWM·1 … C-DWM·9 (§4) are the enforcement surface of D1–D7 —
 each cites its decision and the frozen precedent it rides (the C-EV·n
-carries are EV-CAL's invariants from ADR 0063). They are **pinned** (not
-proposals): they are true of the design as stated, and the ADR 0064 will
+carries are EV-CAL's invariants from ADR [0063](../adr/0063-events-calendar-view.md)). They are **pinned** (not
+proposals): they are true of the design as stated, and the ADR [0064](../adr/0064-events-calendar-dwm-views.md) will
 carry them verbatim.
 
 ## 4. Invariants (pinned for `EV-DWM`)
@@ -307,7 +307,7 @@ carry them verbatim.
   no row, call no seam, are never persisted, and are never an access decision.
   *(C-EV·4 carried.)*
 - **C-DWM·5 — Week starts Monday; the zone is display-only.** The anchor and
-  all window bounds use the `EffectiveTimezoneResolver`'s zone (ADR 0019);
+  all window bounds use the `EffectiveTimezoneResolver`'s zone (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md));
   the week is the anchor's **Monday-start** week (platform default,
   locale-independent — matches the da/de/fr `Intl` week convention); the zone
   id shipped to the TS is a **display** input only (the browser formats via
@@ -363,7 +363,7 @@ against — the exact view-model, the `Calendar` action engine, the new TS
 module's contract, the **9 pinned test names**, the three-test acceptance
 gate, and the drift-guard. U02–U06 implement against this text; a mismatch is
 a `## U<m> — Drift pause` (§6.5). All decisions are **locked — [DECIDED —
-ADR 0064]**.
+ADR [0064](../adr/0064-events-calendar-dwm-views.md)]**.
 
 ### 6.1 The view-model (exact C#)
 
@@ -402,11 +402,11 @@ public sealed record EventCalendarViewModel(
   + the trailing offset to the next Sunday — e.g. Sept 2026: 1 + 30 + 3 =
   34 columns — D4). `DateTime` (date-only, no
   time) — the columns are day-granular; the per-chip instants remain
-  `EventRow.StartUtc` / `EndUtc` (ADR 0063, unchanged).
+  `EventRow.StartUtc` / `EndUtc` (ADR [0063](../adr/0063-events-calendar-view.md), unchanged).
 
 Nothing else changes on the record: `Events`, `FromAnchor`, `PrevAnchor`,
 `NextAnchor`, `CurrentComponentId`, `Components`, `TimeZoneId` are
-unchanged; `EventRow`'s additive `StartUtc` / `EndUtc` fields (ADR 0063) are
+unchanged; `EventRow`'s additive `StartUtc` / `EndUtc` fields (ADR [0063](../adr/0063-events-calendar-view.md)) are
 reused unchanged.
 
 ### 6.2 The `Calendar` action engine (exact C#)
@@ -429,7 +429,7 @@ The engine, in order:
    date** — the existing `DateTime.TryParse(from, InvariantCulture,
    DateTimeStyles.None)` → `.Date` shape, falling back to
    `nowInZone.Date` (unchanged from the EV-CAL action).
-3. **Compute the window per view** in the effective zone (ADR 0019; each
+3. **Compute the window per view** in the effective zone (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md); each
    bound = the anchor's local midnight at that date, converted to UTC via
    `zone.GetUtcOffset` → the existing `new DateTime(y,m,d,0,0,0,
    Unspecified)` → `GetUtcOffset` → `ToUniversalTime` shape):
@@ -469,7 +469,7 @@ The engine, in order:
    model** passing the new `View` / `WindowDays` / `Label` fields. **Return**
    `View(vm)`.
 
-No other action changes; the controller stays thin (ADR 0006-D); no seam on
+No other action changes; the controller stays thin (ADR [0006](../adr/0006-module-boundary-contracts.md)-D); no seam on
 `IEventService` / `IAuthorizationService` / `IUserInfoService` /
 `IIdentityService` is touched (C-DWM·1 / D1).
 
@@ -523,7 +523,7 @@ in the handoff note instead of deviating:
 - The 3 `kw-l` key names (`events.calendar.view.day` / `.week` / `.month`).
 - The 9 invariants (C-DWM·1…C-DWM·9) — §4.
 - The 8 FACES (F1…F8) — §5.
-- The D1–D7 decisions (locked — [DECIDED — ADR 0064]) — §3.
+- The D1–D7 decisions (locked — [DECIDED — ADR [0064](../adr/0064-events-calendar-dwm-views.md)]) — §3.
 - The 9 pinned test names — §6.3.
 
 ### 6.6 Run result (EV-DWM acceptance gate — 2026-09-23)

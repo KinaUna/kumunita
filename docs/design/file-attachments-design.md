@@ -20,28 +20,28 @@ updated: 2026-11-02
 > file-attachments lane: it pins the invariant numbers (C-ATT·1–10), the
 > FACES (F1–F9), the exact C# of every seam, the pinned seam-test names, the
 > acceptance gate, and the drift guard (Part 2 is authored by U2). The register
-> (`docs/archive/lanes/file-attachments/plan-file-attachments.md`) is
+> ([`docs/archive/lanes/file-attachments/plan-file-attachments.md`](../archive/lanes/file-attachments/plan-file-attachments.md)) is
 > the **secondary** tier (unit-level deliverables + exit criteria).
-> `docs/archive/lanes/file-attachments/file-attachments-handoff-notes.md` is the **scratch**
+> [`docs/archive/lanes/file-attachments/file-attachments-handoff-notes.md`](../archive/lanes/file-attachments/file-attachments-handoff-notes.md) is the **scratch**
 > tier (one short section per unit, appended, never rewritten).
 > When the three disagree, **this file wins for the pinned shapes**; the
 > register wins for *which files exist* and *what each unit does*.
 >
-> **Amends ADR 0025** (resolves its deferred "arbitrary downloads" follow-on
-> for post / reply / announcement) **and ADR 0011** (uses its reserved
+> **Amends ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)** (resolves its deferred "arbitrary downloads" follow-on
+> for post / reply / announcement) **and ADR [0011](../adr/0011-media-and-file-storage.md)** (uses its reserved
 > allowlist extension point).
 
 ## Context
 
 The platform already ships **two** upload-and-serve capabilities over the same
-content-addressed byte store (ADR 0011: `IMediaStore` + the `MediaObject`
+content-addressed byte store (ADR [0011](../adr/0011-media-and-file-storage.md): `IMediaStore` + the `MediaObject`
 catalog doc in `mt`, `Media__MaxBytes` cap, raster-only allowlist,
 guards-before-write 400/413/415, app-endpoint serving with
 `X-Content-Type-Options: nosniff`):
 
 - the **profile avatar** — ADR 0011's reference consumer (`GET
   /profile/avatar/{subjectId}`, `Profile.AvatarId`);
-- **inline content images** (ADR 0025) — `![alt](/content-image/{id})` in a
+- **inline content images** (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)) — `![alt](/content-image/{id})` in a
   body, served by `GET /content-image/{id}` under the owning resource's single
   `Read` decision, with `ImageIds` additive fields on `Post` / `PostReply` /
   `LocalizedPage` / `Announcement`, the `ContentImageIds` Web parse helper, the
@@ -49,23 +49,23 @@ guards-before-write 400/413/415, app-endpoint serving with
 
 **Files cannot be attached anywhere yet.** There is no "Attach file"
 affordance, no `/attachment/` route, no file allowlist, and no
-`AttachmentIds` field. ADR 0025's "Not decided here" explicitly deferred
+`AttachmentIds` field. ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)'s "Not decided here" explicitly deferred
 "video / audio attachment" (the `AllowedContentTypes` / `MaxBytes` boundary is
-the seam), and ADR 0011's "Revisit when" names "video / office docs /
+the seam), and ADR [0011](../adr/0011-media-and-file-storage.md)'s "Revisit when" names "video / office docs /
 arbitrary downloads" as the follow-on lane the boundary was sized to leave
 open. **This design closes exactly that open question** for the post / reply /
-announcement lane, copying the content-image idiom (ADR 0025) rather than
+announcement lane, copying the content-image idiom (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)) rather than
 inventing a second storage model.
 
 The constraints this lane must honor (all pre-existing, not new):
 
 - **Audit-by-default** — every audience-restricted read is logged (SECURITY.md
   §3, C-MED·2); a public path bypasses both.
-- **`Core` stays HTTP-free AND body-parse-free** (ADR 0006-D) — the
+- **`Core` stays HTTP-free AND body-parse-free** (ADR [0006](../adr/0006-module-boundary-contracts.md)-D) — the
   `IFormFile` boundary and the body parse are Web-layer.
-- **Marten owns the domain documents** (ADR 0004 §B) — the `AttachmentIds`
-  fields ride the additive path (ADR 0004 §B.1).
-- **Lean + Boring, one database** (README principles, ADR 0002) — no new byte
+- **Marten owns the domain documents** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B) — the `AttachmentIds`
+  fields ride the additive path (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
+- **Lean + Boring, one database** (README principles, ADR [0002](../adr/0002-deployment-topology.md)) — no new byte
   store, no new catalog doc, no new `AccessAction`, no new `IMediaStore`
   method (C-MED·1).
 
@@ -75,13 +75,13 @@ The constraints this lane must honor (all pre-existing, not new):
 
 - The three `AttachmentIds` additive fields: `Post.AttachmentIds`,
   `PostReply.AttachmentIds`, `Announcement.AttachmentIds` (all
-  `IReadOnlyList<string>` of `MediaObject.Id` values, ADR 0004 §B.1 — **zero
+  `IReadOnlyList<string>` of `MediaObject.Id` values, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — **zero
   migrations**).
 - The `Find*ByAttachmentIdAsync` reverse-lookup seams (the
   `Find*ByImageIdAsync` shape, mirrored): `PostService.FindPostByAttachmentIdAsync`,
   `PostService.FindReplyByAttachmentIdAsync`,
   `IAnnouncementService.FindByAttachmentIdAsync`.
-- The `POST /attachment` upload lane (ADR 0011's guards verbatim; the
+- The `POST /attachment` upload lane (ADR [0011](../adr/0011-media-and-file-storage.md)'s guards verbatim; the
   **separate** `MediaOptions.AttachmentAllowedContentTypes` allowlist — file
   types, not the raster-only image allowlist).
 - The `GET /attachment/{id}` serve route: the owning resource's single
@@ -111,7 +111,7 @@ The constraints this lane must honor (all pre-existing, not new):
   lane.
 - **Drag-and-drop multi-upload UI** — the button is the single affordance.
 - **File transformations** (thumbnail / conversion) — bytes are stored as
-  uploaded (the ADR 0011 stance).
+  uploaded (the ADR [0011](../adr/0011-media-and-file-storage.md) stance).
 - **Attachments on `LocalizedPage` (static pages) in this pass** — a future
   lane, own design doc + ADR.
 - **Any change to the image lane or the renderer's image handling** — the
@@ -133,12 +133,12 @@ that earns it; renumbering is a breaking change and is not allowed mid-lane.
 
 | # | Invariant | Pinned where |
 |---|-----------|--------------|
-| **C-ATT·1** | **One store, two lanes.** The `IMediaStore` byte store (ADR 0011) is the single content-addressed volume for BOTH images and attachments. No second store, no second volume, no second catalog. The lanes differ only in route, allowlist, and serve semantics. | **U1** (doc) · **U8** (the second lane's upload) · **U12** (ADR 0034) |
+| **C-ATT·1** | **One store, two lanes.** The `IMediaStore` byte store (ADR [0011](../adr/0011-media-and-file-storage.md)) is the single content-addressed volume for BOTH images and attachments. No second store, no second volume, no second catalog. The lanes differ only in route, allowlist, and serve semantics. | **U1** (doc) · **U8** (the second lane's upload) · **U12** (ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md)) |
 | **C-ATT·2** | **Attachments are downloads, not renders.** An attachment in a body is `[label](/attachment/{id})` — an **`<a>` link**, never an `<img>`. The serve route sets `Content-Disposition: attachment`. The image lane keeps its `<img>` inline render. The two never bleed into each other. | **U9** (the serve header) · **U11** (F1/F2) |
 | **C-ATT·3** | **`IMediaStore` is unchanged.** `PutAsync` / `GetAsync` / `OpenReadAsync` / `RemoveAsync` / the `MediaObject` catalog are all **untouched**. Attachments ride the exact same seam. No new store method. | **U3** (the seams are on the services, not the store) · **U11** (the pin) |
-| **C-ATT·4** | **Core never parses bodies.** `PostService` / `AnnouncementService` do **not** scan body Markdown for `/attachment/` links (Core stays body-parse-free, ADR 0006-D). The Web layer extracts attachment ids from the body and passes them in the draft; Core writes them verbatim, exactly the `ImageIds` idiom. | **U7** (the parse is Web-only) · **U4/U5** (the write lanes copy verbatim) |
-| **C-ATT·5** | **`AttachmentIds` is its own field, not `ImageIds`.** Each owning POCO (`Post`, `PostReply`, `Announcement`) gains a **separate** `AttachmentIds` additive POCO field (ADR 0004 §B.1 — zero migrations). A body can carry both; a post's images live in `ImageIds`, its files in `AttachmentIds`. Never merge them. | **U3** (the three fields) · **U6** (the pin) |
-| **C-ATT·6** | **The allowlist is the only content gate.** Upload accepts a file iff its `ContentType` is in `MediaOptions.AttachmentAllowedContentTypes` (resolvable, default pinned in U2). Empty → 400, oversize → 413, disallowed → 415, **guards before any `PutAsync` write** (the ADR 0011 upload idiom). SVG stays **excluded**. | **U8** (the option + the upload) · **U11** (F6) |
+| **C-ATT·4** | **Core never parses bodies.** `PostService` / `AnnouncementService` do **not** scan body Markdown for `/attachment/` links (Core stays body-parse-free, ADR [0006](../adr/0006-module-boundary-contracts.md)-D). The Web layer extracts attachment ids from the body and passes them in the draft; Core writes them verbatim, exactly the `ImageIds` idiom. | **U7** (the parse is Web-only) · **U4/U5** (the write lanes copy verbatim) |
+| **C-ATT·5** | **`AttachmentIds` is its own field, not `ImageIds`.** Each owning POCO (`Post`, `PostReply`, `Announcement`) gains a **separate** `AttachmentIds` additive POCO field (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — zero migrations). A body can carry both; a post's images live in `ImageIds`, its files in `AttachmentIds`. Never merge them. | **U3** (the three fields) · **U6** (the pin) |
+| **C-ATT·6** | **The allowlist is the only content gate.** Upload accepts a file iff its `ContentType` is in `MediaOptions.AttachmentAllowedContentTypes` (resolvable, default pinned in U2). Empty → 400, oversize → 413, disallowed → 415, **guards before any `PutAsync` write** (the ADR [0011](../adr/0011-media-and-file-storage.md) upload idiom). SVG stays **excluded**. | **U8** (the option + the upload) · **U11** (F6) |
 | **C-ATT·7** | **Serve order is fixed and 404-before-decision.** `GET /attachment/{id}`: validate id shape → store miss = 404 → reverse-lookup owner (post → reply → announcement) → **audience decision** (the one `CanAsync(…Read…)`) → serve. Any miss/deny is a **404** (no 403 — no existence leak). UGC deny emits exactly **one** audit `Deny` row; every other 404 emits **zero** audit rows. | **U9** (the serve route) · **U11** (F1–F5) |
 | **C-ATT·8** | **Reply serve resolves the parent.** Unlike the image lane's deliberate "reply 404 drift pause," the attachment lane **resolves the reply's parent post** for its audience decision. The parent is the unit of authorization; a member sees a member's reply-attachment, a non-member 404s. | **U9** (the parent resolution) · **U11** (F4) |
 | **C-ATT·9** | **The image lane is untouched.** Every existing `ImageIds` field, the `/content-image/` route, `IsSafeImageSrc`, the Image editor button, and `MarkdownRenderer`'s image handling are **unchanged**. This lane only **adds**. (`MarkdownRenderer.IsSafeUrl` already accepts the relative `/attachment/{id}` link shape — **zero renderer changes**.) | **U10** (the button is a sibling of the Image button) · **U12** (the ADR states it) |
@@ -174,7 +174,7 @@ stays the authoritative source for unit-level scope:
   the reference is gone ⇒ the bytes are an inert orphan (the C-MED·7
   posture) — never hard-deleted.
 - **Additive fields, zero migrations.** The `AttachmentIds` fields ride the
-  ADR 0004 §B.1 additive path (delta-detected, idempotent, no seed reset);
+  ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive path (delta-detected, idempotent, no seed reset);
   **separate from** `ImageIds` (C-ATT·5).
 - **`Core` stays HTTP-free AND body-parse-free** (C-ATT·4); the parse helper
   is Web-only (`Kumunita.Web.Security`).
@@ -182,7 +182,7 @@ stays the authoritative source for unit-level scope:
   post's (or the parent post's, for a reply) single `Read` decision;
   announcement → its flat `Scope`/communities gate (zero `AccessAudit` rows).
   No new `AccessAction` / `AccessVia` (C-ATT·3/7/8).
-- **The allowlist is a separate ADR 0011 extension point** —
+- **The allowlist is a separate ADR [0011](../adr/0011-media-and-file-storage.md) extension point** —
   `MediaOptions.AttachmentAllowedContentTypes` (positive-only, SVG excluded),
   the same `Media__MaxBytes` cap; the image lane's raster-only
   `AllowedContentTypes` is untouched (C-ATT·6).
@@ -213,13 +213,13 @@ The three owning POCOs each gain a **separate** `AttachmentIds` field (C-ATT·5
 — **never** merged into `ImageIds`; a body can carry both, the images in
 `ImageIds` and the files in `AttachmentIds`). Each is
 `public IReadOnlyList<string> AttachmentIds { get; set; } = [];`, the exact
-additive shape of the sibling `ImageIds` field (ADR 0004 §B.1 — zero
+additive shape of the sibling `ImageIds` field (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — zero
 migrations), placed **immediately after** the `ImageIds` field:
 
 - **`Post.AttachmentIds`** — the **6th** additive field, ordered after
   `Status`, `GroupId`, `LanguageCode`, `DeletedAt`, `ImageIds` (5th).
   Doc-comment: *"Attachment file ids (`/attachment/{id}`); the 6th additive
-  field after `ImageIds` (5th) — ADR 0034, C-ATT·5. Separate from
+  field after `ImageIds` (5th) — ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md), C-ATT·5. Separate from
   `ImageIds`; never merged."*
 - **`PostReply.AttachmentIds`** — the **5th** additive field, ordered after
   `Modified`, `LanguageCode`, `DeletedAt`, `ImageIds` (4th). Same shape +
@@ -500,10 +500,10 @@ assemblies with `dotnet exec …Tests.dll`.
 - **Tests:** `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
   then `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
   (the Core run spins Testcontainers `postgres:18`, ~20 s).
-- **Docs closed:** ADR 0034 authored (Amends ADR 0025 + ADR 0011),
-  `docs/adr/README.md` row (0034), `SECURITY.md` (e) note, `OPS.md`
-  (`Media:AttachmentAllowedContentTypes` tunable), `ARCHITECTURE.md`,
-  `README.md`, the design doc `## File attachments — Closed (recorded)`, the
+- **Docs closed:** ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) authored (Amends ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) + ADR [0011](../adr/0011-media-and-file-storage.md)),
+  [`docs/adr/README.md`](../adr/README.md) row (0034), [`SECURITY.md`](../../SECURITY.md) (e) note, [`OPS.md`](../OPS.md)
+  (`Media:AttachmentAllowedContentTypes` tunable), [`ARCHITECTURE.md`](../ARCHITECTURE.md),
+  [`README.md`](../../README.md), the design doc `## File attachments — Closed (recorded)`, the
   handoff `## Summary`, and the `in-progress/` → `done/` file moves.
 
 ### 2.11 Drift-guard (frozen once written)
@@ -527,7 +527,7 @@ touches — **never** silently. Silence in the handoff means "no drift."
 
 ## File attachments — Closed (recorded) (2026-09-16)
 
-The ATT lane (file attachments on post / reply / announcement, ADR 0034) is
+The ATT lane (file attachments on post / reply / announcement, ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md)) is
 **shipped**. The three `AttachmentIds` additive fields (C-ATT·5, zero
 migrations), the three `Find*ByAttachmentIdAsync` reverse-lookup seams, the
 post/reply/announcement write lanes (create + edit), the `POST /attachment`
@@ -540,10 +540,10 @@ unchanged, C-ATT·9; no new `IMediaStore` / `AccessAction`, C-ATT·3; Core
 body-parse-free, C-ATT·4; orphan-safe 404s, C-ATT·7; download semantics,
 C-ATT·2/8).
 
-- **Decision record:** **ADR 0034** (Amends **0025** — resolves its deferred
+- **Decision record:** **ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md)** (Amends **0025** — resolves its deferred
   "arbitrary downloads" follow-on for the post / reply / announcement lane —
   and **0011** — the `AllowedContentTypes` extension point now exercised by a
-  separate `AttachmentAllowedContentTypes`). `docs/adr/README.md` row 0034.
+  separate `AttachmentAllowedContentTypes`). [`docs/adr/README.md`](../adr/README.md) row 0034.
 - **Gate (§2.10, recorded 2026-09-16):** `dotnet build Kumunita.slnx -c
   Debug` **green** (Core + Web; 1 pre-existing CS8604 warning in
   `WysiwygEditorTests.cs` L910, unrelated — the same warning U3–U11 recorded).
@@ -570,7 +570,7 @@ C-ATT·2/8).
   seam gap — lifting them needs a substitutable `PostService` seam or
   Testcontainers in `Kumunita.Web.Tests`). The intended bodies are preserved
   in `AttachmentServingTests.cs` comment blocks.
-- **Non-decisions (carried forward, ADR 0034 "Not decided here"):**
+- **Non-decisions (carried forward, ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) "Not decided here"):**
   attachments on **static/about pages** (own design doc + ADR); **video /
   audio** streaming; **in-browser preview**; **file transforms**; the **image
   lane's reply-404 drift pause** (this lane did not fix it — it made the

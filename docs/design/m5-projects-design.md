@@ -27,22 +27,22 @@ updated: 2026-11-02
 > is the state machine the to-do flows through). *Out of scope (this file, Part
 > 1):* the exact POCO field sets, the exact `IProjectService` signatures, the
 > 16 + 8 pinned test names, the gate, and the drift-guard (U01 owns Part 2).
-> LOCKED in ADR 0067 (D1–D12 + D8a).
+> LOCKED in ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md) (D1–D12 + D8a).
 
 > **Milestone.** `M5` — the **outcome** arrow (the `M0`–`M6` roadmap letters
-> stay fixed: M4 is shipped — Events, ADR 0054; M6 stays Portability).
-> **ADR 0067** is this milestone's decision record — **not yet authored**;
+> stay fixed: M4 is shipped — Events, ADR [0054](../adr/0054-events-rsvp-reminders.md); M6 stays Portability).
+> **ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md)** is this milestone's decision record — **not yet authored**;
 > this unit (U00) authors Part 1 only, and every decision below is marked
-> **[PROPOSED]** until **U01** locks it into ADR 0067.
+> **[PROPOSED]** until **U01** locks it into ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md).
 >
 > **Status.** **Part 1 (U00) [PROPOSED → LOCKED]; Part 2 (U01) Locked.** The
-> decisions D1–D12 (+ D8a) are locked in **ADR 0067 (Accepted, 2026-09-23)**;
+> decisions D1–D12 (+ D8a) are locked in **ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md) (Accepted, 2026-09-23)**;
 > **Part 2** (the exact C# shapes, the full `IProjectService` surface, the
 > 16 + 8 pinned test names, the three-test acceptance gate, and the
 > drift-guard) follows in the "Seams & contracts" section below. The
 > sealed-unit register is `docs/plans-milestones/plan-m5-projects.md`; the
 > scratch log is
-> `docs/archive/lanes/projects/projects-handoff-notes.md`.
+> [`docs/archive/lanes/projects/projects-handoff-notes.md`](../archive/lanes/projects/projects-handoff-notes.md).
 >
 > **Scope of this file (Part 1):** what this milestone is; the existing
 > surface it reuses — *verified against the actual files*; the design
@@ -80,18 +80,18 @@ on the to-do. A board is **laned** — each `KanbanLane` carries an optional
 lane auto-updates the to-do's status** (the board is the state machine the
 to-do flows through), and a lane at its limit **refuses** a further move /
 copy into it. Standing over a to-do or board is **creator ∪ assignee ∪
-GlobalAdmin**, re-checked server-side (the ADR 0014 / 0016 / 0017 precedent
+GlobalAdmin**, re-checked server-side (the ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 / 0017 precedent
 extended with the assignee as a collaborator). Read is the to-do's / board's
 **own** `Audience` decision, and a to-do rendered on a board is visible only
 if **both** the board and the to-do are visible to the actor.
 
 **The one thing every unit must respect:** this milestone is **additive and
-reusing.** It reuses the `Audience` doc (ADR 0001-B / 0036 — *reused*, not
+reusing.** It reuses the `Audience` doc (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036 — *reused*, not
 extended) on **both** `TodoItem` and `KanbanBoard`, the frozen
 `IAuthorizationService.CanAsync(Read)` / `CanSeeAsync(Read)` decision path
-(ADR 0006) through the two new adapters, the standing matrix (ADR 0014 /
-0016 / 0017), the `MarkdownRenderer` + `bindRichEditor` (ADR 0025 / 0031) for
-an optional to-do body, the `kw-dt` TagHelper (ADR 0019 / 0020) for
+(ADR [0006](../adr/0006-module-boundary-contracts.md)) through the two new adapters, the standing matrix (ADR [0014](../adr/0014-post-edit-lane-author-only.md) /
+0016 / 0017), the `MarkdownRenderer` + `bindRichEditor` (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / 0031) for
+an optional to-do body, the `kw-dt` TagHelper (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020) for
 timestamps, and the existing profile-avatar surface for the assignee chip.
 **No new `AccessAction`**, **no new `AccessVia`**, **no new authorization
 path**, **no editor dependency**, **zero migrations for new fields** (ADR
@@ -109,21 +109,21 @@ builds on without re-inventing:
    mirrors verbatim: the same **6-member** surface (`Id` / `Name` /
    `OwnerId` / `Audience` / `ComponentId` / `TargetKind`, in
    `Authorization/AccessAction.cs`), the `Name = Title ?? Body[..60]`
-   (57 + "…") truncation idiom, the audience written verbatim (ADR 0001-B).
+   (57 + "…") truncation idiom, the audience written verbatim (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B).
    `Post.Audience` is the **`Audience` doc** shape both M5 documents reuse
    (`null` = public — the frozen `Decide()` branch 5); `Post` is the
    `ParentId`-free content-document precedent.
 2. **`Announcement` + `AnnouncementService`** (M3b) — the
-   **author-of-record ∪ GlobalAdmin** standing matrix (ADR 0017), the
+   **author-of-record ∪ GlobalAdmin** standing matrix (ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md)), the
    `CreateAsync` C3 pattern (standing re-checked server-side, the Web
    `[Authorize]` is a convenience pre-gate only), and the 404-vs-403 split
    (`KeyNotFoundException` / `UnauthorizedAccessException`) — the
    `IProjectService` write lanes mirror this.
 3. **`Audience`** (`Authorization/Audience.cs`) — `Mode` + `Grants` + the
-   ADR 0036 `Community` branch; **`null` = public**. The
+   ADR [0036](../adr/0036-community-visible-audience-default.md) `Community` branch; **`null` = public**. The
    `AudienceEditorModel` + `BuildAudience()` single-source form surface (M2,
    reused by every composer) is the to-do / board composer's audience picker.
-4. **`MarkdownRenderer` + `bindRichEditor`** (RC / RE, ADR 0025 / 0031 /
+4. **`MarkdownRenderer` + `bindRichEditor`** (RC / RE, ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / 0031 /
    0033) — the one renderer on the read path, the one editor on the write
    path. The optional to-do `Body` is rendered by the one `MarkdownRenderer`
    and edited by the one `bindRichEditor` — no new editor, no new TS editor
@@ -135,7 +135,7 @@ builds on without re-inventing:
    (the model for `BoardItemPlacement`'s `(TodoItemId, BoardId)` identity),
    the standing matrix (author ∪ GlobalAdmin), the adapter, and the
    `EventDocTypes` surface — the pattern `ProjectDocTypes` mirrors verbatim.
-6. **`kw-dt` TagHelper** (ADR 0019 / 0020) — the one timestamp renderer:
+6. **`kw-dt` TagHelper** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020) — the one timestamp renderer:
    per-request resolver (resident override → platform default → `UTC` floor)
    + format (resident override → platform default → Long floor). Every M5
    timestamp (`TodoItem.Created` / `Modified?`, `KanbanBoard.Created`)
@@ -147,13 +147,13 @@ builds on without re-inventing:
    shape (the M3 group-posts / the M4 board interactions already rely on
    it); the new `client/lib/projects-board.ts` reuses it for the explicit
    POST round trips. **The `tsc`-only / no-editor-dependency constraint
-   stands unchanged** (ADR 0031 § Context: "no editor dependency enters
+   stands unchanged** (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) § Context: "no editor dependency enters
    `package.json`"; `client/lib` is plain-TS, tsc-only — confirmed in
    `src/Kumunita.Web/package.json`: `build` = `tsc`, the only devDependency
    is `typescript`).
-9. **The `kw-l` key-registry shape** (ADR 0015) — the `KnownTranslationKeys`
+9. **The `kw-l` key-registry shape** (ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) — the `KnownTranslationKeys`
    host for the new UI strings; the four seeded languages (en/de/fr/da, the
-   ADR 0042 / 0045 set).
+   ADR [0042](../adr/0042-bundled-initial-language-pack.md) / 0045 set).
 10. **`Program.cs` + `SchemaBootstrap.cs`** (`Kumunita.Web`) — the **two
     boot paths** the `ProjectDocTypes` surface and the `IProjectService`
     registration are wired into (U02). The per-feature registration shape in
@@ -275,7 +275,7 @@ hierarchy). *(C-M5·7.)*
 The Web `[Authorize]` is a convenience pre-gate only, **never** the source of
 truth; `IProjectService` enforces the matrix for **every mutating lane**
 (edit title / status / assignee, add subtask, reorder, move, copy, delete,
-and lane CRUD) — the ADR 0014 / 0016 / 0017 precedent, re-checked
+and lane CRUD) — the ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 / 0017 precedent, re-checked
 server-side. The **creator** is `TodoItem.AuthorId` /
 `KanbanBoard.AuthorId` (the standing owner); the **assignee** is
 `TodoItem.AssigneeId` (a collaborator — assigning a to-do to a resident
@@ -287,9 +287,9 @@ the `Audience` decision — D4). *(C-M5·6.)*
 ### 3.8a No draft lane (D8a)
 **[PROPOSED]**
 
-The ADR 0037 `IsDraft` pin is **out of scope for M5**. A to-do is
+The ADR [0037](../adr/0037-draft-mode-author-only.md) `IsDraft` pin is **out of scope for M5**. A to-do is
 **published on creation** — the create write lane does not set a draft flag,
-and `TodoItem` has **no `IsDraft` field**. The ADR 0037 author-only draft +
+and `TodoItem` has **no `IsDraft` field**. The ADR [0037](../adr/0037-draft-mode-author-only.md) author-only draft +
 `/my/drafts` lane is a **follow-on lane** (own ADR), not part of M5.
 `KanbanBoard` likewise has no `IsDraft` (a board is live on creation; the
 `/my/drafts` lane for boards is out of scope). *(Part of C-M5·11 — no new
@@ -307,12 +307,12 @@ board, not both). *(C-M5·8.)*
 ### 3.10 Plain TS, zero deps, explicit server round trips (D10)
 **[PROPOSED]**
 
-tsc-only (ADR 0031); **no UI library, no bundler**;
+tsc-only (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)); **no UI library, no bundler**;
 `client/lib/projects-board.ts` is the **one** new module. Every action
 (reorder / move / copy / assign / delete) is an **explicit POST**,
 CSRF-aware (the `client/lib/api.ts` shape), then a **full re-render** —
 **no** optimistic local reordering, **no** HTML5 drag events (keyboard /
-menu driven — the ADR 0031 "explicit, server-authoritative" posture). The
+menu driven — the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) "explicit, server-authoritative" posture). The
 status icon + assignee avatar + dropdown menu are plain DOM / JS. *(C-M5·9.)*
 
 ### 3.11 Localization parity (D11)
@@ -322,7 +322,7 @@ The new `kw-l` keys (the to-do / board / lane nouns, the status-icon
 fallback, the dropdown-action labels — move up / down / left / right, copy
 to, move to, assign, delete; the lane "limit" + "status" labels; the board
 empty-state) are present in **all four** seeded languages (en/de/fr/da —
-the ADR 0042 / 0045 set); English is the fallback in every view; the ADR
+the ADR [0042](../adr/0042-bundled-initial-language-pack.md) / 0045 set); English is the fallback in every view; the ADR
 0015 key-registry shape is the host. *(C-M5·10.)*
 
 ### 3.12 Reuse, don't reinvent (D12)
@@ -342,7 +342,7 @@ dependency**. *(C-M5·11.)*
   `BoardItemPlacement`; one new surface `ProjectDocTypes` (the `EventDocTypes`
   pattern verbatim); Marten-native POCOs, conventional `string` `Id`,
   delta-detected + idempotent, no seeding, no EF, zero migrations for
-  existing surfaces (ADR 0004 §B.1).
+  existing surfaces (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 - **C-M5·2 — A to-do is standalone; placement is a separate record.**
   `TodoItem` carries **no** `BoardId` / `LaneId` / `Order`; its presence on a
   board (and its position) is a `BoardItemPlacement` row. A to-do has zero or
@@ -351,7 +351,7 @@ dependency**. *(C-M5·11.)*
   placement; copy-to = duplicate the to-do + place the copy.
 - **C-M5·3 — Read is the to-do's own `Audience`; the board is a container.**
   `TodoItem` and `KanbanBoard` each carry the **exact** post `Audience`
-  (ADR 0001-B / 0036; `null` = public) and each has its own adapter
+  (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036; `null` = public) and each has its own adapter
   (`TargetKind "todo"` / `"board"`). A standalone to-do list / detail is
   gated by the to-do's `Audience` (C-M3·3 aggregate / C3 404-vs-403). A board
   view is gated by the board's `Audience` (entry), then each card by the
@@ -388,7 +388,7 @@ dependency**. *(C-M5·11.)*
   placement is removed from the source board and added to the target board's
   first lane (the to-do is then on the target board, not both).
 - **C-M5·9 — Plain TS, zero deps, explicit server round trips.** tsc-only
-  (ADR 0031); **no UI library, no bundler**; `client/lib/projects-board.ts`
+  (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)); **no UI library, no bundler**; `client/lib/projects-board.ts`
   is the one new module. Every action (reorder / move / copy / assign /
   delete) is an **explicit POST**, CSRF-aware (the `client/lib/api.ts`
   shape), then a full re-render — **no** optimistic local reordering, **no**
@@ -397,7 +397,7 @@ dependency**. *(C-M5·11.)*
 - **C-M5·10 — Localization parity.** The new `kw-l` keys (to-do / board /
   lane nouns, the action labels, the lane limit / status labels, the board
   empty-state) are present in **all four** seeded languages (en/de/fr/da);
-  English is the fallback in every view; the ADR 0015 key-registry shape is
+  English is the fallback in every view; the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) key-registry shape is
   the host.
 - **C-M5·11 — Reuse, don't reinvent.** The `Audience` doc, the frozen
   `IAuthorizationService`, the standing matrix, the `MarkdownRenderer` +
@@ -512,7 +512,7 @@ dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
 
 # Seams & contracts (Part 2, written by U1)
 
-> **Part 2 status.** **Locked** — ADR 0067 (Accepted, 2026-09-23) is the
+> **Part 2 status.** **Locked** — ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md) (Accepted, 2026-09-23) is the
 > decisions source; this section is the **frozen reference tier** U02–U12
 > code against. The four POCOs + two adapters (§2.2), the **full
 > `IProjectService` surface** (§2.3), the `ProjectDocTypes` surface (§2.4), the
@@ -586,9 +586,9 @@ public interface IUserInfoService
 ```
 
 Also reused, not re-shapeable (no C# here — the seams are the *frozen*
-existing surfaces): the `MarkdownRenderer` (ADR 0025) for the optional
+existing surfaces): the `MarkdownRenderer` (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)) for the optional
 `TodoItem.Body` / `KanbanBoard.Description`; the `bindRichEditor`
-(ADR 0031) for the composers; the `kw-dt` TagHelper (ADR 0019 / 0020) for
+(ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) for the composers; the `kw-dt` TagHelper (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020) for
 every M5 timestamp; the `client/lib/api.ts` CSRF-aware fetch shape (the M2/M3
 precedent) for `projects-board.ts`'s explicit POSTs; the `AudienceEditorModel`
 + `BuildAudience()` form surface (M2) for the to-do / board composers; and the
@@ -1056,7 +1056,7 @@ public static class ProjectDocTypes
 ```
 
 **Zero migrations for existing surfaces** — the four docs are new, the
-surface is additive (ADR 0004 §B.1; the `EventDocTypes` precedent).
+surface is additive (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1; the `EventDocTypes` precedent).
 
 ## 2.5 The standing matrix (pinned)
 
@@ -1067,8 +1067,8 @@ Enforced **server-side** in the `ProjectService` (the
 like `AnnouncementService`). The Web `[Authorize]` is a **convenience
 pre-gate only, never the source of truth** (C-M5·6 / D8). Every mutating
 method above carries the principal's real role set — the Web layer passes
-`RoleSet(User)`; Core enforces the matrix (the ADR 0014 / 0016 / 0017
-precedent, extended with the **assignee** as a collaborator — the ADR 0067
+`RoleSet(User)`; Core enforces the matrix (the ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 / 0017
+precedent, extended with the **assignee** as a collaborator — the ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md)
 standing decision).
 
 | Lane (method) | Standing | `AccessVia` | Audit row (C3) |
@@ -1086,7 +1086,7 @@ standing decision).
 - **The creator** is `TodoItem.AuthorId` / `KanbanBoard.AuthorId` (the
   standing owner); **the assignee** is `TodoItem.AssigneeId` (a collaborator
   — assignment grants standing); **GlobalAdmin** is the override branch
-  (the ADR 0017 precedent, exercised via the `actorRoles` parameter).
+  (the ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md) precedent, exercised via the `actorRoles` parameter).
 - `AssigneeId` is **display + standing, never an access gate** — read is
   the `Audience` decision (C-M5·3); the matrix above governs *mutations*.
 - **The placement lanes' standing is over the to-do** (not the board, not
@@ -1096,7 +1096,7 @@ standing decision).
 
 The new `projects.*` block in the `KnownTranslationKeys` registry (the ADR
 0015 key-registry shape is the host), present in **all four** seeded
-languages (en/de/fr/da — the ADR 0042 / 0045 set), English the fallback in
+languages (en/de/fr/da — the ADR [0042](../adr/0042-bundled-initial-language-pack.md) / 0045 set), English the fallback in
 every view:
 
 - `projects.todo.title`
@@ -1119,7 +1119,7 @@ every view:
 - `projects.board.lane.empty`
 - `projects.board.empty`
 
-(19 keys; the ADR 0052 warm-boot baseline backfill lane covers the
+(19 keys; the ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md) warm-boot baseline backfill lane covers the
 `de`/`fr`/`da` rows automatically — no new seeder step in M5.)
 
 ## 2.7 Pinned seam tests — Core (exact names, 16)
@@ -1222,4 +1222,4 @@ The following are **frozen pins**; any mismatch with the implementation is a
 11 invariants C-M5·1–11, and the 10 FACES F1–F10. **No code, no build, no
 tests.** Part 2 (U01) — the exact C# shapes, the full `IProjectService`
 surface, the 16 Core + 8 Web pinned test names, the three-test gate, and the
-drift-guard, locked by **ADR 0067 (Accepted, 2026-09-23)**.*
+drift-guard, locked by **ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md) (Accepted, 2026-09-23)**.*

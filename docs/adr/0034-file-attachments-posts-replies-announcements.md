@@ -14,35 +14,35 @@ updated: 2026-11-02
 ## Context
 
 The platform already ships **two** upload-and-serve capabilities over the same
-content-addressed byte store (ADR 0011): the **profile avatar** and **inline
-content images** (ADR 0025). Both store bytes content-addressed on a local
+content-addressed byte store (ADR [0011](0011-media-and-file-storage.md)): the **profile avatar** and **inline
+content images** (ADR [0025](0025-rich-content-markdown-and-content-images.md)). Both store bytes content-addressed on a local
 volume, keep a `MediaObject` catalog doc in `mt`, carry an
 `IReadOnlyList<string>` of ids on the owning document (`AvatarId` /
 `ImageIds`), and serve only through an app endpoint gated by the owning
 resource's single `Read` decision.
 
-**Files could not be attached anywhere.** ADR 0025's "Not decided here"
-deferred "video / audio attachment"; ADR 0011's "Revisit when" named
+**Files could not be attached anywhere.** ADR [0025](0025-rich-content-markdown-and-content-images.md)'s "Not decided here"
+deferred "video / audio attachment"; ADR [0011](0011-media-and-file-storage.md)'s "Revisit when" named
 "video / office docs / arbitrary downloads" as the follow-on lane the
 allowlist boundary was sized to leave open. This ADR closes exactly that open
 question **for the post / reply / announcement lane**, copying the
-content-image idiom (ADR 0025) rather than inventing a second storage model.
+content-image idiom (ADR [0025](0025-rich-content-markdown-and-content-images.md)) rather than inventing a second storage model.
 
 The constraints the choice must honor (all pre-existing, not new):
 
 - **Audit-by-default** — every audience-restricted read is logged
   (SECURITY.md §3); a public path bypasses both.
-- **`Core` stays HTTP-free AND body-parse-free** (ADR 0006-D) — the
+- **`Core` stays HTTP-free AND body-parse-free** (ADR [0006](0006-module-boundary-contracts.md)-D) — the
   `IFormFile` boundary and the body parse are Web-layer.
-- **Marten owns the domain documents** (ADR 0004 §B) — `AttachmentIds` rides
-  the additive path (ADR 0004 §B.1).
-- **Lean + Boring, one database** (README principles, ADR 0002) — no new byte
+- **Marten owns the domain documents** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B) — `AttachmentIds` rides
+  the additive path (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).
+- **Lean + Boring, one database** (README principles, ADR [0002](0002-deployment-topology.md)) — no new byte
   store, no new catalog doc, no new `AccessAction`, no new `IMediaStore`
   method.
 
 ## Decision
 
-**D1 — One store, two lanes.** The `IMediaStore` byte store (ADR 0011) is the
+**D1 — One store, two lanes.** The `IMediaStore` byte store (ADR [0011](0011-media-and-file-storage.md)) is the
 single content-addressed volume for **both** images and attachments. One
 `PutAsync`, one `MediaObject` catalog, one `MaxBytes` cap, one restore
 surface. The lanes differ only in **route** (`/attachment/{id}` vs
@@ -82,29 +82,29 @@ is a **404** (store-miss, orphan, Deny) — never a 403, so existence never
 leaks; exactly **one `Deny` row** on a UGC (post/reply) Deny, **zero rows**
 on every other 404 path (C-ATT·7/10).
 
-**D5 — The content gate is the ADR 0011 extension point, and it is
+**D5 — The content gate is the ADR [0011](0011-media-and-file-storage.md) extension point, and it is
 separate.** A new `MediaOptions.AttachmentAllowedContentTypes` (positive-only;
 **SVG excluded**; default = a neighborhood set — PDF / Office docs / text /
 csv / zip / the four raster image types) + the **same** `Media__MaxBytes`
 cap. Guards-before-write (empty → 400, oversize → 413, disallowed → 415; no
-file written) — ADR 0011's boundary verbatim (C-ATT·6). The image lane's
+file written) — ADR [0011](0011-media-and-file-storage.md)'s boundary verbatim (C-ATT·6). The image lane's
 raster-only `AllowedContentTypes` is **untouched** (C-ATT·9).
 
 The ten invariants (C-ATT·1–C-ATT·10, the design doc
-`docs/design/file-attachments-design.md` is the primary tier for their full
+[`docs/design/file-attachments-design.md`](../design/file-attachments-design.md) is the primary tier for their full
 text) are the decision's enforceable core.
 
 ## Consequences
 
 - **Three additive `AttachmentIds` POCO fields** (`Post` / `PostReply` /
   `Announcement`), separate from `ImageIds` (C-ATT·5) — **zero migrations**
-  (ADR 0004 §B.1: Marten's schema builder picks up the new field,
+  (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1: Marten's schema builder picks up the new field,
   delta-detected, idempotent).
 - **Three reverse-lookup read seams** (`PostService.FindPostByAttachmentIdAsync`
   / `FindReplyByAttachmentIdAsync`, `IAnnouncementService.FindByAttachmentIdAsync`)
   — un-audited, null when absent (the serve-404 branch), the
   `Find*ByImageIdAsync` shape mirrored.
-- **Two new Web routes** — `POST /attachment` (upload, the ADR 0011 guards
+- **Two new Web routes** — `POST /attachment` (upload, the ADR [0011](0011-media-and-file-storage.md) guards
   verbatim) + `GET /attachment/{id}` (serve, the 5-step ordering: validate id
   → store-miss 404 → reverse-lookup post→reply→announcement → per-owner
   decision → serve with `Content-Disposition: attachment` + `nosniff`).

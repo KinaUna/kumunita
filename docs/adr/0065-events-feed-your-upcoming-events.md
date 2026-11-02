@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 ## Context
 
-The M4 feed (ADR 0054) shows the *community's* upcoming events the caller may
+The M4 feed (ADR [0054](0054-events-rsvp-reminders.md)) shows the *community's* upcoming events the caller may
 read — ordered by `Start` ascending, paged, `componentId`-filterable. A signed-in
 resident has a second, personal question the feed does not answer:
 
@@ -47,7 +47,7 @@ actor's own subject id:
 
 1. **RSVPed** — every event for which the actor holds an `EventRsvp` row,
    **any** `RsvpStatus` (`Going` / `Maybe` / `No`). The **row's existence is
-   the sign-up** (ADR 0054 §3.2, last-write-wins per `(EventId, UserId)`);
+   the sign-up** (ADR [0054](0054-events-rsvp-reminders.md) §3.2, last-write-wins per `(EventId, UserId)`);
    the status is *surfaced by the caller*, never a filter here — a "No" RSVP
    is still an event the resident is tracking.
 2. **Authored** — every event where `AuthorId == actorId`, regardless of RSVP
@@ -56,10 +56,10 @@ actor's own subject id:
 
 The union is **non-leaky by construction** (invariant **C-MINE·1**): a
 non-author can only hold an `EventRsvp` row on an event they may already read
-(`RsvpAsync` gates standing *first*, ADR 0054 §3.2 — you cannot RSVP to an
+(`RsvpAsync` gates standing *first*, ADR [0054](0054-events-rsvp-reminders.md) §3.2 — you cannot RSVP to an
 event you cannot see), and an authored row is the actor's own. The seam
 therefore needs **no per-row `CanAsync` pass** — re-deciding what the write
-lanes already decided would be a second-source break (ADR 0006-D, the thin
+lanes already decided would be a second-source break (ADR [0006](0006-module-boundary-contracts.md)-D, the thin
 controller / single-decision-path convention).
 
 ### D2 — Upcoming + live only; drafts included
@@ -67,8 +67,8 @@ controller / single-decision-path convention).
 The union is further restricted to **upcoming** (`Start > now`, strictly in the
 future — a finished event is not an "upcoming event" of the resident's, even
 if they RSVPed) and **live** (`!IsDeleted` — a soft-deleted event is gone from
-every surface, the ADR 0024 posture). **Drafts are included**: a draft authored
-event is the actor's own row (the ADR 0037 draft gate is *author-only* — a
+every surface, the ADR [0024](0024-author-soft-delete-lane.md) posture). **Drafts are included**: a draft authored
+event is the actor's own row (the ADR [0037](0037-draft-mode-author-only.md) draft gate is *author-only* — a
 non-author cannot see it, and this is the actor's own list), so the section
 shows a resident their not-yet-published events. This differs from the feed
 (`ListUpcomingAsync` excludes drafts unconditionally) — the feed is a
@@ -77,7 +77,7 @@ surface (the draft is the resident's own). (Invariant **C-MINE·2**.)
 
 ### D3 — Order, cap, and the no-audit posture
 
-- **Order** — `Start` ascending (the same feed-ordering index, ADR 0054 §4),
+- **Order** — `Start` ascending (the same feed-ordering index, ADR [0054](0054-events-rsvp-reminders.md) §4),
   so the section reads as a personal to-do list.
 - **Cap** — `MineCap = 50` (a result-count backstop mirroring the
   `PageSize` / `WindowCap` precedent in `EventService`: the per-actor
@@ -103,7 +103,7 @@ surface (the draft is the resident's own). (Invariant **C-MINE·2**.)
 - **The controller** (`EventController.Index`) resolves the section after the
   feed: when the actor id is non-empty it calls `ListMineAsync(actorId)`
   (a `UnauthorizedAccessException` → `ForbidResult`, the 403 split); the
-  section's events join the translation pass (the ADR 0059
+  section's events join the translation pass (the ADR [0059](0059-event-translations.md)
   `ApplyEventTranslationAsync` viewer-language swap, unchanged — the rows are
   the same `Event` docs) and the author / component display-name read lookups
   (never an access decision, C-M3·2). An anonymous caller (empty actor id)
@@ -132,7 +132,7 @@ surface (the draft is the resident's own). (Invariant **C-MINE·2**.)
 - **Drafts are visible in the section, not the feed** (C-MINE·2) — a
   deliberate split between the *community* surface (feed: drafts excluded
   unconditionally) and the *personal* surface (section: the author's own
-  drafts included). The ADR 0037 draft gate is respected (author-only), not
+  drafts included). The ADR [0037](0037-draft-mode-author-only.md) draft gate is respected (author-only), not
   re-applied.
 - **The section is hidden when empty** (C-MINE·5) — a resident with no RSVPs
   and no authored events sees exactly the pre-lane page; the "no upcoming

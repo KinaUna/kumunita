@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0222 — Admin Accounts table on phones
+# ADR [0222](0222-accounts-table-phones.md) — Admin Accounts table on phones
 
 Status: Accepted
 

@@ -43,7 +43,7 @@ updated: 2026-11-02
 > **named lane** (the `ESC` id — **not** a roadmap renumber; the M33 / M34
 > order is untouched, the ADR 013 / 089 / 093 / 109 "named lane, not a
 > renumber" precedent). It is a **capability on the M31 / M32 `ErrorReports`
-> surface** (ADR 0154 + ADR 0155): it **reuses** the M32 `ErrorReport` doc +
+> surface** (ADR [0154](../adr/0154-production-error-handling.md) + ADR [0155](../adr/0155-issue-submission-escalation.md)): it **reuses** the M32 `ErrorReport` doc +
 > the `Kumunita.Core.ErrorReports` context + the `IErrorReportService` seam
 > + the M32 `EscalationForwarder` + the `KUMUNITA_ESCALATION_ENDPOINT` env
 > var and **extends them additively** (the two new docs + the
@@ -81,22 +81,22 @@ updated: 2026-11-02
 > the `AcceptInboundAsync` seam, the four additive `ErrorReport` fields, the
 > `EscalationForwarder` token + DB-config change, the closed `escalation.*`
 > `kw-l` key set, the pinned test names, the acceptance gate, the drift guard)
-> + **ADR 0159**.
+> + **ADR [0159](../adr/0159-escalation-authorization.md)**.
 >
 > **The frozen base (reused, unchanged).** ESC is built **on top of** the
-> M32 `ErrorReports` surface (ADR 0155 — the `ErrorReport` 15-member doc, the
+> M32 `ErrorReports` surface (ADR [0155](../adr/0155-issue-submission-escalation.md) — the `ErrorReport` 15-member doc, the
 > `IErrorReportService` 4-method surface, the `ErrorReportDocTypes`
 > registration surface, the M32 `EscalationForwarder`, and the
 > `KUMUNITA_ESCALATION_ENDPOINT` env-var fallback) and the M31 `ErrorReports`
-> surface (ADR 0154). It also rides the ADR 0004 §B.1 Marten-native /
+> surface (ADR [0154](../adr/0154-production-error-handling.md)). It also rides the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 Marten-native /
 > additive-field pattern (the ESC four additive fields **ride** the existing
 > `.Schema.For<ErrorReport>()` — the idempotent delta at boot, **no new
 > registration surface for the additive fields**; the two new docs ride a
-> **new** `EscalationDocTypes` parallel surface), the ADR 0001-B thin-token
+> **new** `EscalationDocTypes` parallel surface), the ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B thin-token
 > rule (the admin surface is `[Authorize(Roles = GlobalAdmin)]`), the ADR
 > 0006-C3 single-write-lane rule (each token generate / revoke and each inbound
 > acceptance commits its doc + exactly one `AccessAudit` row together), and
-> the ADR 0006-D dependency-direction rule (**`Kumunita.Core` references no
+> the ADR [0006](../adr/0006-module-boundary-contracts.md)-D dependency-direction rule (**`Kumunita.Core` references no
 > ASP.NET HTTP types** — the forwarder + the inbound endpoint are
 > **Web-layer**). All of these still bind **unchanged**. ESC adds **two new
 > docs** (`EscalationToken`, `EscalationOutboundConfig` — ESC·3 / ESC·4),
@@ -117,7 +117,7 @@ updated: 2026-11-02
 > `IAuthorizationService` surface (ESC·12), and **no** persistence of the
 > receiving-side token plaintext (ESC·3). It is **additive**. **No EF
 > migration** (the additive fields are a string / nullable string /
-> `DateTimeOffset?` on an existing doc — ADR 0004 §B.1 idempotent delta at
+> `DateTimeOffset?` on an existing doc — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta at
 > boot).
 >
 > **The `ErrorReport` field set ceiling is re-pinned** (the ESC 19-member set
@@ -153,7 +153,7 @@ updated: 2026-11-02
 > **unauthenticated operator-override fallback** when the DB config is absent
 > or disabled (ESC·4). `AccessVia` gains **exactly one** additive value
 > (`Escalation`) and the 12 frozen values are untouched (ESC·10). The
-> `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+> `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
 > `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip is **U09's**
 > (ESC·13). There is **no new bounded context** (ESC·1).
 
@@ -287,20 +287,20 @@ token-authenticated* channel).
 
 - **ESC·1 — ESC is a capability on the M31 / M32 surface, not a new context.**
   The two new docs (`EscalationToken`, `EscalationOutboundConfig`) live in
-  the `Kumunita.Core.ErrorReports` context (the ADR 0154 / 0155 surface),
+  the `Kumunita.Core.ErrorReports` context (the ADR [0154](../adr/0154-production-error-handling.md) / 0155 surface),
   registered on a **new** `EscalationDocTypes` surface (the M31
   `ErrorReportDocTypes` / the Usage `UsageDocTypes` parallel-surface
   precedent). ESC **reuses** the M32 `ErrorReport` doc + `IErrorReportService`
   and **extends** them additively; it adds **no new bounded context**.
 - **ESC·2 — The `ErrorReport` doc field set is extended additively to a
-  19-member ESC ceiling.** M32's 15 (ADR 0155 D1) are unchanged; ESC adds
+  19-member ESC ceiling.** M32's 15 (ADR [0155](../adr/0155-issue-submission-escalation.md) D1) are unchanged; ESC adds
   **exactly four**: `FromInstance` (string?, the accepting token's `Label`),
   `EscalationReceivedAt` (DateTimeOffset?, the receive instant),
   `EscalationSourceId` (string?, the origin's report id — the inbound
   idempotency key), `EscalationTokenId` (string?, which token accepted it) —
   each null for locally-filed rows. The `Origin` closed set extends from
   `{"error-page","general"}` to `{"error-page","general","escalated"}` (a
-  string field — ADR 0004 §B.1 idempotent delta, **no migration**).
+  string field — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta, **no migration**).
 - **ESC·3 — Receiving-side tokens are the `EscalationToken` doc: multiple,
   labeled, individually revocable, hashed at rest.** Only the **SHA-256 hash**
   is stored — the **plaintext is shown exactly once** at generation, never
@@ -330,7 +330,7 @@ token-authenticated* channel).
   **validation** (hash compare) + the **received-row write** are Core
   (`IEscalationTokenService.ValidateAsync` + `IErrorReportService.
   AcceptInboundAsync`); the **HTTP** (outbound POST + inbound request
-  parsing) is Web (M32·5 / ADR 0006-D — Core stays HTTP-free).
+  parsing) is Web (M32·5 / ADR [0006](../adr/0006-module-boundary-contracts.md)-D — Core stays HTTP-free).
 - **ESC·7 — A successful inbound is idempotent on (token, origin-report-id).**
   A re-delivery of the **same** origin report under the **same** token returns
   the **existing** row (200, idempotent), not a duplicate. The key is
@@ -349,8 +349,8 @@ token-authenticated* channel).
   validates** (immediate). `LastUsedAt` is stamped on each successful inbound
   (a read-then-write on the token row, no audit row).
 - **ESC·10 — `AccessVia` gains exactly one additive value: `Escalation`.**
-  The M1 `Admin` / ADR 013 `Group` / ADR 0028 `Guardian` / ADR 0036
-  `Community` / ADR 0041 `Resident` / M31 `Anonymous` append precedent — the
+  The M1 `Admin` / ADR 013 `Group` / ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) `Guardian` / ADR [0036](../adr/0036-community-visible-audience-default.md)
+  `Community` / ADR [0041](../adr/0041-page-audience-scope-dropdown.md) `Resident` / M31 `Anonymous` append precedent — the
   **12 frozen values are untouched**. The inbound audit row is the **only**
   row that carries `Via = Escalation` (the M2M standing — the receiving admin
   is not the actor, the origin platform is).
@@ -358,7 +358,7 @@ token-authenticated* channel).
   four languages.** Every new user-visible string is a `KnownTranslationKeys`
   entry present, **non-empty, in all four** languages (en/de/fr/da), pinned by
   `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests`. The
-  `en` values are the source text (ADR 0015 D1 `kw-l` provider-floor
+  `en` values are the source text (ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor
   discipline); the `de` / `fr` / `da` values are U07's to author (the M30·6
   four-language pin).
 - **ESC·12 — The admin token/config surface is GlobalAdmin-gated; no new
@@ -370,9 +370,9 @@ token-authenticated* channel).
 - **ESC·13 — The six-member close flip is U09's responsibility.** The
   `Milestones.cs` **lane row** (added as `StatusDone`, **after** the M32 row,
   without disturbing the M33 / M34 order or the single-in-progress pin — M34
-  stays `StatusNext`) / README / `STATUS.md` / `ARCHITECTURE.md` /
+  stays `StatusNext`) / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` (a new entry, newest-first, naming ESC
-  + ADR 0159) lands in U09. The M27 "shipped with no entry until caught in
+  + ADR [0159](../adr/0159-escalation-authorization.md)) lands in U09. The M27 "shipped with no entry until caught in
   review" lesson (AGENTS.md) is held.
 
 ## FACES (pinned, 10)
@@ -611,7 +611,7 @@ value (the ESC·2 19-member ceiling)
 The M32 **15 fields are unchanged** (ESC·2 — no re-shape). ESC adds
 **exactly four** additive fields; each is null for locally-filed rows. The
 `Origin` **closed set** extends from `{"error-page","general"}` to
-`{"error-page","general","escalated"}` (a string field — ADR 0004 §B.1
+`{"error-page","general","escalated"}` (a string field — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
 idempotent delta, **no migration**). The re-pinned **19-member ESC ceiling** is
 the M32 15 + the ESC 4 below.
 
@@ -638,7 +638,7 @@ public sealed class ErrorReport
 additive class)
 
 Namespace `Kumunita.Core.ErrorReports`. The `GenerateAsync` + `RevokeAsync`
-lanes are **single-write-lane** (the ADR 0006 C3 shape — the M32
+lanes are **single-write-lane** (the ADR [0006](../adr/0006-module-boundary-contracts.md) C3 shape — the M32
 `MarkResolvedAsync` precedent: one write session storing the doc + exactly one
 `AccessAudit` row). `ValidateAsync` is a constant-time hash compare that
 stamps `LastUsedAt` on a match (a read-then-write, **no** audit row — the
@@ -691,7 +691,7 @@ public sealed class EscalationTokenService : IEscalationTokenService
 method)
 
 The M31 3 + the M32 1 methods are **unchanged** (ESC·1). `AcceptInboundAsync`
-is the M32 `MarkResolvedAsync` **idempotent-write-lane** shape (the ADR 0006
+is the M32 `MarkResolvedAsync` **idempotent-write-lane** shape (the ADR [0006](../adr/0006-module-boundary-contracts.md)
 C3 single-write-lane): validate the token → idempotent lookup → store the
 received row + **one** `AccessAudit` row → stamp the token's `LastUsedAt` —
 in **one** write session.
@@ -753,7 +753,7 @@ A **new** parallel surface (the M31 `ErrorReportDocTypes` / the Usage
 `UsageDocTypes` parallel-surface precedent). It registers the **two new
 docs**; the M32 `ErrorReportDocTypes` surface is **untouched** (ESC·1 — the
 four additive `ErrorReport` fields **ride** the existing
-`.Schema.For<ErrorReport>()` — ADR 0004 §B.1 idempotent delta at boot, no new
+`.Schema.For<ErrorReport>()` — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta at boot, no new
 surface for the additive fields).
 
 ```csharp
@@ -804,7 +804,7 @@ sets are the **floor**, **untouched**; ESC **adds** this new `escalation.*`
 namespace). Every key is present, **non-empty, in all four** languages
 (en/de/fr/da), pinned by `KwLRegistryConsistencyTests` +
 `KnownTranslationKeys_ParityTests` (the M31·7 / M32·9 precedent). The `en`
-values are the source text (ADR 0015 D1 `kw-l` provider-floor discipline); the
+values are the source text (ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline); the
 `de` / `fr` / `da` values are U07's to author (the M30·6 four-language pin).
 `escalation.list.status.escalated` is the new status chip (the M32
 `errorreport.list.status.*` chip precedent).
@@ -990,7 +990,7 @@ record, do not silently re-shape):
 
 ---
 
-## ADR 0041 — moved content (D11 trim, 2026-11-02)
+## ADR [0041](../adr/0041-page-audience-scope-dropdown.md) — moved content (D11 trim, 2026-11-02)
 
 ## Rejected alternatives
 
@@ -1006,9 +1006,9 @@ record, do not silently re-shape):
 - **Use `AudienceMode` for the new flag.** Rejected — `AudienceMode`
   governs how the *grant list* combines (Any / All). The
   `AllResidents` flag is a *distinct grant*, not a mode of the grant
-  list (the ADR 0036 precedent). Making it an `AudienceMode` value
+  list (the ADR [0036](../adr/0036-community-visible-audience-default.md) precedent). Making it an `AudienceMode` value
   would collide with the C1 invariant (empty-list semantics) and with
-  ADR 0006's "the grant list is the explicit set" contract.
+  ADR [0006](../adr/0006-module-boundary-contracts.md)'s "the grant list is the explicit set" contract.
 
 - **Retire the audience editor entirely.** Rejected — the "Individual
   access" scope still needs it (a board memo for three specific people
@@ -1040,7 +1040,7 @@ conditional editor); the pre-ADR-0041 form shape (a Community
 
 ---
 
-## ADR 0036 — moved content (D11 trim, 2026-11-02)
+## ADR [0036](../adr/0036-community-visible-audience-default.md) — moved content (D11 trim, 2026-11-02)
 
 ## Tests
 
@@ -1076,7 +1076,7 @@ conditional editor); the pre-ADR-0041 form shape (a Community
 
 ---
 
-## ADR 0015 — moved content (D11 trim, 2026-11-02)
+## ADR [0015](../adr/0015-ui-view-localization-mechanics.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
@@ -1133,9 +1133,9 @@ announcement partials). Deliberate exclusions, all recorded so they are not
 read as drift:
 
 - **The setup flow** (`AdminSetup/Setup`) — first-boot, single-admin,
-  pre-community; ADR 0005's seam never claimed it.
+  pre-community; ADR [0005](../adr/0005-multilingual-support.md)'s seam never claimed it.
 - **The `about` product surface** (`StaticPages/About`) — *superseded for
-  this surface by ADR 0042 (2026-09-18), D3/D5*: its 17 `about.*` keys are
+  this surface by ADR [0042](../adr/0042-bundled-initial-language-pack.md) (2026-09-18), D3/D5*: its 17 `about.*` keys are
   now registered and the view is wrapped in `<kw-l>` through the existing
   mechanism; the exclusions below still hold for it.
 - **The FAQ placeholder** accordion — not platform UI yet (the FAQ content
@@ -1176,7 +1176,7 @@ unregistered keys. Consequences:
 
 ---
 
-## ADR 0004 — moved content (D11 trim, 2026-11-02)
+## ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) — moved content (D11 trim, 2026-11-02)
 
 ## Revisit when
 

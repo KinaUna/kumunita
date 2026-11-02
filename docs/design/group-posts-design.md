@@ -28,13 +28,13 @@ updated: 2026-11-02
 ## Context
 
 M2 shipped groups as a **membership / privacy / organizing unit**: membership and
-ownership, invitations, the description lane, and ADR 0010's `IsPrivate` flag (a
+ownership, invitations, the description lane, and ADR [0010](../adr/0010-private-groups.md)'s `IsPrivate` flag (a
 *back-office* organizing unit — a family, a circle — hidden from the audience /
 grant pickers). A group is a **list of users**, resolvable on the live
 membership read (`IUserInfoService.GetGroupIdsAsync`), strong-consistent (C4).
 
 M3 shipped **component posts**: an author *addresses* a post to a group through an
-**audience grant** (ADR 0010 — a private group can *never* be an audience; a
+**audience grant** (ADR [0010](../adr/0010-private-groups.md) — a private group can *never* be an audience; a
 group is a reuse unit, not a recipient), one-level replies, and the component
 feeds over the frozen `Component` buckets. M3b added **component-scoped
 moderation** over a post's *audience* (`Moderate`-gated lane, report-driven
@@ -64,7 +64,7 @@ else.
 That is a **new authorization lane beyond the audience lane** — standing,
 auditable, and deliberately **stricter** than the audience lane (no moderator
 peek, no break-glass; G·4). A change of that standing earns its own ADR —
-**ADR 0013** — and a two-part design doc that pins every invariant, seam, and
+**ADR [0013](../adr/0013-group-posts-membership-lane.md)** — and a two-part design doc that pins every invariant, seam, and
 test name before any implementing unit runs, for the same reason M3 opened that
 way: the guard against *distributed fragmentation* (membership access logic
 re-implemented per surface) and *accidental integration* (the "single decision,
@@ -80,15 +80,15 @@ consumes no letter.
 **In scope**
 
 - `Post.GroupId` **additive** field (`string`, default `string.Empty`.
-  non-empty ⇒ the post is a group-channel post). ADR 0004 §B.1 additive —
+  non-empty ⇒ the post is a group-channel post). ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive —
   delta-detected, idempotent, no re-seed, **no `PostDocTypes` change** (Marten's
   `Schema.For<Post>()` delta picks up the new property); `PostReply` is
   **unchanged** (lane-neutral). **[U4]**
 - The `IAuthorizationService` **group lane**: `AccessVia.Group` (the **8th**
   value, the M1 `Admin`-enum-ADD precedent) + two `CanSeeGroupAsync` overloads
-  (plain + `IDocumentSession`). ADR 0006-E **compatible ADD** — frozen
+  (plain + `IDocumentSession`). ADR [0006](../adr/0006-module-boundary-contracts.md)-E **compatible ADD** — frozen
   signatures untouched (M2 `GetProfilesAsync` / M3b `Moderate` ADD precedent).
-  **[U3: ADR 0013 · U5: the lane impl · U2: the frozen C#]**
+  **[U3: ADR [0013](../adr/0013-group-posts-membership-lane.md) · U5: the lane impl · U2: the frozen C#]**
 - The `PostService` **group surface**: `ListGroupFeedAsync` /
   `GetGroupPostAsync` / `CreateGroupPostAsync` + the `GroupPostDraft` record.
   Replies **reuse** the existing lane-neutral `CreateReplyAsync`.
@@ -102,7 +102,7 @@ consumes no letter.
 - The **19 pinned seam tests** in `Kumunita.Core.Tests/GroupPostServiceTests.cs`
   **[U9 implements · U2 pins the names]** + the recorded **three-test acceptance
   gate** (closed loop / handoff / part-vs-whole) **[U10 records]**.
-- **ADR 0013** — group posts are a membership lane. **[U3]**
+- **ADR [0013](../adr/0013-group-posts-membership-lane.md)** — group posts are a membership lane. **[U3]**
 
 **Out of scope — deferral list (each named; carried forward)**
 
@@ -120,13 +120,13 @@ consumes no letter.
 - **Break-glass on group posts: none.** A group post is visible to members only,
   full stop (G·4). There is no `Via = BreakGlass` branch on the group lane.
 - **Moderator peek: none.** A non-member moderator sees a group post *iff* they
-  are a member (G·4, invariant C5, ADR 0003 default-OFF).
+  are a member (G·4, invariant C5, ADR [0003](../adr/0003-roles-and-moderator-scoping.md) default-OFF).
 - **Non-member authoring: none.** Only current members (owner included) may
   create a group post (G·3). A non-member create denies.
 
 ## Invariants (pinned for group posts)
 
-Group posts are a **caller** of the ADR 0006 invariants (**C1–C6**) and the M3
+Group posts are a **caller** of the ADR [0006](../adr/0006-module-boundary-contracts.md) invariants (**C1–C6**) and the M3
 owned invariants (C-M3·1 reply-inherits, C-M3·3 feed/detail audit shape), not an
 owner. This milestone **owns** eight group-posts invariants, **G·1–G·8**. U2
 (Part 2) freezes the exact C# and the 19 seam-test names that anchor these; each
@@ -138,7 +138,7 @@ from the group-posts master register (authoritative on wording).
 | **G·1** | group-post visibility = **current** membership (strong consistency C4); the membership lane is the **only** access decision; the audience lane is **never** evaluated (G·8). | **U5** (lane impl) · **U2** (decision algorithm) · **U9** (G1–G4, G7, G8) |
 | **G·2** | lane **exclusivity**: a post is either a group-channel post **or** a component feed entry; `GroupId` non-empty ⇒ `ComponentId` empty, excluded from `ListFeedAsync` / `ListAllFeedAsync`. | **U4** (`Post.GroupId`) · **U6** (feed/detail exclusion) · **U9** (G12, G13) |
 | **G·3** | **members-only** authoring: the create gate **is** the group-lane decision; non-member create denies (`UnauthorizedAccessException`; Web **404**). | **U5** (gate = lane) · **U6** (`CreateGroupPostAsync`) · **U9** (G5, G6) |
-| **G·4** | nobody peeks: **no moderator lane, no break-glass**; a moderator / GlobalAdmin sees group posts **iff** they are a member (C5, ADR 0003, how-it-works.md). | **U5** (those branches absent) · **U2** (absent by contract) · **U9** (G7, G8; test #19) |
+| **G·4** | nobody peeks: **no moderator lane, no break-glass**; a moderator / GlobalAdmin sees group posts **iff** they are a member (C5, ADR [0003](../adr/0003-roles-and-moderator-scoping.md), how-it-works.md). | **U5** (those branches absent) · **U2** (absent by contract) · **U9** (G7, G8; test #19) |
 | **G·5** | audit **per lane**: feed = **one aggregate** row; detail = **one decision** row; Allow **and** Deny audited; **in-transaction** via the session overload (C3). | **U6** (row writes) · **U2** (row shape) · **U9** (aggregate/detail shape tests) |
 | **G·6** | delegation is **action-scoped** (C2): an **in-scope `read`** delegate acts with the owner's standing; **out-of-scope denies**. | **U5** (delegation branch) · **U2** · **U9** (G9, G10) |
 | **G·7** | replies **inherit** the parent's single group-lane decision (no second evaluation, no second row — C-M3·1 analog). | **U6** (replies reuse `CreateReplyAsync`) · **U2** · **U9** (G11) |
@@ -147,20 +147,20 @@ from the group-posts master register (authoritative on wording).
 **ADRs the group lane must respect (not pinned as invariants, but the code must
 not violate them):**
 
-- **ADR 0003 §Separation of duties + moderator default-OFF** — the group lane
+- **ADR [0003](../adr/0003-roles-and-moderator-scoping.md) §Separation of duties + moderator default-OFF** — the group lane
   adds **no** moderator branch and **no** break-glass branch; a moderator /
   GlobalAdmin stands exactly as a non-member (G·4).
-- **ADR 0006-D (dependency direction)** — `PostService` (Core) depends only on
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-D (dependency direction)** — `PostService` (Core) depends only on
   `IUserInfoService` (the live `GetGroupIdsAsync` read) + `IAuthorizationService`
   (the two new seams) + its own Marten session. It never reads
   `GroupMembership` / `DelegationGrant` for its own access decision, and
   `Kumunita.Web` is a thin `GroupsController` (the M2 group-lane surface).
-- **ADR 0006-E (change management)** — the two `CanSeeGroupAsync` overloads +
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-E (change management)** — the two `CanSeeGroupAsync` overloads +
   `AccessVia.Group` are the group lane's **ADDs** on `IAuthorizationService`
   (frozen signatures untouched); `Post.GroupId` is the **single additive** on the
-  `Post` POCO. ADR 0006-E's *named here* list grows by exactly these lines in
+  `Post` POCO. ADR [0006](../adr/0006-module-boundary-contracts.md)-E's *named here* list grows by exactly these lines in
   the close (U11 / U12).
-- **ADR 0013 (this milestone)** — "group posts are a membership lane," authored
+- **ADR [0013](../adr/0013-group-posts-membership-lane.md) (this milestone)** — "group posts are a membership lane," authored
   by U3 and cross-referenced throughout Part 2.
 
 ## FACES (pinned, 13)
@@ -196,9 +196,9 @@ them.
 - If a later unit (U2–U12) finds a mismatch between an implemented signature and
   a Part 1 pin, **this doc wins**. The unit updates this file in the same commit
   and appends a one-line drift note to the group-posts handoff note.
-- The invariant *numbers* — **G·1–G·8** — and the ADR 0006 **C1–C6** and M3
+- The invariant *numbers* — **G·1–G·8** — and the ADR [0006](../adr/0006-module-boundary-contracts.md) **C1–C6** and M3
   owned **C-M3·1 / C-M3·3** references are stable for the rest of the milestone.
-  Adding a new group-posts owned invariant (**G·9+**) requires an ADR 0013
+  Adding a new group-posts owned invariant (**G·9+**) requires an ADR [0013](../adr/0013-group-posts-membership-lane.md)
   amendment **plus** a design-doc edit in the same commit; renaming or renumbering
   an existing one is a breaking change and is not allowed mid-milestone.
 - A new FACES row (**G14+**) is added only by a unit that ships the outcome it
@@ -206,9 +206,9 @@ them.
   field** (U1 → U2, and forward): every unit that touches FACES updates the
   count in the group-posts handoff note.
 - **Break-glass is not a deferral.** It is an explicit, standing **not
-  available** rule (G·4; Scope §"Explicitly not available"). U3 (ADR 0013) and
+  available** rule (G·4; Scope §"Explicitly not available"). U3 (ADR [0013](../adr/0013-group-posts-membership-lane.md)) and
   U5 (the lane impl) must **not re-litigate** it — the answer is *no by design*,
-  per how-it-works.md's trust pitch, ADR 0003's moderator default-OFF, and
+  per how-it-works.md's trust pitch, ADR [0003](../adr/0003-roles-and-moderator-scoping.md)'s moderator default-OFF, and
   invariant C5. (The **deferral** list is separate: moderation/report,
   notifications, search, cross-posting, pagination UI.)
 - The **"## Group posts — Closed (recorded)"** section at the end of this file
@@ -574,7 +574,7 @@ public Task<Post> CreateGroupPostAsync(GroupPostDraft draft, string actorId, IDo
 **(a) Group post vs. component post — the lane split (G·1/G·2; M3's
 owner/moderation/break-glass branches do not exist on this lane):**
 
-| Aspect | Component post (M3/M3b — **unchanged**) | Group post (ADR 0013) |
+| Aspect | Component post (M3/M3b — **unchanged**) | Group post (ADR [0013](../adr/0013-group-posts-membership-lane.md)) |
 |---|---|---|
 | Access decision | Owner → Moderate → BreakGlass → MatchGroups (one pass, C6) | **membership only** — the audience lane is **never** evaluated (G·1/G·8) |
 | author-is-owner standing | always allowed (owner branch first) | allowed **iff still a member** (G4 FACES — no owner-skip on this lane) |
@@ -582,7 +582,7 @@ owner/moderation/break-glass branches do not exist on this lane):**
 | delegation (C2) | in-scope grant borrows the owner's standing | the **same rule** on **membership**: in-scope `read` ⇒ `GetGroupIdsAsync(owner)` (G·6) |
 | `ComponentId` | non-empty (the feed organizer) | **empty** (G·2) |
 | `GroupId` | empty | **non-empty** (G·2) |
-| `Audience` | author's choice, frozen (ADR 0001-B) | non-null, **empty**, written by the service (G·8) |
+| `Audience` | author's choice, frozen (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B) | non-null, **empty**, written by the service (G·8) |
 | create gate | ComponentMembership + role skips; no service audit row | the group-lane decision; the Deny row is **persisted** (G·3, G·5) |
 | feeds | `ListFeedAsync` / `ListAllFeedAsync` (both filter on `ComponentId`) | `ListGroupFeedAsync` only — never in a component feed (**structurally**: the two M3 queries filter on `ComponentId` and group posts write it empty — U6 adds no filter; G12/G13 pin the outcome) |
 | replies | inherit the parent (C-M3·1) | inherit the parent (G·7) — the same rule on the group decision |
@@ -663,10 +663,10 @@ event, §2.7):
   the G3/G4 strong-consistency tests drive it through the existing surface.
 - **Authorization — the lane ADDs only.** The four group-lane methods (§2.1)
   + the `AccessVia.Group` value (§2.2) are the **entire** interface delta of
-  the milestone; the four frozen signatures stay byte-identity (ADR 0006-E;
+  the milestone; the four frozen signatures stay byte-identity (ADR [0006](../adr/0006-module-boundary-contracts.md)-E;
   the M3b Moderate-ADD precedent). The lane implementation (U5) reads
   `IUserInfoService` + its own `IDocumentStore` only — **never**
-  `Group`/`GroupMembership` for its own access decisions (ADR 0006-D).
+  `Group`/`GroupMembership` for its own access decisions (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).
 - **Posts — composes, does not derive.** `PostService`'s group surface (U6)
   calls the frozen lane; the lane owns every membership read (U6 never reads
   `GroupMembership`/`DelegationGrant` itself — M1's lane-separation,
@@ -682,12 +682,12 @@ event, §2.7):
   the group reply route runs the detail's **Allow first** (§2.3(b), row 4),
   then `CreateReplyAsync`; the composer's write lands in the Web's in-flight
   session (C3) — the M3 composer precedent.
-- **ADR 0013 (U3)** — "group posts are the membership lane": Part 2
+- **ADR [0013](../adr/0013-group-posts-membership-lane.md) (U3)** — "group posts are the membership lane": Part 2
   (§2.1–§2.3) *is* that contract; the ADR points at it rather than
   re-deriving it, and keeps break-glass **out of scope** (the "unavailable"
   flag — the deferral list is separate: moderation/report, notifications,
   search, cross-posting, pagination UI — Part 1).
-- **ADR 0006-E's "named here" list grows** by: the four group-lane methods +
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-E's "named here" list grows** by: the four group-lane methods +
   the `AccessVia.Group` value + the `Post.GroupId` additive (a doc property,
   not an interface method) + the `GroupPostDraft` record (a type, not a
   seam). The ADR's rule itself is unchanged.
@@ -704,7 +704,7 @@ event, §2.7):
   "read") — freeze when **U5** lands it; the lane **owns** it; later units
   consume, never re-scope it.
 - **`AccessVia.Group`** — 8th value, **appended after `Admin`** (no
-  mid-enum insert — stored audit rows would re-map; the ADR 0004 §B.1
+  mid-enum insert — stored audit rows would re-map; the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
   additive lane, M1's Admin-APPEND precedent).
 - **`Post.GroupId`** — the **one** additive property on `Post` (empty
   default = a component post; non-empty = a group-lane post, G·2);
@@ -789,7 +789,7 @@ reads, each line re-verified by grep/read at close.
 | **seams** | `Post.GroupId` present (U4) — `src/Kumunita.Core/Posts/Post.cs:63`, `public string GroupId { get; set; } = string.Empty;` · `AccessVia.Group` (U5) — `src/Kumunita.Core/Authorization/Decision.cs:31`, 8th enum value after `Admin` · the two `CanSeeGroupAsync` overloads **and** the two `CanSeeGroupFeedAsync` overloads (U2-A1/A2 freeze) — `src/Kumunita.Core/Authorization/IAuthorizationService.cs:101/111/125/132`, implemented in `AuthorizationService.cs:116–156` · the three `PostService` group methods (U6) — `src/Kumunita.Core/Posts/PostService.cs`: `ListGroupFeedAsync:405`, `GetGroupPostAsync:460`, `CreateGroupPostAsync:520` (ctor unchanged) · `GroupPostDraft` (U6) — `src/Kumunita.Core/Posts/GroupPostDraft.cs:20`, `public sealed record GroupPostDraft(string GroupId, string? Title, string Body);` — every symbol grep'd, each named with its file, **all present** | **PASS** |
 | **tests** | the 19 §2.5 names all present in `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs` (lines 45–644), 19 `[Fact]`s, none missing / none extra, character-for-character vs §2.5 · the U10 gate line (Core 254/254 + Web 90/90, 344/344 total) still **PASS** per the recorded section above | **PASS** |
 | **close docs** | `README.md:59` — the **Group posts** Features bullet (the media precedent: a shipped non-lettered lane lives in *Features*; M4/M5/M6 Roadmap lines untouched) · `src/Kumunita.Web/Milestones.cs:27` — `new("GP", "Group posts — the membership-scoped post channel inside a group (ADR 0013)", StatusDone)` · [identity & access](../architecture/identity-access.md) `IAuthorizationService` group-lane comment (lines 186–190) + [data model](../architecture/data-model.md) `Post.groupId` non-empty / `audience` empty / `componentId` empty + the via-list `…\|BreakGlass\|Admin\|Group` — all three carry the group-posts line and **agree with [solution layout](../architecture/solution-layout.md)** (U11's checklist) | **PASS** |
-| **folders** | `docs/archive/lanes/group-posts/group-posts-u01-plan.md` … `group-posts-u11-plan.md` all present (11 spec files, plus the archived `*-exec-plan.md` working files) · the handoff note has one section each for U1–U11 (the U5 section is indented under U4's, the U5→U6 handoff was written as a nested header — content present, counted) and this one, appended at exit | **PASS** |
+| **folders** | [`docs/archive/lanes/group-posts/group-posts-u01-plan.md`](../archive/lanes/group-posts/group-posts-u01-plan.md) … `group-posts-u11-plan.md` all present (11 spec files, plus the archived `*-exec-plan.md` working files) · the handoff note has one section each for U1–U11 (the U5 section is indented under U4's, the U5→U6 handoff was written as a nested header — content present, counted) and this one, appended at exit | **PASS** |
 | **drift** | count of `## U<m> — Drift pause` **headers** in the handoff note = **0** — **clean** (per U11's handoff: the "Drift pause" text mentions in the note are inline prose self-described *not* a drift pause, and the one known-stale archived line — `done/group-posts-u07-plan.md`'s "403 on Deny", where the landed behavior is 404 — is an archived plan-file prose line, not a seam, not a header, and not counted) | **PASS** |
 
 **Outcome: all five lines PASS — no hard failure. The group-posts milestone

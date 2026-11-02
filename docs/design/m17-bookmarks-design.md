@@ -29,7 +29,7 @@ access) — design
 > (`Bookmark`) on a **new `BookmarkDocTypes`** surface (the M9 `MessagingDocTypes` /
 > M5 `ProjectDocTypes` precedent — additive, idempotent, **zero migrations** for
 > existing surfaces), **no adapter at all** (a bookmark is a *personal-by-id*
-> record, the ADR 0105 participant-by-id shape — D2), and the **`bm.*`**
+> record, the ADR [0105](../adr/0105-messaging.md) participant-by-id shape — D2), and the **`bm.*`**
 > `kw-l` registry block (the §kw-l below).
 > **Zero new authorization surface** (C-M17·1): no new `AccessAction`, no
 > new `AccessVia`, no branch in `Decide()`, no method on
@@ -40,9 +40,9 @@ access) — design
 >
 > **Status.** **LOCKED.** The decisions D1–D8, the invariants
 > C-M17·1…7, the FACES F1–F5 + the named trade, the §kw-l key list, and
-> the §gate test names are locked in **ADR 0118 (Accepted, 2026-09-29)**.
+> the §gate test names are locked in **ADR [0118](../adr/0118-bookmarks.md) (Accepted, 2026-09-29)**.
 > The `[PROPOSED]` set in the register
-> `docs/archive/lanes/m17/plan-m17-bookmarks.md` is the locked set this
+> [`docs/archive/lanes/m17/plan-m17-bookmarks.md`](../archive/lanes/m17/plan-m17-bookmarks.md) is the locked set this
 > doc restates **verbatim** (the U00 handoff entry records the lock;
 > **no veto** was recorded before the lock).
 >
@@ -69,14 +69,14 @@ the resident**, not the content.
 
 The precedents M17 composes:
 
-1. **The frozen `IAuthorizationService`** (ADR 0006 §A) — `CanAsync(Read)`
+1. **The frozen `IAuthorizationService`** (ADR [0006](../adr/0006-module-boundary-contracts.md) §A) — `CanAsync(Read)`
    (detail) over an `IAuditableResource`, the `IDocumentSession`
    overloads for C3 same-transaction audits. The frozen surface is
    4-method + the group lane; the frozen `AccessAction` set is
    `Read` / `Moderate`; the frozen `AccessVia` set is Owner / Admin (+
    the existing values). **M17 adds none of these — it adds no adapter
    at all** (C-M17·1 / D2).
-2. **The ADR 0105 (M9 messaging) participant-by-id shape** — the
+2. **The ADR [0105](../adr/0105-messaging.md) (M9 messaging) participant-by-id shape** — the
    *primary* precedent (D2 / C-M17·2): a **personal-by-id record** whose
    access story is **identity comparison in the service**, never an
    audience decision. A non-participant — an operator included — gets a
@@ -88,7 +88,7 @@ The precedents M17 composes:
 3. **The `*DocTypes` parallel-surface shape** (`MessagingDocTypes` /
    `ProjectDocTypes`) — `opts.Schema.For<T>()` + named indexes;
    `ApplyAllConfiguredChangesToDatabaseAsync()` delta-detects and
-   applies the new table **idempotently** at boot (ADR 0004 §B.1) —
+   applies the new table **idempotently** at boot (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1) —
    **zero migrations for existing surfaces**. The M9 `convo_uidx_pair`
    (`UniqueIndex("convo_uidx_pair", c => c.ParticipantA, c =>
    c.ParticipantB)`) is the **F1 idempotency witness** the
@@ -103,12 +103,12 @@ The precedents M17 composes:
    `ProjectService`, `"announcement"` in `AnnouncementService`,
    `"page"` in `PageService`) — D1.
 5. **The `bm.*` `kw-l` block in `KnownTranslationKeys`** (the
-   closed-key registry, ADR 0015) — the `bm.*` block it joins (the
+   closed-key registry, ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) — the `bm.*` block it joins (the
    `KnownTranslationKeys_ParityTests` + `KwLRegistryConsistencyTests`
    pins extend automatically — §kw-l).
 6. **The M5 `projects.*` core-surface precedent** (D6) — M17 is a
    **milestone**, not a **lane**: always available, **no**
-   off-by-default admin toggle (the inverse of the ADR 0101/0105
+   off-by-default admin toggle (the inverse of the ADR [0101](../adr/0101-announcement-comments-lane.md)/0105
    `LocaleSettings` toggle shape — C-M17·6).
 
 The gap M17 closes is the README row itself: the neighborhood today has
@@ -116,18 +116,18 @@ everywhere to *find* the content (feeds, search, the calendar), but
 nowhere to say *these five things are mine to come back to*. M17 adds
 that surface: one document, one new surface, one service seam, a list
 view + nav entry + toggle button on the five target detail surfaces,
-twelve `bm.*` `kw-l` keys (the obs-2 ADR 0118 amendment adds the `bm.toggle.*` flash pair — **14 total**) — and **no** new authorization surface, **no**
+twelve `bm.*` `kw-l` keys (the obs-2 ADR [0118](../adr/0118-bookmarks.md) amendment adds the `bm.toggle.*` flash pair — **14 total**) — and **no** new authorization surface, **no**
 notification lane, **no** folders, **no** sharing (§deferred).
 
 M17 builds entirely on **frozen, verified seams** (the list above). This
 is a **milestone** (a roadmap letter, not a named lane): the close unit
-(U05) flips `Milestones.cs` / the README Roadmap / `docs/STATUS.md` /
-`docs/ARCHITECTURE.md` + `MilestonesTests.cs` (the AGENTS.md doc↔code
+(U05) flips `Milestones.cs` / the README Roadmap / [`docs/STATUS.md`](../STATUS.md) /
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `MilestonesTests.cs` (the AGENTS.md doc↔code
 parity contract — D8). This design doc (authored U00, **LOCKED**) is the
 **primary tier**; the register
-`docs/archive/lanes/m17/plan-m17-bookmarks.md` is the secondary tier; the
+[`docs/archive/lanes/m17/plan-m17-bookmarks.md`](../archive/lanes/m17/plan-m17-bookmarks.md) is the secondary tier; the
 scratch handoff note is
-`docs/archive/lanes/m17/m17-bookmarks-handoff-notes.md`.
+[`docs/archive/lanes/m17/m17-bookmarks-handoff-notes.md`](../archive/lanes/m17/m17-bookmarks-handoff-notes.md).
 
 ## Scope
 
@@ -137,7 +137,7 @@ scratch handoff note is
   / `TargetKind` / `TargetId` / `Created` — §2.1) and the **new
   `BookmarkDocTypes`** surface (the **unique** index on `(OwnerId,
   TargetKind, TargetId)` + a non-unique `(OwnerId, Created)`
-  list-ordering index; ADR 0004 §B.1 additive, **zero migrations** for
+  list-ordering index; ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive, **zero migrations** for
   existing surfaces).
 - `IBookmarkService` + `BookmarkService` — the three seams
   `ListAsync` / `ToggleAsync` / `RemoveAsync` (the D3 write-lane
@@ -156,9 +156,9 @@ scratch handoff note is
 **Out (deferred lanes, each its own ADR — §deferred):**
 
 - The "nudge the author on bookmark" notification lane (D7).
-- ~~Bookmark folders / manual ordering~~ — folders are **settled by ADR 0168**; manual ordering remains deferred.
+- ~~Bookmark folders / manual ordering~~ — folders are **settled by ADR [0168](../adr/0168-bookmark-folders.md)**; manual ordering remains deferred.
 - Bookmark sharing / per-surface "top bookmarked" stats.
-- Bookmarks on **groups** themselves (the ADR 0013 membership-lane
+- Bookmarks on **groups** themselves (the ADR [0013](../adr/0013-group-posts-membership-lane.md) membership-lane
   surfaces have their own visibility world).
 
 ## Human cost
@@ -201,7 +201,7 @@ one document surface, one Web controller + partial — and it depends on
 bookmark is **not** an audience, an `AccessVia`, or a standing — it is a
 pointer (C-M17·1 / D2). There is **no migration path** to plan: the
 `BookmarkDocTypes` surface is delta-detected and applied idempotently at boot
-(ADR 0004 §B.1), and the **only** audited call in the milestone is the
+(ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), and the **only** audited call in the milestone is the
 D3 write-lane check, which is the **target's own** frozen
 `CanAsync(Read)` (the target's own audit row, in the target's own
 transaction — M17 commits none of its own, C-M17·2 / C-M17·3).
@@ -299,7 +299,7 @@ The composition root (U02) wires `BookmarkService` over the
 host-registered Marten `IDocumentStore` + the owning surfaces' read seams
 (the existing service reads the list resolution uses) + the frozen
 `IAuthorizationService` (the D3 check only) + — per the 2026-09-30
-D3/F2 amendment (ADR 0118) — the frozen `IIdentityService` (the
+D3/F2 amendment (ADR [0118](../adr/0118-bookmarks.md)) — the frozen `IIdentityService` (the
 announcement branch resolves the owner's real standing in-Core). **No**
 `INotificationService` (D7). The non-owner path is the Web layer's:
 `[Authorize]` + a controller `ownerId == User id` check, **404** on
@@ -324,10 +324,10 @@ mismatch, **no** `AccessAudit` row (§2.4).
 (`Where(b => b.OwnerId == ownerId)`, ordered by `Created`), resolved
 row-by-row against the owning surface's existing read seam (§2.3 table
 2). **No** `AccessAudit` row, **no** `CanSeeAsync` pass over the bookmark
-rows (the ADR 0105 "reads never audit" + the M6-inbox personal-read
+rows (the ADR [0105](../adr/0105-messaging.md) "reads never audit" + the M6-inbox personal-read
 shape — C-M17·2). The **non-owner** path is the Web layer's:
 `[Authorize]` + the controller's `ownerId == User id` check ⇒ **404** on
-mismatch (a `GlobalAdmin` included — the ADR 0105 "operator has no read
+mismatch (a `GlobalAdmin` included — the ADR [0105](../adr/0105-messaging.md) "operator has no read
 standing" precedent), and that 404 commits **no** `AccessAudit` row.
 
 ### 2.5 Pinned seam tests (exact names)
@@ -376,10 +376,10 @@ F1–F5 + named trade; the D1–D8 decisions; the §kw-l key list; the closed
 the `IBookmarkService` ctor + the 4 public methods + the
 `BookmarkToggleStatus` enum (the ctor **composes** the frozen
 `IAuthorizationService` + the owning surfaces' read seams + — per the
-2026-09-30 D3/F2 amendment, ADR 0118 — the frozen `IIdentityService`
+2026-09-30 D3/F2 amendment, ADR [0118](../adr/0118-bookmarks.md) — the frozen `IIdentityService`
 for the announcement branch only; the **4-method public signature is
 frozen** — the 4th, `IsBookmarkedAsync`, added by the 2026-10-04 F1
-amendment, ADR 0118 — and the added dependencies are frozen seams, so
+amendment, ADR [0118](../adr/0118-bookmarks.md) — and the added dependencies are frozen seams, so
 they are composition detail, not a new surface); the §2.3 / §2.4 tables; and the
 **15** test names (§2.5 — the 14 original + the amendment's
 `GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle`). A change to any
@@ -391,7 +391,7 @@ unit-series rules; recorded in the §drift-guard drift log below).
 - **F1 — The toggle is idempotent and atomic.** Bookmarking the same
   target twice commits **one** row (the unique index is the witness — the
   M9 `convo_uidx_pair` shape); the button reflects "bookmarked" on
-  reload — **completed** (the 2026-10-04 F1 amendment, ADR 0118): the
+  reload — **completed** (the 2026-10-04 F1 amendment, ADR [0118](../adr/0118-bookmarks.md)): the
   detail-surface `_BookmarkButton` partial now `@inject`s the frozen
   `IBookmarkService` and resolves the owner's own per-target state inline
   via `await Bookmarks.IsBookmarkedAsync(ownerId, Kind, Id)` (a
@@ -490,11 +490,11 @@ The named trade (dangling-row UX vs. leak surface) is the priced cost.
 ## Rollout & rollback
 
 Deploy: the `BookmarkDocTypes` surface delta-detects and applies at boot
-(ADR 0004 §B.1 — idempotent, **zero migrations** for existing surfaces);
+(ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — idempotent, **zero migrations** for existing surfaces);
 no seeder step, no data migration, no feature flag (D6 — there is
 **nothing to roll back**: removing the `Bookmark` table + the
 `BookmarkDocTypes` registration restores the pre-M17 state; no row is
-referenced by anything). See `docs/OPS.md`.
+referenced by anything). See [`docs/OPS.md`](../OPS.md).
 
 ## Risks
 
@@ -529,7 +529,7 @@ outbound seams — the list links **back into** the platform (each row's
 created or depended on; the pin is a pointer into the surfaces the
 resident already crosses.
 
-## Decisions (D1–D8, locked — ADR 0118)
+## Decisions (D1–D8, locked — ADR [0118](../adr/0118-bookmarks.md))
 
 - **D1 — One document, one new surface, one new bounded context.** M17
   adds a new bounded context `Kumunita.Core.Bookmarks` with **one
@@ -546,7 +546,7 @@ resident already crosses.
 - **D2 — A bookmark is a personal-by-id record, never an audience
   decision.** M17 adds **no adapter**, **no** new `AccessAction`, **no**
   new `AccessVia`, **no** branch in `Decide()`, **no** method on
-  `IAuthorizationService` (the M9 ADR 0105 shape — a *participant-by-id*
+  `IAuthorizationService` (the M9 ADR [0105](../adr/0105-messaging.md) shape — a *participant-by-id*
   / *owner-by-id* record, not an audience decision). The **owner's** own
   list is a personal read (like the M6 inbox): no `CanSeeAsync` pass
   over the bookmark rows themselves. *Forbids:* a
@@ -607,8 +607,8 @@ resident already crosses.
   `MilestonesTests.cs` re-pinned to
   `M18_Is_The_Single_InProgress_Milestone` + the shipped list gains M17 +
   M19 stays planned; the README **Roadmap** (M17 → done, M18 → in
-  progress) + the M17 **Status** line; `docs/STATUS.md`; and
-  `docs/ARCHITECTURE.md`'s value-chain table gains the **M17 row**. All
+  progress) + the M17 **Status** line; [`docs/STATUS.md`](../STATUS.md); and
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)'s value-chain table gains the **M17 row**. All
   four surfaces ship **in the same unit** (the M15/U10, M16/U06
   docs-parity precedent). *Forbids:* reordering M18/M19; editing a
   shipped milestone's text; breaking the `MilestonesTests` pins;
@@ -631,7 +631,7 @@ resident already crosses.
   **no** `AccessAudit` row for the owner's own list, **no** owner-check
   bypass. A **non-owner** (a `GlobalAdmin` included) gets a non-leaky
   **404** — and that 404 commits **no** `AccessAudit` row either (the
-  ADR 0105 "operator has no read standing" precedent).
+  ADR [0105](../adr/0105-messaging.md) "operator has no read standing" precedent).
 - **C-M17·3 — Bookmarking requires visibility; bookmarking grants
   nothing.** The write lane re-runs the target's frozen `Read` decision
   **before** creating the row; Deny ⇒ **404** (not 403), and the
@@ -653,15 +653,15 @@ resident already crosses.
   four surfaces — `Milestones.cs` (M17→done, M18→next),
   `MilestonesTests.cs` (re-pinned to
   `M18_Is_The_Single_InProgress_Milestone` + shipped list + M19
-  planned), the README Roadmap/Status, and `docs/STATUS.md` + the
-  `docs/ARCHITECTURE.md` value-chain M17 row — **in the same unit**
+  planned), the README Roadmap/Status, and [`docs/STATUS.md`](../STATUS.md) + the
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) value-chain M17 row — **in the same unit**
   (D8).
 
 ## §kw-l — the key list (the `bm.*` keys × en/de/fr/da)
 
 The closed list, locked here so U03 and the parity tests agree (adjust
 individual names to the views as they are authored; the **list** is what
-U03 registers — **14 keys** (the obs-2 ADR 0118 amendment, 2026-09-30, adds
+U03 registers — **14 keys** (the obs-2 ADR [0118](../adr/0118-bookmarks.md) amendment, 2026-09-30, adds
 the two `bm.toggle.*` flash-toast keys to the original 12):
 
 `bm.nav`, `bm.list.title`, `bm.list.empty`, `bm.list.degraded`,
@@ -672,7 +672,7 @@ the two `bm.toggle.*` flash-toast keys to the original 12):
 
 > `bm.button.bookmarked` ("Bookmarked") is the button's **label** key — it is
 > **not** consumed by `_BookmarkButton`. The 2026-10-04 F1 amendment
-> (ADR 0118) completed the F1 design intent (the button reflects
+> (ADR [0118](../adr/0118-bookmarks.md)) completed the F1 design intent (the button reflects
 > "bookmarked" on reload) with a two-lane affordance: the bookmarked state
 > renders a **"Remove"** button that reuses the closed
 > `bm.list.unbookmark` key (the D4 physical-removal lane), and the
@@ -702,11 +702,11 @@ differently by design, and both pins hold together.
 ## §deferred — the deferred-lane list (each a named follow-on, own ADR)
 
 - The "nudge the author on bookmark" lane (D7).
-- ~~Bookmark folders~~ — **settled by ADR 0168** (personal folder tree, depth
+- ~~Bookmark folders~~ — **settled by ADR [0168](../adr/0168-bookmark-folders.md)** (personal folder tree, depth
   ≤ 2, owner-scoped, delete-moves-to-root). Manual **ordering** within a
   folder remains deferred (own ADR).
 - Bookmark sharing / per-surface "top bookmarked" stats.
-- Bookmarks on **groups** themselves (the ADR 0013 membership-lane
+- Bookmarks on **groups** themselves (the ADR [0013](../adr/0013-group-posts-membership-lane.md) membership-lane
   surfaces have their own visibility world).
 
 ## §drift-guard — the frozen pins + the drift log
@@ -733,19 +733,19 @@ the **15** pinned test names (§2.5 — the 14 original + the amendment's
 
 | Date | Unit | Change | Reason |
 |---|---|---|---|
-| 2026-10-04 | F1 (post-U00) | **F1 completed — the button reflects "bookmarked" on reload** (the F1 design intent left unfinished at ship: the detail-surface `_BookmarkButton` was a static "Bookmark" with no remove affordance, because `Toggle` always 302-redirects so the partial's "bookmarked" branch was dead code). The frozen `IBookmarkService` seam gains a **4th public method**, `Task<bool> IsBookmarkedAsync(ownerId, targetKind, targetId)` — a C-M17·2-shape personal read: NO target read (D5 / F4 — a dangling row still answers `true`), NO `AccessAudit` row, NO `CanAsync` pass (the `ListAsync` precedent), NO new `AccessAction` / `AccessVia` / `Decide()` branch. The Web layer needs **no new component**: `_BookmarkButton` `@inject`s the frozen `IBookmarkService` (the house `@inject`-in-view idiom, e.g. `Documents/New.cshtml`) and resolves the owner's per-target state inline via `await Bookmarks.IsBookmarkedAsync(ownerId, Kind, Id)` (a C-M17·2-shape personal read; an unsigned-in visitor / no `SubjectId` resolves NotBookmarked with no query — the C-M17·2 "operator has no read standing" gate). `_BookmarkButton` becomes two-lane: **bookmarked** ⇒ a form POSTing to `/bookmarks/{kind}/{id}/remove` with the `bm.list.unbookmark` ("Remove") label (the D4 physical-removal lane); **not bookmarked** ⇒ the existing `bm.button.bookmark` "Bookmark" form POSTing to `/bookmarks/toggle`. The `BookmarksController.Remove` action gains an **optional** `returnUrl` form field (redirect-back to the detail surface, the obs-2 precedent) — the `returnUrl`-carrying hidden input is already in the partial from obs-2, so no new markup beyond the lane branch. The partial is the **sole** resolver — it makes exactly one targeted personal read and no other service call (the C-M17·2 pin holds: the read is targeted, not the owner's full bookmark list; no `CanAsync` branch). **No** new `bm.*` key (the closed 14-key set is unchanged — the remove lane reuses `bm.list.unbookmark`; `bm.button.bookmarked` is now orphaned by the button, §kw-l note). The test-churn alternative (a mandatory `IBookmarkService` ctor param on the 6 detail controllers + view-model threading) was rejected — it would break ~29 test harnesses; the TagHelper is the house idiom for this. Pinned by the retargeted `BmButton_Partial_Renders_Correct_Lane_For_State` (the old `..._Label_For_State`; now asserts the two-lane structure + the `IBookmarkService` / `IsBookmarkedAsync` seam read + the `KumunitaPrincipal.SubjectId` owner read) + `BookmarkServiceTests` (the `IsBookmarkedAsync` personal read). | F1's design intent ("the button reflects 'bookmarked' on reload") was left unfinished at ship: the U04 handoff notes said it would be satisfied via `BookmarkState` from the row's `IsBookmarked` flag, but `Toggle` always redirects so no detail view ever set `ViewData["BookmarkState"]` and the partial's "bookmarked" branch was dead code — the button was a static "Bookmark" with no way to *remove* a bookmark from the detail surface. Adding one read-only personal-read method (the exact C-M17·2 shape) + a TagHelper (the house idiom for a per-request value consumed by many views) completes F1 without touching the frozen authorization surface, the closed key set, or the 6 detail controllers. See ADR 0118 `## Amendments` (2026-10-04, F1). |
-| 2026-09-30 | obs-4 (post-U00) | D3/F2 write-lane: the `announcement` branch of `BookmarkService.ResolveTargetAsync` now resolves the owner's real standing **in-Core** via the frozen `IIdentityService.GetBySubjectAsync` and hands that role set to `IAnnouncementService.GetAsync`, instead of the pre-amendment **empty** role set. The `BookmarkService` ctor gains an eighth dependency (`IIdentityService`); the `DependencyInjection.cs` M17 factory passes it. The **frozen `IBookmarkService` public signature is unchanged** (3 methods at that point; the 4th, `IsBookmarkedAsync`, landed with the 2026-10-04 F1 amendment); **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the 15th test `GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle` (fails under the old empty-roles code). | The empty-roles lapse was a D3/F2 violation: the write lane re-ran a *stricter* read than the announcement detail page uses, so a `GlobalAdmin` / community-moderator who **could see** a community-targeted announcement was **denied** its bookmark. Resolving the owner's standing via the frozen principal-read seam restores the "same call the detail page uses" invariant (ADR 0118 D3/F2). Fail-closed preserved: no EF account row ⇒ empty set ⇒ degrades exactly as before. See ADR 0118 `## Amendments` (2026-09-30). |
-| 2026-09-30 | obs-2 (post-U00) | **Redirect-back + flash toast** on the bookmark toggle (the button reflects the bookmark state on the surface the user clicked it on, instead of bouncing to `/bookmarks`): the `_BookmarkButton` partial gains a hidden `returnUrl` input (the surface's own detail URL); the `BookmarksController.Toggle` action accepts an optional `returnUrl` form field and redirects to it (or falls back to `/bookmarks` when absent), setting a localized flash (`bm.toggle.bookmarked`) in `TempData["info"]`; `Remove` also sets a flash (`bm.toggle.removed`). The `BookmarksController` ctor gains two **optional** dependencies (`ILocalizationService?`, `ITranslationProvider?`) — the house `T(key)` helper from `AdminPortabilityController`. Two new `bm.toggle.*` kw-l keys added to all four registries (the closed set is now **14 keys**). The **frozen `IBookmarkService` public signature is unchanged** (3 methods at that point; the 4th, `IsBookmarkedAsync`, landed with the 2026-10-04 F1 amendment); **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the retargeted `F1_Toggle_...` / `F4_...` / `M17AcceptanceGateTests.ClosedLoop` (redirect to detail URL + flash key assert) + `BmKeys_AreTheClosedFourteenKeySet` + the partial structural pin `BmButton_Partial_Form_Posts_To_Toggle_Endpoint` (the `returnUrl` hidden input). | The original M17 toggle always redirected to `/bookmarks` — the user lost their place on the detail surface (post, event, page, group post, announcement). The obs-2 amendment restores the surface context via the house flash-toast + redirect-back idiom (`AdminPortabilityController` precedent), without extending the frozen `IBookmarkService` seam. See ADR 0118 `## Amendments` (2026-09-30, obs-2). |
+| 2026-10-04 | F1 (post-U00) | **F1 completed — the button reflects "bookmarked" on reload** (the F1 design intent left unfinished at ship: the detail-surface `_BookmarkButton` was a static "Bookmark" with no remove affordance, because `Toggle` always 302-redirects so the partial's "bookmarked" branch was dead code). The frozen `IBookmarkService` seam gains a **4th public method**, `Task<bool> IsBookmarkedAsync(ownerId, targetKind, targetId)` — a C-M17·2-shape personal read: NO target read (D5 / F4 — a dangling row still answers `true`), NO `AccessAudit` row, NO `CanAsync` pass (the `ListAsync` precedent), NO new `AccessAction` / `AccessVia` / `Decide()` branch. The Web layer needs **no new component**: `_BookmarkButton` `@inject`s the frozen `IBookmarkService` (the house `@inject`-in-view idiom, e.g. `Documents/New.cshtml`) and resolves the owner's per-target state inline via `await Bookmarks.IsBookmarkedAsync(ownerId, Kind, Id)` (a C-M17·2-shape personal read; an unsigned-in visitor / no `SubjectId` resolves NotBookmarked with no query — the C-M17·2 "operator has no read standing" gate). `_BookmarkButton` becomes two-lane: **bookmarked** ⇒ a form POSTing to `/bookmarks/{kind}/{id}/remove` with the `bm.list.unbookmark` ("Remove") label (the D4 physical-removal lane); **not bookmarked** ⇒ the existing `bm.button.bookmark` "Bookmark" form POSTing to `/bookmarks/toggle`. The `BookmarksController.Remove` action gains an **optional** `returnUrl` form field (redirect-back to the detail surface, the obs-2 precedent) — the `returnUrl`-carrying hidden input is already in the partial from obs-2, so no new markup beyond the lane branch. The partial is the **sole** resolver — it makes exactly one targeted personal read and no other service call (the C-M17·2 pin holds: the read is targeted, not the owner's full bookmark list; no `CanAsync` branch). **No** new `bm.*` key (the closed 14-key set is unchanged — the remove lane reuses `bm.list.unbookmark`; `bm.button.bookmarked` is now orphaned by the button, §kw-l note). The test-churn alternative (a mandatory `IBookmarkService` ctor param on the 6 detail controllers + view-model threading) was rejected — it would break ~29 test harnesses; the TagHelper is the house idiom for this. Pinned by the retargeted `BmButton_Partial_Renders_Correct_Lane_For_State` (the old `..._Label_For_State`; now asserts the two-lane structure + the `IBookmarkService` / `IsBookmarkedAsync` seam read + the `KumunitaPrincipal.SubjectId` owner read) + `BookmarkServiceTests` (the `IsBookmarkedAsync` personal read). | F1's design intent ("the button reflects 'bookmarked' on reload") was left unfinished at ship: the U04 handoff notes said it would be satisfied via `BookmarkState` from the row's `IsBookmarked` flag, but `Toggle` always redirects so no detail view ever set `ViewData["BookmarkState"]` and the partial's "bookmarked" branch was dead code — the button was a static "Bookmark" with no way to *remove* a bookmark from the detail surface. Adding one read-only personal-read method (the exact C-M17·2 shape) + a TagHelper (the house idiom for a per-request value consumed by many views) completes F1 without touching the frozen authorization surface, the closed key set, or the 6 detail controllers. See ADR [0118](../adr/0118-bookmarks.md) `## Amendments` (2026-10-04, F1). |
+| 2026-09-30 | obs-4 (post-U00) | D3/F2 write-lane: the `announcement` branch of `BookmarkService.ResolveTargetAsync` now resolves the owner's real standing **in-Core** via the frozen `IIdentityService.GetBySubjectAsync` and hands that role set to `IAnnouncementService.GetAsync`, instead of the pre-amendment **empty** role set. The `BookmarkService` ctor gains an eighth dependency (`IIdentityService`); the `DependencyInjection.cs` M17 factory passes it. The **frozen `IBookmarkService` public signature is unchanged** (3 methods at that point; the 4th, `IsBookmarkedAsync`, landed with the 2026-10-04 F1 amendment); **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the 15th test `GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle` (fails under the old empty-roles code). | The empty-roles lapse was a D3/F2 violation: the write lane re-ran a *stricter* read than the announcement detail page uses, so a `GlobalAdmin` / community-moderator who **could see** a community-targeted announcement was **denied** its bookmark. Resolving the owner's standing via the frozen principal-read seam restores the "same call the detail page uses" invariant (ADR [0118](../adr/0118-bookmarks.md) D3/F2). Fail-closed preserved: no EF account row ⇒ empty set ⇒ degrades exactly as before. See ADR [0118](../adr/0118-bookmarks.md) `## Amendments` (2026-09-30). |
+| 2026-09-30 | obs-2 (post-U00) | **Redirect-back + flash toast** on the bookmark toggle (the button reflects the bookmark state on the surface the user clicked it on, instead of bouncing to `/bookmarks`): the `_BookmarkButton` partial gains a hidden `returnUrl` input (the surface's own detail URL); the `BookmarksController.Toggle` action accepts an optional `returnUrl` form field and redirects to it (or falls back to `/bookmarks` when absent), setting a localized flash (`bm.toggle.bookmarked`) in `TempData["info"]`; `Remove` also sets a flash (`bm.toggle.removed`). The `BookmarksController` ctor gains two **optional** dependencies (`ILocalizationService?`, `ITranslationProvider?`) — the house `T(key)` helper from `AdminPortabilityController`. Two new `bm.toggle.*` kw-l keys added to all four registries (the closed set is now **14 keys**). The **frozen `IBookmarkService` public signature is unchanged** (3 methods at that point; the 4th, `IsBookmarkedAsync`, landed with the 2026-10-04 F1 amendment); **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the retargeted `F1_Toggle_...` / `F4_...` / `M17AcceptanceGateTests.ClosedLoop` (redirect to detail URL + flash key assert) + `BmKeys_AreTheClosedFourteenKeySet` + the partial structural pin `BmButton_Partial_Form_Posts_To_Toggle_Endpoint` (the `returnUrl` hidden input). | The original M17 toggle always redirected to `/bookmarks` — the user lost their place on the detail surface (post, event, page, group post, announcement). The obs-2 amendment restores the surface context via the house flash-toast + redirect-back idiom (`AdminPortabilityController` precedent), without extending the frozen `IBookmarkService` seam. See ADR [0118](../adr/0118-bookmarks.md) `## Amendments` (2026-09-30, obs-2). |
 
 ---
 
-## ADR 0118 — moved content (D11 trim, 2026-11-02)
+## ADR [0118](../adr/0118-bookmarks.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
 ### 2026-10-16 — The inventory / directory kinds join the closed set (the M16 / M2 parity lane)
 
-The M37 PersonalNotes closed set (ADR 0167) already carried the
+The M37 PersonalNotes closed set (ADR [0167](../adr/0167-personal-notes.md)) already carried the
 `directory` kind — a note attaches to **any** content entity, including a
 resident's directory page. The M17 surface, by contrast, still pinned the
 closed `TargetKind` set to seven kinds (post / event / todo /
@@ -788,7 +788,7 @@ read is reused for the directory branch (the M37 PersonalNotes
 - **`BookmarkService.ResolveForListAsync`** (the D5 list resolution,
   the C-M17·2 pure non-auditing doc load) gains two branches: the
   `inventory` branch loads the `InventoryItem` doc directly and degrades
-  on `IsDeleted` (the ADR 0024 soft-delete flag; `InventoryItem` has no
+  on `IsDeleted` (the ADR [0024](../adr/0024-author-soft-delete-lane.md) soft-delete flag; `InventoryItem` has no
   `IsDraft` — D8a shape); the `directory` branch loads the profile
   directly (via the already-composed `IUserInfoService.GetProfileAsync`)
   and degrades on a blocked profile (the M37 PersonalNotes `directory`
@@ -870,7 +870,7 @@ keys** (was 21 after the project / board amendment) for `bm.*` and
 
 ### 2026-10-16 — The project / board kinds join the closed set (the M37 parity lane)
 
-The M37 PersonalNotes closed set (ADR 0167) already carried the
+The M37 PersonalNotes closed set (ADR [0167](../adr/0167-personal-notes.md)) already carried the
 `project` and `board` kinds — a note attaches to **any** content entity,
 including projects and Kanban boards. The M17 surface, by contrast,
 still pinned the closed `TargetKind` set to the original five (post /
@@ -907,7 +907,7 @@ non-leaky 404 (the M16 create-gate posture).
 - **`BookmarkService.ResolveForListAsync`** (the D5 list resolution,
 the C-M17·2 pure non-auditing doc load) gains two branches: the
 `project` branch loads the `Project` doc directly and degrades on
-`IsDeleted` (the ADR 0024 soft-delete flag; `Project` has no `IsDraft`
+`IsDeleted` (the ADR [0024](../adr/0024-author-soft-delete-lane.md) soft-delete flag; `Project` has no `IsDraft`
 — D8a — a project is live on creation); the `board` branch loads the
 `KanbanBoard` doc directly and degrades on `IsDeleted` (the same D8a
 shape). Both return the target's `Title` + the canonical detail URL
@@ -968,7 +968,7 @@ count + the BmKeys count re-targeted; six new seam tests). The
 drift-guard frozen list in the design doc is amended to count the
 closed set as **seven kinds** (was five at M17 ship) and to name
 `project` / `board` among the closed vocabulary. The §kw-l key list is
-amended to count **21 keys** (was 19 after the ADR 0168 folder-tree
+amended to count **21 keys** (was 19 after the ADR [0168](../adr/0168-bookmark-folders.md) folder-tree
 block, 2026-10-14).
 
 ### 2026-10-04 — F1 completed: the button reflects "bookmarked" on reload (the remove affordance)
@@ -1063,7 +1063,7 @@ than the detail page uses, the exact divergence D3 forbids).
 The amendment: the `announcement` branch of
 `BookmarkService.ResolveTargetAsync` now resolves the owner's real
 standing **in-Core** via the frozen `IIdentityService.GetBySubjectAsync`
-(the ADR 0006 §A principal-read seam — the **same category of
+(the ADR [0006](../adr/0006-module-boundary-contracts.md) §A principal-read seam — the **same category of
 composition** as the already-composed `IUserInfoService`, which
 `GetBySubjectAsync` itself reads), and hands that thin-principal role set
 to the announcement read. A `GlobalAdmin` therefore resolves a

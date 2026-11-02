@@ -46,7 +46,7 @@ row points at.
   queue / resolve read path stays on the single post key and
   `C-M3·1`'s "the reply has no own audience; seeing the post is what
   makes the reply visible" invariant is preserved verbatim. This is
-  an ADR 0004 §B.1 additive change: Marten delta-detects the new
+  an ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive change: Marten delta-detects the new
   column on boot (`ApplyAllConfiguredChangesToDatabaseAsync`),
   idempotent across re-seed, and pre-existing rows keep
   `ReplyId = null` with no migration or back-fill.
@@ -65,7 +65,7 @@ row points at.
   - Writes one `Report` row (`Status = "filed"`, the §2.3 item-2
     literal pin; `ReplyId = replyId`, `PostId = parent.Id`) and one
     `AccessAudit` row in the **same** session, one
-    `SaveChangesAsync` (C3 / ADR 0006-C — same-transaction, no
+    `SaveChangesAsync` (C3 / ADR [0006](0006-module-boundary-contracts.md)-C — same-transaction, no
     partial write).
   - The audit row carries a **distinct** `Action` + `TargetKind`
     from the post lane so the log can tell the two apart:
@@ -96,20 +96,20 @@ row points at.
 
 - **UI surface: one per-reply "Report this reply" disclosure in the
   post detail view.** `Views/Posts/Detail.cshtml` adds, inside each
-  reply `<li class="list-group-item">` (after the ADR 0016
+  reply `<li class="list-group-item">` (after the ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md)
   author-only edit `<details>` block), a native `<details>`
-  disclosure (the ADR 0016 per-reply-edit precedent — one per reply,
+  disclosure (the ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) per-reply-edit precedent — one per reply,
   no JS dependency, no id collision) containing a `reason` textarea +
   a submit button, posting to
   `POST /posts/{postId}/replies/{r.Id}/report` with an
   `@Html.AntiForgeryToken()`. The report form is shown on **every**
   reply (not gated on `r.IsAuthor`) — any resident who can see the
   parent post can report any reply under it, including their own;
-  the ADR 0016 author-only edit `<details>` is a separate concern
+  the ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) author-only edit `<details>` is a separate concern
   (it stays gated on `r.IsAuthor`). The button / labels reuse the
   existing `posts.report_*` keys plus one new
   `posts.reply_report_button` key ("Report this reply") — the
-  closed `KnownTranslationKeys` registry (ADR 0015 D2) is the single
+  closed `KnownTranslationKeys` registry (ADR [0015](0015-ui-view-localization-mechanics.md) D2) is the single
   source of truth; the seeder materializes the `en` floor row at
   first boot and the `kw-l` provider's floor covers `en`, so no new
   provider seam is needed.
@@ -179,7 +179,7 @@ Positive
   `ComponentId`-scoped, `Status`-driven lanes with the same
   `C-M3b·4` SoD gate. No new standing, no new route shape, no new
   `Status` literal.
-- The additive field (`Report.ReplyId`) is ADR 0004 §B.1: idempotent
+- The additive field (`Report.ReplyId`) is ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1: idempotent
   at boot, no migration, pre-existing rows keep `null` (post-target
   by default), and the four `Status`-literal pins in the design doc
   hold verbatim for both target kinds.

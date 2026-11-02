@@ -11,7 +11,7 @@ superseded_by: [adr-0028, adr-0041, adr-0086, adr-0138, adr-0142, adr-0151, adr-
 updated: 2026-11-02
 ---
 
-# ADR 0006 — Module boundary contracts (Identity, UserInfo, Authorization)
+# ADR [0006](0006-module-boundary-contracts.md) — Module boundary contracts (Identity, UserInfo, Authorization)
 
 Status: Accepted
 Date: 2026-09-01
@@ -19,12 +19,12 @@ Amends: 0001 (B — thin token, fat authorization), 0003 (break-glass elevation)
 
 ## Context
 
-ADR 0001 decided thin token / fat authorization service; the modular-monolith +
+ADR [0001](0001-core-stack-and-identity-model.md) decided thin token / fat authorization service; the modular-monolith +
 bounded-context sections in [ARCHITECTURE.md](../ARCHITECTURE.md) sketch the three
 in-process modules behind interfaces, and [identity & access](../architecture/identity-access.md) gives draft
 signatures. M1 now implements them and first makes the access model live.
 
-The philosophy (`docs/philosophy/in-code.md`) treats module interfaces as
+The philosophy ([`docs/philosophy/in-code.md`](../philosophy/in-code.md)) treats module interfaces as
 *more precious than their implementation* — they outlast it, and changes to
 audience semantics, group resolution, or delegation resolution are breaking
 changes that belong in an ADR. Today the contract exists only as prose in
@@ -91,7 +91,7 @@ with `Decision = { Allowed, Via, EffectivePrincipalId }` and
 
 	ThinPrincipal = {
 	  SubjectId,       // stable across the instance; later: OIDC `sub`
-	  ExternalId?,     // reserved for federation (ADR 0001)
+	  ExternalId?,     // reserved for federation (ADR [0001](0001-core-stack-and-identity-model.md))
 	  IsVerifiedResident,
 	  Roles,           // simple claim strings: "moderator:<component>"
 	}
@@ -101,9 +101,9 @@ with `Decision = { Allowed, Via, EffectivePrincipalId }` and
   mechanical and confined to this module).
 - **No audience, group, delegation, or content data appears in the
   principal or the cookie.** "Can X see Y" is *always* a per-request query to
-  the AuthorizationModule (ADR 0001-B). A test asserts the principal's claim
+  the AuthorizationModule (ADR [0001](0001-core-stack-and-identity-model.md)-B). A test asserts the principal's claim
   set carries no relational data (D5).
-- Break-glass elevation (`AdminOverride`, ADR 0003) is **not** minted into
+- Break-glass elevation (`AdminOverride`, ADR [0003](0003-roles-and-moderator-scoping.md)) is **not** minted into
   the principal: the AuthorizationModule reads the consumed `AdminOverride`
   row inline at decision time (`expiresAt` past ⇒ no elevation). The
   operator-only, direct-DB-write path stays unchanged and the principal
@@ -134,7 +134,7 @@ the interfaces; none may re-derive access on its own.
    hide access).
 5. **Moderator access to audience-restricted content is off by default.**
    The component-scoped `moderatorAccess` flag is `false` unless a
-   GlobalAdmin sets it (§4.5, ADR 0003); report-driven unlock arrives in
+   GlobalAdmin sets it (§4.5, ADR [0003](0003-roles-and-moderator-scoping.md)); report-driven unlock arrives in
    M3.
 6. **One matching pass.** `CanAsync` and `CanSeeAsync` both reduce to the
    same single match function (`MatchGroups`) so the paths cannot drift.
@@ -218,12 +218,12 @@ the interfaces; none may re-derive access on its own.
 **Negative / accepted risk**
 - Freezing at M1 risks over-constraining before implementation feedback.
   Mitigated by the compatible lane (E) and the revisit conditions below;
-  the `All`-mode edge is already flagged for post-M3 revisit (ADR 0001-B).
+  the `All`-mode edge is already flagged for post-M3 revisit (ADR [0001](0001-core-stack-and-identity-model.md)-B).
 - The frozen surface is slightly larger than M1's minimum (e.g. group
   management methods) — accepted: it *is* M1's work.
 
 Revisit when
-- `All` mode is dropped after M3 per ADR 0001-B → re-specify invariant 1
+- `All` mode is dropped after M3 per ADR [0001](0001-core-stack-and-identity-model.md)-B → re-specify invariant 1
   here.
 - Federation (OpenIddict) lands → `ExternalId` becomes the cross-instance
   identifier; only IdentityModule changes (global identity, local

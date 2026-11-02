@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0260 — Guardian attendance rows show the real RSVP status, localized
+# ADR [0260](0260-guardian-rsvp-rows.md) — Guardian attendance rows show the real RSVP status, localized
 
 Status: Accepted
 Date: 2026-10-29

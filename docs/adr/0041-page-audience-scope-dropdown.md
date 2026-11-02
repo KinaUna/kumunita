@@ -13,8 +13,8 @@ updated: 2026-11-02
 
 ## Context
 
-The page composer's "visibility" card (ADR 0039 §3.4, amended 2026-09-17
-for ADR 0036's community default) was a three-part form:
+The page composer's "visibility" card (ADR [0039](0039-pages-hierarchy-audience-translations.md) §3.4, amended 2026-09-17
+for ADR [0036](0036-community-visible-audience-default.md)'s community default) was a three-part form:
 
 1. A **Public** switch (off by default — the page is resident-only by
    default, matching posts).
@@ -38,7 +38,7 @@ community), and *not* touch the grant pickers — to express the most
 common case ("all residents"). That is four deliberate *don'ts* for the
 *default*.
 
-The audience model already has the primitives (ADR 0001-B + ADR 0036):
+The audience model already has the primitives (ADR [0001](0001-core-stack-and-identity-model.md)-B + ADR [0036](0036-community-visible-audience-default.md)):
 an `Audience` is a grant list + a combine mode + a `Community` flag.
 What it lacked was a **first-class "all residents" grant** — a way to say
 "any signed-in reader, no community required" without either (i) leaving
@@ -54,7 +54,7 @@ grants are *specific* user/group ids, not a set). It needed to be a
   document, a *distinct grant* — not a mode of the `Grants` list, not a
   value of `AudienceMode`.** `public bool AllResidents { get; set; }`
   (default `false`, so existing pages / posts / announcements keep their
-  behavior verbatim — ADR 0001-B's verbatim-write contract is untouched;
+  behavior verbatim — ADR [0001](0001-core-stack-and-identity-model.md)-B's verbatim-write contract is untouched;
   the flag simply round-trips). A `true` flag with an **empty** `Grants`
   list is the "all residents" shape. The flag and the grant list are
   **independent**: a resource can be all-residents-visible *and* carry
@@ -95,8 +95,8 @@ grants are *specific* user/group ids, not a set). It needed to be a
 - **`AccessVia.Resident` is a new additive enum value**, the 11th in
   `AccessVia` (after `Owner` / `Audience` / `Delegation` / `Moderator` /
   `Report` / `BreakGlass` / `Admin` / `Group` / `Guardian` / `Community`),
-  following the M1 `Admin` / ADR 0013 `Group` / ADR 0028 `Guardian` /
-  ADR 0036 `Community` **append** precedent: an additive value, the ten
+  following the M1 `Admin` / ADR [0013](0013-group-posts-membership-lane.md) `Group` / ADR [0028](0028-guardian-controls-account-scope-supervision.md) `Guardian` /
+  ADR [0036](0036-community-visible-audience-default.md) `Community` **append** precedent: an additive value, the ten
   frozen values untouched. It is the audit tag for "this decision
   allowed because the resource is all-residents-visible and the actor
   is signed in" — the "who did this, by what right" query the audit log
@@ -142,7 +142,7 @@ grants are *specific* user/group ids, not a set). It needed to be a
 
 - **The editor's `CommunityVisible` checkbox is retired for the page
   composer.** The `AudienceEditorModel.CommunityVisible` property
-  remains (the post lane still uses it — ADR 0036's contract is
+  remains (the post lane still uses it — ADR [0036](0036-community-visible-audience-default.md)'s contract is
   untouched), but the page's `_PageForm.cshtml` no longer renders it
   (the Scope dropdown is the single source for community scoping on
   pages). The `AudienceEditorModel.AllResidentsVisible` property is
@@ -166,7 +166,7 @@ grants are *specific* user/group ids, not a set). It needed to be a
   unaffected.** They do not set `AllResidents = true` (the flag
   defaults `false`), and their `Decide()` branches (the post lane's
   branch 4, the announcement lane's `AnnouncementScope` enum, the group
-  lane's ADR 0013 membership lane) are untouched. The new branch 4.5 is
+  lane's ADR [0013](0013-group-posts-membership-lane.md) membership lane) are untouched. The new branch 4.5 is
   inert for any resource whose `Audience.AllResidents` is `false`
   (the default).
 
@@ -178,7 +178,7 @@ grants are *specific* user/group ids, not a set). It needed to be a
   audience with the explicit grants). The JS toggle logic
   (`_PageForm.cshtml`'s `refresh()` function) enforces this on the
   client side (a pure CSS-class flip, no server-side re-render — the
-  ADR 0036 posts pattern).
+  ADR [0036](0036-community-visible-audience-default.md) posts pattern).
 
 ## Consequences
 
@@ -194,9 +194,9 @@ grants are *specific* user/group ids, not a set). It needed to be a
   "who did this, by what right" query now distinguishes "the actor is
   a signed-in resident and the page is all-residents-visible" from
   "the actor is a member of the target community and the page is
-  community-visible" (ADR 0036) and from "the actor is on the explicit
+  community-visible" (ADR [0036](0036-community-visible-audience-default.md)) and from "the actor is on the explicit
   grant list" (the MatchGroups branch). This is the page-lane analog of
-  ADR 0036's `AccessVia.Community`.
+  ADR [0036](0036-community-visible-audience-default.md)'s `AccessVia.Community`.
 
 - **The `PageComposeViewModel.CommunityId` field is removed.** Any
   downstream consumer (a test, a view, a partial) that referenced it

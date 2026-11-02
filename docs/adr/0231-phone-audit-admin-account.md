@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0231 — Phone audit of the admin and account pages (tab strips, Analytics overflow, Platform table, headings)
+# ADR [0231](0231-phone-audit-admin-account.md) — Phone audit of the admin and account pages (tab strips, Analytics overflow, Platform table, headings)
 
 Status: Accepted
 
@@ -28,7 +28,7 @@ forms, headings), then the main ones were looked at in the browser pane.
 - **Tab strips:** Account has 9 tabs wrapping into 5 rows (~200px), Admin 6 tabs in 2 rows; content starts below the fold.
 - **Platform pages table:** not stacked on phones (buttons squeeze into a narrow column).
 - **Headings:** Platform used an `h3` under the `h1`; the Communities member panel used an `h6`.
-- Languages, Help and Storage tables already sit in `.table-responsive` (scroll shadows from ADR 0205), which is enough.
+- Languages, Help and Storage tables already sit in `.table-responsive` (scroll shadows from ADR [0205](0205-admin-table-scroll-shadows.md)), which is enough.
 
 ## Decision
 - Analytics button row gets `flex-wrap`.
@@ -36,7 +36,7 @@ forms, headings), then the main ones were looked at in the browser pane.
   `overscroll-behavior-x: contain`) with edge fades (`mask-image`, driven by `--kmb-fade-l/-r`). New `client/lib/tab-strip.ts`
   (loaded in `_Layout`) scrolls the active tab to the centre and keeps the fades current. A strip that holds a dropdown is
   excluded (overflow would clip the menu). Applies to Account, Admin, Projects, Events and the locale settings tabs.
-- Platform pages table: `kmb-stack-table` (ADR 0222), `data-label="Route"`, and action cells start at the left when stacked.
+- Platform pages table: `kmb-stack-table` (ADR [0222](0222-accounts-table-phones.md)), `data-label="Route"`, and action cells start at the left when stacked.
 - Headings: Platform `<h2 class="h3">`; Communities member panel `<h2 class="h6 small">`.
 
 ## Verified (live, CSS and the tab-strip logic injected at 390px)
@@ -49,5 +49,5 @@ forms, headings), then the main ones were looked at in the browser pane.
   readable fields on a phone. If a headed-section pass is wanted for them it is a separate step.
 - Dark mode, checked afterwards (follow-up, no code change): Forest and Ember x light and dark at 390px with the strip scrolled
   to the middle show both edge fades and clipped tab text; tab text contrast is 10.4-11.7:1 inactive and 5.9-10.8:1 active
-  in all four combinations. The tab outline (1.2-1.5:1) is decorative and text-labelled, as in ADR 0208. A screenshot taken
+  in all four combinations. The tab outline (1.2-1.5:1) is decorative and text-labelled, as in ADR [0208](0208-contrast-pass.md). A screenshot taken
   right after switching theme showed pale tabs; it was a mid-transition frame (computed backgrounds were already dark).

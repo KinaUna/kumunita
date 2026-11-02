@@ -11,14 +11,14 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0119 — M18: Recurring events (repeating events over the M4 events surface)
+# ADR [0119](0119-recurring-events.md) — M18: Recurring events (repeating events over the M4 events surface)
 
 Status: Accepted
 Date: 2026-09-25
 
-> **Abstract:** M18 closes the `RRULE` home that ADR 0112 (M12 iCal) and
-> ADR 0115 (M14 integration) both explicitly deferred to it: the M4 events
-> surface (ADR 0054) gains **recurring events** — the author declares a
+> **Abstract:** M18 closes the `RRULE` home that ADR [0112](0112-ical-calendar-export.md) (M12 iCal) and
+> ADR [0115](0115-integration-of-events-and-projects.md) (M14 integration) both explicitly deferred to it: the M4 events
+> surface (ADR [0054](0054-events-rsvp-reminders.md)) gains **recurring events** — the author declares a
 > weekly / monthly / yearly rule in the composer, and the platform
 > **materializes the series as concrete `Event` rows at write time** (two
 > additive fields on the existing `Event` POCO: `RecurrenceHeadId` +
@@ -29,7 +29,7 @@ Date: 2026-09-25
 > recurrence is a **write-time** concern, and reads see concrete rows. A new
 > **author-only** skip / undelete pair rides the frozen
 > `EventToAuditableResource` + `IAuthorizationService` seams
-> (`event.edit`-shaped standing, ADR 0014 / 0016 / 0017 precedent); a closed
+> (`event.edit`-shaped standing, ADR [0014](0014-post-edit-lane-author-only.md) / 0016 / 0017 precedent); a closed
 > 14-key `events.recurrence.*` / `events.series.*` `kw-l` set is pinned in
 > all four languages. **For** a developer touching the `Kumunita.Core.Events`
 > context, the `IEventService` seam, the event composer / detail page, or
@@ -40,21 +40,21 @@ Date: 2026-09-25
 
 ## Context
 
-M4 (ADR 0054) shipped a full event context — the `Event` doc, the
+M4 (ADR [0054](0054-events-rsvp-reminders.md)) shipped a full event context — the `Event` doc, the
 `EventRsvp`, the frozen `IEventService` read/write seams, the
 `EventReminderService`, the `EventToAuditableResource` adapter, the
-`IcsWriter` (M12, ADR 0112), the calendar + detail pages, the ADR 0059
+`IcsWriter` (M12, ADR [0112](0112-ical-calendar-export.md)), the calendar + detail pages, the ADR [0059](0059-event-translations.md)
 translation trio — but the surface **cannot express recurrence**: the author
 who wants a weekly meeting creates each week's event by hand. The README
 roadmap row names M18 exactly ("**Repeating / recurring events over the M4
-events surface (the `RRULE` home deferred by ADR 0112)**"), and two earlier
-ADRs explicitly deferred `RRULE` / recurrence here (ADR 0112's
-"never emitted" list; ADR 0115 D6 / C-M14·6 — the `Milestones.cs`
+events surface (the `RRULE` home deferred by ADR [0112](0112-ical-calendar-export.md))**"), and two earlier
+ADRs explicitly deferred `RRULE` / recurrence here (ADR [0112](0112-ical-calendar-export.md)'s
+"never emitted" list; ADR [0115](0115-integration-of-events-and-projects.md) D6 / C-M14·6 — the `Milestones.cs`
 source-of-truth pin).
 
 The constraint is the one that shaped M14: **compose the frozen seams, never
 extend them** — and M18 extends them by adding **two additive fields on the
-existing `Event` POCO** (D1, the ADR 0004 §B "additive surface" shape — the
+existing `Event` POCO** (D1, the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B "additive surface" shape — the
 `ComponentId` / `TagIds` / `ImageIds` / `AttachmentIds` precedent). The **one
 rule that keeps M18 safe** (D1): recurrence is a **write-time** concern —
 expand the author's rule into concrete `Event` rows at create/edit time — so
@@ -97,7 +97,7 @@ calendar, the search, and the bookmarks all keep working **unchanged**
   `IEventService` — `SkipOccurrenceAsync` (soft-delete one occurrence; head
   rule and siblings untouched) and `UndeleteOccurrenceAsync` (restore it) —
   riding the **frozen** `EventToAuditableResource` + `IAuthorizationService`
-  seams with the existing `event.edit`-shaped standing (ADR 0014 / 0016 /
+  seams with the existing `event.edit`-shaped standing (ADR [0014](0014-post-edit-lane-author-only.md) / 0016 /
   0017 precedent). A non-author actor gets a 404 (the frozen seam's "absent"
   shape — no leak). See the handoff note for the full mechanics.
 - **D6 — ICS unchanged.** The `IcsWriter` (M12) **gains no `RRULE`
@@ -159,7 +159,7 @@ calendar, the search, and the bookmarks all keep working **unchanged**
   always reversible by the author; the head's `RecurrenceRule` and the
   siblings are untouched.
 - **Zero migrations** (D1): the two additive fields are delta-detected and
-  applied idempotently at boot (ADR 0004 §B "additive surface"); existing
+  applied idempotently at boot (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B "additive surface"); existing
   rows read `RecurrenceHeadId = null` + `RecurrenceRule = null` (the
   pre-M18 state, unchanged).
 

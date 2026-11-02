@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0002 — Deployment topology: one instance per neighborhood
+# ADR [0002](0002-deployment-topology.md) — Deployment topology: one instance per neighborhood
 
 Status: Accepted
 Date: 2026-08-25

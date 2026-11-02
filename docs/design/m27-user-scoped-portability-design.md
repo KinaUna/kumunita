@@ -28,7 +28,7 @@ updated: 2026-11-02
 > decision is a **business decision in the resident's UI**, not an
 > authorization decision (C-M27·7).
 >
-> **Status.** **LOCKED.** The decisions D1–D9 are locked in **ADR 0148
+> **Status.** **LOCKED.** The decisions D1–D9 are locked in **ADR [0148](../adr/0148-user-scoped-portability.md)
 > (Accepted, 2026-10-06)**. The `[PROPOSED]` set in the register
 > `plan-m27-user-scoped-portability.md` was **user-approved before U00 ran**
 > (the open-veto window closed with no veto recorded; the U00 handoff entry
@@ -46,10 +46,10 @@ updated: 2026-11-02
 
 ## Context
 
-M11 (ADR 0108) closed the operator's world-seam: a GlobalAdmin moves the
+M11 (ADR [0108](../adr/0108-portability-import-export.md)) closed the operator's world-seam: a GlobalAdmin moves the
 **whole instance** in and out as one versioned `*.kumunita` archive,
 fail-closed, no-secrets. It deliberately deferred two follow-on lanes (named
-in ADR 0108 Consequences, C-M11·5): **per-slice portability** (one user's data
+in ADR [0108](../adr/0108-portability-import-export.md) Consequences, C-M11·5): **per-slice portability** (one user's data
 out) and **import-merge** (onto a diverged instance).
 
 M27 owns both halves of that deferred lane, at the **resident's** scale.
@@ -60,7 +60,7 @@ all-or-nothing restore, it comes back **where it fits**: on import into an
 instance where their groups, components, pages, or tags do not exist or they
 are not a member, the resident **manually resolves each conflict entity** —
 adding it to a target they are a member of or discarding it. No auto-merge, no
-silent re-assignment (ADR 0001-B: the author's choice is absolute).
+silent re-assignment (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B: the author's choice is absolute).
 
 M27 builds entirely on **frozen, verified seams** (the M11 `Portability/`
 context — the BCL-only `KumunitaArchive` ZIP (de)serializer, the
@@ -88,7 +88,7 @@ conflict), the **Web-surface pins** (U10), the **acceptance gate** recorded
 (U11), the **kw-l parity close** (U12), and the **U13 milestone flip**
 (M27 → `StatusDone`, M28 → `StatusNext`).
 
-**Out (each a named follow-on lane, ADR 0148 Consequences — own ADRs):**
+**Out (each a named follow-on lane, ADR [0148](../adr/0148-user-scoped-portability.md) Consequences — own ADRs):**
 cross-neighborhood federation (the `README §Deferred` OpenIddict lane), the
 backup-automation / cron surface (OPS.md), a resident **delete-all-their-data**
 lane (M27 is export / backup + import, not deletion), and import-merge
@@ -136,8 +136,8 @@ click.
   **`tests/Kumunita.Core.Tests/UserPortabilityResolveTests.cs`** (new) +
   **`tests/Kumunita.Core.Tests/UserPortabilityAcceptanceTests.cs`** (new) +
   **`tests/Kumunita.Web.Tests/UserPortabilityControllerTests.cs`** (new).
-- **The U13 parity surfaces:** `Milestones.cs`, the `README.md` Roadmap,
-  `docs/STATUS.md`, `docs/ARCHITECTURE.md`, `MilestonesTests.cs`.
+- **The U13 parity surfaces:** `Milestones.cs`, the [`README.md`](../../README.md) Roadmap,
+  [`docs/STATUS.md`](../STATUS.md), [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md), `MilestonesTests.cs`.
 
 **Unchanged (the frozen surface):** `IAuthorizationService` /
 `IAuditableResource` (zero new adapters, C-M27·7), the `AccessAction` /
@@ -154,7 +154,7 @@ untouched; the surface is server-rendered MVC).
   The M27 `*.kumunita` archive is the **same** M11 format (the `format`
   authority `kumunita/portability/1` unchanged) + one additive optional
   resident-scope marker in the manifest (§2.1 manifest-marker). A plain M11
-  whole-instance archive still validates/imports unchanged (the ADR 0098
+  whole-instance archive still validates/imports unchanged (the ADR [0098](../adr/0098-board-audience-edit-lane.md)
   additive-frozen-surface precedent). Pinned by the U07 format-compat test +
   the §2.1 manifest-marker pin.
 
@@ -178,7 +178,7 @@ untouched; the surface is server-rendered MVC).
   M11 C-M11·4 posture). On apply, **only** the entities the resident resolved
   are written, re-pointed exactly as the resident chose (add-elsewhere → the
   target they picked; discard → no write). There is **no** silent auto-merge
-  of a `conflict` entity to a scope the resident did not choose (ADR 0001-B).
+  of a `conflict` entity to a scope the resident did not choose (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B).
   Pinned by the per-entity conflict test (D8c) + the `ResolveAsync`
   fail-closed pin.
 
@@ -205,8 +205,8 @@ untouched; the surface is server-rendered MVC).
 
 - **C-M27·8 · Docs parity holds at the flip (the close unit, U13).**
   `Milestones.cs` (M27 → `StatusDone`, M28 → `StatusNext`), the README
-  Roadmap (M27 → **Done**, M28 → **In progress**), `docs/STATUS.md`,
-  `docs/ARCHITECTURE.md` all move together **in the same unit** (U13), and
+  Roadmap (M27 → **Done**, M28 → **In progress**), [`docs/STATUS.md`](../STATUS.md),
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) all move together **in the same unit** (U13), and
   `tests/Kumunita.Web.Tests/MilestonesTests.cs` keeps its three pins passing
   (the AGENTS.md doc↔code parity contract).
 
@@ -246,7 +246,7 @@ which is the correct exchange for a self-hosted platform's world-seam.
 
 ## Approach (three tracks + close)
 
-- **Track A — Docs (U00):** the design doc + ADR 0148. U00 is the sign-off
+- **Track A — Docs (U00):** the design doc + ADR [0148](../adr/0148-user-scoped-portability.md). U00 is the sign-off
   gate.
 - **Track B — Framework (U01–U02):** `IUserPortabilityService` +
   `UserPortabilityService` shell (U01); the resident-scope **filter** + the
@@ -290,7 +290,7 @@ or `KnownTranslationKeys_ParityTests` +
 
 **Milestone-flip rule (U13 only, in one unit):** `Milestones.cs` M27 →
 `StatusDone` + M28 → `StatusNext`; the README Roadmap M27 line → **Done** + M28
-→ **In progress**; `docs/STATUS.md` + `docs/ARCHITECTURE.md` move M27 → done;
+→ **In progress**; [`docs/STATUS.md`](../STATUS.md) + [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) move M27 → done;
 **and** `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the order pin is
 **unchanged**, the done-list pin gains `M27`, and the single-in-progress pin is
 **renamed + re-pointed** to M28 (the AGENTS.md doc↔code parity contract,
@@ -424,19 +424,19 @@ public string? ResidentSubjectId { get; set; }
 |---|---|---|---|
 | `Post` | `AuthorId` → principal | M11 ref map | the resident's authored posts |
 | `PostReply` | `AuthorId` → principal | M11 ref map | the resident's authored replies |
-| `PostTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added translations (ADR 0022) |
-| `ReplyTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added translations (ADR 0022) |
+| `PostTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added translations (ADR [0022](../adr/0022-user-added-post-reply-translations.md)) |
+| `ReplyTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added translations (ADR [0022](../adr/0022-user-added-post-reply-translations.md)) |
 | `AnnouncementComment` | `AuthorId` → principal | M11 ref map | the resident's comments on announcements |
 | `Event` | `AuthorId` → principal | M11 ref map | the resident's authored events |
 | `EventRsvp` | `UserId` → principal | M11 ref map | the resident's own RSVPs |
-| `EventTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added event translations (ADR 0059) |
+| `EventTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added event translations (ADR [0059](../adr/0059-event-translations.md)) |
 | `ProjectGoal` | `AuthorId` → principal | M11 ref map | the resident's authored goals |
 | `Project` | `AuthorId` → principal | M11 ref map | the resident's authored projects |
 | `TodoItem` | `AuthorId` → principal | M11 ref map | the resident's authored to-dos |
 | `KanbanBoard` | `AuthorId` → principal | M11 ref map | the resident's authored boards |
-| `TodoTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added to-do translations (ADR 0088) |
-| `BoardTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added board translations (ADR 0088) |
-| `ProjectTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added project translations (ADR 0088) |
+| `TodoTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added to-do translations (ADR [0088](../adr/0088-projects-todos-boards-translations.md)) |
+| `BoardTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added board translations (ADR [0088](../adr/0088-projects-todos-boards-translations.md)) |
+| `ProjectTranslation` | `AuthorId` (nullable) → principal | M11 ref map | the resident's user-added project translations (ADR [0088](../adr/0088-projects-todos-boards-translations.md)) |
 | `TodoComment` | `AuthorId` → principal | M11 ref map | the resident's comments on to-dos |
 | `Conversation` | `ParticipantA` ∪ `ParticipantB` → principal | M11 ref map | conversations the resident participates in |
 | `Message` | `ConversationId` → `Conversation` (the resident is a participant) | M11 ref map (via `Conversation`) | messages in the resident's conversations |
@@ -493,7 +493,7 @@ M11 media manifest, filtered to the resident's `ImageIds` / `AttachmentIds`).
 | `TodoItem` | `(AuthorId, Created, Title)` | the same to-do by the same author |
 | `KanbanBoard` | `(AuthorId, Created, Title)` | the same board by the same author |
 | `Page` | `(AuthorId, Created, Title)` | the same page by the same author |
-| `Tag` | `Slug` | tags are globally unique by slug (the ADR 0044 business key) |
+| `Tag` | `Slug` | tags are globally unique by slug (the ADR [0044](../adr/0044-tags.md) business key) |
 | `Document` | `(OwnerId, Created, Title)` | the same document by the same owner |
 | `Conversation` | `(ParticipantA, ParticipantB)` | a conversation pair is unique (the M9 `convo_uidx_pair` shape) |
 | `Message` | `(ConversationId, SenderId, Created)` | the same message in the same conversation |
@@ -591,7 +591,7 @@ or discard it."*
 
 6. **One `AccessAudit` row** (`Via = Owner`, `TargetKind "portability"`,
    verb `import.resolve`) emitted by the **service** (the controller adds
-   none — the ADR 0105 `messaging.toggle` shape).
+   none — the ADR [0105](../adr/0105-messaging.md) `messaging.toggle` shape).
 
 ### 2.6 Pinned seam tests (exact names)
 
@@ -771,7 +771,7 @@ keys) and are unchanged.
 | `myportability.status` | the status area (the success / conflict-summary line) |
 
 Each × **4 languages** (`en` / `de` / `fr` / `da`), the closed-key registry
-shape (the ADR 0015 `KnownTranslationKeys` pin).
+shape (the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) `KnownTranslationKeys` pin).
 
 ## M27 — Closed (recorded)
 
@@ -796,8 +796,8 @@ satisfies the C-M27·7 zero-new-authorization-surface pin (U12 confirmed the
   the `Web_KwL_KeysResolve` `[Theory]`). **Both full suites green** at close (U13
   exit run, xunit.v3 in-process).
 
-- **The ADR pointer.** `docs/adr/0148-user-scoped-portability.md` — the decision
-  record for this lane (Status: **Accepted**); the ADR index (`docs/adr/README.md`)
+- **The ADR pointer.** [`docs/adr/0148-user-scoped-portability.md`](../adr/0148-user-scoped-portability.md) — the decision
+  record for this lane (Status: **Accepted**); the ADR index ([`docs/adr/README.md`](../adr/README.md))
   carries the 0148 row (appended after the backfilled 0146 / 0147 rows, per the U00
   drift resolution). The 8 invariants (C-M27·1–·8), the 5 FACES (F1–F5), the D1
   closed resident-scope inventory (§2.2), the D4 classify + resolve model (§2.4/§2.5),
@@ -808,10 +808,10 @@ satisfies the C-M27·7 zero-new-authorization-surface pin (U12 confirmed the
   M27 unit):**
   1. **Cross-neighborhood federation** — the `README §Deferred` OpenIddict lane (M27
      is a single-neighborhood resident's own data, not cross-community identity).
-  2. **Backup-automation / cron surface** — the `OPS.md` operator lane (M27 is the
+  2. **Backup-automation / cron surface** — the [`OPS.md`](../OPS.md) operator lane (M27 is the
      resident's on-demand export/import, not a scheduled backup).
   3. **Resident delete-all-their-data** — a future ADR (M27 is export/import, not
-     deletion; the author soft-delete precedent, ADR 0024, is the model to follow).
+     deletion; the author soft-delete precedent, ADR [0024](../adr/0024-author-soft-delete-lane.md), is the model to follow).
   4. **Import-merge beyond the per-entity resident choice** — community-level
      reconciliation, own ADR (M27's `ResolveAsync` is the resident's per-entity
      add-elsewhere / discard, never an automatic merge).
@@ -828,7 +828,7 @@ satisfies the C-M27·7 zero-new-authorization-surface pin (U12 confirmed the
 - **The M28 handoff (C-M27·7) — a closed-loop artifact.** M28 (guardian time limits)
   starts **only after** M27 `StatusDone` **and** M28 `StatusNext`. M27 is a
   *resident-scoped export/import* surface over the existing content lanes; M28 is a
-  *child-scoped schedule* on the GU guardian-controls lane (ADR 0028) — the two do
+  *child-scoped schedule* on the GU guardian-controls lane (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)) — the two do
   not collide on the seams named above. The GU `GuardianLink` + the GU supervision
   seams stay frozen for any M28 schedule surface; M27's `IUserPortabilityService`
   seam (the M11 context, not a new bounded context — D7) is untouched by M28. M28's
@@ -836,13 +836,13 @@ satisfies the C-M27·7 zero-new-authorization-surface pin (U12 confirmed the
 
 ---
 
-## ADR 0148 — moved content (D11 trim, 2026-11-02)
+## ADR [0148](../adr/0148-user-scoped-portability.md) — moved content (D11 trim, 2026-11-02)
 
 ## Alternatives considered
 
 1. **Auto-merge (a deterministic best-effort re-point on import).** Rejected:
    it silently re-assigns the resident's content to a community/authorization
-   scope they did not choose, violating ADR 0001-B (the author's choice is
+   scope they did not choose, violating ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (the author's choice is
    absolute). The README is explicit that the *user* resolves conflicts
    "choosing per entity whether to add it elsewhere or discard it."
 
@@ -854,7 +854,7 @@ satisfies the C-M27·7 zero-new-authorization-surface pin (U12 confirmed the
 
 3. **A new bounded context (`Kumunita.Core/Portability/` →
    `Kumunita.Core/UserPortability/`).** Rejected: M27 is a lane **on** the M11
-   operator surface (the ADR 0109 "named lane on the shipped surface"
+   operator surface (the ADR [0109](../adr/0109-events-past-lane.md) "named lane on the shipped surface"
    precedent), not a new bounded context. A new context would duplicate the
    M11 archive reader/writer + manifest model + doc-type inventory, all of
    which M27 reuses verbatim. The `UserPortabilityService` is a new file in
@@ -865,7 +865,7 @@ satisfies the C-M27·7 zero-new-authorization-surface pin (U12 confirmed the
    **additive optional** manifest field (`Scope?` + `ResidentSubjectId?`),
    not a new format version. A new format version would break the
    "a plain M11 archive still imports whole" invariant (C-M27·1) and would
-   require the M11 importer to be version-aware (the ADR 0098/0106
+   require the M11 importer to be version-aware (the ADR [0098](../adr/0098-board-audience-edit-lane.md)/0106
    additive-frozen-surface precedent is the correct mechanism).
 
 5. **A CLI surface now (a `dotnet kumunita export` / `import` command).**

@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0265 — Projects controller flashes are localized
+# ADR [0265](0265-projects-flashes-localized.md) — Projects controller flashes are localized
 
 Status: Accepted
 Date: 2026-10-29

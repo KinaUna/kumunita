@@ -11,15 +11,15 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0094 — Resident join-request lane for public groups (self-initiated, the reverse of the m2b invitation lane)
+# ADR [0094](0094-group-join-request-lane.md) — Resident join-request lane for public groups (self-initiated, the reverse of the m2b invitation lane)
 
 Status: Accepted
 Date: 2026-09-27
-Amends: nothing — adds a new group write lane on the standing ADR 0007 / ADR 0008 prescribe. **Supersedes the m2b design doc's "No join-request flow" deferral** (docs/design/m2b-group-invitations.md, Context), which deferred a resident self-join as scope-out-of-lane; this ADR lands that deferred lane.
+Amends: nothing — adds a new group write lane on the standing ADR [0007](0007-group-management-lane-owner-or-globaladmin.md) / ADR [0008](0008-member-self-leave-lane.md) prescribe. **Supersedes the m2b design doc's "No join-request flow" deferral** (docs/design/m2b-group-invitations.md, Context), which deferred a resident self-join as scope-out-of-lane; this ADR lands that deferred lane.
 
 ## Context
 
-The m2b invitation lane (ADR 0007's standing, the `GroupInvitation` document, the
+The m2b invitation lane (ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s standing, the `GroupInvitation` document, the
 `group.invite.*` audit family) covers the *owner-initiated* direction of group
 membership: the **owner invites**, the **invitee resolves** (accept / decline),
 and the owner can **cancel**. Its design doc recorded the resident self-join
@@ -31,23 +31,23 @@ member of a *public* group should be able to ask to join it**, and the group's
 owner (or a GlobalAdmin) should be able to review and approve or decline those
 asks on the group detail. This is the reverse direction of the m2b lane — the
 *resident* starts it, the *owner* resolves it — and it only ever opens a
-**public** group (ADR 0010), so it does not touch the private-group model the
+**public** group (ADR [0010](0010-private-groups.md)), so it does not touch the private-group model the
 m2b doc was protecting: a private group's membership still arrives only by
 owner invitation, and no public list ever exposes the owner's private groups.
 
-The standing for the resolve lane is already settled by ADR 0007's
+The standing for the resolve lane is already settled by ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s
 consequences clause ("Adding a new write lane to groups in the future sits on
 `TryResolveOwnerSurface` by default"): it is **owner ∪ GlobalAdmin**, not
 owner-only — identical to add/remove/invite/privacy/description/delete. The
 request + withdraw self-lane sits on the same standing as the m2b
-accept/decline self-lane and ADR 0008's `LeaveGroup` self-lane: only the actor
+accept/decline self-lane and ADR [0008](0008-member-self-leave-lane.md)'s `LeaveGroup` self-lane: only the actor
 may act on their **own** row, with the actor minted from the signed-in
 principal, never a form field (SoD by structural identity).
 
 ## Decision
 
 A new resident self-initiated lane, four Web routes on `GroupsController` over
-four new Core seams on `IUserInfoService` (the ADR 0006-E lane — new named
+four new Core seams on `IUserInfoService` (the ADR [0006](0006-module-boundary-contracts.md)-E lane — new named
 methods, no signature change to any pinned M1/M2/m2b method):
 
 **New Core types (`Kumunita.Core.UserInfo`):**
@@ -76,10 +76,10 @@ Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForGroupAsync(string
 
 - **Standing = owner ∪ GlobalAdmin on the resolve lane.** `ApproveJoinRequest`
   / `DeclineJoinRequest` resolve their surface through
-  `TryResolveOwnerSurface` (the ADR 0007 new-lane rule — identical to
+  `TryResolveOwnerSurface` (the ADR [0007](0007-group-management-lane-owner-or-globaladmin.md) new-lane rule — identical to
   add/remove/invite/privacy/description/delete): a plain member's POST 404s,
   the consistent write-lane failure shape. `ApproveJoinRequest` additionally
-  enforces the **GU supervised-child wall** (ADR 0028 §C / G·2): a resident
+  enforces the **GU supervised-child wall** (ADR [0028](0028-guardian-controls-account-scope-supervision.md) §C / G·2): a resident
   with an active `GuardianLink` is refused on the approve lane — their
   membership-landing lane is guardian-mediated, exactly as
   `AcceptGroupInvitationAsync`. The audit `Via` is derived in the seam
@@ -105,7 +105,7 @@ Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForGroupAsync(string
   `Status == Pending` only.
 - **C-M2·2 — the two read lanes append no `AccessAudit` row** (candidate
   projections, not access decisions).
-- **`DeleteGroupAsync` cascade (ADR 0093).** Deleting a group now also removes
+- **`DeleteGroupAsync` cascade (ADR [0093](0093-group-delete-lane.md)).** Deleting a group now also removes
   its `GroupJoinRequest` rows — beside the `GroupMembership` and
   `GroupInvitation` cascade — so a resident is never left holding a request
   to a group that no longer exists.
@@ -128,7 +128,7 @@ Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForGroupAsync(string
   directory renders only public, non-member groups; the "Pending join
   requests" review surface renders only when `canManage` (owner ∪ GlobalAdmin)
   and there are pending rows. Nine new `kw-l` keys × 4 languages
-  (the ADR 0015 curated registry, `KnownTranslationKeys` parity preserved).
+  (the ADR [0015](0015-ui-view-localization-mechanics.md) curated registry, `KnownTranslationKeys` parity preserved).
 
 ## Consequences
 
@@ -141,13 +141,13 @@ Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForGroupAsync(string
   see their own pending requests, and withdraw one. The owner ∪ GlobalAdmin
   reviews and approves (membership lands, C4) or declines. **Private groups are
   untouched** — they never appear in the directory, and a request to one 404s,
-  so the ADR 0010 private-group model is preserved.
+  so the ADR [0010](0010-private-groups.md) private-group model is preserved.
 - **No notification emission.** This lane deliberately does not add a
-  notification kind (ADR 0076 / 0083 / 0084): the requester's "Your join
+  notification kind (ADR [0076](0076-notifications-inbox-and-recipient-email.md) / 0083 / 0084): the requester's "Your join
   requests" card (with the "pending" state + withdraw) and the owner's
   "Pending join requests" review surface are the standing record; the
   `group.join.request` audit row is the durable fact. A "you have N join
-  requests" inbox lane (ADR 0083 `GroupAdded` emission shape) is a future
+  requests" inbox lane (ADR [0083](0083-group-add-and-invite-notifications.md) `GroupAdded` emission shape) is a future
   lane, out of scope here.
 - **`Withdrawn` is a terminal state** (the m2b `Cancelled` analogue): it drops
   the row off both the requester's "Your join requests" card and the owner's
@@ -167,4 +167,4 @@ Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForGroupAsync(string
   `DeleteGroupAsync` cascade.
 - `Milestones.cs` / the README Roadmap / `MilestonesTests.cs` are **untouched**
   — this is a named lane on the already-shipped M2 group surface (the
-  ADR 0013 / 0089 group-lane precedent), not a new M-letter milestone.
+  ADR [0013](0013-group-posts-membership-lane.md) / 0089 group-lane precedent), not a new M-letter milestone.

@@ -11,7 +11,7 @@ superseded_by: [adr-0083, adr-0093, adr-0094]
 updated: 2026-11-02
 ---
 
-# ADR 0007 — Group management lane: owner ∪ GlobalAdmin for add and remove
+# ADR [0007](0007-group-management-lane-owner-or-globaladmin.md) — Group management lane: owner ∪ GlobalAdmin for add and remove
 
 Status: Accepted
 Date: 2026-09-10
@@ -33,7 +33,7 @@ section nor be able to submit it.
 
 The Core seam is unchanged either way: `AddGroupMemberAsync(groupId, userId,
 addedBy)` derives the audit `Via` from `addedBy == Group.OwnerId`, and its
-SoD lane does not re-gate by actor standing (ADR 0006-D: Web shapes HTTP,
+SoD lane does not re-gate by actor standing (ADR [0006](0006-module-boundary-contracts.md)-D: Web shapes HTTP,
 Core decides). The standing decision is a Web-controller concern, exactly as
 for the existing remove/invite lanes.
 
@@ -54,7 +54,7 @@ lane:
   the per-member Remove forms and the invite lane) — so what a user sees is
   exactly what the route would accept.
 - GlobalAdmin keeps the add lane, matching the remove/invite lanes (the
-  admin's management reach is the M1 break-glass rule; ADR 0003).
+  admin's management reach is the M1 break-glass rule; ADR [0003](0003-roles-and-moderator-scoping.md)).
 - The owner ∪ member *read* projection (`GetGroupsForUserAsync`, F14) is
   untouched: plain members still see the group, its member list, and its
   pending invitations — they just see no mutation forms.

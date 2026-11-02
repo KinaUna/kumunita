@@ -40,7 +40,7 @@ must not expose usable tokens.
   `.Where(t => t.Token == tokenValue && t.Kind == kind)` (first `.Where`, `:1506`).
   Call sites:
   - `:256` — `VerifyWithTokenAsync` (self-serve verify lane)
-  - `:310` — `VerifyAndSetPasswordAsync` (child / ADR 0146 lane)
+  - `:310` — `VerifyAndSetPasswordAsync` (child / ADR [0146](../adr/0146-child-account-child-owns-password.md) lane)
   - `:1251` — `CompleteSeedAdminSetupAsync` (seed-admin setup lane)
 - **Write (setup mint):** `FirstBootSeeder.cs:271` region — the `KindSetup` row sets
   `Token = token` (the **operator-held env token** `SeedAdmin__Token`), `FirstBootSeeder.cs:~274`.
@@ -134,7 +134,7 @@ call sites do **not** all present a raw secret. Tracing the Web layer:
 | Call site (`IdentityService.cs`) | Lane | What the **Web** passes in | Value class |
 |---|---|---|---|
 | `:256` `VerifyWithTokenAsync` | self-serve verify | `token.Token` — the **stored column value** (row loaded by `Id` via `AccountController.LoadUsableVerifyTokenAsync`, `session.LoadAsync<IdentityToken>(id)`) | **stored** |
-| `:310` `VerifyAndSetPasswordAsync` | child (ADR 0146) | `token.Token` — the **stored column value** (same `LoadAsync`-by-`Id` path) | **stored** |
+| `:310` `VerifyAndSetPasswordAsync` | child (ADR [0146](../adr/0146-child-account-child-owns-password.md)) | `token.Token` — the **stored column value** (same `LoadAsync`-by-`Id` path) | **stored** |
 | `:1251` `CompleteSeedAdminSetupAsync` | seed-admin setup | `model.SetupToken` — the **raw** env token the operator typed | **raw** |
 
 **Therefore the blanket "compare `Sha256Hex(tokenValue)`" in the plan is wrong for the
@@ -303,7 +303,7 @@ directly. Do **not** make `FindTokenAsync` public to test it; keep the public su
 
 ---
 
-## ADR 0146 — moved content (D11 trim, 2026-11-02)
+## ADR [0146](../adr/0146-child-account-child-owns-password.md) — moved content (D11 trim, 2026-11-02)
 
 ## Invariants (pinned)
 

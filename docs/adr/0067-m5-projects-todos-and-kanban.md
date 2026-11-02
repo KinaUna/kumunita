@@ -11,7 +11,7 @@ superseded_by: [adr-0068, adr-0069, adr-0070, adr-0073, adr-0079, adr-0086, adr-
 updated: 2026-11-02
 ---
 
-# ADR 0067 — M5: Projects (to-dos + Kanban boards) — a new `Kumunita.Core.Projects` context reusing the frozen authorization / audience / renderer / editor / standing seams
+# ADR [0067](0067-m5-projects-todos-and-kanban.md) — M5: Projects (to-dos + Kanban boards) — a new `Kumunita.Core.Projects` context reusing the frozen authorization / audience / renderer / editor / standing seams
 
 Status: Accepted
 Date: 2026-09-23
@@ -34,13 +34,13 @@ lane is **not** a membership lane).
 > context (assignable, hierarchical **to-dos** + **Kanban boards** with
 > statused, limitable lanes) reusing the frozen seams — the post `Audience`
 > doc verbatim, the frozen `IAuthorizationService` decision path (two new
-> adapters, `TargetKind = "todo"` / `"board"`), the ADR 0014 / 0016 / 0017
+> adapters, `TargetKind = "todo"` / `"board"`), the ADR [0014](0014-post-edit-lane-author-only.md) / 0016 / 0017
 > standing matrix (extended with the **assignee** as a collaborator), the one
 > `MarkdownRenderer` + `bindRichEditor`, the `kw-dt` TagHelper, the
 > `IsDeleted` / `LanguageCode` / `TagIds` / `ImageIds` / `AttachmentIds`
 > lanes. **No new `AccessAction`, no new `AccessVia`, no new authorization
 > path, no editor dependency, zero migrations for existing surfaces** (the
-> four docs are new, the surface is additive — ADR 0004 §B.1). The canonical
+> four docs are new, the surface is additive — ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1). The canonical
 > names are **`TodoItem`** / **`KanbanBoard`** / **`KanbanLane`** /
 > **`BoardItemPlacement`** — `Project` / `ProjectTask` / `ProjectMember` do
 > **not** exist. **For** a developer touching `Kumunita.Core.Projects`, the
@@ -67,10 +67,10 @@ move (M5 → `StatusDone`, M6 → `StatusNext`, in `Milestones.cs` + the README
 Roadmap + `MilestonesTests.cs`).
 
 **The one constraint:** the milestone is **additive and reusing.** The
-`Audience` doc (ADR 0001-B / 0036), the `IAuthorizationService.CanAsync(Read)`
-/ `CanSeeAsync(Read)` decision path (ADR 0006), the standing matrix (ADR 0014 /
-0016 / 0017), the `MarkdownRenderer` + `bindRichEditor` (ADR 0025 / 0031), and
-the `kw-dt` TagHelper (ADR 0019 / 0020) are all **frozen seams** — M5 adds
+`Audience` doc (ADR [0001](0001-core-stack-and-identity-model.md)-B / 0036), the `IAuthorizationService.CanAsync(Read)`
+/ `CanSeeAsync(Read)` decision path (ADR [0006](0006-module-boundary-contracts.md)), the standing matrix (ADR [0014](0014-post-edit-lane-author-only.md) /
+0016 / 0017), the `MarkdownRenderer` + `bindRichEditor` (ADR [0025](0025-rich-content-markdown-and-content-images.md) / 0031), and
+the `kw-dt` TagHelper (ADR [0019](0019-timezone-platform-default-and-resident-override.md) / 0020) are all **frozen seams** — M5 adds
 **adapters + a service + views + one TS module**, not a branch. **No new
 `AccessAction`**, **no new `AccessVia`**, **no new authorization path**, **no
 editor dependency**, **zero migrations for existing surfaces**.
@@ -84,7 +84,7 @@ editor dependency**, **zero migrations for existing surfaces**.
   hierarchy mechanism), the post `Audience`, the `IsDeleted` / `LanguageCode`
   / `TagIds` / `ImageIds` / `AttachmentIds` lanes — and **no** `BoardId` /
   `LaneId` / `Order` / `IsDraft`), `KanbanBoard` (`Title`, optional Markdown
-  `Description`, `AuthorId`, the post `Audience`, the ADR 0024 / 0018 lanes),
+  `Description`, `AuthorId`, the post `Audience`, the ADR [0024](0024-author-soft-delete-lane.md) / 0018 lanes),
   `KanbanLane` (`BoardId`, `Title`, optional `Status` (the status a lane
   **imparts** on a to-do moved into it), optional **advisory** `MaxItems`,
   `Order`), and `BoardItemPlacement` (`TodoItemId` / `BoardId` / `LaneId` /
@@ -99,7 +99,7 @@ editor dependency**, **zero migrations for existing surfaces**.
 - **The audience is the post `Audience`, reused verbatim.** No new `Audience`
   field / `AudienceMode` / `AccessVia` value; the frozen `Decide()` covers
   every standing a to-do / board needs; the composer seeds it
-  **community-visible by default** (ADR 0036) via the `AudienceEditorModel`
+  **community-visible by default** (ADR [0036](0036-community-visible-audience-default.md)) via the `AudienceEditorModel`
   partial verbatim.
 - **The decision path is the frozen `IAuthorizationService`** through two new
   adapters — `TodoItemToAuditableResource` (`TargetKind = "todo"`) and
@@ -147,18 +147,18 @@ editor dependency**, **zero migrations for existing surfaces**.
   line. The `Post` / `Announcement` / `Page` / `Event` surfaces stay
   **untouched**. The board module is plain `client/lib` TS, tsc-only, zero
   dependencies — every action is an **explicit POST**, CSRF-aware, then a
-  **full re-render** (the ADR 0031 "explicit, server-authoritative" posture).
+  **full re-render** (the ADR [0031](0031-wysiwyg-editor-and-toolbar.md) "explicit, server-authoritative" posture).
   See the handoff note for the full surface.
 - **The draft / language / tag / media / delete lanes are reused, not
-  reinvented:** the `LanguageCode` (ADR 0018); the `TagIds` (ADR 0044); the
-  `ImageIds` + `AttachmentIds` (ADR 0025 / 0034); the `IsDeleted` flag +
-  read-lane filter (ADR 0024). **The ADR 0037 draft lane is NOT carried onto
+  reinvented:** the `LanguageCode` (ADR [0018](0018-ugc-authored-in-language-tag.md)); the `TagIds` (ADR [0044](0044-tags.md)); the
+  `ImageIds` + `AttachmentIds` (ADR [0025](0025-rich-content-markdown-and-content-images.md) / 0034); the `IsDeleted` flag +
+  read-lane filter (ADR [0024](0024-author-soft-delete-lane.md)). **The ADR [0037](0037-draft-mode-author-only.md) draft lane is NOT carried onto
   M5** — a to-do / board is live on creation; the draft lane is a follow-on
   ADR.
 - **The localization parity** — the new `projects.*` `kw-l` key block (design
   doc §2.6 — 19 keys) is present in **all four** seeded languages (en/de/fr/
-  da); English is the fallback in every view; the ADR 0015 key-registry shape
-  is the host (the ADR 0052 warm-boot baseline backfill lane covers the
+  da); English is the fallback in every view; the ADR [0015](0015-ui-view-localization-mechanics.md) key-registry shape
+  is the host (the ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) warm-boot baseline backfill lane covers the
   `de`/`fr`/`da` rows).
 - **The 24 pinned seam test names** (design doc §2.7 / §2.8, locked here) —
   16 in `tests/Kumunita.Core.Tests/ProjectServiceTests.cs` (F1–F10, run over

@@ -11,7 +11,7 @@ superseded_by: [adr-0077, adr-0078, adr-0084, adr-0085, adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0076 — M6: Notifications (inbox + recipient email) — a new `Kumunita.Core.Notifications` context reusing the frozen durable-email / translation / personal-read seams
+# ADR [0076](0076-notifications-inbox-and-recipient-email.md) — M6: Notifications (inbox + recipient email) — a new `Kumunita.Core.Notifications` context reusing the frozen durable-email / translation / personal-read seams
 
 Status: Accepted
 Date: 2026-09-24
@@ -31,7 +31,7 @@ notifications-as-a-lane deferral — the lane this ADR executes), **0061** (the
 per-resident outbound-channel language — M6 inherits verbatim),
 **0063 / 0064** (the "no new notifications" deferrals — settled by the
 `todo.assign` kind), and **0067** (the M5 deferrals — settled; the group /
-community assignment notification stays a follow-on lane per ADR 0073 / 0074).
+community assignment notification stays a follow-on lane per ADR [0073](0073-todo-group-community-claim-lane.md) / 0074).
 
 **M6: Notifications (inbox + recipient email).** Up to now, no resident action
 produced a notification. M6 adds the **shared awareness** arrow: the inbox
@@ -55,7 +55,7 @@ Up to now, **none of those moments produced a notification.** The only outbound
 channels were the event-reminder email (M4 §6.4) and the verification email
 (M1), and a resident had no way to *see* what happened to the things they own
 without re-visiting every surface. The ADRs that deferred a notification to
-this milestone: ADR 0013, ADR 0054, ADR 0063 / 0064, ADR 0067, the M3b report-
+this milestone: ADR [0013](0013-group-posts-membership-lane.md), ADR [0054](0054-events-rsvp-reminders.md), ADR [0063](0063-events-calendar-view.md) / 0064, ADR [0067](0067-m5-projects-todos-and-kanban.md), the M3b report-
 file / -assign / -resolve moments, and the M4 §6.4 day-before reminder.
 **The GU/GA guardian-assignment notification stays deferred after M6** (the
 GU/GA ADRs named the deferral; it is not lifted here). The one constraint: the
@@ -102,11 +102,11 @@ event is a no-op** (no second inbox row, no second email).
 inbox row (the `EmailDeadLetterWriter` + `/health` degraded gate). **The inbox
 is the primary channel; the email is the out-of-band nudge.**
 
-**D6 — The per-recipient email language is the ADR 0061 resolution, verbatim.**
+**D6 — The per-recipient email language is the ADR [0061](0061-email-and-notification-language.md) resolution, verbatim.**
 The `NotificationService` resolves the recipient's `Profile.EmailLanguage`
 (the sender's language is irrelevant). **The UGC snippet in the email body**
 (a reply's body, a to-do's title) is **rendered in the sender's authored
-language** (ADR 0018); the template subject / body is in the **recipient's**
+language** (ADR [0018](0018-ugc-authored-in-language-tag.md)); the template subject / body is in the **recipient's**
 `EmailLanguage`.
 
 **D7 — A resident who has disabled a kind still gets the inbox row.**
@@ -133,7 +133,7 @@ count` at a **30-second interval** (a `setInterval` — no WebSocket / SSE /
 push). **The badge shows the unread count**; **the dropdown is a plain
 `fetch` + DOM render**. **No** live update in M6.
 
-**D11 — Reuse, don't reinvent.** The M1 durable-email trio, the ADR 0061
+**D11 — Reuse, don't reinvent.** The M1 durable-email trio, the ADR [0061](0061-email-and-notification-language.md)
 per-recipient language, the `kw-dt` TagHelper, the closed
 `KnownTranslationKeys` registry, and the plain `client/lib` tsc-only TS are
 all **frozen seams** — M6 adds documents + surface + service + controller +
@@ -149,7 +149,7 @@ mechanism, **no** new UI dependency.
   inbox, the `/notifications/unread-count` poller, the `/notifications/mark-
   all-read` POST, the `/notifications/preferences` GET + POST), one view set +
   one layout bell, one plain-TS module, and the `kw-l` keys × 4 languages.
-  That is the whole delta. *(Extended by **ADR 0096**: the per-row
+  That is the whole delta. *(Extended by **ADR [0096](0096-notification-read-unread-per-row-toggle.md)**: the per-row
   `MarkReadAsync` / `MarkUnreadAsync` state lanes + the `/notifications/{id}/
   mark-read` and `/notifications/{id}/mark-unread` POSTs.)*
 - **The no-ADD pin:** no new `AccessAction` / `AccessVia` /
@@ -158,7 +158,7 @@ mechanism, **no** new UI dependency.
   `IUserInfoService.GetProfileAsync` seam, the `ITranslationProvider`, and the
   `IMailerStage.StageAsync` seam.
 - **The reuse pin:** the M1 durable-email trio carries the notification emails
-  (email is best-effort, the inbox is the durable record); ADR 0061's per-
+  (email is best-effort, the inbox is the durable record); ADR [0061](0061-email-and-notification-language.md)'s per-
   recipient language resolution governs them verbatim; the `kw-dt` TagHelper
   renders every inbox timestamp.
 - A resident who disables a kind keeps the inbox record and loses only the
@@ -166,6 +166,6 @@ mechanism, **no** new UI dependency.
   channels (D4).
 - **Deferred, each named:** push / PWA push, digests, per-kind inbox filters,
   the `post.mention` emitter (reserved kind, D2), the group / community to-do
-  assignment notification (ADR 0073 / 0074), **the assigned-guardian
+  assignment notification (ADR [0073](0073-todo-group-community-claim-lane.md) / 0074), **the assigned-guardian
   notification (still deferred after M6)**, read receipts, cross-neighborhood
   notification, and live update (WebSocket / SSE). *See the handoff note.*

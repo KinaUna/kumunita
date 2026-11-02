@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0034 shipped the file-attachment lane and pinned, as **C-ATT·2**, that
+ADR [0034](0034-file-attachments-posts-replies-announcements.md) shipped the file-attachment lane and pinned, as **C-ATT·2**, that
 "attachments are downloads, not renders": the serve route
 (`AttachmentController.ServeFile`) sets `Content-Disposition: attachment` +
 `X-Content-Type-Options: nosniff` + the **stored** `Content-Type`, and a body
@@ -30,7 +30,7 @@ image types. **SVG is excluded.** `text/html`, `image/svg+xml`, and
 `application/javascript` are **not** on the list — the types that carry a
 browser-executable script surface cannot enter the store through this lane.
 
-Since ADR 0034, a small UI affordance landed separately (untracked here,
+Since ADR [0034](0034-file-attachments-posts-replies-announcements.md), a small UI affordance landed separately (untracked here,
 already in the tree): `MarkdownRenderer` emits
 `target="_blank" rel="noopener"` on attachment links, so a reader clicking an
 attachment opens it in a new tab and keeps their place on the page. But while
@@ -53,7 +53,7 @@ this ADR):
   upload iff its declared `Content-Type` is allowlisted. The
   script-bearing types (`text/html`, `image/svg+xml`, `application/javascript`)
   are rejected at the boundary (415), so they **never reach the store**.
-- **The stored `Content-Type` is served verbatim** (ADR 0034 D1 / C-ATT·8):
+- **The stored `Content-Type` is served verbatim** (ADR [0034](0034-file-attachments-posts-replies-announcements.md) D1 / C-ATT·8):
   `ServeFile` returns `File(stream, stored.ContentType)` — the value validated
   at upload, never a client-influenced query parameter.
 
@@ -145,20 +145,20 @@ body still renders the link, the preview happens in a separate browsing
 context. *Forbids:* an inline `<iframe>` of the attachment inside the post /
 announcement / page body, or an `<img>` for a non-image attachment.
 
-**D5 — The document lane (ADR 0122/0125) and the image lane are untouched.**
+**D5 — The document lane (ADR [0122](0122-document-management.md)/0125) and the image lane are untouched.**
 The **document** lane's `DocumentController` download stays
 `Content-Disposition: attachment` (its D6 "a download, never an inline render"
 pin is a *stricter*, deliberate choice for authority-published official
 documents — previewing them is a separate future decision, its own ADR). The
-**image** lane (ADR 0025) keeps its inline `<img>` render and its raster-only
+**image** lane (ADR [0025](0025-rich-content-markdown-and-content-images.md)) keeps its inline `<img>` render and its raster-only
 `AllowedContentTypes` (C-ATT·9). This ADR changes **only** the *attachment*
 lane's serve disposition. *Forbids:* extending the inline branch to
 `/documents/{id}/download` or to `/content-image/{id}`.
 
 **D6 — Zero new authorization surface, zero schema, zero new store method,
-zero new route.** The lane *rides* the frozen ADR 0034 serve route (the
+zero new route.** The lane *rides* the frozen ADR [0034](0034-file-attachments-posts-replies-announcements.md) serve route (the
 5-step ordering, the `Read` decision, the audit contract C-ATT·7/10, the
-404-not-403 posture) and the frozen ADR 0011 `IMediaStore`. It adds exactly:
+404-not-403 posture) and the frozen ADR [0011](0011-media-and-file-storage.md) `IMediaStore`. It adds exactly:
 **one** `MediaOptions` member set (D3), **one** disposition branch in
 `ServeFile` (D2), and the already-shipped renderer affordance (D4). No new
 `AccessAction` / `AccessVia` / `Decide()` branch / adapter, no new `MediaObject`
@@ -171,7 +171,7 @@ field, no new `IMediaStore` method, no migration.
 - **The browser-displayable attachments now preview.** A reader clicking a
   PDF, image, or text/CSV attachment opens it in a new tab that **renders**
   (the browser's native viewer) instead of forcing a download — the
-  "in-browser preview is a future lane" deferral in ADR 0034 is now closed for
+  "in-browser preview is a future lane" deferral in ADR [0034](0034-file-attachments-posts-replies-announcements.md) is now closed for
   this subset. The non-previewable types (Office, zip) still download.
 - **The safety model is auditable and layered** (D1): the dangerous types are
   excluded by the upload gate (not by an inline check), the served type is the
@@ -180,7 +180,7 @@ field, no new `IMediaStore` method, no migration.
   spoof any of the first three layers.
 - **Zero new surface** (D6): it reuses the store, the catalog, the serve
   route, the `Read` decision, and the audit lane. The claim set and the
-  document/schema shape are byte-identical after ADR 0126.
+  document/schema shape are byte-identical after ADR [0126](0126-attachment-inline-preview.md).
 - **The body still renders a link, never an `<img>`/`<iframe>`** (D4): the
   C-ATT·2 "download reference is an `<a>`" pin and the `IsSafeUrl` /
   `IsSafeImageSrc` split are preserved; the preview is a *new tab*, not an
@@ -188,7 +188,7 @@ field, no new `IMediaStore` method, no migration.
 
 **Neutral / cost:**
 
-- **The named trade — a disposition branch for zero new surface:** ADR 0126
+- **The named trade — a disposition branch for zero new surface:** ADR [0126](0126-attachment-inline-preview.md)
   buys *inline preview of the safe-renderable subset, in a new tab, with the
   safety model already three-quarters in the tree*, with **one `MediaOptions`
   member set + one `ServeFile` branch + the (shipped) renderer affordance**,

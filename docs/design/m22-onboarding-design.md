@@ -29,7 +29,7 @@ updated: 2026-11-02
 > (`UpsertProfileAsync`, `SetProfileAvatarAsync`, `SetProfileTimezoneAsync`,
 > `SetProfileDateFormatAsync`, `SetProfileEmailLanguageAsync`, D3), the
 > `LocaleController` settings-tabs shape (the linkable-sections + `FlashAsync`
-> + language-**cookie** lanes, D4), and the ADR 0004 §B.1 additive-surface
+> + language-**cookie** lanes, D4), and the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive-surface
 > discipline (D1). **Zero new `IAuthorizationService` surface, zero new
 > `AccessAction`, zero new `AccessVia`, zero new `Decide()` branch, zero new
 > claim type, zero new `*DocTypes` surface, zero new `Program.cs` boot line,
@@ -39,12 +39,12 @@ updated: 2026-11-02
 > write + `GetOnboardingCompletedAsync` read, D2) + **one
 > `OnboardingController`** (D4) + **one view + banner** (D5) + **one closed
 > `onboarding.*` kw-l set** (15 keys × en/de/fr/da, D7). The six GATE acceptance
-> tests (GATE-1…GATE-6, §9) + the drift-guard (§10) are locked in **ADR 0132
+> tests (GATE-1…GATE-6, §9) + the drift-guard (§10) are locked in **ADR [0132](../adr/0132-onboarding.md)
 > (Accepted, 2026-10-02)**.
 >
 > **Status.** **LOCKED.** The decisions D1–D8, the invariants
 > C-M22·1…C-M22·6, the FACES F1–F5 + the named trade, the closed `onboarding.*`
-> kw-l key set (§8), and the §gate test names (§9) are locked in **ADR 0132
+> kw-l key set (§8), and the §gate test names (§9) are locked in **ADR [0132](../adr/0132-onboarding.md)
 > (Accepted, 2026-10-02)**. The `[PROPOSED]` set in the register
 > `docs/plans-milestones/in-progress/plan-m22-onboarding.md` is the locked set
 > this doc restates **verbatim**, with **two named amendment surfaces**
@@ -91,7 +91,7 @@ Three things follow from the roadmap sentence:
    record*, not a second write path.
 2. **The only NEW Core surface is one additive completion marker + one
    owner-scope lane** (D1, D2): an additive
-   `Profile.OnboardingCompletedAt: DateTimeOffset?` field (ADR 0004 §B.1 —
+   `Profile.OnboardingCompletedAt: DateTimeOffset?` field (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 —
    delta-detected, idempotent, **no re-seed, no EF migration, no new `*DocTypes`
    surface, no new bounded context, no new adapter**) and one owner-scope write
    seam `CompleteOnboardingAsync(subjectId, actorBy)` (the
@@ -104,7 +104,7 @@ Three things follow from the roadmap sentence:
    `OnboardingCompletedAt` is `null`** (the floor = a fresh resident sees it),
    and cleared by the explicit finish/skip action. **Sign-in is never blocked**;
    the "is a new user" state is a *profile field read*, never an identity claim
-   (the thin-token rule, ADR 0001-B).
+   (the thin-token rule, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B).
 
 Everything else about M22 is *what it is not* — see below and §11.
 
@@ -140,15 +140,15 @@ Everything else about M22 is *what it is not* — see below and §11.
   **owner-scope only** (the signed-in resident reads/writes *their own*
   profile); the completion read is owner-scope.
 - **Not a new notification lane.** Finishing onboarding stages **no** email
-  (M6/ADR 0076 is untouched); M22 is a guided shell, not a notify lane.
-- **Not a new storage lane.** The avatar step rides the **frozen ADR 0011
+  (M6/ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) is untouched); M22 is a guided shell, not a notify lane.
+- **Not a new storage lane.** The avatar step rides the **frozen ADR [0011](../adr/0011-media-and-file-storage.md)
   `IMediaStore`** through the existing `SetProfileAvatarAsync` lane; M22 adds
   no storage mechanism (D3).
 
 ## 1 — Decisions (D1–D8) — **LOCKED** (verbatim from the register's [PROPOSED] set; §1.a records the two named amendment surfaces)
 
 **D1 — The completion state is **one additive field on the existing `Profile`
-doc** (ADR 0004 §B.1).** `Kumunita.Core.UserInfo.Profile` gains exactly **one**
+doc** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).** `Kumunita.Core.UserInfo.Profile` gains exactly **one**
 additive member (locked by U00's design doc):
 
 ```csharp
@@ -174,7 +174,7 @@ no new bounded context, no `SchemaBootstrap.cs` change**.
 table, an **EF Core** migration, a **per-step** persisted cursor, or encoding
 "finished onboarding" in an **identity claim** (D6).
 
-**D2 — Two owner-scope seams on `IUserInfoService` (the ADR 0006-E
+**D2 — Two owner-scope seams on `IUserInfoService` (the ADR [0006](../adr/0006-module-boundary-contracts.md)-E
 compatible-addition idiom, the `SetProfileTimezoneAsync` shape verbatim).**
 `IUserInfoService` gains exactly **two** members (the
 `SetProfileTimezoneAsync` / `SetProfileDateFormatAsync` /
@@ -246,7 +246,7 @@ floor = a fresh resident sees it). The banner links to `/onboarding`. It is
 **non-blocking**: **sign-in is never gated**, the banner is always dismissible,
 and the nav entry is present for any `null`-completion resident. The "is a new
 user?" check is the **owner-scope read** of the profile field (D2), **never** a
-claim (the thin-token rule, ADR 0001-B) and **never** a per-request flag
+claim (the thin-token rule, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B) and **never** a per-request flag
 recomputed from scratch.
 
 *Forbids:* blocking sign-in, a modal that can't be dismissed, a **claim-encoded**
@@ -294,7 +294,7 @@ D4's skip-vs-finish shape). Both are resolved against the live codebase:
 - **C1 — D1's `Profile` member name/type: confirmed as
   `OnboardingCompletedAt: DateTimeOffset?`.** Verified against
   `src/Kumunita.Core/UserInfo/Profile.cs`: the existing doc already carries
-  **ten** additive fields in the ADR 0004 §B.1 shape (`AvatarId`, `TimeZone`,
+  **ten** additive fields in the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 shape (`AvatarId`, `TimeZone`,
   `DateFormat`, `EmailLanguage`, and the M23 `Bio`/`TagIds` precedent), all
   registered in `CoreDocTypes` (no new DocTypes surface, no new boot line, no
   `SchemaBootstrap.cs` change). The **single nullable
@@ -388,7 +388,7 @@ D4's skip-vs-finish shape). Both are resolved against the live codebase:
   a claim; the banner is always dismissible.
 - **F5 — The walk-through is localized in the resident's language** (C-M22·6,
   D7): every string is a closed `onboarding.*` key resolved through the
-  `kw-l` provider floor (the en source text is the floor, ADR 0015 D1), in
+  `kw-l` provider floor (the en source text is the floor, ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1), in
   en/de/fr/da.
 
 **The named trade.** M22 buys *a guided, non-blocking, localized walk-through
@@ -408,7 +408,7 @@ scope lane + the frozen lanes it links into.
 ## 4 — The additive `Profile.OnboardingCompletedAt` field (exact C#, D1, U01)
 
 The **exact** additive member on `Kumunita.Core.UserInfo.Profile` (D1,
-§1.a-C1 locked). The doc already carries ten additive fields in the ADR 0004
+§1.a-C1 locked). The doc already carries ten additive fields in the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)
 §B.1 shape (`AvatarId`, `TimeZone`, `DateFormat`, `EmailLanguage`, `Bio`,
 `TagIds` — all delta-detected, all registered in `CoreDocTypes`). Adding
 `OnboardingCompletedAt` follows the same shape:
@@ -426,7 +426,7 @@ The **exact** additive member on `Kumunita.Core.UserInfo.Profile` (D1,
 public DateTimeOffset? OnboardingCompletedAt { get; set; }
 ```
 
-**Additive on an existing doc** (the M23 `Bio`/`TagIds` ADR 0004 §B.1
+**Additive on an existing doc** (the M23 `Bio`/`TagIds` ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
 precedent verbatim): delta-detected, idempotent, **no re-seed, no EF
 migration, no new `*DocTypes` surface, no new `Program.cs` `AddMarten` line,
 no `SchemaBootstrap.cs` change, no new bounded context, no new
@@ -472,7 +472,7 @@ Task<DateTimeOffset?> GetOnboardingCompletedAsync(string subjectId);
 ```
 
 **The `CompleteOnboardingAsync` shape** (the `SetProfileTimezoneAsync` pin
-verbatim — the ADR 0006-E compatible-addition idiom this file already uses):
+verbatim — the ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible-addition idiom this file already uses):
 
 - **Owner-scope** — the self-scope check happens at the Web boundary (the
   owner is the actor); the lane does **not** re-gate.
@@ -520,11 +520,11 @@ already owns that field:
 | Step | Route (link target) | Frozen lane (exact signature) | Notes |
 | --- | --- | --- | --- |
 | Display name + contact details + visibility | `GET /profile/edit` + `POST /profile/edit` | `Task UpsertProfileAsync(Profile profile, ProfileUpdate patch, string? actorBy = null)` | the F13 single-write-surface pin (the `ProfileController.Edit` POST is the sole Web caller; the `ProfileUpdate` patch record is the frozen shape M23 extended with `Bio` / `TagIds`). The walk-through step card links into this surface; it does **not** re-implement the patch. |
-| Avatar | `GET /profile` (avatar upload) | `Task SetProfileAvatarAsync(string subjectId, string? avatarId, string actorBy)` | the C-MED·8 single write-lane shape (owner-scope, no audit row, never load-or-creates); the avatar upload itself rides the frozen ADR 0011 `IMediaStore` + `IOptions<MediaOptions>` C-MED·5 size/type guard (the `ProfileController.AvatarUpload` Web-only `IFormFile`-to-bytes boundary). The walk-through step card links into the avatar upload; it does **not** re-implement the media boundary. |
-| UI language | `GET /settings/language` (the `LocaleController.Index` action; the `LocaleCookie` language section) | the `LocaleController` **cookie** lane (`LocaleCookie.Read` / `LocaleCookie.Write` / `LocaleCookie.Clear` — a per-request `string`, **not** a `Profile` field; the thin-token rule, ADR 0001-B — the cookie is passed to `ITranslationProvider` as a plain BCP-47 string on every subsequent request, M·8 — Core stays HTTP-free) | the walk-through step card links into the Language settings tab; the UI language is a **cookie**, not a `Profile` field, so the walk-through does **not** call any `IUserInfoService` lane for it. |
+| Avatar | `GET /profile` (avatar upload) | `Task SetProfileAvatarAsync(string subjectId, string? avatarId, string actorBy)` | the C-MED·8 single write-lane shape (owner-scope, no audit row, never load-or-creates); the avatar upload itself rides the frozen ADR [0011](../adr/0011-media-and-file-storage.md) `IMediaStore` + `IOptions<MediaOptions>` C-MED·5 size/type guard (the `ProfileController.AvatarUpload` Web-only `IFormFile`-to-bytes boundary). The walk-through step card links into the avatar upload; it does **not** re-implement the media boundary. |
+| UI language | `GET /settings/language` (the `LocaleController.Index` action; the `LocaleCookie` language section) | the `LocaleController` **cookie** lane (`LocaleCookie.Read` / `LocaleCookie.Write` / `LocaleCookie.Clear` — a per-request `string`, **not** a `Profile` field; the thin-token rule, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B — the cookie is passed to `ITranslationProvider` as a plain BCP-47 string on every subsequent request, M·8 — Core stays HTTP-free) | the walk-through step card links into the Language settings tab; the UI language is a **cookie**, not a `Profile` field, so the walk-through does **not** call any `IUserInfoService` lane for it. |
 | Time zone | `GET /settings/timezone` (the `LocaleController.SettingsTimezone` action) | `Task SetProfileTimezoneAsync(string subjectId, string? timezone, string actorBy)` | the C-MED·8 single write-lane shape verbatim (owner-scope, one `SaveChangesAsync`, no `AccessAudit` row, never load-or-creates — `KeyNotFoundException` when no profile). The walk-through step card links into the Timezone settings tab. |
 | Date & time format | `GET /settings/dateformat` (the `LocaleController.SettingsDateFormat` action) | `Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy)` | the C-MED·8 single write-lane shape verbatim (owner-scope, one `SaveChangesAsync`, no `AccessAudit` row, never load-or-creates — `KeyNotFoundException` when no profile). The walk-through step card links into the DateFormat settings tab. |
-| Email & notification language | `GET /settings/language` (the email section folded into the Language tab, ADR 0061 / ADR 0080) | `Task SetProfileEmailLanguageAsync(string subjectId, string? emailLanguage, string actorBy)` | the C-MED·8 single write-lane shape verbatim (owner-scope, one `SaveChangesAsync`, no `AccessAudit` row, never load-or-creates — `KeyNotFoundException` when no profile). The walk-through step card links into the email section of the Language settings tab. |
+| Email & notification language | `GET /settings/language` (the email section folded into the Language tab, ADR [0061](../adr/0061-email-and-notification-language.md) / ADR [0080](../adr/0080-settings-surface-split.md)) | `Task SetProfileEmailLanguageAsync(string subjectId, string? emailLanguage, string actorBy)` | the C-MED·8 single write-lane shape verbatim (owner-scope, one `SaveChangesAsync`, no `AccessAudit` row, never load-or-creates — `KeyNotFoundException` when no profile). The walk-through step card links into the email section of the Language settings tab. |
 
 **The `FlashAsync` idiom** (the `LocaleController.FlashAsync` /
 `ProfileController.FlashAsync` shape the `OnboardingController` mirrors):
@@ -535,7 +535,7 @@ already owns that field:
   the same chain the view's `<kw-l>` TagHelper uses, so the flash string
   renders in the resident's language); falls back to the
   `KnownTranslationKeys.EnValues` source text when the translation seam is
-  absent (the test-construction floor, ADR 0015 D1 — code is the floor, so a
+  absent (the test-construction floor, ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 — code is the floor, so a
   resident never sees a raw key). The `OnboardingController.Finish` /
   `Skip` actions both call `FlashAsync("onboarding.flash_done")` (the single
   flash key in the locked §8 set) and redirect home — the finish/skip
@@ -623,7 +623,7 @@ read (the banner is rendered for a signed-in resident whose
 `OnboardingCompletedAt` is `null`; an unauthenticated request has no subject
 and no banner — the `LocaleController.BuildModel` null-safe idiom, §6); no
 claim read (the "is new" state is a profile-field read, never an identity
-claim — the thin-token rule, ADR 0001-B, D6); no blocking wall (the banner is
+claim — the thin-token rule, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B, D6); no blocking wall (the banner is
 a dismissible affordance, not a gate that blocks sign-in — D5).
 
 ## 8 — The `kw-l` key list (the closed `onboarding.*` set × en/de/fr/da)
@@ -657,7 +657,7 @@ the views are U03's):
 > **Reuse, don't invent:** the audience-editor labels, the "Save" submit, the
 > profile-link targets (`/profile/edit`, `/profile`, `/settings/language`,
 > `/settings/timezone`, `/settings/dateformat`), the flash-shape, and any
-> settings-tab labels the ADR 0080 lane already ships are **not** re-keyed —
+> settings-tab labels the ADR [0080](../adr/0080-settings-surface-split.md) lane already ships are **not** re-keyed —
 > M22 only adds the 15 keys above (the page title + intro + the seven step
 > cards + the visit link + the finish/skip buttons + the flash + the banner
 > text + the banner action). **U03 authors exactly the keys its surface

@@ -11,15 +11,15 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0132 — M22 Onboarding — a guided, non-blocking, localized walk-through + a completion record + a dismissible banner, with zero new authorization surface
+# ADR [0132](0132-onboarding.md) — M22 Onboarding — a guided, non-blocking, localized walk-through + a completion record + a dismissible banner, with zero new authorization surface
 
 Status: Accepted | Date: 2026-09-22
 
 > **Abstract:** M22 ships a **guided, non-blocking, localized walk-through**
 > + a **completion record** + a **dismissible banner**, with **zero new
 > authorization surface** (the C-M22·2 pin). It rides the frozen seams:
-> the ADR 0001-B owner-scope read/write, the ADR 0015 closed
-> `KnownTranslationKeys` set, the ADR 0061 per-recipient language
+> the ADR [0001](0001-core-stack-and-identity-model.md)-B owner-scope read/write, the ADR [0015](0015-ui-view-localization-mechanics.md) closed
+> `KnownTranslationKeys` set, the ADR [0061](0061-email-and-notification-language.md) per-recipient language
 > resolution — **no** new `AccessAction`, **no** `Decide()` branch,
 > **no** `AccessVia`, **no** `IAuthorizationService` method. The
 > completion state is **one additive `Profile` field**
@@ -42,7 +42,7 @@ resident's **account setup** walk-through — **not** an onboarding
 *system* (no per-step progress, no "you're missing X" detection, no
 elevated/guest onboarding, no admin completion-rate metric, no new
 languages — each a follow-on lane, D8). The *natural* shape is to ride
-the frozen seams (the ADR 0001-B owner-scope read/write, the ADR 0015
+the frozen seams (the ADR [0001](0001-core-stack-and-identity-model.md)-B owner-scope read/write, the ADR [0015](0015-ui-view-localization-mechanics.md)
 closed `KnownTranslationKeys` set) and add **one additive `Profile`
 field** + **one owner-scope write seam** + **one controller** + **one
 view/banner** + **one closed `kw-l` set** — **not** to invent a new

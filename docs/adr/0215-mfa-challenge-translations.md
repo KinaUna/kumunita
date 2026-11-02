@@ -11,12 +11,12 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0215 — MFA challenge page translations
+# ADR [0215](0215-mfa-challenge-translations.md) — MFA challenge page translations
 
 Status: Accepted
 
 ## Context
-ADR 0214 left the sign-in MFA challenge (Login view, MfaPending branch) and its four model-error
+ADR [0214](0214-login-mfa-fixes.md) left the sign-in MFA challenge (Login view, MfaPending branch) and its four model-error
 messages (AccountController.LoginMfa) as hard-coded English. The settings-side MFA page stays plain
 English on purpose (see that view's header comment); the challenge is part of sign-in, which is localized.
 

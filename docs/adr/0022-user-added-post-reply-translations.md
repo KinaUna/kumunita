@@ -13,11 +13,11 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0018 (UGC authored-in language tag) deliberately scoped out a **separate
+ADR [0018](0018-ugc-authored-in-language-tag.md) (UGC authored-in language tag) deliberately scoped out a **separate
 feature**: a human authoring a *translation* of an existing post or reply into
-another supported language. ADR 0005 §C likewise keeps out of scope "translating
+another supported language. ADR [0005](0005-multilingual-support.md) §C likewise keeps out of scope "translating
 user-generated content (posts, replies, announcements) — a separate, later
-feature." ADR 0021 added a `Translator` role, but that role reaches the *platform
+feature." ADR [0021](0021-translator-role-delegated-translation-editing.md) added a `Translator` role, but that role reaches the *platform
 surface* only (the UI strings and static pages) — it does not touch UGC, and
 it should not: a neighbor translating a friend's post into Polish needs none of
 the control-plane standing.
@@ -53,13 +53,13 @@ built on.
 
 - **Standing to add** is owned in Core (`PostService.CanAddTranslation` — a
   public display probe the Web uses to decide whether to show the form, and
-  `ResolveTranslationStanding`, the private decision), per ADR 0006-D
+  `ResolveTranslationStanding`, the private decision), per ADR [0006](0006-module-boundary-contracts.md)-D
   ("the service owns the decision, not the Web"):
   - **Community post / reply** — the **author** (of the post, or of the reply
     for reply translations), **∪ that community's Moderator** (a
     `moderator:<componentId>` claim), **∪ GlobalAdmin**.
   - **Group post / reply** — the **author** **∪ GlobalAdmin only**. A
-    component-moderator claim does *not* qualify on a group lane — ADR 0007
+    component-moderator claim does *not* qualify on a group lane — ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)
     established that groups have no component-moderator scope, so a Moderator
     of the post's community cannot act on a group's post.
   - Standing is resolved from the row's own facts (lane, component, row
@@ -98,14 +98,14 @@ built on.
     disabled or non-seeded language never appears as an option.
 
 - **Announcements are explicitly out of scope** (as the request states, "each
-  post and each reply"). The announcement edit lane (ADR 0017) is untouched.
+  post and each reply"). The announcement edit lane (ADR [0017](0017-announcement-edit-lane-author-or-globaladmin.md)) is untouched.
 
 ## Consequences
 
 Positive
 - A post or reply can now carry a human-authored translation into any enabled
   language, visible to everyone who can already read the parent — no new
-  audience, no new moderation lane, no machine-translation (ADR 0005 §C stays
+  audience, no new moderation lane, no machine-translation (ADR [0005](0005-multilingual-support.md) §C stays
   intact: this is *user-authored*, not *machine* translation).
 - Standing is decided in Core and reused for both the decision and the UI
   affordance, so the "who can add" rule cannot drift between the form's
@@ -121,7 +121,7 @@ Negative / accepted risks
   lane is the natural next step if it's ever needed (see "Revisit when").
 - A community **Moderator** can add a translation to *any* post/reply in their
   community, not just ones they would moderate. That is broader than the
-  post-edit lane (author-only, ADR 0014/0016) — accepted, because a
+  post-edit lane (author-only, ADR [0014](0014-post-edit-lane-author-only.md)/0016) — accepted, because a
   translation is a *new* artifact in a language the moderator speaks, not an
   edit of the author's text, and the row is attributed to the moderator's
   account on the audit line.

@@ -28,7 +28,7 @@ updated: 2026-11-02
 > read seam (`GetHistoryAsync`, the 5th method), one new parallel doc-type
 > surface (`StorageHistoryDocTypes`), one capture tick / handler / service
 > (the M13 `UsagePurge` precedent), and the closed `storage.trend.*` `kw-l` key
-> set. It settles M24's named deferral verbatim: ADR 0134 §"named
+> set. It settles M24's named deferral verbatim: ADR [0134](../adr/0134-storage-metrics.md) §"named
 > non-decisions" item (3) — "**The time-series lane** … time series is a future
 > lane (own ADR, the M13 charts precedent)." **M33 is that lane.** Out of scope:
 > the per-instance retention knob, the CSV export, the capacity-projection, the
@@ -45,7 +45,7 @@ updated: 2026-11-02
 > / `GetPerUserUsageBytesAsync` + 1 M25 ADD `GetPlatformSpaceAsync`) + the
 > `StorageMetricsSnapshot` DTO (the **7 data members** the sample mirrors) and
 > **extends them additively**. M33 **is** the "time-series lane" M24 named as a
-> deferral (ADR 0134 item 3); it settles that named non-decision on the M24
+> deferral (ADR [0134](../adr/0134-storage-metrics.md) item 3); it settles that named non-decision on the M24
 > storage surface.
 >
 > **Three-tier contract.** This file is the **primary** tier of M33's contract:
@@ -70,21 +70,21 @@ updated: 2026-11-02
 > the `StorageHistoryDocTypes` surface, the capture service / tick / handler
 > shapes, the `RetentionDays` constant, the closed `storage.trend.*` `kw-l` key
 > set, the 11 pinned test names, the acceptance gate, the drift guard) +
-> **ADR 0156**.
+> **ADR [0156](../adr/0156-storage-metrics-history.md)**.
 >
 > **The frozen base (reused, unchanged).** M33 is built **on top of** the M24
-> storage-metrics surface (ADR 0134 — the `IStorageMetricsService` 4-method
+> storage-metrics surface (ADR [0134](../adr/0134-storage-metrics.md) — the `IStorageMetricsService` 4-method
 > surface, the `StorageMetricsSnapshot` DTO, the `UsageDocTypes` /
 > `StorageSettingsDocTypes` registration surfaces, the
-> `AdminStorageMetricsController`) and the ADR 0004 §B.1 parallel-doc-type-
+> `AdminStorageMetricsController`) and the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 parallel-doc-type-
 > surface pattern (the `StorageHistoryDocTypes` shape **mirrors**
 > `UsageDocTypes` / `StorageSettingsDocTypes` — one `.Schema.For` each). It
-> also rides the M13 `UsagePurge` capture / retention precedent (ADR 0114 —
+> also rides the M13 `UsagePurge` capture / retention precedent (ADR [0114](../adr/0114-logging-and-usage-analytics.md) —
 > the `UsagePurgeTick` / `UsagePurgeHandler` / `UsagePurgeService` shape, the
 > `RetentionDays = 365` platform constant, the "telemetry is not an auditable
-> resource" discipline), the ADR 0006-D dependency-direction rule
+> resource" discipline), the ADR [0006](../adr/0006-module-boundary-contracts.md)-D dependency-direction rule
 > (**`Kumunita.Core` references no ASP.NET HTTP types** — the capture service
-> is Wolverine-free; the handler is the Web thin adapter), and the ADR 0015 D1
+> is Wolverine-free; the handler is the Web thin adapter), and the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1
 > `kw-l` provider-floor discipline (the `en` value is the source text). All of
 > these still bind **unchanged**. M33 adds **one doc**
 > (`StorageMetricsSample`, the 8-member M33·2 ceiling, M33·2), **one read
@@ -100,7 +100,7 @@ updated: 2026-11-02
 > sample **mirrors** it, M33·2), **no** `AccessAction` / `Decide()` branch /
 > `IAuthorizationService` surface / `AccessAudit` row (M33·4 / M33·9), **no**
 > new dependency / JS chart library (M33·10), and **no** EF migration (the new
-> doc rides the new `StorageHistoryDocTypes.Configure` surface — ADR 0004 §B.1
+> doc rides the new `StorageHistoryDocTypes.Configure` surface — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
 > idempotent delta at boot). It is **additive**.
 >
 > **The one thing every unit must respect:** M33 is **capture + trend** on the
@@ -121,7 +121,7 @@ updated: 2026-11-02
 > `/admin/storage` four-metric header + per-user table are **unchanged**
 > (M33·9 — additive only); the M24 `GlobalAdmin` gate is **unchanged** (a
 > non-GlobalAdmin still gets 403). The `Milestones.cs` / README /
-> `STATUS.md` / `ARCHITECTURE.md` / `MilestonesTests.cs` / `WhatsNew.cs`
+> [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) / `MilestonesTests.cs` / `WhatsNew.cs`
 > six-member close flip is **U08's** (M33·12). After M33, the operator opens
 > `/admin/storage` and sees the current snapshot **and** the direction it is
 > moving — the fill rate over the last month or quarter — so they can project
@@ -133,7 +133,7 @@ updated: 2026-11-02
 M24 (Storage metrics) closed the **point-in-time** storage question: the
 GlobalAdmin can see, at `/admin/storage`, how full the volume is **right now**
 — total used space, available space, user-content used space, and who is using
-the most (the four headline metrics + the per-user table). ADR 0134 shipped that
+the most (the four headline metrics + the per-user table). ADR [0134](../adr/0134-storage-metrics.md) shipped that
 surface and **named its boundary** in §"named non-decisions" item (3):
 
 > "(3) **The time-series lane** — charts / trend lines / per-day breakdowns;
@@ -154,7 +154,7 @@ M33 **is** that future lane, on the M24 storage surface. It adds the
    `AuditPurgeTick` self-rescheduling shape) stores **one**
    `StorageMetricsSample` per UTC day. The sample is the M24
    `StorageMetricsSnapshot` frozen at the day boundary (the M13 `UsageEvent`
-   "capture over time" precedent, ADR 0114, applied to storage). The capture is
+   "capture over time" precedent, ADR [0114](../adr/0114-logging-and-usage-analytics.md), applied to storage). The capture is
    a **durable side-effect**, not a middleware (storage is not a per-request
    concern — the M13 `UsageEvent` middleware captures *requests*; M33's
    `TimeoutMessage` captures *the day*, M33·3).
@@ -192,7 +192,7 @@ export, a capacity-projection, a per-user history, or a resident-facing history
   with `SampleDate` replacing `AsOf`; `SampleDate` is the UTC day captured; the
   `Id` is **deterministic** — one sample per UTC day, a same-day re-capture
   **overwrites**, M33·2);
-- the **`StorageHistoryDocTypes`** parallel registration surface (the ADR 0004
+- the **`StorageHistoryDocTypes`** parallel registration surface (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)
   §B.1 shape — `opts.Schema.For<StorageMetricsSample>();`, mirroring
   `UsageDocTypes` / `StorageSettingsDocTypes`, M33·1) + the boot wiring into
   both paths (the dev loop in `Program.cs` + the all-env `SchemaBootstrap`);
@@ -241,7 +241,7 @@ export, a capacity-projection, a per-user history, or a resident-facing history
   a **future lane**.
 - **The resident-facing history** — M33 is **`GlobalAdmin`-gated** (the M24
   precedent); there is **no** resident surface. A future lane may add one.
-- **The `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+- **The `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip** until the
   milestone *ships* (U08 owns it — the `WhatsNew.cs` `0.49.0` entry is
   appended by U08, not by an earlier unit, M33·12).
@@ -261,7 +261,7 @@ close unit (U08) re-pins them again.
   (`StorageMetricsSample`, M33·2), **one new read seam**
   (`GetHistoryAsync`, the 5th method on the existing seam — the M25
   `GetPlatformSpaceAsync` ADD precedent), **one new parallel doc-type surface**
-  (`StorageHistoryDocTypes`, the ADR 0004 §B.1 shape), and **one capture
+  (`StorageHistoryDocTypes`, the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 shape), and **one capture
   tick** (the M33·3 lane). The 3 M24 methods + the M25 ADD are **unchanged**
   (additive-only; M33 **adds**, it does not re-shape).
 - **M33·2 — The sample is a point-in-time snapshot, one per UTC day.** The
@@ -299,7 +299,7 @@ close unit (U08) re-pins them again.
   in Core (it references `Wolverine.TimeoutMessage`, the `UsagePurgeTick`
   precedent), but the **business logic** (capture + purge) is the Wolverine-
   free service. The **handler** is the Web thin adapter. There is **no**
-  `HttpClient` in Core (ADR 0006-D) and **no** outbound channel — the sample is
+  `HttpClient` in Core (ADR [0006](../adr/0006-module-boundary-contracts.md)-D) and **no** outbound channel — the sample is
   a local Marten document (M33·6).
 - **M33·6 — The sample never leaves the instance.** The `StorageMetricsSample`
   is a local Postgres document; nothing M33 emits, stores, or renders leaves the
@@ -340,10 +340,10 @@ close unit (U08) re-pins them again.
   **unchanged** (M33·1 — M33 **adds** the `storage.trend.*` set, it does not
   re-author the M24 set).
 - **M33·12 — The six-member close flip is U08's responsibility.** The
-  `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+  `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip lands in U08 (the
   M32·12 / M31·12 precedent). The `WhatsNew.cs` registry gains one new entry
-  (newest-first, the `0.49.0` row) naming M33 + ADR 0156.
+  (newest-first, the `0.49.0` row) naming M33 + ADR [0156](../adr/0156-storage-metrics-history.md).
 
 ## FACES (pinned, 10)
 
@@ -384,7 +384,7 @@ Part 2 (Seams & contracts — the exact `StorageMetricsSample` doc shape, the
 `StorageHistoryDocTypes` surface, the capture service / tick / handler shapes,
 the `RetentionDays` constant, the closed `storage.trend.*` `kw-l` key set, the
 11 pinned test names, the three-test acceptance gate, the drift-guard) is
-authored by U02, 2026-10-09 + **ADR 0156**.*
+authored by U02, 2026-10-09 + **ADR [0156](../adr/0156-storage-metrics-history.md)**.*
 
 ## Seams & contracts (Part 2, written by U02)
 
@@ -689,7 +689,7 @@ public sealed class StorageMetricsSample
 }
 ```
 
-The `StorageHistoryDocTypes` parallel-surface registration (the ADR 0004
+The `StorageHistoryDocTypes` parallel-surface registration (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)
 §B.1 shape — the `UsageDocTypes` / `StorageSettingsDocTypes` precedent,
 M33·1):
 
@@ -758,7 +758,7 @@ M24 `storage.*` key set is **unchanged**, M33·1 additive-only; M33 **adds**
 this set, M33·11). Every key is present, **non-empty, in all four**
 languages (en/de/fr/da), pinned by `KwLRegistryConsistencyTests` +
 `KnownTranslationKeys_ParityTests` (the M33·11 pin). The `en` value is the
-source text (the ADR 0015 D1 `kw-l` provider-floor discipline); the `de` /
+source text (the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline); the `de` /
 `fr` / `da` values are U06's to author (the M30·6 four-language pin).
 
 | Key | `en` value (source text) |
@@ -854,7 +854,7 @@ unit-series rule §12):
   `TotalUniqueFiles` (int) · `TotalDistinctUsers` (int). **No field outside
   this set** may appear in the doc (unit-series rule §4).
 - **The `StorageHistoryDocTypes` registration shape** — one
-  `opts.Schema.For<StorageMetricsSample>();` call (the ADR 0004 §B.1
+  `opts.Schema.For<StorageMetricsSample>();` call (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
   parallel-surface shape, the `UsageDocTypes` / `StorageSettingsDocTypes`
   precedent, M33·1); wired into **both** boot paths (the dev loop in
   `Program.cs` + the all-env `SchemaBootstrap` — the M3/Media/Usage
@@ -887,9 +887,9 @@ unit-series rule §12):
   **adds** the `storage.trend.*` set, it does not re-author the M24 set).
 
 *Part 2 — Seams & contracts, closed `kw-l` key set, pinned test names,
-acceptance gate, drift-guard. Authored by U02, 2026-10-09. **ADR 0156** is
-`docs/adr/0156-storage-metrics-history.md` (the index row is
-`docs/adr/README.md`).*
+acceptance gate, drift-guard. Authored by U02, 2026-10-09. **ADR [0156](../adr/0156-storage-metrics-history.md)** is
+[`docs/adr/0156-storage-metrics-history.md`](../adr/0156-storage-metrics-history.md) (the index row is
+[`docs/adr/README.md`](../adr/README.md)).*
 
 ### Run result (M33 acceptance gate — 2026-10-09)
 

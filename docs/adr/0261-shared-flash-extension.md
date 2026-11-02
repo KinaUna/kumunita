@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0261 — A shared FlashAsync extension; Guardian, Announcement and Event flashes localized
+# ADR [0261](0261-shared-flash-extension.md) — A shared FlashAsync extension; Guardian, Announcement and Event flashes localized
 
 Status: Accepted
 Date: 2026-10-29

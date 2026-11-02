@@ -27,7 +27,7 @@ updated: 2026-11-02
 > (`GetHistoryAsync`, the 3rd method), two new DTOs (`UsageDailyTotal`, the
 > 2-member M34·1 ceiling; `UsageHistoryResult`, the 2-member wrapper), the
 > closed `analytics.trend.*` `kw-l` key set. It settles M13's named deferral
-> verbatim: ADR 0114 §"deferred lanes" item 1 — "**Charts** (a `client/lib`
+> verbatim: ADR [0114](../adr/0114-logging-and-usage-analytics.md) §"deferred lanes" item 1 — "**Charts** (a `client/lib`
 > TS module over the existing table) … the admin page is a table + a count for
 > M13. **Own lane**, own ADR." **M34 is that lane.** Out of scope: the
 > per-surface over-time chart, the CSV export of the history, the
@@ -83,16 +83,16 @@ updated: 2026-11-02
 > **Part 2 (U02):** the seams & contracts (the exact `UsageDailyTotal` /
 > `UsageHistoryResult` DTO shapes, the `GetHistoryAsync` seam, the M13
 > surface extension, the closed `analytics.trend.*` `kw-l` key set, the 11
-> pinned test names, the acceptance gate, the drift guard) + **ADR 0162**.
+> pinned test names, the acceptance gate, the drift guard) + **ADR [0162](../adr/0162-analytics-history.md)**.
 >
 > **The frozen base (reused, unchanged).** M34 is built **on top of** the M13
-> analytics surface (ADR 0114 — the `IUsageAnalyticsService` 2-method
+> analytics surface (ADR [0114](../adr/0114-logging-and-usage-analytics.md) — the `IUsageAnalyticsService` 2-method
 > surface, the `UsageEvent` doc, the `UsageAnalyticsResult` / `SurfaceRow` /
 > `UsageCsvRow` POCOs, the `UsageDocTypes` registration surface, the
 > `UsagePurgeService` 365-day retention, the `AdminAnalyticsController`). It
-> also rides the ADR 0006-D dependency-direction rule (**`Kumunita.Core`
+> also rides the ADR [0006](../adr/0006-module-boundary-contracts.md)-D dependency-direction rule (**`Kumunita.Core`
 > references no ASP.NET HTTP types** — the read seam is on the existing
-> Wolverine-free service; no `HttpClient` in Core), and the ADR 0015 D1 `kw-l`
+> Wolverine-free service; no `HttpClient` in Core), and the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l`
 > provider-floor discipline (the `en` value is the source text). All of these
 > still bind **unchanged**. M34 adds **one read seam**
 > (`GetHistoryAsync`, the 3rd method, M34·1), **two DTOs**
@@ -126,7 +126,7 @@ updated: 2026-11-02
 > surface-rank table + distinct-actor header + CSV export lane are
 > **unchanged** (M34·8 — additive only); the M13 `GlobalAdmin` gate is
 > **unchanged** (a non-GlobalAdmin still gets 403, M34·8). The `Milestones.cs`
-> / README / `STATUS.md` / `ARCHITECTURE.md` / `MilestonesTests.cs` /
+> / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) / `MilestonesTests.cs` /
 > `WhatsNew.cs` six-member close flip is **U08's** (M34·12) — and **M34 is
 > the last milestone**, so the close promotes **no** successor. After M34,
 > the operator opens `/admin/analytics` and sees the window's aggregates
@@ -140,11 +140,11 @@ M13 (Logging and analytics) closed the **point-in-time** analytics question:
 the GlobalAdmin can see, at `/admin/analytics`, how the platform was used over
 a pinned 7/30/90-day window — the per-surface ranking, the
 authenticated/anonymous split, the distinct-actor count, and a CSV export of
-the per-day-per-surface rows. ADR 0114 shipped that surface and **named its
+the per-day-per-surface rows. ADR [0114](../adr/0114-logging-and-usage-analytics.md) shipped that surface and **named its
 boundary** in §"deferred lanes" item 1:
 
 > "**Charts** (a `client/lib` TS module over the existing table) — a `tsc`-
-> only module, the ADR 0031 discipline; the admin page is a table + a count
+> only module, the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) discipline; the admin page is a table + a count
 > for M13. **Own lane**, own ADR."
 
 M13 answered "how was it used **in this window**". A single window's count
@@ -219,7 +219,7 @@ multi-week/month aggregation (the named deferrals, §Scope).
 - the **M13 surface extension** — the `AdminAnalyticsController.Index` gains
   the history read (a second read alongside the M13 `GetWindowAsync` read;
   the M13 read is **unchanged**) + the `AnalyticsViewModel` gains a `History`
-  member + a `TrendWindowDays` label member (**Option-B seam, ADR 0162
+  member + a `TrendWindowDays` label member (**Option-B seam, ADR [0162](../adr/0162-analytics-history.md)
   close resolution** — the Trend section's own `?trendwindow=` window,
   independent of the M13 `?window=` read) + the
   `Views/AdminAnalytics/Index.cshtml` gains a **Trend** section (a per-day
@@ -250,7 +250,7 @@ multi-week/month aggregation (the named deferrals, §Scope).
   precedent); there is **no** resident surface. A future lane may add one.
 - **The multi-week / month aggregation** — M34 v1 is **daily granularity**; a
   weekly / monthly bucket toggle is a **future lane**.
-- **The `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+- **The `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip** until the
   milestone *ships* (U08 owns it — the `WhatsNew.cs` `0.55.0` entry is
   appended by U08, not by an earlier unit, M34·12). And **M34 is the last
@@ -318,7 +318,7 @@ capture tick, M33·7 retention constant); M34 has no capture lane to pin.
   the new method is on the existing service). The impl is a **Wolverine-free
   read** over the `UsageEvent` doc (one `QuerySession` + one grouped query —
   the M13 `GetWindowAsync` aggregation shape). There is **no** `HttpClient`
-  in Core (ADR 0006-D) and **no** outbound channel — the read is over local
+  in Core (ADR [0006](../adr/0006-module-boundary-contracts.md)-D) and **no** outbound channel — the read is over local
   Postgres documents (M34·5).
 - **M34·7 — The trend window is a pinned set.** `GetHistoryAsync(int days)`
   accepts a **pinned** set `{7, 30, 90, 180, 365}`; an unknown value throws
@@ -335,7 +335,7 @@ capture tick, M33·7 retention constant); M34 has no capture lane to pin.
   read (a second read alongside the M13 `GetWindowAsync` read — the M13 read
   is **unchanged**); `AnalyticsViewModel` gains an `IReadOnlyList<
   UsageDailyTotal> History` member + a `TrendWindowDays` label member
-  (**Option-B seam, the ADR 0162 close resolution** — the Trend section
+  (**Option-B seam, the ADR [0162](../adr/0162-analytics-history.md) close resolution** — the Trend section
   carries its **own** window over a separate `?trendwindow=` param, pinned
   {7, 30, 90, 180, 365}, so it is **independent** of the M13 `WindowDays`
   member over `?window=` (pinned {7, 30, 90}); the two reads no longer
@@ -365,10 +365,10 @@ capture tick, M33·7 retention constant); M34 has no capture lane to pin.
   set is **untouched** (M34·1 — M34 **adds** the `analytics.trend.*` set, it
   does not re-author the M13 set).
 - **M34·12 — The six-member close flip is U08's responsibility.** The
-  `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+  `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip lands in U08 (the
   M33·12 precedent). The `WhatsNew.cs` registry gains one new entry
-  (newest-first, the `0.55.0` row) naming M34 + ADR 0162. **M34 is the last
+  (newest-first, the `0.55.0` row) naming M34 + ADR [0162](../adr/0162-analytics-history.md). **M34 is the last
   milestone** — the close flips `M34` from `StatusNext` to `StatusDone` and
   promotes **no** successor (the `M34_Is_The_Single_InProgress_Milestone`
   pin is **removed** and replaced with a "no in-progress milestone"
@@ -387,7 +387,7 @@ written; the drift-guard (U02 + U08) re-pins them.
   M34·9).
 - **M34-2 — A GlobalAdmin switches the trend window to 7/90/180/365.** The
   table + sparkline reflect the chosen window (the `?trendwindow=` query
-  param — the Option-B independent Trend seam, ADR 0162 close resolution;
+  param — the Option-B independent Trend seam, ADR [0162](../adr/0162-analytics-history.md) close resolution;
   the M13 `?window=` read stays 7/30/90) (M34·7).
 - **M34-3 — The history is empty** (a fresh instance, no `UsageEvent` rows
   yet) → the "Trend" section renders the `analytics.trend.empty` message (not
@@ -521,7 +521,7 @@ capture tick / handler / boot-seed, **no** new DI line (the M34·1 pin).
 pinned by `KwLRegistryConsistencyTests` (Web.Tests) +
 `KnownTranslationKeys_ParityTests` (Core.Tests) (the M34·11 pin, the M33·11
 closed-set precedent). The `en` values below are the **source text** (the
-ADR 0015 D1 `kw-l` provider-floor discipline); the `de` / `fr` / `da` values
+ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline); the `de` / `fr` / `da` values
 are U05's to author (the M34·11 four-language pin). The M13
 `admin.analytics_*` key set is **untouched** (the M34·1 additive-only pin —
 M34 **adds** this set, it does not re-author the M13 set):
@@ -629,7 +629,7 @@ rule §13):
   outside either set.
 - **The M13 surface extension (M34·8)** — `Index` gains the second read +
   the `History` view-model member + the `TrendWindowDays` label member
-  (**Option-B seam, ADR 0162 close resolution** — the Trend section's own
+  (**Option-B seam, ADR [0162](../adr/0162-analytics-history.md) close resolution** — the Trend section's own
   `?trendwindow=` window, independent of the M13 `?window=` read) + the
   Trend section (table + sparkline + five window links over `?trendwindow=`
   + the `analytics.trend.empty` empty-state); the M13 surface-rank table +
@@ -645,7 +645,7 @@ rule §13):
 `UsageDailyTotal` / `UsageHistoryResult` DTO shapes, the closed
 `analytics.trend.*` `kw-l` key set, the 11 pinned test names, the
 three-test acceptance gate, the drift-guard). Authored by U02, 2026-10-11.
-Companion ADR: `docs/adr/0162-analytics-history.md` (Draft).*
+Companion ADR: [`docs/adr/0162-analytics-history.md`](../adr/0162-analytics-history.md) (Draft).*
 
 ### Run result (M34 acceptance gate — 2026-10-11)
 

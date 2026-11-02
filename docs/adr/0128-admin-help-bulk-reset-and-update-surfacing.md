@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0128 — Admin bulk help-page reset and "newer shipped text" surfacing
+# ADR [0128](0128-admin-help-bulk-reset-and-update-surfacing.md) — Admin bulk help-page reset and "newer shipped text" surfacing
 
 **Status:** Accepted
 **Date:** 2026-09-12
@@ -24,7 +24,7 @@ surface split this new `/admin/help` surface joins).
 
 ## Context
 
-ADR 0058 gave the platform a **per-page** "reset to seeded text" action: an admin
+ADR [0058](0058-page-reset-to-seeded-text-lane.md) gave the platform a **per-page** "reset to seeded text" action: an admin
 reverts *one* page's English body and its `de`/`fr`/`da` translation rows to the
 code-owned seeded baseline. That is the right primitive, but it leaves two gaps
 for the *bulk* case, which is the workflow most admins will actually hit:
@@ -40,8 +40,8 @@ for the *bulk* case, which is the workflow most admins will actually hit:
 
 The tempting fix for (2) is a **silent auto-apply**: at boot, detect that the
 shipped baseline is newer and overwrite the stored pages. That is rejected here —
-it is the same anti-pattern ADR 0058 D5 guards against (a destructive write with
-no operator intent), and it violates the ADR 0042 D1 rule that a *human editor is
+it is the same anti-pattern ADR [0058](0058-page-reset-to-seeded-text-lane.md) D5 guards against (a destructive write with
+no operator intent), and it violates the ADR [0042](0042-bundled-initial-language-pack.md) D1 rule that a *human editor is
 the only writer* of a non-`en` body. An admin who customised a help page for
 their community would have that work silently clobbered on the next deploy.
 
@@ -57,14 +57,14 @@ both explicit, both destructive, both audited, both GlobalAdmin-only.
 A new `AdminHelpController` (route `admin/help`,
 `[Authorize(Roles = Roles.GlobalAdmin)]`) with one GET and two POSTs. It is a
 sibling to `AdminSignupController` / `AdminTimezoneController` and the other
-`/admin/*` surfaces (ADR 0062), and it is deliberately a **dedicated controller**:
+`/admin/*` surfaces (ADR [0062](0062-admin-surface-split.md)), and it is deliberately a **dedicated controller**:
 the `AdminController`'s constructor is pinned by the Web test harnesses, so a new
 seam goes on its own controller — the established convention.
 
 - **`GET /admin/help`** — lists every seeded page with a "newer shipped text"
   flag (read-only; D2). No writes, no audit row.
 - **`POST /admin/help/reset`** — resets *one* seeded page (delegates to the
-  existing ADR 0058 `PageService.ResetToSeededAsync` lane verbatim).
+  existing ADR [0058](0058-page-reset-to-seeded-text-lane.md) `PageService.ResetToSeededAsync` lane verbatim).
 - **`POST /admin/help/reset-all`** — resets **every** seeded page (the new bulk
   lane, D3).
 
@@ -88,7 +88,7 @@ A page is flagged `HasNewerShippedText` when **any** of these holds:
 - a `de`/`fr`/`da` row the baseline defines is **missing** on the stored page, or
 - a `de`/`fr`/`da` row the baseline defines **differs** from the baseline.
 
-Crucially it does **not** flag languages the baseline does not carry (the ADR 0058
+Crucially it does **not** flag languages the baseline does not carry (the ADR [0058](0058-page-reset-to-seeded-text-lane.md)
 D4 skip rule): a community-authored `es` row, or any `de`/`fr`/`da` row for a
 slug whose baseline has no such row, is not a divergence — it is custom content
 the reset would never touch, and it must not read as "newer shipped text".
@@ -105,7 +105,7 @@ the gap between the DB and the current code.
 - re-checks **GlobalAdmin** standing (denied → `UnauthorizedAccessException` —
   the `[Authorize]` attribute is the first guard, this is the second);
 - loads every seeded `Page`;
-- delegates each reset to the **same** ADR 0058 applier
+- delegates each reset to the **same** ADR [0058](0058-page-reset-to-seeded-text-lane.md) applier
   (`FirstBootSeeder.ResetSeededTextAsync`) — so the bulk reset writes byte-for-byte
   the same text a per-page reset would;
 - writes one `AccessAudit` row per page (`Action = "page.reset"`,
@@ -118,18 +118,18 @@ existing `page.reset` vocabulary and the existing
 
 ### D4 — Standing: GlobalAdmin, verbatim (the stricter of the two lanes)
 
-The per-page ADR 0058 lane allows **author ∪ GlobalAdmin** on a *blog* page. But
+The per-page ADR [0058](0058-page-reset-to-seeded-text-lane.md) lane allows **author ∪ GlobalAdmin** on a *blog* page. But
 this bulk surface only ever operates on **seeded** pages, and every seeded page
 is a `PageKind.System` page (platform pages + the user guides) — none of them is
 a blog page. So the effective standing for every reset reachable from
 `/admin/help` is **GlobalAdmin** (the `CheckEditStanding` helper still applies on
 the per-page path; the bulk path checks GlobalAdmin directly). A community
-Moderator has no standing here, matching ADR 0058 D3 (reset is a
+Moderator has no standing here, matching ADR [0058](0058-page-reset-to-seeded-text-lane.md) D3 (reset is a
 platform-level operation).
 
 ### D5 — Destructive by design, opt-in, the default is non-destructive
 
-This is the same defining property as ADR 0058 D5, applied to the bulk case. A
+This is the same defining property as ADR [0058](0058-page-reset-to-seeded-text-lane.md) D5, applied to the bulk case. A
 reset replaces hand-edited text and there is **no undo** (the prior text is gone
 from the page; the audit row is the only trail). The guards are:
 
@@ -166,7 +166,7 @@ from the page; the audit row is the only trail). The guards are:
 The lane adds: **one** admin controller (3 actions), **one** view, **one**
 list-group link, **two** `PageService` methods (`GetSeededPageStatusAsync`,
 `ResetAllSeededPagesAsync`), **one** `FirstBootSeeder.AllSeededSlugs()` registry
-read, and **one** `SeededPageStatus` record. It reuses the ADR 0058
+read, and **one** `SeededPageStatus` record. It reuses the ADR [0058](0058-page-reset-to-seeded-text-lane.md)
 `ResetToSeededAsync` / `ResetSeededTextAsync` appliers verbatim. It adds **no**
 new doc type, **no** schema change, **no** new `AccessAction` / `AccessVia`,
 **no** new role, **no** new failure shape, and **no** new `kw-l` key.
@@ -197,7 +197,7 @@ new doc type, **no** schema change, **no** new `AccessAction` / `AccessVia`,
   code baseline", which is what an admin needs to decide a reset. It is not
   asserting which is "better".
 - A bulk reset **replaces** the admin's hand-edited `de`/`fr`/`da` rows, exactly
-  as a per-page reset does (ADR 0058 D5). The `confirm()` on "Reset all" states
+  as a per-page reset does (ADR [0058](0058-page-reset-to-seeded-text-lane.md) D5). The `confirm()` on "Reset all" states
   this plainly across the whole set.
 - The probe recomputes on every visit (a small read over a small, closed set of
   pages). That is the cost of "no schema, no cache, no boot hook" — acceptable at
@@ -205,7 +205,7 @@ new doc type, **no** schema change, **no** new `AccessAction` / `AccessVia`,
 
 **Deferred (own lanes).**
 
-- A **"restore my custom text"** undo — deliberately absent (D5), as in ADR 0058:
+- A **"restore my custom text"** undo — deliberately absent (D5), as in ADR [0058](0058-page-reset-to-seeded-text-lane.md):
   the reset is destructive and the audit row is the only trail.
 - Resetting the **language catalog** or **UI-string** baselines to the code-owned
   seed — a different surface, its own ADR.
@@ -216,8 +216,8 @@ None — the lane is self-contained.
 
 ## References
 
-- **ADR 0058** — the per-page "reset to seeded text" lane this lane builds on
+- **ADR [0058](0058-page-reset-to-seeded-text-lane.md)** — the per-page "reset to seeded text" lane this lane builds on
   (the same applier, the same standing matrix, the same `page.reset` audit).
-- **ADR 0057** — the `GuidePages` registry (part of the seeded slug set).
-- **ADR 0042 / 0043** — the en/de/fr/da seeded page baselines.
-- **ADR 0062** — the admin surface split this `/admin/help` surface joins.
+- **ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md)** — the `GuidePages` registry (part of the seeded slug set).
+- **ADR [0042](0042-bundled-initial-language-pack.md) / 0043** — the en/de/fr/da seeded page baselines.
+- **ADR [0062](0062-admin-surface-split.md)** — the admin surface split this `/admin/help` surface joins.

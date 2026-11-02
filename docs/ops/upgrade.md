@@ -33,10 +33,10 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
 4. On boot, pending **versioned migrations** are applied — the Marten storage features
    (`FeatureSchemaBase` / doc-type changes) are **delta-detected against the live `mt`
    catalog** and applied idempotently (Weasel-feature pattern: no `mt.migrations` ledger —
-   ADR 0004 §B) and Identity migrations run against `identity.__EFMigrationsHistory`;
+   ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B) and Identity migrations run against `identity.__EFMigrationsHistory`;
    check the logs confirm the steps ran. Schema evolution is forward-only and lives in the
    image, so the new image must always carry a superset of the running schema's steps
-   (ADR 0004).
+   (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)).
 5. Smoke test: home page renders, `/health` OK; the `build` SHA matches the deployed
    commit. (The full smoke set — login, create a post, open a component — exists from M1/M3.)
 6. **Rollback (if needed):** reselect the **previous commit SHA** recorded in step 2 in
@@ -53,7 +53,7 @@ need to roll back — it is the "one-step" the 2026-10-22 audit found missing:
 ordered, guarded, drilled, dated shape around it.
 
 **R1 — the schema-compat guard (run BEFORE reselecting the SHA):**
-the forward-only rule (ADR 0004 §B, step 4 above) constrains the *forward*
+the forward-only rule (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B, step 4 above) constrains the *forward*
 direction (the new image must be a superset). This guard constrains the
 *rollback* direction — does the **old** image tolerate the **current**
 schema?
@@ -113,10 +113,10 @@ new procedure, it *calls* the existing one. The exact sequence:
      (superuser; the `kumunita` role cannot drop/recreate the DB it is
      connected *as*). The backups page's PITR only narrows the RPO; this leg works **with or
      without** it.
-   **The restore connects as the `postgres` superuser** — the ADR 0004
+   **The restore connects as the `postgres` superuser** — the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)
    "app role owns the DB" consequence (the `kumunita` role cannot
    drop/recreate the DB it is connected *as*).
-3. **Restore the media volume too, if bracketed** (ADR 0011, [backups](backups.md) "Second
+3. **Restore the media volume too, if bracketed** (ADR [0011](../adr/0011-media-and-file-storage.md), [backups](backups.md) "Second
    restore surface"): the DB restore does **not** rewind the media volume
    (`Media__RootPath`). If the media snapshot brackets the dump, restore it
    as **step 2.5** — between the DB restore and app start. A half-restore

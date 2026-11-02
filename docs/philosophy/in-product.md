@@ -58,7 +58,7 @@ model of the platform — especially of the access model. Where their mental
 models diverge, seams break silently: a moderator assumes a group "obviously"
 includes the board, a resident assumes their post is private to neighbors.
 Design reviews, a shared written model of the access rules, and clear
-moderator scoping (ADR 0003) are our integration harnesses. A feature that
+moderator scoping (ADR [0003](../adr/0003-roles-and-moderator-scoping.md)) are our integration harnesses. A feature that
 works technically but confuses the residents failed at a seam we didn't see.
 
 ## Releases are integration events

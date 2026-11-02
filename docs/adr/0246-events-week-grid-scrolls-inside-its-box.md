@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0246 — The events week grid scrolls inside its own box on narrow screens
+# ADR [0246](0246-events-week-grid-scrolls-inside-its-box.md) — The events week grid scrolls inside its own box on narrow screens
 
 Status: Accepted
 Date: 2026-10-29

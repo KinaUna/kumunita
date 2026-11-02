@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0130 — Sample corpus: whole-corpus create-if-missing backfill on warm boot
+# ADR [0130](0130-sample-corpus-warm-boot-backfill.md) — Sample corpus: whole-corpus create-if-missing backfill on warm boot
 
 **Status:** Accepted
 **Date:** 2026-09-12
@@ -25,7 +25,7 @@ untouched).
 
 ## Context
 
-ADR 0129 moved the development sample neighborhood into an embedded
+ADR [0129](0129-sample-data-embedded-json-document.md) moved the development sample neighborhood into an embedded
 `Data/sample-data.json` and demoted `SampleDataSeeder` to a **generic
 materializer**. Cold boot — a pristine database — materializes the whole corpus
 once. But a deployment that was seeded *before* the corpus was last grown has no
@@ -33,9 +33,9 @@ path to pick up the new content: the corpus only ever appears on a first boot, a
 a "warm" boot (a database that already holds some of the sample rows) leaves the
 previously-absent rows absent.
 
-ADR 0060 D1 solved this for exactly one surface — the events' de / fr / da
-translation rows — with a dedicated `BackfillEventTranslationsAsync`. ADR 0052 and
-ADR 0047 D2 each added their own narrow warm-boot backfill (the UI-string
+ADR [0060](0060-event-translation-sample-backfill.md) D1 solved this for exactly one surface — the events' de / fr / da
+translation rows — with a dedicated `BackfillEventTranslationsAsync`. ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) and
+ADR [0047](0047-static-page-localization-and-backfill.md) D2 each added their own narrow warm-boot backfill (the UI-string
 baselines, then the four system pages' translations). Three separately-authored
 warm-boot mechanisms, each matching by a different key, each with its own
 "create-if-missing, never clobber" care. As the corpus kept growing, each *new*
@@ -46,7 +46,7 @@ instance missing rows.
 The user asked: *when a platform instance is set to use the demo sample data, it
 should import the demo data on boot and add any missing entries from the sample
 data.* The natural generalization is a **single, whole-corpus reconciliation** that
-re-applies ADR 0056 D1's "create-if-missing, never clobber" rule to every
+re-applies ADR [0056](0056-sample-data-opt-in-and-deploy-posture.md) D1's "create-if-missing, never clobber" rule to every
 entity in the document, on every warm boot.
 
 ## Decision
@@ -71,11 +71,11 @@ resident edit (a retitled post, a corrected description) is preserved:
 
 | Entity                 | Natural key                                                        |
 |------------------------|--------------------------------------------------------------------|
-| accounts               | e-mail (the ADR 0078 closed set)                                   |
+| accounts               | e-mail (the ADR [0078](0078-sample-account-notification-suppression-in-production.md) closed set)                                   |
 | tags                   | `Slug`                                                            |
-| groups                 | `Name` (the `Group` doc carries no slug — ADR 0010)               |
+| groups                 | `Name` (the `Group` doc carries no slug — ADR [0010](0010-private-groups.md))               |
 | announcements          | `(Title, CommunityId)`                                            |
-| posts                  | `(Title, lane)` — lane = `GroupId` for a group post, `ComponentId` for a community post (ADR 0013 exclusivity) |
+| posts                  | `(Title, lane)` — lane = `GroupId` for a group post, `ComponentId` for a community post (ADR [0013](0013-group-posts-membership-lane.md) exclusivity) |
 | replies                | `(PostId, Body)`                                                  |
 | events                 | `Title`                                                           |
 | RSVPs                  | `(EventId, ResidentEmail)`                                        |
@@ -100,12 +100,12 @@ replies, events, RSVPs, pages, goals, projects, to-dos, and every translation
 row — are staged into a **single** `IDocumentSession` and committed once. The
 Identity-side work (the account ensures and the mandatory-community re-applications)
 runs through `UserManager` / `IUserInfoService` as before, outside that session.
-This is the ADR 0004 C3 "all `mt` writes commit in one `IDocumentSession`"
+This is the ADR [0004](0004-data-persistence-and-schema-evolution.md) C3 "all `mt` writes commit in one `IDocumentSession`"
 invariant, applied to the backfill exactly as to the cold boot.
 
 ### D4 — Two postures, as on the cold boot
 
-The account reconciliation honours the ADR 0056 two-posture credential rule: a
+The account reconciliation honours the ADR [0056](0056-sample-data-opt-in-and-deploy-posture.md) two-posture credential rule: a
 deployed instance (mailer present, `seedAdminEmail` set) leaves the admin password
 `null` (no weak credential — the setup-token lane) and generates random passwords
 for the other sample accounts; a development instance applies the weak demo
@@ -118,7 +118,7 @@ never overwritten.
 - **Additive corpus growth now "just works."** A developer adds a post, event,
   page, or translation to `sample-data.json` and any instance that has sample data
   enabled picks it up on its next warm boot — no per-entity backfill to remember.
-  The ADR 0060 D1 / ADR 0052 / ADR 0047 D2 backfills still hold, now as special
+  The ADR [0060](0060-event-translation-sample-backfill.md) D1 / ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) / ADR [0047](0047-static-page-localization-and-backfill.md) D2 backfills still hold, now as special
   cases of the loop.
 - **A renamed display string is a rename, not a create.** Natural keys are
   display strings (titles, names). The corpus contains a few **same-title posts

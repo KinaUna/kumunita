@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0209 — Focus rings: the two `outline: 0/none` rules
+# ADR [0209](0209-focus-rings.md) — Focus rings: the two `outline: 0/none` rules
 
 Status: Accepted
 
@@ -21,7 +21,7 @@ Status: Accepted
 `--bs-focus-ring-color` glow (rgba green at 0.28 / 0.40 alpha) that measures 1.65:1 (light) and
 2.5:1 (dark) against the surface, under the 3:1 minimum for focus indicators; the card's
 border also turned `--bs-primary`, which is green in Ember and 2.6-2.7:1 on dark. The global
-`html[data-kmb-palette] :focus-visible` accent outline (ADR 0175) was being switched off.
+`html[data-kmb-palette] :focus-visible` accent outline (ADR [0175](0175-palettes-and-feed-card.md)) was being switched off.
 
 ## Decision
 - ⋮ action button: no outline override and no glow; the accent outline (2px, offset 2px) shows

@@ -21,7 +21,7 @@ updated: 2026-11-02
 > F4 pin §6.8 / OPS §5), not on F4's code (which is empty — F4.U2 is "no code
 > needed," F4 pin §7).
 > **Status:** this is the **Part-0 design pin** (F20.U1). It is **design-only**:
-> no code, no build, no `.cs` touched. F20.U2 lands the **`docs/OPS.md` runbook
+> no code, no build, no `.cs` touched. F20.U2 lands the **[`docs/OPS.md`](../OPS.md) runbook
 > update** (the one-step rollback + the schema-compat guard + the drill procedure
 > + the "last drilled" line) — that is the **code side**, and it is a *runbook*,
 > not C# (see §7). F20.U3 is the **owner-ops drill** — recorded as an **open
@@ -54,7 +54,7 @@ updated: 2026-11-02
   (`pgbackrest --stanza=<instance> restore --type=time --target=…` / `--latest`)
   — the continuous-WAL restore that **F4** (pin §6.8) provides once `archive_command`
   is live.
-- **Forward-only schema (OPS §3 step 4, ADR 0004 §B):** "the new image must
+- **Forward-only schema (OPS §3 step 4, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B):** "the new image must
   always carry a **superset** of the running schema's steps." Marten delta-
   detection is **idempotent, no `mt.migrations` ledger** (Weasel-feature pattern);
   EF Identity migrations run against `identity.__EFMigrationsHistory`.
@@ -89,7 +89,7 @@ equivalent forms — **primary (prod, Coolify)** and **equivalent (local / compo
    rebuilds the image from that commit (§3 intro: no registry — the commit *is*
    the version).
 3. **On boot**, the **old** image's Marten delta-detection runs against the
-   **current** `mt` catalog. Because the schema is forward-only (ADR 0004 §B) and
+   **current** `mt` catalog. Because the schema is forward-only (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B) and
    the old image's feature set is a **subset** of what is applied, it tolerates
    the superset and is a **no-op** — **provided** the changes in the rolled-back
    window are additive-only (the §3 guard decides; a breaking change routes to
@@ -117,7 +117,7 @@ existing primitives (the gap the audit found, §1).
 
 ## 3. The schema-compat guard (pinned)
 
-**The rule:** forward-only (ADR 0004 §B) means the **old** image may be rolled
+**The rule:** forward-only (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B) means the **old** image may be rolled
 back over the **new** schema **iff** the schema changes in the rolled-back window
 are **additive-only**.
 
@@ -174,10 +174,10 @@ F20's 'one-step rollback' restore step will call").
      dependency only *narrows the RPO*; this leg works **with or without** F4).
    - **The restore connects as the `postgres` superuser** — the `kumunita` role
      cannot drop/recreate the DB it is connected *as* (OPS §5 step 2; the
-     **ADR 0004 "app role owns the DB"** consequence, §6).
+     **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) "app role owns the DB"** consequence, §6).
 3. **Restore the media volume too, if bracketed** (F4 §5 boundary, re-stated):
    the DB restore does **not** rewind the media volume (`Media__RootPath`,
-   ADR 0011). If the media snapshot brackets the dump (OPS §4 "Second restore
+   ADR [0011](../adr/0011-media-and-file-storage.md)). If the media snapshot brackets the dump (OPS §4 "Second restore
    surface"), restore it as **step 2.5** — between the DB restore and app start.
    A half-restore (Postgres at `T`, media volume at `T'`) degrades safely (a
    missing `MediaObject` byte is a **re-hydratable avatar `404`**; the content
@@ -237,13 +237,13 @@ auditable** record rather than a one-off.
 
 ---
 
-## 6. The ADR 0004 "app role owns the DB" tension (recorded, not resolved here)
+## 6. The ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) "app role owns the DB" tension (recorded, not resolved here)
 
 - The **DB-restore leg requires the `postgres` superuser** (OPS §5 step 2)
-  **precisely because** the app role owns the DB (ADR 0004) — the `kumunita` role
+  **precisely because** the app role owns the DB (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)) — the `kumunita` role
   cannot drop/recreate the DB it is connected *as*. This is the **non-blocking**
   reading for F20: the restore path is the **superuser** path, which does **not**
-  depend on the app role's privileges — so the ADR 0004 ownership does **not**
+  depend on the app role's privileges — so the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) ownership does **not**
   prevent the rollback.
 - The **forward-only tolerance** in §3 also leans on the app role's schema
   ownership: the old image, on boot, runs its Marten delta-detection **as the
@@ -263,7 +263,7 @@ auditable** record rather than a one-off.
 
 ## 7. Why this is `code+ops`, and what the code side is
 
-- **The code side (F20.U2) is the `docs/OPS.md` runbook update** — **NOT a C#
+- **The code side (F20.U2) is the [`docs/OPS.md`](../OPS.md) runbook update** — **NOT a C#
   change.** There is **no app-side knob, no health-probe field, no DI seam** a
   one-step rollback needs: the app neither initiates nor participates in its own
   image rollback or its own DB restore — the **owner** does. This mirrors F4's
@@ -273,7 +273,7 @@ auditable** record rather than a one-off.
   (Coolify reselect + PITR restore) **already exists** (OPS §3 step 6 + OPS §5 /
   F4 pin §6.8); what is **absent** is the **one-step, guarded, drilled, dated**
   shape around it. U2 is the artifact that closes that gap.
-- **F20.U2 (≤ 1 file, the runbook):** add to `docs/OPS.md` (§3 **Upgrade** and/or
+- **F20.U2 (≤ 1 file, the runbook):** add to [`docs/OPS.md`](../OPS.md) (§3 **Upgrade** and/or
   §5 **Restore**) the §2 one-step rollback sequence, the §3 schema-compat guard +
   checklist, the §5 drill procedure, and the "Last drilled (rollback)" line — and
   record the owner-ops drill as an **open item**. **No C#, no
@@ -287,15 +287,15 @@ auditable** record rather than a one-off.
 ## 8. Invariants held + open items
 
 **Invariants (this unit, and the lane):**
-- **ADR 0006** module boundaries — **untouched** (no new bounded context / surface
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)** module boundaries — **untouched** (no new bounded context / surface
   / schema; the rollback is owner-ops around existing primitives).
 - **C3 single-write-lane** — **untouched** (the rollback is owner-ops, not an app
   write lane; no new write path).
 - **Core stays HTTP-free** — **untouched** (no app-side rollback code; the §2/§4
   legs are host/owner commands, not C#).
-- **ADR 0004 forward-only** — **enforced, not changed** (the §3 guard *applies*
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) forward-only** — **enforced, not changed** (the §3 guard *applies*
   the forward-only invariant in the rollback direction; it does not relax it).
-- **ADR 0011 media-volume boundary** — **preserved, not replaced** (the §4 leg
+- **ADR [0011](../adr/0011-media-and-file-storage.md) media-volume boundary** — **preserved, not replaced** (the §4 leg
   reuses the existing media snapshot procedure; F20 does not change it).
 - **F4 dependency honored** — the §4 leg **reuses** F4's PITR primitive (F4 pin
   §6.8), never re-invents it.
@@ -338,5 +338,5 @@ auditable** record rather than a one-off.
   no build run** for this unit.
 - **Forward pointer:** **F20 is now at U2** — a fresh clean-slate agent reads
   this pin **§2 / §3 / §5** (the exact runbook content to land), **§7** (the U2
-  shape — `docs/OPS.md`, ≤ 1 file, no C#), **OPS §3 / §5** (where U2 lands it),
+  shape — [`docs/OPS.md`](../OPS.md), ≤ 1 file, no C#), **OPS §3 / §5** (where U2 lands it),
   and the **F20.U1 handoff entry** below.

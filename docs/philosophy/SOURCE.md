@@ -29,7 +29,7 @@ this pass without a matching guideline change that supersedes:
 
 | Local file | What differs from guideline `generic/` | Why |
 |---|---|---|
-| `README.md` | Opens with "A neighborhood is a system…"; frames the product as "a shared place that holds." | Kumunita is *a* platform for *one* neighborhood, not a market-seeking product. "Product" in the guidelines corresponds to "community platform" here. |
+| [`README.md`](../../README.md) | Opens with "A neighborhood is a system…"; frames the product as "a shared place that holds." | Kumunita is *a* platform for *one* neighborhood, not a market-seeking product. "Product" in the guidelines corresponds to "community platform" here. |
 | `START-HERE.md` | "the-platform-as-integrator.md" row (not `product-as-integrator.md`); every example refers to residents, moderators, access model, groups, reports, audit log. | Local domain guide is `the-platform-as-integrator.md`. |
 | `domains-of-integration.md` | 6 product-native set is rephrased around community (Value, Fit, Trust, Lifecycle, Agency, Access) rather than market. | Kumunita has no paid tier, no growth funnel, no churn. The same integration questions apply to the community platform but with different parts. |
 | `in-code.md` | Adds "the access model is the most load-bearing contract in the codebase" section; names the three modules (Identity, UserInfo, Authorization); audit log as the production feedback loop. | Kumunita's authorization model (thin token, fat authorization service, always-on audit) is its single biggest seam and deserves its own paragraph. |

@@ -13,8 +13,8 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0018 added the **authored-in language tag** (`Post.LanguageCode` /
-`PostReply.LanguageCode`) — "the language the item was written in." ADR 0022
+ADR [0018](0018-ugc-authored-in-language-tag.md) added the **authored-in language tag** (`Post.LanguageCode` /
+`PostReply.LanguageCode`) — "the language the item was written in." ADR [0022](0022-user-added-post-reply-translations.md)
 added the **user-added-translation** chip row — a human translating an existing
 post/reply into *another* supported language, shown on the detail surface as
 chips with expandable `<details>` panels.
@@ -34,7 +34,7 @@ detail surfaces (community + group lane):
    expandable panel below the original; there is no way to read it in place or
    switch back.
 
-ADR 0005 §C is the constraint that shapes the fix: **UGC is never
+ADR [0005](0005-multilingual-support.md) §C is the constraint that shapes the fix: **UGC is never
 machine-translated and its display is never auto-switched by the
 `kumunita.locale` cookie.** Whatever this lane adds is therefore an
 **explicit click**, not a preference.
@@ -47,7 +47,7 @@ Two decisions, both display-only, both zero Core / schema change.
 detail surface.** The item's own `LanguageCode` renders as the **first,
 always-present, default-visible** variant chip; the main title+body (post) /
 body (reply) is swapped to the selected variant on **explicit click** (never
-auto — ADR 0005 §C), with a guaranteed path back to the original. Every
+auto — ADR [0005](0005-multilingual-support.md) §C), with a guaranteed path back to the original. Every
 variant's title+body is rendered **server-side** (the same escape-safe
 `MarkdownRenderer` the current `<details>` panels use) into a hidden
 container; a small `tsc`-only ES module toggles `display` — no `innerHTML`, no
@@ -56,30 +56,30 @@ added variants remain present in the DOM. The "Add a …" candidate list
 **excludes** the item's own language, so the authored-in language is never
 offered to add.
 
-**(b) The shared `LanguageOption` record is left untouched** (ADR 0026 still
+**(b) The shared `LanguageOption` record is left untouched** (ADR [0026](0026-group-community-name-description-translations.md) still
 consumes its 3-positional-arg shape). The authored-in code is carried
 **additively** on the two post-detail view models and the reply item —
 `PostDetailViewModel.OriginalLanguageCode`,
 `GroupPostDetailViewModel.OriginalLanguageCode`, and a trailing positional
 `OriginalLanguageCode` on `ReplyItem` (11th, after `DeletedAt?`) — populated
-from the ADR 0018 fields the detail result already returns.
+from the ADR [0018](0018-ugc-authored-in-language-tag.md) fields the detail result already returns.
 
 ## Consequences
 
-- The ADR 0022 add-lane candidate list now **excludes** the authored-in
+- The ADR [0022](0022-user-added-post-reply-translations.md) add-lane candidate list now **excludes** the authored-in
   language (TD·4); the "Add a <authored-in>" offer disappears.
-- The ADR 0018 tag gains a **visible home** on the detail surface — it is the
+- The ADR [0018](0018-ugc-authored-in-language-tag.md) tag gains a **visible home** on the detail surface — it is the
   first, always-present, default-visible variant, not just a stored tag.
 - The post/reply detail views render **one variant container per language**
   (the `<details>` panels are replaced by the chip + variant model on this
   surface); the swap is progressive enhancement (JS-off still shows the
   original).
-- Soft-deleted rows (ADR 0024) show their placeholder and **no** chip row /
+- Soft-deleted rows (ADR [0024](0024-author-soft-delete-lane.md)) show their placeholder and **no** chip row /
   swap.
 - **Zero** migration, **zero** new document, **zero** new read seam — the
-  field already exists (ADR 0018); the shared `LanguageOption` record and the
-  ADR 0022 write lane (standing + route actions) are unchanged.
+  field already exists (ADR [0018](0018-ugc-authored-in-language-tag.md)); the shared `LanguageOption` record and the
+  ADR [0022](0022-user-added-post-reply-translations.md) write lane (standing + route actions) are unchanged.
 - **Amends 0018**: the authored-in tag's meaning is extended from "a stored
   tag" to "the first, always-present, default-visible variant on the detail
-  surface." ADR 0005 §C, ADR 0022, and the M4/M5/M6 roadmap letters are
+  surface." ADR [0005](0005-multilingual-support.md) §C, ADR [0022](0022-user-added-post-reply-translations.md), and the M4/M5/M6 roadmap letters are
   untouched.

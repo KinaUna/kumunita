@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0085 — Notification item link + reply highlight: a same-origin `LinkPath` on the `Notification` doc (inbox renders it clickable; the email carries it **absolute**), and a `#reply-{id}` anchor + scroll-and-highlight on the post detail
+# ADR [0085](0085-notification-item-link-and-reply-highlight.md) — Notification item link + reply highlight: a same-origin `LinkPath` on the `Notification` doc (inbox renders it clickable; the email carries it **absolute**), and a `#reply-{id}` anchor + scroll-and-highlight on the post detail
 
 Status: Accepted | Date: 2026-09-26
 
@@ -31,11 +31,11 @@ Status: Accepted | Date: 2026-09-26
 
 ## Context
 
-The M6 notifications surface (ADR 0076) shipped the **shared awareness** arrow
+The M6 notifications surface (ADR [0076](0076-notifications-inbox-and-recipient-email.md)) shipped the **shared awareness** arrow
 — an inbox row + a best-effort email nudge for the content/reply events a
 resident is involved in (`post.reply`, `group.post`, `community.post`,
-`announcement`, `event.rsvp`, `page.child`). ADR 0083 added the
-group-membership kinds and ADR 0084 the per-target subscriptions. But two
+`announcement`, `event.rsvp`, `page.child`). ADR [0083](0083-group-add-and-invite-notifications.md) added the
+group-membership kinds and ADR [0084](0084-per-target-notification-subscriptions.md) the per-target subscriptions. But two
 ergonomics gaps remained on exactly the "something happened to *my* content"
 surface, and both are the difference between "a nudge" and "a nudge I can act
 on without first opening the platform to find where to look":
@@ -45,7 +45,7 @@ on without first opening the platform to find where to look":
    RSVP'd to your event," the inbox row and the email body say *what* happened
    (the kind badge + the localized subject/body + the UGC snippet) but not
    *where*. To act, the resident has to re-derive the item's address by hand.
-   The reply-content part of that gap was already closed by ADR 0076 (the UGC
+   The reply-content part of that gap was already closed by ADR [0076](0076-notifications-inbox-and-recipient-email.md) (the UGC
    snippet is in the email). What is *not* in the inbox or the email is the
    **address** of the thing they should go to.
 2. **No reply highlight.** Even if the resident knows the post, clicking into
@@ -77,7 +77,7 @@ the post-detail anchor + scroll/highlight, and the one new `kw-l` key.
 
 - **D1 — One additive field on the `Notification` doc: `LinkPath` (a
   same-origin relative path, or `null`).** A new `public string? LinkPath`
-  (the `NotificationDocTypes` surface, additive on the ADR 0084 doc) holds the
+  (the `NotificationDocTypes` surface, additive on the ADR [0084](0084-per-target-notification-subscriptions.md) doc) holds the
   **same-origin relative** path of the item the notification is about — e.g.
   `/posts/{postId}#reply-{replyId}` for a reply, `/posts/{postId}` for a
   community post, `/groups/{groupId}/posts/{postId}` for a group post,
@@ -88,7 +88,7 @@ the post-detail anchor + scroll/highlight, and the one new `kw-l` key.
   URL does not need a data migration), a `LinkPath` on a kind whose recipient
   cannot read the item (a link is never a substitute for the content lane's
   own audience decision — the resident clicking the link still goes through
-  the normal Read gate), and any change the ADR 0004 §B contract does not
+  the normal Read gate), and any change the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B contract does not
   allow.
 - **D2 — One additive optional parameter on the frozen `EmitAsync`:
   `linkPath` (default `null`), and the email carries it absolute.**
@@ -159,14 +159,14 @@ the post-detail anchor + scroll/highlight, and the one new `kw-l` key.
 - **Frozen-surface, additive.** The `Notification` doc gains one optional
   field and `EmitAsync` one null-defaulted param — the existing 5-arg short
   overload and every existing emitter / test call site keep compiling and
-  behaving identically (the ADR 0084 frozen-surface-amendment precedent). The
-  three ADR 0084 emitters (`announcement` / `community.post` / `page.child`)
-  inherit `LinkPath` for free, as do the three ADR 0076 kinds
+  behaving identically (the ADR [0084](0084-per-target-notification-subscriptions.md) frozen-surface-amendment precedent). The
+  three ADR [0084](0084-per-target-notification-subscriptions.md) emitters (`announcement` / `community.post` / `page.child`)
+  inherit `LinkPath` for free, as do the three ADR [0076](0076-notifications-inbox-and-recipient-email.md) kinds
   (`post.reply` / `group.post` / `event.rsvp`).
 - **Relative stored, absolute derived.** The stored `LinkPath` is
   same-origin relative (D1); the email appends the **absolute** form
   (`BaseUrl + linkPath`, D2) — the `VerificationOptions.BaseUrl` + relative-
-  path precedent (ADR 0061) reused, so a redeploy with a new base URL needs no
+  path precedent (ADR [0061](0061-email-and-notification-language.md)) reused, so a redeploy with a new base URL needs no
   data migration.
 - **No new bounded context, no new `AccessAction`, no new `AccessVia`.** The
   six emitters are the existing content lanes' write seams; the inbox / email

@@ -11,17 +11,17 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0193 — Portability import modes: a "keep existing" choice
+# ADR [0193](0193-portability-import-modes.md) — Portability import modes: a "keep existing" choice
 
 Status: Accepted
 Date: 2026-10-27
-Extends the **M11 portability surface** (ADR 0108, the D1 "restore onto a
+Extends the **M11 portability surface** (ADR [0108](0108-portability-import-export.md), the D1 "restore onto a
 fresh instance" semantic + the C-M11·2 no-secret import boundary + the
 C-M11·4 fail-closed validate gate + the §validate/§apply phase order, the
 §principals eight-field closed set, the §inventory 44-content-doc closed
 registry + D7 import order, the C-M11·3 content-addressed media, and the
 one-audit-row `portability.import` shape) and the **M27 user-scoped
-portability precedent** (ADR 0148, the D4 business-key duplicate detector +
+portability precedent** (ADR [0148](0148-user-scoped-portability.md), the D4 business-key duplicate detector +
 the classify→resolve import shape — the "keep vs. add" decision the
 resident surface already makes per-entity, re-applied here at the operator
 surface as a single whole-instance mode). This ADR gives the
@@ -38,7 +38,7 @@ this lane closes).
 
 ## Context
 
-M11 (ADR 0108) locked the import semantic as **D1 restore onto a fresh
+M11 (ADR [0108](0108-portability-import-export.md)) locked the import semantic as **D1 restore onto a fresh
 instance**: the `PortabilityApplyIdentity.ApplyAsync` re-creator runs
 `UserManager.CreateAsync` keyed by the exported `subjectId`, and a
 "principal already exists" collision was a **validate-phase failure** (C-M11·4)
@@ -64,8 +64,8 @@ clean slate import should be done."**
 The constraint that keeps both modes safe is the one M11 already enforces
 (C-M11·4, the fail-closed pin): **the validate phase runs to completion
 before any write, and a mid-apply failure is the documented restore path,
-never a silently-accepted half-import.** The ADR 0193 lane re-applies that
-discipline to the two new modes. M27 (ADR 0148) already solved the *per-entity*
+never a silently-accepted half-import.** The ADR [0193](0193-portability-import-modes.md) lane re-applies that
+discipline to the two new modes. M27 (ADR [0148](0148-user-scoped-portability.md)) already solved the *per-entity*
 version of this exact decision at the resident surface (the D4 business-key
 duplicate detector classifies each entity as `duplicate` vs. `new` and the
 operator resolves them); this lane generalizes that same keep-vs-add decision
@@ -73,13 +73,13 @@ to the **whole instance** at the operator surface, as a single mode choice
 rather than per-entity.
 
 The Web-layer surface already exists (the `AdminPortabilityController` import
-action + the `Views/AdminPortability/Index.cshtml` upload form, the ADR 0108
-D5 surface); the ADR 0193 lane adds **one `bool keepExisting` form field** +
+action + the `Views/AdminPortability/Index.cshtml` upload form, the ADR [0108](0108-portability-import-export.md)
+D5 surface); the ADR [0193](0193-portability-import-modes.md) lane adds **one `bool keepExisting` form field** +
 the mode dispatch, and **two new `portability.import.keep_existing*`
-translation keys** (the ADR 0015 / ADR 0052 × en/de/fr/da parity pins,
+translation keys** (the ADR [0015](0015-ui-view-localization-mechanics.md) / ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) × en/de/fr/da parity pins,
 re-applied). No new `AccessAction`, no new `AccessVia`, no new `Decide()`
 branch, no new adapter, no new bounded context, no new document — the
-`portability.import` audit row (the ADR 0108 one-audit-row shape) is the same
+`portability.import` audit row (the ADR [0108](0108-portability-import-export.md) one-audit-row shape) is the same
 row in both modes.
 
 ## Decision
@@ -97,7 +97,7 @@ is **unchanged** and delegates to the new overload with `CleanSlate` (source
 sites keep their signature verbatim). The Web `AdminPortabilityController`
 import action gains a `bool keepExisting = false` parameter and maps
 `keepExisting ? KeepExisting : CleanSlate` onto the mode. The audit row is
-emitted by the **service** (the controller adds none — the ADR 0108 one-audit-row
+emitted by the **service** (the controller adds none — the ADR [0108](0108-portability-import-export.md) one-audit-row
 shape, re-applied); both modes emit exactly one `portability.import` row
 (`TargetKind "portability"`, `Via = Admin`).
 
@@ -135,7 +135,7 @@ The **operational docs** (`AccessAudit` / `OutboxEmail` / `EmailDeadLetter` /
 operational state (the §inventory "Excluded" set), not resident content the
 archive carries. The audit trail of the import itself (the
 `portability.import` row) is emitted **after** the apply, so it survives. The
-operator's pre-import backup remains the rollback path (the ADR 0108 D1
+operator's pre-import backup remains the rollback path (the ADR [0108](0108-portability-import-export.md) D1
 semantic, unchanged).
 
 **D3 — KeepExisting (checked): skip-existing, add-new.**
@@ -186,7 +186,7 @@ keepExisting = false` default → `CleanSlate` (replace). Checked posts
 `keepExisting=true` → `KeepExisting` (merge). The two new kw-l keys
 (`portability.import.keep_existing` +
 `portability.import.keep_existing_hint`, × en/de/fr/da) go through the closed
-`KnownTranslationKeys` registry (the ADR 0015 / ADR 0052 parity pins,
+`KnownTranslationKeys` registry (the ADR [0015](0015-ui-view-localization-mechanics.md) / ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) parity pins,
 re-applied) + the `AdminPortabilityControllerTests` kw-l parity pin. The
 form's existing `data-confirm` destructive-action guard (the `confirm.js`
 idiom) is unchanged — the operator still confirms before a replace.
@@ -195,7 +195,7 @@ idiom) is unchanged — the operator still confirms before a replace.
 Both modes emit exactly one `portability.import` `AccessAudit` row
 (`Action "portability.import"`, `TargetKind "portability"`,
 `TargetId "portability"`, `Via = AccessVia.Admin`, `Outcome Allow`) — the
-ADR 0108 one-audit-row shape. The mode is **not** recorded in the audit row
+ADR [0108](0108-portability-import-export.md) one-audit-row shape. The mode is **not** recorded in the audit row
 (the row's `Action` is the verb, not the mode; distinguishing the modes in
 the audit trail is a future-lane decision, not a requirement of this lane —
 the rollback path is the operator's pre-import backup in both modes).
@@ -220,15 +220,15 @@ the rollback path is the operator's pre-import backup in both modes).
   principals' secrets (fresh non-portable password + fresh security stamp); a
   KeepExisting import never touches an existing principal's credentials.
 - **Zero new `AccessAction` / `AccessVia` / `Decide()` branch / adapter**
-  (the ADR 0108 C-M11·7 "no new authorization surface" pin, re-applied) and
+  (the ADR [0108](0108-portability-import-export.md) C-M11·7 "no new authorization surface" pin, re-applied) and
   **zero migrations** (the two `portability.import.keep_existing*` keys are
-  rows in the `TranslationResource` catalog — the ADR 0004 §B.1
+  rows in the `TranslationResource` catalog — the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1
   delta-detected convention).
 - The **operator's pre-import backup** remains the single rollback path in
-  both modes (the ADR 0108 D1 semantic) — the CleanSlate wipe is the
+  both modes (the ADR [0108](0108-portability-import-export.md) D1 semantic) — the CleanSlate wipe is the
   documented destructive step, the merge is the documented additive step,
   and neither silently accepts a half-import.
-- The M27 (ADR 0148) resident surface is **unchanged** — it already has its
+- The M27 (ADR [0148](0148-user-scoped-portability.md)) resident surface is **unchanged** — it already has its
   own per-entity classify→resolve shape (the D4 business-key detector); the
-  ADR 0193 mode is the operator-surface generalization of the same
+  ADR [0193](0193-portability-import-modes.md) mode is the operator-surface generalization of the same
   keep-vs-add decision, not a change to the resident lane.

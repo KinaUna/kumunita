@@ -11,13 +11,13 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0244 — Section cards on the last flat forms: To-do New/Edit, Page New/Edit, Kiosk settings
+# ADR [0244](0244-section-cards-todo-page-kiosk-forms.md) — Section cards on the last flat forms: To-do New/Edit, Page New/Edit, Kiosk settings
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-ADR 0213 and 0224 gave the create/edit forms headed section cards (`card kmb-form-section` with a `kmb-form-section-title`). A check of
+ADR [0213](0213-event-form-sections.md) and 0224 gave the create/edit forms headed section cards (`card kmb-form-section` with a `kmb-form-section-title`). A check of
 every view with a `<form>` found three full-page forms still built as one loose card per field: To-do New (14 fields) and Edit (18),
 the Page New/Edit partial (10) and Kiosk settings (10). The plan's "Still flat" list was stale for the rest: Group, Event, Post,
 Project, Announcement, Document, Goal, Board, Inventory and Profile are already sectioned.

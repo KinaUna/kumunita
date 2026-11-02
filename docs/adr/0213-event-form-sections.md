@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0213 — Event form in headed sections
+# ADR [0213](0213-event-form-sections.md) — Event form in headed sections
 
 Status: Accepted
 

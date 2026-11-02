@@ -13,11 +13,11 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0057 gave the platform a resident-facing guide for every *top-level*
+ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) gave the platform a resident-facing guide for every *top-level*
 surface: `posts`, `groups`, `events`, `projects`, `announcements`,
 `directory`, `people`, `inventory`, `bookmarks`, `documents`, `pages`, `tags`,
 plus the account-and-role guides. Each is a flat `Page` doc, a direct child of
-the canonical `help` page (ADR 0057 D1). That worked when a surface was a
+the canonical `help` page (ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D1). That worked when a surface was a
 single thing.
 
 Several surfaces now **tab their own sub-pages**: Projects has *Projects ·
@@ -38,7 +38,7 @@ So the *knowledge* is present; the *structure* is flat. The fix is not new
 prose so much as **surfacing the prose a resident already has to wade for**,
 by giving each tab its own page *under* the surface guide it belongs to — the
 exact "a page is either a folder or a leaf, or both ('folder-with-index')"
-shape ADR 0039 §3.3 already names, and the same tree ADR 0057 hung the first
+shape ADR [0039](0039-pages-hierarchy-audience-translations.md) §3.3 already names, and the same tree ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) hung the first
 level on.
 
 **The fork that determined this ADR:** keep the guides flat and grow the
@@ -51,11 +51,11 @@ explained *at* the board, not five scroll-positions into a to-do page), and it
 mirrors the app's own information architecture — the resident's mental model
 is "Projects → Boards", and the help tree now matches it.
 
-The one genuine cost is the **flat exact-set pin** ADR 0057 D1 laid down
+The one genuine cost is the **flat exact-set pin** ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D1 laid down
 ("each guide a direct child of `help`", the `UG_GuideRegistryTests` drift
 pin). That pin is a *storage* invariant, not a *display* one, and it was
 laid down to keep the guide set **closed and enumerable** — the same property
-this ADR preserves, now at two levels. ADR 0160 therefore keeps the pin for
+this ADR preserves, now at two levels. ADR [0160](0160-nested-help-guides-tabbed-surface-subpages.md) therefore keeps the pin for
 the top level (the top-level guides are still exactly the `help` children not
 in the parent map) and extends it to the nested level (each nested guide is
 exactly the child of its map-named parent), so the tree remains closed,
@@ -68,11 +68,11 @@ enumerable, and drift-pinned — just one level deeper.
 - A new public static `FirstBootSeeder.GuideParentMap()` returns a
   `slug → parentSlug` dictionary. A guide slug **absent** from the map is a
   **top-level** guide (a direct child of the canonical `help` page — the
-  ADR 0057 D1 shape, unchanged for all 23 existing top-level guides). A guide
+  ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D1 shape, unchanged for all 23 existing top-level guides). A guide
   slug **present** in the map is a **nested** guide: its `ParentId` is the
   page seeded under the map's value (its parent guide), which is itself a
   top-level guide under `help`.
-- The map is a **closed set** (the ADR 0057 "a new guide is a new lane, not a
+- The map is a **closed set** (the ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) "a new guide is a new lane, not a
   silent addition" rule applied to nesting): a new nested guide is a new
   entry here *and* a new `GuidePages()` row, in the same lane. The map and
   the `GuidePages()` registry are the **single source** both the seeder and
@@ -86,8 +86,8 @@ enumerable, and drift-pinned — just one level deeper.
 ### D2 — The 17 new nested guides (+ the `settings` index)
 
 The closed nested set, each a `Page` doc `Kind = System`, `Audience = null`
-(public — a how-to is not audience-gated, ADR 0057 D1), `LanguageCode = en`
-(authored-in the source language, ADR 0042 D1), `AuthorId = string.Empty`
+(public — a how-to is not audience-gated, ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D1), `LanguageCode = en`
+(authored-in the source language, ADR [0042](0042-bundled-initial-language-pack.md) D1), `AuthorId = string.Empty`
 (platform content), `IsDraft = false`, `IsDeleted = false`:
 
 | Slug (leaf) | Parent guide | The tab it documents |
@@ -124,7 +124,7 @@ than re-nests. Total guide tree: the original 23 top-level guides + `settings`
   parent: the in-flight id of the guide named by `GuideParentMap[slug]` when
   present, else the `help` page id. The resolved id is stored as the guide's
   `ParentId`. The existing create-if-missing + code-wins-refresh invariant
-  (ADR 0057 D1 / ADR 0042 D1) is preserved per guide.
+  (ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D1 / ADR [0042](0042-bundled-initial-language-pack.md) D1) is preserved per guide.
 - `BackfillUserGuidesAsync` (the warm-boot path) applies the **same** map
   resolution, so a deployment that predates the nested set backfills the
   nested guides under their correct top-level parent (not directly under
@@ -135,14 +135,14 @@ than re-nests. Total guide tree: the original 23 top-level guides + `settings`
 ### D4 — The `en` floor and the hand-curated `de`/`fr`/`da` baselines both ship
 
 - The 17 nested guides + the `settings` index ship their **`en`** body in
-  `GuidePages()` (the code-owned floor, ADR 0042 D1) **and** their **`de` /
+  `GuidePages()` (the code-owned floor, ADR [0042](0042-bundled-initial-language-pack.md) D1) **and** their **`de` /
   `fr` / `da`** baseline bodies in `DeGuidePages()` / `FrGuidePages()` /
-  `DaGuidePages()` (the community-owned floor, ADR 0057 D2 — the exact same
+  `DaGuidePages()` (the community-owned floor, ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D2 — the exact same
   shape the original 23 top-level guides use). A pristine boot therefore gives
   a German / French / Danish reader a real localized guide for every nested
   sub-page, not an `en`-floor fallback.
 - The baselines are **seeded create-if-missing, then community-owned** (the
-  ADR 0042 D1 invariant): an in-app edit by a Translator / GlobalAdmin is never
+  ADR [0042](0042-bundled-initial-language-pack.md) D1 invariant): an in-app edit by a Translator / GlobalAdmin is never
   clobbered by a later deploy. The warm-boot
   `BackfillGuideTranslationsAsync` reaches the nested guides exactly as it
   reaches the top-level ones (it walks the two-level guide subtree, not just
@@ -151,24 +151,24 @@ than re-nests. Total guide tree: the original 23 top-level guides + `settings`
   "every guide that *has* a `de`/`fr`/`da` baseline carries exactly one row
   per language, and the second boot does not duplicate them" — so it holds
   for the full 41-guide set with all guides baselined.
-- The "never machine-translated" clause (ADR 0005 C) is preserved: the lane
+- The "never machine-translated" clause (ADR [0005](0005-multilingual-support.md) C) is preserved: the lane
   ships only hand-curated baseline prose; no baseline is machine-generated.
 - **This is the default going forward:** a new guide (top-level or nested)
   ships with its `en` floor *and* its `de`/`fr`/`da` hand-curated baselines in
   the same lane, mirroring the four-surface set and the original top-level
-  guides (ADR 0057 D2). A guide that ships `en`-only is the exception and
+  guides (ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D2). A guide that ships `en`-only is the exception and
   must say so in its ADR, not the norm.
 
 ### D5 — The tree browse, the `/admin/help` surface, and the reset lane are unchanged
 
-- The `/pages` tree browse (ADR 0039 §3.8) renders a nested guide as a child
+- The `/pages` tree browse (ADR [0039](0039-pages-hierarchy-audience-translations.md) §3.8) renders a nested guide as a child
   of its parent guide automatically — it walks the `ParentId` chain, so no
   view change is needed. A resident sees `help → projects → boards`.
 - `AllSeededSlugs()`, `FindSeededPageText()`, `HasSeededText()`, and the
-  ADR 0128 status probe + bulk reset already query **by slug across the whole
+  ADR [0128](0128-admin-help-bulk-reset-and-update-surfacing.md) status probe + bulk reset already query **by slug across the whole
   tree**, so a nested guide is listed, reset, and status-checked identically
   to a top-level one. No change.
-- The `PagePaths.Derive` chain (ADR 0039 §3.3) resolves a nested guide's
+- The `PagePaths.Derive` chain (ADR [0039](0039-pages-hierarchy-audience-translations.md) §3.3) resolves a nested guide's
   href to `/pages/system/help/{parent}/{slug}` (e.g.
   `/pages/system/help/projects/boards`) — no change, the chain is
   parent-id-driven.
@@ -191,5 +191,5 @@ than re-nests. Total guide tree: the original 23 top-level guides + `settings`
   unchanged.
 - **For the non-`en` baseline:** the new guides ship their `de` / `fr` / `da`
   baselines hand-curated in the same lane as the `en` floor (D4) — the same
-  ADR 0057 D2 shape the original 23 top-level guides use, and now the default
-  for any new guide. This is the ADR 0042 D1 split held at the new level.
+  ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D2 shape the original 23 top-level guides use, and now the default
+  for any new guide. This is the ADR [0042](0042-bundled-initial-language-pack.md) D1 split held at the new level.

@@ -11,19 +11,19 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0226 — Feed card footer with a reply count
+# ADR [0226](0226-feed-reply-count.md) — Feed card footer with a reply count
 
 Status: Accepted
 
 ## Context
-ADR 0175 left the feed card footer (`.airy-post-foot`) as a TODO: it needs a reply count, and `PostListItem` did not
+ADR [0175](0175-palettes-and-feed-card.md) left the feed card footer (`.airy-post-foot`) as a TODO: it needs a reply count, and `PostListItem` did not
 carry one. This is a data change, not only styling.
 
 ## Decision
 - **Source:** a batched read per feed page, `PostService.CountRepliesAsync(IReadOnlyCollection<string> postIds)`
   returning `postId -> count` (posts with no replies are absent). One query per page, owns its `QuerySession`, no audit
   row (a reply inherits the parent post's `Read` decision already made by the feed). No schema or write-path change,
-  no denormalised counter to keep in sync. Soft-deleted replies still count (ADR 0024), matching the detail page's
+  no denormalised counter to keep in sync. Soft-deleted replies still count (ADR [0024](0024-author-soft-delete-lane.md)), matching the detail page's
   "Replies (N)" heading.
 - **Model:** `PostListItem` gains a trailing `int ReplyCount = 0`. Populated by the community feed, the all-sections
   feed and the group feed; `MyDraftsController` leaves it at 0.

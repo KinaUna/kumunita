@@ -11,14 +11,14 @@ superseded_by: [adr-0055, adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0012 — Community membership: mandatory communities + moderator-managed optional membership
+# ADR [0012](0012-community-membership-mandatory-and-moderator.md) — Community membership: mandatory communities + moderator-managed optional membership
 
 Status: Accepted
 Date: 2026-09-11
 Amends: M3 (the "posts in components" lane — component membership gains the
-mandatory/optional axis and a moderator write surface); ADR 0004 §B (the new
+mandatory/optional axis and a moderator write surface); ADR [0004](0004-data-persistence-and-schema-evolution.md) §B (the new
 `Component.Mandatory` column rides the existing `CoreDocTypes` migration
-surface, no new schema surface); ADR 0006-E (all four new seams are additive)
+surface, no new schema surface); ADR [0006](0006-module-boundary-contracts.md)-E (all four new seams are additive)
 
 ## Context
 
@@ -38,18 +38,18 @@ gaps were settled by this request:
    but whether the community is mandatory at all is an admin-level call,
    not delegated down.
 2. **Optional communities need their owner's managing hand.** For ordinary
-   communities the *moderator* (the `moderator:{id}` scope claim of ADR 0003)
+   communities the *moderator* (the `moderator:{id}` scope claim of ADR [0003](0003-roles-and-moderator-scoping.md))
    should add and remove members — today only the GlobalAdmin can, via the
    `/admin` per-account set form.
 3. **Members should be able to leave.** A membership someone else granted is
    not a one-way ticket; a non-moderator member of an *optional* community
-   can remove themselves (the exact shape of ADR 0008's group self-leave).
+   can remove themselves (the exact shape of ADR [0008](0008-member-self-leave-lane.md)'s group self-leave).
 
 The invariants to keep: the thin-token rule (decision in Core, HTTP shape in
-Web — ADR 0006-D); audit-by-default (every state change of restricted
+Web — ADR [0006](0006-module-boundary-contracts.md)-D); audit-by-default (every state change of restricted
 content is logged, SECURITY.md); strong consistency C4 (a membership change
 is live on the very next gate read — no projection, no cache); the frozen
-`/admin` surface stays usable (ADR 0006-A).
+`/admin` surface stays usable (ADR [0006](0006-module-boundary-contracts.md)-A).
 
 ## Decision
 
@@ -59,7 +59,7 @@ one flag, one definition of membership, one gate.
 ### Core (`Kumunita.Core.UserInfo`)
 
 - **`Component.Mandatory`** (added to `CoreDocTypes`; default `false`).
-  ADR 0004 §B unchanged otherwise.
+  ADR [0004](0004-data-persistence-and-schema-evolution.md) §B unchanged otherwise.
 - **The single "who is a member" definition** — `GetCommunityIdsAsync(userId)`
   returns the explicit `ComponentMembership` rows **∪ (Enabled ∧ Mandatory)**
   components. Disabled∧mandatory grants nothing (a disabled component is
@@ -102,12 +102,12 @@ one flag, one definition of membership, one gate.
   any account, and the self-leave route below reuses the seam; the refusal
   with a *surfed message* lives on the dedicated lane
   (`RemoveCommunityMemberAsync`), the skip lives on the frozen one. No
-  break on the ADR 0006-A surface.
+  break on the ADR [0006](0006-module-boundary-contracts.md)-A surface.
 
 ### Web (`Kumunita.Web`)
 
 - **New `CommunityController`** on the community feed — the standing's own
-  surface, ADR 0003-style per-component:
+  surface, ADR [0003](0003-roles-and-moderator-scoping.md)-style per-component:
   - `GET /community/manage/{id}` — mandatory state (the toggle form is
     offered to the **GlobalAdmin only**; a community moderator sees member
     management without it), member
@@ -118,15 +118,15 @@ one flag, one definition of membership, one gate.
     `POST /community/manage/{id}/add`, `POST /community/manage/{id}/remove`
     (the `UserId` form field). `manage` is a literal path segment (not the
     `{id}` slot) so it can't collide with the `{id}`-shaped component routes.
-  - `POST /community/{id}/leave` — **the self-lane, ADR 0008 verbatim on the
+  - `POST /community/{id}/leave` — **the self-lane, ADR [0008](0008-member-self-leave-lane.md) verbatim on the
     component axis**: no target anywhere, the actor's own subject is both
     `userId` and `actorId` on the frozen
     `ClearCommunityMembershipAsync` — self by construction. The Web route
     pre-checks the flag (mandatory → refusal message + redirect to the
     community; the Core skip is the second line). Audit reads
     `community.remove-member, ActorId: <the member>, Via: Admin` — the
-    ADR 0008 convention (no third `Via`, no new verb for the self lane).
-  - **The gate's failure shape is 404, not 403** (ADR 0008 U10 / the posts
+    ADR [0008](0008-member-self-leave-lane.md) convention (no third `Via`, no new verb for the self lane).
+  - **The gate's failure shape is 404, not 403** (ADR [0008](0008-member-self-leave-lane.md) U10 / the posts
     lane): no standing on this community's surface → `NotFound()`. The
     service's `UnauthorizedAccessException` maps to the same shape on the
     write lanes (defense in depth — the claims are the token, the Core gate
@@ -134,7 +134,7 @@ one flag, one definition of membership, one gate.
 - **The feed** (`Posts/Index` single-community view): an "Everyone" badge on
   mandatory communities, a Manage-members link for the standing, and the
   Leave form for a member who is neither standing nor implicit (the button
-  tree mirrors exactly what the routes would accept — ADR 0008's
+  tree mirrors exactly what the routes would accept — ADR [0008](0008-member-self-leave-lane.md)'s
   presentation rule).
 - **`/admin`**: the communities table shows the mandatory badge backed by a
   **GlobalAdmin-only toggle** — the same `SetCommunityMandatoryAsync` lane the
@@ -186,7 +186,7 @@ is view-only.
 - `SetCommunityEnabledAsync(false)` on a mandatory community still hides it
   from every reader (union = enabled∧mandatory) — a mandatory but *disabled*
   community grants nothing; re-enabling restores it implicitly.
-- ADR 0008's "one recorded exception for the actor's own row" stays exactly
+- ADR [0008](0008-member-self-leave-lane.md)'s "one recorded exception for the actor's own row" stays exactly
   that: this ADR adds a second such lane (components' self-leave), same
   construction, same audit reading, same 404-on-no-standing shape; the group
   side is untouched.

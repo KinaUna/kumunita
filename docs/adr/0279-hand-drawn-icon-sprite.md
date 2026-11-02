@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0279 — Hand-drawn nav and account-menu icons from one sprite
+# ADR [0279](0279-hand-drawn-icon-sprite.md) — Hand-drawn nav and account-menu icons from one sprite
 
 Status: Accepted
 Date: 2026-10-31

@@ -13,25 +13,25 @@ updated: 2026-11-02
 
 ## Context
 
-M4 shipped events (ADR 0054); EV-CAL / EV-DWM / EV-NW (ADR 0063 / 0064 /
-0081) shipped the in-app calendar; EV-PAST (ADR 0109) added the past-events
+M4 shipped events (ADR [0054](0054-events-rsvp-reminders.md)); EV-CAL / EV-DWM / EV-NW (ADR [0063](0063-events-calendar-view.md) / 0064 /
+0081) shipped the in-app calendar; EV-PAST (ADR [0109](0109-events-past-lane.md)) added the past-events
 option. But the residents' **actual calendar app** — the one they already
 check, that pushes reminders onto their phone — had no access to this
 platform. ARCHITECTURE.md's M12 row names the step: **"outcome + world
 seams — events land in the calendars residents already check."** M11
-(ADR 0108) closed the *data* world seam (the `*.kumunita` archive out, and
+(ADR [0108](0108-portability-import-export.md)) closed the *data* world seam (the `*.kumunita` archive out, and
 back). M12 closes the *calendar* world seam.
 
 The constraint that shapes the decision is the same one that shaped every
 outward lane since M11: **a file that travels must not carry a decision.**
 The iCal format has first-class properties (`ORGANIZER`, `ATTENDEE`,
 `RSVP`) that would leak the author's identity and the **author-only** RSVP
-list (ADR 0054 §3.2) into a file the resident hands to their calendar app
+list (ADR [0054](0054-events-rsvp-reminders.md) §3.2) into a file the resident hands to their calendar app
 (and on, to anyone who reads it). So the surface must be built on a
 **closed, portable subset** of RFC 5545 that carries **only** the display
 fields of events the caller may already see, and it must be **authorized per
 fetch** (never a standing token) so the boundary stays the resident's own
-session (the M6 link-lane posture, ADR 0085 / ADR 0095).
+session (the M6 link-lane posture, ADR [0085](0085-notification-item-link-and-reply-highlight.md) / ADR [0095](0095-group-invite-accept-decline-links.md)).
 
 ## Decision
 
@@ -48,14 +48,14 @@ property surface). It emits **exactly** the pinned RFC 5545 subset
 **empty** feed that is still a valid calendar. **`ORGANIZER` / `ATTENDEE` /
 `RSVP` / `RRULE` / `VTODO` / `Color` / any `X-…` vendor property are
 **never** emitted (the "the file never carries a decision" pin,
-C-M12·2 — the ADR 0028 posture applied to the file form).
+C-M12·2 — the ADR [0028](0028-guardian-controls-account-scope-supervision.md) posture applied to the file form).
 
 **D2 — No subscription token: the feed rides the cookie, re-authorized every
 fetch.** The two routes are `[Authorize]` (the whole app's model); there is
 **no** `?token=`, no query param, no long-lived subscription credential.
 The subscription re-runs the **frozen** `IEventService` read seam on every
 fetch, so the membership of the file tracks the caller's grant and session
-**live** — the M6 link-lane posture (ADR 0085 / ADR 0095) applied to a
+**live** — the M6 link-lane posture (ADR [0085](0085-notification-item-link-and-reply-highlight.md) / ADR [0095](0095-group-invite-accept-decline-links.md)) applied to a
 subscription rather than a one-time link. A stranger without a session gets
 the standard sign-in challenge (F3, **no anonymous iCal surface**). The
 `Cache-Control: no-store` pin (D3) keeps the per-caller file out of any
@@ -79,12 +79,12 @@ name.** The §field-map in the design doc is the pin: `UID` from `Event.Id`,
 `DTSTAMP` from the caller's fetch instant (the RFC's "date-time of
 creation" = the refresh marker, **not** `Event.Modified`), `DTSTART`/
 `DTEND` from the stored UTC `Start`/`End` (the calendar app renders in the
-subscriber's local time — the point of the surface; the ADR 0019/0020
+subscriber's local time — the point of the surface; the ADR [0019](0019-timezone-platform-default-and-resident-override.md)/0020
 `kw-dt` in-app rendering does **not** apply to a file), `SUMMARY` from
 `Title`, `DESCRIPTION` from the **Markdown source** of `Body` (**not**
 rendered HTML — HTML in `DESCRIPTION` is non-portable; the raw Markdown is
 honest + portable), `LOCATION` from `Location`, `CATEGORIES` from the
-event's `TagIds` **resolved to the ADR 0044 display name**
+event's `TagIds` **resolved to the ADR [0044](0044-tags.md) display name**
 (`TagTranslation` → base `Name`) by the **Web layer** (the pure emitter
 takes the already-resolved names, C-M12·5). `Color` / `Audience` /
 `AuthorId` / the RSVP list are **never** emitted (D1's "never" list).
@@ -93,10 +93,10 @@ takes the already-resolved names, C-M12·5). `Color` / `Audience` /
 page gains one "Add to calendar" link (the `events.ics.download` key) and
 the `/events` + calendar pages each gain one "Calendar feed (iCal)" link
 (the `events.ics.feed` key) — both plain `<a>` links (**no new JS**, the
-ADR 0031 tsc-only discipline holds; C-M12·6). Both keys join the closed
+ADR [0031](0031-wysiwyg-editor-and-toolbar.md) tsc-only discipline holds; C-M12·6). Both keys join the closed
 `kw-l` registry in **all four** languages (the
 `KnownTranslationKeys_ParityTests` enforces the 4-language set + non-empty
-values; the ADR 0015/0052 warm-boot backfill seeds them idempotently). The
+values; the ADR [0015](0015-ui-view-localization-mechanics.md)/0052 warm-boot backfill seeds them idempotently). The
 links are **quiet** (C-M12·6) — the detail page already renders only for a
 visible event, so the "Add to calendar" link needs no extra gate.
 
@@ -127,8 +127,8 @@ The **Web** pins (NSubstitute, no Postgres) pin: the two routes exist +
 anonymous challenge, and the kw-l parity (the two keys × en/de/fr/da).
 
 **D8 — Docs flip in one unit (U05).** `Milestones.cs` (M12 → `StatusDone`,
-M13 → `StatusNext`), `README.md` Roadmap, `docs/STATUS.md`,
-`docs/ARCHITECTURE.md` (the "M11 done; M12 shipped" line), and
+M13 → `StatusNext`), [`README.md`](../../README.md) Roadmap, [`docs/STATUS.md`](../STATUS.md),
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) (the "M11 done; M12 shipped" line), and
 `MilestonesTests` (re-pinned to **M13**) all move in one unit (the C-M11·8
 precedent verbatim) — the exact-order pin M0…M14 unchanged, the single-
 in-progress now M13. This ADR is the milestone's decision record (U00); the
@@ -155,17 +155,17 @@ unit series U01–U05 executes it.
 - **Not chosen:** a **NuGet ICS library** (a new dependency + an
   uncontrolled property surface — the M11 BCL-only precedent wins); a
   **subscription token** (a standing credential the resident would share
-  with their calendar — the M6 link-lane posture, ADR 0085 / ADR 0095, wins);
+  with their calendar — the M6 link-lane posture, ADR [0085](0085-notification-item-link-and-reply-highlight.md) / ADR [0095](0095-group-invite-accept-decline-links.md), wins);
   an **`ORGANIZER`** property (it would leak the author's identity into a
-  file that travels — the ADR 0028 "no standing to carry a secret" posture
+  file that travels — the ADR [0028](0028-guardian-controls-account-scope-supervision.md) "no standing to carry a secret" posture
   wins); a **rendered-HTML `DESCRIPTION`** (non-portable across calendar
   clients — the Markdown source is the portable, honest form); an **admin
   kill-switch** (the feed is already off *for a caller* by them not being
-  signed in — the ADR 0105 inverse-shape considered and rejected: a global
+  signed in — the ADR [0105](0105-messaging.md) inverse-shape considered and rejected: a global
   toggle has no gear to turn, the cookie *is* the gate).
 - **Deferred to their own lanes (each a named follow-on, own ADR):**
   **RSVP state in the calendar file** (`ATTENDEE` / `RSVP` — a **privacy**
-  decision, it would leak the author-only RSVP list, ADR 0054 §3.2);
+  decision, it would leak the author-only RSVP list, ADR [0054](0054-events-rsvp-reminders.md) §3.2);
   **recurring events** (`RRULE` — **M14** is the natural home); **`VTODO`
   for projects/to-dos** (a different calendar surface); **ICS import**
   (round-tripping calendar files **into** Kumunita — a write lane with its

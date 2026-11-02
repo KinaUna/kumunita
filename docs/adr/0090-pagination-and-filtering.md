@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0090 — Pagination & filtering: the one canonical paging contract (M7)
+# ADR [0090](0090-pagination-and-filtering.md) — Pagination & filtering: the one canonical paging contract (M7)
 
 Status: Accepted
 Date: 2026-09-26
@@ -48,7 +48,7 @@ At one-neighborhood scale the lists are small by design — but
 the contract defects (the wrong `Total`, the missing `HasMore`, the
 unbounded lists, the rendered leak) are wrong regardless of scale.
 
-This ADR records the decision; `docs/design/m7-pagination-filtering-design.md`
+This ADR records the decision; [`docs/design/m7-pagination-filtering-design.md`](../design/m7-pagination-filtering-design.md)
 (parts 1–2) freezes the invariants **C-M7·1…7**, the FACES **F1–F8**, and
 the **exact C#** of every seam this ADR points at — the design doc is the
 authority on shape; this ADR is the authority on *why these shapes, and
@@ -144,7 +144,7 @@ why nothing else*.
 
 - **Paging is display-only, never an access input (C-M7·2).** A page
   number never appears in an `IAuthorizationService` call, an `Audience`
-  evaluation, or an `AccessAudit` row's identity — the ADR 0064 `?view=`
+  evaluation, or an `AccessAudit` row's identity — the ADR [0064](0064-events-calendar-dwm-views.md) `?view=`
   display-selector precedent. One page, one aggregate audit row
   (C-M7·1) extends C-M3·3 to paged visits; the paged visit emits exactly
   the same audit shape as an unpaged one.
@@ -152,8 +152,8 @@ why nothing else*.
 - **Zero new authorization surface, zero schema change.** No new
   `AccessAction`, no new `AccessVia`, no new `Decide()` branch, no new
   adapter, no new bounded context, no new document, no new index — this
-  is a read-lane and a UI lane on the frozen seams (the ADR 0006 /
-  ADR 0004 §B discipline). The frozen-surface rule is honoured: the
+  is a read-lane and a UI lane on the frozen seams (the ADR [0006](0006-module-boundary-contracts.md) /
+  ADR [0004](0004-data-persistence-and-schema-evolution.md) §B discipline). The frozen-surface rule is honoured: the
   `HasMore` signal (record return / `HasMore` field) / the new paged read
   seams are compatible ADDs; the tag lane's non-paged
   `ListPostsByTagAsync` / `ListPagesByTagAsync` were the pre-M7 shape and
@@ -184,5 +184,5 @@ why nothing else*.
   top of the same `page` param discipline.
 - **Close (U05):** README Roadmap + `Milestones.cs` flip (M7 → Done, M8
   → Next; `MilestonesTests.cs` kept green per the AGENTS.md parity
-  contract); `ARCHITECTURE.md` "shape of the code" gains the shared
+  contract); [`ARCHITECTURE.md`](../ARCHITECTURE.md) "shape of the code" gains the shared
   pagination idiom note.

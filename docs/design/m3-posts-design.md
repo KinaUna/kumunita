@@ -68,7 +68,7 @@ invariant list).
 - `PostService` (Kumunita.Core, bounded context `Kumunita.Core.Posts`) — the
   first M3-owned feature-service, composing **only** `IUserInfoService` (read
   lane) + `IAuthorizationService` + its own Marten session. Never reads
-  `GroupMembership` or `DelegationGrant` for access purposes (ADR 0006-D
+  `GroupMembership` or `DelegationGrant` for access purposes (ADR [0006](../adr/0006-module-boundary-contracts.md)-D
   lane, mirrors M2 §3 C-M2·2).
 - The `Post` / `PostReply` / `Report` documents (Poco, Marten-native,
   conventional `string Id`; the `Report` table is **registered but dormant**
@@ -76,7 +76,7 @@ invariant list).
 - The `PostToAuditableResource : IAuditableResource` adapter (single `Id`,
   `Name`, `OwnerId`, `Audience`, `ComponentId`, `TargetKind = "post"`).
 - `IUserInfoService.GetComponentsAsync(bool enabledOnly)` — **the single
-  M3 ADD** on a frozen interface (ADR 0006-E compatible-lane, precedent
+  M3 ADD** on a frozen interface (ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible-lane, precedent
   `GetProfilesAsync`; doc-comment says *candidate* set, no audit row, never
   a visible set).
 - `PostDocTypes.Configure(StoreOptions)` — the new parallel document surface
@@ -130,7 +130,7 @@ invariant list).
 
 ## Invariants (pinned for M3)
 
-M3 is a *caller* of the ADR 0006 invariants, not an owner (mirrors M2's
+M3 is a *caller* of the ADR [0006](../adr/0006-module-boundary-contracts.md) invariants, not an owner (mirrors M2's
 positioning). M3 *owns* three new invariants (C-M3·1/2/3 — the three
 behavioral rules M3 is the first milestone to need: reply inheritance,
 component-candidate isolation, feed/detail audit-shape). The following ADR
@@ -142,35 +142,35 @@ seam tests for M3 (pinned by Part 2 §2.5) will name each by id.
 > body is authoritative). The handoff note (U1's entry) carries this
 > discrepancy so U2 — who owns the test list — can confirm or correct.
 
-| # | ADR 0006 / M3 pin | How M3 uses it |
+| # | ADR [0006](../adr/0006-module-boundary-contracts.md) / M3 pin | How M3 uses it |
 |---|---|---|
 | **C-M3·1** (M3-owned) | A `PostReply` has **no separate `Audience` field**; its visibility is **exactly** the parent `Post`'s `Read` decision. No second `IAuthorizationService` call for a reply; the reply is *not evaluated* (and emits no `AccessAudit` row) when the parent is denied. | Reply-visibility inherits the parent's `Read` (the C6 core, `MatchGroups`, called **once** on the post and then *applied* to the reply list). A reply list is always a *subset* of a visible parent. This is what keeps the "two `CanSeeAsync` calls" bug out of the detail render — and is the reason the detail page is one decision row, not two. |
 | **C-M3·2** (M3-owned) | A `Component` is a **candidate filter** (a feed organizer — which list does this post land in?), **never** an access decision. `GetComponentsAsync(enabledOnly)` returns a *candidate set*; its output never renders without passing the post's own `Read`. The component filter emits **no `AccessAudit` row** of its own (it is a precondition, not a decision). | The composer's component picker, the feed grouping, the `/community/{id}` route: all read `Component` documents via the frozen `IUserInfoService` — never via `CanSeeAsync`. A post in "Safety" is visible **exactly** per its own `Audience`; no "Safety component is open" rule exists. M3 tests assert the absence of an audit row for the candidate query (F9). |
 | **C-M3·3** (M3-owned) | **Audit shape:** feed render = **one aggregate row** (`targetKind = "post"`, `visibleCount` / `hiddenCount`, same `IDocumentSession` overload M1 used for single + bulk). Detail render = **one decision row** (Allow *or* Deny) per post. Reply visibility inherits the parent decision (C-M3·1) — **no separate reply row in either shape**. All rows commit in the *same transaction* as their render (or, for create / reply writes, in the same transaction as the domain write). | M3's two render shapes are *frozen*: a feed page does not fan out into one row per post; a detail page does not emit a row per reply. The `IDocumentSession` overloads (the frozen no-session methods retain their own-commit semantics, per M1's §E lane) are the *only* way M3's reads and writes get their `AccessAudit` rows in-transaction. |
-| **C1** (ADR 0006) | Empty audience denies (both `Any` and `All`; explicit guard). | `Post.Audience` is **non-null** (an M3 document-level rule: it is a required field, not optional). Explicit `Any` + empty grant, or `All` + empty grant ⇒ `CanSeeAsync` returns deny for everyone *except* the author (C1's owner branch is the *only* exception — F4). A draft the author is composing also sees itself via that same owner branch. |
-| **C2** (ADR 0006) | Delegation is action-scoped. | A delegate with `Read` in scope sees the author's post on any surface that renders it (feed, detail). A delegate without `Read` in scope sees nothing of it — the post is hidden, no partial fields, no "hidden" placeholder. `Via = Delegation` records the acting identity in the `AccessAudit` row (carried through M1's `AccessVia` vocabulary). |
-| **C3** (ADR 0006) | Audit always on — Allow *and* Deny. | Per C-M3·3: a feed render commits one aggregate Allow+Deny row in the same transaction; a detail render commits one decision row (Allow *or* Deny); a `Post` / `PostReply` create commits the domain write and its `AccessAudit` (Allow) in the same transaction. A reply create on a denied parent is **not executed at all** (C-M3·1 is the guard). |
-| **C4** (ADR 0006) | Strong-consistency membership resolution against live documents. | A membership change (add a group member, add a resident to `Post.Audience`) takes effect on the **very next** render — no projection in the access path. M3's e2e pins: post created in group G while viewer V is not in G (V sees nothing); add V to G; V's next render shows the post (F5). |
-| **C5** (ADR 0006) | Moderator default-OFF on audience-restricted content. | **M3's hold:** M3 exercises **no** `Moderate`-on-post call. A moderator (any scope) cannot peek at a post the author has not shared with them — `CanSeeAsync` denies the moderator exactly as it denies any other non-audience viewer, and the `AccessAudit` row records Deny. `Via = Report` stays dormant (M3b). M3 tests assert the absence (F3 / F8). |
-| **C6** (ADR 0006) | One matching pass (`MatchGroups`) shared by `CanAsync` and `CanSeeAsync`. | The feed (bulk), the detail (single), and the reply-visibility (inherited from the parent's single `Read` decision — C-M3·1) all reduce to the **same** `MatchGroups` core; they cannot drift. A post visible to a group member in the feed is visible on the detail page, and a reply under it is visible on the detail, in one pass. |
-| **ADR 0001-B** | Author's choice is absolute. | The composer writes the chosen `Audience` verbatim into `Post.Audience`. M3 does **not** auto-add group grants, does **not** second-guess a "Safety only" choice with a "but the author is friendly" branch, and does **not** inject a community-wide audience. The C1 owner branch is the only "extra" the author gets. |
-| **ADR 0004 §B.1** | Marten-native document registration (POCOs, conventional `string Id`), delta-detected, idempotent, no seeding. | M3's three documents are registered in **`Kumunita.Core/Bootstrap/PostDocTypes.Configure(StoreOptions)`** — a new parallel surface analogous to `CoreDocTypes`. **No seeding** (the four components are already seeded by M1's `FirstBootSeeder`; M3 consumes them, does not re-seed). Delta-detected + idempotent is inherited from `ApplyAllConfiguredChangesToDatabaseAsync`. *Open veto:* the plan notes U1 may flip to a hand-rolled `FeatureSchemaBase` subclass before U2 pins §2.2 — this doc records the choice; U2's pin decides. |
+| **C1** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Empty audience denies (both `Any` and `All`; explicit guard). | `Post.Audience` is **non-null** (an M3 document-level rule: it is a required field, not optional). Explicit `Any` + empty grant, or `All` + empty grant ⇒ `CanSeeAsync` returns deny for everyone *except* the author (C1's owner branch is the *only* exception — F4). A draft the author is composing also sees itself via that same owner branch. |
+| **C2** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Delegation is action-scoped. | A delegate with `Read` in scope sees the author's post on any surface that renders it (feed, detail). A delegate without `Read` in scope sees nothing of it — the post is hidden, no partial fields, no "hidden" placeholder. `Via = Delegation` records the acting identity in the `AccessAudit` row (carried through M1's `AccessVia` vocabulary). |
+| **C3** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Audit always on — Allow *and* Deny. | Per C-M3·3: a feed render commits one aggregate Allow+Deny row in the same transaction; a detail render commits one decision row (Allow *or* Deny); a `Post` / `PostReply` create commits the domain write and its `AccessAudit` (Allow) in the same transaction. A reply create on a denied parent is **not executed at all** (C-M3·1 is the guard). |
+| **C4** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Strong-consistency membership resolution against live documents. | A membership change (add a group member, add a resident to `Post.Audience`) takes effect on the **very next** render — no projection in the access path. M3's e2e pins: post created in group G while viewer V is not in G (V sees nothing); add V to G; V's next render shows the post (F5). |
+| **C5** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Moderator default-OFF on audience-restricted content. | **M3's hold:** M3 exercises **no** `Moderate`-on-post call. A moderator (any scope) cannot peek at a post the author has not shared with them — `CanSeeAsync` denies the moderator exactly as it denies any other non-audience viewer, and the `AccessAudit` row records Deny. `Via = Report` stays dormant (M3b). M3 tests assert the absence (F3 / F8). |
+| **C6** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | One matching pass (`MatchGroups`) shared by `CanAsync` and `CanSeeAsync`. | The feed (bulk), the detail (single), and the reply-visibility (inherited from the parent's single `Read` decision — C-M3·1) all reduce to the **same** `MatchGroups` core; they cannot drift. A post visible to a group member in the feed is visible on the detail page, and a reply under it is visible on the detail, in one pass. |
+| **ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B** | Author's choice is absolute. | The composer writes the chosen `Audience` verbatim into `Post.Audience`. M3 does **not** auto-add group grants, does **not** second-guess a "Safety only" choice with a "but the author is friendly" branch, and does **not** inject a community-wide audience. The C1 owner branch is the only "extra" the author gets. |
+| **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** | Marten-native document registration (POCOs, conventional `string Id`), delta-detected, idempotent, no seeding. | M3's three documents are registered in **`Kumunita.Core/Bootstrap/PostDocTypes.Configure(StoreOptions)`** — a new parallel surface analogous to `CoreDocTypes`. **No seeding** (the four components are already seeded by M1's `FirstBootSeeder`; M3 consumes them, does not re-seed). Delta-detected + idempotent is inherited from `ApplyAllConfiguredChangesToDatabaseAsync`. *Open veto:* the plan notes U1 may flip to a hand-rolled `FeatureSchemaBase` subclass before U2 pins §2.2 — this doc records the choice; U2's pin decides. |
 
 **ADRs M3 must respect (not pinned as invariants, but the code must not
 violate):**
 
-- **ADR 0003 §Separation of duties** — M3's post create/reply surface is
+- **ADR [0003](../adr/0003-roles-and-moderator-scoping.md) §Separation of duties** — M3's post create/reply surface is
   *owner-scoped to the author* (a resident posts in their name; a delegate
   posts with `Via = Delegation`). M3 **does not** add a moderator scope, does
   **not** add a GlobalAdmin surface for posts, and leaves the M3b report /
   resolve flow to M3b. A `GlobalAdmin` reading a post in M3 has the **same**
   `Read` standing as any resident (C5).
-- **ADR 0006-D** (dependency direction) — `PostService` (Core) depends only on
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-D** (dependency direction) — `PostService` (Core) depends only on
   `IUserInfoService` + `IAuthorizationService` + Marten; it never reads
   `GroupMembership` / `DelegationGrant` for its own access decisions, and the
   `Kumunita.Web` layer is a thin controller (mirroring M2's
   `DirectoryController` shape).
-- **ADR 0006-E** (change management) —
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-E** (change management) —
   `IUserInfoService.GetComponentsAsync(bool enabledOnly)` is the **single
   M3 ADD**, named in the doc-comment as a compatible-lane addition (the ADR's
   *named here* list grows by exactly one line in M3's close — U11, U12).
@@ -204,8 +204,8 @@ without re-deriving them.
 - If a later unit (U3–U12) finds a mismatch between an implemented signature
   and the pin in this Part, **this doc wins**. The unit updates this file in
   the same commit and appends a one-line drift note to
-  `docs/archive/lanes/m3/m3-handoff-notes.md`.
-- The invariant *numbers* — ADR 0006's **C1, C2, C3, C4, C5, C6**; the three
+  [`docs/archive/lanes/m3/m3-handoff-notes.md`](../archive/lanes/m3/m3-handoff-notes.md).
+- The invariant *numbers* — ADR [0006](../adr/0006-module-boundary-contracts.md)'s **C1, C2, C3, C4, C5, C6**; the three
   M3-owned **C-M3·1, C-M3·2, C-M3·3**; ADR **0001-B**; ADR **0004 §B.1** — are
   stable for the rest of M3. Adding a new M3-owned invariant (C-M3·4+)
   requires an ADR amendment plus a design-doc edit in the same commit;
@@ -238,7 +238,7 @@ namespaces are the contract U3–U11 must implement against. If a later unit
 discovers an implemented signature that does not exist verbatim here, the
 drift-guard (§2.7) applies: **this file wins**; the unit updates this file in
 the same commit and appends a drift note to
-`docs/archive/lanes/m3/m3-handoff-notes.md`.
+[`docs/archive/lanes/m3/m3-handoff-notes.md`](../archive/lanes/m3/m3-handoff-notes.md).
 
 Namespace conventions:
 
@@ -261,7 +261,7 @@ introduced by this section.
 
 Seams that exist as of M1/M2. M3 *calls* them; M3 does not modify.
 
-`Kumunita.Core.Authorization.IAuthorizationService` (frozen, ADR 0006 §A):
+`Kumunita.Core.Authorization.IAuthorizationService` (frozen, ADR [0006](../adr/0006-module-boundary-contracts.md) §A):
 
 ```csharp
 public interface IAuthorizationService
@@ -330,7 +330,7 @@ public interface IAuditableResource
 > / `F8_ComponentIsFilterNotAccessGate`, F3/F8).
 
 `Kumunita.Core.UserInfo.IUserInfoService` — M3's frozen M1/M2 surface plus
-M3's **one** ADD (ADR 0006-E compatible lane, mirroring M2's
+M3's **one** ADD (ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible lane, mirroring M2's
 `GetProfilesAsync(bool)`):
 
 ```csharp
@@ -387,7 +387,7 @@ public interface IUserInfoService
 ### 2.2 New M3-owned Core types (exact C#)
 
 Namespace `Kumunita.Core.Posts`. All three documents are **Marten-native**
-POCOs with the conventional `string Id` identity (ADR 0004 §B.1; the carve-out
+POCOs with the conventional `string Id` identity (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1; the carve-out
 for a hand-rolled `FeatureSchemaBase` is *not* used in M3 — that pin is
 reserved for operator-written tables like `AdminOverride`, mirroring
 `CoreDocTypes`).
@@ -624,7 +624,7 @@ anchor from Part 1:
 14. `Detail_DecisionAuditRowShape_ViaOwner`      — C-M3·3, C1 (single-row, `Via=Owner`).
 15. `Detail_DecisionAuditRowShape_ViaAudience`   — C-M3·3 (single-row, `Via=Audience`).
 16. `Detail_DecisionAuditRowShape_ViaDelegation` — C-M3·3, C2 (single-row, `Via=Delegation`).
-17. `AuthorAudienceWrittenVerbatim`              — ADR 0001-B (the composer's choice
+17. `AuthorAudienceWrittenVerbatim`              — ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (the composer's choice
     is absolute; the DB row's `Audience` is bit-identical to the draft's).
 18. `PostService_MakesNoModerateCall`            — C5 (absence; `Moderate` is
     never invoked on a post in M3; the call is asserted to be `Read` only).
@@ -650,7 +650,7 @@ audience's author→group-recipient arrow, not a second `Can*` call):
 
 **The gate is recorded by U10** (per the plan register: U9 is "seam tests
 only"; U10 is "run + record the M3 acceptance gate"). U11 (the
-`ARCHITECTURE.md` flip + M3→M3b deferral note) and U12 (the final
+[`ARCHITECTURE.md`](../ARCHITECTURE.md) flip + M3→M3b deferral note) and U12 (the final
 `## M3 — Closed (recorded)` append) are the close units, the M2 U12 / U15
 analogs re-indexed to M3.
 
@@ -659,8 +659,8 @@ analogs re-indexed to M3.
 The following pins are **frozen** in this doc, and any violation is a `## U<m>
 — Drift pause` per unit-series rule §6 (unit-series rule in the plan):
 
-- The **11** invariants from Part 1 (C-M3·1/2/3, ADR 0006 C1–C6, ADR 0001-B,
-  ADR 0003 §SoD, ADR 0004 §B.1, ADR 0006-D, ADR 0006-E) — the *numbers*
+- The **11** invariants from Part 1 (C-M3·1/2/3, ADR [0006](../adr/0006-module-boundary-contracts.md) C1–C6, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B,
+  ADR [0003](../adr/0003-roles-and-moderator-scoping.md) §SoD, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1, ADR [0006](../adr/0006-module-boundary-contracts.md)-D, ADR [0006](../adr/0006-module-boundary-contracts.md)-E) — the *numbers*
   (not the prose) are stable for the rest of M3; rename / renumber is a
   breaking change (Part 1 already pins this; it repeats here because
   Part 2's own §2.5 / §2.4 names hang off them).
@@ -746,7 +746,7 @@ observations block M3's e2e from running in this unit:
 1. **No `e2e-m3.spec.ts` exists** in `tests/Kumunita.Web.Tests/`. The M3
    plan register does not name any unit that authors the M3 e2e spec;
    U9's handoff exit says "no e2e authored (U11)", but U11's own spec is
-   the `ARCHITECTURE.md` flip + `## Summary` handoff and does not author
+   the [`ARCHITECTURE.md`](../ARCHITECTURE.md) flip + `## Summary` handoff and does not author
    an e2e either — that attribution is a **plan-documentation slip**,
    recorded here per U1's unit-series convention (flag slips in the
    handoff, body/spec authoritative; not a §2.6 drift-pause since no
@@ -786,7 +786,7 @@ to end) — records the M3 e2e pass count in a subsequent `### Run result
 M3 is closed. The three-test gate is recorded above in § `Run result (M3
 acceptance gate — 2026-09-04)` (all PASS: closed-loop · handoff ·
 part-vs-whole, `Kumunita.Core.Tests` 105/105 + `Kumunita.Web.Tests` 37/37 =
-142/142, 0 failed, M1 + M2 anchors re-run unchanged). The `ARCHITECTURE.md`
+142/142, 0 failed, M1 + M2 anchors re-run unchanged). The [`ARCHITECTURE.md`](../ARCHITECTURE.md)
 §2 `Posts/` line is flipped to **M3 ✓ live** with the gate summary (the
 `Moderation/` line is re-marked **M3b — not yet created**; the `Events/` and
 `Projects/` lines are untouched). **This design-doc close is the *record*
@@ -819,11 +819,11 @@ items.
    the M3b U1 design-doc unit — a read-lane pin on a (new)
    `IReportService.CanReadWithReportAsync`-shaped seam, or a direct branch
    on `AuthorizationService.Decide` (the thinner lane is decided in that
-   unit; ADR 0006-E compatible-lane applies, mirroring the M3 lane U4 just
+   unit; ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible-lane applies, mirroring the M3 lane U4 just
    landed).
 3. **Moderator surfaces — the moderator queue, the resolve UI, the "assign
    to a moderator" form.** `/admin` (M1's admin surface) is **unchanged** in
-   M3 (the ADR 0003-SoD pin names this). **M3b candidate:** a new
+   M3 (the ADR [0003](../adr/0003-roles-and-moderator-scoping.md)-SoD pin names this). **M3b candidate:** a new
    `/moderation` surface — its own controller + Razor views; the queue is a
    read over `Report` ordered `At` desc + `Status` desc; the resolve form is
    a `Report` write lane that sets `Status`.

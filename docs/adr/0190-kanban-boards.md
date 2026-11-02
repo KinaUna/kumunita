@@ -11,11 +11,11 @@ superseded_by: [adr-0195]
 updated: 2026-11-02
 ---
 
-# ADR 0190 — Kanban boards
+# ADR [0190](0190-kanban-boards.md) — Kanban boards
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-27
-Relates to: ADR 0067/0069 (kanban), ADR 0188/0189 (Projects)
+Relates to: ADR [0067](0067-m5-projects-todos-and-kanban.md)/0069 (kanban), ADR [0188](0188-projects-lists.md)/0189 (Projects)
 
 ## Context
 
@@ -33,7 +33,7 @@ text wrapped a word per line.
   cards (`--kmb-surface`, 12px radius, border, hover shadow) always read lighter than the lane in all four
   palette/mode combinations; the lane head uses the heading font; the at-limit lane keeps its amber rule.
 - Card focus and lane drag-over use `--kmb-accent` instead of Bootstrap primary.
-- Count and status badges pick up the chip styles from ADR 0188.
+- Count and status badges pick up the chip styles from ADR [0188](0188-projects-lists.md).
 
 ## Open
 

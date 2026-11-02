@@ -27,8 +27,8 @@ pages under [`start/`](start/) are the doors in.
 ## Tier model
 
 Three tiers, defined in [`DOCS-CONVENTIONS.md`](DOCS-CONVENTIONS.md):
-**`living`** (current truth, updated in place — e.g. `README.md`,
-`AGENTS.md`, `docs/start/*.md`); **`reference`** (stable reference,
+**`living`** (current truth, updated in place — e.g. [`README.md`](../README.md),
+[`AGENTS.md`](../AGENTS.md), `docs/start/*.md`); **`reference`** (stable reference,
 correct as of a point in time — e.g. `adr/`, `design/`); **`archive`**
 (lane history, frozen at the lane's close — e.g. `archive/lanes/<lane>/…`).
 
@@ -40,12 +40,12 @@ The shape the `IMPROVE-DOCS` lane is building toward (see the plan's
 | Path | What lives there |
 |---|---|
 | [`start/`](start/) | per-audience entry pages (links + one-line reasons only) |
-| [`architecture/`](architecture/identity-access.md) | `ARCHITECTURE.md` split by section (the hub stays at [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)) |
+| [`architecture/`](architecture/identity-access.md) | [`ARCHITECTURE.md`](ARCHITECTURE.md) split by section (the hub stays at [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)) |
 | [`security/`](security/why-first.md) | threat model, control map, audit checklists (the concern files, split from the [`SECURITY.md`](SECURITY.md) model hub in `D08`) |
 | [`ops/`](ops/) | one runbook per procedure (split from the [`OPS.md`](OPS.md) hub in `D04`) |
 | [`deploy/coolify/`](deploy/coolify/00-plan.md) | the Coolify guide, one step per file (split from the [`COOLIFY.md`](COOLIFY.md) hub in `D05`) |
-| [`dev/`](dev/README.md) | the working doctrine — running locally, Razor verification, testing + CI, live-server debugging, sandbox quirks (split from `AGENTS.md` in `D06`; running-locally in `D07`) |
-| [`product/`](product/roadmap.md) | features, roadmap, deferred-by-design (split from `README.md` in `D07`) |
+| [`dev/`](dev/README.md) | the working doctrine — running locally, Razor verification, testing + CI, live-server debugging, sandbox quirks (split from [`AGENTS.md`](../AGENTS.md) in `D06`; running-locally in `D07`) |
+| [`product/`](product/roadmap.md) | features, roadmap, deferred-by-design (split from [`README.md`](../README.md) in `D07`) |
 | [`philosophy/`](philosophy/README.md) | the trust model and the integration argument (unchanged shape) |
 | [`guides/`](guides/CONVENTIONS.md) | the in-app guide registry and writing conventions |
 | [`adr/`](adr/README.md) | decision records (~250-line cap, index generated from front-matter) |
@@ -80,10 +80,10 @@ Each unit `D00`–`D14` is one small, self-documenting commit (or a short
 series for the mechanical batches). `D00` (conventions + harness), `D01`
 (this map + the entry pages), `D02` (the archive move), `D03` (the archive
 tier), `D04` (the ops split), `D05` (the Coolify split), `D06` (slimming
-`AGENTS.md` into [`dev/`](dev/README.md)), `D07` (slimming `README.md` into
+[`AGENTS.md`](../AGENTS.md) into [`dev/`](dev/README.md)), `D07` (slimming [`README.md`](../README.md) into
 [`product/`](product/roadmap.md)), `D08` (splitting the security docs into
 [`security/`](security/why-first.md) + the audit program + the VDP at the repo
-root), `D09` (splitting `ARCHITECTURE.md` into
+root), `D09` (splitting [`ARCHITECTURE.md`](ARCHITECTURE.md) into
 [`architecture/`](architecture/identity-access.md) + the hub), and `D10`
 (landing the [`design/`](design/m3b-moderation.md) front-matter + abstracts +
 the six subsystem hubs) are done.

@@ -15,7 +15,7 @@ updated: 2026-11-02
 
 Two shipped truths collide at the serve route:
 
-- **Group posts are gated by membership, not by audience.** ADR 0013's
+- **Group posts are gated by membership, not by audience.** ADR [0013](0013-group-posts-membership-lane.md)'s
   G·1/G·2/G·8 pin this: a post with non-empty `Post.GroupId` is a
   group-lane post; its visibility is *exactly* the group's current
   membership (`CanSeeGroupAsync`, the membership lane); the audience lane
@@ -28,7 +28,7 @@ Two shipped truths collide at the serve route:
   reply-parent branch of each — resolved the owning post and called
   `IAuthorizationService.CanAsync(…Read…, PostToAuditableResource(post))`.
   `PostToAuditableResource` projects `Audience = post.Audience` (the
-  empty one), and the empty-audience-denies invariant (ADR 0006-C1) makes
+  empty one), and the empty-audience-denies invariant (ADR [0006](0006-module-boundary-contracts.md)-C1) makes
   `EvaluateAudience` return `false` for an empty audience. The only
   branches that could fire were **owner** (the author) and **break-glass**
   (a consumed `AdminOverride`).
@@ -43,15 +43,15 @@ audience lane is structurally closed for group posts.
 The fix is small and surgical, but it settles a *design* question — *which
 lane is the "single `Read` decision" for a group post's media?* — that
 previously went unrecorded (both serve routes were authored on the
-component-post assumption that the audience lane is the decision). ADR 0025's
-D4 and ADR 0034's D4 both say "the post's one `Read` decision"; for a group
-post, the post's one `Read` decision *is* the membership lane (ADR 0013
+component-post assumption that the audience lane is the decision). ADR [0025](0025-rich-content-markdown-and-content-images.md)'s
+D4 and ADR [0034](0034-file-attachments-posts-replies-announcements.md)'s D4 both say "the post's one `Read` decision"; for a group
+post, the post's one `Read` decision *is* the membership lane (ADR [0013](0013-group-posts-membership-lane.md)
 G·1). This ADR records that decision and the shared seam that enforces it.
 
 ## Decision
 
 - **The lane choice is driven by the post's own shape.** A post with
-  non-empty `Post.GroupId` (ADR 0013 G·2) routes to the **membership** lane
+  non-empty `Post.GroupId` (ADR [0013](0013-group-posts-membership-lane.md) G·2) routes to the **membership** lane
   (`IAuthorizationService.CanSeeGroupAsync(actorId, post.GroupId,
   post.Id)`); a post with empty `Post.GroupId` routes to the **audience**
   lane (`IAuthorizationService.CanAsync(actorId, AccessAction.Read,
@@ -70,20 +70,20 @@ G·1). This ADR records that decision and the shared seam that enforces it.
   shape and the authorization seam it is handed.
 - **The reply-parent branch uses the same seam.** A reply's media is
   served under its **parent post's** single `Read` decision (C-M3·1,
-  ADR 0034 D4). The parent's own shape decides the lane: a group-post
+  ADR [0034](0034-file-attachments-posts-replies-announcements.md) D4). The parent's own shape decides the lane: a group-post
   parent ⇒ the membership lane (the parent's `GroupId`); a component-post
   parent ⇒ the audience lane (the parent's `Audience`). One decision
   call, one audit row, in either case.
 - **The image lane's reply-404 drift pause is *not* lifted by this ADR**
-  (ADR 0034's "not decided here" record holds). The reply-parent *routing*
+  (ADR [0034](0034-file-attachments-posts-replies-announcements.md)'s "not decided here" record holds). The reply-parent *routing*
   is now group-aware (a group-post reply's attachment and image both route
   to the membership lane), but the image lane's reply branch still 404s
   unconditionally (the `PostReply.ImageIds` field is still unpopulated by
-  the reply write lanes — the ADR 0025 lane's deliberate "create only, not
+  the reply write lanes — the ADR [0025](0025-rich-content-markdown-and-content-images.md) lane's deliberate "create only, not
   edit" precedent, C-ATT·9). The attachment reply lane is the one that
   works for group posts.
 - **No new `AccessAction`, no new `IAuthorizationService` method, no new
-  authorization module** (ADR 0006-D). The two lanes this seam picks
+  authorization module** (ADR [0006](0006-module-boundary-contracts.md)-D). The two lanes this seam picks
   between — `CanSeeGroupAsync` and `CanAsync` — are both frozen. The seam
   only *chooses*; it does not *add*.
 - **The audit row is the lane's, not the seam's.** On a group-lane Allow,
@@ -92,7 +92,7 @@ G·1). This ADR records that decision and the shared seam that enforces it.
   membership); on a component-lane Allow, the row is `TargetKind = "post"`,
   `Via = Owner / Audience / Moderator / BreakGlass / Delegation` (the
   §4.4 order). The "who did this, by what right" query the audit log
-  exists to answer (ADR 0006) is preserved by the *correct* lane being
+  exists to answer (ADR [0006](0006-module-boundary-contracts.md)) is preserved by the *correct* lane being
   chosen — a second call on the wrong lane would emit a row with the
   wrong `Via` and corrupt the log.
 
@@ -104,7 +104,7 @@ G·1). This ADR records that decision and the shared seam that enforces it.
   non-member to a group post gets a **404** on the media (one `Deny` audit
   row on the membership lane — `Via = Group` / `Delegation`, `TargetKind =
   "grouppost"`), the same 404 posture as the post's own detail read gate
-  (ADR 0013 G·3/G·4). The component-post behavior is **unchanged** (the
+  (ADR [0013](0013-group-posts-membership-lane.md) G·3/G·4). The component-post behavior is **unchanged** (the
   audience lane was and is the decision; the seam routes it there).
 - **One new file, one new test file, one ADR README row.**
   `src/Kumunita.Web/Security/PostReadDecision.cs` (the shared seam),
@@ -114,7 +114,7 @@ G·1). This ADR records that decision and the shared seam that enforces it.
   ADR. The two controllers' post branches and the attachment controller's
   reply-parent branch each lose their inline 2-line branch and call the
   seam; the image controller's reply branch (the drift pause) is
-  **untouched** (ADR 0034's "not decided here" record holds).
+  **untouched** (ADR [0034](0034-file-attachments-posts-replies-announcements.md)'s "not decided here" record holds).
 - **The two serve routes now share a single routing decision.** Before
   this ADR, the lane choice was written inline in three places (the post
   branch of each controller + the reply-parent branch of the attachment
@@ -122,7 +122,7 @@ G·1). This ADR records that decision and the shared seam that enforces it.
   member be served (or denied) inconsistently across the three surfaces.
   The seam makes the routing a *single* testable unit; the 5 tests in
   `PostReadDecisionTests` pin it at the seam level (no store, no Postgres).
-- **The drift-paused Web serve FACES remain paused** (ADR 0034's "known
+- **The drift-paused Web serve FACES remain paused** (ADR [0034](0034-file-attachments-posts-replies-announcements.md)'s "known
   limitation" record holds). `AttachmentServingTests` /
   `ContentImageServingTests` still carry zero `[Fact]` methods — they need
   a drivable `PostService` reverse-lookup seam (or Testcontainers in

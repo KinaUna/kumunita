@@ -37,7 +37,7 @@ be true, that document says
 - **SSH:** key-based only; consider fail2ban; disable password login.
 - **Secrets:** never baked into the image. Env / secrets manager only. Rotate SMTP, DB, and
   admin credentials on a schedule and after any suspected exposure.
-- **DB user (two-role split, ADR 0171 / F22):** the database is owned by a dedicated
+- **DB user (two-role split, ADR [0171](../adr/0171-least-privilege-db-role.md) / F22):** the database is owned by a dedicated
   **non-superuser migration role `kumunita_migrate`** (`CREATE DATABASE kumunita OWNER
   kumunita_migrate`); `kumunita_migrate` owns the `mt` + `identity` schemas and is the
   only role that may run DDL (schema/table creation, `CREATE EXTENSION`). The runtime **

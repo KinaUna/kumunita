@@ -24,7 +24,7 @@ updated: 2026-11-02
 A **deployed demo site** is a throwaway `Production` instance a prospective
 neighborhood can click through, pre-populated with the mock neighborhood (ADR
 0055 / 0056). It is a **separate app + dedicated Postgres** (the one-instance-per
-neighborhood topology, ADR 0002) — never a real neighborhood's database. It is
+neighborhood topology, ADR [0002](../adr/0002-deployment-topology.md)) — never a real neighborhood's database. It is
 **disposable by design**: treat its data as scratch, and never let it become a real
 deployment (wipe + re-seed, or provision fresh, when it outlives its purpose).
 
@@ -66,7 +66,7 @@ Teardown / reset: `docker compose down -v` (dev) or delete the Coolify app + its
 addon and re-run steps 1–5 for a fresh seed — the content seeder is first-boot only and
 idempotent, so a warm DB will not re-seed or duplicate (the pristine gate keeps it from
 re-running). The one warm-boot write is the sample-event translation backfill
-(create-if-missing, idempotent, ADR 0060) — it never duplicates and never clobbers a
+(create-if-missing, idempotent, ADR [0060](../adr/0060-event-translation-sample-backfill.md)) — it never duplicates and never clobbers a
 Translator's edit. Do **not** point a real neighborhood's `Community__Name` / Postgres at
 this instance; if a demo site is ever going to carry real residents, provision a
 **real** instance ([provision](provision.md), without `SampleData__Enabled`) and migrate

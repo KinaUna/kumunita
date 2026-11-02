@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0005 introduced the multilingual lane: the platform's UI strings and
+ADR [0005](0005-multilingual-support.md) introduced the multilingual lane: the platform's UI strings and
 static pages are `mt` documents (a `TranslationResource` row per key +
 language, a `LocalizedPage` row per slug + language), edited in-app under
 `/admin/languages`. Until now that surface was **GlobalAdmin-only**.
@@ -37,7 +37,7 @@ able to delegate that to other users."
 ## Decision
 
 - **A fourth role, `Translator`**, added to `Kumunita.Core.Identity.Roles`
-  alongside `Member`, `Moderator`, `GlobalAdmin` (ADR 0003). It is a plain
+  alongside `Member`, `Moderator`, `GlobalAdmin` (ADR [0003](0003-roles-and-moderator-scoping.md)). It is a plain
   claim string on the thin principal — no new claim type, no new data
   document, no `ModeratorAssignment`-style scope (translation is
   instance-wide, not component-scoped). `FirstBootSeeder` creates the role
@@ -69,7 +69,7 @@ able to delegate that to other users."
 
 - **Audit attribution is unchanged.** Translation and page saves still write
   exactly one `AccessAudit` row with `Via = AccessVia.Admin` — the standing
-  slot the codebase already pins for this lane (ADR 0005 D, the
+  slot the codebase already pins for this lane (ADR [0005](0005-multilingual-support.md) D, the
   `translation.save` / `page.save` FACES tests). The actor's **account** is
   what differentiates a GlobalAdmin from a Translator, and it is already on
   the row as `ActorId` / `EffectivePrincipalId` — so "who saved this string"
@@ -85,7 +85,7 @@ able to delegate that to other users."
   falling back to the raw key.
 
 - **Scope boundary — community names are not in it.** The translation surface
-  (ADR 0005) is exactly the UI strings and the static pages. Community /
+  (ADR [0005](0005-multilingual-support.md)) is exactly the UI strings and the static pages. Community /
   group names are `Component` documents set in the Admin panel (a UserInfo
   concern), **not** `TranslationResource` / `LocalizedPage` rows — so a
   `Translator` does not edit them. Extending translation to those names is a
@@ -108,7 +108,7 @@ Negative / accepted risks
   shared rows any other can. Accepted for a single-neighborhood instance:
   translation is instance-wide, the audit row records who saved what, and the
   optimistic-concurrency (409) story already covers the "two people at once"
-  case (ADR 0005 D).
+  case (ADR [0005](0005-multilingual-support.md) D).
 - One more option in the Admin Index role dropdown and one more role to keep
   in the seeder / claim factory / `Roles` set in sync. Accepted — these are
   the same mechanical sites the other two elevated roles already live in.

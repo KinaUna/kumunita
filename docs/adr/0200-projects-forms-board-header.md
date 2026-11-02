@@ -11,20 +11,20 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0200 — Projects forms and board header
+# ADR [0200](0200-projects-forms-board-header.md) — Projects forms and board header
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-28
-Relates to: ADR 0190 (kanban), ADR 0184 (detail pages), ADR 0182 (forms)
+Relates to: ADR [0190](0190-kanban-boards.md) (kanban), ADR [0184](0184-announcement-detail.md) (detail pages), ADR [0182](0182-form-look.md) (forms)
 
 ## Decision
 
 - Board header (`Projects/BoardDetail.cshtml`): the existing `<header class="airy-head">` becomes a surface card
   (`.kmb-board-head`) in the normal page width above the board. The author line is the shared byline (avatar with
   stable hue, name, created / modified), the community, project link and event link are `.kmb-chip`s on one row
-  (links keep the ADR 0086 / 0115 dangling rules), tags are chips, translation chips are `.kmb-chip.kmb-chip-btn` with a
+  (links keep the ADR [0086](0086-goals-projects-lane.md) / 0115 dangling rules), tags are chips, translation chips are `.kmb-chip.kmb-chip-btn` with a
   server-rendered `aria-pressed`. The Full page / Full screen buttons and the menu are unchanged.
-- Projects forms (Board, Goal, Project New/Edit) already follow the form look (ADR 0182). CSS-only additions: the
+- Projects forms (Board, Goal, Project New/Edit) already follow the form look (ADR [0182](0182-form-look.md)). CSS-only additions: the
   audience card's heading uses the heading font; the "Everyone" switch hint aligns under its label; the divider is hidden
   while the restricted panel is hidden; the submit row centres the primary button and a quiet Cancel.
 
@@ -32,7 +32,7 @@ Relates to: ADR 0190 (kanban), ADR 0184 (detail pages), ADR 0182 (forms)
 
 - The shared community hint says "this event appears under" on board, goal and project forms (wording bug in a shared
   translation key); left for a copy fix.
-- The leftover ADR 0086 comment above the removed project-link block in `BoardDetail.cshtml` is historical.
+- The leftover ADR [0086](0086-goals-projects-lane.md) comment above the removed project-link block in `BoardDetail.cshtml` is historical.
 
 ## Open
 

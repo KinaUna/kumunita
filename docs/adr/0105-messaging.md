@@ -11,7 +11,7 @@ superseded_by: [adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0105 — M9: 1:1 resident messaging (a new `Kumunita.Core.Messaging` context — participant-by-id access, plain-text capped immutable messages, the ADR 0101 admin-toggle shape with the floor inverted to OFF, the M6 `message.new` nudge, zero new authorization surface)
+# ADR [0105](0105-messaging.md) — M9: 1:1 resident messaging (a new `Kumunita.Core.Messaging` context — participant-by-id access, plain-text capped immutable messages, the ADR [0101](0101-announcement-comments-lane.md) admin-toggle shape with the floor inverted to OFF, the M6 `message.new` nudge, zero new authorization surface)
 
 Status: Accepted
 Date: 2026-09-27
@@ -30,13 +30,13 @@ messaging gate).
 > **Abstract:** the platform has public and group-scoped conversation
 > surfaces but **no direct 1:1 channel between two residents** (grep-
 > verified). M9 is **greenfield** but builds entirely on frozen, verified
-> seams: the M6 notification lane, the ADR 0101 admin-toggle shape, the
-> ADR 0090 paging discipline, and ADR 0004 §B.1's Marten-native document-
+> seams: the M6 notification lane, the ADR [0101](0101-announcement-comments-lane.md) admin-toggle shape, the
+> ADR [0090](0090-pagination-and-filtering.md) paging discipline, and ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1's Marten-native document-
 > surface rule. Three deliberate differences from the closest precedents,
 > each a narrowing rather than a new mechanism: the **toggle floor is
 > inverted** (off, not the codebase `true`-floor convention — messaging is
 > a privacy-sensitive opt-in); the **operator has no read standing** (a
-> GlobalAdmin who is not a participant gets a non-leaky 404 — the ADR 0028
+> GlobalAdmin who is not a participant gets a non-leaky 404 — the ADR [0028](0028-guardian-controls-account-scope-supervision.md)
 > GU precedent carried to a resident surface); the **message is
 > deliberately dumb** (plain text, ≤ 2000 chars, immutable). One bounded
 > context, two documents, one surface, additive — **no `Audience` field on
@@ -60,9 +60,9 @@ from the closest precedents, each a narrowing: the **toggle floor is
 inverted** (off, not the codebase `true`-floor convention — messaging is a
 privacy-sensitive opt-in a neighborhood *chooses*, not a public surface a
 fresh instance ships open); the **operator has no read standing** (a
-GlobalAdmin who is not a participant gets a non-leaky 404 — the ADR 0028 GU
+GlobalAdmin who is not a participant gets a non-leaky 404 — the ADR [0028](0028-guardian-controls-account-scope-supervision.md) GU
 precedent carried to a resident surface); the **message is deliberately
-dumb** (plain text, ≤ 2000 chars, immutable — the ADR 0025/0031/0034/0024
+dumb** (plain text, ≤ 2000 chars, immutable — the ADR [0025](0025-rich-content-markdown-and-content-images.md)/0031/0034/0024
 machinery is the follow-on lanes' entry, not M9's value). This is a
 **milestone** (a roadmap letter, not a named lane): the close unit (U07)
 flips `Milestones.cs` / the README Roadmap / `MilestonesTests.cs`.
@@ -80,7 +80,7 @@ flips `Milestones.cs` / the README Roadmap / `MilestonesTests.cs`.
   participant pair is the whole access story), **no `Modified` /
   `DeletedAt`** (immutable in M9, D7), **no attachments**.
 - **D2 — The admin toggle is a hard service gate, default OFF.**
-  `LocaleSettings.MessagingEnabled` is an additive `bool` (ADR 0004 §B.1)
+  `LocaleSettings.MessagingEnabled` is an additive `bool` (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1)
   **defaulting to `false`** — a **missing** settings row reads as **off**.
   `IsMessagingEnabledAsync()` reads `settings?.MessagingEnabled == true`;
   `SetMessagingEnabledAsync(enabled, actorId)` commits the locked
@@ -91,16 +91,16 @@ flips `Milestones.cs` / the README Roadmap / `MilestonesTests.cs`.
   conversation is visible to **exactly its two** participants. A
   non-participant — a third resident, a moderator, a GlobalAdmin — gets a
   **non-leaky 404** (`KeyNotFoundException`), never 403 and never data
-  (the ADR 0028 GU precedent; the ADR 0089 "no break-glass" pin).
+  (the ADR [0028](0028-guardian-controls-account-scope-supervision.md) GU precedent; the ADR [0089](0089-group-events-membership-lane.md) "no break-glass" pin).
 - **D4 — No `Audience`, no `IAuthorizationService` in the read path.** The
-  participant check is an **id comparison in the service** (the ADR 0076 D3
+  participant check is an **id comparison in the service** (the ADR [0076](0076-notifications-inbox-and-recipient-email.md) D3
   "the id is the whole access story" shape). Zero new `AccessAction`, zero
   new `AccessVia`, zero `Decide()` branch, zero `IAuditableResource`
   adapter.
 - **D5 — Audit: one `AccessAudit` row per write, in-transaction; reads
   never audit.** Single-target rows only, committed in the **same
   session** as the domain write (one `SaveChangesAsync`). **Reads emit no
-  audit row** (the ADR 0076 F11 personal-read shape). See the handoff note
+  audit row** (the ADR [0076](0076-notifications-inbox-and-recipient-email.md) F11 personal-read shape). See the handoff note
   for the full audit table.
 - **D6 — The new-message nudge rides the M6 lane.** On send, the service
   calls the **existing** `NotificationService.EmitAsync` for the *other*
@@ -108,7 +108,7 @@ flips `Milestones.cs` / the README Roadmap / `MilestonesTests.cs`.
   `NotificationKinds` set; also in the `Known` list — so the recipient
   owns a per-kind mail toggle), idempotency key
   **`notification:message.new:{messageId}`** (stable, content-derived),
-  `linkPath = /messages/{conversationId}` (ADR 0085), the message text as
+  `linkPath = /messages/{conversationId}` (ADR [0085](0085-notification-item-link-and-reply-highlight.md)), the message text as
   the body (the recipient's `EmailLanguage` governs the template — ADR
   0061, verbatim). The emission runs **before the send's single
   `SaveChangesAsync`**; a failed email never rolls back the message.
@@ -119,7 +119,7 @@ flips `Milestones.cs` / the README Roadmap / `MilestonesTests.cs`.
   `ArgumentException` (400). A sent message is **immutable in M9** — no
   edit, no delete.
 - **D8 — Read state is per-recipient.** `Message.ReadBy` is one `string?`
-  — the recipient who read it; `null` = unread (the ADR 0076
+  — the recipient who read it; `null` = unread (the ADR [0076](0076-notifications-inbox-and-recipient-email.md)
   `Notification.ReadAt` "personal read marker" shape). `MarkReadAsync`
   sets it **for the caller only**. **No "read by the other" is ever
   surfaced** (read-receipts are a deferred lane).
@@ -145,16 +145,16 @@ flips `Milestones.cs` / the README Roadmap / `MilestonesTests.cs`.
   channel, no UI dependency.
 - **The operator wall:** for the first time a resident surface is
   *unreadable by the platform operator* — a GlobalAdmin who is not a
-  participant gets the same non-leaky 404 a stranger gets (the ADR 0028 GU
+  participant gets the same non-leaky 404 a stranger gets (the ADR [0028](0028-guardian-controls-account-scope-supervision.md) GU
   precedent made a standing rule, D3). The privacy model gains a surface it
   cannot audit-peek; the audit trail still records every *write*.
 - **The toggle is the rollback.** Flipping it off is an instant,
-  data-preserving close (the ADR 0101 "governs new access, keeps the data"
+  data-preserving close (the ADR [0101](0101-announcement-comments-lane.md) "governs new access, keeps the data"
   precedent); a code revert is a normal revert — two additive documents,
   one additive bool, one additive kind, nothing to migrate away.
-- **Deferred, each a named lane (own ADR):** group messaging (the ADR 0013
+- **Deferred, each a named lane (own ADR):** group messaging (the ADR [0013](0013-group-posts-membership-lane.md)
   membership lane is its access story), rich content in messages (the ADR
-  0025/0031/0034 machinery), edit / delete (the ADR 0024 soft-delete shape),
+  0025/0031/0034 machinery), edit / delete (the ADR [0024](0024-author-soft-delete-lane.md) soft-delete shape),
   read-receipts (the `ReadBy` field already stores the data), and the
   `LanguageCode` display/translation lane for message text (the ADR
   0018/0022/0027 family).

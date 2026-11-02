@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0082 — Content actions dropdown (announcements, posts, pages, replies)
+# ADR [0082](0082-content-actions-dropdown.md) — Content actions dropdown (announcements, posts, pages, replies)
 
 Status: Accepted
 Date: 2026-09-12
@@ -38,7 +38,7 @@ card block:
 For a content item with a standing-holder viewer (author or
 Translator/GlobalAdmin), the surface reads as a vertical wall of buttons
 and panels — most of which the resident never touches. The same clutter was
-already addressed for **todos and kanban cards** (ADR 0069 + ADR 0071): a
+already addressed for **todos and kanban cards** (ADR [0069](0069-kanban-drag-dnd-fixed-statuses-and-add-lane.md) + ADR [0071](0071-lane-edit-arrow-autosubmit-and-menu-dividers.md)): a
 single `⋮` Bootstrap dropdown on the right of the row, with the heavy
 actions opening a Bootstrap modal (`data-bs-toggle="modal"` /
 `data-bs-target`), the light actions (Edit link, Delete form) inline in
@@ -54,16 +54,16 @@ surfaces), and reads at a glance.
   `_AccountNav.cshtml` / `TodoDetail.cshtml` shape (the M2/M3/M4
   shared nav-dropdown idiom): `btn btn-sm action-glyph-btn
   dropdown-toggle` (the borderless ⋮ trigger, ADR 0070's `.kanban-glyph-btn`
-  generalized to all `⋮` dropdown triggers by ADR 0092),
+  generalized to all `⋮` dropdown triggers by ADR [0092](0092-borderless-kebab-dropdown-triggers.md)),
   `data-bs-toggle="dropdown"`, `aria-label`, and the
   `⋮` glyph. `ms-auto` aligns it right.
 - **Light actions inline in the menu.** Edit (a link, or a form that
   POSTs to the existing edit route) and Delete (a form with `data-confirm`)
-  stay inside the dropdown, the ADR 0069 / ADR 0071 pattern.
+  stay inside the dropdown, the ADR [0069](0069-kanban-drag-dnd-fixed-statuses-and-add-lane.md) / ADR [0071](0071-lane-edit-arrow-autosubmit-and-menu-dividers.md) pattern.
 - **Heavy actions move to modals.** Every translation add / translation
   edit / reply-edit / report form opens a Bootstrap modal
   (`data-bs-toggle="modal"` `data-bs-target="#…"`) with the form rendered
-  inside `modal-body` — the ADR 0071 "Add subtask" / Kanban-card shape.
+  inside `modal-body` — the ADR [0071](0071-lane-edit-arrow-autosubmit-and-menu-dividers.md) "Add subtask" / Kanban-card shape.
   Each modal has a `data-bs-dismiss="modal"` Cancel and a primary Save
   (or Report) in the footer. The modal is a sibling of the card in the
   same `col-*` wrapper; it is `fade` + hidden until opened. **The
@@ -76,12 +76,12 @@ surfaces), and reads at a glance.
   "too cluttered" concern is about *containers*, not *controls* — the
   modal moves the container, the control stays.
 - **The Report action (post + reply) is a modal**, matching the
-  ADR 0071 idiom. The dropdown item is a
+  ADR [0071](0071-lane-edit-arrow-autosubmit-and-menu-dividers.md) idiom. The dropdown item is a
   `data-bs-toggle="modal" data-bs-target="#report-modal"` button; the
   `#report-form` form and `#report-reason` textarea live inside the
   modal (the e2e selectors in `e2e-m3.spec.ts` are preserved — only the
   *click path* changes from a collapse toggle to a modal toggle). The
-  reply's report lane (ADR 0023) is likewise a per-reply modal
+  reply's report lane (ADR [0023](0023-reply-report-target-lane.md)) is likewise a per-reply modal
   (`#reply-report-modal-{replyId}`) so multiple replies on one page do
   not collide.
 - **Routes, form `action`, field `name` / `id`, `@Html.AntiForgeryToken()`,
@@ -98,7 +98,7 @@ surfaces), and reads at a glance.
   `posts.translation_save`, `posts.translation_title_label`,
   `posts.translation_body_label`, `posts.translation_optional`,
   `announcements.edit_button`, `pages.delete`, `common.cancel`, `common.add`).
-- **The chip row (TD / ADR 0027) is unchanged.** It remains the
+- **The chip row (TD / ADR [0027](0027-post-reply-translation-display-and-swap.md)) is unchanged.** It remains the
   language-swap selector below the content — a *selector*, not an action
   surface. The dropdown is the action surface.
 - **The reply composer (Posts/Detail, the bottom `#reply-body` form) is
@@ -143,10 +143,10 @@ surfaces), and reads at a glance.
   per-translation `#reply-trans-edit-{id}-{lang}` /
   `#reply-trans-add-{id}-{lang}`) are scoped by language code (and reply
   id) so multiple items on the same page do not collide.
-- ADR 0016 (per-reply edit), ADR 0023 (reply report), ADR 0024 (author
-  soft-delete), ADR 0027 (TD chips), ADR 0029 (translation add lane),
-  ADR 0037 (drafts), ADR 0048 (translation edit/remove), ADR 0071
-  (modal idiom), ADR 0069 (todo dropdown) remain in force — this ADR
+- ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) (per-reply edit), ADR [0023](0023-reply-report-target-lane.md) (reply report), ADR [0024](0024-author-soft-delete-lane.md) (author
+  soft-delete), ADR [0027](0027-post-reply-translation-display-and-swap.md) (TD chips), ADR [0029](0029-announcement-translations.md) (translation add lane),
+  ADR [0037](0037-draft-mode-author-only.md) (drafts), ADR [0048](0048-translation-edit-and-remove-lanes.md) (translation edit/remove), ADR [0071](0071-lane-edit-arrow-autosubmit-and-menu-dividers.md)
+  (modal idiom), ADR [0069](0069-kanban-drag-dnd-fixed-statuses-and-add-lane.md) (todo dropdown) remain in force — this ADR
   changes *only the container*, not the behavior.
 
 ## Affected files
@@ -159,7 +159,7 @@ surfaces), and reads at a glance.
 - `src/Kumunita.Web/Views/Groups/Detail.cshtml` / `Groups/PostDetail.cshtml`
   (the same `⋮` trigger shape, added later)
 - `src/Kumunita.Web/wwwroot/css/site.css` (the trigger class, now
-  `.action-glyph-btn` — ADR 0092)
+  `.action-glyph-btn` — ADR [0092](0092-borderless-kebab-dropdown-triggers.md))
 - `tests/Kumunita.Web.Tests/e2e-m3.spec.ts` (helper only; no test-body
   changes)
 

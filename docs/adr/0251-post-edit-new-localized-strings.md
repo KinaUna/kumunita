@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0251 — Post edit and Post new: hard-coded English moves to translation keys
+# ADR [0251](0251-post-edit-new-localized-strings.md) — Post edit and Post new: hard-coded English moves to translation keys
 
 Status: Accepted
 Date: 2026-10-29
@@ -29,7 +29,7 @@ available" alert, the Community label and hint, the Tags label, the "Audience �
   `posts.audience_empty_all`, `posts.audience_empty_any`. Shared strings (`audience_heading`, `audience_empty_label`) are used by both pages.
 - `<kw-l>` escapes its content, so the inline emphasis is dropped: the lede no longer bolds "community", and the All/Any warnings no
   longer bold the mode name. "Empty audience." stays bold (the `<b>` wraps the `<kw-l>`).
-- The Edit back link gets the same `<div class="mb-2">` wrapper as the group forms (ADR 0250).
+- The Edit back link gets the same `<div class="mb-2">` wrapper as the group forms (ADR [0250](0250-group-form-back-links.md)).
 - de/fr/da are machine-written and need native review (parked with the other translation reviews).
 
 ## Not covered

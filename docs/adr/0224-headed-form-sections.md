@@ -11,18 +11,18 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0224 — Headed section cards on the other forms
+# ADR [0224](0224-headed-form-sections.md) — Headed section cards on the other forms
 
 Status: Accepted
 
 ## Context
-ADR 0213 gave the Event form four headed section cards. The Post, Project, Announcement and group-post forms still
+ADR [0213](0213-event-form-sections.md) gave the Event form four headed section cards. The Post, Project, Announcement and group-post forms still
 had one card per field (Post New: six cards, Project New: seven, Announcement: five), so a long form read as a
 stack of unrelated boxes.
 
 ## Decision
 The same pattern (`card kmb-form-section`, an `<h2 class="kmb-form-section-title">`, each field in a
-`kmb-form-field`; the existing `palettes.css` rules from ADR 0213 apply, no new CSS):
+`kmb-form-field`; the existing `palettes.css` rules from ADR [0213](0213-event-form-sections.md) apply, no new CSS):
 
 | Form | Sections |
 | --- | --- |

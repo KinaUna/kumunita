@@ -11,7 +11,7 @@ superseded_by: [adr-0086]
 updated: 2026-11-02
 ---
 
-# ADR 0070 — Board edit lane (title + description) + board polish
+# ADR [0070](0070-board-edit-lane-and-board-polish.md) — Board edit lane (title + description) + board polish
 
 Status: Accepted
 Date: 2026-09-24
@@ -19,7 +19,7 @@ Amends: 0067
 
 ## Context
 
-ADR 0067 shipped the M5 board: a `KanbanBoard` with its `KanbanLane`
+ADR [0067](0067-m5-projects-todos-and-kanban.md) shipped the M5 board: a `KanbanBoard` with its `KanbanLane`
 columns, a `TodoItem`, and a `BoardItemPlacement` binding. The board detail
 page (`Views/Projects/BoardDetail.cshtml`) supported **creating** a board and
 writing into lanes and cards, but had **no lane to edit the board itself** —
@@ -39,7 +39,7 @@ Three more surface gaps, all cosmetic:
 
 One already-accepted decision constrains this lane:
 
-- **ADR 0067 §2.3 freezes the `IProjectService` surface.** "An ADD beyond
+- **ADR [0067](0067-m5-projects-todos-and-kanban.md) §2.3 freezes the `IProjectService` surface.** "An ADD beyond
   this list is a **new ADR**." So the new `UpdateBoardAsync` seam this
   decision records is exactly what this ADR settles.
 - **Board standing (C-M5·6)** is `creator ∪ GlobalAdmin` over the board
@@ -62,7 +62,7 @@ One already-accepted decision constrains this lane:
     `AccessVia.Owner` for the creator / `AccessVia.Admin` for the
     GlobalAdmin (the `BoardAuditViaFor` shape).
   - The board's `Audience`, community, and language are **not** editable —
-    they are creation-time choices (fixed per ADR 0067's board-creation
+    they are creation-time choices (fixed per ADR [0067](0067-m5-projects-todos-and-kanban.md)'s board-creation
     lane) and are not part of `UpdateBoardRequest`.
 
 - **The board edit page**: `GET /projects/boards/{boardId}/edit` (title +
@@ -76,7 +76,7 @@ One already-accepted decision constrains this lane:
   `projects.board.edit_lead`, `projects.board.save` × 4 languages.
 
 - **Borderless ⋮ triggers.** A new `.kanban-glyph-btn` class (renamed
-  `.action-glyph-btn` by ADR 0092, which generalizes the class to every `⋮`
+  `.action-glyph-btn` by ADR [0092](0092-borderless-kebab-dropdown-triggers.md), which generalizes the class to every `⋮`
   dropdown trigger in the app) (border: 0,
   transparent ground, a faint `rgba(0,0,0,.06)` hover/focus tint) replaces
   `btn-outline-secondary` on the board-head and lane-head ⋮ buttons — the
@@ -89,7 +89,7 @@ One already-accepted decision constrains this lane:
 ## Consequences
 
 - The `IProjectService` surface grows by exactly one seam (`UpdateBoardAsync`)
-  — the frozen-surface rule (ADR 0067 §2.3) is honoured by recording it here
+  — the frozen-surface rule (ADR [0067](0067-m5-projects-todos-and-kanban.md) §2.3) is honoured by recording it here
   rather than slipping it into the surface silently.
 - A board's title and description are now a living record, matching the
   lane / card edit lanes; the `board.update` audit row keeps the

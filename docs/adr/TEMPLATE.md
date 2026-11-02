@@ -71,7 +71,7 @@ updated: 2026-11-02
 
 The `related:` list is the seam: the **design doc** is the canonical
 destination for any "why" content the ADR cap will not fit. The ADR index
-(`docs/adr/README.md`) is generated from this front-matter — do not hand-edit
+([`docs/adr/README.md`](README.md)) is generated from this front-matter — do not hand-edit
 the index.
 
 ## The cap — what stays, what moves
@@ -79,7 +79,7 @@ the index.
 The target is **~250 lines** (the `docs-report.ps1` bucket is ≤250 / 251–400 /
 >400; the gate is ≤250). What stays in the ADR: **Status, Context (the
 forces), Decision, Consequences.** What moves out — to the linked design doc
-(or `docs/design/adr-handoffs.md` if the ADR has no dedicated design doc; or
+(or [`docs/design/adr-handoffs.md`](../design/adr-handoffs.md) if the ADR has no dedicated design doc; or
 the archived handoff note if the design doc is in `archive/lanes/…`):
 
 - **options analysis** — "we considered A and B, we picked A because…" — the

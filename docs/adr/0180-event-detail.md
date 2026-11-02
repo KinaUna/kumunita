@@ -11,17 +11,17 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0180 — Event detail: rich header
+# ADR [0180](0180-event-detail.md) — Event detail: rich header
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0179 (event card), ADR 0173/0175 (UI refresh), ADR 0054 (RSVP)
+Relates to: ADR [0179](0179-event-card.md) (event card), ADR [0173](0173-report-targets-lane.md)/0175 (UI refresh), ADR [0054](0054-events-rsvp-reminders.md) (RSVP)
 
 ## Decisions
 
 **D1 — Rich header, structure unchanged.** The detail card keeps its order (title row, body,
 translation chips, author band; then RSVP, linked to-dos/boards, add-to-do). The title row gains the
-feed's 56×64 date tile (`.kmb-event-date`, `kw-dt` sentinels from ADR 0179) beside the title; the
+feed's 56×64 date tile (`.kmb-event-date`, `kw-dt` sentinels from ADR [0179](0179-event-card.md)) beside the title; the
 community badge becomes the shared `.kmb-chip`; the single muted date line becomes two icon rows
 ("when": weekday + the resident's effective date format, "where") above a quiet "Add to calendar"
 button. RSVP stays below the description (decided with the owner).

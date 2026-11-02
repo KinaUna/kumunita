@@ -28,7 +28,7 @@ updated: 2026-11-02
 - **Schedule:** the `postgres` addon on the VPS is backed up **hourly via the Coolify
   backup task** (examplium instance; daily is the documented floor for a new instance).
   The dump target is the app database `kumunita` — owned by the **`kumunita_migrate`**
-  role (the two-role split, **ADR 0171** / F22: `kumunita_migrate` owns the DB + the
+  role (the two-role split, **ADR [0171](../adr/0171-least-privilege-db-role.md)** / F22: `kumunita_migrate` owns the DB + the
   `mt` / `identity` schemas and carries DDL; the demoted `kumunita` app role is DML),
   so it can be taken by `kumunita_migrate` or `postgres`. (Example host cron, if operating
   without Coolify's task: `0 3 * * * pg_dump -Fc -h 127.0.0.1 -U kumunita_migrate kumunita
@@ -40,10 +40,10 @@ updated: 2026-11-02
 - **Verify:** restore a recent dump to a scratch DB at least quarterly. *A backup
   you can't restore is not a backup.* Update "Last backup verified" in the inventory.
 
-**Second restore surface — the media volume (ADR 0011):** the *byte payload* of
+**Second restore surface — the media volume (ADR [0011](../adr/0011-media-and-file-storage.md)):** the *byte payload* of
 avatars lives on the dedicated volume at `Media__RootPath`, not in Postgres; the
 dump carries only the catalog (the `MediaObject` rows). The **attachment
-(payload bytes of the ADR 0034 download lane) live on this same volume** — one
+(payload bytes of the ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) download lane) live on this same volume** — one
 volume, two route families (`/content-image/{id}` + `/attachment/{id}`), one
 catalog, one snapshot (C-ATT·1; C-MED·7 unchanged — no new restore surface).
 So:
@@ -94,7 +94,7 @@ point is no longer the dump cadence, it is the WAL stream.
   **F12 human alert channel** (F12 is the lane that *builds* that channel; this
   step **reuses** it and does not build it).
 - **Scope boundary — Postgres surface only:** PITR/WAL archiving covers the
-  **Postgres surface only**. The **media volume** (`Media__RootPath`, ADR 0011)
+  **Postgres surface only**. The **media volume** (`Media__RootPath`, ADR [0011](../adr/0011-media-and-file-storage.md))
   is a **separate** restore surface — pgBackRest does not snapshot it, and
   PITR-ing Postgres to a point in time does **not** rewind it. The media-volume
   snapshot/restore procedure above is **preserved unchanged**; a half-restore

@@ -28,10 +28,10 @@ updated: 2026-11-02
 > `AccessVia`, `IAuthorizationService.Decide()` branch, or role
 > (C-M15·5): the lanes ride the existing
 > `[Authorize(Roles = "GlobalAdmin,Translator")]` class gate on
-> `LanguagesController` (ADR 0021). Zero schema change, zero new
+> `LanguagesController` (ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md)). Zero schema change, zero new
 > dependency (C-M15·8).
 >
-> **Status.** **LOCKED.** The decisions D1–D10 are locked in **ADR 0116
+> **Status.** **LOCKED.** The decisions D1–D10 are locked in **ADR [0116](../adr/0116-translation-bulk.md)
 > (Accepted, 2026-09-29)**. The `[PROPOSED]` set in the register
 > `plan-m15-translation-bulk.md` was **user-approved before U00 ran**
 > (the open-veto window closed with **no veto recorded**; the U00 handoff
@@ -58,14 +58,14 @@ provider, the registry, the editor):
   `(Key, LanguageCode)`.
 - **One closed key registry** — `KnownTranslationKeys` (`AllKeys` in
   declaration order = `EnValues` keys; `EnValues` as the provider floor;
-  per-language baselines for `de` / `fr` / `da`, ADR 0042 / ADR 0045),
+  per-language baselines for `de` / `fr` / `da`, ADR [0042](../adr/0042-bundled-initial-language-pack.md) / ADR [0045](../adr/0045-danish-preseeded-disabled.md)),
   guarded by the `KnownTranslationKeys_ParityTests` +
   `KwLRegistryConsistencyTests` pins.
 - **One live surface** — `/admin/languages`, whose key-managed editor
   (the ML-UI U6 `Translations` view) lists the closed key list with the
   `en` reference and saves **one row at a time** through the frozen
   `ILocalizationService.UpsertTranslationAsync` (`translation.save`,
-  `Via = Admin`, the ADR 0021 Translator split).
+  `Via = Admin`, the ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md) Translator split).
 
 The per-row loop is the whole gap M15 closes. A translator who wants to
 *check, update, or extend the platform's translations as a batch* — or to
@@ -90,25 +90,25 @@ M15 builds entirely on **frozen, verified seams** (grep-confirmed):
    save`, `TargetKind "translation"`, `TargetId` = key, `Via = Admin`) —
    the row write the batch lane composes, not a new one.
 4. **The `LanguagesController` class gate**
-   `[Authorize(Roles = "GlobalAdmin,Translator")]` (ADR 0021) + the
+   `[Authorize(Roles = "GlobalAdmin,Translator")]` (ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md)) + the
    `SaveTranslation` POST route + the nested public view-model idiom the
    new routes join.
 5. **The `KnownTranslationKeys` registry** (the closed universe of keys —
    `AllKeys` in declaration order; `EnValues` as the `source` column's
    reference) + its two parity test classes.
-6. **The M13 CSV precedent** (ADR 0114 — `GET /admin/analytics/export`:
+6. **The M13 CSV precedent** (ADR [0114](../adr/0114-logging-and-usage-analytics.md) — `GET /admin/analytics/export`:
    `text/csv; charset=utf-8` + `Content-Disposition: attachment` +
    `Cache-Control: no-store` + exactly one `AccessAudit` row
-   `analytics.export`) and the **M12 serve idiom** (ADR 0112 / ADR 0034 /
-   ADR 0108).
+   `analytics.export`) and the **M12 serve idiom** (ADR [0112](../adr/0112-ical-calendar-export.md) / ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) /
+   ADR [0108](../adr/0108-portability-import-export.md)).
 7. **The `IcsWriter` / `TodoIcsWriter` pure-emitter discipline** (ADR
-   0112 / ADR 0115 D4 — BCL-only, pure, closed subset, no session, no
+   0112 / ADR [0115](../adr/0115-integration-of-events-and-projects.md) D4 — BCL-only, pure, closed subset, no session, no
    audit, no HTTP) that the `TranslationBulkExporter` /
    `TranslationBulkImporter` copy.
 
 This is a **milestone** (a roadmap letter, not a named lane): the close
-unit (U06) flips `Milestones.cs` / the README Roadmap / `docs/STATUS.md` /
-`docs/ARCHITECTURE.md` + `MilestonesTests.cs` (the AGENTS.md doc↔code
+unit (U06) flips `Milestones.cs` / the README Roadmap / [`docs/STATUS.md`](../STATUS.md) /
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `MilestonesTests.cs` (the AGENTS.md doc↔code
 parity contract — D10). This design doc (authored U00,
 **LOCKED**) is the **primary tier**; the register
 `docs/plans-milestones/plan-m15-translation-bulk.md` is the secondary
@@ -133,17 +133,17 @@ three editor-facing `kw-l` keys). The **pinned test names**
 (§pinned tests) + the **three acceptance tests** (U06, §gate). The **U06
 milestone flip** (D10).
 
-**Out (each a named follow-on lane, ADR 0116 Consequences — own ADRs; the
+**Out (each a named follow-on lane, ADR [0116](../adr/0116-translation-bulk.md) Consequences — own ADRs; the
 deferred-lane list is locked in §deferred):** UGC translation bulk
 (posts / replies / announcements / events / pages / group+community —
-per-parent rows with their own standing matrix, ADR 0022/0026/0027/
+per-parent rows with their own standing matrix, ADR [0022](../adr/0022-user-added-post-reply-translations.md)/0026/0027/
 0029/0059/0088); a remove/blank lane in the bundle (a blank cell is a
 **no-op**, C-M15·4 — removal is a standing decision on the per-surface
-remove lanes, ADR 0048); machine translation (the README §Deferred pin
-stands — ADR 0005 C); a "new language + fill it in one step" mega-lane
+remove lanes, ADR [0048](../adr/0048-translation-edit-and-remove-lanes.md)); machine translation (the README §Deferred pin
+stands — ADR [0005](../adr/0005-multilingual-support.md) C); a "new language + fill it in one step" mega-lane
 (D7 — the composition of the existing catalog lane + the bundle is the
 shape); other i18n formats (XLIFF / PO — the bundle's format is the file's
-own header, D2); per-key ownership / review workflow (ADR 0021
+own header, D2); per-key ownership / review workflow (ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md)
 "Revisit when" — drafts, per-key ownership, an approval step are
 workflows, not bulk).
 
@@ -156,9 +156,9 @@ spreadsheet, or machine-translation tool, and back — "so they can easily
 be checked, updated, and extended with new languages," the roadmap row
 names. It takes **nothing** from a resident's time or attention (a plain
 resident, including a moderator, never sees the surface — it rides the
-existing ADR 0021 standing split), and it **protects** the trust
+existing ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md) standing split), and it **protects** the trust
 boundary rather than testing it: the bundle carries **only** the
-platform's own UI strings (the ADR 0005 A scope — the UGC exclusion, the
+platform's own UI strings (the ADR [0005](../adr/0005-multilingual-support.md) A scope — the UGC exclusion, the
 deferred-lane list), and it is a **view of the store, never a store**
 (C-M15·1) — there is no second copy of the translations to drift, leak,
 or reconcile. The cost is the translator's, and it is **less** than
@@ -199,7 +199,7 @@ row per commit — and it is named, bounded, and reversible (§FACES trade).
   `LocalizationServiceTests.cs` family or sibling files) +
   **`tests/Kumunita.Web.Tests/`** (U04/U05/U06 pins).
 - **The U06 parity surfaces:** `Milestones.cs`, `MilestonesTests.cs`, the
-  `README.md` Roadmap, `docs/STATUS.md`, `docs/ARCHITECTURE.md` (the
+  [`README.md`](../../README.md) Roadmap, [`docs/STATUS.md`](../STATUS.md), [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) (the
   value-chain table gains the M15 row — the table currently ends at M14).
 
 **Unchanged (the frozen surface — C-M15·7/8, the drift-guard frozen list
@@ -299,9 +299,9 @@ noted):
   string actorId, CancellationToken ct = default)`** (D4, U04) — the one
   `translation.export` audit row (`TargetKind "translation"`, `TargetId`
   = the joined language codes, `Via = Admin`, `Outcome = Allow`): a
-  **read with an audit**, the M13 analytics-CSV precedent (ADR 0114 — an
+  **read with an audit**, the M13 analytics-CSV precedent (ADR [0114](../adr/0114-logging-and-usage-analytics.md) — an
   admin-surface CSV carries exactly one `AccessAudit` row). Emitted by
-  the **service**; the controller adds none (the ADR 0021 idiom).
+  the **service**; the controller adds none (the ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md) idiom).
 
 **Depended on** (frozen, unchanged — the §drift-guard list):
 `TranslationResource` + the `CoreDocTypes` unique index; the frozen
@@ -316,7 +316,7 @@ nested public view-model idiom; `AccessAudit` (the row shape).
 **Access model:** **unchanged** (C-M15·5). M15 touches **no** audience,
 **no** group, **no** delegation, **no** moderator scope — the three bulk
 lanes are an **operator action over platform text** the way the existing
-editor is (ADR 0021), gated by the **existing** class-level
+editor is (ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md)), gated by the **existing** class-level
 `[Authorize(Roles = "GlobalAdmin,Translator")]` on
 `LanguagesController`. M15 adds **no catalog action**, so nothing new
 needs a per-action gate (the catalog mutations keep their own
@@ -380,17 +380,17 @@ four languages.
 
 ## Emergent impact
 
-**Privacy:** the bundle is **platform text only** (the ADR 0005 A scope —
+**Privacy:** the bundle is **platform text only** (the ADR [0005](../adr/0005-multilingual-support.md) A scope —
 UI strings; the UGC exclusion is a locked deferral, §deferred), so the
 file that travels carries no resident content at all — a stronger
 boundary than the M11 archive (which carries the content *graph*,
 secret-free). The serve idiom (`Content-Disposition: attachment` +
 `Cache-Control: no-store`) keeps the download out of a shared browser's
-cache (the ADR 0112 / ADR 0034 idiom). **Trust:** the fail-closed import
+cache (the ADR [0112](../adr/0112-ical-calendar-export.md) / ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) idiom). **Trust:** the fail-closed import
 (C-M15·3) means a corrupt or malformed bundle is refused **wholesale** —
 the platform's translation set is never left half-imported; the
 blank-no-op (C-M15·4) means a file can never **erase** a translation —
-removal stays a standing decision on the per-surface lanes (ADR 0048).
+removal stays a standing decision on the per-surface lanes (ADR [0048](../adr/0048-translation-edit-and-remove-lanes.md)).
 **Reliability:** the round-trip is lossless for the closed set
 (C-M15·2) — the previous export **is** the import's own rollback
 (§FACES trade). **Legibility:** the bundle is self-describing — the
@@ -406,7 +406,7 @@ save instead of N, one file instead of N inputs.
 This is the **whole** (the platform's translation set), not a part. It
 optimizes **batchability + world-seam** (the set can leave and come back
 whole) at the cost of **none of the resident's time or attention** (the
-surface rides the existing ADR 0021 standing split — a plain resident
+surface rides the existing ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md) standing split — a plain resident
 never sees it). The part it deliberately does **not** optimize is the
 **UGC translation set** — posts / replies / announcements / events /
 pages / group+community are per-parent rows with their own standing
@@ -418,7 +418,7 @@ platform's translations"), not the fragments' per-parent inventories.
 
 - **F1 (coherent)** — the bulk lanes ride the house's own seams: the
   closed key registry, the catalog as the column set, the frozen one-row
-  upsert as the write, the ADR 0021 standing split, the M13 CSV+audit
+  upsert as the write, the ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md) standing split, the M13 CSV+audit
   precedent, the M12 serve idiom. **Nothing new is invented** — the batch
   is a loop and a file over machinery that already exists.
 - **F2 (stable)** — additive-only: two pure functions + four additive
@@ -489,7 +489,7 @@ POCOs are not Marten documents and create no `mt` tables.
   *expects* a blank to erase would be surprised (nothing changed). The
   `translations.bulk.import_hint` key + the batch form's blank behavior
   (D8, C-M15·4) make the rule visible; the remove decision stays on the
-  per-surface lanes (ADR 0048) — the risk is the *expectation*, not the
+  per-surface lanes (ADR [0048](../adr/0048-translation-edit-and-remove-lanes.md)) — the risk is the *expectation*, not the
   code.
 - **The closed key set is a snapshot of the registry.** If a future lane
   adds a `KnownTranslationKeys` key, the next export **automatically**
@@ -520,12 +520,12 @@ platform (a plain CSV, self-describing, marker-owned) and come back
   upserted, blanks skipped, refusals wholesale), the store is the single
   source of truth before, during, and after (C-M15·1).
 - **Not** — UGC translation bulk (§deferred, own ADR); a remove/blank
-  lane (§deferred — the ADR 0048 standing lanes own removal); machine
+  lane (§deferred — the ADR [0048](../adr/0048-translation-edit-and-remove-lanes.md) standing lanes own removal); machine
   translation (the platform never calls one — the seam is that the file
-  *can go to* a translator, ADR 0005 C); other i18n formats (§deferred —
+  *can go to* a translator, ADR [0005](../adr/0005-multilingual-support.md) C); other i18n formats (§deferred —
   the marker owns the format).
 
-## Decisions (D1–D10, locked — ADR 0116)
+## Decisions (D1–D10, locked — ADR [0116](../adr/0116-translation-bulk.md))
 
 > **Locked verbatim.** These are the register's [PROPOSED] set, locked
 > with **no veto recorded** (the open-veto window closed before U00 ran).
@@ -558,7 +558,7 @@ platform (a plain CSV, self-describing, marker-owned) and come back
 - **D4 · Audit: exactly one row per mutating action + one per export,
   all `Via = AccessVia.Admin`, `Outcome = Allow`, committed in the same
   session as the writes.** `translation.export` (TargetId = the joined
-  language codes — the M13 analytics-CSV precedent, ADR 0114),
+  language codes — the M13 analytics-CSV precedent, ADR [0114](../adr/0114-logging-and-usage-analytics.md)),
   `translation.import` (TargetId = the count of upserted rows, as a
   string), `translation.save_all` (TargetId = the language code). A
   **refused** import writes **no row**.
@@ -567,7 +567,7 @@ platform (a plain CSV, self-describing, marker-owned) and come back
   body; every body key ∈ `KnownTranslationKeys.AllKeys`; every language
   column ∈ the catalog's codes; the `source` column is ignored. Any
   failure ⇒ **zero writes, no audit row**, first offending row named
-  (the M11 validate-then-apply posture, ADR 0108 D4). Apply: each
+  (the M11 validate-then-apply posture, ADR [0108](../adr/0108-portability-import-export.md) D4). Apply: each
   present non-blank row upserts **through the same row store the frozen
   `UpsertTranslationAsync` uses** (one session, one audit row).
 - **D6 · The batch editor is a second mode on the existing view — the
@@ -581,7 +581,7 @@ platform (a plain CSV, self-describing, marker-owned) and come back
 - **D7 · "Extend with new languages" = the existing catalog lane + the
   bundle, in that order.** A GlobalAdmin adds a language through the
   **existing** catalog surface (a bundled baseline auto-creates its
-  rows — ADR 0042/0044; a custom language starts empty). The next
+  rows — ADR [0042](../adr/0042-bundled-initial-language-pack.md)/0044; a custom language starts empty). The next
   export shows the new column; the fill + import lands the rows. M15
   adds **zero** catalog surface — "new language" is composition of the
   existing seams.
@@ -602,8 +602,8 @@ platform (a plain CSV, self-describing, marker-owned) and come back
   `ILocalizationService`.
 - **D10 · Docs parity at the flip (U06, always last):** `Milestones.cs`
   M15 → `StatusDone` + M16 → `StatusNext`; `MilestonesTests.cs` re-pin;
-  README (Status + Roadmap); `docs/STATUS.md`;
-  `docs/ARCHITECTURE.md` value-chain table gains the M15 row (the table
+  README (Status + Roadmap); [`docs/STATUS.md`](../STATUS.md);
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) value-chain table gains the M15 row (the table
   currently ends at M14).
 
 ## Invariants (C-M15·1–8, locked verbatim)
@@ -622,7 +622,7 @@ platform (a plain CSV, self-describing, marker-owned) and come back
   offending row named (422 at the route).
 - **C-M15·4 · Blank = no-op, never erase.** A blank import cell and a
   blank batch-editor input **skip** that row. Erasing a translation is
-  a standing decision on the per-surface remove lanes (ADR 0048) — a
+  a standing decision on the per-surface remove lanes (ADR [0048](../adr/0048-translation-edit-and-remove-lanes.md)) — a
   bulk file never carries a remove.
 - **C-M15·5 · No new authorization surface.** No new `AccessAction`,
   `AccessVia`, `Decide()` branch, role, or adapter. The three bulk
@@ -721,7 +721,7 @@ file-facing, `save_all` is editor-facing):
 Each × **4 languages** (`en` / `de` / `fr` / `da`), the closed-key
 registry shape (the `KnownTranslationKeys_ParityTests` +
 `KwLRegistryConsistencyTests` pins enforce the 4-language set + non-empty
-values; the ADR 0052 warm-boot backfill seeds them idempotently).
+values; the ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md) warm-boot backfill seeds them idempotently).
 
 ## §gate — the three acceptance tests (U06)
 
@@ -760,12 +760,12 @@ already covered).
 
 | Deferred lane | The one-line "own ADR" note |
 |---|---|
-| **UGC translation bulk** (posts / replies / announcements / events / pages / group+community name+description) | A bulk export of *those* is a **different inventory** — one row per parent × language, each with its own author standing matrix (ADR 0022/0026/0027/0029/0059/0088) — an own lane, own ADR. M15's bundle is **platform text only** (the ADR 0005 A scope). |
-| **A remove/blank lane in the bundle** | A blank cell is a **no-op** (C-M15·4). Removing a translation row is a **standing decision** (the per-surface remove lanes, ADR 0048) — a bulk file never carries a remove. Own ADR if/when a remove-in-bundle shape is wanted. |
-| **Machine translation** | The README §Deferred pin stands (ADR 0005 C): an MT provider is a **third-party boundary** in SECURITY.md; the bundle's world-seam is that the file *can go to* a translator, not that the platform calls one. Own ADR as a new trust boundary. |
-| **A "new language + fill it in one step" mega-lane** | D7's shape is the catalog mutation **then** the bundle loop — two decisions, two audit rows, two surfaces. A coupled mega-form is the anti-pattern the ADR 0108 operator plane avoids. Own ADR if/when the two-step loop is measured to hurt. |
+| **UGC translation bulk** (posts / replies / announcements / events / pages / group+community name+description) | A bulk export of *those* is a **different inventory** — one row per parent × language, each with its own author standing matrix (ADR [0022](../adr/0022-user-added-post-reply-translations.md)/0026/0027/0029/0059/0088) — an own lane, own ADR. M15's bundle is **platform text only** (the ADR [0005](../adr/0005-multilingual-support.md) A scope). |
+| **A remove/blank lane in the bundle** | A blank cell is a **no-op** (C-M15·4). Removing a translation row is a **standing decision** (the per-surface remove lanes, ADR [0048](../adr/0048-translation-edit-and-remove-lanes.md)) — a bulk file never carries a remove. Own ADR if/when a remove-in-bundle shape is wanted. |
+| **Machine translation** | The README §Deferred pin stands (ADR [0005](../adr/0005-multilingual-support.md) C): an MT provider is a **third-party boundary** in SECURITY.md; the bundle's world-seam is that the file *can go to* a translator, not that the platform calls one. Own ADR as a new trust boundary. |
+| **A "new language + fill it in one step" mega-lane** | D7's shape is the catalog mutation **then** the bundle loop — two decisions, two audit rows, two surfaces. A coupled mega-form is the anti-pattern the ADR [0108](../adr/0108-portability-import-export.md) operator plane avoids. Own ADR if/when the two-step loop is measured to hurt. |
 | **Other i18n formats (XLIFF / PO / …)** | The closed format is the marker-owned CSV (D2). A format the file's own header does not own is **refused** (C-M15·3); other formats are an own lane, own ADR. |
-| **Per-key ownership / review workflow** | ADR 0021 "Revisit when": drafts, per-key ownership, an approval step are **workflows, not bulk** — own ADR. |
+| **Per-key ownership / review workflow** | ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md) "Revisit when": drafts, per-key ownership, an approval step are **workflows, not bulk** — own ADR. |
 
 ## §drift-guard — the frozen pins + the drift log
 
@@ -811,7 +811,7 @@ here.
 
 ---
 
-## ADR 0116 — moved content (D11 trim, 2026-11-02)
+## ADR [0116](../adr/0116-translation-bulk.md) — moved content (D11 trim, 2026-11-02)
 
 ## Affected files
 
@@ -845,22 +845,22 @@ here.
   `tests/Kumunita.Web.Tests/` — the U04 (3) + U05 (2) pins + the U06
   three acceptance tests + the cross-surface pins (names verbatim in the
   design doc §pinned tests / §gate).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
+- `src/Kumunita.Web/Milestones.cs` + [`README.md`](../../README.md) + [`docs/STATUS.md`](../STATUS.md) +
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
   — the M15 → `StatusDone` / M16 → `StatusNext` flip (D10), in one unit
   (U06).
 
 
 ---
 
-## ADR 0042 — moved content (D11 trim, 2026-11-02)
+## ADR [0042](../adr/0042-bundled-initial-language-pack.md) — moved content (D11 trim, 2026-11-02)
 
 ## Revisit when
 
 - A **warm-reseed or upgrade-push mechanism** for community-owned languages
   is wanted (D1 asymmetry becomes a complaint) — decide it as a *new*
   seeder path with its own ownership review, not as an `LS` extension.
-- **MT is introduced** (ADR 0005 C): the baselines are the natural *seed
+- **MT is introduced** (ADR [0005](../adr/0005-multilingual-support.md) C): the baselines are the natural *seed
   material* for an opt-in, clearly-labeled suggestion surface — but that
   is a trust-boundary decision with its own ADR and SECURITY.md review.
 - The community **adds a fourth language in-app** and wants *its* baseline
@@ -875,7 +875,7 @@ here.
 
 ---
 
-## ADR 0052 — moved content (D11 trim, 2026-11-02)
+## ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md) — moved content (D11 trim, 2026-11-02)
 
 ## Tests
 
@@ -886,12 +886,12 @@ three, one key missing only `fr` and carrying an admin-edited `de`
 row) → the backfill adds exactly the missing rows with the baseline
 text, leaves the admin-edited `de` row byte-identical, never touches
 the `en` rows, creates no duplicates, and a re-run is a no-op. The
-existing page-backfill test (ADR 0047 D2) is unchanged and still green.
+existing page-backfill test (ADR [0047](../adr/0047-static-page-localization-and-backfill.md) D2) is unchanged and still green.
 
 
 ---
 
-## ADR 0022 — moved content (D11 trim, 2026-11-02)
+## ADR [0022](../adr/0022-user-added-post-reply-translations.md) — moved content (D11 trim, 2026-11-02)
 
 ## Revisit when
 
@@ -902,13 +902,13 @@ existing page-backfill test (ADR 0047 D2) is unchanged and still green.
   (e.g. a translation is visible even where the original is not) — then the
   "inherits the parent's Read" invariant breaks and the row needs its own
   audience + moderation, which is a much larger change.
-- **Announcement** translations are requested — that is the ADR 0017 lane
+- **Announcement** translations are requested — that is the ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md) lane
   extended, a separate decision.
 
 
 ---
 
-## ADR 0021 — moved content (D11 trim, 2026-11-02)
+## ADR [0021](../adr/0021-translator-role-delegated-translation-editing.md) — moved content (D11 trim, 2026-11-02)
 
 ## Revisit when
 

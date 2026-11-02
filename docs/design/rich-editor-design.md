@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 # Rich editor (`RE`) — WYSIWYG authoring surface + toolbar over the RC Markdown lane
 
-> **Abstract:** the **rich editor (`RE`)** design — a **WYSIWYG authoring surface + toolbar** over the RC Markdown lane: a `renderPreview` mirror subset, a closed toolbar marker set (the ceiling), the client `IsSafeImageSrc` mirror, and the pinned tests. Built **on top of** RC (ADR 0025) — RC's R·1–R·7 bind unchanged. **Who is it for:** a developer touching the rich editor or the toolbar; an agent that needs the frozen-base + ceiling invariant. **When to read the rest:** before touching the editor surface, the toolbar markers, or the `renderPreview` mirror.
+> **Abstract:** the **rich editor (`RE`)** design — a **WYSIWYG authoring surface + toolbar** over the RC Markdown lane: a `renderPreview` mirror subset, a closed toolbar marker set (the ceiling), the client `IsSafeImageSrc` mirror, and the pinned tests. Built **on top of** RC (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)) — RC's R·1–R·7 bind unchanged. **Who is it for:** a developer touching the rich editor or the toolbar; an agent that needs the frozen-base + ceiling invariant. **When to read the rest:** before touching the editor surface, the toolbar markers, or the `renderPreview` mirror.
 
 
 > **Three-tier contract.** This file is the **primary** tier of the RE lane:
@@ -29,7 +29,7 @@ updated: 2026-11-02
 > register wins for *which files exist* and *what each unit does*.
 >
 > **The frozen base.** This lane is built **on top of** the rich-content lane
-> (`RC`, ADR 0025). RC's **R·1–R·7** all still bind **unchanged** (re-anchored
+> (`RC`, ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)). RC's **R·1–R·7** all still bind **unchanged** (re-anchored
 > in §Frozen base below). RE adds **no** re-shape of `MarkdownRenderer`,
 > `ContentImageIds`, `IMediaStore`, the four `ImageIds` fields, the
 > `/content-image` routes, or the `.rc-body` / `.rc-image` CSS. It is
@@ -45,7 +45,7 @@ a photo"* (RC `Scope`, R1). RC delivered the **read** half: `MarkdownRenderer`
 renders `**bold**`, lists, links, and `![alt](/content-image/{id})` images on
 every read surface, and `Body` is stored as a Markdown `string` (RC R·7, zero
 migrations). RC deliberately left the **write** half at the boring floor —
-*"the composer is a textarea with a Markdown hint"* (ADR 0025,
+*"the composer is a textarea with a Markdown hint"* (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md),
 *"Any WYSIWYG / third-party editor"* non-decision) — so a resident who wants
 bold still **hand-types `**text**` and watches the raw markers** while
 composing.
@@ -395,7 +395,7 @@ render it; RE·2 forces it out of both the toolbar and the preview (see
 ## Frozen base (RC R·1–R·7, re-anchored unchanged)
 
 The RE lane **does not re-state** these — they keep binding from the RC design
-doc (`docs/design/rich-content-design.md`) and ADR 0025:
+doc ([`docs/design/rich-content-design.md`](rich-content-design.md)) and ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md):
 
 - **R·1** — one renderer: `MarkdownRenderer.RenderHtml` is the single
   Markdown → HTML path for every body.
@@ -407,7 +407,7 @@ doc (`docs/design/rich-content-design.md`) and ADR 0025:
 - **R·4** — the serving route defers to the owning resource's decision;
   404-orphan; no new `AccessAction`.
 - **R·5** — Core stays HTTP-free.
-- **R·6** — upload boundary is ADR 0011's, verbatim.
+- **R·6** — upload boundary is ADR [0011](../adr/0011-media-and-file-storage.md)'s, verbatim.
 - **R·7** — zero schema migrations; `Body` stays a `string`.
 
 RE's **RE·3** (no new dependency / no new server surface / no new audit row)

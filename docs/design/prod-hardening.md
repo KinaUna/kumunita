@@ -20,7 +20,7 @@ updated: 2026-11-02
 > platform-maintainer executing the owner-ops legs; a developer executing an
 > `F#` U2/U3; an agent that needs the audit-row → fix → design-pin lookup.
 > **When to read the rest:** before touching a finding's code seam, an
-> owner-ops step, or the ADR 0171 reconciliation (F22).
+> owner-ops step, or the ADR [0171](../adr/0171-least-privilege-db-role.md) reconciliation (F22).
 
 # Prod-hardening (the 2026-10-22 audit remediation)
 
@@ -31,7 +31,7 @@ fixes are **independent** (each pin is self-contained) — unlike the other five
 subsystem hubs, this lane has no single "base → extension" chain; it is a
 **closed set of 18 findings**, each tied to the audit row it closes. F22 is
 the lane's last fix (its U3 runs the six-member close-flip) and the one that
-resolves the ADR 0004 "app role owns the DB" tension via [ADR 0171](../adr/0171-least-privilege-db-role.md).
+resolves the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) "app role owns the DB" tension via [ADR 0171](../adr/0171-least-privilege-db-role.md).
 
 | Fix | Audit row | What it closes | Design pin (current truth) |
 |---|---|---|---|

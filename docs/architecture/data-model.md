@@ -17,11 +17,11 @@ updated: 2026-11-02
 > **Abstract:** the document shape — the two-schema split (`mt` for domain docs, `identity` for the ASP.NET Identity tables), the per-context document inventory, the conventions (UUIDv7, `created`/`updated`, embedded `Audience`), the optimistic-concurrency rule, and the audit retention & scope policy. **Who is it for:** a developer adding a new document, a new index, or a new doc-type surface; an agent that needs the canonical field set before writing a query. **When to read the rest:** before touching a `*DocTypes.cs` surface, adding a document, or writing a migration.
 
 
-One Postgres per instance, two schemas (ADR 0004):
+One Postgres per instance, two schemas (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)):
   - `mt`       — all domain documents below + Marten projections; schema via Marten versioned migrations
      - `identity` — stock ASP.NET Core Identity tables (`AspNet*`); schema via EF Core migrations
   Neither ORM touches the other schema; a single `pg_dump` captures both.
-  Media (ADR 0011) is the one stored payload outside Postgres: the bytes are
+  Media (ADR [0011](../adr/0011-media-and-file-storage.md)) is the one stored payload outside Postgres: the bytes are
   content-addressed on a dedicated volume (`Media__RootPath`), the catalog is a
   document on `mt` — a **second restore surface** that must be snapshotted
   alongside the DB dump (OPS.md §4/§5).
@@ -45,7 +45,7 @@ UserInfoModule
   // opted in ⇒ no decision / no audit row; non-null ⇒ one `CanAsync` decision + one AccessAudit
   // row. A self-view (viewer == owner) always renders the owner's own contact block — a
   // short-circuit with no decision and no audit row (the audience controls others, not the owner).
-  // `visibility` stays on the document + editor (author-controlled, ADR 0003) as the audience
+  // `visibility` stays on the document + editor (author-controlled, ADR [0003](../adr/0003-roles-and-moderator-scoping.md)) as the audience
   // for detailed non-contact fields once they exist — it takes no effect at the directory layer.
   Profile          { subjectId, externalId?, householdId?, displayName, verified, blocked,
                      visibility: Audience, contactVisibility?: Audience, email, phone? }
@@ -55,17 +55,17 @@ UserInfoModule
   // (Deliberate vocabulary: in ASP.NET a "principal" is the *actor*, so the grant
   // fields avoid that word — see [Services](identity-access.md).)
   DelegationGrant  { id, ownerId, delegateId, scope: [action], from, to?, revokedBy? }
-  GuardianLink     { id, guardianId, childId, status: Active|Dissolved, createdAt, dissolvedAt?, dissolvedBy? }   // GU (ADR 0028): the account-scope supervision link (standing off an Active row, G·2); dissolve one-way (G·5)
+  GuardianLink     { id, guardianId, childId, status: Active|Dissolved, createdAt, dissolvedAt?, dissolvedBy? }   // GU (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)): the account-scope supervision link (standing off an Active row, G·2); dissolve one-way (G·5)
 
   // `householdId` is display/metadata ONLY (future group-helper: "family from
   // household", see [Group helpers](extension-seams.md)). The authorization path never reads it — household-based
-  // visibility is expressed as a household *Group* the owner grants, per ADR 0001-B.
+  // visibility is expressed as a household *Group* the owner grants, per ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B.
 
 Content
   Component        { id, name, description, icon, sortOrder, enabled, moderatorAccess }
   Post             { id, kind: Announcement|Discussion, componentId?, authorId, title, body,
                      audience, pinned, hidden, created, updated }
-  // Group lane (ADR 0013, group posts milestone): a group post is a Post with
+  // Group lane (ADR [0013](../adr/0013-group-posts-membership-lane.md), group posts milestone): a group post is a Post with
   // `groupId` non-empty — membership is the sole access decision, `audience`
   // is written non-null and empty (never evaluated), `componentId` empty (the
   // post is excluded from component + "all sections" feeds); PostReply is
@@ -74,15 +74,15 @@ Content
   PostReply        { id, postId, authorId, body, created }
   Audience         { mode: Any|All, grants: [ { kind: User|Group, id } ] }   (embedded)
 
-Events (M4 ✓ — ADR 0054; the names below are the canonical field set the
+Events (M4 ✓ — ADR [0054](../adr/0054-events-rsvp-reminders.md); the names below are the canonical field set the
 shipped `Kumunita.Core.Events.Event` doc carries — design/m4-events-design.md §3.1)
   Event            { id, title, body, componentId?, authorId, start, end, location?,
                      capacity?, audience, reminderEnabled, isDraft, isDeleted,
                      languageCode, tagIds, imageIds, attachmentIds,
                      created, modified? }
-  EventRsvp        { id, eventId, userId, status: Going|Maybe|No, at }   // (eventId, userId) unique — last-write-wins (ADR 0054 §3.2)
+  EventRsvp        { id, eventId, userId, status: Going|Maybe|No, at }   // (eventId, userId) unique — last-write-wins (ADR [0054](../adr/0054-events-rsvp-reminders.md) §3.2)
 
-  // Events calendar (EV-CAL ✓ — ADR 0063): a second, display-only view over the
+  // Events calendar (EV-CAL ✓ — ADR [0063](../adr/0063-events-calendar-view.md)): a second, display-only view over the
   // same data — `GET /events/calendar` renders a month-anchored, rolling 30-day
   // window (overlap pairs highlighted client-side, prev/next/today navigation)
   // served by the one additive read seam `IEventService.ListInRangeAsync`
@@ -90,7 +90,7 @@ shipped `Kumunita.Core.Events.Event` doc carries — design/m4-events-design.md 
   // `AccessAudit` row mirroring `ListUpcomingAsync`). Display-only, zero
   // document changes — no new doc, schema, or seed; the M4 surface untouched.
 
-  // Events calendar views (EV-DWM ✓ — ADR 0064): the same `GET /events/calendar`
+  // Events calendar views (EV-DWM ✓ — ADR [0064](../adr/0064-events-calendar-dwm-views.md)): the same `GET /events/calendar`
   // surface turned into the three named views residents expect — Day,
   // Week (Monday-start, time-ruler), and Month (true calendar month) — over the
   // same already-authorized event set, the same `ListInRangeAsync` seam, the
@@ -104,7 +104,7 @@ shipped `Kumunita.Core.Events.Event` doc carries — design/m4-events-design.md 
   // Zero Core change — the `ListInRangeAsync` seam is reused unchanged (it is
   // already window-agnostic); no new doc, schema, seed, seam, or dependency.
 
-Projects (M5 ✓ — ADR 0067; the names below are the canonical field set the
+Projects (M5 ✓ — ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md); the names below are the canonical field set the
 shipped `Kumunita.Core.Projects.TodoItem` doc carries — design/m5-projects-design.md §2.2)
   TodoItem           { id, title, body?, componentId?, authorId, assigneeId?, status?, parentId?,
                      audience, isDeleted, languageCode, tagIds, imageIds, attachmentIds,
@@ -121,17 +121,17 @@ shipped `Kumunita.Core.Projects.TodoItem` doc carries — design/m5-projects-des
   // are TodoItemToAuditableResource (TargetKind "todo") + KanbanBoardToAuditableResource
   // (TargetKind "board"). A BoardItemPlacement is not itself an auditable resource.
 
-  // PL ✓ (ADR 0086; design/pl-goals-projects-design.md) — the higher-level goals +
+  // PL ✓ (ADR [0086](../adr/0086-goals-projects-lane.md); design/pl-goals-projects-design.md) — the higher-level goals +
   // projects page on top of M5, additive on this same context + ProjectDocTypes
   // (zero migration): a goal is the organizing container; a project points at
   // its goal (GoalId?) and is what a to-do / board associates to (ProjectId?).
   ProjectGoal        { id, title, description?, componentId?, authorId, audience, isDeleted,
                      languageCode, created, modified? }                                          // no dates, no IsDraft, no ProjectId (D2)
   Project            { id, title, description?, goalId?, status?, startAt?, dueAt?, componentId?,
-                     authorId, audience, isDeleted, languageCode, created, modified? }           // status is a string, not an enum (C-PL·4); dates optional (ADR 0079)
+                     authorId, audience, isDeleted, languageCode, created, modified? }           // status is a string, not an enum (C-PL·4); dates optional (ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md))
   // TodoItem + KanbanBoard each gain one additive string? ProjectId (D4) — a feed
   // filter, never a gate (C-M3·2); their own Audience stays the access boundary.
-  // Standing over a goal / project is creator ∪ GlobalAdmin (ADR 0070, no assignee
+  // Standing over a goal / project is creator ∪ GlobalAdmin (ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md), no assignee
   // branch), re-checked server-side in ProjectService; read is each doc's own
   // Audience through the two new adapters ProjectGoalToAuditableResource
   // (TargetKind "goal") + ProjectToAuditableResource (TargetKind "project").
@@ -146,7 +146,7 @@ shipped `Kumunita.Core.Projects.TodoItem` doc carries — design/m5-projects-des
   // (ComponentId, Created) on each, GoalId on Project) + the ProjectId indexes
   // on TodoItem + KanbanBoard.
 
-  // TBD ✓ (ADR 0087; design/tbd-todo-dependency-design.md) — the "waiting on"
+  // TBD ✓ (ADR [0087](../adr/0087-todo-dependency-blocked-by-lane.md); design/tbd-todo-dependency-design.md) — the "waiting on"
   // dependency lane on top of M5, additive on this same context + ProjectDocTypes
   // (zero migration). A to-do points at the other to-do it is waiting on
   // (BlockedByTodoId?) — a hint, never a gate (C-TBD·2): it never changes the
@@ -165,12 +165,12 @@ shipped `Kumunita.Core.Projects.TodoItem` doc carries — design/m5-projects-des
   // a gate — the unassignedOnly / projectId discipline). ProjectDocTypes registers
   // the BlockedByTodoId index on TodoItem.
 
-Localization (ADR 0005 — languages and translations are data, not env)
+Localization (ADR [0005](../adr/0005-multilingual-support.md) — languages and translations are data, not env)
   LanguageCatalog     { code, nativeName, enabled, sortOrder }                 # one row per supported language
   LocaleSettings      { defaultLanguageCode }                                  # singleton document
   TranslationResource { key, languageCode, text }                              # UI strings
   LocalizedPage       { slug, languageCode, title, body: Markdown, updated }   # terms, about, help
-                                         # (retired — ADR 0043 SP moved the four
+                                         # (retired — ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md) SP moved the four
                                          # canonical system pages to `Page` rows
                                          # with `PageKind.System`; `LocalizedPage`
                                          # is kept only for the historical record
@@ -191,7 +191,7 @@ Email outbox
   EmailDeadLetter  { id, idempotencyKey, recipient, subject, lastError, attempts,
                      createdAt, deadAt }
 
-Media (ADR 0011 — content-addressed byte store; catalog here, bytes on the volume)
+Media (ADR [0011](../adr/0011-media-and-file-storage.md) — content-addressed byte store; catalog here, bytes on the volume)
   // Registered via MediaDocTypes (one doc surface per feature, M1/M3 pattern).
   // The payload itself is NOT a document: it is the file at
   // {Media__RootPath}/{id[0..2]}/{id}; the hash (sha256 of the payload) is the id.

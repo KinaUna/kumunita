@@ -11,7 +11,7 @@ superseded_by: [adr-0071]
 updated: 2026-11-02
 ---
 
-# ADR 0069 — Kanban board: drag-and-drop moves, fixed statuses, add-lane
+# ADR [0069](0069-kanban-drag-dnd-fixed-statuses-and-add-lane.md) — Kanban board: drag-and-drop moves, fixed statuses, add-lane
 
 Status: Accepted
 Date: 2026-09-23
@@ -19,19 +19,19 @@ Amends: 0067, 0068
 
 ## Context
 
-ADR 0067 shipped the M5 board and ADR 0068 added the per-lane ⋮ menu (rename /
+ADR [0067](0067-m5-projects-todos-and-kanban.md) shipped the M5 board and ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md) added the per-lane ⋮ menu (rename /
 set limit / set status / move left / move right) plus an add-to-do foot. Three
 things are still at odds with the board's reference model (KinaUna's kanban,
 `KinaUnaAzure/Kanbans`) that the operator uses daily:
 
-- **Moving is keyboard- and menu-only.** ADR 0067 D10 / C-M5·9 pins "no HTML5
+- **Moving is keyboard- and menu-only.** ADR [0067](0067-m5-projects-todos-and-kanban.md) D10 / C-M5·9 pins "no HTML5
   drag, no optimistic reordering"; the only channels are the arrow-key
   shortcuts on a focused card (`client/lib/projects-board.ts`) and the
   move-up/down/left/right menu items. A board you have to *read the menu* to
   rearrange does not feel like a board.
 - **Statuses are free text.** `TodoItem.Status` and `KanbanLane.Status` are
   unconstrained strings ("Status is a free-text label — a string, not a fixed
-  list", ADR 0067). There is no shared vocabulary, so one resident's
+  list", ADR [0067](0067-m5-projects-todos-and-kanban.md)). There is no shared vocabulary, so one resident's
   "in progress" and another's "In Progress" are different values, and the lane
   head can only render whatever text it was given — no icon.
 - **A board starts with its lanes frozen at creation.** `CreateBoardAsync`
@@ -43,7 +43,7 @@ things are still at odds with the board's reference model (KinaUna's kanban,
 
 Two already-accepted decisions constrain this lane:
 
-- **ADR 0067 §2.3 freezes the `IProjectService` surface.** "An ADD beyond this
+- **ADR [0067](0067-m5-projects-todos-and-kanban.md) §2.3 freezes the `IProjectService` surface.** "An ADD beyond this
   list is a **new ADR**." The three new seams below — `CreateLaneAsync`,
   `MoveLaneToPositionAsync`, `MoveTodoToLanePositionAsync` — are exactly what
   this ADR records, plus the fixed status vocabulary.
@@ -74,7 +74,7 @@ to work unchanged.
 
 A new `KanbanStatuses` static class in `Kumunita.Core.Projects` defines the
 closed status vocabulary as **string constants** (the stored value stays a
-`string` — no schema change, no Marten migration, ADR 0004 untouched):
+`string` — no schema change, no Marten migration, ADR [0004](0004-data-persistence-and-schema-evolution.md) untouched):
 
 - `NotStarted = "not-started"`, `InProgress = "in-progress"`,
   `Done = "done"`, `Cancelled = "cancelled"`, and `Known = [NotStarted,
@@ -104,7 +104,7 @@ write. A new lane is empty (no `BoardItemPlacement` rows).
 
 ### `MoveLaneToPositionAsync(laneId, index, actorId, actorRoles)`
 
-The **lane drag** seam — a generalization of ADR 0068's adjacent
+The **lane drag** seam — a generalization of ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md)'s adjacent
 `MoveLaneAsync`. Moves a lane to the board's **0-based position `index`**
 (clamped to `[0, laneCount-1]`) among the board's lanes ordered by `Order`.
 This is a **reorder, not a renumber of cards**: the lane's own `Order`
@@ -114,7 +114,7 @@ untouched — a card keeps its lane and its slot. A no-op when the lane is
 already at `index`. Standing, 404/403 split, and the `board.move_lane` audit
 row are the same as `MoveLaneAsync` (audit target is the **board**).
 
-**The renumber is executed park-then-settle, in two commits** (the ADR 0068
+**The renumber is executed park-then-settle, in two commits** (the ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md)
 23505 rationale, generalized): `KanbanLane` carries a unique index on
 `(BoardId, Order)` and Postgres enforces a non-deferrable unique index
 **row-by-row**, so writing a lane's new `Order` while its destination still
@@ -150,7 +150,7 @@ Standing is `creator ∪ assignee ∪ GlobalAdmin` over the **to-do**
 (`CheckTodoStanding`); a missing placement / to-do / lane is
 `KeyNotFoundException` (404), a denied actor `UnauthorizedAccessException`
 (403). One `AccessAudit` row (`todo.move_to_lane`, `TargetKind = "todo"`, the
-to-do's id — the same verb and target as ADR 0067's adjacent-lane move, so a
+to-do's id — the same verb and target as ADR [0067](0067-m5-projects-todos-and-kanban.md)'s adjacent-lane move, so a
 drag and a menu-move are indistinguishable in the audit trail). The adjacent
 `MoveTodoWithinLaneAsync` / `MoveTodoToAdjacentLaneAsync` lanes are **kept** as
 the keyboard/menu channel.
@@ -181,13 +181,13 @@ the keyboard/menu channel.
   (`index` form field) → `MoveTodoToLanePositionAsync` (card drag).
 
 All three are `[ValidateAntiForgeryToken]`, redirect-after-POST to
-`/projects/boards/{id}` (the ADR 0068 idiom); a lane-limit refusal or a blank
+`/projects/boards/{id}` (the ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md) idiom); a lane-limit refusal or a blank
 title is a `TempData["error"]` (the `AddTodoToLanePost` shape), a denied actor
 a 403, a missing id a 404.
 
 ### Strings
 
-New `kw-l` keys (the `KnownTranslationKeys` en/de/fr/da blocks, the ADR 0015
+New `kw-l` keys (the `KnownTranslationKeys` en/de/fr/da blocks, the ADR [0015](0015-ui-view-localization-mechanics.md)
 hard-gate): `projects.board.lane.add_lane`, and the status labels
 `projects.board.status.none` / `.not_started` / `.in_progress` / `.done` /
 `.cancelled`.
@@ -210,4 +210,4 @@ hard-gate): `projects.board.lane.add_lane`, and the status labels
   to stay inside Postgres's row-by-row unique-index check.
 - `IProjectService` grows by three methods (`CreateLaneAsync`,
   `MoveLaneToPositionAsync`, `MoveTodoToLanePositionAsync`) — the ADDs this
-  ADR authorizes under ADR 0067 §2.3's freeze.
+  ADR authorizes under ADR [0067](0067-m5-projects-todos-and-kanban.md) §2.3's freeze.

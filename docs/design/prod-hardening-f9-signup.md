@@ -27,7 +27,7 @@ updated: 2026-11-02
 > rate-limit policy — and, as §1c shows, that policy is **not even attached to
 > the action**.
 
-> **Repo doctrine applied (from `AGENTS.md`):** *"Core stays HTTP-free"* (ADR
+> **Repo doctrine applied (from [`AGENTS.md`](../../AGENTS.md)):** *"Core stays HTTP-free"* (ADR
 > 0006) — so the enforcement point is a **Core write-lane** check (an
 > exception, a message-free domain rule), and the Web owns the
 > resident-facing message (the F2/F5 precedent: Core throws a **dedicated
@@ -48,7 +48,7 @@ updated: 2026-11-02
 - **Self-serve:** `AccountController.Signup(POST)`
   (`src/Kumunita.Web/Controllers/AccountController.cs:416-448`) →
   `identity.RegisterAsync(displayName, email, password)` (`:436`).
-- **Child lane (ADR 0146 / ADR 0028):** `GuardianController.cs:1085` →
+- **Child lane (ADR [0146](../adr/0146-child-account-child-owns-password.md) / ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)):** `GuardianController.cs:1085` →
   `identity.RegisterChildAccountAsync(displayName, email)` — the guardian
   (a resident, GU standing) creates a password-less account for a child.
 - **Both** flow into the shared body:
@@ -139,11 +139,11 @@ existing `catch` does not swallow it) + a dedicated view-model flag
 
 | Axis | Committed file (PIN) | NuGet package |
 |---|---|---|
-| **Self-contained deployment** (ADR 0001, the repo's cardinal invariant — the platform ships as one pinned image + one Postgres; A6 in SECURITY.md is "pinned image + package versions; rebuild on base-image updates") | ✅ zero new runtime dependency; the list is **in the image**, rebuild-reproducible | ❌ a new `<PackageReference>` = a new supply-chain surface (A6) **and** a new version to pin/upgrade/audit for a T1 self-hosted platform whose owner explicitly deferred CAPTCHA "by decision" |
+| **Self-contained deployment** (ADR [0001](../adr/0001-core-stack-and-identity-model.md), the repo's cardinal invariant — the platform ships as one pinned image + one Postgres; A6 in SECURITY.md is "pinned image + package versions; rebuild on base-image updates") | ✅ zero new runtime dependency; the list is **in the image**, rebuild-reproducible | ❌ a new `<PackageReference>` = a new supply-chain surface (A6) **and** a new version to pin/upgrade/audit for a T1 self-hosted platform whose owner explicitly deferred CAPTCHA "by decision" |
 | **Owner control / opacity** (SECURITY.md §6 — the instance owner settles platform values) | ✅ the owner edits one text file + rebuilds; a false positive (a legitimate community member's domain) is a **one-line deletion**, not a package upgrade | ❌ the owner cannot delete one domain without forking the package; the list is whatever the upstream maintainer decided |
 | **Update cadence** | The list is a **slow-moving surface** at T1 scale: the high-signal disposable domains (mailinator, tempmail, 10minutemail, guerrillamail, …) have been stable for years; a quarterly owner review is sufficient (the same cadence as the `gitleaks` full-history scan the audit's out-of-scope list already names) | A package's "freshness" is real but **not worth the supply-chain cost** at this scale; and a package that is *stale* is worse than a committed file that is *reviewed* |
 | **Auditability** | ✅ the diff of the file **is** the change record (git blame, per-instance) | ❌ the change is upstream; the instance's "what did we block, and why" question is answered by the package's changelog, not the repo |
-| **The repo's own precedent** | The repo already commits curated, owner-editable lists as text: `docs/SECURITY.md`'s control map, `dev-db-init/01-app-role.sql`, the `disposable`-adjacent block-lists in `NotificationQuietSchedule.cs` (hours-of-day) — **a committed, versioned, owner-editable data file is the idiom** | No NuGet-backed data-file precedent in the repo (the 6 `PackageReference`s in `Kumunita.Web.csproj` are all **functional** libraries — TypeScript.MSBuild, Npgsql.EFCore, WolverineFx — not data) |
+| **The repo's own precedent** | The repo already commits curated, owner-editable lists as text: [`docs/SECURITY.md`](../SECURITY.md)'s control map, `dev-db-init/01-app-role.sql`, the `disposable`-adjacent block-lists in `NotificationQuietSchedule.cs` (hours-of-day) — **a committed, versioned, owner-editable data file is the idiom** | No NuGet-backed data-file precedent in the repo (the 6 `PackageReference`s in `Kumunita.Web.csproj` are all **functional** libraries — TypeScript.MSBuild, Npgsql.EFCore, WolverineFx — not data) |
 
 **Counter-argument acknowledged and rejected:** "a maintained package is
 fresher." Accepted in principle, but at T1 scale the **false-positive
@@ -157,7 +157,7 @@ for every other curated list.
 
 - **Path:** `src/Kumunita.Core/Identity/disposable-emails.txt` (next to
   `IdentityService.cs` — the file the check reads; the Identity module owns
-  it, ADR 0006).
+  it, ADR [0006](../adr/0006-module-boundary-contracts.md)).
 - **Format:** **one domain per line**, case-insensitive, **no wildcards, no
   subdomain matching, no comments** (a `#` line is a domain starting with
   `#`, which is not a valid domain — the format is self-policing).
@@ -372,7 +372,7 @@ dependency).
 ### 3f. Non-goals (F9.U2 must not do)
 
 - **Do not** add a new `IIdentityService` method — the check is in
-  `RegisterCoreAsync` (the shared body), not a new lane (the ADR 0006-E
+  `RegisterCoreAsync` (the shared body), not a new lane (the ADR [0006](../adr/0006-module-boundary-contracts.md)-E
   "compatible ADD" discipline: an ADD to the existing seam, not a new
   surface).
 - **Do not** add a new bounded context, a new `DocTypes` surface, a new DI
@@ -445,7 +445,7 @@ the **seam** is code, the **key** is owner-ops).
   **mandatory** (a missing/invalid token → a re-render with the
   `BotChallengeFailed` flag, the `EmailDomainDisallowed` precedent — §3c).
 - **The Core seam (F9.U3 owns):** a **new interface**
-  `IBotChallengeVerifier` in `Kumunita.Core.Identity` (the ADR 0006-E
+  `IBotChallengeVerifier` in `Kumunita.Core.Identity` (the ADR [0006](../adr/0006-module-boundary-contracts.md)-E
   ADD — a new interface on the Identity module's public surface, the
   `IIdentityService` precedent):
   ```csharp
@@ -527,17 +527,17 @@ in the same block).
   owner turns the flag on."*
 - **OPS.md §10 (the CAPTCHA deferral paragraph, `:448-452`)** — the
   "Revisit and add one (e.g. Turnstile…)" sentence gains: *"The seam is
-  in place (F9, AUTH-15, `docs/design/prod-hardening-f9-signup.md` §4):
+  in place (F9, AUTH-15, [`docs/design/prod-hardening-f9-signup.md`](prod-hardening-f9-signup.md) §4):
   set `KUMUNITA__SIGNUP__BOT_CHECK=true` +
   `KUMUNITA__SIGNUP__BOT_CHECK__SITE_KEY=<key>` and rebuild. The deferral
   conditions (a) abuse observed / (b) shared VPS still apply — the seam
   does not force the challenge on."*
 - **No new ADR** (the deferral is already a standing decision; the seam
   is an **implementation** of the already-decided "revisit and add one"
-  path — the ADR 0006-E "compatible ADD" discipline: a new interface + a
+  path — the ADR [0006](../adr/0006-module-boundary-contracts.md)-E "compatible ADD" discipline: a new interface + a
   new env-var flag, no new bounded context, no new ADR). The **close-flip**
   at F22 (the lane's last unit) records the F9 row in the
-  `WhatsNew.cs` / `STATUS.md` / `ARCHITECTURE.md` members (the
+  `WhatsNew.cs` / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) members (the
   close-flip contract, `plan-prod-hardening.md` § "Close-flip contract").
 
 ---
@@ -615,7 +615,7 @@ runs, per the lane's protocol).
 - **Do not** change the `FindByEmailAsync` duplicate-check behavior, the
   verification-token mint, the `mailer.StageAsync` call, the
   `EmitAccountNotificationAsync` call, or the `IsSignupOpenAsync` gate
-  (ADR 0050) — the blocklist check is **before** the duplicate check,
+  (ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)) — the blocklist check is **before** the duplicate check,
   the bot-challenge check is **before** the `RegisterAsync` call; all
   existing behavior is **untouched** when the flag is off (the default).
 - **Do not** add a permanent-email **allowlist** (§3f) — the blocklist

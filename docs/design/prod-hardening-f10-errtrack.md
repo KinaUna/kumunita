@@ -32,8 +32,8 @@ updated: 2026-11-02
 > unchanged until they set `SENTRY_DSN` + rebuild — the F9.U3
 > flag-off-deferred idiom, the §4c CSP additive + flag-gated precedent).
 
-> **Repo doctrine applied (from `AGENTS.md` + the F9 precedent):**
-> *"Core stays HTTP-free"* (ADR 0006) — so the registration and the
+> **Repo doctrine applied (from [`AGENTS.md`](../../AGENTS.md) + the F9 precedent):**
+> *"Core stays HTTP-free"* (ADR [0006](../adr/0006-module-boundary-contracts.md)) — so the registration and the
 > PII-scrubber are **Web** concerns. The scrubber is a **Web** `SendCallback`
 > on the Sentry options (a `Program.cs`-owned registration), **not** a Core
 > interface. The `SmtpSender` / `IMailerStage` Core I/O-seam precedent is
@@ -86,7 +86,7 @@ updated: 2026-11-02
 
 ## 2. The `UseSentry` call shape — the exact pin (F10.U2 lands it)
 
-**The registration is a Web concern** (ADR 0006 — Core stays HTTP-free; the
+**The registration is a Web concern** (ADR [0006](../adr/0006-module-boundary-contracts.md) — Core stays HTTP-free; the
 registration is a `Program.cs`-owned `builder`-phase call). **The DSN is
 owner-ops** (the owner's Sentry DSN, registered to the instance's domain).
 **When the DSN is unset, Sentry is a no-op** — the `builder.WebHost.UseSentry(…)`
@@ -172,7 +172,7 @@ if (!string.IsNullOrWhiteSpace(kumunitaSentryDsn))
 
 ## 3. The PII-scrubbing contract — the exact pin (F10.U2 lands it)
 
-**The scrubber is a Web concern** (ADR 0006 — Core stays HTTP-free; the
+**The scrubber is a Web concern** (ADR [0006](../adr/0006-module-boundary-contracts.md) — Core stays HTTP-free; the
 scrubber is a `SendCallback` on the Sentry options, a `Program.cs`-owned
 registration, **not** a Core interface). The `SmtpSender` / `IMailerStage`
 Core I/O-seam precedent is **the shape** (a thin I/O seam the Web owns the
@@ -247,7 +247,7 @@ closed-list precedent):
 
 **The "never-leave-the-instance" invariant** (pin §3d):
 
-- **The scrubber is a Web concern** (ADR 0006 — Core stays HTTP-free; the
+- **The scrubber is a Web concern** (ADR [0006](../adr/0006-module-boundary-contracts.md) — Core stays HTTP-free; the
   scrubber is a `SendCallback` on the Sentry options, a `Program.cs`-owned
   registration, **not** a Core interface). The **Core** owns the **domain**
   rules (the `IMailerStage` / `SmtpSender` I/O seam, the `IBotChallengeVerifier`
@@ -391,13 +391,13 @@ allows, pin §7):
   the F10 pin is the **error tracker**, **not** the alert channel (the F11 /
   F12 units own the sink + the channel). **No `IAlertSink` type, no
   `IAlertSink` registration, no `IAlertSink` test** in F10.
-- **The `WhatsNew.cs` / `Milestones.cs` / `STATUS.md` / `ARCHITECTURE.md` /
+- **The `WhatsNew.cs` / `Milestones.cs` / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `docs/adr/` close-flip** (the six members) — the
   close-flip happens at **F22**, the lane's **last** unit. **F10 is not the
   lane's last unit** (F11–F22 remain). **Do NOT run the close-flip** in F10.U1
   / F10.U2 / F10.U3.
 - **The `Kumunita.Core` project** — the Sentry registration is a **Web**
-  concern (ADR 0006 — Core stays HTTP-free). **No `Kumunita.Core.csproj`
+  concern (ADR [0006](../adr/0006-module-boundary-contracts.md) — Core stays HTTP-free). **No `Kumunita.Core.csproj`
   change, no `Kumunita.Core` `.cs` change, no `Kumunita.Core` test change** in
   F10.
 
@@ -411,7 +411,7 @@ allows, pin §7):
   `ISentryEventSink` registration, no `/api/sentry` route). **The owner's
   instance is unchanged** until they set the DSN + rebuild (the F9.U3
   flag-off-deferred idiom, the §4c CSP additive + flag-gated precedent).
-- **Core stays HTTP-free** (ADR 0006) — the registration and the PII-scrubber
+- **Core stays HTTP-free** (ADR [0006](../adr/0006-module-boundary-contracts.md)) — the registration and the PII-scrubber
   are **Web** concerns (a `Program.cs`-owned `builder`-phase call + a
   `SendCallback` on the Sentry options). **No `Kumunita.Core` type, no
   `Kumunita.Core` `.cs` change, no `Kumunita.Core` test change** in F10.

@@ -12,7 +12,7 @@ updated: 2026-11-02
 
 # F22 — DB-18: demote the app role (least-privilege) — Part-0 design pin
 
-> **Abstract:** the **F22 app-role demotion** design pin (Part-0, design-only) — **demote the app role** (least-privilege): today the app role is the **database owner** (`CREATE DATABASE kumunita OWNER kumunita`) — it can `ALTER`/`DROP` its own DB + create/drop any schema. F22 splits it into a least-privilege app role + a separate owner role, gated on owner acceptance of **ADR 0171**. The lane's last fix (its U3 is the close-flip). Closes 2026-10-22 DB-18. **Who is it for:** a developer executing F22 U2; an agent that needs the two-role DDL + the ADR 0171 gate. **When to read the rest:** before touching the `dev-db-init/01-app-role.sql` split, the boot-ownership path, or the ADR 0171 reconciliation.
+> **Abstract:** the **F22 app-role demotion** design pin (Part-0, design-only) — **demote the app role** (least-privilege): today the app role is the **database owner** (`CREATE DATABASE kumunita OWNER kumunita`) — it can `ALTER`/`DROP` its own DB + create/drop any schema. F22 splits it into a least-privilege app role + a separate owner role, gated on owner acceptance of **ADR [0171](../adr/0171-least-privilege-db-role.md)**. The lane's last fix (its U3 is the close-flip). Closes 2026-10-22 DB-18. **Who is it for:** a developer executing F22 U2; an agent that needs the two-role DDL + the ADR [0171](../adr/0171-least-privilege-db-role.md) gate. **When to read the rest:** before touching the `dev-db-init/01-app-role.sql` split, the boot-ownership path, or the ADR [0171](../adr/0171-least-privilege-db-role.md) reconciliation.
 
 
 > **Fix:** F22 (report row **DB-18**) — kind **`code+ops`**, **dep: —** (no code
@@ -21,11 +21,11 @@ updated: 2026-11-02
 > **Status:** this is the **Part-0 design pin** (F22.U1). It is **design-only**:
 > no code, no build, no `src/**` / `tests/**` / `dev-db-init/**` change, no
 > `<PackageReference>`, no migration, no `.slnx` change, no test run. The pin
-> (this file) + the **proposed ADR 0171** (the ADR amendment that resolves the
-> ADR 0004 "app role owns the DB" tension) are the **two** deliverables.
+> (this file) + the **proposed ADR [0171](../adr/0171-least-privilege-db-role.md)** (the ADR amendment that resolves the
+> ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) "app role owns the DB" tension) are the **two** deliverables.
 > **F22.U2** lands the split (the `dev-db-init/01-app-role.sql` two-role DDL + the
 > **boot-ownership path** in `Program.cs`) — **high risk, and it is gated on
-> owner acceptance of ADR 0171 first** (U1 records the tension; the owner must
+> owner acceptance of ADR [0171](../adr/0171-least-privilege-db-role.md) first** (U1 records the tension; the owner must
 > accept the reconciliation before the risky migration proceeds). **F22.U3** is
 > the **owner-ops step** (apply the split on the prod Postgres) — recorded as an
 > **open item, never assumed done**, and is the lane's **close-flip** unit.
@@ -40,13 +40,13 @@ updated: 2026-11-02
 
 ---
 
-## 1. The exact ADR 0004 tension (grounded, not assumed)
+## 1. The exact ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) tension (grounded, not assumed)
 
 The two constraints collide on **one role** — and the collision is the whole fix:
 
-**ADR 0004 needs a role that *can* create schemas at boot.** ADR 0004 §A splits
+**ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) needs a role that *can* create schemas at boot.** ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §A splits
 one Postgres into two schemas with a hard ownership boundary (`mt` — Marten;
-`identity` — EF Core Identity). ADR 0004 §B pins the applied-state contract:
+`identity` — EF Core Identity). ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B pins the applied-state contract:
 *"Applied at boot in all environments (incl. production): the versioned steps
 only — a pristine database gets its initial state with no operator step"* and
 *"Re-running an already-applied step is a no-op."* The mechanism that makes a
@@ -56,24 +56,24 @@ reason verbatim:
 
 > `kumunita` is the dedicated non-superuser role the app runs as (docs/OPS.md
 > §10) and **owns the app database so it can create the `mt` and `identity`
-> schemas at boot (ADR 0004).**
+> schemas at boot (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)).**
 
 **The DB-18 least-privilege FAIL forbids that same role from being the owner.**
 The role in `ConnectionStrings:Kumunita` (the one both Marten **DML** at
 `Program.cs:95` and EF Core **DML** at `Program.cs:474` connect as) is the
 database **owner** — the broadest standing short of a superuser.
 
-**The tension, precisely:** ADR 0004's boot-ownership invariant *requires*
+**The tension, precisely:** ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)'s boot-ownership invariant *requires*
 **some** role to carry the DDL-creation capability (`CREATE SCHEMA` /
 `CREATE TABLE` in `mt` and `identity`) at boot; DB-18's least-privilege
 requirement *forbids* the **runtime app** role from being the database owner.
 The reconciliation is **not** to drop the boot-ownership invariant (that would
-break ADR 0004 §B's "pristine database gets its initial state with no operator
+break ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B's "pristine database gets its initial state with no operator
 step") — it is to **split the capability across two roles**: a dedicated
 **migration** role keeps the DDL-creation capability (and the boot contract),
-and the **runtime app** role is **demoted to DML**. ADR 0004's *forward-only +
+and the **runtime app** role is **demoted to DML**. ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)'s *forward-only +
 delta-detected idempotent boot* is **preserved**; only **which role** carries
-the DDL capability changes. This is a **proposal** (ADR 0171), not an accepted
+the DDL capability changes. This is a **proposal** (ADR [0171](../adr/0171-least-privilege-db-role.md)), not an accepted
 change — U2 must not proceed until the owner accepts it.
 
 ---
@@ -98,7 +98,7 @@ equivalent — but the *shape* below is the contract):
   needs at runtime).
 - **The DDL-creation capability is not removed — it is moved** to
   `kumunita_migrate`, which is the role that actually performs the boot
-  schema-apply. ADR 0004 §B's "pristine database gets its initial state with no
+  schema-apply. ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B's "pristine database gets its initial state with no
   operator step" is therefore **preserved** (§3).
 - **The split demotes *privileges*, not the forward-only path.** The
   schema-evolution mechanism (Weasel `FeatureSchemaBase`, delta-detected,
@@ -109,7 +109,7 @@ equivalent — but the *shape* below is the contract):
 
 ## 3. The boot-ownership migration (pin item 2) — how a pristine boot still creates `mt` / `identity`
 
-This is the piece that makes the split **reconcile** with ADR 0004 §B rather
+This is the piece that makes the split **reconcile** with ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B rather
 than break it. A pristine boot proceeds in **four ordered steps**; the key is
 that the **DDL** step and the **DML** step run as **different roles**:
 
@@ -126,7 +126,7 @@ that the **DDL** step and the **DML** step run as **different roles**:
    `SchemaBootstrap.ApplyAsync` → Marten `ApplyAllConfiguredChangesToDatabaseAsync()`
    (creates the `mt` schema + tables, **owned by `kumunita_migrate`**) + EF
    `Database.MigrateAsync()` (creates the `identity` schema + `AspNet*` tables,
-   **owned by `kumunita_migrate`**). This is **exactly** the ADR 0004 §B boot
+   **owned by `kumunita_migrate`**). This is **exactly** the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B boot
    path, unchanged in shape — the only difference is *which role* it connects
    as. Delta-detected ⇒ a re-run is a no-op.
 3. **Grant step** (the app process, still connecting as **`kumunita_migrate`**,
@@ -141,7 +141,7 @@ that the **DDL** step and the **DML** step run as **different roles**:
    and writes, `Program.cs:95` (Marten) and `Program.cs:474` (EF) unchanged.
    The role is DML-only — it has no `CREATE` / `DROP`.
 
-**Net effect on the ADR 0004 invariants:** the "pristine database gets its
+**Net effect on the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) invariants:** the "pristine database gets its
 initial state with no operator step" contract is **preserved** (steps 2–3 run
 at boot in all environments, incl. production); the "re-run is a no-op" contract
 is **preserved** (step 2 is delta-detected, step 3 is idempotent grants); the
@@ -235,16 +235,16 @@ is real at the Postgres layer, not just asserted in a doc.
 
 ## 6. Invariants held (this pin + the unit it drives)
 
-- **ADR 0004 forward-only + delta-detected idempotent boot — PRESERVED, not
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) forward-only + delta-detected idempotent boot — PRESERVED, not
   dropped.** The split demotes *privileges* (which role holds `CREATE`), it does
   **not** change the schema-evolution mechanism, the forward-only path, or the
   "pristine database gets its initial state with no operator step" contract
   (§3). The "app role owns the DB so it can create the `mt` / `identity`
   schemas at boot" invariant is **reconciled by proposal** (a dedicated
   migration role now carries the capability), **not silently dropped** — the
-  reconciliation is **ADR 0171**, which the owner must accept before U2
+  reconciliation is **ADR [0171](../adr/0171-least-privilege-db-role.md)**, which the owner must accept before U2
   proceeds.
-- **ADR 0006 module boundaries + Core stays HTTP-free — HELD.** F22 adds **no**
+- **ADR [0006](../adr/0006-module-boundary-contracts.md) module boundaries + Core stays HTTP-free — HELD.** F22 adds **no**
   bounded context, **no** Core service seam, **no** cross-context call. The
   change is at the **Postgres role / privilege** layer (the `dev-db-init` DDL +
   the boot connection shape in `Program.cs`), below the bounded contexts. Core
@@ -296,15 +296,15 @@ lane's close-flip unit):
 
 **F22.U1 is design-only:** no code, no build, no `src/**` / `tests/**` /
 `dev-db-init/**` change, no `<PackageReference>`, no migration, no `.slnx`
-change, no test run. The pin (this file) + **ADR 0171** (the proposed ADR
+change, no test run. The pin (this file) + **ADR [0171](../adr/0171-least-privilege-db-role.md)** (the proposed ADR
 amendment) exist and pin the **three** items: (1) the **two-role split** —
 `kumunita_migrate` (DB owner + schema owner, the DDL role) vs. `kumunita`
 (demoted to `CONNECT` + `USAGE` + `SELECT` / `INSERT` / `UPDATE` / `DELETE`, the
 DML role) (§2); (2) the **boot-ownership migration** — the 4-step pristine-boot
 ordering where the DDL step and the DML step run as **different roles**,
-preserving ADR 0004 §B's no-operator-step boot (§3 + §4 the exact DDL); (3) the
-**pinned test name** `AppRole_CannotDropSchema` (§5). The **ADR 0004 tension**
-is recorded, and the reconciliation is a **proposal** (ADR 0171), **not an
+preserving ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B's no-operator-step boot (§3 + §4 the exact DDL); (3) the
+**pinned test name** `AppRole_CannotDropSchema` (§5). The **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) tension**
+is recorded, and the reconciliation is a **proposal** (ADR [0171](../adr/0171-least-privilege-db-role.md)), **not an
 accepted change** (§1 + §6). The **owner-ops open items** are recorded, **not
 assumed done** (§7). The invariants are held (§6).
 
@@ -313,21 +313,21 @@ remain**. **No 6-member close-flip yet** (that happens at **F22.U3**, the lane's
 last unit). Next unit = **F22.U2** — **the high-risk migration + role split**:
 implement the §4 two-role DDL in `dev-db-init/01-app-role.sql` + the §3
 boot-ownership path (the `Program.cs` `DbMigrate` env-knob pair, F21-knob
-shape), **gated on owner acceptance of ADR 0171 first**. A fresh clean-slate
+shape), **gated on owner acceptance of ADR [0171](../adr/0171-least-privilege-db-role.md) first**. A fresh clean-slate
 agent reads this entry + **§2 / §3 / §4** (the role matrix, the boot ordering,
 the exact DDL) + **§5** (the test shape) + **§6** (the invariants) + **§7** (the
-owner ops) + **ADR 0171** (the acceptance gate) + `dev-db-init/01-app-role.sql`
+owner ops) + **ADR [0171](../adr/0171-least-privilege-db-role.md)** (the acceptance gate) + `dev-db-init/01-app-role.sql`
 (the current single-owner DDL to replace) + `Program.cs` **~92–104** (the F21
 `DbTls` knob, the shape the new `DbMigrate` knob follows).
 
 ---
 
-## ADR 0171 — moved content (D11 trim, 2026-11-02)
+## ADR [0171](../adr/0171-least-privilege-db-role.md) — moved content (D11 trim, 2026-11-02)
 
 ## Implementation (F22.U2, 2026-10-25)
 
 Decisions the empirical boot-DDL resolution settled, recorded here so the ADR
-matches what actually ships (the pin `docs/design/prod-hardening-f22-role.md`
+matches what actually ships (the pin [`docs/design/prod-hardening-f22-role.md`](prod-hardening-f22-role.md)
 is the F22.U1 source; this addendum is the F22.U2 implementation record):
 
 - **The one forced exception.** The app role is **not the owner** of `mt`
@@ -342,7 +342,7 @@ is the F22.U1 source; this addendum is the F22.U2 implementation record):
 - **`mt` is pre-created; `identity` is not.** `mt` is created in init owned by
   `kumunita_migrate` with `GRANT USAGE, CREATE … TO kumunita`; `identity` is
   **deliberately absent** after init — (a) its absence is the pristine signal in
-  `DbBootstrap.IsPristineAsync` (ADR 0004 §B), and (b) the EF initial migration
+  `DbBootstrap.IsPristineAsync` (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B), and (b) the EF initial migration
   `EnsureSchema("identity")` emits `CREATE SCHEMA IF NOT EXISTS identity`, which
   needs **database-level** CREATE — so it must run as `kumunita_migrate`. The
   app then gets `identity` USAGE + table DML **at boot** (below), not in init.

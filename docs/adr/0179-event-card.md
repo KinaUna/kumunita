@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0179 — Event card with date tile
+# ADR [0179](0179-event-card.md) — Event card with date tile
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0173/0175 (UI refresh), ADR 0065 (EV-MINE), ADR 0019/0020 (zone and format)
+Relates to: ADR [0173](0173-report-targets-lane.md)/0175 (UI refresh), ADR [0065](0065-events-feed-your-upcoming-events.md) (EV-MINE), ADR [0019](0019-timezone-platform-default-and-resident-override.md)/0020 (zone and format)
 
 ## Decisions
 
@@ -27,10 +27,10 @@ the feed cards. No data changes; the sort control, pager and "show more" behave 
 (`mine-more.ts` now also reveals `.kmb-event-card[hidden]`).
 
 **D2 — Zone-correct tile.** `kw-dt` gains three sentinels beside `timeonly`: `month` (MMM), `day`
-(d) and `weekday` (ddd), all in the resident's effective zone (ADR 0019), invariant culture.
+(d) and `weekday` (ddd), all in the resident's effective zone (ADR [0019](0019-timezone-platform-default-and-resident-override.md)), invariant culture.
 Pinned in `DateTimeTagHelperTests`.
 
-**D3 — Empty states** use `.kmb-empty` (ADR 0177).
+**D3 — Empty states** use `.kmb-empty` (ADR [0177](0177-groups-tile-and-empty-state.md)).
 
 ## Open
 

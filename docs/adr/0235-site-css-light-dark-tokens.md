@@ -11,12 +11,12 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0235 — site.css colour tokens collapse into light-dark() (second half of the light-dark cleanup)
+# ADR [0235](0235-site-css-light-dark-tokens.md) — site.css colour tokens collapse into light-dark() (second half of the light-dark cleanup)
 
 Status: Accepted
 
 ## Context
-ADR 0228 collapsed the palette tokens in `palettes.css` into `light-dark()`. `site.css` still held its own Forest dark token set
+ADR [0228](0228-housekeeping-light-dark-detail-rename-doc-types.md) collapsed the palette tokens in `palettes.css` into `light-dark()`. `site.css` still held its own Forest dark token set
 twice: once under `@media (prefers-color-scheme: dark) { html:not([data-kmb-theme='light']) { … } }` and once under
 `html[data-kmb-theme='dark'] { … }`, about 180 lines each and required to stay identical by hand.
 
@@ -42,7 +42,7 @@ rail, table, utilities).
 
 ## Not covered
 Real pages (markup that sets variables on non-root elements was not exercised), and nothing was rendered in the running app
-(the container serves the old stylesheet until rebuilt). Browsers without `light-dark()` support are out of scope, as for ADR 0228.
+(the container serves the old stylesheet until rebuilt). Browsers without `light-dark()` support are out of scope, as for ADR [0228](0228-housekeeping-light-dark-detail-rename-doc-types.md).
 
 ## Follow-ups
 - Step 2: the component patch groups, using the same diff script.

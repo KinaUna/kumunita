@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0031 (the rich-editor lane, `RE`) and ADR 0032 (the inline-editor lane,
+ADR [0031](0031-wysiwyg-editor-and-toolbar.md) (the rich-editor lane, `RE`) and ADR [0032](0032-inline-editor-rendered-default-view.md) (the inline-editor lane,
 `IE`) together shipped the split-view authoring surface: a toolbar, a source
 `<textarea>`, and a rendered preview pane on the 10 composer surfaces (16
 editor blocks / 10 view files — U0 verified). IE made the rendered pane the
@@ -25,7 +25,7 @@ path is to click `</>`, reveal the raw Markdown `<textarea>`, and hand-type
 exact inverse of what Gmail/Outlook do: a resident clicks the rendered text,
 puts the caret in it, and types.
 
-ADR 0031 D1 / ADR 0032 named the ceiling *"true `contenteditable` / a
+ADR [0031](0031-wysiwyg-editor-and-toolbar.md) D1 / ADR [0032](0032-inline-editor-rendered-default-view.md) named the ceiling *"true `contenteditable` / a
 third-party editor — hard non-negotiable out,"* on the grounds it would
 (a) break the `tsc`-only constraint, (b) introduce an HTML→Markdown
 round-trip engine, and (c) fight RC's `ImageIds` parse (which reads the

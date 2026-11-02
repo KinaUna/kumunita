@@ -56,7 +56,7 @@ local to that extension.
 
 ---
 
-## ADR 0119 — moved content (D11 trim, 2026-11-02)
+## ADR [0119](../adr/0119-recurring-events.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
@@ -79,23 +79,23 @@ local to that extension.
 
 ## Supersedes
 
-- **ADR 0112 (M12 iCal)'s "no `RRULE`" pin — in scope.** The
-  `IcsWriter`'s "never emitted" list includes `RRULE` (the ADR 0028
+- **ADR [0112](../adr/0112-ical-calendar-export.md) (M12 iCal)'s "no `RRULE`" pin — in scope.** The
+  `IcsWriter`'s "never emitted" list includes `RRULE` (the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)
   posture applied to the file form); its Consequences defers
   "**recurring events** (`RRULE` — **M14** is the natural home)" (a
   stale forward-ref — the roadmap settled M18, not M14). M18 is the
-  `RRULE` home (D6 / C-M18·6). **However, the shape ADR 0112 pinned
+  `RRULE` home (D6 / C-M18·6). **However, the shape ADR [0112](../adr/0112-ical-calendar-export.md) pinned
   (per-occurrence `VEVENT`, no rule line) is what M18 implements** —
   the `IcsWriter` is **unchanged** (D6 / C-M18·6): the M12 feed
   already emits one `VEVENT` per concrete row in scope, and M18's
   materialized occurrences flow through it with **no** `IcsWriter`
   change. The `RRULE` line itself is still **never emitted** (the
-  ADR 0028 posture is preserved — the file that travels must not
+  ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) posture is preserved — the file that travels must not
   carry a decision). The M12 ADR's "no `RRULE`" pin is therefore
   **superseded in scope** (M18 is the `RRULE` home) but the **shape**
   it pinned (per-occurrence `VEVENT`, no rule line) is what M18
   implements.
-- **ADR 0115 (M14 integration)'s C-M14·6 "no `RRULE` / recurrence"
+- **ADR [0115](../adr/0115-integration-of-events-and-projects.md) (M14 integration)'s C-M14·6 "no `RRULE` / recurrence"
   deferral.** M14's D6 / C-M14·6 pins "**No `RRULE` / recurrence
   anywhere in M14**" and names M18 as the `RRULE` home (the
   `Milestones.cs` source-of-truth pin). M18 is that home (D1–D11).
@@ -140,7 +140,7 @@ local to that extension.
 - `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the
   four locale files — the 14 `events.recurrence.*` /
   `events.series.*` `kw-l` keys in en/de/fr/da (D9).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md`
+- `src/Kumunita.Web/Milestones.cs` + [`README.md`](../../README.md) + [`docs/STATUS.md`](../STATUS.md)
   + `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/
   MilestonesTests.cs` — the M18 → `StatusDone` / M19 →
   `StatusNext` flip (D8, U08 close), in one unit.

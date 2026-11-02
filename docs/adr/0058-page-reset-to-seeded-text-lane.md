@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0058 — Page "Reset to seeded text" lane
+# ADR [0058](0058-page-reset-to-seeded-text-lane.md) — Page "Reset to seeded text" lane
 
 **Status:** Accepted
 **Date:** 2026-09-12
@@ -46,14 +46,14 @@ seed text, backfilled on upgrade, that this lane *reverts to* on demand).
 
 A fresh instance is seeded by the first-boot seeder (`FirstBootSeeder`)
 with a small, closed set of **code-owned** platform pages (terms, help,
-privacy, code of conduct, about) and the user guides (ADR 0057) — in
+privacy, code of conduct, about) and the user guides (ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md)) — in
 English, plus a `de` / `fr` / `da` baseline for each. That seeded text is
 the **source of truth** for what a page *says* on a brand-new deployment,
 and it lives in code, so it can be improved and re-shipped over time as
 features land.
 
 Once an instance is live, though, the same pages become **admin-editable in
-place** (ADR 0039 / 0040 standing matrix; the WYSIWYG editor). Two
+place** (ADR [0039](0039-pages-hierarchy-audience-translations.md) / 0040 standing matrix; the WYSIWYG editor). Two
 consequences collide: (1) **An admin's local edits and the shipped text
 diverge** — the in-app copy now carries both the admin's custom wording
 **and** the older, now-stale shipped wording, welded together in one body.
@@ -63,8 +63,8 @@ the row and let the seeder recreate it (loses the admin's customisations
 and the hand-authored non-`en` translation rows). Neither is good, and
 neither is what an admin actually wants.
 
-The upgrade-time backfill (ADR 0057 `BackfillUserGuidesAsync`, and the
-analogous page-translation warm-boot backfill, ADR 0047/0052) is
+The upgrade-time backfill (ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) `BackfillUserGuidesAsync`, and the
+analogous page-translation warm-boot backfill, ADR [0047](0047-static-page-localization-and-backfill.md)/0052) is
 deliberately **create-if-missing** and **never overwrites** — it must never
 clobber an admin's work. That's the right default for *automatic*
 behaviour. But it means an admin who wants the *new* shipped text has to do
@@ -92,7 +92,7 @@ This lane adds that tool.
   note for the full seam split.
 - **D3 — Standing: the **edit standing**, verbatim.** Reset is a
   **write** to a page, so it is governed by the **page edit standing**
-  (ADR 0040 §3.7), exactly as "Save" is: `PageKind.System` →
+  (ADR [0040](0040-pages-system-and-user-kinds-and-blog-feed.md) §3.7), exactly as "Save" is: `PageKind.System` →
   **GlobalAdmin** only; `PageKind.User` (blog) → **author ∪ GlobalAdmin**.
   This is the same standing the edit lane already enforces (the
   `CheckEditStanding` helper), so there is **no new standing branch** — a
@@ -174,7 +174,7 @@ Resetting the **language catalog** or **UI-string** baselines to the
 code-owned seed (the same *kind* of lane, but a different surface and its
 own ADR).
 
-**Follow-on.** **ADR 0128** — the **bulk** variant on top of this lane: an
+**Follow-on.** **ADR [0128](0128-admin-help-bulk-reset-and-update-surfacing.md)** — the **bulk** variant on top of this lane: an
 `/admin/help` surface that surfaces *which* seeded pages have newer shipped
 text and resets **every** seeded page in one audited action. It reuses this
 lane's `ResetSeededTextAsync` applier and `page.reset` audit verbatim; this

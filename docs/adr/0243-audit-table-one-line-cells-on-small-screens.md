@@ -11,13 +11,13 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0243 — The admin Audit table keeps cells on one line on small screens
+# ADR [0243](0243-audit-table-one-line-cells-on-small-screens.md) — The admin Audit table keeps cells on one line on small screens
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-A survey of the admin tables at 375px (the ADR 0222 follow-up) found one real problem: `/admin/audit`. Its 32-character actor,
+A survey of the admin tables at 375px (the ADR [0222](0222-accounts-table-phones.md) follow-up) found one real problem: `/admin/audit`. Its 32-character actor,
 effective and target ids carry `text-break`, so on a phone they wrap one character per line and each row is 236px tall (the table is
 830px wide in a 349px box). Help, Kiosk settings, Analytics, Storage and Languages rows are 51 to 78px; Error reports, Escalation and
 Moderation have no tables.

@@ -21,23 +21,23 @@ updated: 2026-11-02
 > one shared `_Pager` partial, one `PagedViewModel` model) wired into
 > **every** paged list surface — the 7 routes that already page in Core
 > (8 pager instances) + the 2 routes that gain paging in this milestone
-> (3 paged sections). **ADR 0090** is this milestone's decision record —
+> (3 paged sections). **ADR [0090](../adr/0090-pagination-and-filtering.md)** is this milestone's decision record —
 > **authored in this unit (U00)**, **Accepted 2026-09-26**; every decision
 > D1–D10 below is **locked** (the `[PROPOSED]` markers in the lane plan
 > `plan-m7-pagination-filtering.md` are the pre-lock shape and are retired
-> by this lock — the ADR 0087 precedent). The sealed-unit register is
+> by this lock — the ADR [0087](../adr/0087-todo-dependency-blocked-by-lane.md) precedent). The sealed-unit register is
 > `docs/plans-milestones/in-progress/m7/plan-m7-pagination-filtering.md`;
 > the scratch log is
 > `docs/plans-milestones/in-progress/m7/m7-handoff-notes.md` (one `## U#`
 > section per unit, appended, never rewritten).
 >
-> **Status.** **LOCKED.** The decisions D1–D10 are locked in **ADR 0090
+> **Status.** **LOCKED.** The decisions D1–D10 are locked in **ADR [0090](../adr/0090-pagination-and-filtering.md)
 > (Accepted, 2026-09-26)**; **Part 2** (the exact C# shapes of every seam,
 > the pinned test names, and the drift-guard) follows in the "Seams &
 > contracts" section below.
 >
 > **Roadmap confirm (U00):** `M7` is the single `StatusNext` on
-> `Milestones.cs` (the ADR 0086 / 0087 / 0088 / 0089 named-lane ADRs all
+> `Milestones.cs` (the ADR [0086](../adr/0086-goals-projects-lane.md) / 0087 / 0088 / 0089 named-lane ADRs all
 > record this); M7 is a **milestone**, not a named lane — the close unit
 > (U05) flips `Milestones.cs` / the README Roadmap / `MilestonesTests.cs`
 > (the AGENTS.md doc↔code parity contract).
@@ -157,9 +157,9 @@ M7 amends additively:
      (U01) `ListPostsByTagPagedAsync` **+** `ListPagesByTagPagedAsync`
      (**two** paged sections, one route)
 8. **`KnownTranslationKeys.cs`** (`Kumunita.Core.Localization`) — the
-   `kw-l` registry (ADR 0015) with the four seeded languages
-   (`en` / `de` / `fr` — ADR 0042; `da` — ADR 0045, disabled by default) +
-   the ADR 0052 warm-boot baseline backfill that covers new keys'
+   `kw-l` registry (ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) with the four seeded languages
+   (`en` / `de` / `fr` — ADR [0042](../adr/0042-bundled-initial-language-pack.md); `da` — ADR [0045](../adr/0045-danish-preseeded-disabled.md), disabled by default) +
+   the ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md) warm-boot baseline backfill that covers new keys'
    non-`en` rows automatically. The two `pagination.*` keys are additive
    on it; `KnownTranslationKeys_ParityTests` covers them once registered.
 9. **`PostgresFixture`** (`tests/Kumunita.Core.Tests`, Testcontainers
@@ -169,7 +169,7 @@ M7 amends additively:
 
 ## 3. The design decisions (locked)
 
-Locked by **ADR 0090 (Accepted, 2026-09-26)**; the `[PROPOSED]` markers in
+Locked by **ADR [0090](../adr/0090-pagination-and-filtering.md) (Accepted, 2026-09-26)**; the `[PROPOSED]` markers in
 the lane plan are retired by this lock.
 
 ### 3.1 The contract is signal-based, not count-based (D1)
@@ -305,7 +305,7 @@ The filter set is **frozen** at what exists per surface (the inventory in
 refers to *making the existing filters paginate correctly* (D7) — adding
 new filters (by-author, by-tag on the community feed, date-range) is scope
 creep that belongs to M8 (search) or a dedicated lane. The by-tag browse
-*already exists* (ADR 0044); M7 just pages it.
+*already exists* (ADR [0044](../adr/0044-tags.md)); M7 just pages it.
 
 ### 3.10 The test home is split by seam (D10)
 
@@ -330,7 +330,7 @@ tests).
 - **C-M7·2 — Paging is display-only, never an access input.** A page
   number never appears in an `IAuthorizationService` call, an `Audience`
   evaluation, or an `AccessAudit` row's identity. The `?page=` query is a
-  *display* parameter (the ADR 0064 `?view=` display-selector precedent,
+  *display* parameter (the ADR [0064](../adr/0064-events-calendar-dwm-views.md) `?view=` display-selector precedent,
   C-DWM·3).
 - **C-M7·3 — Page size is a per-service constant, 30.** Not
   configuration, not user-selectable, not a query parameter. Changing it
@@ -408,7 +408,7 @@ tests).
   (new, 3 tests — U03); `tests/Kumunita.Web.Tests/M7NewlyPagedTests.cs`
   (new, 3 tests — U04).
 - **The close (U05):** README Roadmap + `Milestones.cs` + `MilestonesTests.cs`
-  flip; the `ARCHITECTURE.md` "shape of the code" note.
+  flip; the [`ARCHITECTURE.md`](../ARCHITECTURE.md) "shape of the code" note.
 
 ## 7. Part 2 — Seams & contracts (exact shapes)
 
@@ -647,7 +647,7 @@ links (GET navigation — the server-rendered idiom; no JS).
 Two new keys × the four seeded languages (`en` / `de` / `fr` / `da`):
 **`pagination.prev` = "Newer"**, **`pagination.next` = "Older"** (the feeds
 are newest-first / earliest-start-first — *Prev* steps toward the head of
-the list, *Next* toward the tail). The ADR 0052 warm-boot baseline
+the list, *Next* toward the tail). The ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md) warm-boot baseline
 backfill covers the non-`en` rows. `KnownTranslationKeys_ParityTests`
 still passes once registered.
 
@@ -784,7 +784,7 @@ line here and stops (unit-series rule 6).
   "no other Web/test change in U01" only both hold with the one-token
   `out` fix at each. The compiler (`dotnet build Kumunita.slnx`) is the
   authoritative break set; the §7.2a list is the U00-verified shape. The
-  lane plan text is the pre-lock shape; this doc + ADR 0090 are the lock.
+  lane plan text is the pre-lock shape; this doc + ADR [0090](../adr/0090-pagination-and-filtering.md) are the lock.
 - **U01 — 2026-09-26. (CS1988 — the §7.5 pin is C#-illegal on `async`
   seams; resolved by the page-record pivot.)** The §7.5 / D3 pin of
   **`out bool hasMore`** on the six async list seams is **CS1988-illegal**:

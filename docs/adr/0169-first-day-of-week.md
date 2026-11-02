@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0169 — First day of week: a per-resident display preference
+# ADR [0169](0169-first-day-of-week.md) — First day of week: a per-resident display preference
 
 Status: Accepted
 Date: 2026-10-15
@@ -20,14 +20,14 @@ Date: 2026-10-15
 > time-limit days) and the events calendar now **respect each resident's
 > preferred first day of the week** (Monday by default), with **zero new
 > authorization surface** and **zero migration**. This ADR re-applies the
-> **ADR 0004 §B.1 delta-detected, idempotent, zero-migration document-surface
+> **ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 delta-detected, idempotent, zero-migration document-surface
 > shape** (one additive `Profile` field on the existing `UserInfo` context),
 > the **`SetProfilePageSizeAsync` owner-scope write-lane shape** (fail-closed
 > `KeyNotFoundException`, one `IUserInfoService` seam, **zero** audit rows),
 > the **frozen `IAuthorizationService` / `AccessAction` / `AccessVia` /
-> `Decide()` surface** (ADR 0006 — **no adapter at all** — a display
+> `Decide()` surface** (ADR [0006](0006-module-boundary-contracts.md) — **no adapter at all** — a display
 > preference is *not* an audience decision), and the **closed
-> `KnownTranslationKeys` registry + en/de/fr/da parity pins** (ADR 0015 /
+> `KnownTranslationKeys` registry + en/de/fr/da parity pins** (ADR [0015](0015-ui-view-localization-mechanics.md) /
 > 0052). It fixes two shipped problems: the pickers rendered raw `int`
 > indices (`0`–`6`) instead of localized day names, and the week began on
 > Sunday for an audience whose week begins on **Monday**. **For** a developer
@@ -72,7 +72,7 @@ on the **Date & time format** page.
   existing `UserInfo` context doc) gains one field — `int? FirstDayOfWeek` (0 =
   Sunday … 6 = Saturday, the .NET `DayOfWeek` index; `null` = the platform
   default, Monday). Additive on the existing doc — delta-detected, idempotent,
-  zero migration (ADR 0004 §B.1); `null` means "use the default" (the exact
+  zero migration (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1); `null` means "use the default" (the exact
   `PageSize` shape). No EF migration (not an Identity table). See the handoff
   note for the field declaration.
 - **D2 — the resolver: pure `WeekAnchor`.** The ordering + anchoring logic
@@ -132,11 +132,11 @@ on the **Date & time format** page.
   the existing owner-scope `IUserInfoService` seam (the
   `SetProfilePageSizeAsync` shape); no `AccessAction` / `AccessVia` / `Decide()`
   / `IAuthorizationService` change, no adapter.
-- **Zero migration.** One additive `Profile` field (the ADR 0004 §B.1 shape);
+- **Zero migration.** One additive `Profile` field (the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 shape);
   no EF migration.
 - **A named lane, not a milestone** — the M-letter milestone ordering
   (`Milestones.cs`, README Roadmap, `MilestonesTests.cs`) is **byte-identical**
-  (the ADR 0013 `GP` / ADR 0011 `M4-adjacent` precedent); the close flips the
-  doc-sync pair (README Roadmap + `STATUS.md` + `ARCHITECTURE.md`) + the
-  `WhatsNew.cs` 0.65.0 entry (the required close-flip member, ADR 0110). See
+  (the ADR [0013](0013-group-posts-membership-lane.md) `GP` / ADR [0011](0011-media-and-file-storage.md) `M4-adjacent` precedent); the close flips the
+  doc-sync pair (README Roadmap + [`STATUS.md`](../STATUS.md) + [`ARCHITECTURE.md`](../ARCHITECTURE.md)) + the
+  `WhatsNew.cs` 0.65.0 entry (the required close-flip member, ADR [0110](0110-platform-versioning-and-whats-new.md)). See
   the handoff note for the close-flip entries.

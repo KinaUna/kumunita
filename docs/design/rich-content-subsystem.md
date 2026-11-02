@@ -55,11 +55,11 @@ editor contract is local to that extension.
 
 ---
 
-## ADR 0033 — moved content (D11 trim, 2026-11-02)
+## ADR [0033](../adr/0033-wysiwyg-inline-editing.md) — moved content (D11 trim, 2026-11-02)
 
 ## Not decided here (explicit non-decisions)
 
-Each is a **future lane** (WY-2, if it comes), named — the ADR 0011 / 0025 /
+Each is a **future lane** (WY-2, if it comes), named — the ADR [0011](../adr/0011-media-and-file-storage.md) / 0025 /
 0031 precedent holds:
 
 - **Nested lists** — the WY·3 subset is flat `<ul>`/`<ol>` + `<li>`.
@@ -83,7 +83,7 @@ Each is a **future lane** (WY-2, if it comes), named — the ADR 0011 / 0025 /
   amendment to this ADR.
 - The **`tsc`-only / no-editor-dependency** stance is challenged (e.g. a
   request to adopt ProseMirror/Quill/Tiptap) — that is the load-bearing
-  constraint of ADR 0031 D1; relaxing it is itself a new ADR that would
+  constraint of ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) D1; relaxing it is itself a new ADR that would
   supersede this one.
 - The **byte-identical body** guarantee (RC R·3 / WY·5) is challenged — that
   is RC's `ImageIds` source-parse; changing it is a new ADR, not a code

@@ -15,7 +15,7 @@ updated: 2026-11-02
 > the "one fact, one place" rule, and the tier model. Read this before
 > adding or moving a doc; it is referenced by every unit of the
 > `IMPROVE-DOCS` lane ([plan-improve-docs.md](plans-milestones/improve-docs/plan-improve-docs.md)).
-> **Who is it for:** anyone touching `docs/`, `README.md` or `AGENTS.md`.
+> **Who is it for:** anyone touching `docs/`, [`README.md`](../README.md) or [`AGENTS.md`](../AGENTS.md).
 > **When to read the rest:** before your first doc change in a session, or
 > when a later unit's exit criterion names one of these rules.
 
@@ -74,7 +74,7 @@ ADRs are decision records, **~250-line target** (the gate's bucketing is
   the options analysis;
 - **options analysis, test lists, implementation notes** move to the
   linked design doc (the ADR's front-matter `related:` names it), or to the
-  shared `docs/design/adr-handoffs.md` when the ADR has no dedicated design
+  shared [`docs/design/adr-handoffs.md`](design/adr-handoffs.md) when the ADR has no dedicated design
 doc.
 
 ADR **numbers are permanent** — the code cites them ~9 600 times, so a
@@ -106,8 +106,8 @@ drift is silent coupling in the doc layer.
 ## The tier model
 
 - **`living`** — the *current truth* for its subject, updated in place as
-  the platform changes. Examples: `README.md`, `AGENTS.md`,
-  `docs/DOCS-CONVENTIONS.md`, `docs/start/*.md`.
+  the platform changes. Examples: [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md),
+  [`docs/DOCS-CONVENTIONS.md`](DOCS-CONVENTIONS.md), `docs/start/*.md`.
 - **`reference`** — a *stable reference* that is correct as of a point in
   time and is not expected to change without a deliberate revision.
   Examples: ADRs, design docs (after `D10` settles their status).

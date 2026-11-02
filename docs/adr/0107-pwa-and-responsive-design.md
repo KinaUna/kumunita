@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0107 — M10: PWA and responsive design
+# ADR [0107](0107-pwa-and-responsive-design.md) — M10: PWA and responsive design
 
 Status: Accepted
 
@@ -23,7 +23,7 @@ Status: Accepted
 > breakpoint rule + a closed, split phone-width surface pass + two pinned
 > a11y floors). **Front-end-only, greenfield** (no web manifest, no
 > service worker, no `manifest.*` / `sw.js` anywhere in the tree today),
-> built entirely on frozen seams: the ADR 0031 tsc-only client pipeline,
+> built entirely on frozen seams: the ADR [0031](0031-wysiwyg-editor-and-toolbar.md) tsc-only client pipeline,
 > the CSP shipped in `Program.cs` (`script-src 'self'`), Bootstrap 5.3
 > dist CSS, the self-hosted logo PNGs, and the existing Playwright
 > harness. **Zero Core change, zero new authorization surface, zero new
@@ -70,7 +70,7 @@ the README Roadmap / `MilestonesTests.cs`.
   **nothing else**: no push, no background sync, no `PushManager`, no
   `SyncManager`. *Forbids:* shipping the M6/M9 deferred "PWA push" now —
   its surface is the M6 notification lane (a follow-on lane with its own
-  ADR under ADR 0076).
+  ADR under ADR [0076](0076-notifications-inbox-and-recipient-email.md)).
 - **D2 — The SW is an explicit allowlist, GET-only, and never touches
   signed-in routes.** The SW intercepts **only** same-origin `GET`
   responses whose path is on a closed 15-path allowlist. **Every other
@@ -128,7 +128,7 @@ the README Roadmap / `MilestonesTests.cs`.
   **no** new `I…Service` seam, **no** new `AccessAction` / `AccessVia`,
   **no** new audit verb, **no** schema change, **no `LocaleSettings`
   toggle** — a PWA surface is public-asset behavior, not a
-  privacy-sensitive opt-in (the inverse of the ADR 0105 `MessagingEnabled`
+  privacy-sensitive opt-in (the inverse of the ADR [0105](0105-messaging.md) `MessagingEnabled`
   shape).
 
 ## Consequences
@@ -157,10 +157,10 @@ the README Roadmap / `MilestonesTests.cs`.
   `sw.js` delete) so `activate` clears the old `kumunita-shell-v*` cache.
   No resident data is involved, no migration, no seed, no toggle.
 - **Deferred, each a named lane (own ADR):** PWA push notifications (under
-  ADR 0076), the tablet responsive pass, offline authenticated pages,
+  ADR [0076](0076-notifications-inbox-and-recipient-email.md)), the tablet responsive pass, offline authenticated pages,
   `maskable` icon refinement, and `screenshots` / `shortcuts` manifest
   enrichment. See the handoff note for the full deferred-lane catalog.
 - **Milestone, not lane:** `Milestones.cs` / the README Roadmap /
-  `MilestonesTests.cs` / `docs/STATUS.md` / `docs/ARCHITECTURE.md` flip in
+  `MilestonesTests.cs` / [`docs/STATUS.md`](../STATUS.md) / [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) flip in
   the U07 close (M10 → `StatusDone`, M11 → `StatusNext` — the AGENTS.md
   parity contract, C-M10·8).

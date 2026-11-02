@@ -13,11 +13,11 @@ updated: 2026-11-02
 
 ## Context
 
-M6 (ADR 0076) and the admin-lane kinds (ADR 0077) made **every**
+M6 (ADR [0076](0076-notifications-inbox-and-recipient-email.md)) and the admin-lane kinds (ADR [0077](0077-admin-account-signup-verify-notification.md)) made **every**
 resident a full notification citizen: a reply, a group post, an RSVP, a
 report, a to-do — each produces an inbox row and, per the recipient's
 preference, a durable email. That is exactly right for a real
-neighborhood. But ADR 0055 / 0056 introduced a second, distinct kind of
+neighborhood. But ADR [0055](0055-development-sample-data-lane.md) / 0056 introduced a second, distinct kind of
 resident — the **sample neighborhood** — which is an explicit opt-in
 (`SampleData__Enabled`) that, in the Development loop, is backed by
 **Mailpit** (a local SMTP sink that discards mail after showing it). In
@@ -25,7 +25,7 @@ that environment, the sample accounts being notified is harmless and
 even useful: a developer can watch the durable-outbox pipeline work
 end-to-end against the seeded mock neighborhood.
 
-The problem is the **deployed demo** posture (ADR 0056): a Production
+The problem is the **deployed demo** posture (ADR [0056](0056-sample-data-opt-in-and-deploy-posture.md)): a Production
 instance with `SampleData__Enabled=true` is a *public* instance whose
 sample accounts are real, sign-in-able rows (random high-entropy
 passwords, a credentials summary e-mailed to the seed admin). In that

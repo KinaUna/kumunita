@@ -14,7 +14,7 @@ updated: 2026-11-02
 ## Context
 
 The platform already has **two** relevant surfaces, and M25 sits *between* them:
-the **byte store + catalog** (ADR 0011 — `IMediaStore.PutAsync` + the
+the **byte store + catalog** (ADR [0011](0011-media-and-file-storage.md) — `IMediaStore.PutAsync` + the
 `MediaObject` doc every upload lane writes through) and the **per-lane size
 gate (pre-M25)** — each Web upload action read `MediaOptions.MaxBytes` (env
 `Media__MaxBytes`, default 10 MiB) and rejected an oversize payload with **413**
@@ -30,7 +30,7 @@ resident sees their own usage / quota / remaining). The decision lives in
 **Core** (pure), the gate in **Web** (the single `413` producer), and
 enforcement runs **before** `PutAsync` on **every** upload lane. The one thing
 the lane respects: **`Core` stays HTTP-free and the decision stays pure**
-(ADR 0006-D). The full moved detail (the `CommunityStorageSettings` field
+(ADR [0006](0006-module-boundary-contracts.md)-D). The full moved detail (the `CommunityStorageSettings` field
 list, the `StorageLimits.Decide` shape, the 5-lane adoption table, the F2-
 vs-F3 detail, the seven C-UP invariants, the ten FACES, the OPS.md note, the
 M24 `statvfs_t` defect flag) lives in the [handoff
@@ -44,7 +44,7 @@ note](../design/adr-handoffs.md#adr-0135--upload-limits-m25-moved-detail).
   the admin sets; M25 does not let an admin pick a different quota for a single
   resident.
 - **Not the admin *metrics* tables** — the per-user / total usage *dashboard* is
-  M24's surface (ADR 0134), which M25 **reuses** for its reads.
+  M24's surface (ADR [0134](0134-storage-metrics.md)), which M25 **reuses** for its reads.
 - **Not serve-time enforcement** — a file already stored is still served; M25
   only gates *new* uploads at the write boundary.
 - **No `IMediaStore` / `MediaObject` reshape** — no new field on `MediaObject`,
@@ -89,13 +89,13 @@ resident's numbers. Read-only: **no** `AccessAudit` row (C-UP·7).
 
 **D5 — The admin settings surface.** `GET`/`POST /admin/storage/settings`
 (`AdminStorageController`, `[Authorize(Roles = GlobalAdmin)]`), **distinct
-from** M24's `GET /admin/storage` metrics surface (ADR 0134). The `POST` reads
+from** M24's `GET /admin/storage` metrics surface (ADR [0134](0134-storage-metrics.md)). The `POST` reads
 the two values and calls `SetAsync` **in the caller's session** (one write,
 C-UP·1) — the F4 strong-consistency contract.
 
 ## Consequences
 
-- **`Core` stays HTTP-free and the decision stays pure** (ADR 0006-D):
+- **`Core` stays HTTP-free and the decision stays pure** (ADR [0006](0006-module-boundary-contracts.md)-D):
   `IFormFile` / `Stream` / `IActionResult` never cross the seam; the Web layer
   owns the `413`. The `StorageLimits` decision is testable with no DB, no HTTP,
   no session.

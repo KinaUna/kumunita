@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0064 — The events calendar Day/Week/Month views (`EV-DWM`): the three named views over the same authorized events
+# ADR [0064](0064-events-calendar-dwm-views.md) — The events calendar Day/Week/Month views (`EV-DWM`): the three named views over the same authorized events
 
 Status: Accepted
 Date: 2026-09-23
@@ -35,7 +35,7 @@ interfaces — `IEventService` is *reused, unchanged*).
 > lane, no new audit row shape, no new bounded context, **no seam on
 > `IEventService` / `EventService`** (the `ListInRangeAsync` seam is
 > *already* window-agnostic — D1), no new dependency. The visibility split
-> is **the service's, never re-derived in the Web** (ADR 0006-D, the
+> is **the service's, never re-derived in the Web** (ADR [0006](0006-module-boundary-contracts.md)-D, the
 > EV-CAL precedent): each view shows exactly what
 > `ListInRangeAsync`'s `CanSeeAsync(Read)` gate allows for that window.
 > **The `?view=` selector and the window are *display* inputs — never an
@@ -48,7 +48,7 @@ interfaces — `IEventService` is *reused, unchanged*).
 
 ## Context
 
-ADR 0063 (`EV-CAL`) gave residents a time overview the feed cannot: a
+ADR [0063](0063-events-calendar-view.md) (`EV-CAL`) gave residents a time overview the feed cannot: a
 month-anchored calendar at `GET /events/calendar`, a rolling **30-day chip
 grid**, client-side overlap highlighting, and prev/next/today navigation.
 But a resident opening that page expects the **three views every calendar
@@ -65,7 +65,7 @@ zero Core change** — and **nothing else**: no documents, no schema, no
 seeding, no write lane, no new audit row shape, no new bounded context,
 **no seam on `IEventService` / `EventService`** (the `ListInRangeAsync`
 seam is *already* window-agnostic — D1), no new dependency. The visibility
-split is **the service's, never re-derived in the Web** (ADR 0006-D, the
+split is **the service's, never re-derived in the Web** (ADR [0006](0006-module-boundary-contracts.md)-D, the
 EV-CAL precedent): each view shows exactly what
 `ListInRangeAsync`'s `CanSeeAsync(Read)` gate allows for that window.
 **The `?view=` selector and the window are *display* inputs — never an
@@ -79,7 +79,7 @@ access decision.**
   untouched; no EF; **no** seam added on `IEventService` or
   `IAuthorizationService` / `IUserInfoService` / `IIdentityService`. The
   `ListInRangeAsync` seam is **reused, unchanged** — it is *already*
-  window-agnostic (ADR 0063 D2: it accepts arbitrary `[startUtc, endUtc)`
+  window-agnostic (ADR [0063](0063-events-calendar-view.md) D2: it accepts arbitrary `[startUtc, endUtc)`
   UTC bounds), so day / week / month windows are **caller policy in the
   controller**. The **only** additive C# in the whole lane is: the additive
   `EventCalendarViewModel` fields (`View`, `WindowDays`,
@@ -134,7 +134,7 @@ access decision.**
   (en/de/fr/da) in `KnownTranslationKeys.cs`:
   `events.calendar.view.day`, `events.calendar.view.week`,
   `events.calendar.view.month`. The existing `events.calendar.*` block is
-  the host; the ADR 0015 registry shape holds. The view **labels** (a full
+  the host; the ADR [0015](0015-ui-view-localization-mechanics.md) registry shape holds. The view **labels** (a full
   date / a date range / a month name) are **computed display strings**
   rendered through `kw-dt` / the UI culture — dates, not UI nouns, so they
   are **not** registry keys (C-DWM·9).
@@ -167,7 +167,7 @@ access decision.**
 - **The M4 + EV-CAL surface is untouched except the additive view-model
   fields + the `?view=` param.** No field on any document, no new
   `AccessAction` / `AccessVia`, no seam on the frozen cross-context
-  interfaces, no new dependency (the C-DWM·1 + ADR 0031 pins) — verified by
+  interfaces, no new dependency (the C-DWM·1 + ADR [0031](0031-wysiwyg-editor-and-toolbar.md) pins) — verified by
   the part-vs-whole gate.
 - **The roadmap stays honest.** `EV-DWM` opens as the single in-progress
   milestone (the `M5` pin moves to `Planned`, returning to `M5` at lane

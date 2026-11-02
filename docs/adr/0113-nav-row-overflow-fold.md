@@ -11,24 +11,24 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0113 — the variant-B nav-row overflow fold (Community + Groups into the More menu)
+# ADR [0113](0113-nav-row-overflow-fold.md) — the variant-B nav-row overflow fold (Community + Groups into the More menu)
 
 Status: Accepted
 Date: 2026-09-28
-Extends the **ADR 0111 nav-layout surface** (the two resident-selectable
+Extends the **ADR [0111](0111-nav-layout-variants-b-and-c.md) nav-layout surface** (the two resident-selectable
 layouts — variant **B**, the compact top row with a Bootstrap "More ▾"
 dropdown, the default; and variant **C**, the icon rail), the **tsc-only
-discipline** (ADR 0031 — a `client/lib/*.ts` module, compiled by `tsc` into
+discipline** (ADR [0031](0031-wysiwyg-editor-and-toolbar.md) — a `client/lib/*.ts` module, compiled by `tsc` into
 `wwwroot/js/lib/`, loaded as a `<script type="module">`, never an inline
 script in a Razor view — the `detach-menu.ts` precedent), the **`kw-l`
-closed-key registry + en/de/fr/da parity pins** (ADR 0015 — this lane adds
+closed-key registry + en/de/fr/da parity pins** (ADR [0015](0015-ui-view-localization-mechanics.md) — this lane adds
 **no** new key: the folded items keep their existing `nav.community` /
 `nav.groups` labels), the **site.css media-block boundary pin** (the M10
 drift-guard frozen pin #7 + `PwaManifestTests.Site_Css_Media_Block_Boundary_
 Pinned` — six `@media` occurrences total at the time of this ADR; the
 inventory has since grown to **twelve** blocks — see the M10 design doc
 §drift-guard log), and the **e2e-frozen selectors**
-(ADR 0111 D6 / `e2e-pwa-responsive.spec.ts` — `header .navbar`,
+(ADR [0111](0111-nav-layout-variants-b-and-c.md) D6 / `e2e-pwa-responsive.spec.ts` — `header .navbar`,
 `.navbar-toggler`, `a#accountMenu`, `a#notifications-bell`,
 `a#languageMenu`). This ADR removes the horizontal scrollbar that appears in
 the variant-B ("top row") layout when the window sits between the `sm` and
@@ -38,7 +38,7 @@ dropdown, and unfold again when there is room.
 
 ## Context
 
-ADR 0111 shipped the two nav layouts. In the default variant B the row
+ADR [0111](0111-nav-layout-variants-b-and-c.md) shipped the two nav layouts. In the default variant B the row
 carries, for a signed-in resident, a **fixed natural width** of links:
 
 ```
@@ -60,18 +60,18 @@ The broken band is the in-between one.
 The fix must satisfy the standing constraints:
 
 - **No new `kw-l` key** — the folded items are re-homed, not re-labelled,
-  so the closed-registry + parity pins are untouched (ADR 0015).
+  so the closed-registry + parity pins are untouched (ADR [0015](0015-ui-view-localization-mechanics.md)).
 - **No new `@media` block** — the `@media` inventory (six at the time of
   this ADR; now **twelve** blocks — see the M10 design doc §drift-guard
   log) is a frozen M10 drift-guard pin, so the fold's styling must be a
   state-scoped, non-media rule.
 - **No inline script in a Razor view** (SECURITY.md §6) — the fold logic is
-  a tsc-only module (ADR 0031).
+  a tsc-only module (ADR [0031](0031-wysiwyg-editor-and-toolbar.md)).
 - **Self-scoped** — it must be a clean no-op in variant C (the icon rail),
   for signed-out users (Community/Groups aren't rendered), and wherever the
   hooks are absent. It must not disturb the e2e-frozen selectors.
 - **Behavioural** (the fold actually firing at a given width) is the
-  Playwright e2e surface (the ADR 0107/0111 `e2e-pwa-responsive.spec.ts`
+  Playwright e2e surface (the ADR [0107](0107-pwa-and-responsive-design.md)/0111 `e2e-pwa-responsive.spec.ts`
   precedent); xUnit pins the structural contract only (string pins, no
   TestServer).
 
@@ -128,7 +128,7 @@ folded items inherit the correct mobile treatment there for free.
 fold is a **re-homing**, not a re-labelling: the two anchors keep their
 existing `<kw-l key="nav.community">` / `<kw-l key="nav.groups">` content
 (registered in en/de/fr/da, already pinned). No key is added, removed, or
-re-scoped, so the ADR 0015 closed-registry + parity pins are untouched.
+re-scoped, so the ADR [0015](0015-ui-view-localization-mechanics.md) closed-registry + parity pins are untouched.
 
 ## Consequences
 
@@ -157,9 +157,9 @@ re-scoped, so the ADR 0015 closed-registry + parity pins are untouched.
   styles `.kmb-nav-folded` and keeps the pinned `@media` count (six at the
   time of this ADR; now **twelve** blocks — see the M10 design doc
   §drift-guard log; the live total is pinned by the two media tests, not a
-  hard-coded six); and ADR 0113 is recorded + indexed.
+  hard-coded six); and ADR [0113](0113-nav-row-overflow-fold.md) is recorded + indexed.
 - **Follow-on (out of scope).** The behavioural guarantee (fold fires at a
-  given width) is the Playwright e2e surface, the ADR 0107/0111
+  given width) is the Playwright e2e surface, the ADR [0107](0107-pwa-and-responsive-design.md)/0111
   `e2e-pwa-responsive.spec.ts` precedent. If a future nav addition widens the
   flat row beyond two foldable links, the fold target set is a data-attribute
   extension, not a module change.
@@ -169,7 +169,7 @@ re-scoped, so the ADR 0015 closed-registry + parity pins are untouched.
 - **New:** `src/Kumunita.Web/client/lib/nav-more-fold.ts` (the module)
 - **New:** `tests/Kumunita.Web.Tests/NavMoreFoldTests.cs` (the structural
   pins)
-- **New:** `docs/adr/0113-nav-row-overflow-fold.md` (this ADR)
+- **New:** [`docs/adr/0113-nav-row-overflow-fold.md`](0113-nav-row-overflow-fold.md) (this ADR)
 - **Changed:** `src/Kumunita.Web/Views/Shared/_Layout.cshtml` (two
   `data-nav-fold` hooks on the Community/Groups `<li>`s, one `data-nav-more`
   hook on the More `<li>`, one `<script type="module"
@@ -178,7 +178,7 @@ re-scoped, so the ADR 0015 closed-registry + parity pins are untouched.
   `.kmb-nav-folded` rule, non-`@media`)
 - **Changed:** `src/Kumunita.Web/WhatsNew.cs` (the 0.10.0 "Navigation
   layout" line annotated)
-- **Changed:** `docs/adr/README.md` (the ADR 0113 index row)
+- **Changed:** [`docs/adr/README.md`](README.md) (the ADR [0113](0113-nav-row-overflow-fold.md) index row)
 - **Untouched (by design):** the `kw-l` registry + the en/de/fr/da parity
   pins (no new key); the `@media` inventory (six at the time of this ADR;
   now **twelve** blocks — see the M10 design doc §drift-guard log; the

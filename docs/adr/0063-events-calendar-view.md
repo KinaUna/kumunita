@@ -11,7 +11,7 @@ superseded_by: [adr-0064]
 updated: 2026-11-02
 ---
 
-# ADR 0063 — The events calendar (`EV-CAL`): a month-anchored, display-only overview of visible events
+# ADR [0063](0063-events-calendar-view.md) — The events calendar (`EV-CAL`): a month-anchored, display-only overview of visible events
 
 Status: Accepted
 Date: 2026-09-23
@@ -24,7 +24,7 @@ the `events-calendar.ts` module). **No** amendment to **0006** (no seam is
 opened on the frozen cross-context interfaces — `IEventService` is M4's *own*
 lane, so this ADD is permitted).
 
-> **Abstract:** M4 (ADR 0054) shipped the events **feed** — a chronological
+> **Abstract:** M4 (ADR [0054](0054-events-rsvp-reminders.md)) shipped the events **feed** — a chronological
 > list that answers *"what's next"* but gives no **time overview** (a clash
 > between two events is invisible; the last occurrence of a recurring kind of
 > thing is behind the current page). The `EV-CAL` named lane (the `GP` / `TG`
@@ -42,7 +42,7 @@ lane, so this ADD is permitted).
 > dependencies), and 8 `kw-l` keys × 4 languages — and **nothing else**: no
 > documents, no schema, no seeding, no write lane, no audit row kind, no §6.4
 > job, no new dependency. The visibility split is **the service's, never
-> re-derived in the Web** (ADR 0006-D); **overlap is a *display* concern**
+> re-derived in the Web** (ADR [0006](0006-module-boundary-contracts.md)-D); **overlap is a *display* concern**
 > computed client-side, never an access decision. **For** a developer touching
 > the `IEventService.ListInRangeAsync` seam, the `EventController.Calendar`
 > action, the `Events/Calendar` view, or the `tests/*` calendar families. The
@@ -53,7 +53,7 @@ lane, so this ADD is permitted).
 
 ## Context
 
-M4 (ADR 0054) shipped the events surface: the feed (`GET /events`, ordered by
+M4 (ADR [0054](0054-events-rsvp-reminders.md)) shipped the events surface: the feed (`GET /events`, ordered by
 `Start`, paged), the detail view, RSVPs, and the day-before reminder. The feed
 answers *"what's next"* — but it is a **chronological list**, so it gives no
 **time overview**. Two resident questions have no answer there:
@@ -71,7 +71,7 @@ model (+ 2 additive defaulted `EventRow` fields), one `client/lib` TS module
 (tsc-only, zero dependencies), and 8 `kw-l` keys × 4 languages — and
 **nothing else**: no documents, no schema, no seeding, no write lane, no audit
 row kind, no §6.4 job, no editor work, no new dependency. The visibility split
-is **the service's, never re-derived in the Web** (ADR 0006-D, the M4
+is **the service's, never re-derived in the Web** (ADR [0006](0006-module-boundary-contracts.md)-D, the M4
 `EventController` precedent): the calendar shows exactly what
 `ListInRangeAsync`'s `CanSeeAsync(Read)` gate allows. **Overlap is a
 *display* concern** computed client-side over the already-authorized list — it
@@ -97,7 +97,7 @@ writes no row, calls no seam, and is never an access decision.
   audit shape.
 - **D3 — The route + anchor + window.** `GET /events/calendar` with
   `?from=YYYY-MM-DD` (the month anchor **in the viewer's effective timezone**,
-  ADR 0019; default = the zone's today) and `?componentId=…` (the feed's
+  ADR [0019](0019-timezone-platform-default-and-resident-override.md); default = the zone's today) and `?componentId=…` (the feed's
   filter, a filter never a gate). Window = `[anchorLocalStartUtc,
   anchorLocalStartUtc + 30d)`; prev/next = the anchor shifted **±1 month**,
   pre-rendered as plain GET links (C-EV·7 — no client nav code). See the
@@ -149,7 +149,7 @@ writes no row, calls no seam, and is never an access decision.
   row, or a service concept (C-EV·4).
 - **The M4 surface is untouched except the one additive seam.** No field on
   any document, no new `AccessAction` / `AccessVia`, no seam on the frozen
-  cross-context interfaces, no new dependency (the C-EV·6 + ADR 0031 pins) —
+  cross-context interfaces, no new dependency (the C-EV·6 + ADR [0031](0031-wysiwyg-editor-and-toolbar.md) pins) —
   verified by the part-vs-whole gate.
 - **The roadmap stays honest.** `EV-CAL` opens as the single in-progress
   milestone (the `M5` pin moves to `Planned`, returning to `M5` at lane close)

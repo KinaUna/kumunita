@@ -39,7 +39,7 @@ self-contained and links back to the others):
 
 | Concern | File |
 |---------|------|
-| **Rules + cadence** (this hub) | `SECURITY-AUDIT.md` (you are here) |
+| **Rules + cadence** (this hub) | [`SECURITY-AUDIT.md`](SECURITY-AUDIT.md) (you are here) |
 | **Checklists C / D / P / R** — code, deployment, platform-admin, recurring review | [`audit-checklists.md`](security/audit-checklists.md) |
 | **Annual & trigger-based audits** (A-1…A-3 + the trigger table) | [`audit-annual-trigger.md`](security/audit-annual-trigger.md) |
 | **The audit log** — the append-only record of every run + the SEC remediation lane's per-finding rows | [`audit-log.md`](security/audit-log.md) |

@@ -33,23 +33,23 @@ updated: 2026-11-02
 > **one new composition service** (`IProfileFindService`, the
 > `DirectoryService` shape, D4) + **the closed `kw-l` key set** (12 keys ×
 > en/de/fr/da, §7). The five GATE acceptance tests (GATE-1…GATE-5, §8) + the
-> drift-guard (§9) are locked in **ADR 0123 (Accepted, 2026-10-01)**.
+> drift-guard (§9) are locked in **ADR [0123](../adr/0123-extended-profiles.md) (Accepted, 2026-10-01)**.
 >
-> **The frozen `IAuthorizationService` `Read` path (ADR 0006), the two
+> **The frozen `IAuthorizationService` `Read` path (ADR [0006](../adr/0006-module-boundary-contracts.md)), the two
 > existing profile adapters (`ProfileToAuditableResource`, `TargetKind
 > "directory"` + the `ContactVisibilityResource`), the frozen ADR 0044 `Tag`
-> shared-id doc + `ITagService`, and the ADR 0025/0031/0033 rich-content lane
+> shared-id doc + `ITagService`, and the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)/0031/0033 rich-content lane
 > are byte-identical** (C-M23·2/5/6). The `Profile` doc is the **catalog**
 > (the authority for access, its `Visibility` / `ContactVisibility`
 > audiences); the bio is a **field on that same doc** (not a second document,
-> D1); the profile tags **reference the frozen ADR 0044 `Tag` by `Tag.Id`**
+> D1); the profile tags **reference the frozen ADR [0044](../adr/0044-tags.md) `Tag` by `Tag.Id`**
 > (the `Post.TagIds` / `Page.TagIds` idiom, D1, C-M23·6); and the find-people
 > read is **over profiles the viewer may already see** (the match is a feed
 > organizer, never a gate — D6, C-M23·4).
 >
 > **Status.** **LOCKED.** The decisions D1–D8, the invariants
 > C-M23·1…C-M23·6, the FACES F1–F6 + the named trade, the §7 `kw-l` key list,
-> and the §8 gate test names are locked in **ADR 0123 (Accepted, 2026-10-01)**.
+> and the §8 gate test names are locked in **ADR [0123](../adr/0123-extended-profiles.md) (Accepted, 2026-10-01)**.
 > The `[PROPOSED]` set in the register
 > `docs/plans-milestones/in-progress/plan-m23-extended-profiles.md` is the
 > locked set this doc restates **verbatim**, with **one clarifying amendment**
@@ -86,12 +86,12 @@ M23 adds **two author-owned fields to the existing `Profile` document** and a
 **find-people read** over them. Two things follow from the roadmap sentence:
 
 1. **"a biography"** = a new `Profile.Bio` field (rich content — Markdown +
-   optional in-content images, the ADR 0025/0031/0033 lane), **and**
+   optional in-content images, the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)/0031/0033 lane), **and**
    **"free author-set tags (skills, interests, knowledge, expertise)"** = a
-   new `Profile.TagIds: string[]` field that **references the frozen ADR 0044
+   new `Profile.TagIds: string[]` field that **references the frozen ADR [0044](../adr/0044-tags.md)
    shared `Tag` doc** by `Tag.Id` (the `Post.TagIds` / `Page.TagIds` idiom).
    Both are **additive POCO fields** on the M1-registered `Profile` doc
-   (ADR 0004 §B.1 — delta-detected, idempotent, **no re-seed**, **no new
+   (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — delta-detected, idempotent, **no re-seed**, **no new
    DocTypes surface**, **no new document**, **no new context**).
 2. **"to make it easier to find people with something in common"** = a
    **find-people read** (a new `IProfileFindService`, the `DirectoryService`
@@ -105,7 +105,7 @@ M23 adds **two author-owned fields to the existing `Profile` document** and a
 
 - **Not a new document, not a new context, not a new storage lane.** M23 adds
   **two fields to the existing `Profile` doc** + **one composition service**
-  (`IProfileFindService`). The `Tag` doc is the **frozen ADR 0044** `Tag`
+  (`IProfileFindService`). The `Tag` doc is the **frozen ADR [0044](../adr/0044-tags.md)** `Tag`
   (already registered in `TagDocTypes`, already referenced by `Post`/`Page`);
   M23 adds `Profile.TagIds` as a *third* referencer — it does **not** create a
   second `Tag` type (D1, D3).
@@ -122,9 +122,9 @@ M23 adds **two author-owned fields to the existing `Profile` document** and a
   (by-tag + bio-substring, paged). A facet browse, "people in common," or a
   `/people/skills/{tag}` taxonomy is a deferred lane (D8·3).
 - **Not inline WYSIWYG editing of the bio on the detail view.** M23's bio is
-  author-edited in `/profile/edit` (the ADR 0031/0033 `bindRichEditor` editor)
+  author-edited in `/profile/edit` (the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)/0033 `bindRichEditor` editor)
   and rendered read-only via the existing `MarkdownRenderer.RenderHtml` helper
-  (`src/Kumunita.Web/Security/`); the ADR 0032/0033 inline-edit lane on the
+  (`src/Kumunita.Web/Security/`); the ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)/0033 inline-edit lane on the
   detail view is a deferred lane (D8·1).
 - **Not a per-field audience.** Bio and tags are gated by the **one** existing
   `Profile.Visibility` audience (the M2 "kept for detailed fields" audience
@@ -137,7 +137,7 @@ M23 adds **two author-owned fields to the existing `Profile` document** and a
 ## 1 — Decisions (D1–D8) — **LOCKED** (verbatim from the register's [PROPOSED] set; §1.a records the one clarifying amendment)
 
 **D1 — `Profile` gains **two additive fields**; no new document, no new
-DocTypes surface (ADR 0004 §B.1).** `Profile` (the M1-registered doc,
+DocTypes surface (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).** `Profile` (the M1-registered doc,
 `Kumunita.Core.UserInfo`) gains exactly two fields, both **additive POCO
 fields** (the `Post.Status` / `Post.TagIds` / `Profile.AvatarId` /
 `Profile.TimeZone` history on a POCO — delta-detected, idempotent, **no
@@ -152,7 +152,7 @@ public string[] TagIds { get; set; } = [];          // references the shared ADR
 ```
 
 `Profile.TagIds` is the **`Post.TagIds` / `Page.TagIds` idiom verbatim** — a
-`string[]` of `Tag.Id` values, default empty, referencing the **frozen ADR 0044
+`string[]` of `Tag.Id` values, default empty, referencing the **frozen ADR [0044](../adr/0044-tags.md)
 `Tag`** doc (the `MediaObject` shared-id-doc shape the `Tag` already is). M23
 adds `Profile` as a **third referencer** of the shared `Tag`; it creates no new
 tag type.
@@ -183,7 +183,7 @@ new ProfileToAuditableResource(profile))` → gates **bio + tags**; (b)
 (owner branch) — no decision, no row. A `null`/absent `ContactVisibility`
 short-circuits (b) with no row (the existing C-M2·1 shape); bio/tags use the
 non-null `Visibility` (an empty `Visibility` **denies** non-owners — the lean
-default, C-M23·1 / ADR 0006-C1).
+default, C-M23·1 / ADR [0006](../adr/0006-module-boundary-contracts.md)-C1).
 
 *Forbids:* a **new** `AccessAction` / `AccessVia` / `Decide()` branch, a new
 `IAuditableResource` adapter (the two existing ones are reused), a new
@@ -213,8 +213,8 @@ public sealed record ProfileUpdate(
 ```
 
 `UpsertProfileAsync` writes `Profile.Bio` **verbatim** (the author's choice is
-absolute — ADR 0001-B; a `null` patch leaves it) and resolves
-`Profile.TagIds` to `Tag.Id` values using the **frozen ADR 0044 create-or-get
+absolute — ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B; a `null` patch leaves it) and resolves
+`Profile.TagIds` to `Tag.Id` values using the **frozen ADR [0044](../adr/0044-tags.md) create-or-get
 idiom** (C-TG·4: `slug` = the typed string lowercased + trimmed; a missing
 `Slug` **creates** a `Tag` with `CreatedBy = actorId`, C-TG·5; a present
 `Slug` **reuses** the existing `Tag`, no row). The create-or-get is **inlined**
@@ -233,7 +233,7 @@ not re-gate.
 *Forbids:* a **new** `IUserInfoService` write method for profile tags/bio (it
 rides `UpsertProfileAsync`), a **new** `ITagService` profile method, a separate
 "profile tag editor" controller (the tag is a field on the profile, edited
-where the profile is edited — the ADR 0044 "no separate tag editor controller"
+where the profile is edited — the ADR [0044](../adr/0044-tags.md) "no separate tag editor controller"
 pin carried to profiles), or an unaudited direct `session.Store` from a
 controller.
 
@@ -245,11 +245,11 @@ controller.
 way `DirectoryService` is. It composes **only** the frozen seams —
 `IUserInfoService` (the candidate set via the existing `GetProfilesAsync`),
 `IAuthorizationService` (the per-profile `Visibility` decision), the
-**frozen ADR 0044 `ITagService`** (tag display-name resolution, ADR 0005
+**frozen ADR [0044](../adr/0044-tags.md) `ITagService`** (tag display-name resolution, ADR [0005](../adr/0005-multilingual-support.md)
 preference order) + its own `IDocumentStore` — exactly the `DirectoryService`
-"pure caller of the frozen modules" shape (ADR 0006-D).
+"pure caller of the frozen modules" shape (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).
 
-Two **paged** read methods (the M7 `HasMore` idiom — ADR 0090 D6 — the
+Two **paged** read methods (the M7 `HasMore` idiom — ADR [0090](../adr/0090-pagination-and-filtering.md) D6 — the
 `TagService.ListPostsByTagPagedAsync` shape, `PageSize = 30`):
 
 ```csharp
@@ -300,36 +300,36 @@ it — a second row is a drift violation), a find-people read that surfaces a
 profile the viewer cannot see, or a find-people read that emits **no**
 aggregate audit row (D6, C-M23·4).
 
-**D5 — The bio is **rich content** (ADR 0025/0031/0033) + the profile editor
-**reuses** the existing `bindRichEditor` WYSIWYG and the frozen ADR 0044 tag
+**D5 — The bio is **rich content** (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)/0031/0033) + the profile editor
+**reuses** the existing `bindRichEditor` WYSIWYG and the frozen ADR [0044](../adr/0044-tags.md) tag
 input; the detail **reuses** the existing `MarkdownRenderer.RenderHtml`
 helper.** The profile editor (`/profile/edit`) adds two surfaces, both
-**reusing frozen land**: (a) a **bio** field — the ADR 0031/0033 WYSIWYG
+**reusing frozen land**: (a) a **bio** field — the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)/0033 WYSIWYG
 editor (or a Markdown textarea) over a `string` field, exactly the surface
 posts/announcements/pages use for their bodies; (b) a **tags** input — the
-**frozen ADR 0044 tag input** (the composer's tag picker +
+**frozen ADR [0044](../adr/0044-tags.md) tag input** (the composer's tag picker +
 `ITagService.SuggestAsync` autocomplete). The existing two audience editors
 (`Visibility` + `ContactVisibility`) are **unchanged**. The directory detail
 renders the bio via the **existing** `MarkdownRenderer.RenderHtml` helper (the
-ADR 0025 rendered lane, the "single Markdown engine") — `null`/empty bio ⇒
-no bio block (no placeholder). Profile tags render as chips (the ADR 0044 tag
+ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) rendered lane, the "single Markdown engine") — `null`/empty bio ⇒
+no bio block (no placeholder). Profile tags render as chips (the ADR [0044](../adr/0044-tags.md) tag
 display-name idiom, resolved per-viewer).
 
-*Forbids:* a **new** editor subsystem (reuse the ADR 0031/0033
-`bindRichEditor` + the ADR 0044 tag input), a **new** tag-management surface for
-profiles, inline WYSIWYG editing on the detail view (the ADR 0032/0033 lane —
+*Forbids:* a **new** editor subsystem (reuse the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)/0033
+`bindRichEditor` + the ADR [0044](../adr/0044-tags.md) tag input), a **new** tag-management surface for
+profiles, inline WYSIWYG editing on the detail view (the ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)/0033 lane —
 deferred, D8·1), or a bio rendered as plain text (it is rich content, D5 —
 rendered by `MarkdownRenderer.RenderHtml`).
 
 **D6 — **Privacy-pin:** find-people results are computed over profiles the
 viewer may **already see**; a match is a *feed organizer*, never a gate; a
 profile the viewer cannot see never surfaces and its bio/tag never leaks (the
-ADR 0044 D5 global-enumeration exclusion carried to profiles).** The by-tag
+ADR [0044](../adr/0044-tags.md) D5 global-enumeration exclusion carried to profiles).** The by-tag
 and bio-substring reads (D4) both: filter the candidate set by the match,
 **then** gate each survivor by its `Visibility`; a profile whose `Visibility`
 denies the viewer **never** appears in the results, and its `Bio`/`TagIds` are
 never a match artifact. The tag's *display name* may surface (it is a label,
-ADR 0044 D5) but only as part of a profile the viewer may already see. A
+ADR [0044](../adr/0044-tags.md) D5) but only as part of a profile the viewer may already see. A
 **global tag enumeration** over profiles is excluded by design (it would leak a
 subject's interests behind content they cannot see). Each read emits **one**
 aggregate `AccessAudit` row (C3).
@@ -343,7 +343,7 @@ M23 adds **no** `AccessAction`, **no** `Decide()` branch, **no** `AccessVia`
 value, **no** `IAuthorizationService` method, **no** `TargetKind`. It reuses
 exactly: the **existing** `ProfileToAuditableResource` (`TargetKind
 "directory"`, `Audience => Profile.Visibility`) + the **existing**
-`ContactVisibilityResource` + `AccessAction.Read` + the **frozen ADR 0044
+`ContactVisibilityResource` + `AccessAction.Read` + the **frozen ADR [0044](../adr/0044-tags.md)
 `ITagService`** read lanes (tag display names). It adds **one** composition
 service (`IProfileFindService`, the `DirectoryService` shape — a *caller* of
 the frozen seams, not an extension of them).
@@ -353,18 +353,18 @@ the frozen seams, not an extension of them).
 it does **not** extend it).
 
 **D8 — **Deferred lanes** (each a future ADR, not part of M23).** (1)
-**Inline WYSIWYG editing of the bio on the detail view** (the ADR 0032/0033
+**Inline WYSIWYG editing of the bio on the detail view** (the ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)/0033
 inline-edit lane) — M23's bio is author-edited in `/profile/edit`; inline-edit
 on the detail is a future lane. (2) **Bio full-text / semantic search** (beyond
 substring) — the M8 substring engine is M23's floor; a richer search is a
 future lane. (3) **A people-discovery *surface*** (facet browse, "people in
 common," a `/people/skills/{tag}` taxonomy, shared-interests) — M23 ships the
 *find-people read*; a richer surface is a future lane. (4) **A "new bio/tags
-set" notification** — rides M6 (ADR 0076); M23 stages **no** email. (5)
+set" notification** — rides M6 (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)); M23 stages **no** email. (5)
 **Profile-tag curation by an admin** (a moderator/global-admin manages another
-resident's tags) — M23 is author-self-edit only (the ADR 0003 SoD lane is
+resident's tags) — M23 is author-self-edit only (the ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD lane is
 untouched); an admin curation lane is future. (6) **Bio image alt-text /
-captioning** — rides the ADR 0025/0011 image lane; M23 reuses it as-is; a
+captioning** — rides the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)/0011 image lane; M23 reuses it as-is; a
 dedicated bio-image lane is future.
 
 ### 1.a — Amendments (additive; the register's original text is not rewritten)
@@ -413,7 +413,7 @@ is rewritten — this is the single D#-relevant clarification in the unit.
   seam + claim set are unchanged.
 - **C-M23·3 — Bio + tags are written through the single `UpsertProfileAsync`
   lane (D3, the F13 pin extended); `ProfileUpdate` gains `Bio` + `TagIds`; the
-  bio is written **verbatim** (ADR 0001-B); a missing tag slug is created
+  bio is written **verbatim** (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B); a missing tag slug is created
   (C-TG·4, one `tag.create` row each, C-TG·9) and a present slug is reused (no
   row); the profile write emits **no** audit row (the existing
   `UpsertProfileAsync` shape — a Profile field write, not an access decision);
@@ -421,7 +421,7 @@ is rewritten — this is the single D#-relevant clarification in the unit.
   (C3).** A test pins the verbatim bio + the tag-creation + the reuse +
   `null` ⇒ don't-touch + the no-audit-row profile write.
 - **C-M23·4 — Find-people results are computed over profiles the viewer may
-  already see (D6, the ADR 0044 D5 privacy-pin); a match is a feed organizer,
+  already see (D6, the ADR [0044](../adr/0044-tags.md) D5 privacy-pin); a match is a feed organizer,
   never a gate; a profile the viewer cannot see never surfaces and its
   bio/tag never leaks; one aggregate `AccessAudit` row per read
   (`targetKind "directory"`, `visibleCount`/`hiddenCount`, `targetId = null`)
@@ -432,16 +432,16 @@ is rewritten — this is the single D#-relevant clarification in the unit.
   images, rendered by the existing `MarkdownRenderer.RenderHtml` helper (the
   "single Markdown engine"); `null`/empty ⇒ no bio block.** A test pins the
   rich render + the null case.
-- **C-M23·6 — `Profile.TagIds` references the shared ADR 0044 `Tag` doc by
+- **C-M23·6 — `Profile.TagIds` references the shared ADR [0044](../adr/0044-tags.md) `Tag` doc by
   `Tag.Id` (D1, the `Post.TagIds` idiom); a profile tag is a label, never a
   gate (C-TG·1 carried to profiles); the tag's display name is resolved
-  per-viewer (ADR 0005 preference order, D5).** A test pins the `Tag.Id`
+  per-viewer (ADR [0005](../adr/0005-multilingual-support.md) preference order, D5).** A test pins the `Tag.Id`
   reference shape + the no-gate pin.
 
 ## 3 — FACES (F1–F6) + the named trade
 
 - **F1 — A resident may set a bio + tags on their own profile, gated by the
-  profile's `Visibility` (the author's choice, ADR 0001-B).** *(C-M23·1,
+  profile's `Visibility` (the author's choice, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B).** *(C-M23·1,
   C-M23·3, C-M23·5.)*
 - **F2 — The profile's bio + tags render on the directory detail *only* when the
   viewer's `Visibility` decision allows; the contact block renders under the
@@ -451,13 +451,13 @@ is rewritten — this is the single D#-relevant clarification in the unit.
   whatever their saved `Visibility` says.** *(C-M23·1.)*
 - **F4 — A fresh profile's bio + tags are visible to no one but the author (the
   lean default: `Visibility = new()` empty denies non-owners).** *(C-M23·1,
-  ADR 0006-C1.)*
+  ADR [0006](../adr/0006-module-boundary-contracts.md)-C1.)*
 - **F5 — A resident finds others "with something in common" via by-tag +
   bio-substring find-people, over profiles they may already see; one aggregate
   audit row per read; a profile they cannot see never surfaces.** *(C-M23·4,
   C-M23·6, D6.)*
 - **F6 — A profile tag is a label, never a gate; its display name resolves
-  per-viewer (ADR 0005); tagging a profile rides the frozen ADR 0044 `Tag` (no
+  per-viewer (ADR [0005](../adr/0005-multilingual-support.md)); tagging a profile rides the frozen ADR [0044](../adr/0044-tags.md) `Tag` (no
   new tag type, no new gate).** *(C-M23·6, C-TG·1.)*
 
 **The named trade.** M23 buys *a resident's biography + free author-set tags
@@ -547,7 +547,7 @@ public sealed record ProfileUpdate(
 `UserInfoService.UpsertProfileAsync` (verified: load-or-create by
 `SubjectId`; "patch wins on every non-null field"; "no audit row — a Profile
 field write, not an access decision"; one `SaveChangesAsync`) gains **two**
-patch branches, and the `TagIds` resolution inlines the **frozen ADR 0044
+patch branches, and the `TagIds` resolution inlines the **frozen ADR [0044](../adr/0044-tags.md)
 create-or-get** (the `TagService.AttachToPostAsync` loop, verified:
 `Slug` = business key, `Name` = base display, `CreatedBy` = actor, one
 `tag.create` row per **newly created** tag, a present slug **reused** with no
@@ -700,7 +700,7 @@ find-people rows:**
 
 > **Reuse, don't invent:** the audience-editor labels, the "Save" submit, the
 > profile-link target (`/directory/[subjectId]`), the verified-badge shape, and
-> any tag-picker labels the ADR 0044 lane already ships are **not** re-keyed —
+> any tag-picker labels the ADR [0044](../adr/0044-tags.md) lane already ships are **not** re-keyed —
 > M23 only adds the keys above (the bio/tags labels + the find-people surface +
 > the nav entry). Each unit authors exactly the keys its surface renders, so its
 > own parity test is green at its own exit; no unit consumes a key it has not
@@ -750,7 +750,7 @@ find-people rows:**
   it does **not** extend the seams).
 - A unit is about to **create a second `Tag` doc type for profiles, a new
   `ProfileBio`/`ProfileTag` document, or a new `*DocTypes` surface** — that
-  violates D1 / C-M23·6; stop and report (the `Tag` is the frozen ADR 0044
+  violates D1 / C-M23·6; stop and report (the `Tag` is the frozen ADR [0044](../adr/0044-tags.md)
   shared doc; the bio is a field on the `Profile`).
 - A unit is about to **add a new `IUserInfoService` write method for profile
   tags/bio** (instead of extending `UpsertProfileAsync`) or **add a separate
@@ -769,7 +769,7 @@ find-people rows:**
 - A unit is about to **render the bio as plain text** (instead of via
   `MarkdownRenderer.RenderHtml`) or **invent a new editor / tag-input
   subsystem** — that violates D5 / C-M23·5; stop and report (reuse the ADR
-  0031/0033 `bindRichEditor` + the ADR 0044 tag input + the
+  0031/0033 `bindRichEditor` + the ADR [0044](../adr/0044-tags.md) tag input + the
   `MarkdownRenderer.RenderHtml` helper).
 - A user-visible string that is **not** already in `KnownTranslationKeys` for
   all four languages is about to be rendered — add it to the closed set (§7)
@@ -802,9 +802,9 @@ surface**.
 The six deferred lanes (each a future ADR, listed so a unit does not reach for
 them — D8, verbatim):
 
-1. **Inline WYSIWYG editing of the bio on the detail view** — the ADR 0032/0033
+1. **Inline WYSIWYG editing of the bio on the detail view** — the ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)/0033
    inline-edit lane. *Why deferred:* M23's bio is author-edited in
-   `/profile/edit`; inline-edit on the detail is the ADR 0032/0033 lane applied
+   `/profile/edit`; inline-edit on the detail is the ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)/0033 lane applied
    to the profile (a future ADR).
 2. **Bio full-text / semantic search** (beyond substring). *Why deferred:* the
    M8 `ISearchService` D4 substring engine is M23's floor; a richer search
@@ -813,20 +813,20 @@ them — D8, verbatim):
    `/people/skills/{tag}` taxonomy, shared-interests). *Why deferred:* M23
    ships the *find-people read*; a richer discovery surface is a larger design
    (a future ADR).
-4. **A "new bio/tags set" notification** — rides M6 (ADR 0076). *Why
+4. **A "new bio/tags set" notification** — rides M6 (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)). *Why
    deferred:* M23 is author-edit-and-find, not notify; a nudge is the M6
    notification lane applied to a new event kind (a future lane, D8·4).
 5. **Profile-tag curation by an admin** (a moderator/global-admin manages
    another resident's tags). *Why deferred:* M23 is author-self-edit only (the
-   ADR 0003 SoD lane is untouched); an admin curation lane is a larger
+   ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD lane is untouched); an admin curation lane is a larger
    authorization design (a future ADR).
-6. **Bio image alt-text / captioning** — rides the ADR 0025/0011 image lane.
+6. **Bio image alt-text / captioning** — rides the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)/0011 image lane.
    *Why deferred:* M23 reuses the image lane as-is; a dedicated bio-image lane
    is a future lane.
 
 ---
 
-## ADR 0123 — moved content (D11 trim, 2026-11-02)
+## ADR [0123](../adr/0123-extended-profiles.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
@@ -876,16 +876,16 @@ them — D8, verbatim):
 ## Supersedes
 
 - **None.** M23 **extends the existing `Profile` doc + adds one composition
-  service**; it does not supersede an earlier ADR. It *rides* ADR 0006 (the
+  service**; it does not supersede an earlier ADR. It *rides* ADR [0006](../adr/0006-module-boundary-contracts.md) (the
   frozen `Read` path + the two existing profile adapters + the deny-by-default
-  floor), ADR 0001-B (the `Visibility` audience + bio written verbatim), ADR
+  floor), ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (the `Visibility` audience + bio written verbatim), ADR
   0004 §B.1 (the additive-field discipline — no new DocTypes surface, no
-  migration), ADR 0044 (the frozen `Tag` shared-id doc + the `ITagService`
+  migration), ADR [0044](../adr/0044-tags.md) (the frozen `Tag` shared-id doc + the `ITagService`
   create-or-get + the tag display-name resolution + the D5 global-enumeration
-  exclusion), ADR 0025/0031/0033 (the rich-content lane + the `bindRichEditor`
-  WYSIWYG + the single `MarkdownRenderer.RenderHtml` engine), and ADR 0090 D6 /
+  exclusion), ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)/0031/0033 (the rich-content lane + the `bindRichEditor`
+  WYSIWYG + the single `MarkdownRenderer.RenderHtml` engine), and ADR [0090](../adr/0090-pagination-and-filtering.md) D6 /
   M8 D4 (the `PageSize = 30` idiom + the bio-substring engine). The two existing
-  profile adapters, the frozen ADR 0044 `Tag`/`ITagService` seams, and the
+  profile adapters, the frozen ADR [0044](../adr/0044-tags.md) `Tag`/`ITagService` seams, and the
   `CoreDocTypes` registration are **unchanged** (C-M23·2/6). This is stated
   explicitly so a later reader knows M23 is an **additive profile + find-people
   surface, not a correction** — no earlier ADR's decisions are revised or
@@ -897,7 +897,7 @@ them — D8, verbatim):
 - `src/Kumunita.Core/UserInfo/Profile.cs` — the two additive fields (`Bio`,
   `TagIds`) (D1) + the `ProfileUpdate` extension (`Bio`, `TagIds`) (D3) (U01).
 - `src/Kumunita.Core/UserInfo/UserInfoService.cs` (`UpsertProfileAsync`) — the
-  bio verbatim write + the inlined ADR 0044 tag create-or-get, no profile-write
+  bio verbatim write + the inlined ADR [0044](../adr/0044-tags.md) tag create-or-get, no profile-write
   audit row, one `SaveChangesAsync` (D3) (U02).
 - `src/Kumunita.Core/UserInfo/IProfileFindService.cs` + `ProfileFindService.cs`
   — new (the find-people read: `FindPeopleByTagAsync` / `FindPeopleByBioAsync`
@@ -917,8 +917,8 @@ them — D8, verbatim):
   files — the 12 `profile.*` / `nav.people` `kw-l` keys in en/de/fr/da (U04 the
   editor/detail/flash rows; U05 the find-people rows; the closed key set §7 of
   the design doc).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the
+- `src/Kumunita.Web/Milestones.cs` + [`README.md`](../../README.md) + [`docs/STATUS.md`](../STATUS.md) +
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the
   **one** milestone flip (U06 close: M23 → `StatusDone` + M22 promoted to
   `StatusNext` + the pin re-pinned to `M22_Is_The_Single_InProgress_Milestone`).
 - **New tests** (the GATE-1…5 pins): `tests/Kumunita.Core.Tests/` — the

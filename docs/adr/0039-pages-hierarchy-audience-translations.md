@@ -11,7 +11,7 @@ superseded_by: [adr-0040, adr-0057, adr-0165]
 updated: 2026-11-02
 ---
 
-# ADR 0039 — Pages: a hierarchical, audience-restricted, translatable knowledge tree (absorbs the static-page lane)
+# ADR [0039](0039-pages-hierarchy-audience-translations.md) — Pages: a hierarchical, audience-restricted, translatable knowledge tree (absorbs the static-page lane)
 
 Status: Accepted
 Date: 2026-09-17
@@ -19,10 +19,10 @@ Supersedes: **0005 A** (the static-page lane — *absorbed* into this tree,
 retired last in U07).
 
 > **Abstract:** the platform's one resident-facing long-form prose surface —
-> the flat, admin-only, **public-by-construction** static-page lane (ADR 0005
+> the flat, admin-only, **public-by-construction** static-page lane (ADR [0005](0005-multilingual-support.md)
 > A: `LocalizedPage`, slugs `terms` / `help` / `about`) — is **absorbed into
 > a single unified knowledge tree**: a new **`Kumunita.Core.Pages`** bounded
-> context (`Page` + `PageTranslation`, the ADR 0022/0026/0029 shape) carrying
+> context (`Page` + `PageTranslation`, the ADR [0022](0022-user-added-post-reply-translations.md)/0026/0029 shape) carrying
 > **hierarchy** (`ParentId` forest + a derived, not stored, path), **audience
 > restriction** (the post `Audience` reused verbatim — `null` = public, the
 > frozen `Decide()` branch 5), **mount points** (a nullable `MountPoint` tag —
@@ -44,11 +44,11 @@ retired last in U07).
 ## Context
 
 The platform ships **one** resident-facing surface for long-form, admin-
-authored prose: the **static-page** lane (ADR 0005 A) — `LocalizedPage`
+authored prose: the **static-page** lane (ADR [0005](0005-multilingual-support.md) A) — `LocalizedPage`
 (flat slugs), served by `StaticPagesController` over
 `ITranslationProvider.GetPageAsync`, written by the admin/translator-only
 `UpsertPageAsync` seam, **public by construction** (no audience, no
-authorization, no `AccessAudit`), editable in the WYSIWYG editor (ADR 0031 /
+authorization, no `AccessAudit`), editable in the WYSIWYG editor (ADR [0031](0031-wysiwyg-editor-and-toolbar.md) /
 0033). It is **flat** (no hierarchy), **admin-only** (a community Moderator
 has no standing to add a "how the platform works" page), and **not audience-
 restricted**.
@@ -79,17 +79,17 @@ destructive step until green" discipline).
   structure of a page: `ParentId?` hierarchy, `Slug` (unique per parent),
   `Title`, `Body`, **`Audience?`** (the **existing** post `Audience` — *not*
   a new scope; `null` = public), `AuthorId`, `ComponentId?` (moderator
-  scoping), `LanguageCode` (ADR 0018), `MountPoint?`, `Created` / `Modified?`,
-  `IsDraft` (ADR 0037), `ImageIds` (ADR 0025), `AttachmentIds` (ADR 0034)) +
-  `PageTranslation` (a user-added translation row, the ADR 0022/0026/0029
+  scoping), `LanguageCode` (ADR [0018](0018-ugc-authored-in-language-tag.md)), `MountPoint?`, `Created` / `Modified?`,
+  `IsDraft` (ADR [0037](0037-draft-mode-author-only.md)), `ImageIds` (ADR [0025](0025-rich-content-markdown-and-content-images.md)), `AttachmentIds` (ADR [0034](0034-file-attachments-posts-replies-announcements.md))) +
+  `PageTranslation` (a user-added translation row, the ADR [0022](0022-user-added-post-reply-translations.md)/0026/0029
   shape, `(PageId, LanguageCode)` unique index). See the handoff note for the
   full field sets.
-- **The audience is the post `Audience`, reused verbatim** (ADR 0001-B / 0036):
+- **The audience is the post `Audience`, reused verbatim** (ADR [0001](0001-core-stack-and-identity-model.md)-B / 0036):
   `null` = public (`Decide()` branch 5, *unchanged*); non-null = `Mode` +
   `Grants` + the `Community` flag. **No new `Audience` field, no new
   `AudienceMode`, no new `AccessVia` value.** The **default** for a new page
   is **non-public, community-visible** (`Audience.Community = true` + a
-  `ComponentId`, empty grants) — **consistent with posts** (ADR 0036) —
+  `ComponentId`, empty grants) — **consistent with posts** (ADR [0036](0036-community-visible-audience-default.md)) —
   ~~originally "pages default public"~~, **reversed 2026-09-17** (a *per-
   surface composer choice*, not a change to the `Audience` doc).
 - **The decision path is the frozen `IAuthorizationService`.** A new
@@ -117,9 +117,9 @@ destructive step until green" discipline).
   always the `Audience` + `CanAsync(Read)`.
 - **Translatable UGC row shape, reused verbatim.** A `PageTranslation` row
   carries a user-added translation; **standing** = GlobalAdmin ∪ Translator
-  (ADR 0021/0022) **plus the community-Moderator lane for a community-scoped
-  page** (the ADR 0029 announcement lane, carried over); **add-only** (ADR
-  0022); **display** = the ADR 0027 chip-swap, reused verbatim. No new
+  (ADR [0021](0021-translator-role-delegated-translation-editing.md)/0022) **plus the community-Moderator lane for a community-scoped
+  page** (the ADR [0029](0029-announcement-translations.md) announcement lane, carried over); **add-only** (ADR
+  0022); **display** = the ADR [0027](0027-post-reply-translation-display-and-swap.md) chip-swap, reused verbatim. No new
   display rule.
 - **The standing matrix** (enforced server-side in the `PageService`, the
   `AnnouncementService.CreateAsync` C3 pattern; the Web `[Authorize(Roles=…)]`
@@ -127,13 +127,13 @@ destructive step until green" discipline).
   ∪ (community Moderator); **Edit** body / audience / hierarchy — the `AuthorId`
   ∪ GlobalAdmin ∪ (a Moderator of its `ComponentId`); **Add a translation** —
   GlobalAdmin ∪ Translator ∪ (community Moderator); **Publish** a draft — the
-  `AuthorId` only (ADR 0037); **Move / rename / delete** — GlobalAdmin ∪ (a
+  `AuthorId` only (ADR [0037](0037-draft-mode-author-only.md)); **Move / rename / delete** — GlobalAdmin ∪ (a
   Moderator) — *not* a plain author (a page is platform content, not a personal
   note). **Every write lane** stores its `AccessAudit` row (C3),
   `TargetKind = "page"`, `Action` `page.create` / `page.update` /
   `page.translation.add` / `page.publish` / `page.delete` / `page.move`. See
   the handoff note for the full table.
-- **Delete is a soft-delete** (`IsDeleted = true`, the ADR 0024 shape),
+- **Delete is a soft-delete** (`IsDeleted = true`, the ADR [0024](0024-author-soft-delete-lane.md) shape),
   filtered in the read lanes — an accidental delete of a seeded page is
   recoverable and a page's children are not orphaned mid-tree. A hard delete
   is a future lane if needed.
@@ -153,7 +153,7 @@ destructive step until green" discipline).
   `Views/Languages/PreviewPage.cshtml`'s `bindRichEditor` + RC + ATT wiring.
   See the handoff note for the full surface.
 - **The data migration (absorb)** — (1) create the `Page` + `PageTranslation`
-  tables (ADR 0004 §B.1); (2) **seed the three default pages** (`about`,
+  tables (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1); (2) **seed the three default pages** (`about`,
   `terms`, `help`) as `Page` docs carrying the *current* `LocalizedPage` `en`
   bodies, `Audience = null`, `MountPoint` set, **idempotent**; (3) **keep
   `LocalizedPage` read-only + non-destructive for one release** (the old seam
@@ -169,7 +169,7 @@ destructive step until green" discipline).
 
 - **One page engine, one editor, one translation lane, one decision path** —
   the lane *unifies* instead of *duplicating* (the whole point of absorbing
-  `LocalizedPage`); the "single page engine" (ADR 0005 A) now covers a tree,
+  `LocalizedPage`); the "single page engine" (ADR [0005](0005-multilingual-support.md) A) now covers a tree,
   not three slugs.
 - **The audience machinery is reused end-to-end** — a page gets
   private/community/public visibility, the correct `AccessVia` audit tag, and

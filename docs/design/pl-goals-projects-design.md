@@ -19,7 +19,7 @@ updated: 2026-11-02
 
 > **Named lane.** `PL` (short id **`PL`** = *Projects Lane*) — the higher-level
 > **goals** and **projects** page on top of the M5 to-do / board surface.
-> **ADR 0086** is this lane's decision record — **authored in this unit (U00)**,
+> **ADR [0086](../adr/0086-goals-projects-lane.md)** is this lane's decision record — **authored in this unit (U00)**,
 > **Accepted 2026-09-25**; every decision D1–D12 below is **locked** (the
 > `[PROPOSED]` markers in the lane plan `plan-pl-goals-projects.md` were the
 > pre-lock shape). The sealed-unit register is
@@ -29,7 +29,7 @@ updated: 2026-11-02
 > section per unit, appended, never rewritten).
 >
 > **Status.** **Part 1 (U00) LOCKED; Part 2 (U00) LOCKED.** The decisions
-> D1–D12 are locked in **ADR 0086 (Accepted, 2026-09-25)**; **Part 2** (the
+> D1–D12 are locked in **ADR [0086](../adr/0086-goals-projects-lane.md) (Accepted, 2026-09-25)**; **Part 2** (the
 > exact C# shapes, the additive `IProjectService` seams, the request DTOs,
 > the `ProjectDocTypes` additive shape, the pinned test names, the three-test
 > acceptance gate, and the drift-guard) follows in the "Seams & contracts"
@@ -39,7 +39,7 @@ updated: 2026-11-02
 > **Roadmap confirm (U00):** `M7` ("Pagination and filtering") is the single
 > `StatusNext` on `Milestones.cs` (verified 2026-09-25); `PL` is a **named
 > lane, not a milestone** — `Milestones.cs` / `MilestonesTests.cs` are
-> **untouched** (the ADR 0013 / 0015 / 0084 / 0085 named-lane precedent). The
+> **untouched** (the ADR [0013](../adr/0013-group-posts-membership-lane.md) / 0015 / 0084 / 0085 named-lane precedent). The
 > README Roadmap gains one `PL` lane entry at close (U10).
 >
 > **Scope of this file:** what this lane is; the existing surface it reuses
@@ -52,7 +52,7 @@ updated: 2026-11-02
 
 ## 1. What this lane is
 
-M5 (ADR 0067) shipped the **work items** — assignable, hierarchical
+M5 (ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md)) shipped the **work items** — assignable, hierarchical
 **to-dos** and **Kanban boards** — and deliberately left out the *higher
 level* (the M5 design doc D2's "a per-project 'goals' rollup … M5 ships
 to-dos + boards, not a higher-level goal doc"): the **goals** a neighborhood
@@ -77,20 +77,20 @@ paths** — the to-do / board feeds keep their current routes, now one tab
 deeper. The M5 work-item surface (the `TodoItem` / `KanbanBoard` /
 `KanbanLane` / `BoardItemPlacement` documents, the read / write / placement
 lanes) is **untouched in behavior** — the `ProjectId` field is *additive* on
-the two existing documents (ADR 0004 §B.1 delta-detect; zero migration for
+the two existing documents (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 delta-detect; zero migration for
 existing rows), and the existing `IProjectService` seams gain one additive
 optional `projectId` filter parameter each on the two feed seams (the
 frozen-surface rule honoured by this ADR).
 
 **The one thing every unit must respect:** this lane is **additive and
-reusing.** It reuses the `Audience` doc (ADR 0001-B / 0036 — *reused*, not
+reusing.** It reuses the `Audience` doc (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036 — *reused*, not
 extended) on **both** `ProjectGoal` and `Project`, the frozen
 `IAuthorizationService.CanAsync(Read)` / `CanSeeAsync(Read)` decision path
-(ADR 0006) through **two new adapters** (`ProjectGoalToAuditableResource`,
+(ADR [0006](../adr/0006-module-boundary-contracts.md)) through **two new adapters** (`ProjectGoalToAuditableResource`,
 `ProjectToAuditableResource`), the standing matrix **creator ∪ GlobalAdmin**
-(the ADR 0070 board-edit precedent — there is *no* assignee collaborator on
-a goal or project), the `MarkdownRenderer` + `bindRichEditor` (ADR 0025 /
-0031) for the optional description, the `kw-dt` TagHelper (ADR 0019 / 0020)
+(the ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md) board-edit precedent — there is *no* assignee collaborator on
+a goal or project), the `MarkdownRenderer` + `bindRichEditor` (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) /
+0031) for the optional description, the `kw-dt` TagHelper (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020)
 for the dates, and the existing `AudienceEditorModel` / component-picker /
 language-picker composer trio (the M2/M3/M4/M5 pattern). **No new
 `AccessAction`**, **no new `AccessVia`**, **no new authorization branch** —
@@ -104,47 +104,47 @@ builds on without re-inventing:
 
 1. **`TodoItem` / `KanbanBoard` + `TodoItemToAuditableResource` /
    `KanbanBoardToAuditableResource` + `ProjectService`**
-   (`Kumunita.Core.Projects`, M5 / ADR 0067) — the **immediate template**:
+   (`Kumunita.Core.Projects`, M5 / ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md)) — the **immediate template**:
    the field-by-field provenance shape (§9.1 mirrors it), the two 6-member
    adapters (§9.2 mirrors them verbatim), the standing re-check helpers
-   (`CheckBoardStanding` creator ∪ GlobalAdmin — ADR 0070), the
+   (`CheckBoardStanding` creator ∪ GlobalAdmin — ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md)), the
    `AccessAudit` row shape (C3), and the `ProjectDocTypes` surface (§9.5
    extends it additively).
 2. **`Audience`** (`Kumunita.Core.Authorization`) — the exact post
-   `Audience` doc (ADR 0001-B / 0036; `null` = public, the frozen
+   `Audience` doc (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036; `null` = public, the frozen
    `Decide()` branch 5). Both new documents carry it verbatim; the
    `AudienceEditorModel` + `BuildAudience()` single-source form surface
    (M2, reused by every composer) is the goal / project composer's audience
    picker. **Reused, not extended.**
-3. **`IAuthorizationService`** (the frozen 4-method Read surface, ADR 0006)
+3. **`IAuthorizationService`** (the frozen 4-method Read surface, ADR [0006](../adr/0006-module-boundary-contracts.md))
    — `CanSeeAsync(Read)` for the feeds (one shared matching pass; the single
    aggregate `AccessAudit` row), `CanAsync(Read)` for the details (the
    404-vs-403 split). The two new adapters plug into it; **no signature
    change, no new `AccessAction`, no new `AccessVia`, no new `Decide()`
    branch** (C-PL·1).
-4. **`ProjectService.UpdateBoardAsync`** (ADR 0070) — the **creator ∪
+4. **`ProjectService.UpdateBoardAsync`** (ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md)) — the **creator ∪
    GlobalAdmin** standing precedent this lane reuses for goal / project
    write standing (there is *no* assignee collaborator on a goal or
    project), and the **full-update** shape (`Title` + `Description`, blank
    description → `null`, `Modified` stamped on a real change only).
-5. **`TodoItem.StartAt` / `TodoItem.DueAt`** (ADR 0079) — the **optional
+5. **`TodoItem.StartAt` / `TodoItem.DueAt`** (ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md)) — the **optional
    date** shape: two nullable `DateTimeOffset?` fields, stored UTC, rendered
    by the one `<kw-dt>` TagHelper in the viewer's effective timezone (ADR
    0019), bound from `type="datetime-local"` inputs; `null` = no date.
    `Project.StartAt` / `Project.DueAt` are exactly this, verbatim.
-6. **`TodoItem.IsDeleted` / `KanbanBoard.IsDeleted`** (ADR 0024) — the
+6. **`TodoItem.IsDeleted` / `KanbanBoard.IsDeleted`** (ADR [0024](../adr/0024-author-soft-delete-lane.md)) — the
    **soft-delete flag** (`bool`, `false` default) + the **dangling-
    association rule** (the referencing row is *kept*; the read lane's
    `!IsDeleted` filter is what hides it; the link is not rendered when the
    target is soft-deleted). `ProjectGoal.IsDeleted` / `Project.IsDeleted`
    are exactly this.
-7. **`MarkdownRenderer` + `bindRichEditor`** (RC / RE, ADR 0025 / 0031 /
+7. **`MarkdownRenderer` + `bindRichEditor`** (RC / RE, ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / 0031 /
    0033) — the one renderer on the read path, the one editor on the write
    path. The optional goal / project `Description` is rendered by the one
    `MarkdownRenderer` and edited by the one `bindRichEditor` — no new
    editor, no new TS editor module. (The card / feed descriptions are
    pre-rendered via `MarkdownRenderer`, **not** the WYSIWYG `rc-editor`.)
-8. **`kw-dt` TagHelper** (ADR 0019 / 0020) — the one timestamp renderer:
+8. **`kw-dt` TagHelper** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020) — the one timestamp renderer:
    per-request resolver (resident override → platform default → `UTC`
    floor) + format (resident override → platform default → Long floor).
    Every PL timestamp (`ProjectGoal.Created` / `Modified?`,
@@ -161,12 +161,12 @@ builds on without re-inventing:
     `_AdminNav` idiom). The **Projects** tab is additive (the first entry);
     the active-tab derivation extends to the new action names.
 11. **`KnownTranslationKeys.cs`** (`Kumunita.Core.Localization`) — the
-    `kw-l` registry (ADR 0015) with the four seeded languages (en/de/fr/da,
-    the ADR 0042 / 0045 set) + the ADR 0052 warm-boot baseline backfill that
+    `kw-l` registry (ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) with the four seeded languages (en/de/fr/da,
+    the ADR [0042](../adr/0042-bundled-initial-language-pack.md) / 0045 set) + the ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md) warm-boot baseline backfill that
     covers new keys' `de`/`fr`/`da` rows automatically. The `pl.*` keys
     (D11) are additive on it.
 12. **`ProjectDocTypes`** (`Kumunita.Core`) — the existing surface the two new
-    docs + the two `ProjectId` indexes register on (the ADR 0004 §B.1
+    docs + the two `ProjectId` indexes register on (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
     delta-detect shape; the unnamed-computed-index constraint noted there
     applies to the new `(ComponentId, Created)` indexes too).
 13. **`PostgresFixture`** (`tests/Kumunita.Core.Tests`, Testcontainers
@@ -175,22 +175,22 @@ builds on without re-inventing:
 
 ## 3. The design decisions (locked)
 
-Locked by **ADR 0086 (Accepted, 2026-09-25)**; the `[PROPOSED]` markers in
+Locked by **ADR [0086](../adr/0086-goals-projects-lane.md) (Accepted, 2026-09-25)**; the `[PROPOSED]` markers in
 the lane plan are retired by this lock.
 
 ### 3.1 Two new documents, one existing context (D1)
 `ProjectGoal` + `Project` (ns `Kumunita.Core.Projects`, the M5 context — a
 *new* context would be overkill for two docs that share the same standing /
-audience / renderer surface). Additive on **`ProjectDocTypes`** (ADR 0004 §B.1 —
+audience / renderer surface). Additive on **`ProjectDocTypes`** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 —
 the surface already delta-detects; zero new surface file, zero migration for
 existing docs). *(C-PL·8.)*
 
 ### 3.2 `ProjectGoal` shape (D2)
-`Id`; `Title` (non-empty); `Description?` (Markdown — the ADR 0025 shape,
+`Id`; `Title` (non-empty); `Description?` (Markdown — the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) shape,
 optional); `ComponentId?` (a feed filter, never a gate — C-M3·2); `AuthorId`
 (the standing owner — C-M5·6); `Audience?` (the **exact** post `Audience` —
-ADR 0001-B / 0036, `null` = public); `IsDeleted` (the ADR 0024 soft-delete
-flag, `false` default); `LanguageCode` (ADR 0018 authored-in tag);
+ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036, `null` = public); `IsDeleted` (the ADR [0024](../adr/0024-author-soft-delete-lane.md) soft-delete
+flag, `false` default); `LanguageCode` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) authored-in tag);
 `Created`; `Modified?`. **No** `IsDraft`, **no** dates (a goal is a
 direction, not a scheduled thing), **no** `ProjectId` (the association is
 *outward* — a project points at its goal, not the reverse).
@@ -201,15 +201,15 @@ optional goal — `null` = standalone project; the **sole** association
 mechanism, the `TodoItem.ParentId` shape in intent); `Status?` (a **string**
 — the state label; `null` = none; **not** an enum — the C-M5·4
 string-status pin carried over); `StartAt?` / `DueAt?` (both **nullable**
-`DateTimeOffset` — the ADR 0079 optional-date shape); `ComponentId?` (feed
+`DateTimeOffset` — the ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md) optional-date shape); `ComponentId?` (feed
 filter, never a gate); `AuthorId` (standing owner); `Audience?` (the exact
-post `Audience`); `IsDeleted` (ADR 0024 flag); `LanguageCode` (ADR 0018);
+post `Audience`); `IsDeleted` (ADR [0024](../adr/0024-author-soft-delete-lane.md) flag); `LanguageCode` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md));
 `Created`; `Modified?`. **No** `IsDraft`.
 
 ### 3.4 To-dos and boards gain one optional `ProjectId?` each (D4)
 A `ProjectId?` on **`TodoItem`** and **`KanbanBoard`** (a feed filter,
 never a gate — C-M3·2; the `ComponentId` shape, **not** a gate). The
-`ProjectId` is **additive** (ADR 0004 §B.1 — Marten delta-detects the new
+`ProjectId` is **additive** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — Marten delta-detects the new
 column; **zero migration for existing rows** — existing to-dos / boards
 simply have `ProjectId == null`). It is a **display + filter + standing
 context**, never an access boundary (a to-do's / board's `Read` decision
@@ -217,7 +217,7 @@ stays its **own** `Audience` — C-M5·3; `ProjectId` changes nothing about
 who may *see* the to-do / board).
 
 ### 3.5 Standing (D5)
-**Creator ∪ GlobalAdmin** over a goal / project (the ADR 0070 board-edit
+**Creator ∪ GlobalAdmin** over a goal / project (the ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md) board-edit
 precedent; **no** assignee branch — a goal / project is not assignable the
 way a to-do is). The standing is **re-checked server-side** in every write
 lane (C-M5·6); the Web `[Authorize]` is a convenience pre-gate only.
@@ -226,7 +226,7 @@ lane (C-M5·6); the Web `[Authorize]` is a convenience pre-gate only.
 Deleting a **goal** sets `ProjectGoal.IsDeleted = true`; the
 `Project.GoalId` rows are **kept** (the association dangles; the project
 detail view's goal link is not rendered when the goal is soft-deleted — the
-read lane's filter, the ADR 0024 shape). Deleting a **project** sets
+read lane's filter, the ADR [0024](../adr/0024-author-soft-delete-lane.md) shape). Deleting a **project** sets
 `Project.IsDeleted = true`; the `TodoItem.ProjectId` /
 `KanbanBoard.ProjectId` rows are **kept** (the same dangling-association
 rule; the to-do / board detail view's project link is not rendered when the
@@ -237,7 +237,7 @@ One **`SetTodoProjectAsync`** + one **`SetBoardProjectAsync`** — each
 re-checks standing **over its own to-do / board** server-side — the to-do
 lane uses the to-do's own standing matrix (creator ∪ assignee ∪ GlobalAdmin,
 the C-M5·6 shape, matching `AssignTodoAsync`), the board lane uses the
-board's own (creator ∪ GlobalAdmin, the ADR 0070 shape, matching
+board's own (creator ∪ GlobalAdmin, the ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md) shape, matching
 `UpdateBoardAsync`) — writes `ProjectId` (or clears it when `null`), stamps
 `Modified`, and stores one `AccessAudit` row (`TargetKind = "todo"` /
 `"board"`). A non-null `projectId` pointing at a soft-deleted or unreadable
@@ -284,14 +284,14 @@ nav-tab label). **× 4 languages** (the `KnownTranslationKeys.cs`
 precedent; the exact count is pinned in §9.6).
 
 ### 3.12 The ADR number (D12)
-**ADR 0086** (the next free number after ADR 0085 — `docs/adr/README.md`
+**ADR [0086](../adr/0086-goals-projects-lane.md)** (the next free number after ADR [0085](../adr/0085-notification-item-link-and-reply-highlight.md) — [`docs/adr/README.md`](../adr/README.md)
 confirms 0085 is the current highest, verified 2026-09-25).
 
 **Out of scope (→ follow-on lanes, own ADRs):** a per-project *progress
 rollup* (the to-do / board count is the display nicety — a follow-on lane),
 a **goal** rollup to a project's due date (a display nicety — a follow-on
 lane), drag-and-drop association (the explicit form POST is the M5 pin —
-ADR 0031's plain-GET/POST posture), a per-goal / per-project *member*
+ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)'s plain-GET/POST posture), a per-goal / per-project *member*
 surface (the standing matrix is creator ∪ GlobalAdmin; a collaborator lane
 is a follow-on ADR), and a **board-per-project** grouping view (the project
 detail page's associated-to-dos / boards list is the unit; a dedicated
@@ -304,9 +304,9 @@ board-view is a follow-on lane).
   in `Decide()` — `PL` adds **two adapters**
   (`ProjectGoalToAuditableResource`, `ProjectToAuditableResource`) over the
   frozen `IAuthorizationService.CanAsync(Read)` / `CanSeeAsync(Read)` path
-  (ADR 0006), not a branch (the C-M5·11 precedent).
+  (ADR [0006](../adr/0006-module-boundary-contracts.md)), not a branch (the C-M5·11 precedent).
 - **C-PL·2 — Standing is creator ∪ GlobalAdmin, re-checked server-side.**
-  Over a goal or a project (the ADR 0070 board-edit precedent; **no**
+  Over a goal or a project (the ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md) board-edit precedent; **no**
   assignee branch — a goal / project is not assignable the way a to-do is).
   The Web `[Authorize]` is a convenience pre-gate only (C-M5·6); the
   association lanes use each resource's **own** matrix — the to-do's
@@ -323,11 +323,11 @@ board-view is a follow-on lane).
   `Project.Status` is a self-labelled state).
 - **C-PL·5 — `Project.StartAt` / `Project.DueAt` are optional** (the ADR
   0079 optional-date shape; both nullable `DateTimeOffset`; `null` = no
-  date; stored UTC, rendered by the one `kw-dt` TagHelper, ADR 0019 / 0020;
+  date; stored UTC, rendered by the one `kw-dt` TagHelper, ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020;
   `type="datetime-local"` inputs bound model-side to nullable
   `DateTimeOffset?`; blank → `null`).
 - **C-PL·6 — The delete cascade is soft + non-destructive.** A goal's /
-  project's soft-delete (the ADR 0024 `IsDeleted` flag) **never deletes**
+  project's soft-delete (the ADR [0024](../adr/0024-author-soft-delete-lane.md) `IsDeleted` flag) **never deletes**
   the projects / to-dos / boards associated with it — the association field
   simply **dangles** and the read lane's `!IsDeleted` filter is what hides
   the target (the D6 rule; **no** hard delete anywhere).
@@ -340,8 +340,8 @@ board-view is a follow-on lane).
   existing `Projects` context (D1); the `ProjectDocTypes` surface and the
   `IProjectService` seam grow **additively** (new docs registered, new
   optional feed-filter param, new lanes) — every existing M5 call site
-  compiles and behaves **unchanged** (the ADR 0004 §B.1 + frozen-surface
-  rule, the ADR 0070 / 0073 / 0074 / 0079 precedent); **zero migration for
+  compiles and behaves **unchanged** (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 + frozen-surface
+  rule, the ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md) / 0073 / 0074 / 0079 precedent); **zero migration for
   existing rows**.
 
 ## 5. FACES (pinned, 10)
@@ -451,8 +451,8 @@ dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
 
 - **The `ProjectId` field on two existing documents** (C-PL·8) is the one
   additive-on-existing-doc risk in the lane: Marten delta-detects the new
-  column at boot (ADR 0004 §B.1 — the M5 `StartAt` / `DueAt` additive
-  precedent, ADR 0079), so there is no migration and no data change; the
+  column at boot (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — the M5 `StartAt` / `DueAt` additive
+  precedent, ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md)), so there is no migration and no data change; the
   guard is that **no existing lane reads `ProjectId` as a gate** (C-PL·3) —
   the `ProjectServiceTests` feed pins (the `ProjectId` filter) prove the
   filter behavior, and the existing M5 pins prove nothing regressed.
@@ -478,7 +478,7 @@ dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
 
 # Seams & contracts (Part 2, written by U00)
 
-> **Part 2 status.** **Locked** — ADR 0086 (Accepted, 2026-09-25) is the
+> **Part 2 status.** **Locked** — ADR [0086](../adr/0086-goals-projects-lane.md) (Accepted, 2026-09-25) is the
 > decisions source; this section is the **frozen reference tier** U01–U09
 > code against. The two POCOs + two adapters (§9.1 / §9.2), the additive
 > `IProjectService` seams (§9.3), the request DTOs (§9.4), the `ProjectDocTypes`
@@ -588,8 +588,8 @@ public sealed class ProjectToAuditableResource : IAuditableResource
 
 ## 9.3 The additive `IProjectService` seams (exact C#, verbatim)
 
-Additive on the frozen M5 surface (ADR 0067 §2.3; the frozen-surface rule
-honoured by ADR 0086 — this is the "new ADR" the rule names). Every existing
+Additive on the frozen M5 surface (ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md) §2.3; the frozen-surface rule
+honoured by ADR [0086](../adr/0086-goals-projects-lane.md) — this is the "new ADR" the rule names). Every existing
 M5 seam keeps its **exact** signature **except** the two feed seams, which
 gain one additive optional parameter each (noted below).
 
@@ -827,7 +827,7 @@ opts.Schema.For<KanbanBoard>().Index(b => b.ProjectId);
 project may be associated with many to-dos / boards; a project has **at
 most one** goal — the `GoalId` is a **single** field, not a list — so no
 business-key unique index is needed on any of the three). **Zero migration
-for existing rows** (ADR 0004 §B.1 delta-detect; the C-PL·8 additive pin).
+for existing rows** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 delta-detect; the C-PL·8 additive pin).
 
 ## 9.6 The pinned test names (the ~20 shape)
 
@@ -900,7 +900,7 @@ The three-test gate, **verbatim** from the lane plan
    `ListProjectsAsync` / `GetProjectAsync` / `CreateProjectAsync` /
    `UpdateProjectAsync` / `SetTodoProjectAsync` / `SetBoardProjectAsync`
    seams) is **frozen** — the Web controller (U05–U09) codes against it,
-   never re-derives access (the ADR 0006-D pin); the standing matrix
+   never re-derives access (the ADR [0006](../adr/0006-module-boundary-contracts.md)-D pin); the standing matrix
    (creator ∪ GlobalAdmin) is **re-checked server-side** in every write
    lane (C-M5·6); the `AccessAudit` rows (`TargetKind = "goal"` /
    `"project"`) are stored in the caller's session (C3).
@@ -930,7 +930,7 @@ The following are **frozen pins**; any mismatch with the implementation is a
 - **No new `AccessAction`**, **no new `AccessVia`**, **no new authorization
   branch** — `PL` adds two *adapters* (`ProjectGoalToAuditableResource`,
   `ProjectToAuditableResource`), not a *branch* (the C-M5·11 precedent).
-- **The standing matrix is creator ∪ GlobalAdmin** (the ADR 0070 board-edit
+- **The standing matrix is creator ∪ GlobalAdmin** (the ADR [0070](../adr/0070-board-edit-lane-and-board-polish.md) board-edit
   precedent; **no** assignee branch — a goal / project is not assignable the
   way a to-do is).
 - **The `ProjectId` on `TodoItem` / `KanbanBoard` is a feed filter, never a
@@ -939,7 +939,7 @@ The following are **frozen pins**; any mismatch with the implementation is a
 - **The `Status` on `Project` is a string, not an enum** (the C-M5·4
   string-status pin carried over; the lane's vocabulary is whatever the
   project author names).
-- **The `StartAt` / `DueAt` on `Project` are optional** (the ADR 0079
+- **The `StartAt` / `DueAt` on `Project` are optional** (the ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md)
   optional-date shape; `null` = no date).
 - **The delete cascade is soft + non-destructive** (D6; the dangling-
   association rule; **no** hard delete anywhere).
@@ -948,7 +948,7 @@ The following are **frozen pins**; any mismatch with the implementation is a
   change).
 - **`M7` stays `StatusNext` on the roadmap** (the `Milestones.cs` /
   `MilestonesTests.cs` are **untouched** — a named lane, not a milestone,
-  the ADR 0013 / 0015 precedent).
+  the ADR [0013](../adr/0013-group-posts-membership-lane.md) / 0015 precedent).
 
 Plus this file's own frozen shapes: **the two POCOs** (§9.1) — the exact
 field sets; a re-shape (renaming a field, adding a gate field, a `ProjectId`
@@ -969,5 +969,5 @@ master list; a rename / renumber is a break. **The three-test gate** (§9.7)
 invariants C-PL·1–8, and the 10 FACES F1–F10. **No code, no build, no
 tests.** Part 2 (U00) — the exact C# shapes, the additive `IProjectService`
 seams, the request DTOs, the `ProjectDocTypes` additive shape, the pinned test
-names, the three-test gate, and the drift-guard, locked by **ADR 0086
+names, the three-test gate, and the drift-guard, locked by **ADR [0086](../adr/0086-goals-projects-lane.md)
 (Accepted, 2026-09-25)**.*

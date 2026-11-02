@@ -94,7 +94,7 @@ can name what it trades away before it's built.
 |---|--------------------------------------------|-------|--------------------------------|
 | − | `everyday-life.md`                         | 10 min| the same idea in plain language — start here if jargon isn't your language |
 | 0 | `START-HERE.md` (this page)                | 5 min | the one argument               |
-| 1 | `README.md`                                | 5 min | the six principles, in full    |
+| 1 | [`README.md`](../../README.md)                                | 5 min | the six principles, in full    |
 | 2 | `the-platform-as-integrator.md`            | 10 min| why the platform exists        |
 | 3 | `in-code.md`                               | 10 min| how we build code              |
 | 4 | `in-product.md`                            | 5 min | how we run the platform & community |

@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0221 — Non-text contrast pass (WCAG 1.4.11)
+# ADR [0221](0221-non-text-contrast.md) — Non-text contrast pass (WCAG 1.4.11)
 
 Status: Accepted
 

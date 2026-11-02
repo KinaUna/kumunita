@@ -13,8 +13,8 @@ updated: 2026-11-02
 
 ## Context
 
-The GU lane (ADR 0028) shipped the account-level supervision surface for a
-child's account, and ADR 0028 §B already records that **"a child may have
+The GU lane (ADR [0028](0028-guardian-controls-account-scope-supervision.md)) shipped the account-level supervision surface for a
+child's account, and ADR [0028](0028-guardian-controls-account-scope-supervision.md) §B already records that **"a child may have
 one or two guardians (each an active row)"** — the `GuardianLink` document
 and the `CreateGuardianLinkAsync` seam both already support multiple active
 rows for the same `ChildId`. The gap: today the **only** path to
@@ -30,7 +30,7 @@ This ADR is the **deliberate supersession** of that non-decision for the
 *existing active guardian* case: the standing basis for the second
 guardian is not "created" but **"assigned-by-an-existing-guardian."** The
 arrow moved from supervision to co-supervision; the standing conferred is
-the same standing. `docs/design/guardian-assignment-design.md` freezes the
+the same standing. [`docs/design/guardian-assignment-design.md`](../design/guardian-assignment-design.md) freezes the
 invariants **G-A·1–G-A·6**, the FACES, the pinned contract, and the seam
 tests this ADR points at.
 
@@ -42,7 +42,7 @@ The **assigning** guardian's active `GuardianLink` over the child is the
 standing basis (G-A·1 — the GU lane's G·2 "standing is from the active
 link, checked live" precedent, inherited). The `ActiveLinkAsync` helper the
 `Dissolve` route already uses gates the assign POST; a non-guardian → 404
-(the ADR 0012/0013 "a non-guardian learns nothing" shape). No new
+(the ADR [0012](0012-community-membership-mandatory-and-moderator.md)/0013 "a non-guardian learns nothing" shape). No new
 `AccessVia` value; the `AccessVia.Guardian` value (the GU lane's 9th value)
 is **reused** as the audit `Via` for the `guardian.create` row the assign
 lane emits.
@@ -87,12 +87,12 @@ child"** (the assigned guardian) and targets **what** (the link row over
 the child); the **assigning** guardian's identity is **not persisted** on
 the row — a legibility limitation accepted because G-A·3 forbids a new
 seam (a seam that threaded the conferrer in would be a GU-surface change).
-This is the GU lane's existing audit shape (ADR 0028 §E), unchanged.
+This is the GU lane's existing audit shape (ADR [0028](0028-guardian-controls-account-scope-supervision.md) §E), unchanged.
 
 ### E. The non-decisions (the "for now")
 
 - **No remove path** — a co-guardian dissolving *another* co-guardian's
-  link, or the child dissolving a co-guardian's link. The ADR 0028 G·5
+  link, or the child dissolving a co-guardian's link. The ADR [0028](0028-guardian-controls-account-scope-supervision.md) G·5
   safety valve (a GlobalAdmin dissolving any active link, audited `Via:
   Admin`) remains the only "dissolve any active link" path.
 - **No acceptance/consent step** on the assigned guardian — the standing
@@ -106,13 +106,13 @@ This is the GU lane's existing audit shape (ADR 0028 §E), unchanged.
   / M1's verification lane is unchanged; the assigned guardian simply has
   standing on their next read.
 
-Each is *deferred*, not *denied* — each re-litigates as an ADR 0038
+Each is *deferred*, not *denied* — each re-litigates as an ADR [0038](0038-guardian-assignment.md)
 amendment when it earns its keep.
 
 ## Consequences
 
 - **The family case gains a *co-supervision* lane, not just a private-group
-  one** — the ADR 0028 "the family case gains a supervision lane" precedent,
+  one** — the ADR [0028](0028-guardian-controls-account-scope-supervision.md) "the family case gains a supervision lane" precedent,
   extended: a second adult can be brought into standing over an existing
   child's account without a GlobalAdmin in the loop and without creating a
   new account.
@@ -122,21 +122,21 @@ amendment when it earns its keep.
   the creator's (the five GU actions, no content read); the `GuardianLink`
   POCO, the GU seams, and the GU enforcement path are all byte-identical. A
   family that later wants a *remove* lane or an *acceptance* step is told
-  that is an ADR 0038 amendment, not a toggle.
+  that is an ADR [0038](0038-guardian-assignment.md) amendment, not a toggle.
 
 - **The `Authority` chain gains a co-supervision standing row:** the
   `guardian.create` audit row records the **assigned** guardian as the
   standing-holder over the child's account (the GU seam's shape, §D), so
   "who now holds standing over this child" is legible and traceable (the
-  ADR 0028 family legibility row, extended one step). **Named
+  ADR [0028](0028-guardian-controls-account-scope-supervision.md) family legibility row, extended one step). **Named
   limitation:** the row does **not** persist the *assigning* guardian —
   "who conferred the standing" is not on the row (the assigning
   guardian's id is the actor of the web `POST`, recoverable only from the
   web layer's own request log, if any). If a future family wants the
-  conferring guardian on the row, that is an ADR 0038 amendment (a
+  conferring guardian on the row, that is an ADR [0038](0038-guardian-assignment.md) amendment (a
   deliberate GU-surface change), not a toggle.
 
-- **The roadmap trio moves together** (AGENTS.md contract): `README.md`
+- **The roadmap trio moves together** (AGENTS.md contract): [`README.md`](../../README.md)
   Features + Roadmap and `Milestones.cs` gain the `GA` named lane (pulled
   forward ahead of **M4**, the `GU` precedent); `MilestonesTests.cs`
   updates in the same commit. M4/M5/M6 stay Events / Projects /
@@ -144,7 +144,7 @@ amendment when it earns its keep.
 
 - **Backward-compat:** fully additive. The `GuardianLink` POCO is
   byte-identical; the GU seams are byte-identical; the new
-  `IIdentityService` member is an ADD (ADR 0006-E compatible); the new
+  `IIdentityService` member is an ADD (ADR [0006](0006-module-boundary-contracts.md)-E compatible); the new
   `GuardianController` action is an ADD; the new view model and record are
   new; the `Detail.cshtml` appends are additive; no stored row's meaning
   changes. Re-deploying an older image over a forward-migrated database is

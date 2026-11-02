@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0181 — Calendar tab restyle
+# ADR [0181](0181-calendar.md) — Calendar tab restyle
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0063/0064/0081 (calendar), ADR 0173/0175 (UI refresh), ADR 0179/0180 (events)
+Relates to: ADR [0063](0063-events-calendar-view.md)/0064/0081 (calendar), ADR [0173](0173-report-targets-lane.md)/0175 (UI refresh), ADR [0179](0179-event-card.md)/0180 (events)
 
 ## Decisions
 

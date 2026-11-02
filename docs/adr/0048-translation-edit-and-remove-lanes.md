@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0048 — Edit + remove lanes for user-added translations
+# ADR [0048](0048-translation-edit-and-remove-lanes.md) — Edit + remove lanes for user-added translations
 
 Status: Accepted
 Date: 2026-09-19
@@ -20,13 +20,13 @@ Date: 2026-09-19
 
 Every user-added translation lane on the platform shipped **add-only**:
 
-- **Posts + replies** — ADR 0022 ("no separate 'edit' or 'delete' seam,
-  matching ADR 0022's add-only shape"), re-confirmed for the group lane by
-  ADR 0027 (the display/swap surface reads the rows but adds no write lane).
-- **Announcements** — ADR 0029 (add lane; no update/remove seam).
-- **Group + community name/description** — ADR 0026 ("**Add-only lane,
+- **Posts + replies** — ADR [0022](0022-user-added-post-reply-translations.md) ("no separate 'edit' or 'delete' seam,
+  matching ADR [0022](0022-user-added-post-reply-translations.md)'s add-only shape"), re-confirmed for the group lane by
+  ADR [0027](0027-post-reply-translation-display-and-swap.md) (the display/swap surface reads the rows but adds no write lane).
+- **Announcements** — ADR [0029](0029-announcement-translations.md) (add lane; no update/remove seam).
+- **Group + community name/description** — ADR [0026](0026-group-community-name-description-translations.md) ("**Add-only lane,
   at-least-one field.** There is no edit or remove of a translation row").
-- **Pages** — ADR 0039 / 0047 (the backfill is create-if-missing; no
+- **Pages** — ADR [0039](0039-pages-hierarchy-audience-translations.md) / 0047 (the backfill is create-if-missing; no
   edit/remove of a user-added row).
 
 The consequence is visible to residents and to the small set of actors who
@@ -81,14 +81,14 @@ All follow the platform's C3 invariant: writes go through the **caller's**
 Each new seam calls the **same** standing resolver the add lane already uses
 for its parent. No new standing, no new role, no new `AccessVia` value:
 
-- **Post / reply** — the ADR 0022 matrix (author ∪ GlobalAdmin ∪ Translator;
-  the group-lane author lane per ADR 0027's parent-post standing).
-- **Announcement** — the ADR 0029 matrix (author ∪ GlobalAdmin ∪ Translator).
-- **Group** — the ADR 0026 matrix (owner ∪ GlobalAdmin ∪ Translator; a
+- **Post / reply** — the ADR [0022](0022-user-added-post-reply-translations.md) matrix (author ∪ GlobalAdmin ∪ Translator;
+  the group-lane author lane per ADR [0027](0027-post-reply-translation-display-and-swap.md)'s parent-post standing).
+- **Announcement** — the ADR [0029](0029-announcement-translations.md) matrix (author ∪ GlobalAdmin ∪ Translator).
+- **Group** — the ADR [0026](0026-group-community-name-description-translations.md) matrix (owner ∪ GlobalAdmin ∪ Translator; a
   member is *not* a standing, unchanged).
-- **Community** — the ADR 0026 matrix (GlobalAdmin ∪ Translator; a community
+- **Community** — the ADR [0026](0026-group-community-name-description-translations.md) matrix (GlobalAdmin ∪ Translator; a community
   has no owner, unchanged).
-- **Page** — the ADR 0039 / 0042 matrix (the page's author standing ∪
+- **Page** — the ADR [0039](0039-pages-hierarchy-audience-translations.md) / 0042 matrix (the page's author standing ∪
   GlobalAdmin ∪ Translator, via `PageService.ResolveTranslationStandingVia`).
 
 A denied standing throws `UnauthorizedAccessException`; a missing parent or
@@ -101,9 +101,9 @@ at-least-one-field rule as the add lane on the name/description surfaces).
 - **Post / page / announcement rows** — `Title` (nullable) and/or `Body`.
   The add lane's non-blank rule is preserved on update: a row must end with
   at least one non-blank field.
-- **Reply rows** — `Body` only (replies have no title, ADR 0022).
+- **Reply rows** — `Body` only (replies have no title, ADR [0022](0022-user-added-post-reply-translations.md)).
 - **Group / community rows** — `Name` and/or `Description`; at least one
-  non-blank, else `ArgumentException` (ADR 0026's at-least-one rule, held).
+  non-blank, else `ArgumentException` (ADR [0026](0026-group-community-name-description-translations.md)'s at-least-one rule, held).
 
 Identity fields are immutable on the edit lane in every case:
 `AuthorId` (a correction is not a re-attribution — the row keeps the author
@@ -147,14 +147,14 @@ minted from the signed-in principal, never a form field; the session from
   `NotFound`**.
 - **Groups** (group name/description on `/groups/{id}/translations/…`; the
   group post + reply translation routes on the group-post detail) — the
-  group-lane failure shape (ADR 0026's add-lane pin, held): **404
+  group-lane failure shape (ADR [0026](0026-group-community-name-description-translations.md)'s add-lane pin, held): **404
   fail-closed** for both a non-visible group *and* a denied standing; the
   surface advertises no 403.
 - **Community** (`/community/translations/update` + `/…/remove`) —
-  denied → **403 `Forbid`**; missing row → **404 `NotFound`**. *(ADR 0053 —
+  denied → **403 `Forbid`**; missing row → **404 `NotFound`**. *(ADR [0053](0053-community-translation-surface-own-page.md) —
   the community surface's add/update/remove routes now live exactly here on
   the `/community/translations/{id}` resource, matching this D5 shape; the
-  read page is `Community/Translations`, off the ADR 0026 manage page.)*
+  read page is `Community/Translations`, off the ADR [0026](0026-group-community-name-description-translations.md) manage page.)*
 - **Announcement** (`/announcements/{id}/translations/update` + `/…/remove`)
   — denied → **403 `Forbid`**; missing announcement/row → **404
   `NotFound`**.
@@ -164,7 +164,7 @@ minted from the signed-in principal, never a form field; the session from
 The view affordances (edit + remove forms in the translation
 `<details>` blocks) live on the six surfaces' existing show views
 (`Posts/Detail`, `Groups/PostDetail`, `Groups/Detail`, `Community/Manage`,
-`Announcement/Detail`, `Page/Show`); *(ADR 0053 — the community one is now
+`Announcement/Detail`, `Page/Show`); *(ADR [0053](0053-community-translation-surface-own-page.md) — the community one is now
 `Community/Translations`.)* The two UI labels per surface
 (`…_translation_edit` / `…_translation_remove` key families) are registered
 in `KnownTranslationKeys` for all four enabled languages.
@@ -187,7 +187,7 @@ standing, audit action, or failure shape changes.
   lane, so there is no new surface for a resident to learn and no new
   decision for the audit log to disambiguate.
 - **Neutral:** the translation documents are unchanged (no new field, no
-  new document, no migration — ADR 0004 §B untouched); the `AccessAction`
+  new document, no migration — ADR [0004](0004-data-persistence-and-schema-evolution.md) §B untouched); the `AccessAction`
   enum gains twelve values (two per surface); the six surfaces' show views
   each gain one pair of small forms.
 - **Web test coverage note:** the post/reply translation edit/remove Web

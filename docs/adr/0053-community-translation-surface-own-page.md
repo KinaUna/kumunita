@@ -11,24 +11,24 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0053 — Community translation surface on its own page
+# ADR [0053](0053-community-translation-surface-own-page.md) — Community translation surface on its own page
 
 Status: Accepted
 Date: 2026-09-21
 
 ## Context
 
-ADR 0026 settled the community name/description translation **lane** — the
+ADR [0026](0026-group-community-name-description-translations.md) settled the community name/description translation **lane** — the
 `CommunityTranslation` document, the standing matrix (GlobalAdmin ∪ Translator,
 no owner), the add seam, the audit row, and the **read/write render** — and
-ADR 0048 lifted its add-only pin (the `Update…` / `Remove…` lanes on that same
+ADR [0048](0048-translation-edit-and-remove-lanes.md) lifted its add-only pin (the `Update…` / `Remove…` lanes on that same
 row). Neither ADR settled *where* the community's translation surface lives:
-ADR 0026 §D (the "Web surface" bullet) describes it as rendered **on the
-community manage page** (`/community/manage/{id}`), and ADR 0048 D5's view
+ADR [0026](0026-group-community-name-description-translations.md) §D (the "Web surface" bullet) describes it as rendered **on the
+community manage page** (`/community/manage/{id}`), and ADR [0048](0048-translation-edit-and-remove-lanes.md) D5's view
 affordance note likewise names `Community/Manage` as the place the edit +
 remove forms live.
 
-In practice the community manage page (`Community/Manage`) is the ADR 0012
+In practice the community manage page (`Community/Manage`) is the ADR [0012](0012-community-membership-mandatory-and-moderator.md)
 **membership** surface: the mandatory toggle, the member list with per-row
 remove, and the add-picker. The translation block was bolted on to the bottom
 of that page, so a resident managing membership is also shown the community
@@ -39,10 +39,10 @@ Two concrete problems follow:
 
 - **Cognitive:** the membership page and the translation page are different
   concerns sharing one URL and one view model. A moderator (who manages
-  members but has *no* translation standing, ADR 0026 §D) still lands on a
+  members but has *no* translation standing, ADR [0026](0026-group-community-name-description-translations.md) §D) still lands on a
   page that renders translation rows for them to view — the page is no longer
   *about* membership.
-- **Routing:** the community write lanes had drifted from ADR 0048 D5's
+- **Routing:** the community write lanes had drifted from ADR [0048](0048-translation-edit-and-remove-lanes.md) D5's
   documented community shape. D5 spells the community routes as
   `/community/translations/update` + `/community/translations/remove` (i.e. a
   top-level `/community/translations` resource), but the shipped code
@@ -69,8 +69,8 @@ translation block on the manage page used to carry:
 - the **available translations** as an expandable chip per language
   (name + description), the read half;
 - for each **supported language lacking a row**, an "Add a `<language>`
-  translation" form (ADR 0026's at-least-one rule), the write half;
-- the **edit** and **remove** forms inside each row's `<details>` (ADR 0048);
+  translation" form (ADR [0026](0026-group-community-name-description-translations.md)'s at-least-one rule), the write half;
+- the **edit** and **remove** forms inside each row's `<details>` (ADR [0048](0048-translation-edit-and-remove-lanes.md));
 - a "← Back to the feed" link and a view-only note for standing-adjacent
   viewers (a manage-standing viewer without translation standing).
 
@@ -78,7 +78,7 @@ The manage page (`Manage.cshtml` + `ManageCommunityViewModel`) drops the
 translation block and its helpers (`langNames` / `missingLanguages` /
 `LangName`) and the three view-model properties
 (`CommunityTranslations` / `Languages` / `CanTranslate`) — the page is the
-ADR 0012 membership surface again.
+ADR [0012](0012-community-membership-mandatory-and-moderator.md) membership surface again.
 
 ### D2 — Reaches the same people as the manage page did; admits a wider set to *view*
 
@@ -93,7 +93,7 @@ exposed: the **manage standing** (GlobalAdmin ∪ component-moderator, the
   forms are not offered; the standing gate in `UserInfoService` is the real
   wall, unchanged) — identical to the manage page's behaviour for a
   moderator;
-- **everyone else** → **404 `NotFound`** (fail-closed, the ADR 0008 "U10"
+- **everyone else** → **404 `NotFound`** (fail-closed, the ADR [0008](0008-member-self-leave-lane.md) "U10"
   shape) — identical to the manage page for an outsider.
 
 So a resident who could see translations on the manage page can still see
@@ -101,7 +101,7 @@ them (now on their own page), and no one who could not sees them now. The
 standing matrix, the `AccessVia` tag, and the failure shapes are all
 **unchanged**.
 
-### D3 — Routes align to ADR 0048 D5's documented community shape
+### D3 — Routes align to ADR [0048](0048-translation-edit-and-remove-lanes.md) D5's documented community shape
 
 The community write lanes move to the top-level resource D5 already
 described, all still thin over the same Core seams
@@ -150,7 +150,7 @@ existing `CommunityControllerTranslationTests` and
 
 - **Positive:** the membership page is about membership again; the translation
   surface has a URL and a page of its own with a discoverable link; the
-  community write routes now match ADR 0048 D5's documented shape instead of
+  community write routes now match ADR [0048](0048-translation-edit-and-remove-lanes.md) D5's documented shape instead of
   diverging from it.
 - **Neutral:** no change to the standing matrix, the `CommunityTranslation`
   document, the audit vocabulary, the `AccessAction` values, the failure

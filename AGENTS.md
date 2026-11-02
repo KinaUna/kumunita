@@ -12,21 +12,21 @@ no multi-tenant data model.
 
 ## Start here
 
-- `README.md` — what the platform is, current status, principles, tech stack,
+- [`README.md`](README.md) — what the platform is, current status, principles, tech stack,
   and the Running instructions.
-- `docs/ARCHITECTURE.md` — the detailed map: stack, data model, the bounded
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the detailed map: stack, data model, the bounded
   contexts, the module-boundary contracts, the CQRS-lite & Wolverine
   convention.
-- `docs/adr/` — decision records. **ADR 0004** (persistence & schema
-  evolution) and **ADR 0006** (module boundary contracts) constrain how data
+- `docs/adr/` — decision records. **ADR [0004](docs/adr/0004-data-persistence-and-schema-evolution.md)** (persistence & schema
+  evolution) and **ADR [0006](docs/adr/0006-module-boundary-contracts.md)** (module boundary contracts) constrain how data
   is stored and how contexts talk — read them before touching persistence,
   schema, or cross-context calls.
 - `docs/design/` — the per-milestone design docs; the M1–M3 scope is the
   shipped surface.
-- `docs/SECURITY.md` — the privacy model, threat model, and access-control
+- [`docs/SECURITY.md`](docs/SECURITY.md) — the privacy model, threat model, and access-control
   rules. This repo is privacy-first; the author's audience choice is the
   authoritative constraint.
-- `docs/DOCS-CONVENTIONS.md` — the shared doc rules (front-matter, abstract,
+- [`docs/DOCS-CONVENTIONS.md`](docs/DOCS-CONVENTIONS.md) — the shared doc rules (front-matter, abstract,
   ADR cap, linking) — read before your first doc change.
 - `docs/dev/` — the working doctrine: [razor-verification](docs/dev/razor-verification.md),
   [testing-and-ci](docs/dev/testing-and-ci.md), [live-server-debugging](docs/dev/live-server-debugging.md), [agent-environment-quirks](docs/dev/agent-environment-quirks.md).
@@ -40,9 +40,9 @@ no multi-tenant data model.
   `CoreDocTypes`) is a feature module, not a top-level bounded context.
 - **`Kumunita.Web`** — Razor Pages / MVC (server-rendered), `Program.cs`
   bootstrap, `Milestones.cs` (home-page roadmap — the canonical list; keep in
-  sync with `docs/product/roadmap.md` + `docs/STATUS.md`), `Models/` +
+  sync with [`docs/product/roadmap.md`](docs/product/roadmap.md) + [`docs/STATUS.md`](docs/STATUS.md)), `Models/` +
   `Security/` (view-models and claim shaping, both server-rendered).
-- **Persistence** (ADR 0004 §B): **Marten** owns the domain documents and
+- **Persistence** (ADR [0004](docs/adr/0004-data-persistence-and-schema-evolution.md) §B): **Marten** owns the domain documents and
   versioned schema (the `CoreDocTypes` / `PostDocTypes` registration
   surfaces). **EF Core is used only for ASP.NET Identity tables** — do not
   put domain data in EF.
@@ -65,7 +65,7 @@ sourcing, a single durable email handler rather than a saga) — follow them.
   resolved by the `Authorization` service per request, not in an identity claim.
 - Keep `Milestones.cs` and the roadmap docs together — `Milestones.cs` is the
   **canonical list** (it renders the home page and its doc-comment names this
-  as the contract); `docs/product/roadmap.md` + `docs/STATUS.md` point at it
+  as the contract); [`docs/product/roadmap.md`](docs/product/roadmap.md) + [`docs/STATUS.md`](docs/STATUS.md) point at it
   rather than restating it.
 
 ## Don't pause mid-task to check in
@@ -93,22 +93,22 @@ when you change behavior:
 
 - The **roadmap** and `src/Kumunita.Web/Milestones.cs` — `Milestones.cs` is the
   **source of truth** (the home page renders it; `MilestonesTests.cs` pins the
-  exact order + shipped statuses). `docs/product/roadmap.md` (the roadmap's doc
-  home, re-pointed by `IMPROVE-DOCS` `D07`) and `docs/STATUS.md` (the detailed
+  exact order + shipped statuses). [`docs/product/roadmap.md`](docs/product/roadmap.md) (the roadmap's doc
+  home, re-pointed by `IMPROVE-DOCS` `D07`) and [`docs/STATUS.md`](docs/STATUS.md) (the detailed
   narrative) name `Milestones.cs` as the source of truth and link — they do
   **not** restate the list. Bump a milestone to "done" in `Milestones.cs` when
   it ships and the docs follow. Keep in step with a roadmap reorder.
-- **`src/Kumunita.Web/WhatsNew.cs`** (the "What's new" registry, ADR 0110,
+- **`src/Kumunita.Web/WhatsNew.cs`** (the "What's new" registry, ADR [0110](docs/adr/0110-platform-versioning-and-whats-new.md),
   pinned by `tests/Kumunita.Web.Tests/WhatsNewTests.cs`) — the platform's
   version history. When a milestone **or a named lane ships**, add its version
   (newest-first; or extend the newest row) — a **required sixth member** of
   the close flip above. "Shipped" = the close unit ran, not "in progress."
 - When a **new capability lands out of the M-letter order**, it gets a *named
   lane* with a short ID — **not** a renumber. Precedent: media/avatars
-  (ADR 0011), **group posts** (`GP`, ADR 0013), **multilingual**
-  (`ML`, ADR 0005). M4/M5/M6 are untouched.
-- The **bounded-context / persistence layout** in `docs/ARCHITECTURE.md` and
-  ADR 0004/0006 — if you add a new context, doc-type surface, or change how
+  (ADR [0011](docs/adr/0011-media-and-file-storage.md)), **group posts** (`GP`, ADR [0013](docs/adr/0013-group-posts-membership-lane.md)), **multilingual**
+  (`ML`, ADR [0005](docs/adr/0005-multilingual-support.md)). M4/M5/M6 are untouched.
+- The **bounded-context / persistence layout** in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
+  ADR [0004](docs/adr/0004-data-persistence-and-schema-evolution.md)/0006 — if you add a new context, doc-type surface, or change how
   contexts register in `DependencyInjection.cs`, reflect it in the relevant
   ADR rather than leaving the design doc stale.
 - A **new capability that settles a design question** gets an ADR under

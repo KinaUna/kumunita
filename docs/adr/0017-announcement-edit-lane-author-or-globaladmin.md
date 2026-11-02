@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0017 — Announcement edit lane: author-of-record ∪ GlobalAdmin (flat lane)
+# ADR [0017](0017-announcement-edit-lane-author-or-globaladmin.md) — Announcement edit lane: author-of-record ∪ GlobalAdmin (flat lane)
 
 Status: Accepted
 Date: 2026-09-13
@@ -47,7 +47,7 @@ broadening who may *re-write* it.
 The targeted lane is different and was already correct: its edit standing is
 that community's moderator, which is meaningful (the moderator governs that
 community's channel) and is exactly who should be able to correct a message
-addressed to it. The ADR 0014/0016 "author-only, no moderator/admin branch"
+addressed to it. The ADR [0014](0014-post-edit-lane-author-only.md)/0016 "author-only, no moderator/admin branch"
 convention is the *post* lane's rule; the announcement lane is deliberately
 **not** author-only — it is author **∪** GlobalAdmin — because an admin
 legitimately curates platform announcements even when another admin or a
@@ -74,7 +74,7 @@ moderator originated them.
 - **`AuthorId` is immutable on the edit lane.** `UpdateAsync` preserves the
   stored `AuthorId`; it never re-assigns authorship. `Created` is preserved;
   `Modified` is stamped (the same Modified-stamped / Created-untouched shape
-  as ADR 0014/0016).
+  as ADR [0014](0014-post-edit-lane-author-only.md)/0016).
 - **The create lane is unchanged.** `EnsureCreatePermissionAsync` keeps the
   existing standing (Public → GlobalAdmin; flat Community → GlobalAdmin or
   Moderator; targeted → GlobalAdmin or that community's moderator). Only the
@@ -114,7 +114,7 @@ moderator originated them.
   already exists on `Announcement` and is the immutable author-of-record; the
   edit gate simply starts reading it. The `PostDocTypes` registration surface is
   unchanged.
-- This lane is intentionally **not** author-only (contrast ADR 0014/0016): the
+- This lane is intentionally **not** author-only (contrast ADR [0014](0014-post-edit-lane-author-only.md)/0016): the
   GlobalAdmin branch is retained for platform curation. If a future
   requirement wants to remove the admin branch from the flat lane, it is a
   separate decision — this ADR's flat-lane rule is `author ∪ GlobalAdmin`, not

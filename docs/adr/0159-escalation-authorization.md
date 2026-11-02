@@ -11,14 +11,14 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0159 — Escalation authorization + receiving inbox (a token-gated acceptance lane + the receiving inbox + the outbound config page on the M32 ErrorReports surface)
+# ADR [0159](0159-escalation-authorization.md) — Escalation authorization + receiving inbox (a token-gated acceptance lane + the receiving inbox + the outbound config page on the M32 ErrorReports surface)
 
 Status: Accepted
 Date: 2026-10-10
 
 ## Context
 
-M32 (ADR 0155) closed the **escalation** end of the error-report lifecycle: an
+M32 (ADR [0155](0155-issue-submission-escalation.md)) closed the **escalation** end of the error-report lifecycle: an
 admin on an origin instance can forward a report to the
 `KUMUNITA_ESCALATION_ENDPOINT` env-var URL (the `POST …/escalate` action → the
 Web-layer `IEscalationForwarder` POSTs the 8-field payload — never persisted —
@@ -56,15 +56,15 @@ the receiving platform if it has a valid token."
   context** (D1, ESC·1). ESC **reuses** the M32 `ErrorReport` doc + the
   `Kumunita.Core.ErrorReports` context + the `IErrorReportService` seam + the
   M32 `EscalationForwarder` + the `KUMUNITA_ESCALATION_ENDPOINT` env var and
-  **extends them additively** (ADR 0004 §B.1). **No new bounded context** —
+  **extends them additively** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1). **No new bounded context** —
   the two new docs (`EscalationToken`, `EscalationOutboundConfig`) ride a
   **new** `EscalationDocTypes` parallel registration surface (the M31
   `ErrorReportDocTypes` / the Usage `UsageDocTypes` precedent), and the four
   additive `ErrorReport` fields ride the *existing*
-  `.Schema.For<ErrorReport>()` (ADR 0004 §B.1 idempotent delta at boot, **no
+  `.Schema.For<ErrorReport>()` (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta at boot, **no
   new surface for the additive fields**).
 - **The `ErrorReport` doc field set is extended additively to a 19-member
-  ceiling** (D2, ESC·2). M32's 15 (ADR 0155 D3) are **unchanged** (exact
+  ceiling** (D2, ESC·2). M32's 15 (ADR [0155](0155-issue-submission-escalation.md) D3) are **unchanged** (exact
   names, types, nullability); ESC adds **exactly four**, each null for
   locally-filed rows: `FromInstance` (`string?`, the accepting token's
   `Label`), `EscalationReceivedAt` (`DateTimeOffset?`, the receive instant),
@@ -72,7 +72,7 @@ the receiving platform if it has a valid token."
   idempotency key), `EscalationTokenId` (`string?`, which token accepted it).
   No field outside the 19-member set may appear in the doc. The `Origin`
   closed set extends from `{"error-page","general"}` to
-  `{"error-page","general","escalated"}` (a string field — ADR 0004 §B.1, no
+  `{"error-page","general","escalated"}` (a string field — ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1, no
   migration). **No EF migration.**
 - **Receiving-side tokens are the `EscalationToken` doc: multiple, labeled,
   individually revocable, hashed at rest** (D3, ESC·3). Only the **SHA-256
@@ -100,7 +100,7 @@ the receiving platform if it has a valid token."
   `GenerateAsync` / `RevokeAsync` / `ValidateAsync` (the exact C# shape is the
   design doc §2.1.1 pin) + the `EscalationTokenSummary` read-model record
   (never the doc; no plaintext / no hash). `GenerateAsync` + `RevokeAsync` are
-  **single-write-lane** (the ADR 0006 C3 shape, the M32·8 precedent — one write
+  **single-write-lane** (the ADR [0006](0006-module-boundary-contracts.md) C3 shape, the M32·8 precedent — one write
   session storing the doc + exactly one `AccessAudit` row, `Via = Admin`,
   action `escalation.token.generate` / `escalation.token.revoke`,
   `TargetKind` "escalation-token"). `ValidateAsync` is a constant-time hash
@@ -115,7 +115,7 @@ the receiving platform if it has a valid token."
   are **unchanged**, ESC·1). `InboundReport` is a **separate** record (not a
   re-shape of `ErrorReportDraft`); `InboundResult` carries `Created` / `Row` /
   `Error?`. The impl is the M32 `MarkResolvedAsync` **idempotent-write-lane**
-  shape (ADR 0006 C3 single-write-lane): validate the token → look up an
+  shape (ADR [0006](0006-module-boundary-contracts.md) C3 single-write-lane): validate the token → look up an
   existing row on `(EscalationTokenId, EscalationSourceId)` (the **ESC·7**
   idempotency key — a re-delivery returns the existing row, no duplicate, no
   second audit row) → else store a new `ErrorReport` (`Origin = "escalated"`)
@@ -144,7 +144,7 @@ the receiving platform if it has a valid token."
   ConfiguredSource` (`"db"` / `"env"` / `null`) — the M32 4 members are
   **unchanged**. The **validation** (hash compare) + the **received-row
   write** are Core; the **HTTP** (outbound POST + inbound request parsing) is
-  Web (ADR 0006-D — Core stays HTTP-free).
+  Web (ADR [0006](0006-module-boundary-contracts.md)-D — Core stays HTTP-free).
 - **Received issues surface in the same admin list** (D9, ESC·8). The M31·4
   `/admin/error-reports` list is **unchanged** in shape; ESC adds the
   `Origin = "escalated"` chip + a `?filter=received|local` selector (the
@@ -153,8 +153,8 @@ the receiving platform if it has a valid token."
   surface. The existing five admin actions (`Index` / `MarkTriaged` / `Detail`
   / `Resolve` / `Escalate`) are **unchanged** (ESC·1 — additive-only).
 - **`AccessVia` gains exactly one additive value: `Escalation`** (D10,
-  ESC·10). The M1 `Admin` / ADR 0013 `Group` / ADR 0028 `Guardian` / ADR 0036
-  `Community` / ADR 0041 `Resident` / M31 `Anonymous` append precedent — the
+  ESC·10). The M1 `Admin` / ADR [0013](0013-group-posts-membership-lane.md) `Group` / ADR [0028](0028-guardian-controls-account-scope-supervision.md) `Guardian` / ADR [0036](0036-community-visible-audience-default.md)
+  `Community` / ADR [0041](0041-page-audience-scope-dropdown.md) `Resident` / M31 `Anonymous` append precedent — the
   **12 frozen values are untouched**. The inbound audit row is the **only**
   row that carries `Via = Escalation` (the M2M standing — the receiving admin
   is not the actor, the origin platform is).
@@ -162,22 +162,22 @@ the receiving platform if it has a valid token."
   (D11, ESC·12). `/admin/escalation` (outbound config) +
   `/admin/escalation/tokens` (receiving tokens) are
   `[Authorize(Roles = GlobalAdmin)]` (the M31·4 / M31·9 / M32·10 precedent —
-  the ADR 0001-B thin-token rule). **No new `AccessAction`, no new `Decide()`
+  the ADR [0001](0001-core-stack-and-identity-model.md)-B thin-token rule). **No new `AccessAction`, no new `Decide()`
   branch, no new `IAuthorizationService` surface.** The inbound endpoint is
   **public** (token-gated, ESC·5).
 - **The closed `escalation.*` `kw-l` key set is parity-pinned in four
   languages** (D12, ESC·11). **~24 keys** (the design doc §2.3 table), each
   present, **non-empty, in all four** languages (en/de/fr/da), pinned by
   `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` (the
-  M31·7 / M32·9 precedent). The `en` values are the source text (the ADR 0015
+  M31·7 / M32·9 precedent). The `en` values are the source text (the ADR [0015](0015-ui-view-localization-mechanics.md)
   D1 `kw-l` provider-floor discipline). The M31 / M32 `errorreport.*` /
   `issue.*` key sets are the **floor** — **untouched** (ESC·1).
 - **The six-member close flip is the lane's close unit (ESC·13)** — the
   `Milestones.cs` lane row (added `StatusDone`, after the M32 row, without
   disturbing the M33 / M34 order or the single-in-progress pin — M34 stays
-  `StatusNext`) / README / `STATUS.md` / `ARCHITECTURE.md` /
+  `StatusNext`) / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` (a new entry, newest-first, naming ESC
-  + ADR 0159). The M27 "shipped with no entry until caught in review" lesson
+  + ADR [0159](0159-escalation-authorization.md)). The M27 "shipped with no entry until caught in review" lesson
   (AGENTS.md) is held.
 
 ## Consequences
@@ -197,13 +197,13 @@ the receiving platform if it has a valid token."
 - **The `ErrorReport` doc is the 19-member ESC ceiling** — the M32 15
   unchanged + the ESC 4 additive (ESC·2). **No EF migration** (the additive
   fields + the `Origin` "escalated" value are a string / nullable string /
-  `DateTimeOffset?` on an existing doc — ADR 0004 §B.1 idempotent delta at
+  `DateTimeOffset?` on an existing doc — ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta at
   boot).
 - **One new Core service** (`IEscalationTokenService` /
   `EscalationTokenService`) + **one new registration surface**
   (`EscalationDocTypes`) + **one additive `IErrorReportService` seam**
   (`AcceptInboundAsync`) + **one additive `AccessVia` value**
-  (`Escalation`). **`Kumunita.Core` stays HTTP-free** (ESC·6, ADR 0006-D);
+  (`Escalation`). **`Kumunita.Core` stays HTTP-free** (ESC·6, ADR [0006](0006-module-boundary-contracts.md)-D);
   the forwarder + the inbound endpoint are **Web-layer**.
 - **The receiving-side token plaintext is never persisted** (ESC·3) — only the
   SHA-256 hash is stored; the plaintext is shown exactly once at generation.

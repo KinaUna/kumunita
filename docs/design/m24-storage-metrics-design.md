@@ -17,7 +17,7 @@ updated: 2026-11-02
 
 
 > **Milestone M24.** A **read-only admin feedback lane** over the *existing*
-> media byte store + catalog (ADR 0011). M24 surfaces **storage metrics** —
+> media byte store + catalog (ADR [0011](../adr/0011-media-and-file-storage.md)). M24 surfaces **storage metrics** —
 > the admin's view of the byte store: **total used space**, **available
 > space**, **user-content used space**, and **space used per user** — closing
 > the operator's storage feedback loop locally. It is the *metrics* half;
@@ -43,9 +43,9 @@ ARCHITECTURE.md value-chain row: "**M13** logging and analytics —
 
 M24 answers a **different** operator question that the platform today cannot
 answer at all: **how full is the byte store, and who is using it?** The media
-byte store (ADR 0011) is a **dedicated local volume** (`LocalVolumeFileStore`)
+byte store (ADR [0011](../adr/0011-media-and-file-storage.md)) is a **dedicated local volume** (`LocalVolumeFileStore`)
 holding the content-addressed payloads, with a **`mt` catalog**
-(`MediaObject`, Marten-owned, ADR 0004 §B) recording each unique file's
+(`MediaObject`, Marten-owned, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B) recording each unique file's
 `SizeBytes` and `CreatedById` (who first stored it). Two restore surfaces,
 one story (C-MED·7): the catalog rides the `pg_dump`; the payload rides the
 volume snapshot (OPS.md procedures 4/5). The operator can read either surface
@@ -78,7 +78,7 @@ same context rather than opening a new one.
 - **The admin settings surface + enforcement** — the admin-set per-file size
   limit and the per-user total content quota, and the upload-time enforcement
   of both, are **M25** (Upload limits). M24 *reads* the `MaxBytes` boundary
-  (the `MediaOptions` env default, ADR 0011) as context; it does not change
+  (the `MediaOptions` env default, ADR [0011](../adr/0011-media-and-file-storage.md)) as context; it does not change
   or enforce it.
 - **The resident self-usage view** — the resident's own view of "how much of
   my quota remains" is **M25**. M24 is **admin-only**; it renders **no**
@@ -155,8 +155,8 @@ resident content, and who is storing the most, without leaving the box for
 - The **pinned Core + Web tests** (U4/U6 per the M13 template — the
   exact names are authored by U2 in Part 2).
 - The **ADR + OPS/README/Milestones sync** (the C-SM·7 close unit, U8,
-  updates `Milestones.cs` + `README.md` Roadmap + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` in the same unit; `MilestonesTests.cs` is re-pinned
+  updates `Milestones.cs` + [`README.md`](../../README.md) Roadmap + [`docs/STATUS.md`](../STATUS.md) +
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) in the same unit; `MilestonesTests.cs` is re-pinned
   to keep the single-in-progress contract passing — M24 → `StatusDone`,
   M25 → `StatusNext`).
 
@@ -194,7 +194,7 @@ Part 2 and in the close unit (U8).
   `AccessAudit` rows, **zero** new documents. Pinned by F8 (the zero
   `AccessAudit` row test) + the U2 seam-shape pin (the `IStorageMetricsService`
   methods return DTOs; there is no `SaveChangesAsync` in the impl).
-- **C-SM·3 — `Core` stays HTTP-free (ADR 0006-D).** The seam returns plain
+- **C-SM·3 — `Core` stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).** The seam returns plain
   DTOs (`StorageMetricsSnapshot`, `PerUserStorageRow`,
   `PerUserStoragePage`); no `IFormFile`, no `ActionResult`. The
   `/admin/storage` view model (`StorageMetricsViewModel`) is Web-only.
@@ -263,7 +263,7 @@ written; the drift-guard (U2 + U8) re-pins them.
 - **F9** — `IMediaStore` + `MediaObject` are **not reshaped** by M24 —
   **C-SM·1** (the not-reshaped pin; a reflection test over the
   `IMediaStore` interface + the `MediaObject` POCO asserting the exact
-  member set is unchanged from the ADR 0011 shape).
+  member set is unchanged from the ADR [0011](../adr/0011-media-and-file-storage.md) shape).
 - **F10** — the `GetPerUserUsageBytesAsync` seam is **reusable by name** by
   M25 (the M25 handoff is a **closed-loop** artifact) — **C-SM·7** (the
   seam-shape pin; the method name + signature are frozen so M25's
@@ -396,7 +396,7 @@ public sealed record PerUserStoragePage(
     bool HasMore);
 ```
 
-`IMediaFileStore` — **two read-only ADDs** (C-SM·2; the ADR 0006-E lane).
+`IMediaFileStore` — **two read-only ADDs** (C-SM·2; the ADR [0006](../adr/0006-module-boundary-contracts.md)-E lane).
 These are the **only** interface change (C-SM·1) — **no** other
 `IMediaFileStore` member is touched:
 
@@ -657,7 +657,7 @@ satisfies the C-SM·7 single-in-progress contract and unblocks **M25 U1/U2**
   precedent). `MilestonesTests.cs` is re-pinned to match: M24 added to
   `Shipped_Milestones_Are_Marked_Done`, and the single-in-progress test is
   re-pointed to **M25** (`MilestonesTests` reports 4 tests, 4 green).
-- **ADR 0134.** `docs/adr/0134-storage-metrics.md` — the Context / Decision /
+- **ADR [0134](../adr/0134-storage-metrics.md).** [`docs/adr/0134-storage-metrics.md`](../adr/0134-storage-metrics.md) — the Context / Decision /
   Consequences for the lane, the seven invariants (C-SM·1–7), the ten FACES
   (F1–F10), and the named non-decisions (M25 the surface + enforcement; the CSV
   export lane; the time-series lane; the M26 sort-lane hook).
@@ -667,5 +667,5 @@ satisfies the C-SM·7 single-in-progress contract and unblocks **M25 U1/U2**
   = default)` — `Σ MediaObject.SizeBytes WHERE CreatedById == subjectId`.
   **M25's** U4 (`IStorageSettingsService.GetPerUserUsageBytesAsync`)
   **delegates** to it (or re-points to it) rather than re-deriving the
-  per-user usage computation. A M25 agent finds it by this name in ADR 0134 +
+  per-user usage computation. A M25 agent finds it by this name in ADR [0134](../adr/0134-storage-metrics.md) +
   this section + the handoff `## Summary`.

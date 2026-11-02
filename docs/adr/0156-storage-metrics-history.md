@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0156 — Storage metrics history (M33) — the M24 `/admin/storage` admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future
+# ADR [0156](0156-storage-metrics-history.md) — Storage metrics history (M33) — the M24 `/admin/storage` admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future
 
 Status: Accepted | Date: 2026-10-09
 
-> **Abstract:** M33 settles M24's **named non-decision** (ADR 0134
+> **Abstract:** M33 settles M24's **named non-decision** (ADR [0134](0134-storage-metrics.md)
 > item 3 — "time series is a future lane (own ADR, the M13 charts
 > precedent)") on the M24 storage surface: it adds a **daily capture**
 > (one `StorageMetricsSample` per UTC day), a **retention** (365-day
@@ -51,14 +51,14 @@ whether the instance's capacity is sufficient in the future." M24 (ADR
 see, at `/admin/storage`, how full the volume is **right now** (the four
 headline metrics + the per-user table). A single snapshot cannot answer the
 operator's **capacity-planning** question: **is the volume filling fast
-enough that I need more space before it runs out?** ADR 0134 §"named
+enough that I need more space before it runs out?** ADR [0134](0134-storage-metrics.md) §"named
 non-decisions" item 3 named this exact gap as a deferral ("time series is a
 future lane (own ADR, the M13 charts precedent)"). M33 **is** that future
 lane, on the M24 storage surface. It rides **frozen** seams — the M24
 `Kumunita.Core.Usage` context, the M24 `IStorageMetricsService`
 4-method surface, the M24 `StorageMetricsSnapshot` DTO, the M13
-`UsagePurge` tick / handler / service precedent (ADR 0114), and the M24
-`GlobalAdmin`-gated `/admin/storage` surface (ADR 0134 D3) — adding a
+`UsagePurge` tick / handler / service precedent (ADR [0114](0114-logging-and-usage-analytics.md)), and the M24
+`GlobalAdmin`-gated `/admin/storage` surface (ADR [0134](0134-storage-metrics.md) D3) — adding a
 small, additive delta.
 
 ## Decision
@@ -66,11 +66,11 @@ small, additive delta.
 - **D1 — M33 is a capability on the M24 `Kumunita.Core.Usage` surface, not
   a new context (M33·1).** M33 **reuses** the M24 `Usage` context + the
   `IStorageMetricsService` seam + the `StorageMetricsSnapshot` DTO and
-  **extends them additively** (ADR 0004 §B.1). **No** new bounded context;
+  **extends them additively** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1). **No** new bounded context;
   **no** re-shape of the 3 M24 methods + the M25 ADD
   `GetPlatformSpaceAsync`; **no** EF migration — the new
   `StorageMetricsSample` doc rides the new `StorageHistoryDocTypes.Configure`
-  surface (the ADR 0004 §B.1 idempotent delta at boot).
+  surface (the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta at boot).
 - **D2 — One new doc: the `StorageMetricsSample` (the 8-member M33·2
   ceiling).** The doc carries **exactly** 8 members (the `Id` + the
   7-member sample shape mirroring the M24 `StorageMetricsSnapshot`, with
@@ -90,7 +90,7 @@ small, additive delta.
   fabricated zero rows). The 3 M24 methods + the M25 ADD are
   **unchanged**.
 - **D4 — One new parallel doc-type surface: `StorageHistoryDocTypes`
-  (M33·1).** `opts.Schema.For<StorageMetricsSample>()` — the ADR 0004
+  (M33·1).** `opts.Schema.For<StorageMetricsSample>()` — the ADR [0004](0004-data-persistence-and-schema-evolution.md)
   §B.1 parallel-surface shape, wired into **both** boot paths (the dev
   loop in `Program.cs` + the all-env `SchemaBootstrap`).
 - **D5 — One new capture lane: the Wolverine-free Core service + the tick
@@ -149,7 +149,7 @@ small, additive delta.
   `AccessAudit` rows.
 - **`Kumunita.Core` stays HTTP-free + Wolverine-free (M33·5)** — the
   capture service is a Wolverine-free static class; the **handler** is the
-  Web thin adapter; **no** `HttpClient` in Core (ADR 0006-D); **no**
+  Web thin adapter; **no** `HttpClient` in Core (ADR [0006](0006-module-boundary-contracts.md)-D); **no**
   outbound channel (M33·6).
 - **The sample never leaves the instance (M33·6)** — the
   `StorageMetricsSample` is a local Postgres document; nothing M33 emits,

@@ -18,7 +18,7 @@ updated: 2026-11-02
 > `/admin/labels`, and the rename stays consistent across the surface (the
 > nav **and** the page `<h1>` agree — one resolver, one value). It is a
 > **display override, never a re-route** — the routes are unchanged; only what
-> they render changes. The shape is the SITE lane's (ADR 0150): a new
+> they render changes. The shape is the SITE lane's (ADR [0150](../adr/0150-site-content-customization.md)): a new
 > `SurfaceLabels` **singleton** doc (one row per instance, `Id = "singleton"`,
 > all 13 labels defaulting to `null` = the shipped `kw-l` text), a best-effort
 > read + one audited write lane, and a byte-identical fresh-instance default
@@ -48,10 +48,10 @@ updated: 2026-11-02
 > guard).
 >
 > **The frozen base.** This milestone is built **on top of** the
-> `LocaleSettings` singleton (ADR 0005 B), the `SiteContent` singleton shape
-> (ADR 0150), the single-write-lane shape (ADR 0050), the additive-doc-type
-> convention (ADR 0004 §B.1), the module-boundary contract (ADR 0006), and the
-> `kw-l` provider-floor discipline (ADR 0015 D1). All of these still bind
+> `LocaleSettings` singleton (ADR [0005](../adr/0005-multilingual-support.md) B), the `SiteContent` singleton shape
+> (ADR [0150](../adr/0150-site-content-customization.md)), the single-write-lane shape (ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)), the additive-doc-type
+> convention (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), the module-boundary contract (ADR [0006](../adr/0006-module-boundary-contracts.md)), and the
+> `kw-l` provider-floor discipline (ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1). All of these still bind
 > **unchanged** (re-anchored in §Frozen base below). M29 adds **no** re-shape
 > of `SiteContent`, **no** re-shape of `LocaleSettings`, **no** removal of a
 > `kw-l` registry entry, **no** new `AccessAction` / `AccessVia` /
@@ -60,28 +60,28 @@ updated: 2026-11-02
 > bounded context (`Kumunita.Core.SurfaceLabels`), one new service
 > (`ISurfaceLabelsService`), one new admin surface (`/admin/labels`), and one
 > label-resolver seam the views call. **No EF migration** (a new Marten doc
-> type is additive per ADR 0004 §B.1; the delta is applied idempotently at
+> type is additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1; the delta is applied idempotently at
 > boot). **No new route for the read** (the 13 existing nav routes are
 > unchanged — only what they render changes).
 >
 > **The `SurfaceLabels` field set is the ceiling** (the 13 optional `string?`
 > label fields in the register's "one thing" section — no field outside the
-> field set may appear in the doc, the ADR 0152 D1 pin). **The `kw-l` registry
+> field set may appear in the doc, the ADR [0152](../adr/0152-admin-surface-labels.md) D1 pin). **The `kw-l` registry
 > entries are the floor** (the `nav.*` / `inv.nav` / `bm.nav` /
-> `documents.title` keys stay, the ADR 0152 D3 pin). **The `SiteContent` and
+> `documents.title` keys stay, the ADR [0152](../adr/0152-admin-surface-labels.md) D3 pin). **The `SiteContent` and
 > `LocaleSettings` docs are untouched** (this milestone adds a *new* doc in a
-> *new* context, not a new field on an existing one, the ADR 0150 D6 / ADR 0006
+> *new* context, not a new field on an existing one, the ADR [0150](../adr/0150-site-content-customization.md) D6 / ADR [0006](../adr/0006-module-boundary-contracts.md)
 > module-boundary pin). **The routes are unchanged** (the "label, not
 > re-route" pin — a rename never moves a link).
 
 ## Value chain
 
-The `SP` lane (ADR 0043) shipped the four static pages (terms / help /
+The `SP` lane (ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md)) shipped the four static pages (terms / help /
 privacy / conduct) as admin-editable `Page` docs — an admin can now change
 what those pages say without a code change. The `LocaleSettings` singleton
-(ADR 0005 B) ships the admin-settled instance values (default language /
+(ADR [0005](../adr/0005-multilingual-support.md) B) ships the admin-settled instance values (default language /
 timezone / date format / sign-up gate / messaging) — an admin can now change
-how the platform *behaves* without a code change. The SITE lane (ADR 0150)
+how the platform *behaves* without a code change. The SITE lane (ADR [0150](../adr/0150-site-content-customization.md))
 shipped the two **landing surfaces' hero copy + section toggles** as a
 `SiteContent` singleton — an admin can now change what the home and about
 heroes say, and which sections appear. But the **13 top-navigation items**
@@ -142,31 +142,31 @@ old word — **inconsistent** (the nav and the header would disagree).
 
 ### The precedent shapes (frozen, verified by U00)
 
-- **ADR 0005 B** — the `LocaleSettings` singleton (`Id = "singleton"`
+- **ADR [0005](../adr/0005-multilingual-support.md) B** — the `LocaleSettings` singleton (`Id = "singleton"`
   sentinel, the additive-field convention, one row per instance). The
   `SurfaceLabels` doc will be a **new** singleton in the same shape, **not** a
-  new field on `LocaleSettings` (ADR 0006 module-boundary contract).
-- **ADR 0150** — the `SiteContent` singleton + the best-effort read
+  new field on `LocaleSettings` (ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary contract).
+- **ADR [0150](../adr/0150-site-content-customization.md)** — the `SiteContent` singleton + the best-effort read
   (`SiteContentService.GetAsync`, never throws / never null → in-code
   fallback) + the single audited write-lane (`SaveAsync`, one session, the doc
   + exactly one `AccessAudit` row commit together) + the
   `AdminSiteController` `[Route("admin/site")]`
   `[Authorize(Roles = GlobalAdmin)]` dedicated surface. The `SurfaceLabels`
   doc + service + `AdminSurfaceLabelsController` mirror this shape exactly.
-- **ADR 0050** — the single-write-lane shape (`AdminSignupController`, the
+- **ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)** — the single-write-lane shape (`AdminSignupController`, the
   `IsSignupOpen` best-effort read, the `SetSignupOpenAsync` audited write, the
   `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST, the
   `TempData["info"]` flash, the `RedirectToAction(nameof(Index))` redirect).
 
 ### The constraints that still bind
 
-- **ADR 0004 §B.1** — additive doc type (delta applied idempotently at boot,
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** — additive doc type (delta applied idempotently at boot,
   no EF migration). The `SurfaceLabels` doc is a **new** Marten doc type, not
   a new field on an existing one.
-- **ADR 0006** — module-boundary contract. The `SurfaceLabels` context is a
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)** — module-boundary contract. The `SurfaceLabels` context is a
   **new** bounded context (`Kumunita.Core.SurfaceLabels`), independent of
   `SiteContent`, `LocaleSettings`, and the `Localization` context.
-- **ADR 0015 D1** — `kw-l` provider-floor discipline. The `kw-l` registry
+- **ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1** — `kw-l` provider-floor discipline. The `kw-l` registry
   entries stay (the `nav.*` / `inv.nav` / `bm.nav` / `documents.title` keys are
   not removed, not re-shaped, not re-keyed).
 - **The SITE / M28 test model** — the `FirstBootSeeder` default pin (the
@@ -185,11 +185,11 @@ old word — **inconsistent** (the nav and the header would disagree).
 - The `SurfaceLabels` doc (a new `Kumunita.Core.SurfaceLabels` context,
   `Id = "singleton"` sentinel, the **13 optional `string?` label fields**, all
   defaulting to `null`).
-- The `ISurfaceLabelsService` + `SurfaceLabelsService` (the ADR 0150
+- The `ISurfaceLabelsService` + `SurfaceLabelsService` (the ADR [0150](../adr/0150-site-content-customization.md)
   single-write-lane shape — the `GetLabelAsync(surfaceKey, fallbackKey,
   effectiveLanguage, ct)` read + the `SaveAsync(SurfaceLabels labels, string
   actorBy)` write).
-- The `SurfaceLabelsDocTypes.Configure(opts)` surface (the ADR 0004 §B.1
+- The `SurfaceLabelsDocTypes.Configure(opts)` surface (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
   additive doc type — the `opts.Schema.For<SurfaceLabels>()` shape).
 - The `FirstBootSeeder` default (the **all-null** `SurfaceLabels` — create-if-missing,
   idempotent, never-overwrites; byte-identical to the shipped text via the
@@ -234,15 +234,15 @@ every FACES row references a stable number.
 | # | Invariant (one-line M29 note) |
 |---|------------------------------|
 | **M29·1** | **A rename stays consistent across the surface** — the resolved label is the **same** in the nav (the flat row, the More dropdown, and the mobile rail) **and** in the surface's `<h1>` page header. One resolver, one value — a rename is never "nav says X, header says Y." The nav + header views call **one** helper (the label-resolver seam) so they resolve to the same value. |
-| **M29·2** | **The read is a public surface** — the label resolution is **world-readable**, **not** an access decision, **not** a claim (the ADR 0001-B thin-token rule), and **never audited**. A missing `SurfaceLabels` row (a fresh boot before the seeder ran, or a test construction with no store) degrades to **all-null** → every label falls back to its `kw-l` key (byte-identical to today) — never a blank nav, never an error. |
+| **M29·2** | **The read is a public surface** — the label resolution is **world-readable**, **not** an access decision, **not** a claim (the ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B thin-token rule), and **never audited**. A missing `SurfaceLabels` row (a fresh boot before the seeder ran, or a test construction with no store) degrades to **all-null** → every label falls back to its `kw-l` key (byte-identical to today) — never a blank nav, never an error. |
 | **M29·3** | **The resolution rule** — for a surface, the resolved label = the admin-set label **if present and non-blank**, else the `kw-l` translation of that surface's nav key in the viewer's effective language (a blank / whitespace-only admin label falls back to the `kw-l` key — the "empty = use default" shape). The `kw-l` key is the **floor**; the admin label is an **optional override on top**. |
 | **M29·4** | **The defaults are byte-identical to the shipped `kw-l` text** — the `SurfaceLabels` default is **all-null** (every label unset → every one falls back to its `kw-l` key); the `FirstBootSeeder` seed is **all-null**, and the in-code fallback is the **all-null** `SurfaceLabels` (the byte-identical `kw-l` text, via the fallback). An admin who never touches the surface sees exactly what a fresh instance ships today. The `kw-l` registry entries (`nav.*` / `inv.nav` / `bm.nav` / `documents.title`) are **not** removed, not re-shaped, not re-keyed — they remain the **fallback** the in-code default resolves to; the registry parity tests are **untouched**. |
-| **M29·5** | **The write is the ADR 0150 single-write-lane shape** — one `ISurfaceLabelsService.SaveAsync(labels, actorBy)` lane that loads the singleton, applies the full 13-field set, and saves in one session (invariant C3); exactly **one** `AccessAudit` row per save (`Via = Admin`, action `surface_labels.save`, `TargetKind` "surface-labels" — the `site.save` / `signup.set-open` / `timezone.set-default` singleton-toggle shape). The lane **upserts** the singleton (the `SiteContent` "one row per instance" shape, ADR 0150 D6). Strong consistency: the new value is live on the very next `GetAsync` / render. |
-| **M29·6** | **The `SurfaceLabels` doc is a singleton (one row per instance)** — the `Id` is the sentinel `"singleton"` (the exact `SiteContent` / `LocaleSettings` shape, ADR 0005 B). The doc is registered in a new `SurfaceLabelsDocTypes.Configure(opts)` surface (the `SiteContentDocTypes` parallel surface, ADR 0004 §B.1); the delta is applied idempotently at boot. **No EF migration** (a new Marten doc type is additive per ADR 0004 §B.1). The `SiteContent` and `LocaleSettings` docs are **untouched** — this milestone adds a *new* doc in a *new* context, not a new field on an existing one (the ADR 0150 D6 pin, the ADR 0006 module-boundary contract). |
-| **M29·7** | **The `/admin/labels` surface is the ADR 0150 shape** — `[Route("admin/labels")]` + `[Authorize(Roles = GlobalAdmin)]` on a new `AdminSurfaceLabelsController` (a **dedicated** controller — the `AdminController`'s constructor is pinned by two Web-layer test harnesses, so a new dependency there would break them; a separate `/admin/labels` surface mirrors `/admin/site` / `/admin/signup` / `/admin/timezone`). The GET seeds the form with the current singleton; the POST saves it (one `AccessAudit` row, the `site.save` shape). A blank field **clears** that surface's label (falls back to the `kw-l` key). The `/admin/platform` page gains one list-group row linking to `/admin/labels`. |
+| **M29·5** | **The write is the ADR [0150](../adr/0150-site-content-customization.md) single-write-lane shape** — one `ISurfaceLabelsService.SaveAsync(labels, actorBy)` lane that loads the singleton, applies the full 13-field set, and saves in one session (invariant C3); exactly **one** `AccessAudit` row per save (`Via = Admin`, action `surface_labels.save`, `TargetKind` "surface-labels" — the `site.save` / `signup.set-open` / `timezone.set-default` singleton-toggle shape). The lane **upserts** the singleton (the `SiteContent` "one row per instance" shape, ADR [0150](../adr/0150-site-content-customization.md) D6). Strong consistency: the new value is live on the very next `GetAsync` / render. |
+| **M29·6** | **The `SurfaceLabels` doc is a singleton (one row per instance)** — the `Id` is the sentinel `"singleton"` (the exact `SiteContent` / `LocaleSettings` shape, ADR [0005](../adr/0005-multilingual-support.md) B). The doc is registered in a new `SurfaceLabelsDocTypes.Configure(opts)` surface (the `SiteContentDocTypes` parallel surface, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1); the delta is applied idempotently at boot. **No EF migration** (a new Marten doc type is additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1). The `SiteContent` and `LocaleSettings` docs are **untouched** — this milestone adds a *new* doc in a *new* context, not a new field on an existing one (the ADR [0150](../adr/0150-site-content-customization.md) D6 pin, the ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary contract). |
+| **M29·7** | **The `/admin/labels` surface is the ADR [0150](../adr/0150-site-content-customization.md) shape** — `[Route("admin/labels")]` + `[Authorize(Roles = GlobalAdmin)]` on a new `AdminSurfaceLabelsController` (a **dedicated** controller — the `AdminController`'s constructor is pinned by two Web-layer test harnesses, so a new dependency there would break them; a separate `/admin/labels` surface mirrors `/admin/site` / `/admin/signup` / `/admin/timezone`). The GET seeds the form with the current singleton; the POST saves it (one `AccessAudit` row, the `site.save` shape). A blank field **clears** that surface's label (falls back to the `kw-l` key). The `/admin/platform` page gains one list-group row linking to `/admin/labels`. |
 | **M29·8** | **Single-string labels, not per-language** — each label is **one** admin-set string (a literal override), shown in **all** languages when set. The per-language label is a **named deferral** (a future `LBL-2` lane would add a `SurfaceLabelTranslation` row shape — the `PageTranslation` / `PostTranslation` precedent — + a `/admin/labels` translation editor) — the exact SITE lane D1 "single string, translation deferred" shape. |
 | **M29·9** | **a11y** — the resolved label is rendered **where the `kw-l` key is today** (no DOM structure change); the nav links' `aria-label`s are **unchanged** for the surfaces that are shown. The label is **text only** — the nav icons (the flat-row link glyphs, the More-dropdown item shapes, the mobile-rail `<svg>` icons) stay as shipped; only the text source changes (the `kw-l` key is replaced by the resolver, the fallback is the same key). |
-| **M29·10** | **The `Milestones.cs` / README / `MilestonesTests` trio is untouched until the milestone *ships* (U10 owns the close flip); Home's hero stays under the SITE lane** — the `MilestonesTests` pin that the single in-progress milestone is unchanged stays intact through U00–U09; the `WhatsNew.cs` registry gains one new entry (newest-first, the `0.45.0` row) naming M29 + ADR 0152 when it ships (the required sixth member of the close flip — the M27 "shipped with no entry until caught in review" lesson, AGENTS.md, is held). The Home surface's hero text is **already** admin-editable via the SITE lane (ADR 0150 — the `HomeHeroEyebrow` / `HomeHeroLead` fields); M29 drives the **Home nav label only**; it does **not** touch the SITE hero. |
+| **M29·10** | **The `Milestones.cs` / README / `MilestonesTests` trio is untouched until the milestone *ships* (U10 owns the close flip); Home's hero stays under the SITE lane** — the `MilestonesTests` pin that the single in-progress milestone is unchanged stays intact through U00–U09; the `WhatsNew.cs` registry gains one new entry (newest-first, the `0.45.0` row) naming M29 + ADR [0152](../adr/0152-admin-surface-labels.md) when it ships (the required sixth member of the close flip — the M27 "shipped with no entry until caught in review" lesson, AGENTS.md, is held). The Home surface's hero text is **already** admin-editable via the SITE lane (ADR [0150](../adr/0150-site-content-customization.md) — the `HomeHeroEyebrow` / `HomeHeroLead` fields); M29 drives the **Home nav label only**; it does **not** touch the SITE hero. |
 
 ## FACES (pinned, 10)
 
@@ -260,32 +260,32 @@ more invariants.
 | **M29-7** | The admin navigates to `/admin/labels` (from the `/admin/platform` list-group row) — the GET seeds the form with the current singleton (all 13 fields). The admin edits a label and clicks **Save** — the POST saves the full 13-field set, writes one `AccessAudit` row, and redirects back to the GET. A **non-`GlobalAdmin`** is **denied** (the `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST). | M29·7 |
 | **M29-8** | The `kw-l` registry entries (`nav.*` / `inv.nav` / `bm.nav` / `documents.title` keys in `KnownTranslationKeys.cs`) are **untouched** — the nav + header `kw-l` wrap is replaced by a server-resolved `SurfaceLabels` value, but the registry entries stay (they are still the canonical `en` source text the fallback resolves to). The `KwLRegistryConsistencyTests` / `KnownTranslationKeys_ParityTests` pins are **green** (the registry entries are untouched). A future per-language-label lane (out of scope, `LBL-2`) would add a `SurfaceLabelTranslation` row shape keyed on the same strings. | M29·4 |
 | **M29-9** | A visitor with a screen reader loads any page — the resolved label is in the **same DOM position** as the `kw-l` key today (the nav link text / the `<h1>` text); the DOM structure is **unchanged** (only the text source changes). The nav links' `aria-label`s are **unchanged** for the surfaces that are shown; the nav icons (flat-row glyphs, More-dropdown shapes, mobile-rail `<svg>`s) stay as shipped. | M29·9 |
-| **M29-10** | The Home surface's **hero** (the `HomeHeroEyebrow` / `HomeHeroLead` fields, ADR 0150) is **untouched** by M29 — the SITE lane owns the hero text. M29 drives **only the Home nav label** (the `nav.home` key in the flat row, the More dropdown is unaffected, and the mobile-rail Home icon label). A resident who loads `/` sees the SITE hero **exactly** as the SITE lane renders it, and the Home nav item showing the admin's Home label (or the `kw-l` fallback). The SITE hero is **never** re-shaped. | M29·1 (the non-conflict note) |
+| **M29-10** | The Home surface's **hero** (the `HomeHeroEyebrow` / `HomeHeroLead` fields, ADR [0150](../adr/0150-site-content-customization.md)) is **untouched** by M29 — the SITE lane owns the hero text. M29 drives **only the Home nav label** (the `nav.home` key in the flat row, the More dropdown is unaffected, and the mobile-rail Home icon label). A resident who loads `/` sees the SITE hero **exactly** as the SITE lane renders it, and the Home nav item showing the admin's Home label (or the `kw-l` fallback). The SITE hero is **never** re-shaped. | M29·1 (the non-conflict note) |
 
 ## Frozen base (unchanged)
 
 All of the following still bind **unchanged**; this milestone does not re-shape
 any of them:
 
-- **ADR 0005 B** — the `LocaleSettings` singleton (`Id = "singleton"`
+- **ADR [0005](../adr/0005-multilingual-support.md) B** — the `LocaleSettings` singleton (`Id = "singleton"`
   sentinel, the additive-field convention, one row per instance). The
   `SurfaceLabels` doc will be a **new** singleton in the same shape, **not** a
-  new field on `LocaleSettings` (ADR 0006 module-boundary contract).
-- **ADR 0150** — the `SiteContent` singleton + the best-effort read + the
+  new field on `LocaleSettings` (ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary contract).
+- **ADR [0150](../adr/0150-site-content-customization.md)** — the `SiteContent` singleton + the best-effort read + the
   single audited write-lane + the `AdminSiteController`
   `[Route("admin/site")]` `[Authorize(Roles = GlobalAdmin)]` surface. The
   `SurfaceLabels` doc + service + `AdminSurfaceLabelsController` mirror this
   shape exactly.
-- **ADR 0050** — the single-write-lane shape (`AdminSignupController`, the
+- **ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)** — the single-write-lane shape (`AdminSignupController`, the
   `IsSignupOpen` best-effort read, the `SetSignupOpenAsync` audited write, the
   `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST, the
   `TempData["info"]` flash, the `RedirectToAction(nameof(Index))` redirect).
-- **ADR 0004 §B.1** — additive doc type (delta applied idempotently at boot,
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** — additive doc type (delta applied idempotently at boot,
   no EF migration).
-- **ADR 0006** — module-boundary contract. The `SurfaceLabels` context is a
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)** — module-boundary contract. The `SurfaceLabels` context is a
   **new** bounded context (`Kumunita.Core.SurfaceLabels`), independent of
   `SiteContent`, `LocaleSettings`, and the `Localization` context.
-- **ADR 0015 D1** — `kw-l` provider-floor discipline. The `kw-l` registry
+- **ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1** — `kw-l` provider-floor discipline. The `kw-l` registry
   entries stay (the `nav.*` / `inv.nav` / `bm.nav` / `documents.title` keys are
   not removed, not re-shaped, not re-keyed).
 - **The SITE / M28 test model** — the `FirstBootSeeder` default pin, the
@@ -309,11 +309,11 @@ U03–U09 codes against these exact shapes; the pinned test names are the
 All of the following keep binding **unchanged**; this section re-anchors them
 for the contract readers and they are **not** re-shaped by Part 2:
 
-- **ADR 0005 B** — the `LocaleSettings` singleton shape (`Id = "singleton"`
+- **ADR [0005](../adr/0005-multilingual-support.md) B** — the `LocaleSettings` singleton shape (`Id = "singleton"`
   sentinel, the additive-field convention, one row per instance). The
   `SurfaceLabels` doc is a **new** singleton in the same shape, **not** a new
-  field on `LocaleSettings` (ADR 0006 module-boundary contract).
-- **ADR 0150** — the `SiteContent` singleton shape: the `SiteContentService`
+  field on `LocaleSettings` (ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary contract).
+- **ADR [0150](../adr/0150-site-content-customization.md)** — the `SiteContent` singleton shape: the `SiteContentService`
   best-effort read (`GetAsync` never throws / never null → the in-code
   all-null fallback), the `SaveAsync` single audited write-lane (one session,
   the doc + exactly one `AccessAudit` row commit together, no-op on missing
@@ -321,18 +321,18 @@ for the contract readers and they are **not** re-shaped by Part 2:
   `AdminSiteController` `[Route("admin/site")]` `[Authorize(Roles =
   GlobalAdmin)]` dedicated surface. The `SurfaceLabels` doc + service +
   `AdminSurfaceLabelsController` mirror this shape exactly.
-- **ADR 0050** — the single-write-lane shape (`AdminSignupController`, the
+- **ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)** — the single-write-lane shape (`AdminSignupController`, the
   `IsSignupOpen` best-effort read, the `SetSignupOpenAsync` audited write, the
   `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST, the
   `TempData["info"]` flash, the `RedirectToAction(nameof(Index))` redirect).
-- **ADR 0004 §B.1** — additive doc type (delta applied idempotently at boot,
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** — additive doc type (delta applied idempotently at boot,
   no EF migration). The `SurfaceLabels` doc is a **new** Marten doc type,
   registered in a new `SurfaceLabelsDocTypes.Configure(opts)` surface (the
   `SiteContentDocTypes` parallel surface).
-- **ADR 0006** — module-boundary contract. The `SurfaceLabels` context is a
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)** — module-boundary contract. The `SurfaceLabels` context is a
   **new** bounded context (`Kumunita.Core.SurfaceLabels`), independent of
   `SiteContent`, `LocaleSettings`, and the `Localization` context.
-- **ADR 0015 D1** — `kw-l` provider-floor discipline. The `kw-l` registry
+- **ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1** — `kw-l` provider-floor discipline. The `kw-l` registry
   entries stay (the `nav.*` / `inv.nav` / `bm.nav` / `documents.title` keys
   are not removed, not re-shaped, not re-keyed).
 - **The SITE / M28 test model** — the `FirstBootSeeder` default pin, the
@@ -346,11 +346,11 @@ for the contract readers and they are **not** re-shaped by Part 2:
 
 The `SurfaceLabels` doc (a **new** bounded context
 `Kumunita.Core.SurfaceLabels`, `Id = "singleton"` sentinel — the exact
-`SiteContent` / `LocaleSettings` shape, ADR 0005 B) carries **exactly 13
+`SiteContent` / `LocaleSettings` shape, ADR [0005](../adr/0005-multilingual-support.md) B) carries **exactly 13
 optional `string?` label fields**, one per surface key, **all defaulting to
 `null`** (`null` = "use the `kw-l` fallback" — the "empty = use default"
-shape, M29·3 / M29·4). The field set is the **ceiling** (ADR 0152 D1): a
-future `LBL-2` lane **adds** fields (additive per ADR 0004 §B.1), it does not
+shape, M29·3 / M29·4). The field set is the **ceiling** (ADR [0152](../adr/0152-admin-surface-labels.md) D1): a
+future `LBL-2` lane **adds** fields (additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), it does not
 re-shape the existing 13.
 
 | # | Field (`public string?`) | Surface key | `kw-l` fallback key | Surface route | a11y note |
@@ -370,13 +370,13 @@ re-shape the existing 13.
 | 13 | `People` | `people` | `nav.people` | `/people` | label is text only — the nav icon stays as shipped |
 
 The `Id` is the sentinel `"singleton"` (the exact `SiteContent` /
-`LocaleSettings` shape, ADR 0005 B — one row per instance). The doc is
+`LocaleSettings` shape, ADR [0005](../adr/0005-multilingual-support.md) B — one row per instance). The doc is
 registered in a new `SurfaceLabelsDocTypes.Configure(opts)` surface (the
 `SiteContentDocTypes` parallel surface, ADR 0004 §B.1): `opts.Schema.For
 <SurfaceLabels>()` — the delta is applied idempotently at boot. **No EF
 migration.** The `SiteContent` and `LocaleSettings` docs are **untouched**
 (this milestone adds a *new* doc in a *new* context, not a new field on an
-existing one — the ADR 0150 D6 / ADR 0006 module-boundary pin). A
+existing one — the ADR [0150](../adr/0150-site-content-customization.md) D6 / ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary pin). A
 `GetLabel(string surfaceKey)` helper (case-insensitive) returns the field's
 value or `null` (the `surfaceKey` → field mapping above, e.g. `"home"` →
 `Home`, `"announcements"` → `Announcements`, …, `"people"` → `People`).
@@ -390,7 +390,7 @@ nav and the header resolve to the **same** value (M29·1). The read is
 `SurfaceLabels` row (a fresh boot before the seeder ran, or a test
 construction with no store) degrades to the **all-null** `SurfaceLabels`
 → every label falls back to its `kw-l` key (byte-identical to today) —
-never a blank nav, never an error (the ADR 0050 `IsSignupOpenAsync`
+never a blank nav, never an error (the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `IsSignupOpenAsync`
 best-effort shape, the SITE·1 read contract).
 
 ```csharp
@@ -467,14 +467,14 @@ shown (M29·9).
 
 ### 2.4 the write-lane contract (exact C#)
 
-The write is the **ADR 0150 single-write-lane shape** (M29·5). One
+The write is the **ADR [0150](../adr/0150-site-content-customization.md) single-write-lane shape** (M29·5). One
 `ISurfaceLabelsService.SaveAsync(labels, actorBy)` lane that loads the
 singleton, applies the full 13-field set, and saves in one session
 (invariant C3); exactly **one** `AccessAudit` row per save (`Via = Admin`,
 action `surface_labels.save`, `TargetKind` "surface-labels" — the
 `site.save` / `signup.set-open` / `timezone.set-default` singleton-toggle
 shape). The lane **upserts** the singleton (the `SiteContent` "one row per
-instance" shape, ADR 0150 D6) — it never creates a second row (M29·6).
+instance" shape, ADR [0150](../adr/0150-site-content-customization.md) D6) — it never creates a second row (M29·6).
 **Strong consistency** (invariant C4): the new value is live on the very
 next `GetLabelAsync` / render.
 
@@ -557,7 +557,7 @@ classes; the exact names are the drift-guard's test-name ceiling (no test
 whose exact name is not in this list may be introduced — unit-series rule 3).
 
 **`tests/Kumunita.Core.Tests/SurfaceLabelsServiceTests.cs`** — the 8 Core
-seam pins (the ADR 0150 single-write-lane shape + the read-seam contract):
+seam pins (the ADR [0150](../adr/0150-site-content-customization.md) single-write-lane shape + the read-seam contract):
 
 1. `GetAsync_MissingStore_ReturnsAllNullFallback` — a test construction with
    no store degrades to the all-null fallback (M29·2, M29·6).
@@ -589,7 +589,7 @@ seeder pins (the `FirstBootSeeder` all-null default, the SITE / M28
     (no duplicate row, no field change) (M29·6).
 
 **`tests/Kumunita.Web.Tests/AdminSurfaceLabelsControllerTests.cs`** — the 4
-Web controller pins (the `/admin/labels` surface, the ADR 0150 shape):
+Web controller pins (the `/admin/labels` surface, the ADR [0150](../adr/0150-site-content-customization.md) shape):
 
 12. `GET_SeesCurrentSingleton` — the GET seeds the form with the current
     singleton (all 13 fields) (M29·7).
@@ -627,7 +627,7 @@ all three must be green:
    `SurfaceLabelsSeederTests` 3 pins + the `SiteContentServiceTests` /
    `KnownTranslationKeys_ParityTests` / `KwLRegistryConsistencyTests`
    registry-parity pins + the pre-existing Core suite all pass; the registry
-   entries are **untouched** — ADR 0152 D3, M29·4, M29·8).
+   entries are **untouched** — ADR [0152](../adr/0152-admin-surface-labels.md) D3, M29·4, M29·8).
 3. `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
    — **green** (the `AdminSurfaceLabelsControllerTests` 4 pins + the
    `SurfaceLabelResolutionTests` 5 pins + the `AdminSiteControllerTests`
@@ -642,7 +642,7 @@ stay **green** (the registry entries are untouched — the `nav.*` /
 source text the fallback resolves to). The `SiteContentServiceTests` /
 `AdminSiteControllerTests` pins stay **green** (the SITE precedent shapes are
 unchanged — M29 adds a *new* doc in a *new* context, not a new field on
-`SiteContent` — ADR 0150 D6 / ADR 0006 module-boundary pin). The
+`SiteContent` — ADR [0150](../adr/0150-site-content-customization.md) D6 / ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary pin). The
 `MilestonesTests` pin stays **green** through U00–U09 (the order +
 single-in-progress pin is intact until the milestone *ships* — U10 owns the
 close flip). The `WhatsNewTests` pin is **green at U10** (the `0.45.0`
@@ -666,14 +666,14 @@ The drift guard is the **ceiling / floor / untouched / unchanged** pin set
 for M29. A unit that drifts from any of these is a `## U<m> — Drift pause`
 in the handoff note (unit-series rule 8), not a silent re-shape.
 
-- **The `SurfaceLabels` field set is the ceiling** (ADR 0152 D1, M29·6) — the
+- **The `SurfaceLabels` field set is the ceiling** (ADR [0152](../adr/0152-admin-surface-labels.md) D1, M29·6) — the
   13 optional `string?` fields (Home / Announcements / Community / Groups /
   Events / Projects / Inventory / Bookmarks / Documents / Pages / Tags /
   Directory / People) are the **complete** admin surface for the current
   scope. **No field outside the field set may appear in the doc**; a future
-  `LBL-2` lane **adds** fields (additive per ADR 0004 §B.1), it does not
+  `LBL-2` lane **adds** fields (additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), it does not
   re-shape the existing 13.
-- **The `kw-l` registry entries are the floor** (ADR 0152 D3, M29·4) — the
+- **The `kw-l` registry entries are the floor** (ADR [0152](../adr/0152-admin-surface-labels.md) D3, M29·4) — the
   `nav.home` / `nav.announcements` / `nav.community` / `nav.groups` /
   `nav.events` / `nav.projects` / `inv.nav` / `bm.nav` / `documents.title` /
   `nav.pages` / `nav.tags` / `nav.directory` / `nav.people` keys in
@@ -682,8 +682,8 @@ in the handoff note (unit-series rule 8), not a silent re-shape.
   `en` source text). The registry parity tests
   (`KnownTranslationKeys_ParityTests` / `KwLRegistryConsistencyTests`) are
   **untouched**.
-- **The `SiteContent` + `LocaleSettings` docs are untouched** (ADR 0150 D6 /
-  ADR 0006 module-boundary pin, M29·6) — M29 adds a **new** doc in a **new**
+- **The `SiteContent` + `LocaleSettings` docs are untouched** (ADR [0150](../adr/0150-site-content-customization.md) D6 /
+  ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary pin, M29·6) — M29 adds a **new** doc in a **new**
   bounded context (`Kumunita.Core.SurfaceLabels`), not a new field on an
   existing one. The `SiteContent` and `LocaleSettings` field sets are
   **unchanged**.
@@ -699,7 +699,7 @@ in the handoff note (unit-series rule 8), not a silent re-shape.
   pin stays intact through U00–U09; U10 owns the close flip (the
   six-member close flip including the `WhatsNew.cs` `0.45.0` entry).
 - **The SITE hero is untouched** (M29·10) — the Home surface's hero text
-  (the `HomeHeroEyebrow` / `HomeHeroLead` fields, ADR 0150) is **already**
+  (the `HomeHeroEyebrow` / `HomeHeroLead` fields, ADR [0150](../adr/0150-site-content-customization.md)) is **already**
   admin-editable via the SITE lane; M29 drives the **Home nav label only**
   (the `nav.home` key), it does **not** touch the SITE hero.
 - **The test names are the ceiling** (unit-series rule 3) — no test whose
@@ -751,11 +751,11 @@ in the handoff note (unit-series rule 8), not a silent re-shape.
 - **registry parity — GREEN.** `KnownTranslationKeys_ParityTests` +
   `KwLRegistryConsistencyTests` pass (not in the 4-failure set) — the
   `nav.*` / `inv.nav` / `bm.nav` / `documents.title` registry entries are
-  **untouched** (ADR 0152 D3, M29·4).
+  **untouched** (ADR [0152](../adr/0152-admin-surface-labels.md) D3, M29·4).
 - **SITE precedent — GREEN.** `SiteContentServiceTests` +
   `SiteContentSeederTests` (Core, green in the 1384) + `AdminSiteControllerTests`
   (Web, not in the 4-failure set) pass — the SITE shapes are unchanged
-  (ADR 0150 D6 / ADR 0006 — M29 adds a *new* doc in a *new* context).
+  (ADR [0150](../adr/0150-site-content-customization.md) D6 / ADR [0006](../adr/0006-module-boundary-contracts.md) — M29 adds a *new* doc in a *new* context).
 - **`MilestonesTests` — GREEN** (not in the 4-failure set) — the order +
   single-in-progress pin is intact through U00–U09 (U10 owns the close flip).
 - **`WhatsNewTests` — PENDING U10** — the `0.45.0` entry (the required sixth
@@ -822,7 +822,7 @@ the six-member close flip, the U09 carry-forward reconciled green, and the
   `M23FindPeopleTests.Layout_Carries_APeopleNavEntry_…`) were **re-pinned to
   the invariants they actually care about** — the link (a rename never moves a
   link — "label, not re-route"), the M29 resolver seam (`GetLabelAsync`), and
-  the `kw-l` registry floor (ADR 0152 D3) — rather than U05's replaced literal
+  the `kw-l` registry floor (ADR [0152](../adr/0152-admin-surface-labels.md) D3) — rather than U05's replaced literal
   `key="…"` markup. The 4th, `ImproveHarnessTests.ImproveCheck_Gate_Passes`, is
   cleared: this design doc now opens with an `Abstract` in the first 15 lines
   (gate (g) — the doc drops out of the >400-without-Abstract baseline
@@ -837,18 +837,18 @@ the six-member close flip, the U09 carry-forward reconciled green, and the
 `WhatsNew.cs`):**
 
 - `src/Kumunita.Web/Milestones.cs` — M29 `StatusPlanned` → `StatusDone`.
-- `README.md` — the Status M29 line → **done** (ADR 0152); the planned set is
+- [`README.md`](../../README.md) — the Status M29 line → **done** (ADR [0152](../adr/0152-admin-surface-labels.md)); the planned set is
   now **M30–M34** (five).
-- `docs/STATUS.md` — the M29 shipped line (the `SurfaceLabels` singleton + the
+- [`docs/STATUS.md`](../STATUS.md) — the M29 shipped line (the `SurfaceLabels` singleton + the
   13 nav items + 13 surface headers + `/admin/labels`).
-- `docs/ARCHITECTURE.md` — the M29 bounded-context line (the `Kumunita.Core.SurfaceLabels`
+- [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) — the M29 bounded-context line (the `Kumunita.Core.SurfaceLabels`
   context + `SurfaceLabels` singleton + `ISurfaceLabelsService` seam + the
-  dedicated `AdminSurfaceLabelsController`, the ADR 0150 shape).
+  dedicated `AdminSurfaceLabelsController`, the ADR [0150](../adr/0150-site-content-customization.md) shape).
 - `tests/Kumunita.Web.Tests/MilestonesTests.cs` — M29 added to the done set;
   the planned set is now `{M30, M31, M32, M33, M34}`; the order test is
   unchanged (M29 stays in the same position).
 - `src/Kumunita.Web/WhatsNew.cs` — the `0.45.0` entry (newest-first, after the
-  `0.44.0` IMPROVE reduction entry) naming M29 + ADR 0152. (The
+  `0.44.0` IMPROVE reduction entry) naming M29 + ADR [0152](../adr/0152-admin-surface-labels.md). (The
   `WhatsNewTests` head pin advances `0.44.0` → `0.45.0` and still pins the
   IMPROVE `0.44.0` reduction entry one row back.)
 
@@ -875,11 +875,11 @@ note move to `docs/archive/lanes/m29/`.
 
 ---
 
-## ADR 0150 — moved content (D11 trim, 2026-11-02)
+## ADR [0150](../adr/0150-site-content-customization.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
-### 2026-10-22 — D3 save lane: upsert-on-missing (ADR 0170)
+### 2026-10-22 — D3 save lane: upsert-on-missing (ADR [0170](../adr/0170-site-content-save-upsert-on-missing.md))
 
 D3's "The lane **upserts** the singleton — it never creates a second
 row (D6)" is preserved (still true — an upsert, not a second row), but
@@ -887,7 +887,7 @@ the **no-op-on-missing-row** behavior the `ISiteContentService.SaveAsync`
 doc comment and the `SiteContentService.SaveAsync` code carried ("a
 missing row is a no-op — the lane never load-or-creates") is **retired**.
 A save on a missing row now **creates** the singleton with the caller's
-field set + the single `AccessAudit` row (the ADR 0164 `KioskService`
+field set + the single `AccessAudit` row (the ADR [0164](../adr/0164-kiosk-mode.md) `KioskService`
 "upsert vs. no-op" shape — the M35·2 pin), so a save is never a silent
 no-op (invariant C3/C4 are actually honored on the missing-row path).
 The M35·2 "upsert vs. no-op" divergence between the `SiteContent`
@@ -896,8 +896,8 @@ services are now on parity; the two other Kiosk divergences (caller's
 session, nullable read) remain. One new Core test
 (`SiteContentServiceTests.SaveAsync_MissingRow_CreatesSingleton`) pins
 the new behavior; the existing `SiteContentServiceTests` (which seed a
-row first) are unchanged. The sibling `SurfaceLabelsService` (ADR 0152,
+row first) are unchanged. The sibling `SurfaceLabelsService` (ADR [0152](../adr/0152-admin-surface-labels.md),
 M29·6) carries the same no-op template and is **not** amended in this
-pass (D5 of ADR 0170 — a separate follow-up if the latent-bug class is
-confirmed there). See **ADR 0170** for the full locked text (the
+pass (D5 of ADR [0170](../adr/0170-site-content-save-upsert-on-missing.md) — a separate follow-up if the latent-bug class is
+confirmed there). See **ADR [0170](../adr/0170-site-content-save-upsert-on-missing.md)** for the full locked text (the
 amendment, the D5 scope note, and the consequences).

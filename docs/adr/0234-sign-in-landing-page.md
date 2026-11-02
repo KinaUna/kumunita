@@ -11,12 +11,12 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0234 — Where a sign-in lands: Home, and MFA settings after a recovery code
+# ADR [0234](0234-sign-in-landing-page.md) — Where a sign-in lands: Home, and MFA settings after a recovery code
 
 Status: Accepted
 
 ## Context
-ADR 0232 noticed that a recovery-code sign-in ended on `/profile/edit`. Reading the controller showed it was not special to
+ADR [0232](0232-verification-gaps-faq-mfa-upload.md) noticed that a recovery-code sign-in ended on `/profile/edit`. Reading the controller showed it was not special to
 recovery: every sign-in without a `returnUrl` (password, authenticator code, recovery code, and the "already signed in"
 bounce on `GET /Account/Login`) redirected to `/profile/edit`. The "Home page" setting only hides the home intro, so there is
 no landing preference to honour.

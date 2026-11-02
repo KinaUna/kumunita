@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0207 — Detail page titles are `<h1>`
+# ADR [0207](0207-detail-page-h1-titles.md) — Detail page titles are `<h1>`
 
 Status: Accepted
 

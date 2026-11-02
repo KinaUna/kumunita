@@ -11,15 +11,15 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0083 — Group membership notifications: notify the resident when they are added to a group or invited to join one (kinds `group.added` / `group.invite`), and the tabbed group detail page
+# ADR [0083](0083-group-add-and-invite-notifications.md) — Group membership notifications: notify the resident when they are added to a group or invited to join one (kinds `group.added` / `group.invite`), and the tabbed group detail page
 
 Status: Accepted | Date: 2026-09-20
 
 > **Abstract:** two new `NotificationKinds`
 > (`group.added` / `group.invite`) join the closed M6
-> `NotificationKinds` vocabulary (ADR 0076 D2), **reusing verbatim** the
+> `NotificationKinds` vocabulary (ADR [0076](0076-notifications-inbox-and-recipient-email.md) D2), **reusing verbatim** the
 > `NotificationService.EmitAsync` seam, the frozen `IMailerStage.StageAsync`
-> trio, and the ADR 0061 per-recipient language resolution — **no** new
+> trio, and the ADR [0061](0061-email-and-notification-language.md) per-recipient language resolution — **no** new
 > context, **no** new document, **no** new surface, **no** new service.
 > The `UserInfoService` primary-ctor gains a **trailing, optional**
 > `IServiceProvider? services = null` (the circular-dependency seam, the
@@ -41,19 +41,19 @@ Status: Accepted | Date: 2026-09-20
 
 ## Context
 
-The M6 notifications context (ADR 0076) shipped eleven kinds. ADR 0076 D2
+The M6 notifications context (ADR [0076](0076-notifications-inbox-and-recipient-email.md)) shipped eleven kinds. ADR [0076](0076-notifications-inbox-and-recipient-email.md) D2
 reserved the `post.mention` kind and left the *membership-change* kinds
-(`group.added` / `group.invite`) as a **follow-on lane** (ADR 0076's
+(`group.added` / `group.invite`) as a **follow-on lane** (ADR [0076](0076-notifications-inbox-and-recipient-email.md)'s
 "deferred to their own lanes" posture). This ADR is that follow-on: the
 *membership-change* kinds (not the *content* kind — the `group.post` kind
-was settled by ADR 0076 D2 + wired emitter). The *natural* shape is to
+was settled by ADR [0076](0076-notifications-inbox-and-recipient-email.md) D2 + wired emitter). The *natural* shape is to
 **add two kinds** to the closed `NotificationKinds` vocabulary,
 **reuse verbatim** the `EmitAsync` seam, the `IMailerStage.StageAsync`
-trio, and the ADR 0061 per-recipient language resolution — **not** to
+trio, and the ADR [0061](0061-email-and-notification-language.md) per-recipient language resolution — **not** to
 invent a new context, a new document, a new surface, or a new service. The
 group detail page's sections (Feed / Members / Settings) are already
-shipped (ADR 0007/0008/0010/0013/0026); this ADR **restructures** them into
-the Bootstrap `nav-tabs` idiom (the ADR 0062 `_ProjectsTabs.cshtml`
+shipped (ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)/0008/0010/0013/0026); this ADR **restructures** them into
+the Bootstrap `nav-tabs` idiom (the ADR [0062](0062-admin-surface-split.md) `_ProjectsTabs.cshtml`
 precedent) — a **view restructure**, not a new surface.
 
 ## Decision
@@ -63,9 +63,9 @@ precedent) — a **view restructure**, not a new surface.
   `group.invite` (the resident was *invited* to join a group). The
   `EmitAsync` seam (the M6 D1/D4/D5/D7 frozen shape) is **reused
   verbatim** — the two emitters sit on the two `UserInfoService` write
-  seams that ADR 0007's SoD gate protects (the membership upsert / the
+  seams that ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s SoD gate protects (the membership upsert / the
   invitation write). The self-leave seam (`RemoveGroupMemberAsync`,
-  ADR 0008) deliberately does **not** emit (a self-leave is not something
+  ADR [0008](0008-member-self-leave-lane.md)) deliberately does **not** emit (a self-leave is not something
   to be notified *about*). See the handoff note for the Amends ledger.
 - **D2 — The `UserInfoService` primary-ctor gains a trailing, optional
   `IServiceProvider? services = null`.** The two emitters resolve the
@@ -74,7 +74,7 @@ precedent) — a **view restructure**, not a new surface.
   to runtime, which breaks the construction-time cycle (the
   `NotificationService` constructor takes `IUserInfoService`, so injecting
   a `NotificationService?` **directly** into `UserInfoService` would
-  create a cycle). The `null` default preserves the **181 pre-ADR 0083
+  create a cycle). The `null` default preserves the **181 pre-ADR [0083](0083-group-add-and-invite-notifications.md)
   direct-construction test call sites** (they get `services = null` → no
   emission, the pre-M6 behavior). See the handoff note for the full
   circular-dependency seam detail.
@@ -83,7 +83,7 @@ precedent) — a **view restructure**, not a new surface.
   row is **the recipient's own data** (the `RecipientId` is the whole
   access story). **No** audit row is emitted for the notification itself —
   the *domain* write already emits its own `AccessAudit` row (the
-  membership upsert / the invitation write, ADR 0007's SoD derivation).
+  membership upsert / the invitation write, ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s SoD derivation).
   *Forbids:* a new `AccessAction`, a new `AccessVia`, a
   `NotificationToAuditableResource` adapter, or an audit row on the
   notification emission.
@@ -106,14 +106,14 @@ precedent) — a **view restructure**, not a new surface.
 - **D6 — The group detail page becomes three tabs: Feed, Members,
   Settings (owner ∪ GlobalAdmin only).** `Views/Groups/Detail.cshtml`
   restructures the existing sections into the Bootstrap `nav nav-tabs`
-  idiom (the `_ProjectsTabs.cshtml` precedent, ADR 0062). The active tab
+  idiom (the `_ProjectsTabs.cshtml` precedent, ADR [0062](0062-admin-surface-split.md)). The active tab
   is derived **server-side from the `?tab=` query string** (no client-side
   tab JS, no new dependency). See the handoff note for the full tab
   layout.
 - **D7 — Reuse, don't reinvent.** The M6 `NotificationService.EmitAsync`
-  seam, the M1 durable-email trio, the ADR 0061 per-recipient
+  seam, the M1 durable-email trio, the ADR [0061](0061-email-and-notification-language.md) per-recipient
   outbound-channel language, the closed `KnownTranslationKeys` registry,
-  the Bootstrap `nav-tabs` idiom, and the ADR 0078 sample-account
+  the Bootstrap `nav-tabs` idiom, and the ADR [0078](0078-sample-account-notification-suppression-in-production.md) sample-account
   suppression gate (inherited by the two new kinds for free — the
   suppression check in `EmitAsync` is kind-agnostic) are all **frozen
   seams**. This ADR adds **two kind constants + two emitters (both in
@@ -140,16 +140,16 @@ precedent) — a **view restructure**, not a new surface.
   is the notifications count assertion, by design.
 - A resident who is added to a group or invited to one now sees an inbox
   row (and, if they have an email and haven't disabled the kind, an email)
-  in their own `EmailLanguage` (ADR 0061), with the group's name as the
-  snippet (ADR 0018) — the "something just changed about me" signal M6
-  promised for membership changes and that ADR 0076 left as a follow-on.
+  in their own `EmailLanguage` (ADR [0061](0061-email-and-notification-language.md)), with the group's name as the
+  snippet (ADR [0018](0018-ugc-authored-in-language-tag.md)) — the "something just changed about me" signal M6
+  promised for membership changes and that ADR [0076](0076-notifications-inbox-and-recipient-email.md) left as a follow-on.
 - The group detail page is now Feed / Members / Settings tabs: a member
   lands on the Feed; an owner ∪ GlobalAdmin additionally sees Members'
   management lanes and the Settings tab; deep links `?tab=…` land on the
   right tab.
 - **Deferred, each named:** per-kind **sub-settings** (an email-only vs
-  inbox-only split, ADR 0076's follow-on), **notification options on the
+  inbox-only split, ADR [0076](0076-notifications-inbox-and-recipient-email.md)'s follow-on), **notification options on the
   group Settings tab**, the **`post.mention`** emitter (still reserved,
-  ADR 0076 D2), **group/community to-do assignment** notifications
-  (ADR 0073 / 0074), **push / PWA push** (M9), **digests**, and **live
+  ADR [0076](0076-notifications-inbox-and-recipient-email.md) D2), **group/community to-do assignment** notifications
+  (ADR [0073](0073-todo-group-community-claim-lane.md) / 0074), **push / PWA push** (M9), **digests**, and **live
   update** (WebSocket / SSE) — each a follow-on lane with its own ADR.

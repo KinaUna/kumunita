@@ -17,7 +17,7 @@ updated: 2026-11-02
 
 
 > **M25 (Upload limits)** is a **settings + enforcement** lane over the *existing*
-> media byte store (ADR 0011). It does **not** add a new store, catalog doc,
+> media byte store (ADR [0011](../adr/0011-media-and-file-storage.md)). It does **not** add a new store, catalog doc,
 > `AccessAction`, or bounded context — it reuses `IMediaStore` + `MediaObject`
 > (content-addressed, `SizeBytes`, `CreatedById`) and the existing
 > `Kumunita.Core.Usage` context.
@@ -44,7 +44,7 @@ operator-tuned env vars only) and surfaces one number **to the resident**:
 
 - **per-file size limit** — an admin can set the max bytes for a single upload
   from inside the app (today it is the operator-tuned env `Media__MaxBytes`,
-  5 MiB default, per ADR 0011). The env value remains the **fallback** when the
+  5 MiB default, per ADR [0011](../adr/0011-media-and-file-storage.md)). The env value remains the **fallback** when the
   admin has not set one.
 - **per-user total content quota** — an admin can set a resident's total
   content cap. Quota `0` means **unlimited**.
@@ -60,7 +60,7 @@ only once (and only the first storer counts the file at all).
 ### What M25 does *not* do (non-decisions)
 
 - **Not a new store or a new doc for the bytes** — the `MediaObject` catalog
-  and the `IMediaStore` byte path are untouched (C-MED·4/6 from ADR 0011 hold).
+  and the `IMediaStore` byte path are untouched (C-MED·4/6 from ADR [0011](../adr/0011-media-and-file-storage.md) hold).
 - **Not per-resident quota overrides** — the quota is one community-wide number
   the admin sets; M25 does not let an admin pick a different quota for a single
   resident. (That is a later, out-of-scope lane.)
@@ -114,7 +114,7 @@ The 7 invariants. Ids and names are **frozen** once written.
   per-request spoofable.
 - **C-UP·2** — **guards before write**: size + quota are checked **before**
   `PutAsync`; on a reject, **no byte is written**.
-- **C-UP·3** — **`Core` stays HTTP-free** (ADR 0006-D): the decision is a pure
+- **C-UP·3** — **`Core` stays HTTP-free** (ADR [0006](../adr/0006-module-boundary-contracts.md)-D): the decision is a pure
   Core function; the `ActionResult` mapping is Web-only.
 - **C-UP·4** — **content-addressed usage**: a user's usage =
   `Σ MediaObject.SizeBytes WHERE CreatedById == subjectId`; dedup inherent.
@@ -161,7 +161,7 @@ F1–F10, each bound to an invariant. Names are **frozen** once written.
 ### 2.1 New Core-owned types (exact C#) — namespace `Kumunita.Core.Usage`
 
 All four Core types (`CommunityStorageSettings`, `IStorageSettingsService`,
-`StorageDecision`, `StorageLimits`) are **HTTP-free** (C-UP·3 / ADR 0006-D) and
+`StorageDecision`, `StorageLimits`) are **HTTP-free** (C-UP·3 / ADR [0006](../adr/0006-module-boundary-contracts.md)-D) and
 live in `Kumunita.Core.Usage`, mirroring the M24 `IStorageMetricsService` /
 `StorageMetricsService` pair already in that context. `IUploadGate` is the
 **Web-only** gate (it returns `ActionResult`, so it cannot cross into Core).
@@ -466,7 +466,7 @@ The following are **frozen**; any mismatch is a `## U<m> — Drift pause`
 - **The M24 C-SM·7 seam reuse:** `IStorageSettingsService.
   GetPerUserUsageBytesAsync` **delegates to / re-points to** the existing
   `IStorageMetricsService.GetPerUserUsageBytesAsync` (the M24 storage-metrics
-  lane, ADR 0134). If M24's seam is removed or reshaped, or the per-user usage
+  lane, ADR [0134](../adr/0134-storage-metrics.md)). If M24's seam is removed or reshaped, or the per-user usage
   read is re-pointed *away* from it, that is a drift-guard event — it is the
   one cross-milestone seam M25 depends on, and it is **named here** so a later
   unit cannot silently re-implement it.
@@ -497,7 +497,7 @@ satisfies the C-UP·6 single-in-progress contract and unblocks **M26 (Sorting)**
   not re-implemented**; `IStorageSettingsService.GetPerUserUsageBytesAsync`
   delegates to it. The admin view's community-total figure reuses M24's
   C-SM·2 seam (`IStorageMetricsService.GetSnapshotAsync`). M25 is the
-  *enforcement* half; ADR 0134 (M24) is the *metrics* half.
+  *enforcement* half; ADR [0134](../adr/0134-storage-metrics.md) (M24) is the *metrics* half.
 
 - **The test count (honest "Closed" basis, U10).** Core
   `Kumunita.Core.Tests`: **Total 1153, Errors 0, Failed 0, Skipped 0**
@@ -508,7 +508,7 @@ satisfies the C-UP·6 single-in-progress contract and unblocks **M26 (Sorting)**
   Skipped 0** (including U9's nine per-lane enforcement tests + U7's two
   resident self-view tests). **Both suites green.**
 
-- **The ADR pointer.** `docs/adr/0135-upload-limits.md` — the decision record
+- **The ADR pointer.** [`docs/adr/0135-upload-limits.md`](../adr/0135-upload-limits.md) — the decision record
   for this lane. (ADR **0134** is M24's storage-metrics ADR — it is correctly
   named in the body wherever the M24 *seam* being reused is cited, and is not
   M25's own pointer.)
@@ -529,17 +529,17 @@ satisfies the C-UP·6 single-in-progress contract and unblocks **M26 (Sorting)**
 
 ---
 
-## ADR 0135 — moved content (D11 trim, 2026-11-02)
+## ADR [0135](../adr/0135-upload-limits.md) — moved content (D11 trim, 2026-11-02)
 
 ## Not decided here (explicit non-decisions)
 
-Each is a **future lane**, named — the ADR 0011 / 0034 precedent holds:
+Each is a **future lane**, named — the ADR [0011](../adr/0011-media-and-file-storage.md) / 0034 precedent holds:
 
 - **Per-resident quota overrides** — the quota is a single community-wide value the
   admin sets; a per-resident override (an admin picking a different quota for one
   user) is a later lane (would widen `CommunityStorageSettings` to a per-resident
   map).
-- **The admin *metrics* tables** — M24's surface (ADR 0134); M25 reuses its reads,
+- **The admin *metrics* tables** — M24's surface (ADR [0134](../adr/0134-storage-metrics.md)); M25 reuses its reads,
   does not add another metrics view.
 - **Serve-time / edit-reference enforcement** — the gate is at the *byte-write*
   boundary; serving an already-stored file and editing a *reference* are not quota

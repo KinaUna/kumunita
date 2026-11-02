@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0269 — Controller ModelState validation messages are localized
+# ADR [0269](0269-modelstate-messages-localized.md) — Controller ModelState validation messages are localized
 
 Status: Accepted
 Date: 2026-10-29
@@ -21,7 +21,7 @@ Date: 2026-10-29
 Projects) rendered English validation and sign-in/permission text under every locale. Many messages repeat across controllers.
 
 ## Decision
-- Each call becomes `ModelState.AddModelError(field, await this.FlashAsync(key, "English"))` — the same shared extension as the flashes (ADR 0261), English floor
+- Each call becomes `ModelState.AddModelError(field, await this.FlashAsync(key, "English"))` — the same shared extension as the flashes (ADR [0261](0261-shared-flash-extension.md)), English floor
   byte-identical, so tests that assert the English validation text are unaffected.
 - 63 distinct messages → 63 new `validation.*` keys in en/de/fr/da (one key per distinct text, reused across controllers: "A title is required.",
   "Audience mode is required (Any or All).", the end-after-start messages, …); `flash.not_signed_in` and `flash.comment_needs_text` reused.
@@ -36,4 +36,4 @@ service exception text surfaced via `ex.Message` / `ModelState` (English at the 
 
 Compiled and run 2026-10-29 (build clean; `Kumunita.Web.Tests` green).
 
-The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 12975 -> 13243 on 2026-10-29 for the 63 new keys x en/de/fr/da of this lane (12975 -> 13227; the ADR 0265/0266 shipped-additions mechanism).
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 12975 -> 13243 on 2026-10-29 for the 63 new keys x en/de/fr/da of this lane (12975 -> 13227; the ADR [0265](0265-projects-flashes-localized.md)/0266 shipped-additions mechanism).

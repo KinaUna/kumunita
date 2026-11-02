@@ -15,7 +15,7 @@ updated: 2026-11-02
 > **Abstract:** why the avatar *bytes* must live on a persistent media volume (or uploads vanish on every redeploy), and the same two-step fix + verification as the keyring. **Who is it for:** the host operator. **When to read the rest:** before first deploy; when avatars 404 after a redeploy.
 
 # 5.2A — Media volume persistence (required in production)
-The avatar **bytes** are not in Postgres (ADR 0011): the dump carries the
+The avatar **bytes** are not in Postgres (ADR [0011](../../../adr/0011-media-and-file-storage.md)): the dump carries the
 catalog (`MediaObject` rows), while the content-addressed files live under
 `Media__RootPath`. The in-code default is `{BaseDirectory}/media` — inside
 the image layer — so a Coolify deployment **as documented above but without

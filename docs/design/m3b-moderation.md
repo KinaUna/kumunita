@@ -24,12 +24,12 @@ updated: 2026-11-02
 > `PostStatus` enum + the `C-M3b·1..4` invariants, pinned in Part 2's
 > `## Seams & contracts` (the FACES count is pinned at 6). *Out of scope:*
 > everything M3 deferred — events, projects, notifications, export / iCal /
-> federation / MCP / API — is **not** M3b; `/admin` (M1) is unchanged (ADR 0003
+> federation / MCP / API — is **not** M3b; `/admin` (M1) is unchanged (ADR [0003](../adr/0003-roles-and-moderator-scoping.md)
 > SoD pins this).
 
 > **Part 1 of 2 (U1 — doc-only, no build).** Part 1 pins **scope** (the six-item
 > M3b deferral list = M3b's complete in-scope, nothing else), **invariants**
-> (the new `C-M3b·1..4` + which ADR 0006 / ADR 0001-B / ADR 0003 clause still
+> (the new `C-M3b·1..4` + which ADR [0006](../adr/0006-module-boundary-contracts.md) / ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / ADR [0003](../adr/0003-roles-and-moderator-scoping.md) clause still
 > holds), and the **FACES table (pinned count: 6)**. Part 2 (U2) will append
 > `## Seams & contracts (Part 2, written by U2)` with the exact C# shapes
 > U3–U10 must implement against (the four `ModerationService` method
@@ -50,7 +50,7 @@ audience, even with `ModeratorAccess` flagged ON, because M3 ships no
 `Moderate`-on-post call and no `Via = Report` branch).
 
 M3b closes the gap M3 deliberately left open. The scope is the six-item deferral
-list M3 recorded in `docs/design/m3-posts-design.md` § `## M3 — Closed (recorded)`
+list M3 recorded in [`docs/design/m3-posts-design.md`](m3-posts-design.md) § `## M3 — Closed (recorded)`
 → `### M3b deferral list`, mirrored verbatim in `docs/plans-milestones/
 m3-handoff-notes.md` § `## Summary` (U11's close) and in the plan's own
 Assumptions. That list **is** M3b's in-scope. Nothing else — events, projects,
@@ -80,7 +80,7 @@ M3b's lanes.
    standing moderator (C-M3b·2, F2).
 3. **Moderator surfaces — the queue, the resolve UI, the "assign to a
    moderator" form.** `/admin` (M1's admin surface) is **unchanged** in M3
-   (ADR 0003 SoD pins this — U7 confirms it is not touched again).
+   (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD pins this — U7 confirms it is not touched again).
 4. **The `Post.Status` field (hidden / removed) and the M3b removal path.**
    M3's `Post` POCO has **no** `Status` column (registered *absent*, not
    nullable-not-set). M3b adds the enum + the two `Moderate`-gated write
@@ -128,7 +128,7 @@ scope" block — nothing else is in M3b):**
 
 ## Invariants (pinned for M3b)
 
-M3b is a *caller* of the ADR 0006 invariants (not an owner), **plus** the
+M3b is a *caller* of the ADR [0006](../adr/0006-module-boundary-contracts.md) invariants (not an owner), **plus** the
 first caller to actually *exercise* two of the reserved M1 vocabulary
 entries (`AccessAction.Moderate`, `AccessVia.Report`) and the
 `ModeratorAccess` flag-flip seam. M3b owns **four** new invariants
@@ -137,55 +137,55 @@ need: the resident-facing report-filing lane, the
 `Via = Report` read branch, the `Moderate`-gated write lane (hide / remove),
 and the SoD on assign.
 
-| # | ADR 0006 / M3b pin | How M3b uses it |
+| # | ADR [0006](../adr/0006-module-boundary-contracts.md) / M3b pin | How M3b uses it |
 |---|---|---|
 | **C-M3b·1** (M3b-owned) | **Report filing is a resident-facing intake action, not an access decision.** A resident who can currently *see* a post (their `Read` decision is `Allowed`) may file a report against it. Filing needs **no** `CanAsync` call (it is an *intake* action, analogous to M1's `UpsertProfileAsync` — a write seam, not an access decision). Filing **does** append an `AccessAudit` row (a write lane), but the row's `Via` tag is the **filing tag** (pinned by Part 2 §2.3, C-M3b·1) — **not** `Via = Report` (reserved for the *read* branch, C-M3b·2), and **not** `Via = Owner` (that is the C1 owner branch). The exact tag / `AccessVia` literal is U2's Part 2 §2.3 pin; U1 pins only the two negatives here. | The report-filing action (F1) is the first M3b write lane that **does not need** a `CanAsync` authorization decision — it is an *intake* action, not an *access* decision. The audit row's `Via` tag is the pinned filing tag (Part 2 §2.3), distinct from `Via = Report` (the read branch, C-M3b·2). The "filing ≠ read branch" split is U1's pin; U2's Part 2 §2.3 carries the exact tag. |
-| **C-M3b·2** (M3b-owned) | **`Via = Report` read branch.** A **filed report** in a post's component unlocks that post **for a standing moderator with `ModeratorAccess` scope on that component** (M1 branch #2, the C5 carve-out U7 will exercise) — the post's own `Read` decision is no longer the sole gate; the *filed report* is the gate. The `AccessAudit` row records `Via = Report` with the **acting identity** (the standing moderator, not the resident who filed). The resident who files the report is **not** the viewer on this branch — *filing* (C-M3b·1) and *unlock via filing* (C-M3b·2) are two distinct lanes. This is the C5 carve-out going live — the **exact inverse** of M3's F3 / F8 "absence" tests (a `Moderate`-holding viewer sees nothing beyond the author's audience). | The `Via = Report` branch (F2) is the M3b read-lane addition: it is either a new method on `ModerationService` (e.g. `CanReadWithReportAsync`) **or** a direct branch on `AuthorizationService.Decide` — U2's Part 2 §2.4 pin decides which (the *thinner lane* per the M3 handoff, the M3 deferral list item 2's candidate wording). ADR 0006-E "compatible lane" applies (M3b's close — U11 — grows M1's *named here* list by exactly one line). A `Moderate`-holding viewer with **no** filed report in the post's component still sees nothing (C5, unactivated) — the branch is triggered by the *filed report*, not by the `Moderate` action alone. |
-| **C-M3b·3** (M3b-owned) | **`Moderate`-gated write lane, same-transaction, no partial writes.** `HidePostAsync` / `RemovePostAsync` (the two moderation write lanes): both call `IAuthorizationService.CanAsync(actorId, AccessAction.Moderate, target, idDocumentSession)` **before** writing, in the **same** `IDocumentSession` transaction as the domain write (C3, ADR 0006-C: audit always on — Allow *and* Deny); a denied call is **not executed at all** (no `Hidden` status write, no `Removed` status write, no partial state). `Post.Status ∈ { Active, Hidden, Removed }` is the *only* state the write lane touches — **additive** (ADR 0004 §B.1), not a breaking reshape. Both lanes are `Moderate`-gated (a non-moderator caller is denied; the `AccessAudit` row records Deny). | The two moderation write lanes (F3 / F4) are the **first** code path that ever passes `AccessAction.Moderate` into `CanAsync`. The `Post.Status` enum is the **single M3b ADD** on the `Post` POCO (ADR 0004 §B.1 additive, no migration, no re-seed). A non-moderator caller is denied (C3, ADR 0006-C) — the audit row records Deny with the acting identity and the pinned `Via` tag. The **same** `IDocumentSession` overload (M1's §E lane) is the *only* way the write lane and its audit row commit atomically. |
-| **C-M3b·4** (M3b-owned) | **SoD on assign (ADR 0003):** only a **GlobalAdmin** can invoke `AssignReportAsync` (the "assign to a moderator" form). A **Moderator** caller is **denied** (the `AccessAudit` row records Deny; the write is **not executed**). The `ModeratorAccess` flag-flip (`IUserInfoService.SetComponentModeratorAccessAsync` — M1, unchanged, GlobalAdmin-gated) is a **separate** seam: the assign lane (F5) does **not** call it directly; the flag-flip is the **unlock / resolve** lane's (F6) job — the "report-driven unlock" that activates the C5 carve-out for the standing moderator on subsequent renders (not the F5 render). `/admin` (M1's admin surface) is **unchanged** in M3b (ADR 0003 SoD pin; U7 confirms it is not touched). | `AssignReportAsync` (F5) is GlobalAdmin-gated (SoD). A Moderator caller is denied (C3, ADR 0006-C). **The `ModeratorAccess` flag-flip** (`SetComponentModeratorAccessAsync`, M1, unchanged, GlobalAdmin-gated) is a **separate** seam — M3b's resolve / unlock lane (F6) calls it (the "report-driven unlock"), and it commits in the **same** `IDocumentSession` transaction as the report's `Status` write (C3, ADR 0006-C). A non-GlobalAdmin caller is denied; the audit row records Deny. **`/admin` is unchanged** (ADR 0003 SoD, M1's admin surface). |
+| **C-M3b·2** (M3b-owned) | **`Via = Report` read branch.** A **filed report** in a post's component unlocks that post **for a standing moderator with `ModeratorAccess` scope on that component** (M1 branch #2, the C5 carve-out U7 will exercise) — the post's own `Read` decision is no longer the sole gate; the *filed report* is the gate. The `AccessAudit` row records `Via = Report` with the **acting identity** (the standing moderator, not the resident who filed). The resident who files the report is **not** the viewer on this branch — *filing* (C-M3b·1) and *unlock via filing* (C-M3b·2) are two distinct lanes. This is the C5 carve-out going live — the **exact inverse** of M3's F3 / F8 "absence" tests (a `Moderate`-holding viewer sees nothing beyond the author's audience). | The `Via = Report` branch (F2) is the M3b read-lane addition: it is either a new method on `ModerationService` (e.g. `CanReadWithReportAsync`) **or** a direct branch on `AuthorizationService.Decide` — U2's Part 2 §2.4 pin decides which (the *thinner lane* per the M3 handoff, the M3 deferral list item 2's candidate wording). ADR [0006](../adr/0006-module-boundary-contracts.md)-E "compatible lane" applies (M3b's close — U11 — grows M1's *named here* list by exactly one line). A `Moderate`-holding viewer with **no** filed report in the post's component still sees nothing (C5, unactivated) — the branch is triggered by the *filed report*, not by the `Moderate` action alone. |
+| **C-M3b·3** (M3b-owned) | **`Moderate`-gated write lane, same-transaction, no partial writes.** `HidePostAsync` / `RemovePostAsync` (the two moderation write lanes): both call `IAuthorizationService.CanAsync(actorId, AccessAction.Moderate, target, idDocumentSession)` **before** writing, in the **same** `IDocumentSession` transaction as the domain write (C3, ADR [0006](../adr/0006-module-boundary-contracts.md)-C: audit always on — Allow *and* Deny); a denied call is **not executed at all** (no `Hidden` status write, no `Removed` status write, no partial state). `Post.Status ∈ { Active, Hidden, Removed }` is the *only* state the write lane touches — **additive** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), not a breaking reshape. Both lanes are `Moderate`-gated (a non-moderator caller is denied; the `AccessAudit` row records Deny). | The two moderation write lanes (F3 / F4) are the **first** code path that ever passes `AccessAction.Moderate` into `CanAsync`. The `Post.Status` enum is the **single M3b ADD** on the `Post` POCO (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive, no migration, no re-seed). A non-moderator caller is denied (C3, ADR [0006](../adr/0006-module-boundary-contracts.md)-C) — the audit row records Deny with the acting identity and the pinned `Via` tag. The **same** `IDocumentSession` overload (M1's §E lane) is the *only* way the write lane and its audit row commit atomically. |
+| **C-M3b·4** (M3b-owned) | **SoD on assign (ADR [0003](../adr/0003-roles-and-moderator-scoping.md)):** only a **GlobalAdmin** can invoke `AssignReportAsync` (the "assign to a moderator" form). A **Moderator** caller is **denied** (the `AccessAudit` row records Deny; the write is **not executed**). The `ModeratorAccess` flag-flip (`IUserInfoService.SetComponentModeratorAccessAsync` — M1, unchanged, GlobalAdmin-gated) is a **separate** seam: the assign lane (F5) does **not** call it directly; the flag-flip is the **unlock / resolve** lane's (F6) job — the "report-driven unlock" that activates the C5 carve-out for the standing moderator on subsequent renders (not the F5 render). `/admin` (M1's admin surface) is **unchanged** in M3b (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD pin; U7 confirms it is not touched). | `AssignReportAsync` (F5) is GlobalAdmin-gated (SoD). A Moderator caller is denied (C3, ADR [0006](../adr/0006-module-boundary-contracts.md)-C). **The `ModeratorAccess` flag-flip** (`SetComponentModeratorAccessAsync`, M1, unchanged, GlobalAdmin-gated) is a **separate** seam — M3b's resolve / unlock lane (F6) calls it (the "report-driven unlock"), and it commits in the **same** `IDocumentSession` transaction as the report's `Status` write (C3, ADR [0006](../adr/0006-module-boundary-contracts.md)-C). A non-GlobalAdmin caller is denied; the audit row records Deny. **`/admin` is unchanged** (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD, M1's admin surface). |
 
 **ADRs M3b must keep holding (pinned in the invariant rows above, and not
 violated elsewhere):**
 
-- **ADR 0006 C1** (C5 carve-out, default-OFF) — still binding: a
+- **ADR [0006](../adr/0006-module-boundary-contracts.md) C1** (C5 carve-out, default-OFF) — still binding: a
   `Moderate`-holding viewer sees **nothing** on a post the author has not
   shared with them *unless* a filed report is present (C-M3b·2, the
   "filed report" gate).
-- **ADR 0006 C3** (audit always on — Allow *and* Deny) — still binding:
+- **ADR [0006](../adr/0006-module-boundary-contracts.md) C3** (audit always on — Allow *and* Deny) — still binding:
   every M3b write lane (filing, hide, remove, assign, resolve) and read
   branch (`Via = Report`) commits an `AccessAudit` row in the same
   `IDocumentSession` transaction (C-M3b·1/2/3/4).
-- **ADR 0006 C4** (strong-consistency membership resolution against live
+- **ADR [0006](../adr/0006-module-boundary-contracts.md) C4** (strong-consistency membership resolution against live
   documents) — still binding: a membership change (a group add, an
   audience-grant add, a `ModeratorAccess` flag-flip) takes effect on the
   **very next** render — no projection in the access path (M3's F5 e2e pin
   still holds in M3b).
-- **ADR 0006 C6** (one matching pass — `MatchGroups` — shared by `CanAsync`
+- **ADR [0006](../adr/0006-module-boundary-contracts.md) C6** (one matching pass — `MatchGroups` — shared by `CanAsync`
   and `CanSeeAsync`) — still binding: the `Via = Report` branch (C-M3b·2)
   **is** the single matching pass; it cannot drift from the owner /
   audience / delegation passes.
-- **ADR 0001-B** (author's choice is absolute) — still binding: the
+- **ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B** (author's choice is absolute) — still binding: the
   composer writes the chosen `Audience` verbatim; M3b does **not**
   auto-add group grants, does **not** second-guess a "Safety only" choice
   with a "but the author is friendly" branch, and does **not** inject a
   community-wide audience (the C1 owner branch is the only "extra" the
   author gets).
-- **ADR 0004 §B.1** (Marten-native document registration, POCOs,
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** (Marten-native document registration, POCOs,
   conventional `string Id`, delta-detected, idempotent, no seeding) —
   still binding: the `Post.Status` field (C-M3b·3, the single M3b ADD on
   `Post`) is additive (delta-detected, idempotent, no re-seed).
-- **ADR 0003 §Separation of duties** — still binding: a `GlobalAdmin`
+- **ADR [0003](../adr/0003-roles-and-moderator-scoping.md) §Separation of duties** — still binding: a `GlobalAdmin`
   calling `AssignReportAsync` is allowed (C-M3b·4); a Moderator caller is
-  denied (C3, ADR 0006-C). `/admin` is unchanged (M3's ADR 0003 SoD pin
+  denied (C3, ADR [0006](../adr/0006-module-boundary-contracts.md)-C). `/admin` is unchanged (M3's ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD pin
   still holds — U7 confirms).
-- **ADR 0006-E** (compatible lane) — the `Via = Report` branch (C-M3b·2) is
-  the **single M3b ADD** on the authorization surface (ADR 0006-E "named
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-E** (compatible lane) — the `Via = Report` branch (C-M3b·2) is
+  the **single M3b ADD** on the authorization surface (ADR [0006](../adr/0006-module-boundary-contracts.md)-E "named
   here" list grows by exactly one line in M3b's close — U11). The
-  `Post.Status` field (C-M3b·3) is a Core POCO change (ADR 0004 §B.1), not
+  `Post.Status` field (C-M3b·3) is a Core POCO change (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), not
   an authorization-surface change.
-- **ADR 0006-D** (dependency direction) — still binding: `ModerationService`
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-D** (dependency direction) — still binding: `ModerationService`
   (Core) composes **only** `IUserInfoService` + `IAuthorizationService` +
-  its own Marten session (C3's single-write, ADR 0006-E compatible lane);
+  its own Marten session (C3's single-write, ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible lane);
   the `Kumunita.Web` layer is a thin controller (mirroring M2's
   `DirectoryController` shape, M3's `PostsController` shape).
 
@@ -208,11 +208,11 @@ that pin by id.
 | # | Outcome (what a resident / moderator sees) | Pinned by |
 |---|---|---|
 | C-M3b·1 (filing lane — resident-facing intake, no authz call; the `Via` tag is part-2-pinned, part 1's two negatives only: not `Via=Report`, not `Via=Owner`) |
-| F2 | A `Moderate`-holding moderator with a *filed report* on a post in their component **can read** that post — the post's own `Read` decision is no longer the sole gate; the *filed report* is the gate. The `AccessAudit` row records `Via = Report` with the acting identity (the moderator). A `Moderate`-holding viewer with **no** filed report in the post's component still sees nothing (C5, unactivated) — the branch is triggered by the *filed report*, not the `Moderate` action alone. | C-M3b·2 (`Via = Report` read branch, C5 carve-out live; ADR 0006-E compatible lane) |
-| F3 | A `Moderate`-holding moderator who calls `HidePostAsync` on a post in their scope: the post's `Status` flips to `Hidden`; the `AccessAudit` row records the write outcome with the pinned **write-lane `Via` tag** (Part 2 §2.3, C-M3b·3) and the acting identity. A non-moderator caller is **denied** (C3, ADR 0006-C); the audit row records Deny, and the write is **not executed at all** (no partial state). | C-M3b·3 (hide lane, `Moderate`-gated, same-transaction, no partial write; the `AccessVia` tag is part-2-pinned, not a literal in part 1) |
-| F4 | A `Moderate`-holding moderator who calls `RemovePostAsync` on a post in their scope: the post's `Status` flips to `Removed`; the `AccessAudit` row records the write outcome with the pinned **write-lane `Via` tag** (Part 2 §2.3, C-M3b·3) and the acting identity. A non-moderator caller is **denied** (C3, ADR 0006-C); no partial write. **`/admin` is unchanged** (M1's admin surface; ADR 0003 SoD; U7 confirms it is not touched). | C-M3b·3 (remove lane) + ADR 0003 SoD (`/admin` unchanged) |
-| F5 | A **GlobalAdmin** who calls `AssignReportAsync` on a report: the report's `Status` flips to `Assigned` (the pinned assign state, Part 2 §2.3); a `ModeratorAssignment` row is written (the standing-moderator's id, the report's `ComponentId`, the granting `GlobalAdmin` id as `GrantedBy`, the `At` timestamp). A **Moderator** caller is **denied** (ADR 0003 SoD; C3 audit row records Deny). The `ModeratorAssignment` POCO is M1's existing type (U5 confirms; U1 does **not** add or reshape). | C-M3b·4 (assign lane, GlobalAdmin-gated, SoD; `ModeratorAssignment` is M1's existing POCO — not a new M3b ADD) |
-| F6 | A **GlobalAdmin** who calls `UnlockAsync` / `ResolveReportAsync` on a report: the report's `Status` flips to `Resolved` (pinned, Part 2 §2.3); the report's `ComponentId` → the component's `ModeratorAccess` flag is flipped (via the existing `IUserInfoService.SetComponentModeratorAccessAsync` seam — M1, **unchanged**, GlobalAdmin-gated) **in the same transaction** (C3 — same-transaction as the report's `Status` write). A non-GlobalAdmin caller is **denied** (C3 row records Deny). **This is the C5-activation event**: the flag-flip is what enables the `Via = Report` read branch (C-M3b·2) for the **standing moderator** on **subsequent** renders — not the same render (F6's audit row does not include the `Via = Report` read decision; that decision is C-M3b·2's, the *next* render). | C-M3b·4 (unlock / resolve lane, flag-flip via the M1 seam — the **only** way to flip `ModeratorAccess`, C-M3b·4's "separate seam" pin; ADR 0006-C same-transaction) |
+| F2 | A `Moderate`-holding moderator with a *filed report* on a post in their component **can read** that post — the post's own `Read` decision is no longer the sole gate; the *filed report* is the gate. The `AccessAudit` row records `Via = Report` with the acting identity (the moderator). A `Moderate`-holding viewer with **no** filed report in the post's component still sees nothing (C5, unactivated) — the branch is triggered by the *filed report*, not the `Moderate` action alone. | C-M3b·2 (`Via = Report` read branch, C5 carve-out live; ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible lane) |
+| F3 | A `Moderate`-holding moderator who calls `HidePostAsync` on a post in their scope: the post's `Status` flips to `Hidden`; the `AccessAudit` row records the write outcome with the pinned **write-lane `Via` tag** (Part 2 §2.3, C-M3b·3) and the acting identity. A non-moderator caller is **denied** (C3, ADR [0006](../adr/0006-module-boundary-contracts.md)-C); the audit row records Deny, and the write is **not executed at all** (no partial state). | C-M3b·3 (hide lane, `Moderate`-gated, same-transaction, no partial write; the `AccessVia` tag is part-2-pinned, not a literal in part 1) |
+| F4 | A `Moderate`-holding moderator who calls `RemovePostAsync` on a post in their scope: the post's `Status` flips to `Removed`; the `AccessAudit` row records the write outcome with the pinned **write-lane `Via` tag** (Part 2 §2.3, C-M3b·3) and the acting identity. A non-moderator caller is **denied** (C3, ADR [0006](../adr/0006-module-boundary-contracts.md)-C); no partial write. **`/admin` is unchanged** (M1's admin surface; ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD; U7 confirms it is not touched). | C-M3b·3 (remove lane) + ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD (`/admin` unchanged) |
+| F5 | A **GlobalAdmin** who calls `AssignReportAsync` on a report: the report's `Status` flips to `Assigned` (the pinned assign state, Part 2 §2.3); a `ModeratorAssignment` row is written (the standing-moderator's id, the report's `ComponentId`, the granting `GlobalAdmin` id as `GrantedBy`, the `At` timestamp). A **Moderator** caller is **denied** (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD; C3 audit row records Deny). The `ModeratorAssignment` POCO is M1's existing type (U5 confirms; U1 does **not** add or reshape). | C-M3b·4 (assign lane, GlobalAdmin-gated, SoD; `ModeratorAssignment` is M1's existing POCO — not a new M3b ADD) |
+| F6 | A **GlobalAdmin** who calls `UnlockAsync` / `ResolveReportAsync` on a report: the report's `Status` flips to `Resolved` (pinned, Part 2 §2.3); the report's `ComponentId` → the component's `ModeratorAccess` flag is flipped (via the existing `IUserInfoService.SetComponentModeratorAccessAsync` seam — M1, **unchanged**, GlobalAdmin-gated) **in the same transaction** (C3 — same-transaction as the report's `Status` write). A non-GlobalAdmin caller is **denied** (C3 row records Deny). **This is the C5-activation event**: the flag-flip is what enables the `Via = Report` read branch (C-M3b·2) for the **standing moderator** on **subsequent** renders — not the same render (F6's audit row does not include the `Via = Report` read decision; that decision is C-M3b·2's, the *next* render). | C-M3b·4 (unlock / resolve lane, flag-flip via the M1 seam — the **only** way to flip `ModeratorAccess`, C-M3b·4's "separate seam" pin; ADR [0006](../adr/0006-module-boundary-contracts.md)-C same-transaction) |
 
 > **F6 note for U2:** the F6 row's "C5-activation event" is a **semantic
 > note** (the flag-flip *enables* the read branch), not a new invariant pin
@@ -235,8 +235,8 @@ Part 1.
 - If a later unit (U2–U11) finds a mismatch between an implemented signature
   and the pin in **this** Part, **this doc wins**. The unit updates this file
   in the same commit and appends a one-line drift note to
-  `docs/archive/lanes/m3b/m3b-handoff-notes.md`.
-- The invariant *numbers* — the four M3b-owned **C-M3b·1..4**; ADR 0006's
+  [`docs/archive/lanes/m3b/m3b-handoff-notes.md`](../archive/lanes/m3b/m3b-handoff-notes.md).
+- The invariant *numbers* — the four M3b-owned **C-M3b·1..4**; ADR [0006](../adr/0006-module-boundary-contracts.md)'s
   **C1, C2, C3, C4, C5, C6** (still binding, re-pinned in the "ADRs M3b must
   keep holding" list above); ADR **0001-B**; ADR **0003 §SoD**; ADR
   **0004 §B.1** — are **stable for the rest of M3b**. Renaming or
@@ -263,7 +263,7 @@ Part 1.
   (the C1 owner branch, M3). U2 pins the exact tag and the exact
   `AccessVia` literal it maps to — the drift-guard above applies.
 - **The `PostStatus` enum shape** (the `Post.Status` field, C-M3b·3) is a
-  Part 2 §2.2 pin. Part 1 pins only the *additive* nature (ADR 0004 §B.1,
+  Part 2 §2.2 pin. Part 1 pins only the *additive* nature (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1,
   no re-seed, no migration) and the *single* `AccessAction` id that
   exercises it (`Moderate`). U2 pins the exact C# enum literal set
   (`Active` / `Hidden` / `Removed`, or the M3b-final spelling) and the
@@ -273,7 +273,7 @@ Part 1.
   on `ModerationService` **or** a direct branch on
   `AuthorizationService.Decide` — **U2's §2.4 pin decides which**. M3b's
   U5 implements against the pin; it does **not** re-decide.
-- **`/admin` is unchanged** (ADR 0003 SoD, M1's admin surface). M3b's
+- **`/admin` is unchanged** (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD, M1's admin surface). M3b's
   `AssignReportAsync` (C-M3b·4, F5) is a *new* GlobalAdmin-gated surface
   (a **Moderator** / **GlobalAdmin** surface, not a `/admin` surface). U7
   (the `/moderation` surface) confirms `/admin` was not touched.
@@ -293,7 +293,7 @@ read lane, §2.3 reply route) — the four items below:
      IDocumentSession session)` — the resident-facing intake lane (F1).
    - `Task AssignReportAsync(string reportId, string actorId, IDocumentSession
      session)` — the GlobalAdmin-gated "assign to a moderator" lane (F5;
-     SoD, ADR 0003).
+     SoD, ADR [0003](../adr/0003-roles-and-moderator-scoping.md)).
    - `Task UnlockAsync(string reportId, string actorId, IDocumentSession
      session)` — the GlobalAdmin-gated "report-driven unlock" lane (F6;
      the sole caller of `IUserInfoService.SetComponentModeratorAccessAsync`
@@ -305,11 +305,11 @@ read lane, §2.3 reply route) — the four items below:
    (U2's §2.2 / §2.3 freeze the exact param order, return type,
    exception surface, and whether each writes its `AccessAudit` row in the
    same `IDocumentSession` as the domain write — yes, per
-   C-M3b·3 / ADR 0006-C.)
+   C-M3b·3 / ADR [0006](../adr/0006-module-boundary-contracts.md)-C.)
 
 2. **The `Post.Status` enum + the `HidePostAsync` / `RemovePostAsync`
    signatures on `PostService`** (C-M3b·3, F3 / F4) — the additive enum
-   (ADR 0004 §B.1; the *single* M3b ADD on the `Post` POCO) with the
+   (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1; the *single* M3b ADD on the `Post` POCO) with the
    exact literal set (expected `Active` / `Hidden` / `Removed`; U2 may
    rename, the *shape* — nullable-with-default — is the pin), the two
    `Task HidePostAsync(string postId, string actorId, IDocumentSession
@@ -363,12 +363,12 @@ namespaces are the contract U3–U11 must implement against. If a later unit
 discovers an implemented signature that does not match verbatim here, the
 drift-guard (§2.7) applies: **this file wins**; the unit updates this file
 in the same commit and appends a drift note to
-`docs/archive/lanes/m3b/m3b-handoff-notes.md`.
+[`docs/archive/lanes/m3b/m3b-handoff-notes.md`](../archive/lanes/m3b/m3b-handoff-notes.md).
 
 Namespace conventions:
 
 - Frozen Core modules (M1/M2 surface, unchanged by M3b):
-  `Kumunita.Core.Authorization` (ADR 0006-D boundary; `IAuthorizationService`,
+  `Kumunita.Core.Authorization` (ADR [0006](../adr/0006-module-boundary-contracts.md)-D boundary; `IAuthorizationService`,
   `IUserInfoService`, `AccessVia`, `AccessAction`, `Decision`,
   `IAuditableResource`, `AccessAudit`, `ModeratorAssignment` — all M1-frozen;
   `ModeratorAssignment` is a M1 POCO, M3b's F5 assign lane writes to it —
@@ -377,11 +377,11 @@ Namespace conventions:
   M3b owns the *workflow write lanes* only; the POCO shape is unchanged
   (rule 5: no new field added to `Report`).
 - M3b's **one** new bounded-context addition on the Posts POCO surface:
-  the `PostStatus` enum + `Post.Status` property (C-M3b·3, ADR 0004 §B.1
+  the `PostStatus` enum + `Post.Status` property (C-M3b·3, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
   additive — no migration, no re-seed).
 - M3b's **one** new bounded context: `Kumunita.Core.Moderation`
   (`ModerationService` — the four write lanes + the `Via = Report`
-  read lane; composes only the frozen M1/M2 seams per ADR 0006-D,
+  read lane; composes only the frozen M1/M2 seams per ADR [0006](../adr/0006-module-boundary-contracts.md)-D,
   exactly the boundary M1/M2/M3 held).
 - Web-side composition: `Kumunita.Web.Controllers` (the
   `ModerationController` and the `POST /posts/{id}/replies` action on
@@ -507,7 +507,7 @@ Task<PostReply> CreateReplyAsync(string postId, string actorId, string body,
 
 M3b introduces **one** new bounded context (`Kumunita.Core.Moderation`)
 and **ONE** additional field on the M3 `Post` POCO (`Status`, the
-`PostStatus` enum + property — C-M3b·3, ADR 0004 §B.1 additive).
+`PostStatus` enum + property — C-M3b·3, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive).
 
 **2.2.1** The `PostStatus` enum + `Post.Status` property (added to
 `src/Kumunita.Core/Posts/Post.cs` — **U3 lands here first**):
@@ -589,7 +589,7 @@ public async Task RemovePostAsync(string postId, string actorId,
 **2.2.3** The new `Kumunita.Core.Moderation.ModerationService` (in
 **new** file `src/Kumunita.Core/Moderation/ModerationService.cs` — the
 four report-workflow write lanes **and** the `Via = Report` read lane:
-C-M3b·1/2/4; ADR 0006-D composes only `IUserInfoService` +
+C-M3b·1/2/4; ADR [0006](../adr/0006-module-boundary-contracts.md)-D composes only `IUserInfoService` +
 `IAuthorizationService` + its own Marten session — no new seam on a
 frozen interface, no second decision path):
 
@@ -854,7 +854,7 @@ remove, assign, unlock / resolve). The **read** lane's pin (
      "the write-lane `Via` tag — §2.3 pin, not a `Moderator` literal");
      this item confirms it.
 
-4. **No partial write** (C-M3b·3, ADR 0006-C): every write lane
+4. **No partial write** (C-M3b·3, ADR [0006](../adr/0006-module-boundary-contracts.md)-C): every write lane
    (filing, hide, remove, assign, unlock, resolve) commits the domain
    write **and** the audit row in the **same** `IDocumentSession`
    transaction (one `SaveChangesAsync`). A denied call is **not
@@ -864,7 +864,7 @@ remove, assign, unlock / resolve). The **read** lane's pin (
 ### 2.4 The moderator-unlock rule (C-M3b·2 / C-M3b·4 — pin the read-
 branch shape and the flag-flip call)
 
-1. **Read-branch shape** (C-M3b·2, ADR 0006-E compatible lane):
+1. **Read-branch shape** (C-M3b·2, ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible lane):
    the **new method on `ModerationService`** —
    `CanReadWithReportAsync(string postId, string actorId)` — is the
    **single** new authorization-surface addition M3b makes. It is a
@@ -875,7 +875,7 @@ branch shape and the flag-flip call)
    M3 `PostService.GetPostAsync` precedent, the read-lane
    "audit-row in own commit" shape). It **does not** add a branch
    to `AuthorizationService.Decide` (that would couple the module to
-   `Report` reads — ADR 0006-D single-decision-path violation, and
+   `Report` reads — ADR [0006](../adr/0006-module-boundary-contracts.md)-D single-decision-path violation, and
    would be a new seam on `IAuthorizationService` — rule 4
    violation). The **thinner, boundary-preserving** lane (per U1's
    handoff item 2) is the **new method** — pin this, not the
@@ -887,7 +887,7 @@ branch shape and the flag-flip call)
    **unchanged**, GlobalAdmin-gated. The `UnlockAsync` /
    `ResolveReportAsync` write lanes call this seam **in the same
    `IDocumentSession` transaction** as the report's `Status` write
-   (C3 — same-transaction, ADR 0006-C). The `actorId` parameter is
+   (C3 — same-transaction, ADR [0006](../adr/0006-module-boundary-contracts.md)-C). The `actorId` parameter is
    the GlobalAdmin's id. The `on` parameter is `true` (the activation /
    unlock flag — "the report-driven unlock" that activates the C5
    carve-out for the standing moderator on subsequent renders).
@@ -964,14 +964,14 @@ anchored to the invariant id / FACES row it pins.
 ### 2.6 Acceptance gate (U10 records — the three-test gate, M1/M2/M3
 precedent)
 
-`docs/design/m3b-moderation.md` § `## M3b — Closed (recorded)` (U11) must
+[`docs/design/m3b-moderation.md`](m3b-moderation.md) § `## M3b — Closed (recorded)` (U11) must
 record, **verbatim**, the three-test result of the M3b e2e spec (M3b
 deferral item 6 — `e2e-m3.spec.ts`), mirroring `m3-posts-design.md` §
 `Run result (M3 acceptance gate — 2026-09-04)`:
 
 | # | Gate (what U10's e2e spec asserts) | Recorded in (U11's close) |
 |---|---|---|
-| G1 | **closed-loop**: the report file → assign → unlock → resolve sequence, plus the two hide / remove lanes, are **all exercised** in a **single** Playwright test flow (the "the six FACES rows + the two write lanes are reachable in a single closed session" pin — F1, F2, F3, F4, F5, F6). M3b's **gate**: one test file that passes end-to-end on `dotnet test` without a manual fixture (the M2 D2 fixture-throw is either fixed in U10 or the documented-throw is re-recorded — **not** silently re-deferred). | `docs/design/m3b-moderation.md` § `## M3b — Closed (recorded)` |
+| G1 | **closed-loop**: the report file → assign → unlock → resolve sequence, plus the two hide / remove lanes, are **all exercised** in a **single** Playwright test flow (the "the six FACES rows + the two write lanes are reachable in a single closed session" pin — F1, F2, F3, F4, F5, F6). M3b's **gate**: one test file that passes end-to-end on `dotnet test` without a manual fixture (the M2 D2 fixture-throw is either fixed in U10 or the documented-throw is re-recorded — **not** silently re-deferred). | [`docs/design/m3b-moderation.md`](m3b-moderation.md) § `## M3b — Closed (recorded)` |
 | G2 | **handoff**: the `Via = Report` read branch (C-M3b·2) is exercised by a **subsequent** render after the `ResolveReportAsync` lane's flag-flip (the "the next render sees the flag-flip" C4 strong-consistency pin). M3b's **gate**: the handoff test is a **separate** test file (two renders in sequence, the C-M3b·2 `Via = Report` audit row recorded on the **second** render). | same |
 | G3 | **part-vs-whole**: the **whole** M3b write lane set (filing + assign + unlock + resolve + hide + remove) is **not** exercised by any **single** Playwright test file (part-vs-whole separation — the six FACES rows must be exercisable in **both** a **single** test (G1) and in **separate** tests (G2 + one per lane, each isolated). M3b's **gate**: the test suite includes both the **closed-loop** test (G1) and the **per-lane** tests (G2 + F3/F4/F5/F6 in their own files). | same |
 
@@ -991,7 +991,7 @@ deferral item 6 — `e2e-m3.spec.ts`), mirroring `m3-posts-design.md` §
   implemented signature and the pin in **this** section, **this file
   wins**; the unit updates this file **in the same commit** and
   appends a one-line drift note to
-  `docs/archive/lanes/m3b/m3b-handoff-notes.md` (the M3b Plan §
+  [`docs/archive/lanes/m3b/m3b-handoff-notes.md`](../archive/lanes/m3b/m3b-handoff-notes.md) (the M3b Plan §
   "Per-unit template" Exit rule).
 - **The four `Via` literal pins** (items 1 and 3 of §2.3 = filing +
   hide/remove lanes; the read-branch pin at item 3 of §2.4 =
@@ -1011,12 +1011,12 @@ deferral item 6 — `e2e-m3.spec.ts`), mirroring `m3-posts-design.md` §
   This is the **only** path — a unit may not locally re-pin to a
   different literal **without** an ADR amendment.
 - **The `PostStatus` enum literal set** (`Active` / `Hidden` /
-  `Removed` — §2.2.1, the single M3b ADD on the `Post` POCO, ADR 0004
+  `Removed` — §2.2.1, the single M3b ADD on the `Post` POCO, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)
   §B.1 additive — delta-detected, idempotent, no re-seed) is **stable**
   for the rest of M3b. Adding a new `PostStatus` literal (e.g.
-  `Archived`) is **additive** (ADR 0004 §B.1 — not breaking in the
+  `Archived`) is **additive** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — not breaking in the
   schema sense) but **requires the ADR-amendment path above** (amend
-  ADR 0004 §B.1 to name the new literal, update §2.2.1 in the same
+  ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 to name the new literal, update §2.2.1 in the same
   commit, drift note). Renaming an existing one **is** a breaking
   change (the `Post.Status` column's stored values shift) and is
   **not** allowed mid-M3b.
@@ -1025,7 +1025,7 @@ deferral item 6 — `e2e-m3.spec.ts`), mirroring `m3-posts-design.md` §
   `session` parameter on the read lane that is not in §2.2.3) must
   follow the §2.7 ADR-amendment path above (update this file in the
   same commit + drift note + ADR amendment if the change affects
-  ADR 0006-D / C3 / C4).
+  ADR [0006](../adr/0006-module-boundary-contracts.md)-D / C3 / C4).
 - **The `IAuthorizationService.Decide` branch alternative** (the
   second candidate from U1's handoff item 2) is **not taken** — the
   **new method** on `ModerationService` (item 1 of §2.4) is the
@@ -1037,8 +1037,8 @@ deferral item 6 — `e2e-m3.spec.ts`), mirroring `m3-posts-design.md` §
 design doc wins** (M3b Part 1 § drift-guard + this Part 2 §2.7); the
 unit updates this file **in the same commit** + drift note; **no**
 mid-M3b renumbering / renaming / re-pinning of the invariant ids (M3b
-C-M3b·1..4), ADR clauses (C1/C2/C3/C4/C5/C6; ADR 0001-B; ADR 0003
-§SoD; ADR 0004 §B.1), `Via` literals, `Status` literals, or
+C-M3b·1..4), ADR clauses (C1/C2/C3/C4/C5/C6; ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B; ADR [0003](../adr/0003-roles-and-moderator-scoping.md)
+§SoD; ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), `Via` literals, `Status` literals, or
 `PostStatus` literals.
 
 *Part 2 ends here. U3–U10 implement against this section. The
@@ -1095,7 +1095,7 @@ records the *pass count* in a future `### Run result (M3b e2e —
 Exit and design doc §2.6 G3 note, U10 **records** the
 fixture-throw status (does **not** silently re-defer — the gap is
 this paragraph + a matching bullet in
-`docs/archive/lanes/m3b/m3b-handoff-notes.md` § `## U10`), and the
+[`docs/archive/lanes/m3b/m3b-handoff-notes.md`](../archive/lanes/m3b/m3b-handoff-notes.md) § `## U10`), and the
 gate's *unit-suite* evidence above (155/155) is the pass criterion
 recorded in this milestone. The M2 D2 `kumunita` fixture re-records
 **the same documented-throw status** it carried at U13 and re-carried
@@ -1129,7 +1129,7 @@ drift-pause rule binds to a **frozen pin being broken**, not to a
  *U11 (the M3b close) appends `## M3b — Closed (recorded)` below
 this section — same shape as M2's U15 / M3's U12 (three-tier
 contract re-confirmation + the `## Summary` table in
-`docs/archive/lanes/m3b/m3b-handoff-notes.md`).*
+[`docs/archive/lanes/m3b/m3b-handoff-notes.md`](../archive/lanes/m3b/m3b-handoff-notes.md)).*
 
 ---
 
@@ -1145,7 +1145,7 @@ re-run unchanged; **13 M3b-pinned** `ModerationServiceTests` +
 (the `Events/` and `Projects/` lines are untouched — they are
 still M4 / M5 scope). **This design-doc close is the *record*
 close; the sole M3b→next-milestone *handoff* artifact is
-`docs/archive/lanes/m3b/m3b-handoff-notes.md` § `## Summary` (U11's
+[`docs/archive/lanes/m3b/m3b-handoff-notes.md`](../archive/lanes/m3b/m3b-handoff-notes.md) § `## Summary` (U11's
 close)** — read that section first when starting the next milestone's
 U1 (it holds the U1→U11 table + the reconciled count drift + the
 deferred items in a single artifact).
@@ -1272,11 +1272,11 @@ explicitly rather than silently dropped"):
    Removed) is **additive** — M4 may safely add
    `Archived` / `Pinned` / `Draft` / similar literals per the
    ADR-amendment path (§2.7's §A line "adding a new `PostStatus`
-   literal is additive — ADR 0004 §B.1 — not breaking in the
+   literal is additive — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — not breaking in the
    schema sense — but requires the ADR-amendment path above").
 **U11's Close is the last M3b unit's record; the M3b→M4 handoff
 is complete when U11's `## U11` section is appended below (see
-`docs/archive/lanes/m3b/m3b-handoff-notes.md`) and this
+[`docs/archive/lanes/m3b/m3b-handoff-notes.md`](../archive/lanes/m3b/m3b-handoff-notes.md)) and this
 `## M3b — Closed (recorded)` section above is in place. That
 two-part pair — the design-doc close and the handoff-note
 `## Summary` table — is the *sole* M3b→M4 handoff artifact,

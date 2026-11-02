@@ -41,7 +41,7 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
       // Returns the delegate's active grant (if any): { ownerId, scope, from, to? }.
       // Noun note: "delegate" is the actor; "owner" is the principal they act as.
       // Create / Read / membership-management lanes, plus the group
-      // description and privacy seams (ADR 0009 / ADR 0010):
+      // description and privacy seams (ADR [0009](../adr/0009-group-description-display-and-edit-lane.md) / ADR [0010](../adr/0010-private-groups.md)):
       // SetDescription, SetPrivacy, GetPublicGroups.
     }
 
@@ -55,7 +55,7 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
       Task<VisibleSet> CanSeeAsync(string actorId, Action action,
                                    IEnumerable<IAuditableResource> candidates);
       // VisibleSet = { visible: [ { id, via: Owner|Audience|Delegation } ], hiddenCount }
-      // Group lane (ADR 0013, group posts milestone) — membership is the SOLE
+      // Group lane (ADR [0013](../adr/0013-group-posts-membership-lane.md), group posts milestone) — membership is the SOLE
       // decision: CanSeeGroupAsync(actorId, groupId, targetPostId?) for
       // detail/create-gate (one decision audit row) and
       // CanSeeGroupFeedAsync(actorId, groupId, candidateCount) for the feed
@@ -68,7 +68,7 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
 ## 4.3 Access model
 
 - **Audience** = grants to users and/or groups; combine **Any** (union, default) | **All** (intersection).
-- **Groups** = the reuse unit (ADR 0010: **private** groups are a membership/organizing unit, hidden from the audience pickers).
+- **Groups** = the reuse unit (ADR [0010](../adr/0010-private-groups.md): **private** groups are a membership/organizing unit, hidden from the audience pickers).
 - **Delegation** = scoped acting; resolves an effective principal.
 - **Moderator access** to audience-restricted content = **off by default**; a report grants
   the assigned moderator audited access to that item; an admin can enable standing
@@ -145,7 +145,7 @@ Every decision on audience-restricted content is audited, Allow or Deny.
 - **Moderator** — scoped to one or more functional components.
 - **Member** — verified resident.
 
-**GlobalAdmin trust management** (mitigates the single-admin concentration, ADR 0003):
+**GlobalAdmin trust management** (mitigates the single-admin concentration, ADR [0003](../adr/0003-roles-and-moderator-scoping.md)):
 
 - **Two admins as standing practice.** Promoting a second GlobalAdmin is normal, not an
   exception — each can demote the other, so no single account is a hard point of trust.

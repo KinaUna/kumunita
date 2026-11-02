@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0178 — Home restyle (no structural change)
+# ADR [0178](0178-home-restyle.md) — Home restyle (no structural change)
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0175 (UI refresh), ADR 0150 (site content customization)
+Relates to: ADR [0175](0175-palettes-and-feed-card.md) (UI refresh), ADR [0150](0150-site-content-customization.md) (site content customization)
 
 ## Decision
 

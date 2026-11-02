@@ -12,7 +12,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0084 — Per-target notification subscriptions: opt-in/opt-out per (recipient, kind, target)
+# ADR [0084](0084-per-target-notification-subscriptions.md) — Per-target notification subscriptions: opt-in/opt-out per (recipient, kind, target)
 
 Status: Accepted
 Date: 2026-09-25
@@ -29,7 +29,7 @@ live in the linked design doc.
 
 ## Context
 
-M6 (ADR 0076) shipped a **shared awareness** arrow — a durable inbox, a best-effort
+M6 (ADR [0076](0076-notifications-inbox-and-recipient-email.md)) shipped a **shared awareness** arrow — a durable inbox, a best-effort
 email nudge, a closed kind vocabulary, and a settings toggle that is **kind-level**
 (one bit per kind, shared across every target). Four of the most common "hear about
 *this specific thing*" moments have a **per-target** shape a kind-level toggle cannot
@@ -38,7 +38,7 @@ per-target scoping as a follow-on. **This ADR executes that follow-on**: it comp
 the wiring for the two unwired lanes (announcement, community post), re-gates group
 posts per-target, and adds the never-wired page-child lane, plus the settings-page
 list and the per-page subscribe toggle. It is a **lane within the M6 surface** (the
-ADR 0083 / 0077 shape); no roadmap letter moves.
+ADR [0083](0083-group-add-and-invite-notifications.md) / 0077 shape); no roadmap letter moves.
 
 ## Decision
 
@@ -51,7 +51,7 @@ ADR 0083 / 0077 shape); no roadmap letter moves.
   D4); `community.post` → the community's members, excluding the author; `page.child`
   → the parent's subscribers, excluding the author.
 - **D3 — A 7-arg `EmitAsync` overload + a gate consulted *first*.** The 6-arg
-  signature is **unchanged** (ADR 0078); with `targetId` set the recipient's effective
+  signature is **unchanged** (ADR [0078](0078-sample-account-notification-suppression-in-production.md)); with `targetId` set the recipient's effective
   choice is consulted **before** dedup / profile / sample-suppression and a `false`
   returns `null`; with it null (legacy emitters) the gate is skipped, so the 13
   pre-0084 emitters are byte-for-byte unchanged.

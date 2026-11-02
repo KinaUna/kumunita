@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0247 — The Kanban board contains its screen-reader labels, so the page stops scrolling sideways
+# ADR [0247](0247-kanban-board-contains-its-hidden-labels.md) — The Kanban board contains its screen-reader labels, so the page stops scrolling sideways
 
 Status: Accepted
 Date: 2026-10-29

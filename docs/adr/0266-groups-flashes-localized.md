@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0266 — Groups controller flashes are localized
+# ADR [0266](0266-groups-flashes-localized.md) — Groups controller flashes are localized
 
 Status: Accepted
 Date: 2026-10-29

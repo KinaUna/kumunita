@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0108 — M11: Portability (import/export) — whole-instance export + a fail-closed restore of a versioned `*.kumunita` archive
+# ADR [0108](0108-portability-import-export.md) — M11: Portability (import/export) — whole-instance export + a fail-closed restore of a versioned `*.kumunita` archive
 
 Status: Accepted | Date: 2026-09-27
 
@@ -65,17 +65,17 @@ archive reader/writer anywhere in the tree). It builds entirely on frozen,
 verified seams: the Marten domain documents across the registered `*DocTypes`
 surfaces, the ASP.NET Identity tables (the **principals** — the credential
 material lives here and **never travels**), the content-addressed media volume
-(ADR 0011), the GlobalAdmin admin-surface house pattern (ADR 0101/0105/0106),
+(ADR [0011](0011-media-and-file-storage.md)), the GlobalAdmin admin-surface house pattern (ADR [0101](0101-announcement-comments-lane.md)/0105/0106),
 the BCL `System.IO.Compression.ZipArchive` (in the .NET 10 framework — **no
 new package**), and the `CommunityOptions` + `LocaleSettings` +
 `LanguageCatalog` state (the `config.json` snapshot source).
 
 This is a **milestone** (a roadmap letter, not a named lane): the close unit
-(U07) flips `Milestones.cs` / the README Roadmap / `docs/STATUS.md` /
-`docs/ARCHITECTURE.md` + `MilestonesTests.cs` (the AGENTS.md doc↔code parity
-contract, C-M11·8). The design doc `docs/design/m11-portability-design.md`
+(U07) flips `Milestones.cs` / the README Roadmap / [`docs/STATUS.md`](../STATUS.md) /
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `MilestonesTests.cs` (the AGENTS.md doc↔code parity
+contract, C-M11·8). The design doc [`docs/design/m11-portability-design.md`](../design/m11-portability-design.md)
 (authored U00, **LOCKED**) is the primary tier; the register
-`docs/archive/lanes/m11/plan-m11-portability.md` is the secondary tier.
+[`docs/archive/lanes/m11/plan-m11-portability.md`](../archive/lanes/m11/plan-m11-portability.md) is the secondary tier.
 
 ## Decision
 
@@ -112,7 +112,7 @@ contract, C-M11·8). The design doc `docs/design/m11-portability-design.md`
   sign-in record. On import the principals are **re-created** (keyed by the
   exported `subjectId`) and their secrets are **reset** (a fresh,
   non-portable password; the resident re-authenticates). This is the privacy
-  pin (C-M11·2) and the ADR 0028 GU precedent ("no standing to carry a
+  pin (C-M11·2) and the ADR [0028](0028-guardian-controls-account-scope-supervision.md) GU precedent ("no standing to carry a
   secret"). **The no-secret boundary is the single most load-bearing M11
   invariant.**
 - **D4 — Import is validate-then-apply, fail-closed, atomic.** The
@@ -134,11 +134,11 @@ contract, C-M11·8). The design doc `docs/design/m11-portability-design.md`
   are `[Authorize(Roles = GlobalAdmin)]`; **export** and **import** each
   emit exactly **one** `AccessAudit` row (`TargetKind "portability"`,
   `Via = Admin`, verb `"export"` / `"import"`), emitted by the service (the
-  ADR 0105 `messaging.toggle` shape). A plain resident — including a
+  ADR [0105](0105-messaging.md) `messaging.toggle` shape). A plain resident — including a
   moderator — never sees the surface.
 - **D6 — The media travels content-addressed, with the catalog doc.** The
   bytes are copied **verbatim** into the archive at the **same**
-  `{Id[0..2]}/{Id}` layout the local volume uses (ADR 0011), so import is a
+  `{Id[0..2]}/{Id}` layout the local volume uses (ADR [0011](0011-media-and-file-storage.md)), so import is a
   byte-copy and the content-hash dedup is preserved. The `MediaObject`
   catalog doc travels as a `docs/MediaObject.json` row. A `MediaObject`
   listed in the manifest whose bytes are missing / mismatched is a

@@ -13,10 +13,10 @@ updated: 2026-11-02
 
 ## Context
 
-M11 (ADR 0108) closed the operator's world-seam: a GlobalAdmin moves the
+M11 (ADR [0108](0108-portability-import-export.md)) closed the operator's world-seam: a GlobalAdmin moves the
 **whole instance** in and out as one versioned `*.kumunita` archive,
 fail-closed, no-secrets. It deliberately deferred two follow-on lanes (named
-in ADR 0108 Consequences, C-M11·5): **per-slice portability** (one user's data
+in ADR [0108](0108-portability-import-export.md) Consequences, C-M11·5): **per-slice portability** (one user's data
 out) and **import-merge** (onto a diverged instance).
 
 M27 owns both halves of that deferred lane, at the **resident's** scale. The
@@ -26,7 +26,7 @@ unlike M11's all-or-nothing restore, it comes back **where it fits**: on
 import into an instance where their groups, components, pages, or tags do not
 exist or they are not a member, the resident **manually resolves each conflict
 entity** — adding it to a target they are a member of or discarding it. No
-auto-merge, no silent re-assignment (ADR 0001-B: the author's choice is
+auto-merge, no silent re-assignment (ADR [0001](0001-core-stack-and-identity-model.md)-B: the author's choice is
 absolute).
 
 M27 is the **resident-scoped** half of the portability world-seam that M11
@@ -41,7 +41,7 @@ and authorization.
 
 **The M11 vs M27 distinction (the load-bearing framing):**
 
-| Axis | M11 (ADR 0108) — shipped | M27 (this lane) — to ship |
+| Axis | M11 (ADR [0108](0108-portability-import-export.md)) — shipped | M27 (this lane) — to ship |
 |---|---|---|
 | Actor | GlobalAdmin (operator) | the resident themself (`[Authorize]`, verified) |
 | Scope | the **whole** instance (44 doc types) | **one resident's authored data** (a closed subset, pinned) |
@@ -88,7 +88,7 @@ and authorization.
   additive, **optional** manifest field the M11 importer ignores (the resident
   scope marker — `Scope? = "resident"` + `ResidentSubjectId?`; a
   `kumunita/portability/1` archive without them is a plain whole-instance
-  archive — the ADR 0098/0106 additive-frozen-surface precedent: existing
+  archive — the ADR [0098](0098-board-audience-edit-lane.md)/0106 additive-frozen-surface precedent: existing
   readers/callers keep compiling, a plain M11 archive still imports whole).
   **No new package** (the lean-stack + tsc-only discipline holds).
 
@@ -117,20 +117,20 @@ and authorization.
   (fail-closed on the write path, C-M27·4). **Alternative considered and
   rejected:** auto-merge (a deterministic best-effort re-point) — it silently
   re-assigns the resident's content to a community/authorization scope they
-  did not choose, violating ADR 0001-B (the author's choice is absolute).
+  did not choose, violating ADR [0001](0001-core-stack-and-identity-model.md)-B (the author's choice is absolute).
 
 - **D5 · The surface is the resident's own, thin + audited + quiet.**
   `UserPortabilityController` at `/account/portability` (the resident's
   account surface — the `/settings/...` house pattern, `[Authorize]`, verified
   resident; the **resident's own** data only, so there is no GlobalAdmin
-  break-glass and no audience decision — the ADR 0105/0118 personal-by-id
+  break-glass and no audience decision — the ADR [0105](0105-messaging.md)/0118 personal-by-id
   posture): `GET /account/portability` (the index), `GET
   /account/portability/export` (streams the `*.kumunita`), `POST
   /account/portability/import` (validate + classify), `POST
   /account/portability/import/resolve` (apply the resident's per-entity
   decisions). Each write emits **one** `AccessAudit` row (`Via = Owner`,
   `TargetKind "portability"`, verb `export` / `import` / `import.resolve`);
-  reads (index, the resolve-review) emit **none** (the ADR 0105 "reads never
+  reads (index, the resolve-review) emit **none** (the ADR [0105](0105-messaging.md) "reads never
   audit" / M6-inbox shape). **Zero new authorization surface** (C-M27·7).
 
 - **D6 · Zero new authorization surface.** M27 reuses the resident self-lane
@@ -144,14 +144,14 @@ and authorization.
 - **D7 · Core home = a new resident-scoped service over the M11 context.**
   `Kumunita.Core/Portability/UserPortabilityService` (a new file in the
   **existing** `Kumunita.Core/Portability/` context — M27 is a lane **on** the
-  M11 operator surface, the ADR 0109 "named lane on the shipped surface"
+  M11 operator surface, the ADR [0109](0109-events-past-lane.md) "named lane on the shipped surface"
   precedent, not a new bounded context) with the `IUserPortabilityService`
   seam: `ExportAsync(residentSubjectId, ct)` → `Stream`;
   `ClassifyAsync(residentSubjectId, Stream, ct)` →
   `UserPortabilityImportPlan`; `ResolveAsync(residentSubjectId,
   UserPortabilityImportPlan, IReadOnlyList<UserPortabilityEntityResolution>,
   ct)` → `UserPortabilityImportResult`. No new document, no new `*DocTypes`
-  surface, **no migration** (ADR 0004 §B.1).
+  surface, **no migration** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).
 
 - **D8 · Tests: a Core round-trip + the per-entity resolve pins + the Web
   surface pins.** The **three acceptance tests** (the closed-loop / handoff /
@@ -200,7 +200,7 @@ and authorization.
 
 - **The resident's choice is absolute on import (C-M27·4).** There is no
   auto-merge. A `conflict` entity the resident did not resolve is **not**
-  applied. A discarded entity writes **nothing**. This is the ADR 0001-B
+  applied. A discarded entity writes **nothing**. This is the ADR [0001](0001-core-stack-and-identity-model.md)-B
   "the author's choice is absolute" principle applied to the import path.
 
 - **Zero new authorization surface (C-M27·7).** The `IAuthorizationService`

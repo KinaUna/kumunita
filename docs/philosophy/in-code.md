@@ -2,7 +2,7 @@
 
 How the six principles become practice on Kumunita's stack: a modular
 monolith (ASP.NET Core 10, Marten, Wolverine, plain TypeScript, one Postgres
-per neighborhood). The stack is a detail (ADR 0001); the seams it exposes are
+per neighborhood). The stack is a detail (ADR [0001](../adr/0001-core-stack-and-identity-model.md)); the seams it exposes are
 not.
 
 ## Boundaries are contracts

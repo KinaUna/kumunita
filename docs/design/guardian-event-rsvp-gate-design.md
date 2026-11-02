@@ -14,21 +14,21 @@ updated: 2026-11-02
 
 # Design Doc — Guardian's event-attendance gate (the consent lane's missing promise made functional)
 
-> **Abstract:** the **guardian's event-attendance gate** design — the **consent lane's missing promise made functional**: the guardian's event RSVP consent (the group half works via ADR 0028/0141; the event half had no enforcement lane). An **optional** gate (the product want) on the frozen M4 events surface + the GU lane. **Who is it for:** a developer touching the event-RSVP consent gate; an agent that needs the request-row + guardian-resolve shape. **When to read the rest:** before touching the RSVP consent lane, the gate toggle, or the guardian resolve.
+> **Abstract:** the **guardian's event-attendance gate** design — the **consent lane's missing promise made functional**: the guardian's event RSVP consent (the group half works via ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)/0141; the event half had no enforcement lane). An **optional** gate (the product want) on the frozen M4 events surface + the GU lane. **Who is it for:** a developer touching the event-RSVP consent gate; an agent that needs the request-row + guardian-resolve shape. **When to read the rest:** before touching the RSVP consent lane, the gate toggle, or the guardian resolve.
 
 
 ADR: [0144](../adr/0144-guardian-event-rsvp-gate.md) — the authority for
 every seam name, default, and refuse shape in this document.
-Builds on: ADR 0028 (GU), ADR 0038 (consent), ADR 0054 (M4 events), ADR
-0013 (group invitations), ADR 0141 (GU community-approval lane — the
+Builds on: ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) (GU), ADR [0038](../adr/0038-guardian-assignment.md) (consent), ADR [0054](../adr/0054-events-rsvp-reminders.md) (M4 events), ADR
+0013 (group invitations), ADR [0141](../adr/0141-guardian-community-approval-lane.md) (GU community-approval lane — the
 closest precedent, the "request-row + guardian resolve pair" shape).
 
 ## Context
 
 The consent text a guardian accepts before a child account may exist
-(`guardian.consent.duties_invitations`, ADR 0038 §F) promises the guardian
+(`guardian.consent.duties_invitations`, ADR [0038](../adr/0038-guardian-assignment.md) §F) promises the guardian
 "review and approve or deny all group **and event** invitations." The group
-half works (ADR 0028/0141: the supervised child's self-lane is refused, the
+half works (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)/0141: the supervised child's self-lane is refused, the
 guardian gets the request, the guardian decides). The event half had no
 enforcement lane at all — a supervised child could RSVP to any visible event
 with zero guardian involvement. A guardian who accepted the terms could not
@@ -61,7 +61,7 @@ text's literal promise):
   separate future lane if wanted).
 - No removal of resolved request rows (the audit trail persists; a child's
   re-act writes a fresh `Pending` row over the same `(EventId, ChildId)` key).
-- No `AccessAudit` row on the child's own self-lane (the ADR 0054 M4 pin —
+- No `AccessAudit` row on the child's own self-lane (the ADR [0054](../adr/0054-events-rsvp-reminders.md) M4 pin —
   "a routine RSVP is not an access decision" — is preserved; only the
   guardian's resolve lanes are audited, `Via: Guardian`).
 - No `AccessAction` / `AccessVia` / `IAuthorizationService` changes (the
@@ -90,7 +90,7 @@ text's literal promise):
 
 ## Seams & contracts
 
-The ADR 0144 §B–§G tables are the contract. The load-bearing pins:
+The ADR [0144](../adr/0144-guardian-event-rsvp-gate.md) §B–§G tables are the contract. The load-bearing pins:
 
 - **The gate fires on the child's link existence, not the actor's standing.**
   `RsvpAsync` asks "does this *actor* have an active `GuardianLink` where
@@ -132,7 +132,7 @@ The ADR 0144 §B–§G tables are the contract. The load-bearing pins:
   `DesiredStatus`.
 - `GuardianNotifies` → RSVP lands + `guardian.event_rsvp` row, no request row.
 - `ChildDecides` → RSVP lands, **no** guardian notification.
-- Unsupervised → RSVP lands unchanged (the ADR 0054 shape), no gate effect.
+- Unsupervised → RSVP lands unchanged (the ADR [0054](../adr/0054-events-rsvp-reminders.md) shape), no gate effect.
 - Approve → child's RSVP row with the desired status, request `Approved` +
   `ResolvedBy`, `guardian.event_rsvp_approve` audit `Via: Guardian`.
 - Deny → no RSVP row, request `Denied`, `guardian.event_rsvp_deny` audit.
@@ -212,12 +212,12 @@ The ADR 0144 §B–§G tables are the contract. The load-bearing pins:
   green (the one unrelated flake —
   `ProjectServiceTests.CreateTodoComment_UnreadableTodoRefused` — passes
   in isolation; a Docker test-container pressure flake, not a regression).
-- ADR 0144 + this design doc are the permanent record; the CONVENTIONS.md
+- ADR [0144](../adr/0144-guardian-event-rsvp-gate.md) + this design doc are the permanent record; the CONVENTIONS.md
   child-accounts row + the ADR README index are updated alongside.
 
 ---
 
-## ADR 0144 — moved content (D11 trim, 2026-11-02)
+## ADR [0144](../adr/0144-guardian-event-rsvp-gate.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendment history
 

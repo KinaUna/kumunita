@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0086 — Goals & Projects lane (`PL`): the higher-level goals + projects page on top of M5
+# ADR [0086](0086-goals-projects-lane.md) — Goals & Projects lane (`PL`): the higher-level goals + projects page on top of M5
 
 Status: Accepted
 Date: 2026-09-25
@@ -19,7 +19,7 @@ Amends: 0067 / 0070 / 0079 / 0024 / 0006 / 0001-B / 0036 / 0025 / 0031 / 0018 / 
 
 ## Context
 
-ADR 0067 shipped the M5 **work-item surface** — `TodoItem`, `KanbanBoard`,
+ADR [0067](0067-m5-projects-todos-and-kanban.md) shipped the M5 **work-item surface** — `TodoItem`, `KanbanBoard`,
 `KanbanLane`, `BoardItemPlacement` in the `Kumunita.Core.Projects` context —
 and deliberately left out the *higher level* (the M5 design doc D2's "a
 per-project 'goals' rollup … M5 ships to-dos + boards, not a higher-level
@@ -30,16 +30,16 @@ the closest field was the ad-hoc `TodoItem.Status` string.
 
 One already-accepted decision constrains this lane:
 
-- **ADR 0067 §2.3 freezes the `IProjectService` surface.** "An ADD beyond
+- **ADR [0067](0067-m5-projects-todos-and-kanban.md) §2.3 freezes the `IProjectService` surface.** "An ADD beyond
   this list is a **new ADR**." So the new goal / project read / write lanes,
   the association lanes, the delete lanes, and the `projectId` feed-filter
   parameter this decision records are exactly what this ADR settles.
 - **Board standing (C-M5·6)** is `creator ∪ GlobalAdmin` over the board
-  (the `CheckBoardStanding` shape, ADR 0070) — the same matrix every
+  (the `CheckBoardStanding` shape, ADR [0070](0070-board-edit-lane-and-board-polish.md)) — the same matrix every
   board-scoped write uses, so goal / project write standing reuses it
   rather than inventing a new one (a goal / project has **no** assignee
   collaborator).
-- **The `ProjectId` on `TodoItem` / `KanbanBoard` is additive** (ADR 0004
+- **The `ProjectId` on `TodoItem` / `KanbanBoard` is additive** (ADR [0004](0004-data-persistence-and-schema-evolution.md)
   §B.1 delta-detect; zero migration for existing rows) and a **feed filter,
   never a gate** (C-M3·2, the `ComponentId` shape) — the to-do's / board's
   own `Audience` decision stays the access boundary (C-M5·3).
@@ -52,10 +52,10 @@ One already-accepted decision constrains this lane:
   renderer surface), additive on **`ProjectDocTypes`** (the surface already
   delta-detects; zero new surface file, zero migration for existing docs).
 - **`ProjectGoal` (D2).** `Id`; `Title` (non-empty); `Description?`
-  (Markdown — the ADR 0025 shape, optional); `ComponentId?` (a feed filter,
+  (Markdown — the ADR [0025](0025-rich-content-markdown-and-content-images.md) shape, optional); `ComponentId?` (a feed filter,
   never a gate); `AuthorId` (the standing owner); `Audience?` (the **exact**
-  post `Audience` — ADR 0001-B / 0036, `null` = public); `IsDeleted` (the
-  ADR 0024 soft-delete flag, `false` default); `LanguageCode` (ADR 0018);
+  post `Audience` — ADR [0001](0001-core-stack-and-identity-model.md)-B / 0036, `null` = public); `IsDeleted` (the
+  ADR [0024](0024-author-soft-delete-lane.md) soft-delete flag, `false` default); `LanguageCode` (ADR [0018](0018-ugc-authored-in-language-tag.md));
   `Created`; `Modified?`. **No** `IsDraft`, **no** dates (a goal is a
   direction, not a scheduled thing), **no** `ProjectId` (the association is
   *outward* — a project points at its goal, not the reverse).
@@ -63,18 +63,18 @@ One already-accepted decision constrains this lane:
   `GoalId?` (the optional goal — `null` = standalone project; the **sole**
   association mechanism); `Status?` (a **string** — the state label; `null`
   = none; **not** an enum — the C-M5·4 string-status pin carried over);
-  `StartAt?` / `DueAt?` (both **nullable** `DateTimeOffset` — the ADR 0079
+  `StartAt?` / `DueAt?` (both **nullable** `DateTimeOffset` — the ADR [0079](0079-todo-optional-start-and-due-dates.md)
   optional-date shape); `ComponentId?`; `AuthorId`; `Audience?` (the exact
-  post `Audience`); `IsDeleted` (ADR 0024 flag); `LanguageCode` (ADR 0018);
+  post `Audience`); `IsDeleted` (ADR [0024](0024-author-soft-delete-lane.md) flag); `LanguageCode` (ADR [0018](0018-ugc-authored-in-language-tag.md));
   `Created`; `Modified?`. **No** `IsDraft`.
 - **One `ProjectId?` on `TodoItem` + `KanbanBoard` (D4).** A feed filter,
   never a gate (C-M3·2; the `ComponentId` shape, **not** a gate); additive
-  (ADR 0004 §B.1 — zero migration for existing rows, which simply have
+  (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 — zero migration for existing rows, which simply have
   `ProjectId == null`); a display + filter + standing context, never an
   access boundary (a to-do's / board's `Read` decision stays its **own**
   `Audience` — C-M5·3).
 - **Standing (D5).** **Creator ∪ GlobalAdmin** over a goal / project (the
-  ADR 0070 board-edit precedent; **no** assignee branch); re-checked
+  ADR [0070](0070-board-edit-lane-and-board-polish.md) board-edit precedent; **no** assignee branch); re-checked
   server-side in every write lane (C-M5·6); the Web `[Authorize]` is a
   convenience pre-gate only.
 - **Delete cascade semantics (D6 — soft, non-destructive).** Deleting a
@@ -116,18 +116,18 @@ One already-accepted decision constrains this lane:
 - **`kw-l` keys (D11).** A `pl.*` key namespace
   (`pl.goal.*` / `pl.project.*` / `pl.todo.project_link` /
   `pl.board.project_link` / `pl.projects_tab`) in
-  `KnownTranslationKeys.cs`, **× 4 languages** (en/de/fr/da — the ADR 0015
-  registry, the ADR 0052 warm-boot baseline backfill covering the non-`en`
+  `KnownTranslationKeys.cs`, **× 4 languages** (en/de/fr/da — the ADR [0015](0015-ui-view-localization-mechanics.md)
+  registry, the ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) warm-boot baseline backfill covering the non-`en`
   rows).
 - **Two new adapters, not a branch.**
   `ProjectGoalToAuditableResource` (`TargetKind = "goal"`) +
   `ProjectToAuditableResource` (`TargetKind = "project"`) implement the
   frozen 6-member `IAuditableResource` surface; the read path is the frozen
-  `IAuthorizationService.CanAsync(Read)` / `CanSeeAsync(Read)` (ADR 0006)
+  `IAuthorizationService.CanAsync(Read)` / `CanSeeAsync(Read)` (ADR [0006](0006-module-boundary-contracts.md))
   — no signature change, no new action, no new via, no new `Decide()`
   branch.
 - **`Milestones.cs` / README Roadmap / `MilestonesTests.cs` untouched** —
-  `PL` is a **named lane, not a milestone** (the ADR 0013 / 0015 / 0084 /
+  `PL` is a **named lane, not a milestone** (the ADR [0013](0013-group-posts-membership-lane.md) / 0015 / 0084 /
   0085 precedent): `M7` stays the single `StatusNext`; the README Roadmap
   gains one `PL` lane entry at close (U10).
 
@@ -136,7 +136,7 @@ One already-accepted decision constrains this lane:
 - The `ProjectDocTypes` surface grows by two documents + four indexes (the
   `(ComponentId, Created)` feed indexes on `ProjectGoal` + `Project`, the
   `GoalId` index on `Project`, the `ProjectId` indexes on `TodoItem` +
-  `KanbanBoard`) — delta-detected at boot (ADR 0004 §B.1), zero migration
+  `KanbanBoard`) — delta-detected at boot (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1), zero migration
   for existing rows.
 - The frozen `IAuthorizationService` path gains two adapters
   (`ProjectGoalToAuditableResource` / `ProjectToAuditableResource`) — no
@@ -157,7 +157,7 @@ One already-accepted decision constrains this lane:
   detail views grow the project link; the to-do / board create + edit forms
   + the project composer / edit grow the pickers.
 - `KnownTranslationKeys.cs` grows the `pl.*` key block × 4 languages (the
-  ADR 0015 registry; the ADR 0052 warm-boot baseline backfill covers the
+  ADR [0015](0015-ui-view-localization-mechanics.md) registry; the ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) warm-boot baseline backfill covers the
   non-`en` rows).
 - The lane is **additive and reusing** — no new bounded context, no new
   `AccessAction` / `AccessVia` / `Decide()` branch, no new editor module,

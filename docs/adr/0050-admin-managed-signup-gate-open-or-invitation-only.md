@@ -36,9 +36,9 @@ to flip the instance between **open** (residents may self-register) and
 without touching the host.
 
 The natural home is the same "instance value, admin-settled, `true`/sane floor"
-shape the two closest siblings already use — ADR 0019 (time zone) and ADR 0020
+shape the two closest siblings already use — ADR [0019](0019-timezone-platform-default-and-resident-override.md) (time zone) and ADR [0020](0020-date-format-platform-default-and-resident-override.md)
 (date format) — both of which store an admin-settled platform value on the
-`LocaleSettings` singleton (id `"singleton"`, ADR 0005 B), read it through a
+`LocaleSettings` singleton (id `"singleton"`, ADR [0005](0005-multilingual-support.md) B), read it through a
 plain service method, and write it through a **single audited** lane that appends
 exactly one `AccessAudit` row (`Via = Admin`) in the same session/commit. A
 boolean policy toggle is a weaker cousin of the same trio: a single admin-settled
@@ -60,10 +60,10 @@ sign-up today, and to reopen it.
   document, not a fourth.** `Kumunita.Core.Localization.LocaleSettings.IsSignupOpen`
   (`bool`, default `true`) joins `DefaultLanguageCode`, `DefaultTimezone`, and
   `DefaultDateFormat` on the **same** `mt`-schema document (id `"singleton"`,
-  the ADR 0005 B / ADR 0019 / ADR 0020 shape). One "platform defaults" document,
+  the ADR [0005](0005-multilingual-support.md) B / ADR [0019](0019-timezone-platform-default-and-resident-override.md) / ADR [0020](0020-date-format-platform-default-and-resident-override.md) shape). One "platform defaults" document,
   and a boolean is the cheapest member of the trio.
 
-- **Additive, migration-free (ADR 0004 §B.1).** The field defaults to `true`, so
+- **Additive, migration-free (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).** The field defaults to `true`, so
   an existing `LocaleSettings` row reads as "open" without a migration, and a
   **fresh** instance — whose singleton is materialized by the seeder — also
   starts **open**. No migration file: Marten applies the added boolean column
@@ -75,7 +75,7 @@ sign-up today, and to reopen it.
   `settings is null || settings.IsSignupOpen`. The `null` clause is the floor:
   a missing or un-migrated row is treated as **open**, so a deployment can never
   be locked out of the very account-creation lane it needs to reach its admins.
-  (The inverse of ADR 0020's "blank reads as the floor" — here the floor is the
+  (The inverse of ADR [0020](0020-date-format-platform-default-and-resident-override.md)'s "blank reads as the floor" — here the floor is the
   *permissive* value, because the consequence of a wrong guess is lockout, not
   a cosmetic date format.)
 
@@ -89,11 +89,11 @@ sign-up today, and to reopen it.
     (`Action = "signup.set-open"`, `TargetKind = "signup"`, `TargetId = "signup"`,
     `Via = Admin`, `Outcome = Allow`, `ActorId = adminSubjectId`), committed in
     the same session. The Web boundary owns the GlobalAdmin standing check (the
-    Core seam does not re-check `User` — the ADR 0019/0020 split).
+    Core seam does not re-check `User` — the ADR [0019](0019-timezone-platform-default-and-resident-override.md)/0020 split).
 
 - **Admin surface (`/admin/signup`, GlobalAdmin-gated).** A dedicated
   `AdminSignupController` — **not** a new action on `AdminController` — mirroring
-  `AdminTimezoneController` (ADR 0019) and `AdminDateFormatController` (ADR
+  `AdminTimezoneController` (ADR [0019](0019-timezone-platform-default-and-resident-override.md)) and `AdminDateFormatController` (ADR
   0020) exactly: `[Route("admin/signup")]`,
   `[Authorize(Roles = Roles.GlobalAdmin)]`, a thin `View`/`Save` pair that maps
   the boolean to the two labeled options ("Open — residents can sign up" /
@@ -125,7 +125,7 @@ sign-up today, and to reopen it.
 
 - **No config, no restart.** The value is **data** on an `mt`-schema document,
   not appsettings — a change is live on the very next request (the same "data,
-  not config" posture as ADR 0019 / ADR 0020).
+  not config" posture as ADR [0019](0019-timezone-platform-default-and-resident-override.md) / ADR [0020](0020-date-format-platform-default-and-resident-override.md)).
 
 - **Out of scope (deliberately):** the invitation mechanism itself — the token
   lifecycle, expiry, and admin invite UX that the README Deferred section and
@@ -142,7 +142,7 @@ Positive
   documents that committed the instance to invitation-only before wider rollout
   now have the control they were waiting on: a GlobalAdmin can close self-service
   sign-up on the next request, and reopen it, with no rebuild and no host change.
-- **Mirrors the ADR 0019 / ADR 0020 precedent exactly.** The "admin writes a
+- **Mirrors the ADR [0019](0019-timezone-platform-default-and-resident-override.md) / ADR [0020](0020-date-format-platform-default-and-resident-override.md) precedent exactly.** The "admin writes a
   singleton + audited lane; the read seam floors to the sane value" shape is the
   same, the seams are the same, the test pattern is the same. A developer who
   knows the time-zone and date-format features knows this one; the `true` floor
@@ -153,7 +153,7 @@ Positive
   disabled), a closed instance presents no self-service path — not even to a
   hand-crafted form post. The refusal is a property of the write lane, not of the
   form.
-- **No migration, no lockout risk.** The field is additive (ADR 0004 §B.1) and
+- **No migration, no lockout risk.** The field is additive (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1) and
   floors to `true`, so a fresh or pre-existing instance is never accidentally
   locked out of account creation by a missing or stale row.
 

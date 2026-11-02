@@ -45,7 +45,7 @@ exactly one thing to keep in sync with the code (one fact, one place):
   [`DOCS-CONVENTIONS.md`](../DOCS-CONVENTIONS.md)).
 
 **The sync contract** (re-pointed by `D07` of the `IMPROVE-DOCS` lane):
-`Milestones.cs` is the canonical list; `STATUS.md` is the narrative; this
+`Milestones.cs` is the canonical list; [`STATUS.md`](../STATUS.md) is the narrative; this
 page and the front page point at both — neither restates the list. When a
 milestone or a named lane ships, the full close flip (which docs to touch,
 including the `WhatsNew.cs` registry and the `MilestonesTests.cs` pin) is
@@ -59,13 +59,13 @@ restating this.
 
 - **Machine translation of user-generated content** — optional and opt-in if it
   ever ships: per-item, clearly labeled, and the MT provider becomes a third-party
-  boundary (ADR 0005 C, SECURITY.md §6). Until then UGC is rendered as authored.
+  boundary (ADR [0005](../adr/0005-multilingual-support.md) C, SECURITY.md §6). Until then UGC is rendered as authored.
 - **Geographic zones** as metadata + display filtering (not part of the core access model).
 - **Cross-neighborhood federation** — a standalone OpenIddict IdP; global identity, local authorization.
 - **Group helpers** — suggest/populate groups (neighbors from addresses, family from household).
 - **MCP**, calendar integration, cross-neighborhood data migration.
-- **Invitation-only sign-up** — the **gate** is now admin-managed (ADR 0050),
-  and a fresh instance ships **invitation-only** (ADR 0050, amended 2026-10-05):
+- **Invitation-only sign-up** — the **gate** is now admin-managed (ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)),
+  and a fresh instance ships **invitation-only** (ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md), amended 2026-10-05):
   a GlobalAdmin sets up the platform before any resident can self-register,
   then opens the gate to **open** (residents may self-register) from
   `/admin/signup` — closing it back to **invitation-only** (closed to new

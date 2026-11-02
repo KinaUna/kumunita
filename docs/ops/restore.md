@@ -51,7 +51,7 @@ rewound — restore it from its own snapshot per the rule below):
 4. Re-point DNS; verify email + TLS + `/health`
    ([TLS & domain](tls-domain.md), [email (SMTP)](email-smtp.md)).
 
-**The media volume too (ADR 0011, second surface):** if the backup set
+**The media volume too (ADR [0011](../adr/0011-media-and-file-storage.md), second surface):** if the backup set
 includes the media snapshot, it lands at `Media__RootPath` **before the app
 starts** — same instance: restore the tarball as step 2.5 (between `pg_restore`
 and start); disaster recovery: attach a volume to the new instance (procedure

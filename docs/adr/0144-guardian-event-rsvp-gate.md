@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0144 — Guardian's event-attendance gate: the consent lane's missing promise made functional
+# ADR [0144](0144-guardian-event-rsvp-gate.md) — Guardian's event-attendance gate: the consent lane's missing promise made functional
 
 Status: Accepted | Date: 2026-10-05
 
@@ -30,10 +30,10 @@ Status: Accepted | Date: 2026-10-05
 
 ## Context
 
-ADR 0038's consent text binds a guardian to "review and approve or deny all
+ADR [0038](0038-guardian-assignment.md)'s consent text binds a guardian to "review and approve or deny all
 group and event invitations" before the child's account may exist. The
 *group* half of that promise was functional the moment the GU lane landed
-(ADR 0028, extended by ADR 0141's community-approval lane): a group invitation
+(ADR [0028](0028-guardian-controls-account-scope-supervision.md), extended by ADR [0141](0141-guardian-community-approval-lane.md)'s community-approval lane): a group invitation
 on a supervised child is stored as a `Pending` `GroupInvitation` row, the
 child's self-lane `AcceptGroupInvitationAsync` is refused, the active
 guardian(s) get a `guardian.group_invite` notification, and
@@ -66,8 +66,8 @@ default — it matches the consent text the guardian already accepted, and is
 the most protective. Postures 2 and 3 exist for the guardian who finds
 posture 1 too heavy.
 
-This is a **7th GU supervisory action** (alongside the 5 ADR 0028 froze and
-ADR 0143's deletion), not a new bounded context. It reuses the GU standing gate
+This is a **7th GU supervisory action** (alongside the 5 ADR [0028](0028-guardian-controls-account-scope-supervision.md) froze and
+ADR [0143](0143-guardian-delete-child.md)'s deletion), not a new bounded context. It reuses the GU standing gate
 exactly, mirrors the group-invitation lane's request-row shape for events, and
 adds no new bounded context, no new `AccessAction`, no branch in the frozen
 `IAuthorizationService`.
@@ -105,7 +105,7 @@ adds no new bounded context, no new `AccessAction`, no branch in the frozen
   **`GuardianNotifies` ⇒ allowed** (the upsert proceeds, the guardian is
   notified — the veto window's entry point); **`ChildDecides` ⇒ allowed
   outright** (the upsert proceeds, no notification); **unsupervised (no active
-  link) ⇒ never gated** (the ADR 0054 self-service shape — a mode field with
+  link) ⇒ never gated** (the ADR [0054](0054-events-rsvp-reminders.md) self-service shape — a mode field with
   no active link is a dormant field). The refusal throws the **same**
   `InvalidOperationException` the GU group-invitation lane uses; the Web layer
   catches it once and surfaces it as `TempData["error"]` + a redirect.
@@ -136,7 +136,7 @@ adds no new bounded context, no new `AccessAction`, no branch in the frozen
 ## Consequences
 
 - **The consent lane's missing promise is functional.** The *event* half of
-  the ADR 0038 "review and approve or deny all … event invitations" now has
+  the ADR [0038](0038-guardian-assignment.md) "review and approve or deny all … event invitations" now has
   the same enforcement shape the *group* half already had — a request-row
   gate, a guardian resolve pair, a one-audit-row-per-action posture. A
   guardian who accepted the consent text now has the power they promised in
@@ -152,10 +152,10 @@ adds no new bounded context, no new `AccessAction`, no branch in the frozen
   `IUserInfoService` method — no new bounded context, no new `AccessAction`,
   no new `AccessVia` beyond the existing `Guardian` used for audit, no branch
   in the frozen `IAuthorizationService`, no `Decide()` change. The standing
-  gate is the **same** `GuardActiveLinkAsync` the five ADR 0028 actions use.
+  gate is the **same** `GuardActiveLinkAsync` the five ADR [0028](0028-guardian-controls-account-scope-supervision.md) actions use.
 - **This is a 7th GU supervisory action, not a 6th lane.** It sits alongside
-  the five ADR 0028 froze (suspend, memberships, invitation approval, invite
-  a second guardian, hand-over) and ADR 0143's deletion — the GU surface
+  the five ADR [0028](0028-guardian-controls-account-scope-supervision.md) froze (suspend, memberships, invitation approval, invite
+  a second guardian, hand-over) and ADR [0143](0143-guardian-delete-child.md)'s deletion — the GU surface
   grows by one action, the bounded-context and authorization surfaces stay
   byte-identical.
 - **The missing-profile case fails to the strictest supervised posture, not

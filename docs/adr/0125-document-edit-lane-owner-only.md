@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0122 (M21) shipped the document **upload + serve** surface: an authority
+ADR [0122](0122-document-management.md) (M21) shipped the document **upload + serve** surface: an authority
 (`GlobalAdmin ∪ Moderator`, D5) uploads a document with a chosen `Audience`,
 a resident sees the documents their audience allows (one `Read` decision,
 audited), and the document is served as a download (`Content-Disposition:
@@ -26,7 +26,7 @@ M21" — and its **D9·7** deferred the edit half explicitly:
 > or a soft-delete is the M14/M24 edit-lane carried to documents (a future
 > ADR).
 
-ADR 0122's own D1 says the document has `Modified?` "set only on a future
+ADR [0122](0122-document-management.md)'s own D1 says the document has `Modified?` "set only on a future
 replace." This ADR is that **future replace** — the **edit-by-replacement**
 half of D9·7. A document the uploader got wrong (a mis-typed title, an
 audience that was too wide, a file that needed a corrected version) is today
@@ -35,8 +35,8 @@ stored blob and losing the `Created` timestamp + any read-audit history).
 
 Two already-accepted decisions constrain what the edit lane may be:
 
-- **The `Audience` is the whole access story, written verbatim** (ADR 0006-D,
-  C-M21·1, ADR 0001-B): there is no auto-augmentation and no platform default.
+- **The `Audience` is the whole access story, written verbatim** (ADR [0006](0006-module-boundary-contracts.md)-D,
+  C-M21·1, ADR [0001](0001-core-stack-and-identity-model.md)-B): there is no auto-augmentation and no platform default.
   Whoever edits the audience is the sole authority over *who* the document
   reaches.
 - **The write lane is standing-agnostic and emits no `AccessAudit` row** (ADR
@@ -54,17 +54,17 @@ and/or replaces the file. The document's identity (`Id`), ownership
 ## Decision
 
 **D1 — Document editing is **owner-only** — the uploader, `full stop`.**
-"Owner" is the **uploader** — `Document.OwnerId` (ADR 0122 D1 records
+"Owner" is the **uploader** — `Document.OwnerId` (ADR [0122](0122-document-management.md) D1 records
 `OwnerId = actorId` at upload; the uploader is the document's owner). The new
 write lane `DocumentService.UpdateAsync(documentId, DocumentEdit, actorId,
 IDocumentSession)` is the **single** edit seam. Its one hard gate is
 `document.OwnerId == actorId` (ordinal); anything else throws
 `UnauthorizedAccessException`. There is deliberately **no** elevated branch:
-a non-owner `GlobalAdmin` or `Moderator` is **denied**, exactly as ADR 0014
-(author-only post edit) and ADR 0016 (author-only reply edit) deny a non-author
+a non-owner `GlobalAdmin` or `Moderator` is **denied**, exactly as ADR [0014](0014-post-edit-lane-author-only.md)
+(author-only post edit) and ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) (author-only reply edit) deny a non-author
 `GlobalAdmin`. The document is the uploader's **official** publication; the
 platform's lever over a document the uploader got wrong is *not* to rewrite it
-behind their back (the ADR 0003/0017 moderation-vs-authorship boundary carried
+behind their back (the ADR [0003](0003-roles-and-moderator-scoping.md)/0017 moderation-vs-authorship boundary carried
 to documents). *Forbids:* an elevated-standing edit branch (a non-owner
 GlobalAdmin/Moderator editing), an unaudited direct `session.Store` of a
 document from a controller, or a Core seam that re-derives standing.
@@ -72,37 +72,37 @@ document from a controller, or a Core seam that re-derives standing.
 **D2 — The editable surface is `Audience`, `Title`, `Summary`, and the file
 reference — and the two *named* fields are the audience and the file.**
 - **`Audience`** (the *who can access it* — the access control) is written
-  **verbatim** (C-M21·1, ADR 0001-B): the owner re-chooses the audience on
+  **verbatim** (C-M21·1, ADR [0001](0001-core-stack-and-identity-model.md)-B): the owner re-chooses the audience on
   edit exactly as on create; `AudienceEditorModel.BuildAudience` is the **one**
   deserialization site (the M2 single-source pin, carried to the edit lane),
   and `AudienceEditorModel.FromAudience` is its exact inverse, seeding the
-  "Who to grant to" picker with the stored grants pre-checked (the ADR 0036
-  single source — the same prefill ADR 0014/0017 use for the editable
+  "Who to grant to" picker with the stored grants pre-checked (the ADR [0036](0036-community-visible-audience-default.md)
+  single source — the same prefill ADR [0014](0014-post-edit-lane-author-only.md)/0017 use for the editable
   `LanguageCode` / audience).
-- **The file** (the *replace the file*) — the ADR 0122 D3 byte surface:
+- **The file** (the *replace the file*) — the ADR [0122](0122-document-management.md) D3 byte surface:
   `MediaId` / `Filename` / `ContentType` / `SizeBytes` are populated
-  **server-side by the Web layer** from the frozen ADR 0011
+  **server-side by the Web layer** from the frozen ADR [0011](0011-media-and-file-storage.md)
   `IMediaStore.PutAsync` result (store-first, orphan-safe). The Core service
-  never touches the bytes (ADR 0122 D3).
-- **`Title` / `Summary`** are the owner's **display-only labels** (ADR 0122 D1
+  never touches the bytes (ADR [0122](0122-document-management.md) D3).
+- **`Title` / `Summary`** are the owner's **display-only labels** (ADR [0122](0122-document-management.md) D1
   — "a label, never a gate"); editable alongside the two named fields (the
-  ADR 0014/0016 precedent where `Title` is editable on the author-edit).
+  ADR [0014](0014-post-edit-lane-author-only.md)/0016 precedent where `Title` is editable on the author-edit).
 
 `Id`, `OwnerId`, and `Created` are **immutable on the edit lane** (ownership
-does not transfer — the ADR 0014/0016/0017 "author-of-record" precedent — and
+does not transfer — the ADR [0014](0014-post-edit-lane-author-only.md)/0016/0017 "author-of-record" precedent — and
 the document's origin timestamp is preserved). `Modified` is **stamped** on
-each successful edit (the ADR 0122 D1 field, "set only on a future replace,"
+each successful edit (the ADR [0122](0122-document-management.md) D1 field, "set only on a future replace,"
 now exercised). *Forbids:* re-assigning `OwnerId`, a creation-time re-target
 of the document, or an edit that drops `Created`.
 
 **D3 — The file is **optional** on the edit lane: an empty file is a no-op on
 the byte surface; a present file replaces the reference.** The owner may edit
 **only** the audience, **only** the file, or **both**. The Web layer derives
-`DocumentEdit.FileReplaced` from the form's optional `IFormFile` (ADR 0122 D5
+`DocumentEdit.FileReplaced` from the form's optional `IFormFile` (ADR [0122](0122-document-management.md) D5
 shape): a `null` / zero-byte file keeps the stored blob (`MediaId` /
 `Filename` / `ContentType` / `SizeBytes` unchanged, `FileReplaced = false`); a
 present, non-empty file runs the **same guards-before-write** the upload lane
-uses (ADR 0122 D5/C-M21·7 — empty → 400, oversize → 413, disallowed type →
+uses (ADR [0122](0122-document-management.md) D5/C-M21·7 — empty → 400, oversize → 413, disallowed type →
 415, no file written), stores **first** (orphan-safe — the blob write
 precedes the document write so `MediaId` never dangles), and
 `FileReplaced = true`. The document allowlist
@@ -112,22 +112,22 @@ silently drops the stored file.
 
 **D4 — One write, **no `AccessAudit` row** (C-M21·7, Amendments A2).** The
 edit is a **standing-gated write with no audit row**, the write-lane
-convention ADR 0122 A2 locked for the upload lane: the write is authenticated
+convention ADR [0122](0122-document-management.md) A2 locked for the upload lane: the write is authenticated
 (the Web boundary checks the owner gate, D1), not an audience-restricted read.
 The **reads** stay audited (feed = one aggregate row, C-M21·3; detail/download
 = one decision row, C-M21·4); the **write** does not. One
-`SaveChangesAsync` in the **caller's** session (ADR 0006-E same-transaction);
+`SaveChangesAsync` in the **caller's** session (ADR [0006](0006-module-boundary-contracts.md)-E same-transaction);
 the `Document` is stored once. *Forbids:* an edit `AccessAudit` row, or an
 unaudited direct `session.Store` from a controller (the write goes through
 `UpdateAsync`).
 
-**D5 — Non-owner is **404, not 403** (no existence leak — the ADR 0122 D7
+**D5 — Non-owner is **404, not 403** (no existence leak — the ADR [0122](0122-document-management.md) D7
 posture).** The edit form (`GET /documents/{id}/edit`) and write
 (`POST /documents/{id}/edit`) are **Web-boundary** owner-gated: the actor
 must pass the frozen `Read` decision (the owner branch always passes for the
 owner — `DocumentToAuditableResource.OwnerId => Document.OwnerId`) **and** be
 the owner (`OwnerId == actorId`). A non-owner (including a non-owner
-`GlobalAdmin`) gets **404, not 403** — the ADR 0122 D7 "the form's existence
+`GlobalAdmin`) gets **404, not 403** — the ADR [0122](0122-document-management.md) D7 "the form's existence
 is not leaked" posture, consistent with the document lane's existing
 Deny → 404 (D7) and standing → 404 (D5) responses (not the 403 the post lane
 uses — the document lane is 404-consistent throughout). A **missing** document
@@ -147,7 +147,7 @@ and adds exactly: **one** Core record (`DocumentEdit`), **one** Core method
 (`DocumentEditViewModel`), **two** Web controller actions (GET/POST
 `/documents/{id}/edit`), **one** view (`Edit.cshtml`), **one** `CanEdit`
 affordance on `DocumentDetailViewModel`, and a closed `documents.edit.*`
-`kw-l` key set (en/de/fr/da). The ADR 0122 surface (the `Document` POCO, the
+`kw-l` key set (en/de/fr/da). The ADR [0122](0122-document-management.md) surface (the `Document` POCO, the
 `Read` path, the `IMediaStore` seam, the document allowlist) is **unchanged**.
 *Forbids:* any extension of the frozen authorization seams (the whole point is
 that the edit lane *rides* `Read`, it does not extend it).
@@ -156,22 +156,22 @@ that the edit lane *rides* `Read`, it does not extend it).
 
 **Positive:**
 
-- **A document is no longer write-once** (the ADR 0122 D1 `Modified?` field,
+- **A document is no longer write-once** (the ADR [0122](0122-document-management.md) D1 `Modified?` field,
   "set only on a future replace," now exercised): the **uploader** can
   correct a document in place — re-choose who can access it (the access
-  control, the `Audience`, verbatim) and/or replace the file (the ADR 0011
+  control, the `Audience`, verbatim) and/or replace the file (the ADR [0011](0011-media-and-file-storage.md)
   content-addressed blob, store-first, orphan-safe) — without orphaning the
   stored blob, losing the `Created` timestamp, or losing read-audit history.
-  This is the **edit-by-replacement** half of ADR 0122 D9·7, now shipped.
-- **Owner-only, with the ADR 0014/0016 author-only precedent** (D1): the
+  This is the **edit-by-replacement** half of ADR [0122](0122-document-management.md) D9·7, now shipped.
+- **Owner-only, with the ADR [0014](0014-post-edit-lane-author-only.md)/0016 author-only precedent** (D1): the
   uploader's lever over their own document is exclusive; a non-owner
   `GlobalAdmin`/`Moderator` is denied (not an elevated branch). The platform
   does not rewrite an authority-published file behind the uploader's back.
 - **No new authorization surface** (D6): the edit lane *rides* the frozen
   `Read` path through the existing adapter; the claim set is
-  byte-identical after ADR 0125.
+  byte-identical after ADR [0125](0125-document-edit-lane-owner-only.md).
 - **Consistent 404 posture** (D5): a non-owner and a missing document are the
-  same 404 (the ADR 0122 D7 "no existence leak" — the form's existence is not
+  same 404 (the ADR [0122](0122-document-management.md) D7 "no existence leak" — the form's existence is not
   leaked to a non-owner).
 - **The file is optional** (D3): the owner can edit only the audience, or
   only the file, or both — a lighter correction than delete-and-re-upload.
@@ -179,14 +179,14 @@ that the edit lane *rides* `Read`, it does not extend it).
 **Neutral / cost:**
 
 - **The named trade — an *owner-only, in-place* edit for zero new
-  authorization surface:** ADR 0125 buys *a shared, audited repository where
+  authorization surface:** ADR [0125](0125-document-edit-lane-owner-only.md) buys *a shared, audited repository where
   the uploader can correct their own document (audience + file + labels),
   store-first and orphan-safe*, with **zero new authorization surface + one
   new Core record + one new Core method + one new Web view model + two Web
   actions + one view + a closed `documents.edit.*` key set**, in exchange for
   **no author soft-delete, no versioning, no elevated edit branch, no
   transfer of ownership** (D9·7's soft-delete half, D9·1 versioning, D1
-  ownership immutability): ADR 0125 is *the edit-by-replacement half*,
+  ownership immutability): ADR [0125](0125-document-edit-lane-owner-only.md) is *the edit-by-replacement half*,
   **not** a document-management *system*.
 - **The soft-delete half of D9·7 remains deferred:** removing a document is a
   separate, larger design (the M14/M24 lane shape — delete + blob cleanup +
@@ -196,4 +196,4 @@ that the edit lane *rides* `Read`, it does not extend it).
   authenticated (the Web boundary checks the owner gate, D1), not an
   audience-restricted read — the `PostService.CreatePostAsync` /
   `AttachmentController.Upload` / `AnnouncementService` write-lane convention
-  ADR 0122 A2 locked. The **reads** are audited; the **write** is not.
+  ADR [0122](0122-document-management.md) A2 locked. The **reads** are audited; the **write** is not.

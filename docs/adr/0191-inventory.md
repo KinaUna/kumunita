@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0191 — Inventory
+# ADR [0191](0191-inventory.md) — Inventory
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-27
-Relates to: ADR 0189 (status chip), ADR 0188 (list rows), ADR 0182 (forms)
+Relates to: ADR [0189](0189-todos.md) (status chip), ADR [0188](0188-projects-lists.md) (list rows), ADR [0182](0182-form-look.md) (forms)
 
 ## Decision
 
@@ -27,8 +27,8 @@ Relates to: ADR 0189 (status chip), ADR 0188 (list rows), ADR 0182 (forms)
 - Item page: summary card is a `.kmb-detail-card` with muted heading-font labels (`.kmb-dl`); usage history
   rows are `.kmb-ann-comment` cards, the open check-out marker is a "Out" status chip (was hard-coded
   English `open`).
-- The list filter form is a `.kmb-filter-bar`; list rows are the shared row cards (ADR 0188); New and Edit
-  use the form look (ADR 0182) unchanged.
+- The list filter form is a `.kmb-filter-bar`; list rows are the shared row cards (ADR [0188](0188-projects-lists.md)); New and Edit
+  use the form look (ADR [0182](0182-form-look.md)) unchanged.
 - New translation keys (en, de, fr, da): `inv.list.available`, `inv.detail.checkedOut`.
 
 ## Open

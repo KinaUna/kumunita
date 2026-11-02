@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0253 — New to-do, goal and project forms open with "Everyone" on
+# ADR [0253](0253-new-todo-goal-project-everyone-default.md) — New to-do, goal and project forms open with "Everyone" on
 
 Status: Accepted
 Date: 2026-10-29
@@ -23,7 +23,7 @@ pickers showing, while the copy says "The default — everyone can see this to-d
 The views render the switch from `Model.Audience?.CommunityVisible ?? true`, but the three controller actions (`CreateGet`, `GoalNew`,
 `ProjectNew`) seed a non-null `AudienceEditorModel` without `CommunityVisible`, which defaults to `false`, so the `?? true` never
 applied. A form submitted as shown would have been author-only (an empty audience denies everyone else), the case the board
-composer's seed comment already describes. Not caused by the section-card work (ADR 0244); the controllers are unchanged since.
+composer's seed comment already describes. Not caused by the section-card work (ADR [0244](0244-section-cards-todo-page-kiosk-forms.md)); the controllers are unchanged since.
 
 ## Decision
 - The three actions seed `CommunityVisible = true`, as `BoardNew`, posts and events already do.

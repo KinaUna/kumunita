@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0270 — BadRequest bodies are localized; Core exception text stays English
+# ADR [0270](0270-badrequest-bodies-localized.md) — BadRequest bodies are localized; Core exception text stays English
 
 Status: Accepted
 Date: 2026-10-29
@@ -34,4 +34,4 @@ Page/Index and page-tree leftovers.
 
 Compiled and run 2026-10-29 (build clean, 0 errors).
 
-The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 13227 -> 13243 on 2026-10-29 for the 4 new keys x en/de/fr/da of this lane (the ADR 0265/0266 shipped-additions mechanism).
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 13227 -> 13243 on 2026-10-29 for the 4 new keys x en/de/fr/da of this lane (the ADR [0265](0265-projects-flashes-localized.md)/0266 shipped-additions mechanism).

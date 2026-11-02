@@ -11,13 +11,13 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0283 — Icons on tab strips and button-group switches
+# ADR [0283](0283-tab-and-switch-icons.md) — Icons on tab strips and button-group switches
 
 Status: Accepted
 Date: 2026-11-01
 
 ## Context
-ADR 0279 put hand-drawn icons from one sprite (`Views/Shared/_IconSprite.cshtml`) on the nav and the account menu. The section tab strips and the small button-group switches were
+ADR [0279](0279-hand-drawn-icon-sprite.md) put hand-drawn icons from one sprite (`Views/Shared/_IconSprite.cshtml`) on the nav and the account menu. The section tab strips and the small button-group switches were
 still text-only, so the pages looked unlike the nav that leads to them.
 
 ## Decision
@@ -25,7 +25,7 @@ still text-only, so the pages looked unlike the nav that leads to them.
   Group detail — and the three button-group switches: Events Upcoming/Past, Calendar Day/Week/Month, Translations single/batch mode.
 - **Reuse before drawing**: a tab that means the same thing as an existing symbol reuses it — Language → globe, Home page → home, Messaging + Direct messages → envelope, group Feed →
   speech bubble, group Members → three people, group Settings → sliders. Security in both Settings and Admin shares the new padlock; Calendar tab and the Month switch share the month grid.
-- **25 new symbols** in the ADR 0279 family (24 grid, `.kmb-icon` stroke, dot accents): project-folder, todos, boards, agenda, cal-month, cal-week, cal-day, group-messages, clock,
+- **25 new symbols** in the ADR [0279](0279-hand-drawn-icon-sprite.md) family (24 grid, `.kmb-icon` stroke, dot accents): project-folder, todos, boards, agenda, cal-month, cal-week, cal-day, group-messages, clock,
   date-format, rows, moon, children, lock, database, kiosk, dashboard, accounts, communities, server, chart, upcoming, past, edit-one, edit-batch.
 - **Wiring**: the four tuple-driven partials (`_ProjectsTabs`, `_EventsTabs`, `_SettingsTabs`, `_AdminNav`) gain an `Icon` tuple field holding the full `kmb-i-…` id, rendered as
   `<use href="@("#" + tab.Icon)"/>`; the hand-written strips and switches carry a literal `<use href="#kmb-i-…"/>`. Tabs use 16px icons, the `btn-sm` switches 14px. Icons are

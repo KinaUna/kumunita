@@ -19,7 +19,7 @@ The `SmtpSender` reads six options from the `SMTP` section: `Host`, `Port`,
 `User`, `Pass`, `Secure`, and `From` (`SmtpOptions` in
 `src/Kumunita.Core/Identity/SmtpSender.cs`); all are bound through
 `Configure<SmtpOptions>` in `Program.cs`. The transport is **MailKit's
-`SmtpClient`** (ADR 0131, 2026-10-02) — it supports all three TLS shapes the
+`SmtpClient`** (ADR [0131](../../../adr/0131-smtp-transport-mailkit-swap.md), 2026-10-02) — it supports all three TLS shapes the
 `Secure` option offers: `Tls` (STARTTLS, the conventional 587 shape; the
 default), `Ssl` (implicit TLS / SMTPS, the "TLS up front" 465 shape), and
 `None` (no enforced encryption — take TLS if the relay offers it, plain
@@ -28,7 +28,7 @@ otherwise; the local-only Mailpit shape). The original BCL
 reached `MAIL FROM` without a live AUTH session on a real relay (Proton Mail
 `smtp.protonmail.ch:587`) even though the identical credentials authenticated
 cleanly from the same container and from the VPS host — a live, reproducible
-BCL regression (see ADR 0131 for the full evidence trail).
+BCL regression (see ADR [0131](../../../adr/0131-smtp-transport-mailkit-swap.md) for the full evidence trail).
 
 **A. Local dev loop (compose / Mailpit):** run via `docker-compose.yml` at the
 repo root, which brings up `Mailpit` (SMTP on port 1025, web UI on 8025) plus
@@ -56,7 +56,7 @@ is the `ASPNETCORE_ENVIRONMENT=Development` path, not a Coolify deploy:
 | `SMTP__From` | the resident-facing address shown in verification emails (often the same as `Community__SupportEmail`) |
 
 > **465 / implicit TLS (SMTPS) is supported.** The MailKit transport
-> (ADR 0131) drives `SecureSocketOptions.SslOnConnect` for the `Ssl` value, so
+> (ADR [0131](../../../adr/0131-smtp-transport-mailkit-swap.md)) drives `SecureSocketOptions.SslOnConnect` for the `Ssl` value, so
 > a 465-only relay is a first-class shape: set `SMTP__Port=465` and
 > `SMTP__Secure=Ssl`. (The prior BCL transport could not do this; that
 > limitation is what drove the swap.)

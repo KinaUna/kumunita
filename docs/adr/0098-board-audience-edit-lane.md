@@ -11,29 +11,29 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0098 — Board audience-edit lane (creator ∪ GlobalAdmin)
+# ADR [0098](0098-board-audience-edit-lane.md) — Board audience-edit lane (creator ∪ GlobalAdmin)
 
 Status: Accepted
 Date: 2026-09-27
-**Amends ADR 0070** (the board-update lane), which had frozen a board's
+**Amends ADR [0070](0070-board-edit-lane-and-board-polish.md)** (the board-update lane), which had frozen a board's
 `Audience` as a creation-time choice and excluded it from `UpdateBoardRequest`.
-Extends the **M5 board surface** (ADR 0067 the standing matrix + the frozen
-`IProjectService` convention; ADR 0070 the board-update seam + the `CanEdit`
-standing preview) and the **audience shape** (ADR 0001-B the verbatim audience
-write + `Decide`/`EvaluateAudience` semantics; ADR 0036 the `Community` flag;
-ADR 0041 the `AllResidents` flag) and the **Web audience-editor idiom**
+Extends the **M5 board surface** (ADR [0067](0067-m5-projects-todos-and-kanban.md) the standing matrix + the frozen
+`IProjectService` convention; ADR [0070](0070-board-edit-lane-and-board-polish.md) the board-update seam + the `CanEdit`
+standing preview) and the **audience shape** (ADR [0001](0001-core-stack-and-identity-model.md)-B the verbatim audience
+write + `Decide`/`EvaluateAudience` semantics; ADR [0036](0036-community-visible-audience-default.md) the `Community` flag;
+ADR [0041](0041-page-audience-scope-dropdown.md) the `AllResidents` flag) and the **Web audience-editor idiom**
 (`AudienceEditorModel` + the `_GrantPickers` partial, already used by the
 board-creation form and the post/event/reply forms). This ADR lifts the
 audience freeze: a board's creator or a GlobalAdmin can now **change the
 audience** on the board-edit page. The board's **community and language remain
-creation-time choices** (ADR 0070, now only those two).
+creation-time choices** (ADR [0070](0070-board-edit-lane-and-board-polish.md), now only those two).
 
 ## Context
 
 The board-creation form (`BoardNew`) already offers the full audience editor —
 the `Any`/`All` mode radios, the "Everyone in this community" checkbox, the
 user/group grant pickers, and the shared `_GrantPickers` partial. But the
-board-*edit* page (`BoardEdit`) offered only title + description. ADR 0070
+board-*edit* page (`BoardEdit`) offered only title + description. ADR [0070](0070-board-edit-lane-and-board-polish.md)
 deliberately froze the audience: "The board's `Audience`, community, and
 language are **not** editable — they are creation-time choices." Over the
 miles that followed, the audience editor became the standard affordance on
@@ -49,7 +49,7 @@ The standing and the write-shape are already fixed by the surface:
   `CheckBoardStanding` — **creator ∪ GlobalAdmin**, the assignee branch not
   applying. Changing the audience is a board-update, so it inherits that wall
   unchanged; no new standing matrix, no new `AccessAction`/`AccessVia`.
-- **The audience write is verbatim (ADR 0001-B).** `KanbanBoard.Audience` is
+- **The audience write is verbatim (ADR [0001](0001-core-stack-and-identity-model.md)-B).** `KanbanBoard.Audience` is
   written by reference, `Decide`/`EvaluateAudience` resolve it per request.
   There is no projection, no backfill, no side-effect handler to notify — a
   changed audience is live on the very next read. So the edit is a pure field
@@ -73,19 +73,19 @@ index, no new bounded context, no new `kw-l` key *family* (the audience card
 reuses the existing `projects.board.*` / `posts.audience_all_members` /
 `events.audience_mode_*` keys), and the `Milestones.cs` / README Roadmap /
 `MilestonesTests.cs` triple is **untouched** (a named lane on the already-shipped
-M5 surface, not a milestone — the ADR 0086/0088/0093/0097 precedent). The
-frozen-`IProjectService` rule (ADR 0067 §2.3: "an ADD beyond this list is a new
+M5 surface, not a milestone — the ADR [0086](0086-goals-projects-lane.md)/0088/0093/0097 precedent). The
+frozen-`IProjectService` rule (ADR [0067](0067-m5-projects-todos-and-kanban.md) §2.3: "an ADD beyond this list is a new
 ADR") is honoured — this ADR *is* that new ADR; it amends 0070 rather than
 silently extending 0067.
 
-**Core — `UpdateBoardRequest` (additive, ADR 0084 additive-lane precedent):**
+**Core — `UpdateBoardRequest` (additive, ADR [0084](0084-per-target-notification-subscriptions.md) additive-lane precedent):**
 gains `public Audience? Audience { get; init; }`, the same nullable `Audience`
 `CreateBoardRequest` already carries. The contract is explicit:
 
 - **`null` = leave the stored audience unchanged.** A lane that posts only
   title/description (every pre-0098 caller, and the five existing F16 board-edit
   tests) leaves the audience exactly as it was. `null` is *not* "clear it."
-- **non-null = the actor's complete choice, written verbatim** (ADR 0001-B) —
+- **non-null = the actor's complete choice, written verbatim** (ADR [0001](0001-core-stack-and-identity-model.md)-B) —
   replacing the stored audience wholesale. The editor builds a complete audience
   (`BuildAudience` always returns a non-null `Audience` with the `Community` /
   `AllResidents` flags set from the checkboxes), so the stored value is the
@@ -99,7 +99,7 @@ as a change; an identical audience does not. On a real change the board's
 `Audience` is replaced and `KanbanBoard.Modified` is stamped (the existing
 "stamp on a real change only" no-op shape); a title/description-only no-op still
 leaves `Modified` untouched. The board's **community and language are not part
-of the request** and are not written here — they stay creation-time (ADR 0070).
+of the request** and are not written here — they stay creation-time (ADR [0070](0070-board-edit-lane-and-board-polish.md)).
 The same single `board.update` `AccessAudit` row (board id as target,
 `AccessVia.Owner` for the creator / `AccessVia.Admin` for the GlobalAdmin, the
 `BoardAuditViaFor` shape) covers the audience change — one row, as before.
@@ -118,7 +118,7 @@ gains the **same audience card** the `BoardNew` form renders (the
 mode radios, and the `_GrantPickers` partial with `EditorName = "Audience"`),
 plus the `_GrantPickerScripts` partial. `projects.board.edit_lead` is reworded
 to name the audience among the editable fields and to keep the community/language
-freeze explicit, in all four languages (ADR 0015 registry, en/de/fr/da parity).
+freeze explicit, in all four languages (ADR [0015](0015-ui-view-localization-mechanics.md) registry, en/de/fr/da parity).
 
 **Tests:** two Core pins on the service (audience applied + `Modified` stamped;
 `null` audience leaves the stored audience untouched and `Modified` un-stamped)
@@ -131,7 +131,7 @@ with the pickers seeded; a posted editor is written verbatim onto the request).
   board — including its lanes and placed to-dos, which read the board's
   audience — without recreating the board. The change is live on the next
   read (no projection to settle), and it is already audited as `board.update`.
-- ADR 0070's "audience, community, and language are not editable" narrows to
+- ADR [0070](0070-board-edit-lane-and-board-polish.md)'s "audience, community, and language are not editable" narrows to
   "**community and language** are not editable" — those two genuinely remain
   creation-time (re-pointing a board at another community or language would be
   a different, larger lane and is still out of scope).
@@ -142,5 +142,5 @@ with the pickers seeded; a posted editor is written verbatim onto the request).
   no new Web type, partial, or key family; the editor and pickers are the same
   `AudienceEditorModel` + `_GrantPickers` the rest of the app uses.
 - No new standing, audit action, schema, index, or context — the frozen
-  `IProjectService` surface (ADR 0067) is amended by this ADR, and the additive
-  `UpdateBoardRequest` field follows the ADR 0084 precedent.
+  `IProjectService` surface (ADR [0067](0067-m5-projects-todos-and-kanban.md)) is amended by this ADR, and the additive
+  `UpdateBoardRequest` field follows the ADR [0084](0084-per-target-notification-subscriptions.md) precedent.

@@ -11,12 +11,12 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0229 — Headed form sections, second batch
+# ADR [0229](0229-headed-form-sections-2.md) — Headed form sections, second batch
 
 Status: Accepted
 
 ## Context
-ADR 0224 gave the Post, Project, Announcement and group-post forms the Event form's headed section cards. Twelve forms
+ADR [0224](0224-headed-form-sections.md) gave the Post, Project, Announcement and group-post forms the Event form's headed section cards. Twelve forms
 were still flat single-field cards. This batch covers the small ones.
 
 ## Decision

@@ -22,7 +22,7 @@ neighborhood's Postgres and app must be attached to the *same environment* —
 that is what makes them network-adjacent and shares one scoped env-var set.
 
 1. **Projects → Add new** (from the Coolify home). Name it after the
-   neighborhood (`maplewood`). One project per neighborhood (ADR 0002).
+   neighborhood (`maplewood`). One project per neighborhood (ADR [0002](../../adr/0002-deployment-topology.md)).
 2. Open the project → **Add a new environment** → name it `production`.
    A project must have at least one environment.
 3. `production` is the only environment for now. A future staging or A/B

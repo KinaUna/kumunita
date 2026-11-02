@@ -17,7 +17,7 @@ updated: 2026-11-02
 > **Abstract:** *What it settles:* **per-resident quiet schedules** (allowed /
 > blocked hours of day + days of week) on the frozen M6 notification lane,
 > plus an admin-set check cadence — a **time dimension on the email half only**,
-> evaluated in the resident's **own time zone** (ADR 0019). *The one contract:*
+> evaluated in the resident's **own time zone** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)). *The one contract:*
 > **M20 defers the email, never the inbox row** (C-M20·1) and the quiet verdict
 > is a **pure function** of (schedule, instant, effective zone), not an
 > authorization decision (D3); the only schema change is one additive `bool`
@@ -26,39 +26,39 @@ updated: 2026-11-02
 > *Out of scope:* zero new bounded context / `AccessAction` / `AccessVia` /
 > adapter / `Decide()` branch, no relational quiet table; the frozen
 > `NotificationService` writer, the frozen `IMailerStage` stager, and the frozen
-> ADR 0019 zone resolution are byte-identical (C-M20·1/5). LOCKED in ADR 0121.
+> ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone resolution are byte-identical (C-M20·1/5). LOCKED in ADR [0121](../adr/0121-notification-quiet-times.md).
 
 > **Milestone M20 — Notification quiet times.** The README M20 line, verbatim:
 > "**per-resident quiet schedules (allowed/blocked hours of day and days of
 > week) on the M6 notification lane; admin-set check cadence for pending
-> notifications.**" M6 (ADR 0076) already ships the two-part notification:
+> notifications.**" M6 (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)) already ships the two-part notification:
 > the **inbox row** (a durable, personal record — stored unconditionally, D7)
 > and the **email nudge** (a best-effort side effect staged via the frozen
 > `IMailerStage`). M20 adds a **time dimension** to the email half: a
 > resident can say "hold my notification *emails* during these hours/days,"
-> evaluated in **their own time zone** (ADR 0019).
+> evaluated in **their own time zone** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)).
 >
-> **A milestone over the frozen M6 notification lane + the frozen ADR 0019
+> **A milestone over the frozen M6 notification lane + the frozen ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)
 > zone resolution.** Zero new bounded context, zero new `IAuthorizationService`
 > surface, zero new `AccessAction`, zero new `AccessVia`, zero new adapter,
 > zero new `Decide()` branch (C-M20·5, D1/D4). The **only** schema changes are
 > **one additive `bool` on the existing `Notification` POCO** (`EmailDeferred`,
-> D1 — the ADR 0004 §B.1 additive-field precedent) **+ one new document**
+> D1 — the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive-field precedent) **+ one new document**
 > (`NotificationQuietSchedule`, D2 — registered on `NotificationDocTypes`) **+ one new
 > enum** (`QuietScheduleMode`, D2) **+ one additive `int` on the existing
-> `LocaleSettings` singleton** (`QuietCheckMinutes`, D6 — the ADR 0050/0077/0105
+> `LocaleSettings` singleton** (`QuietCheckMinutes`, D6 — the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)/0077/0105
 > admin-set-runtime-field precedent). The closed `kw-l` key set (15 keys ×
 > en/de/fr/da, §10) + the six GATE acceptance tests (GATE-1…GATE-6, §11) are
-> locked in **ADR 0121 (Accepted, 2026-09-30)**.
+> locked in **ADR [0121](../adr/0121-notification-quiet-times.md) (Accepted, 2026-09-30)**.
 >
 > **The frozen notification writer, the frozen `IMailerStage` stager, the
-> ADR 0019 zone resolution, and the ADR 0076 D7 inbox-durability guarantee are
+> ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone resolution, and the ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D7 inbox-durability guarantee are
 > byte-identical** (C-M20·1/5). The quiet verdict is a **pure function** of
 > (schedule, instant, effective zone) — not an authorization decision (D3).
 >
 > **Status.** **LOCKED.** The decisions D1–D9, the invariants C-M20·1…C-M20·7,
 > the FACES F1–F5 + the named trade, the §10 `kw-l` key list, and the §11 gate
-> test names are locked in **ADR 0121 (Accepted, 2026-09-30)**. The
+> test names are locked in **ADR [0121](../adr/0121-notification-quiet-times.md) (Accepted, 2026-09-30)**. The
 > `[PROPOSED]` set in the register
 > `docs/plans-milestones/in-progress/plan-m20-notification-quiet-times.md` is
 > the locked set this doc restates **verbatim** (the U00 handoff entry records
@@ -69,7 +69,7 @@ updated: 2026-11-02
 > inbox row** (D1, C-M20·1) and **adds zero new authorization surface** (D3,
 > C-M20·5). The quiet verdict is a pure function (D3) — the frozen
 > `NotificationService` writer, the frozen `IMailerStage` stager, and the frozen
-> ADR 0019 zone resolution are the **only** seams touched (an *additive* field
+> ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone resolution are the **only** seams touched (an *additive* field
 > on `Notification` + `LocaleSettings`, a new `NotificationQuietSchedule`
 > document, and one **additive** read seam + one **additive** owner-scope write
 > seam on `NotificationService`, and one **additive** audited write seam on the
@@ -89,16 +89,16 @@ quiet times.** The roadmap line is the scope:
 > week) on the M6 notification lane; admin-set check cadence for pending
 > notifications."
 
-M6 (ADR 0076) already ships the two-part notification: the **inbox row** (a
+M6 (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)) already ships the two-part notification: the **inbox row** (a
 durable, personal record — stored unconditionally, D7) and the **email nudge**
 (a best-effort side effect staged via the frozen `IMailerStage`, the
 `event.reminder`-for-M4 carve-out aside). M20 adds a **time dimension** to the
 email half: a resident can say "hold my notification *emails* during these
-hours/days," evaluated in **their own time zone** (ADR 0019). Three things
+hours/days," evaluated in **their own time zone** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)). Three things
 follow from the roadmap sentence:
 
 1. **The quiet schedule is *per-resident*** — it is the resident's own
-   preference (the ADR 0019 time-zone / ADR 0020 date-format "preference if
+   preference (the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) time-zone / ADR [0020](../adr/0020-date-format-platform-default-and-resident-override.md) date-format "preference if
    present → instance default → floor" shape), written by the resident on their
    own settings surface (owner-scope, no audit row — the
    `SetProfileTimezoneAsync` personal-preference lane).
@@ -108,10 +108,10 @@ follow from the roadmap sentence:
    (every notification's email flows, exactly as today).
 3. **"Admin-set check cadence for pending notifications"** = when an email is
    held (because it is quiet), it is **held, not dropped**, and a **durable
-   background job** (the §6.4 `EventReminders` shape, ADR 0054 §3.6) periodically
+   background job** (the §6.4 `EventReminders` shape, ADR [0054](../adr/0054-events-rsvp-reminders.md) §3.6) periodically
    **re-checks** the held ones and **delivers the ones whose quiet window has
    lifted**. How often it checks is the **admin-set cadence** (a
-   `LocaleSettings` additive knob, the ADR 0050/0077/0105 admin-set-runtime
+   `LocaleSettings` additive knob, the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)/0077/0105 admin-set-runtime
    field precedent).
 
 **What M20 is NOT (the register's "What M20 is NOT", verbatim):**
@@ -120,25 +120,25 @@ follow from the roadmap sentence:
   for a resident (a `group.post` and an `account.signup` are held or released
   together). Per-kind quiet (hold *some* kinds, not others) is a future lane
   (D9). The existing `NotificationPreference.KindsEnabled` (the *which-kinds*
-  email gate, ADR 0076/0084) is **untouched** — M20 governs *when*, that governs
+  email gate, ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)/0084) is **untouched** — M20 governs *when*, that governs
   *which*; the two are orthogonal and both additive.
 - **Not a platform-wide maintenance window.** M20's quiet is **per-resident**
   only. The admin sets the **check cadence** (a number), **not** a quiet
   window for everyone. A global "the site is quiet at 3 a.m." is a future lane
   (D9).
-- **Not inbox deferral.** The **inbox row is always stored** (ADR 0076 D7 — the
+- **Not inbox deferral.** The **inbox row is always stored** (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D7 — the
   inbox is the durable record; the email is the best-effort nudge). M20 defers
   **only the email nudge**. A quiet recipient still sees the row in their inbox;
   they just don't get the *email* until quiet lifts. Dropping/suppressing the
   inbox row during quiet would violate D7 and is forbidden (C-M20·1).
 - **Not a new authorization surface.** M20 rides the frozen `NotificationService`
-  writer + the frozen `IMailerStage` stager + the frozen ADR 0019 timezone
+  writer + the frozen `IMailerStage` stager + the frozen ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) timezone
   resolution. It adds **no** `AccessAction` / `AccessVia` / `Decide()` branch /
   adapter / `IAuthorizationService` method (C-M20·5). The quiet verdict is a
   pure function of (schedule, instant, effective zone) — not an authorization
   decision.
 - **Not a replacement for the sample-suppression or subscription gates.** The
-  ADR 0078 sample gate and the ADR 0084 per-target subscription gate both
+  ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) sample gate and the ADR [0084](../adr/0084-per-target-notification-subscriptions.md) per-target subscription gate both
   **short-circuit `EmitAsync` with a `null` return *before* the inbox row is
   stored** — they suppress *everything*. The M20 quiet gate is different: it
   lets the **inbox row be stored** and defers **only the email**. It sits
@@ -154,8 +154,8 @@ additive `Notification.EmailDeferred` flag + one additive
 be staged (D1, D4) — so the inbox row stays durable and the email is held,
 delivered later by the §6.4 durable flush job (D5). This is D1 + D2 + D3 + D4
 together — it is the whole point of the milestone, and it is what lets every
-other surface (the ADR 0076 D7 inbox-durability guarantee, the frozen
-`IMailerStage`, the ADR 0078/0084 gates, the resident standing) keep working
+other surface (the ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D7 inbox-durability guarantee, the frozen
+`IMailerStage`, the ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md)/0084 gates, the resident standing) keep working
 **unchanged**.
 
 ## 1 — Decisions (D1–D9)
@@ -169,7 +169,7 @@ the **inbox row is still stored** (D7, unchanged), the row is marked
 `EmailDeferred = true`, and the email is **not staged**. When it is not active:
 the existing path is unchanged (email staged as today).
 
-*Forbids:* suppressing/dropping the inbox row during quiet (violates ADR 0076
+*Forbids:* suppressing/dropping the inbox row during quiet (violates ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)
 D7), *dropping* the email (it must be **deferred**, not lost — the roadmap's
 "pending notifications" implies held-then-delivered), or staging the email
 during quiet.
@@ -199,7 +199,7 @@ public enum QuietScheduleMode
 ```
 
 Two **owner-scope** seams on `NotificationService` (the `SetProfileTimezoneAsync`
-single-write-lane shape — owner scope, **no** `AccessAudit` row, ADR 0019):
+single-write-lane shape — owner scope, **no** `AccessAudit` row, ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)):
 `GetQuietScheduleAsync(recipientId, ct)` (returns the row or `null` = never
 quiet) and `SetQuietScheduleAsync(recipientId, schedule, ct)` (store-or-update;
 `null` schedule = clear = never quiet). The Web boundary owns the owner check
@@ -216,18 +216,18 @@ the only writes).
 DateTimeOffset now, TimeZoneInfo effectiveZone)` is a **pure function** (no
 session, no HTTP, no IO — the `UsageCapturePolicy` / `IcsWriter` "pure,
 closed, testable in isolation" discipline). It converts `now` to
-`effectiveZone`'s **wall clock** (ADR 0019 — the instant is converted to the
+`effectiveZone`'s **wall clock** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) — the instant is converted to the
 zone's wall clock *first*, then the hour/day are read, exactly the `kw-dt`
 TagHelper + `EventReminderService` resolution order), then evaluates the
 schedule's `Mode`/`Hours`/`DaysOfWeek` against that wall clock. `null` schedule
 → `false` (never quiet, C-M20·3). An empty `Hours` array means "all hours"; an
 empty `DaysOfWeek` array means "all days" (a schedule with only hours set is
 quiet on every day during those hours). The effective zone is resolved by the
-**caller** (the ADR 0019 chain: `Profile.TimeZone` override →
+**caller** (the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) chain: `Profile.TimeZone` override →
 `LocaleSettings.DefaultTimezone` → `UTC` floor) and passed in — the evaluator
 itself never touches a session.
 
-*Forbids:* evaluating in `UTC` (ignores ADR 0019 — the same wall-clock schedule
+*Forbids:* evaluating in `UTC` (ignores ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) — the same wall-clock schedule
 is a different verdict in UTC+2 vs UTC, which is the *point*), taking a
 client-supplied wall-clock string (trust boundary — the instant is the server's
 `DateTimeOffset.UtcNow`, the zone is the resident's resolved setting), or an
@@ -235,7 +235,7 @@ impure evaluator that reads a session (it would be untestable in isolation).
 
 **D4 — The gate lives in `EmitAsync`, after the inbox row, before the email.**
 The exact insertion point in `NotificationService.EmitAsync` (the 9-arg
-overload — the ADR 0084/0095 frozen-surface shape, **all existing emitters keep
+overload — the ADR [0084](../adr/0084-per-target-notification-subscriptions.md)/0095 frozen-surface shape, **all existing emitters keep
 compiling unchanged**): after the inbox row is stored (D7) and after the
 existing D7 email-kind gate (`EmailEnabledForAsync`) resolves "email is
 enabled," add the quiet gate:
@@ -254,7 +254,7 @@ if (await QuietNowForAsync(session, recipientId, now: DateTimeOffset.UtcNow, ct)
 
 `QuietNowForAsync(session, recipientId, now, ct)` is a small private helper that
 (1) loads the recipient's `NotificationQuietSchedule`, (2) resolves the
-effective zone via the ADR 0019 chain (`IUserInfoService` profile +
+effective zone via the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) chain (`IUserInfoService` profile +
 `ILocalizationService.GetDefaultTimezoneAsync()`), and (3) calls the pure
 `QuietScheduleEvaluator.IsQuietNow` (D3). The **deferred idempotency key** is a
 new, *distinct* stable key (the §6.2 per-email-key precedent):
@@ -295,9 +295,9 @@ would double-store the inbox row, D7), or a flush that stages a still-quiet
 email.
 
 **D6 — The check cadence is an admin-set additive field on `LocaleSettings`.**
-`LocaleSettings` (the ADR 0005 §B per-instance singleton) gains one **additive**
-field (the ADR 0050 `IsSignupOpen` / ADR 0077 `NotifyAdminsOnSignup` / ADR 0105
-`MessagingEnabled` admin-set-runtime-field-on-singleton precedent, ADR 0004
+`LocaleSettings` (the ADR [0005](../adr/0005-multilingual-support.md) §B per-instance singleton) gains one **additive**
+field (the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `IsSignupOpen` / ADR [0077](../adr/0077-admin-account-signup-verify-notification.md) `NotifyAdminsOnSignup` / ADR [0105](../adr/0105-messaging.md)
+`MessagingEnabled` admin-set-runtime-field-on-singleton precedent, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)
 §B.1):
 
 ```csharp
@@ -314,7 +314,7 @@ field (the ADR 0050 `IsSignupOpen` / ADR 0077 `NotifyAdminsOnSignup` / ADR 0105
 public int QuietCheckMinutes { get; set; } = 60;
 ```
 
-A **GlobalAdmin-only** write lane (one audited write, the ADR 0050
+A **GlobalAdmin-only** write lane (one audited write, the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)
 `SetSignupOpenAsync` single-write-lane shape) on the Core service:
 `SetQuietCheckMinutesAsync(int minutes, string adminSubjectId)` — validates the
 value (a floor of, e.g., `5` minutes and a ceiling of, e.g., `1440`, so an
@@ -328,9 +328,9 @@ change at runtime, a cadence written by a non-GlobalAdmin, or an unaudited
 direct store from a controller.
 
 **D7 — The resident surface is the 5th settings section, `/settings/quiet`.**
-`LocaleController` (ADR 0080 — the 4-section split: `/settings/language`,
+`LocaleController` (ADR [0080](../adr/0080-settings-surface-split.md) — the 4-section split: `/settings/language`,
 `/settings/timezone`, `/settings/dateformat`, `/settings/email-language`) gains
-a **5th section** `/settings/quiet`, mirroring the ADR 0019 **time-zone**
+a **5th section** `/settings/quiet`, mirroring the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) **time-zone**
 section exactly (both are time-related, per-resident, owner-scope, no-audit-row,
 folded into the same `LocaleSettingsViewModel` via the shared `BuildModel()`):
 `GET /settings/quiet` (render the resident's schedule + the mode/hours/days
@@ -340,18 +340,18 @@ the schedule = never quiet). The `_SettingsTabs` sub-nav gains a "Quiet hours"
 tab. All user-visible strings are `kw-l` keys (the closed set, §10 below, U06
 authors them).
 
-*Forbids:* a separate `QuietController` (the ADR 0080 precedent is to fold the
+*Forbids:* a separate `QuietController` (the ADR [0080](../adr/0080-settings-surface-split.md) precedent is to fold the
 section into `LocaleController`, like the time-zone section), a surface that
 lets a resident set *another* resident's schedule (owner-scope), or an
 un-audited *auditable* write (it is a personal preference — **no** audit row,
-ADR 0019/0020 shape, C-M20·7).
+ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)/0020 shape, C-M20·7).
 
 **D8 — The admin cadence surface is `/admin/quiet`, GlobalAdmin-gated.**
 A dedicated `AdminQuietController` — **not** a new action on the fat
-`AdminController` — mirroring `AdminSignupController` (ADR 0050):
+`AdminController` — mirroring `AdminSignupController` (ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)):
 `[Route("admin/quiet")]`, `[Authorize(Roles = Roles.GlobalAdmin)]`, a thin
 read/set for the cadence (D6) over `SetQuietCheckMinutesAsync`. The GlobalAdmin
-gate is checked **first** on both GET and POST (the ADR 0050 "gate is
+gate is checked **first** on both GET and POST (the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) "gate is
 authoritative on both the read and write surface" rule); a non-GlobalAdmin
 lands a 404/redirect (the consistent admin-surface failure shape). Affordances
 on `/admin` index are hidden-not-disabled for non-GlobalAdmin actors.
@@ -365,7 +365,7 @@ check (the Web boundary owns that check).
 1. **Per-kind quiet** — hold *some* M6 kinds (e.g. only `group.post`) but not
    others. M20's one-schedule-governs-all is the lean default; per-kind quiet
    rides the existing `NotificationPreference.KindsEnabled` machinery + the
-   D4 gate and needs its own design (it touches the ADR 0084 opt-in/opt-out
+   D4 gate and needs its own design (it touches the ADR [0084](../adr/0084-per-target-notification-subscriptions.md) opt-in/opt-out
    table).
 2. **A platform-wide maintenance window** — the admin sets a site-wide "quiet at
    3 a.m." for *everyone*. M20 is per-resident only; the global window is a
@@ -373,7 +373,7 @@ check (the Web boundary owns that check).
    `EmitAsync`, but it is a different policy surface).
 3. **Inbox deferral** — hiding the *inbox row* (not just the email) during
    quiet. M20 defers **only the email** (D1, C-M20·1 — the inbox is always
-   durable, ADR 0076 D7); a "don't even show me the row until morning" is a
+   durable, ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D7); a "don't even show me the row until morning" is a
    larger design (it re-opens the D7 inbox-as-durable-record guarantee).
 4. **Quiet for the *sender's* timezone, or a shared household schedule** — M20
    is strictly the *recipient's* own zone/schedule (D3); sender-zone or
@@ -396,7 +396,7 @@ check (the Web boundary owns that check).
 
 ## 2 — Invariants (C-M20·1 … C-M20·7)
 
-- **C-M20·1 — The inbox row is always durable (ADR 0076 D7).** A quiet recipient
+- **C-M20·1 — The inbox row is always durable (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D7).** A quiet recipient
   **still gets the inbox row**; only the email is deferred. A test asserts
   `EmitAsync` during quiet stores the `Notification` row **and** sets
   `EmailDeferred = true` **and** stages **no** email, and that the recipient
@@ -405,7 +405,7 @@ check (the Web boundary owns that check).
   takes `(schedule, now, effectiveZone)` and returns a `bool`; no session, no
   HTTP, no IO. A test pins a schedule + an instant and asserts the verdict
   **differs** between the resident's UTC+2 zone and UTC (the same wall-clock
-  schedule is a different verdict — the point of ADR 0019).
+  schedule is a different verdict — the point of ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)).
 - **C-M20·3 — Floor = never quiet (D2).** A recipient with **no**
   `NotificationQuietSchedule` row is never quiet (every notification's email
   flows, exactly as pre-M20). A test asserts a missing schedule evaluates to
@@ -418,7 +418,7 @@ check (the Web boundary owns that check).
 - **C-M20·5 — Zero new authorization surface.** M20 adds **no** `AccessAction`
   / `AccessVia` / `Decide()` branch / `IAuthorizationService` method /
   adapter. The quiet gate + the flush ride the frozen `NotificationService`
-  writer + the frozen `IMailerStage` stager + the frozen ADR 0019 zone
+  writer + the frozen `IMailerStage` stager + the frozen ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone
   resolution. A pin test asserts the `ClaimTypes.All` set is unchanged and
   there is no new `AccessVia`/`AccessAction` member.
 - **C-M20·6 — The cadence floors to a default + is GlobalAdmin-only (D6).**
@@ -445,7 +445,7 @@ check (the Web boundary owns that check).
 - **F4 — An admin sets the check cadence** (D6, D8, C-M20·6): how often the
   flush re-checks held emails (default 60 min, floors to 60 on a missing row).
 - **F5 — Everything is timezone-aware to the recipient's own zone** (D3,
-  C-M20·2, ADR 0019): "quiet at 10 p.m." means 10 p.m. *in their zone*, not
+  C-M20·2, ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)): "quiet at 10 p.m." means 10 p.m. *in their zone*, not
   UTC.
 
 **The named trade.** M20 buys *quiet hours that respect the recipient's own
@@ -547,7 +547,7 @@ public sealed class NotificationQuietSchedule
 **The `NotificationDocTypes` registration** (U02 — the `NotificationQuietSchedule`
 document is Marten-native with a conventional `RecipientId` identity, like
 `NotificationPreference`; the additive-surface delta is applied idempotently at
-boot — ADR 0004 §B.1, zero migration):
+boot — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1, zero migration):
 
 ```csharp
 // In NotificationDocTypes.Configure(StoreOptions opts), alongside NotificationPreference:
@@ -604,7 +604,7 @@ public static bool IsQuietNow(
 ```
 
 The two **owner-scope** seams (D2 — the `SetProfileTimezoneAsync`
-single-write-lane shape: owner scope, **no** `AccessAudit` row, ADR 0019).
+single-write-lane shape: owner scope, **no** `AccessAudit` row, ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)).
 U02 adds them to `NotificationService` (the frozen `IUserInfoService` +
 `ILocalizationService` dependencies are already in the constructor — the
 `GetProfileAsync` / `GetDefaultTimezoneAsync` chain D3's resolution rides):
@@ -678,7 +678,7 @@ private async Task<bool> QuietNowForAsync(
 
 1. `IsQuietNow_Verdict_Differs_Between_UTC2_And_UTC` (GATE-2, C-M20·2) — the
    same schedule + the same instant yields a **different** quiet verdict in the
-   recipient's UTC+2 zone than in UTC (the point of ADR 0019).
+   recipient's UTC+2 zone than in UTC (the point of ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)).
 2. `IsQuietNow_Missing_Schedule_Is_Never_Quiet` (GATE-3, C-M20·3) — a
    `null` schedule (and a `Enabled == false` schedule) evaluates to "not
    quiet"; the emit path is byte-identical to pre-M20 for that recipient.
@@ -688,7 +688,7 @@ private async Task<bool> QuietNowForAsync(
 The exact `Notification.EmailDeferred` additive field (D1) + the exact
 `EmitAsync` gate block. U03 implements both.
 
-**The additive field** (D1 — the ADR 0004 §B.1 additive-field precedent,
+**The additive field** (D1 — the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive-field precedent,
 placed after `ReadAt` in `Notification.cs`):
 
 ```csharp
@@ -901,7 +901,7 @@ The exact `LocaleSettings` additive field (D6) + the exact
 `AdminQuietController` actions (U07) + the admin `kw-l` keys they consume.
 
 **The additive field** (D6 — already pinned in §D6 above; verbatim on the
-`LocaleSettings` singleton, ADR 0005 §B):
+`LocaleSettings` singleton, ADR [0005](../adr/0005-multilingual-support.md) §B):
 
 ```csharp
 // In LocaleSettings.cs (U04), alongside IsSignupOpen / NotifyAdminsOnSignup:
@@ -918,7 +918,7 @@ The exact `LocaleSettings` additive field (D6) + the exact
 public int QuietCheckMinutes { get; set; } = 60;
 ```
 
-**The read + single audited write seam** (D6 — the ADR 0050
+**The read + single audited write seam** (D6 — the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)
 `IsSignupOpenAsync` / `SetSignupOpenAsync` shape verbatim). U04 adds these to
 the Core Localization service (the same `LocaleSettings` singleton the
 `GetDefaultTimezoneAsync` read seam already lives on):
@@ -953,7 +953,7 @@ Task SetQuietCheckMinutesAsync(int minutes, string adminSubjectId);
 **The `AdminQuietController` actions** (D8 — U07, mirroring
 `AdminSignupController` / `AdminTimezoneController` exactly). A dedicated
 controller: the `AdminController` constructor is pinned by two Web-layer test
-harnesses, so a new dependency there would break them (the ADR 0050
+harnesses, so a new dependency there would break them (the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)
 dedicated-controller rationale):
 
 ```csharp
@@ -1036,10 +1036,10 @@ public sealed class AdminQuietController(ILocalizationService localization) : Co
 > — it delegates the write to `SetQuietCheckMinutesAsync` (U04's single audited
 > lane). The GlobalAdmin standing is enforced by
 > `[Authorize(Roles = Roles.GlobalAdmin)]` at the boundary (the Web owns the
-> standing check; the Core seam does not re-check `User` — the ADR 0050 split).
+> standing check; the Core seam does not re-check `User` — the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) split).
 > The `/admin` index affordance is **hidden-not-disabled**: the
 > `admin.quiet.title` link renders **only** for GlobalAdmin actors (a
-> non-GlobalAdmin actor's `/admin` index renders no quiet link — the ADR 0050
+> non-GlobalAdmin actor's `/admin` index renders no quiet link — the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)
 > "affordances hidden, not just gated" rule).
 >
 > **The `kw-l` keys the surface consumes (U06's — §10 is the authoritative
@@ -1070,7 +1070,7 @@ See §4 (the exact C# is verbatim above — the `QuietScheduleMode` enum
 ### 9.2 The pure `QuietScheduleEvaluator` + the owner-scope seams (U02)
 
 See §5 (the exact `QuietScheduleEvaluator.IsQuietNow` is verbatim above — the
-floor short-circuit, the ADR 0019 wall-clock-first conversion, the empty-axis =
+floor short-circuit, the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) wall-clock-first conversion, the empty-axis =
 "all" reading, the `Blocked`/`Allowed` polarity; the two
 `NotificationService` ADDs `GetQuietScheduleAsync` + `SetQuietScheduleAsync`,
 owner-scope, **no** `AccessAudit` row; the two pinned GATE-2 / GATE-3 test
@@ -1079,7 +1079,7 @@ names).
 ### 9.3 The D4 gate + the `QuietNowForAsync` helper (U03)
 
 See §5 (the `QuietNowForAsync` helper is verbatim above — the D2 read seam +
-the ADR 0019 zone chain + the pure evaluator) and §6 (the exact
+the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone chain + the pure evaluator) and §6 (the exact
 `Notification.EmailDeferred` additive field + the exact `EmitAsync` gate block
 inserted after the (4a) `event.reminder` carve-out, before the (5) email-nudge;
 the deferred idempotency-key form
@@ -1105,7 +1105,7 @@ cadence shape distinct from `EventReminderTick`'s baked-in 1-day delay).
 
 ### 9.6 The `/settings/quiet` resident section (U06)
 
-See §D7 (the 5th section on `LocaleController`, mirroring the ADR 0019
+See §D7 (the 5th section on `LocaleController`, mirroring the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)
 time-zone section exactly — `GET`/`POST /settings/quiet`, owner-scope, no
 audit row, folded into the shared `LocaleSettingsViewModel` via `BuildModel()`,
 the `_SettingsTabs` "Quiet hours" tab) and §10 (the resident `kw-l` keys the
@@ -1126,7 +1126,7 @@ The exact closed key set from the register (the §"closed `kw-l` key set"
 table). Added to **all four** of the closed dictionaries in
 `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — `EnValues` (the
 `en` floor, the canonical source text), `DeValues`, `FrValues`, `DaValues`
-(the ADR 0005 / 0015 `en`-floor / per-key shape: the seeder materializes each
+(the ADR [0005](../adr/0005-multilingual-support.md) / 0015 `en`-floor / per-key shape: the seeder materializes each
 key's `en` row on first boot; the non-`en` rows are the localized text).
 **U06 authors the COMPLETE set (resident + admin); U06/U07 consume.**
 
@@ -1150,7 +1150,7 @@ key's `en` row on first boot; the non-`en` rows are the localized text).
 
 **The closed set is 15 keys × 4 languages = 60 strings.** The
 `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` enforce the
-4-language set + non-empty values; the ADR 0015 / 0052 warm-boot backfill seeds
+4-language set + non-empty values; the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) / 0052 warm-boot backfill seeds
 them idempotently. U06 authors them; U06/U07 **consume** them (U07 does not
 add a key).
 
@@ -1168,7 +1168,7 @@ not done, and the milestone is not done until all six are green.
   `EmitAsync_When_Quiet_Stores_Row_Marks_Deferred_Stages_No_Email` (U03).
 - **GATE-2 — The verdict is timezone-aware.** The same schedule + the same
   instant yields a **different** quiet verdict in the recipient's UTC+2 zone
-  than in UTC (ADR 0019 effective zone). *(C-M20·2.)* Pinned test name:
+  than in UTC (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) effective zone). *(C-M20·2.)* Pinned test name:
   `IsQuietNow_Verdict_Differs_Between_UTC2_And_UTC` (U02).
 - **GATE-3 — Floor = never quiet.** A recipient with no
   `NotificationQuietSchedule` row is never quiet; their emit path is
@@ -1209,7 +1209,7 @@ not done, and the milestone is not done until all six are green.
   M20 is zero new authorization surface — the quiet verdict is a pure function,
   not an authorization decision).
 - The quiet gate is about to **suppress or drop the inbox row** (return `null`
-  or skip the `session.Store`) — that violates C-M20·1 / ADR 0076 D7; stop and
+  or skip the `session.Store`) — that violates C-M20·1 / ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D7; stop and
   report (M20 defers the *email* only, never the inbox).
 - A user-visible string that is **not** already in `KnownTranslationKeys` for
   all four languages is about to be rendered — add it to U06's closed set first;
@@ -1238,7 +1238,7 @@ The five deferred lanes verbatim (the register's D9), each with a one-line
 
 1. **Per-kind quiet** (hold *some* M6 kinds but not others) — deferred because
    M20's one-schedule-governs-all is the lean default; per-kind quiet rides the
-   **existing** `NotificationPreference.KindsEnabled` machinery (ADR 0076/0084)
+   **existing** `NotificationPreference.KindsEnabled` machinery (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)/0084)
    + the D4 gate rather than a new per-kind schedule surface (the §drift-guard's
    "a per-kind schedule in M20" pin). A follow-up lane with its own ADR.
 2. **A platform-wide maintenance window** (the admin sets a site-wide "quiet at
@@ -1249,7 +1249,7 @@ The five deferred lanes verbatim (the register's D9), each with a one-line
    lane with its own ADR.
 3. **Inbox deferral** (hiding the *inbox row*, not just the email, during
    quiet) — deferred because M20 defers **only the email** (D1, C-M20·1 — the
-   inbox is always durable, ADR 0076 D7); a "don't even show me the row until
+   inbox is always durable, ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D7); a "don't even show me the row until
    morning" re-opens the D7 inbox-as-durable-record guarantee (the §drift-guard's
    "suppress or drop the inbox row" pin). A follow-up lane with its own ADR.
 4. **Quiet for the *sender's* timezone, or a shared household schedule** —
@@ -1266,7 +1266,7 @@ The five deferred lanes verbatim (the register's D9), each with a one-line
 
 ---
 
-## ADR 0121 — moved content (D11 trim, 2026-11-02)
+## ADR [0121](../adr/0121-notification-quiet-times.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
@@ -1280,14 +1280,14 @@ The five deferred lanes verbatim (the register's D9), each with a one-line
 ## Supersedes
 
 - **None.** M20 **adds a time dimension to the M6 email half**; it does not
-  supersede an earlier ADR. It *rides* ADR 0076 (the M6 two-part notification
-  + D7 inbox-durability), ADR 0019 (the effective-zone chain), ADR 0054 §3.6
-  (the §6.4 durable-job shape), ADR 0050 (the admin-settled policy + one
-  audited write lane + `/admin` controller), ADR 0080 (the 4-section settings
-  split M20 extends to a 5th), ADR 0004 §B.1 (additive-surface discipline), and
-  ADR 0006 (zero new authorization surface). The ADR 0076 D7 inbox-durability
+  supersede an earlier ADR. It *rides* ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) (the M6 two-part notification
+  + D7 inbox-durability), ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) (the effective-zone chain), ADR [0054](../adr/0054-events-rsvp-reminders.md) §3.6
+  (the §6.4 durable-job shape), ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) (the admin-settled policy + one
+  audited write lane + `/admin` controller), ADR [0080](../adr/0080-settings-surface-split.md) (the 4-section settings
+  split M20 extends to a 5th), ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 (additive-surface discipline), and
+  ADR [0006](../adr/0006-module-boundary-contracts.md) (zero new authorization surface). The ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D7 inbox-durability
   guarantee, the frozen `NotificationService`/`IMailerStage` seams, the ADR
-  0084 per-target subscription gate, and the ADR 0078 sample-suppression gate
+  0084 per-target subscription gate, and the ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) sample-suppression gate
   are **unchanged** (C-M20·1/5). This is stated explicitly so a later reader
   knows M20 is an **additive quiet-hours surface, not a correction** — no
   earlier ADR's decisions are revised or re-scoped by this one.
@@ -1328,8 +1328,8 @@ The five deferred lanes verbatim (the register's D9), each with a one-line
 - `src/Kumunita.Web/Controllers/AdminQuietController.cs` +
   `src/Kumunita.Web/Views/AdminQuiet/Index.cshtml` + the `/admin` index
   affordance — the `/admin/quiet` GlobalAdmin cadence surface (D8, F4).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the
+- `src/Kumunita.Web/Milestones.cs` + [`README.md`](../../README.md) + [`docs/STATUS.md`](../STATUS.md) +
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the
   **two** milestone flips (U01 open: M20 → `StatusNext`; U08 close: M20 →
   `StatusDone` + M21 promoted to `StatusNext`).
 - **New tests** (the GATE-1…6 pins): `tests/Kumunita.Core.Tests/` — the
@@ -1342,14 +1342,14 @@ The five deferred lanes verbatim (the register's D9), each with a one-line
 
 ---
 
-## ADR 0078 — moved content (D11 trim, 2026-11-02)
+## ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) — moved content (D11 trim, 2026-11-02)
 
 ## Follow-ons
 
 - **Suppressing the M4 event-reminder e-mail for sample attendees** is
   *not* covered by this gate: the §6.4 reminder is staged directly by
   `EventReminderService` with its own `remind:{eventId}:{userId}` key
-  (ADR 0054) and does not route through `EmitAsync`. On a deployed demo
+  (ADR [0054](../adr/0054-events-rsvp-reminders.md)) and does not route through `EmitAsync`. On a deployed demo
   instance with sample RSVPs, those reminder e-mails still go out. That
   is a narrow, acceptable consequence (the reminders are the one M4
   lane that predates M6 and never adopted the M6 seam); if it becomes
@@ -1358,18 +1358,18 @@ The five deferred lanes verbatim (the register's D9), each with a one-line
 
 ---
 
-## ADR 0080 — moved content (D11 trim, 2026-11-02)
+## ADR [0080](../adr/0080-settings-surface-split.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendment (2026-09-30)
 
 Two surface refinements supersede parts of the original four-section decision
 below; everything not restated here still stands.
 
-- **The Email &amp; notification language section (ADR 0061) is folded into
+- **The Email &amp; notification language section (ADR [0061](../adr/0061-email-and-notification-language.md)) is folded into
   the Language tab.** Rationale: it is another "which language" choice and
   lived awkwardly as a lone picker on its own page. Concretely:
   - `Views/Locale/EmailLanguage.cshtml` is **deleted**; its email picker +
-    reset block and the **help/account mount-slot link** (ADR 0039 §3.8) are
+    reset block and the **help/account mount-slot link** (ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md) §3.8) are
     merged into `Views/Locale/Index.cshtml` (the Language tab), which now
     `@inject`s `IPageService`.
   - `LocaleController.SettingsEmailLanguage()` (the
@@ -1389,7 +1389,7 @@ below; everything not restated here still stands.
     `/settings/email-language` | `EmailLanguage` and the "help/account
     … renders at the bottom of `EmailLanguage.cshtml`" bullet.
 
-- **The Children page (ADR 0028) becomes a settings tab.** The "Children"
+- **The Children page (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)) becomes a settings tab.** The "Children"
   entry is removed from the account dropdown (`_AccountNav.cshtml`) and the
   `Guardian/Index.cshtml` view now renders the shared `_SettingsTabs.cshtml`
   sub-nav (active tab = Children). Because the Guardian page's action is also

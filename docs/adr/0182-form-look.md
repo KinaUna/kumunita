@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0182 — One calm look for card-per-field-group forms
+# ADR [0182](0182-form-look.md) — One calm look for card-per-field-group forms
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0173/0175 (UI refresh), ADR 0179-0181 (events)
+Relates to: ADR [0173](0173-report-targets-lane.md)/0175 (UI refresh), ADR 0179-0181 (events)
 
 ## Context
 
@@ -30,7 +30,7 @@ so detail pages and lists are untouched:
 - cards: `--kmb-surface`, `--kmb-border`, 16px radius, 1rem gap (was 1.5rem), 1.25/1.5rem padding
   (1rem on phones);
 - labels in the heading font, 0.875rem/600; hints in `--kmb-muted`;
-- inputs and selects at the 12px input radius (ADR 0173 D4), keeping the 3:1 border and accent focus
+- inputs and selects at the 12px input radius (ADR [0173](0173-report-targets-lane.md) D4), keeping the 3:1 border and accent focus
   ring from the non-text contrast pass;
 - the shared rich editor: toolbar and pane at the input radius on palette tints; the active-button
   and WYSIWYG-focus colours use the accent instead of Bootstrap blue/green;

@@ -13,8 +13,8 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0004 §A splits one Postgres into two schemas with a hard ownership boundary
-(`mt` — Marten domain documents; `identity` — EF Core Identity tables). ADR 0004
+ADR [0004](0004-data-persistence-and-schema-evolution.md) §A splits one Postgres into two schemas with a hard ownership boundary
+(`mt` — Marten domain documents; `identity` — EF Core Identity tables). ADR [0004](0004-data-persistence-and-schema-evolution.md)
 §B pins the applied-state contract: *"Applied at boot in all environments (incl.
 production): the versioned steps only — a pristine database gets its initial
 state with no operator step"* and *"Re-running an already-applied step is a
@@ -27,14 +27,14 @@ kumunita`, and comments the reason verbatim:
 
 > `kumunita` is the dedicated non-superuser role the app runs as (docs/OPS.md
 > §10) and **owns the app database so it can create the `mt` and `identity`
-> schemas at boot (ADR 0004).**
+> schemas at boot (ADR [0004](0004-data-persistence-and-schema-evolution.md)).**
 
 The **DB-18 least-privilege** FAIL (the prod-hardening audit) objects to exactly
 this: the role the app uses **every** request is the **database owner** — the
 broadest standing short of a superuser, able to `DROP` its own database and
 create/drop any schema in it. A *runtime* application role should not hold that.
 
-The tension is therefore precise: **ADR 0004's boot contract requires *some*
+The tension is therefore precise: **ADR [0004](0004-data-persistence-and-schema-evolution.md)'s boot contract requires *some*
 role to hold the DDL-creation capability; DB-18 forbids the *runtime app* role
 from being the database owner.** These are not contradictory — they can both be
 true if the capability is **moved to a different role.** That is this ADR.
@@ -49,7 +49,7 @@ boot-ownership contract.**
    - **`kumunita_migrate`** — the **migration** role (new). Owns the `kumunita`
      database **and** the `mt` and `identity` schemas. This is the **only** role
      that may run DDL (`CREATE` / `ALTER` / `DROP` on schemas/tables) in the
-     database. It is the role the **boot schema-apply** (ADR 0004 §B:
+     database. It is the role the **boot schema-apply** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B:
      `ApplyAllConfiguredChangesToDatabaseAsync` + `Database.MigrateAsync`)
      connects as, and it is the operator's role for restore / admin work.
    - **`kumunita`** — the **runtime app** role (existing, **demoted**). Holds
@@ -75,10 +75,10 @@ boot-ownership contract.**
    (1) provisioning creates both roles and the database **owned by the migration
    role** (`01-app-role.sql`, once, on an empty data directory);
    (2) the boot schema-apply connects as **`kumunita_migrate`** and creates the
-   `mt` + `identity` schemas and tables (ADR 0004 §B, unchanged in shape);
+   `mt` + `identity` schemas and tables (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B, unchanged in shape);
    (3) the grant path connects as **`kumunita_migrate`** and issues the
    step-3 grants + `ALTER DEFAULT PRIVILEGES` (idempotent on every re-run);
-   (4) the runtime DML connects as **`kumunita`**. ADR 0004 §B's "no operator
+   (4) the runtime DML connects as **`kumunita`**. ADR [0004](0004-data-persistence-and-schema-evolution.md) §B's "no operator
    step" and "re-run is a no-op" contracts are **preserved** — only *which role*
    runs steps 2–3 changes.
 
@@ -96,7 +96,7 @@ boot-ownership contract.**
   the DML the platform was designed to do. DB-18 is closed **when the owner
   applies the split on the prod Postgres** (the `code+ops` ops half, recorded as
   an open item, not assumed).
-- **ADR 0004 is *amended*, not overturned.** §A (two schemas) and the forward-only
+- **ADR [0004](0004-data-persistence-and-schema-evolution.md) is *amended*, not overturned.** §A (two schemas) and the forward-only
   / delta-detected idempotent schema-evolution path are **unchanged**. §B's
   boot-ownership invariant is **reconciled**: the capability it relied on now
   lives in the dedicated migration role. Any future schema change is still
@@ -114,5 +114,5 @@ boot-ownership contract.**
   **open items** (the design pin §7), **recorded, not assumed done**.
 - **No new bounded context, no Core service seam, no `<PackageReference>`, no EF
   migration.** The change is at the Postgres role/privilege layer + the boot
-  connection shape. Core stays HTTP-free; ADR 0006 module boundaries are
+  connection shape. Core stays HTTP-free; ADR [0006](0006-module-boundary-contracts.md) module boundaries are
   untouched.

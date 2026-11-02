@@ -11,17 +11,17 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0216 — Pages tree and page detail at phone width
+# ADR [0216](0216-pages-tree-phone.md) — Pages tree and page detail at phone width
 
 Status: Accepted
 
 ## Context
-The remaining verification gap from ADR 0196: the Pages tree and a nested page at 390px (touch
+The remaining verification gap from ADR [0196](0196-pages.md): the Pages tree and a nested page at 390px (touch
 emulation, Ember light, sample data with 12 branches of up to 8 leaves).
 
 ## Findings
 - No horizontal overflow; long titles (top level and leaf) wrap cleanly and the count chip stays in view.
-- Branch rows already have a 44px summary (ADR 0196). Leaf rows are 61px tall but only the 22px
+- Branch rows already have a 44px summary (ADR [0196](0196-pages.md)). Leaf rows are 61px tall but only the 22px
   title text was tappable.
 - Page detail: the "·" between "Back to the pages" and the breadcrumb dangled at a line end;
   the back link (26px), breadcrumb links (20px) and the Translations chips (26px) were small targets.

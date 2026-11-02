@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 ## Context
 
-ADR 0031 (the rich-editor lane, `RE`) shipped the split view: a toolbar row,
+ADR [0031](0031-wysiwyg-editor-and-toolbar.md) (the rich-editor lane, `RE`) shipped the split view: a toolbar row,
 a source `<textarea>` row, and a rendered preview row — **all three visible
 at once**. That is correct as *architecture*, but the default the resident
 lands on is the **raw Markdown**. A resident composing a post sees
@@ -22,12 +22,12 @@ pane reads as a secondary strip below — a *preview*, not **the** editing
 surface. The promise the platform makes is that a resident writes what they
 *see*; landing on the markers inverts that.
 
-ADR 0031's own *"Not decided here"* set the floor (a textarea + a live
+ADR [0031](0031-wysiwyg-editor-and-toolbar.md)'s own *"Not decided here"* set the floor (a textarea + a live
 preview + a toolbar) but did not settle which of the two visible rows is the
 **default view**. This ADR settles it. The constraints are unchanged and all
 already hold:
 
-- **The `tsc`-only client convention** (ADR 0031) — still no editor
+- **The `tsc`-only client convention** (ADR [0031](0031-wysiwyg-editor-and-toolbar.md)) — still no editor
   dependency, still no `.csproj` / `package.json` change.
 - **One source of truth** (RE·1) — the `<textarea>` is the form field the
   server binds and the source of the body; it is **never** disabled, removed,
@@ -52,7 +52,7 @@ When the source is revealed, **the pane stays visible as a live reference — a
 split view.** Toggling never removes or hides the rendered pane; it only
 toggles the source row. So the two states are: (1) *pane only* (the default —
 the resident sees the rendered composition), and (2) *pane + source* (the
-split view ADR 0031 already shipped — the resident edits Markdown with the
+split view ADR [0031](0031-wysiwyg-editor-and-toolbar.md) already shipped — the resident edits Markdown with the
 rendered result beside it). The pane is present in **both**; the source is
 the only row that toggles. (This is the "pane stays visible" reading — not a
 pane-hides-on-source-reveal state.)
@@ -90,7 +90,7 @@ untouched.
 - **The source is a toggle away, never lost.** The `<textarea>` remains the
   single source of truth (RE·1): hidden by a CSS class, still bound, still
   submitted, its value unchanged. A resident who prefers raw Markdown clicks
-  once and gets the ADR 0031 split view back.
+  once and gets the ADR [0031](0031-wysiwyg-editor-and-toolbar.md) split view back.
 - **No regression surface.** The six RE pure functions and the existing
   toolbar buttons are byte-identical; the only behavioral change is the
   initial `setView(false)` (source hidden) plus the toggle's click handler.
@@ -106,7 +106,7 @@ untouched.
   attribute is also swapped (the a11y / HTML-source pin). If the
   `data-*` attributes are absent (a legacy button), the binder falls
   back to the known en-floor values (`</>` / `Preview`).
-- **The dead `rc.editor.preview` key is removed** — RE (ADR 0031)
+- **The dead `rc.editor.preview` key is removed** — RE (ADR [0031](0031-wysiwyg-editor-and-toolbar.md))
   registered it but never emitted it through `<kw-l>` in any view. IE's
   `rc.editor.showPreview` is the canonical "show preview" label.
   (2026-09-15, post-close amendment.)

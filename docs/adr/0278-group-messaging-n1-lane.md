@@ -11,26 +11,26 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0278 — Group messaging: multi-participant chat threads (the N:1 generalization of M9)
+# ADR [0278](0278-group-messaging-n1-lane.md) — Group messaging: multi-participant chat threads (the N:1 generalization of M9)
 
 Status: Accepted
 Date: 2026-10-30
-Extends the **M9 messaging surface** (ADR 0105 — the `Kumunita.Core.Messaging`
+Extends the **M9 messaging surface** (ADR [0105](0105-messaging.md) — the `Kumunita.Core.Messaging`
 bounded context, the direct 1:1 resident messaging surface, off by default)
 by adding a parallel **`Kumunita.Core.GroupMessaging`** bounded context — the
 N:1 generalization of the same conversation/message shape. The user's ask is
 explicit: *"Let's add group chats, allowing users to select multiple
 recipients for a new chat thread."*
 
-> **Abstract:** the M9 surface (ADR 0105) is strictly 1:1 — the
+> **Abstract:** the M9 surface (ADR [0105](0105-messaging.md)) is strictly 1:1 — the
 > `Conversation` doc carries a sorted `ParticipantA` / `ParticipantB` pair
 > (the `convo_uidx_pair` unique index is the F1 idempotency witness), and
 > every `IMessagingService` seam assumes exactly two participants. A "group
 > chat" is a different shape: two or more participants, an explicit
 > participant set, per-participant read state, and a membership rule. The
 > decision (confirmed with the user): **(1) a new bounded context
-> `Kumunita.Core.GroupMessaging`, not a re-shape of M9** (the ADR 0006 module-
-> boundary doctrine holds, and the M9 ADR 0105 pins stay byte-identical);
+> `Kumunita.Core.GroupMessaging`, not a re-shape of M9** (the ADR [0006](0006-module-boundary-contracts.md) module-
+> boundary doctrine holds, and the M9 ADR [0105](0105-messaging.md) pins stay byte-identical);
 > **(2) an invitation flow** (the 2026-10-30 amendment reshaping the first
 > "add members directly" shape) — the creator is the only initial
 > participant, everyone else gets a **pending invitation** to accept /
@@ -54,7 +54,7 @@ recipients for a new chat thread."*
 
 ## Context
 
-The M9 surface (ADR 0105) is strictly 1:1 — the `Conversation` document
+The M9 surface (ADR [0105](0105-messaging.md)) is strictly 1:1 — the `Conversation` document
 carries `ParticipantA` / `ParticipantB` (the sorted pair), the
 `convo_uidx_pair` unique index is the F1 idempotency witness (a 1:1 is a
 canonical relation), and every `IMessagingService` seam assumes exactly two
@@ -64,7 +64,7 @@ state (each member's unread marker is independent), and a membership rule
 (who may add whom). Forcing that shape into the M9 `Conversation` document
 would have required re-shaping the pair-index, the per-actor read-marker
 field, and every seam in `MessagingService` — and it would have broken the
-M9 ADR 0105 pins (`MessagingServiceTests`, `MessagesControllerTests`) that
+M9 ADR [0105](0105-messaging.md) pins (`MessagingServiceTests`, `MessagesControllerTests`) that
 the codebase deliberately keeps.
 
 The decision (confirmed with the user before implementation): **a new bounded
@@ -109,7 +109,7 @@ surface — the parallel surface to `Kumunita.Core.Messaging`:
   the full field set.
 - **`GroupMessage`** — the M9 `Message` shape generalized: `Id`,
   `ConversationId`, `SenderId`, `Body` (≤ 2000 chars, the M9 D7 cap),
-  `Created`, `LanguageCode` (the ADR 0018 authored-in tag), and `ReadBy` (a
+  `Created`, `LanguageCode` (the ADR [0018](0018-ugc-authored-in-language-tag.md) authored-in tag), and `ReadBy` (a
   **set** of reader ids, sorted — the per-participant read marker; a message
   is *unread for the actor* when `ReadBy` does not contain the actor's id and
   `SenderId != actorId`). The `(ConversationId, Created)` thread-ordering
@@ -123,7 +123,7 @@ surface — the parallel surface to `Kumunita.Core.Messaging`:
   (replaces `AddMembersAsync` — the any-participant-can-invite rule; a
   non-participant actor is the non-leaky 404; one `group.message.invite`
   audit row), `GetConversationAsync` (the non-leaky 404), `ListGroupsAsync`
-  (newest-activity-first, the ADR 0090 `HasMore` paging signal), `SendAsync`
+  (newest-activity-first, the ADR [0090](0090-pagination-and-filtering.md) `HasMore` paging signal), `SendAsync`
   (every **accepted** participant except the sender gets exactly one
   `group.message.new` notification, deduped by the stable idempotency key
   `notification:group.message.new:{messageId}`; one `group.message.send`
@@ -149,7 +149,7 @@ surface — the parallel surface to `Kumunita.Core.Messaging`:
   the rate limiter is the existing `"message"` window (20 req / 15 min, the
   M9 composer's limiter, reused). See the handoff note for the full surface.
 - **The messages tab strip** — `_MessagesTabs.cshtml` (the Bootstrap
-  nav-tabs idiom from `_ProjectsTabs.cshtml` / ADR 0062), the resident's
+  nav-tabs idiom from `_ProjectsTabs.cshtml` / ADR [0062](0062-admin-surface-split.md)), the resident's
   entry point into the two messaging surfaces: the account nav keeps a single
   **Messages** entry (`/messages`, the M9 1:1 surface), and the group lane
   lives as a **Direct · Group** tab strip rendered on all four messaging
@@ -167,10 +167,10 @@ surface — the parallel surface to `Kumunita.Core.Messaging`:
 
 **Zero migrations for existing surfaces** — the `GroupMessagingDocTypes`
 registration surface is additive; `ApplyAllConfiguredChangesToDatabaseAsync()`
-delta-detects the new tables idempotently at boot (the ADR 0004 §B.1 shape,
+delta-detects the new tables idempotently at boot (the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 shape,
 the M9 `MessagingDocTypes` precedent). **Zero re-shape of M9** — the
 `Kumunita.Core.Messaging` context, the `MessagingService`, the
-`MessagesController`, and the M9 ADR 0105 pins are byte-identical (the N:1 is
+`MessagesController`, and the M9 ADR [0105](0105-messaging.md) pins are byte-identical (the N:1 is
 a parallel context, not a re-shape of the 1:1).
 
 **Amendment — the invitation flow (2026-10-30).** The first shape added "add
@@ -197,7 +197,7 @@ together with the re-based `KnownTranslationKeys.cs` +
 ## Consequences
 
 - **Group chat is a first-class N:1 surface, not a re-shape of M9** — the M9
-  ADR 0105 pins (`MessagingServiceTests`, `MessagesControllerTests`) stay
+  ADR [0105](0105-messaging.md) pins (`MessagingServiceTests`, `MessagesControllerTests`) stay
   byte-identical; the group lane is a parallel bounded context.
 - **The M9 access story is carried verbatim** — the toggle is the whole
   access story (C-M9·1 / F5) and the non-leaky 404 (D3/D4) holds for the N:1

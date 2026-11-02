@@ -11,13 +11,13 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0205 — Admin table scroll shadows
+# ADR [0205](0205-admin-table-scroll-shadows.md) — Admin table scroll shadows
 
 Status: Accepted
 
 ## Context
 On a phone the admin Accounts table is 767px wide in a 364px card; Scope, Posting
-and the Manage/Block/Delete actions were off-screen with no cue (ADR 0199 open item).
+and the Manage/Block/Delete actions were off-screen with no cue (ADR [0199](0199-admin-shared-look.md) open item).
 
 ## Decision
 - CSS-only scroll shadows on every `.table-responsive` (admin look): an accent-tinted

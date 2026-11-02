@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0089 — Group events: a membership-scoped group events lane
+# ADR [0089](0089-group-events-membership-lane.md) — Group events: a membership-scoped group events lane
 
 Status: Accepted
 Date: 2026-09-25
@@ -20,32 +20,32 @@ Date: 2026-09-25
 
 Two shipped truths leave a gap:
 
-- **Events are scoped to Communities only.** M4 (ADR 0054) gave events a
+- **Events are scoped to Communities only.** M4 (ADR [0054](0054-events-rsvp-reminders.md)) gave events a
   `ComponentId` feed organizer, an `Audience` boundary, drafts, RSVPs,
   reminders, and translations — but every event lives on the *community*
   surface. A group has **no** events surface: a group's page shows posts and
   members, and the "create an event" affordance only ever reaches the
   community feed. A small circle (a family, a committee, a project team)
-  that already keeps its discussions *inside* a group (ADR 0013) has
+  that already keeps its discussions *inside* a group (ADR [0013](0013-group-posts-membership-lane.md)) has
   nowhere to put the things those discussions are about — the potluck, the
   shift handoff, the site visit.
-- **The platform already has the right mechanism.** ADR 0013 solved exactly
+- **The platform already has the right mechanism.** ADR [0013](0013-group-posts-membership-lane.md) solved exactly
   this for *posts*: a group-channel post is visible **only to current
   members**, membership is the sole decision, a non-member (including a
   GlobalAdmin) gets a 404, and membership changes re-scope the very next
   request. The *why* — "reach exactly the right people as membership
   moves" — is identical for events: a one-time audience grant cannot follow
-  a membership add/remove the way live membership can. Reusing ADR 0013's
+  a membership add/remove the way live membership can. Reusing ADR [0013](0013-group-posts-membership-lane.md)'s
   frozen group-lane seams (`CanSeeGroupAsync` / `CanSeeGroupFeedAsync`)
   rather than inventing an audience-grant variant keeps the privacy model
   consistent and adds **zero** new authorization surface.
 
 Group events therefore need the **membership lane** applied to the M4 event
 surface. This is a new lane on the (frozen) `IEventService` surface — a
-deliberate, reviewable ADD (ADR 0006-E's "add few, add stable" discipline),
-and the ADR 0013 precedent dictates its one hard edge up front: the
+deliberate, reviewable ADD (ADR [0006](0006-module-boundary-contracts.md)-E's "add few, add stable" discipline),
+and the ADR [0013](0013-group-posts-membership-lane.md) precedent dictates its one hard edge up front: the
 strictest privacy lane the platform has. This ADR records the decision;
-`docs/design/group-events-design.md` (Parts 1–2) freezes the invariants
+[`docs/design/group-events-design.md`](../design/group-events-design.md) (Parts 1–2) freezes the invariants
 **GE·1–GE·8**, the FACES, and the **exact C#** this ADR points at — the
 design doc is the authority on shape; this ADR is the authority on *why
 these shapes, and why nothing else*.
@@ -76,19 +76,19 @@ these shapes, and why nothing else*.
   `CreateGroupEventAsync(draft, actorId, IDocumentSession session)`, and
   `UpdateGroupEventAsync(eventId, actorId, GroupEventUpdate, IDocumentSession
   session)` — each a **compatible** ADD on the owning module's surface per
-  ADR 0006-E (the M2 `GetProfilesAsync` / ADR 0013 group-post precedent).
+  ADR [0006](0006-module-boundary-contracts.md)-E (the M2 `GetProfilesAsync` / ADR [0013](0013-group-posts-membership-lane.md) group-post precedent).
   **Publish, RSVP, and the translation lanes are not re-cut** — the group
   event reuses the existing lane-neutral `PublishAsync` (already author-only
   and idempotent), `RsvpAsync` / `GetMyRsvpAsync` / `GetRsvpsAsync`, and the
-  ADR 0059 `EventTranslation` seams, all of which are keyed by `EventId` and
+  ADR [0059](0059-event-translations.md) `EventTranslation` seams, all of which are keyed by `EventId` and
   carry no group-specific branch. **No** new `IAuthorizationService` method,
   **no** new `AccessAction`, **no** new `AccessVia`, **no** new `Decide()`
-  branch: the group lane reuses the ADR 0013 frozen seams verbatim (the lane
+  branch: the group lane reuses the ADR [0013](0013-group-posts-membership-lane.md) frozen seams verbatim (the lane
   is *reused*, not *extended*).
 
 - **The data is one additive, not a new doc — and no new index.**
   `Event.GroupId` (`string`, default `string.Empty`) is the **single** change
-  to the `Event` POCO — the ADR 0004 §B.1 additive lane, the ADR 0013
+  to the `Event` POCO — the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive lane, the ADR [0013](0013-group-posts-membership-lane.md)
   `Post.GroupId` precedent (delta-detected, idempotent, no re-seed). No
   `(GroupId)` index is added, **exactly as `Post.GroupId` has none** — at a
   single-neighborhood scale the group feed's candidate filter
@@ -97,7 +97,7 @@ these shapes, and why nothing else*.
   call. It is written **only** by `EventService.CreateGroupEventAsync`,
   which pins the write shape: `ComponentId = string.Empty` and
   `Audience = new Audience()` (GE·2, GE·8). `EventService`'s existing
-  constructor is **unchanged** (ADR 0006-D: the lane owns every membership
+  constructor is **unchanged** (ADR [0006](0006-module-boundary-contracts.md)-D: the lane owns every membership
   read; `EventService` never reads `GroupMembership` or `DelegationGrant`
   itself — it calls the frozen group seams, exactly as `PostService` does).
 
@@ -126,8 +126,8 @@ these shapes, and why nothing else*.
   group-post lane's `DecideGroupAsync`).
 
 - **Edit / publish standing — author-only, like group posts (GE·4).** A
-  group event's edit and publish lanes are **author-only** (the ADR 0016 /
-  ADR 0037 precedent on the group lane): the sole decision is
+  group event's edit and publish lanes are **author-only** (the ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) /
+  ADR [0037](0037-draft-mode-author-only.md) precedent on the group lane): the sole decision is
   `AuthorId == actorId`; a non-author (including a GlobalAdmin or a
   group-member replier) is denied with `UnauthorizedAccessException`, mapped
   to a 404. There is **no** GlobalAdmin-override branch on the group-lane
@@ -146,10 +146,10 @@ these shapes, and why nothing else*.
   by construction of the RSVP gate), which is exactly the "reach the right
   people" property. No new reminder surface, no new notification kind
   (reusing `event.reminder`), no audit row (the reminder is a side effect,
-  not an access decision — ADR 0054 §3.6).
+  not an access decision — ADR [0054](0054-events-rsvp-reminders.md) §3.6).
 
 - **Translations — available, standing inherited from the author (GE·5).**
-  A group event's user-added translations use the **existing** ADR 0059
+  A group event's user-added translations use the **existing** ADR [0059](0059-event-translations.md)
   `EventTranslation` lanes (`AddEventTranslationAsync` /
   `UpdateEventTranslationAsync` / `RemoveEventTranslationAsync`): the
   standing matrix (author / Translator / GlobalAdmin) and the
@@ -157,7 +157,7 @@ these shapes, and why nothing else*.
   and the translation row is keyed by `EventId`, so the lane is reused as-is
   with no group-specific branch. (This differs from the group-post lane,
   which excludes the component-moderator branch; events have no
-  component-moderator standing in the first place, ADR 0054 §5, so the
+  component-moderator standing in the first place, ADR [0054](0054-events-rsvp-reminders.md) §5, so the
   group-lane event simply reuses the same matrix.)
 
 - **Audit — per lane, always on, in-transaction (C3 / GE·5).** A feed visit
@@ -182,10 +182,10 @@ these shapes, and why nothing else*.
   `ModeratorAssignment` / `Component.ModeratorAccess` path, and no
   `AdminOverride` read on this lane — C5's "moderators are off by default"
   carried to its strictest reading for the platform's most
-  privacy-sensitive lane (ADR 0003; the ADR 0013 G·4 precedent). This is
+  privacy-sensitive lane (ADR [0003](0003-roles-and-moderator-scoping.md); the ADR [0013](0013-group-posts-membership-lane.md) G·4 precedent). This is
   **recorded here as a deliberate "not available"** and is deliberately
   **not** placed in the deferral list in Consequences: re-litigating it later
-  requires an ADR 0089 amendment, per the design doc's drift-guard.
+  requires an ADR [0089](0089-group-events-membership-lane.md) amendment, per the design doc's drift-guard.
 
 ## Consequences
 
@@ -198,14 +198,14 @@ these shapes, and why nothing else*.
   post that isn't really an event) get the time-aware surface they deserve:
   RSVPs, the day-before reminder, a calendar-grade `Start`/`End`.
 
-- **The promise in ADR 0013's `how-it-works.md` extends to events.**
+- **The promise in ADR [0013](0013-group-posts-membership-lane.md)'s `how-it-works.md` extends to events.**
   Membership changes taking effect on the next request (C4) is what makes
   "when membership changes, past events reach exactly the right people"
   true, and the seam tests pin it on both sides (GE3: an added member sees;
   GE4: a removed member loses).
 
 - **The frozen surface grows by exactly one lane, reusing the existing
-  authorization.** The ADR 0006-E "named here (…)" list gains, at this lane's
+  authorization.** The ADR [0006](0006-module-boundary-contracts.md)-E "named here (…)" list gains, at this lane's
   close: the four group-event methods on `IEventService`, the `Event.GroupId`
   additive, the **explicit** `GroupId == string.Empty` filter added to the
   existing `ListUpcomingAsync` / `ListInRangeAsync` candidate predicates
@@ -213,7 +213,7 @@ these shapes, and why nothing else*.
   `GroupEventUpdate` records (types, not seams) — each an ADD, each recorded
   here so the surface stays auditable, per 0006-E's "add few, add stable."
   The `EventDocTypes` surface and the `IAuthorizationService` surface gain
-  **nothing** (no new index, per the `Post.GroupId` precedent; the ADR 0013
+  **nothing** (no new index, per the `Post.GroupId` precedent; the ADR [0013](0013-group-posts-membership-lane.md)
   group seams are reused verbatim).
 
 - **The lane is checkable at its seams.** Named seam tests
@@ -221,7 +221,7 @@ these shapes, and why nothing else*.
   tests cover every FACES row GE1–GE13, including the *absences* (no
   break-glass, no moderator branch, structurally-excluded community
   feeds/calendar, author-only edit, no GlobalAdmin peek). The invariant and
-  FACES numbers (GE·1–GE·8, GE1–GE13) call on ADR 0006's **C1–C6** where they
+  FACES numbers (GE·1–GE·8, GE1–GE13) call on ADR [0006](0006-module-boundary-contracts.md)'s **C1–C6** where they
   overlap, so the lane is checkable at its seams the same way the group-post
   lane's G·1–G·8 set is.
 
@@ -247,4 +247,4 @@ these shapes, and why nothing else*.
   non-member authoring on group events; GlobalAdmin edit/publish override on
   group events. These are privacy-first answers (**no**, on purpose), not
   tickets to work off in a later milestone — changing any of them requires an
-  ADR 0089 amendment, not a product decision.
+  ADR [0089](0089-group-events-membership-lane.md) amendment, not a product decision.

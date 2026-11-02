@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0142 — Delete account: a resident-leave / admin-removal lane that pseudonymizes the audit trail, removes memberships and the profile, and deletes the Identity account — with the last-GlobalAdmin lockout pin and the self-serve GlobalAdmin gate
+# ADR [0142](0142-delete-account.md) — Delete account: a resident-leave / admin-removal lane that pseudonymizes the audit trail, removes memberships and the profile, and deletes the Identity account — with the last-GlobalAdmin lockout pin and the self-serve GlobalAdmin gate
 
 Status: Accepted
 Date: 2026-10-04
@@ -41,7 +41,7 @@ the GlobalAdmin removal lane" pair).
 > GlobalAdmin; the guard fires *before any write*). The **self-serve lane
 > is a GlobalAdmin lane** (a non-GlobalAdmin resident cannot self-delete
 > through `POST /account/delete` — a *deliberate* restriction, the
-> `OPS.md` §9 operator procedure is not a resident self-serve one).
+> [`OPS.md`](../OPS.md) §9 operator procedure is not a resident self-serve one).
 > **For** a developer touching `IIdentityService`, the
 > `DeleteAccountAsync` seam, the `POST /account/delete` /
 > `POST /admin/delete` routes, or the `tests/*` delete-account family. The
@@ -54,9 +54,9 @@ the GlobalAdmin removal lane" pair).
 
 A resident who wants to leave the platform, or a GlobalAdmin who must
 remove a resident (abuse, departure, a legal request), has no in-app
-surface today. The only paths are: *Block* (the ADR 0006 admin suspension
+surface today. The only paths are: *Block* (the ADR [0006](0006-module-boundary-contracts.md) admin suspension
 lane — reversible, preserves the account and its PII; **not** a deletion)
-and *operator-level DB surgery* (the `OPS.md` §9 "Resident requests
+and *operator-level DB surgery* (the [`OPS.md`](../OPS.md) §9 "Resident requests
 account deletion" procedure: disable in-app, then the operator hard-deletes
 the personal data at the DB level — a procedure that leaves the platform's
 own code as the wrong place to perform the deletion, and the
@@ -68,26 +68,26 @@ Three facts about the current surface shape the decision: **there was no
 delete-account surface at all** (the `IIdentityService` seam had
 `BlockAsync` / `UnblockAsync`, `ChangePasswordAsync`, and `SetRoleAsync`,
 but no deletion); **the pseudonymization policy is already designed**
-(`OPS.md` §9 and the data model both describe the "Deletion-of-account
+([`OPS.md`](../OPS.md) §9 and the data model both describe the "Deletion-of-account
 interaction" — the policy is documented, the mechanism is not); **the
-self-serve/admin two-branch shape already exists** (ADR 0138's
+self-serve/admin two-branch shape already exists** (ADR [0138](0138-sample-data-change-password-lock.md)'s
 `ChangePasswordAsync(subjectId, newPassword, byAdmin)` is the exact shape).
 
 ## Decision
 
-- **D1 — The seam: one write lane, two branches (the ADR 0138
+- **D1 — The seam: one write lane, two branches (the ADR [0138](0138-sample-data-change-password-lock.md)
   self-serve/admin distinction).**
   `IIdentityService.DeleteAccountAsync(string targetSubjectId, string
   adminSubjectId)`. Branch 1 — **Self-deletion**
   (`adminSubjectId == targetSubjectId`): the resident deletes their own
-  account; **ADR 0142 D5 gate:** only a `GlobalAdmin` may self-delete (a
+  account; **ADR [0142](0142-delete-account.md) D5 gate:** only a `GlobalAdmin` may self-delete (a
   non-GlobalAdmin's invocation throws `UnauthorizedAccessException`); the
   audit row is `Via: Owner`. Branch 2 — **Admin-initiated**
   (`adminSubjectId != targetSubjectId`): a `GlobalAdmin` removes another
   resident; the `RequireGlobalAdminAsync` gate applies; the audit row is
   `Via: Admin`. **Both branches** share the invariants below. See the
   handoff note for the full seam detail.
-- **D2 — The audit trail is pseudonymized, not deleted** (the `OPS.md` §9
+- **D2 — The audit trail is pseudonymized, not deleted** (the [`OPS.md`](../OPS.md) §9
   / data-model policy, now implemented in-app): the rows the target wrote
   remain in the log (the community is still promised "prove what happened"),
   but the target's `ActorId` / `EffectivePrincipalId` are rewritten to a
@@ -128,21 +128,21 @@ self-serve/admin two-branch shape already exists** (ADR 0138's
   own account through this surface is refused up-front). See the handoff
   note for the full Web surface detail.
 - **D8 — One closed `account.delete.*` + `admin.delete_account.*` +
-  `nav.delete_account` `kw-l` set × en/de/fr/da** (the ADR 0015
-  closed-registry shape, the ADR 0138 `account.change_password.*`
+  `nav.delete_account` `kw-l` set × en/de/fr/da** (the ADR [0015](0015-ui-view-localization-mechanics.md)
+  closed-registry shape, the ADR [0138](0138-sample-data-change-password-lock.md) `account.change_password.*`
   precedent). See the handoff note.
 
 ## Consequences
 
 - A resident who is a `GlobalAdmin` can leave the platform in-app; a
-  resident who is not a `GlobalAdmin` cannot self-delete (the ADR 0142 D5
-  gate) — they ask a `GlobalAdmin`, or the operator performs the `OPS.md`
+  resident who is not a `GlobalAdmin` cannot self-delete (the ADR [0142](0142-delete-account.md) D5
+  gate) — they ask a `GlobalAdmin`, or the operator performs the [`OPS.md`](../OPS.md)
   §9 operator-level procedure. This is a *deliberate* restriction, not a
   bug.
 - The `AccessAudit` trail is now pseudonymized-in-app for every deletion
-  (the `OPS.md` §9 operator-level pseudonymization procedure is now a
+  (the [`OPS.md`](../OPS.md) §9 operator-level pseudonymization procedure is now a
   fallback, not the primary path).
-- A lone `GlobalAdmin` cannot self-delete (the lockout pin) — the `OPS.md`
+- A lone `GlobalAdmin` cannot self-delete (the lockout pin) — the [`OPS.md`](../OPS.md)
   §9 "Two `GlobalAdmin`s should be the standing state" procedure is now
   enforced in the seam, not just documented.
 - The `PrivilegedStampMiddleware`'s "account-removed" branch (the

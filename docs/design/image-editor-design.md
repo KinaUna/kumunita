@@ -13,19 +13,19 @@ updated: 2026-11-02
 
 # Simple image editor (`IM`) — client-side crop + resize for avatars and inline images
 
-> **Abstract:** the **simple image editor (`IM`)** design — **client-side crop + resize** for avatars and inline images: one `client/lib/image-editor.ts` module, wired into the avatar upload + the editor's Image button, one CSS block, and the spec-mirror tests. No document / schema / route / package change; the RC (ADR 0025) + RE (ADR 0031) frozen base is unchanged. **Who is it for:** a developer touching the image-editor module; an agent that needs the export-ceiling invariant. **When to read the rest:** before touching the image editor, the crop/resize, or the export ceiling.
+> **Abstract:** the **simple image editor (`IM`)** design — **client-side crop + resize** for avatars and inline images: one `client/lib/image-editor.ts` module, wired into the avatar upload + the editor's Image button, one CSS block, and the spec-mirror tests. No document / schema / route / package change; the RC (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)) + RE (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) frozen base is unchanged. **Who is it for:** a developer touching the image-editor module; an agent that needs the export-ceiling invariant. **When to read the rest:** before touching the image editor, the crop/resize, or the export ceiling.
 
 
 > **Three-tier contract.** This file is the **primary** tier of the IM lane:
 > it pins the invariant numbers (IM·1–IM·3), the FACES (IM1–IM4), the exact
-> export-ceiling, and the acceptance gate. It sits **under** ADR 0075
+> export-ceiling, and the acceptance gate. It sits **under** ADR [0075](../adr/0075-client-side-image-editing-crop-and-resize.md)
 > (the lane's decision record) and **over** the scratch handoff the
-> session's todo list carries. The frozen base — the RC (ADR 0025) and RE
-> (ADR 0031) invariants — is **unchanged** (re-anchored in §Frozen base
+> session's todo list carries. The frozen base — the RC (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)) and RE
+> (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) invariants — is **unchanged** (re-anchored in §Frozen base
 > below). IM adds **no** re-shape to them; it only adds one `client/lib`
 > module and two call sites.
 
-**Lane ID:** `IM` (image; `IE` is the Inline editor, ADR 0032). **Scope:** one
+**Lane ID:** `IM` (image; `IE` is the Inline editor, ADR [0032](../adr/0032-inline-editor-rendered-default-view.md)). **Scope:** one
 new module `src/Kumunita.Web/client/lib/image-editor.ts`, its wiring into the
 avatar upload and the editor's Image button, one CSS block, and the C#
 spec-mirror tests. **No** document, schema, route, package, or
@@ -65,7 +65,7 @@ upload — purely client-side, always skippable, zero server change.
 - **Rotation, filters, freehand drawing** — the editor is crop + resize only
   (a future lane).
 - **Editing existing stored images** — only the file the resident is about
-  to upload is editable; a stored `MediaObject` is immutable (ADR 0011).
+  to upload is editable; a stored `MediaObject` is immutable (ADR [0011](../adr/0011-media-and-file-storage.md)).
 - **Non-browser environments / SSR** — the module self-wires behind a
   `typeof document` guard; `openImageEditor` returns `null` outside a DOM.
 
@@ -73,13 +73,13 @@ upload — purely client-side, always skippable, zero server change.
 
 ## Frozen base (unchanged by IM)
 
-The RC (ADR 0025) and RE (ADR 0031) invariants stay exactly as pinned. The
+The RC (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)) and RE (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) invariants stay exactly as pinned. The
 two seams IM *consumes* (does not modify) are:
 
 | Seam | What it is (unchanged) | How IM uses it |
 |---|---|---|
 | **RC R·1–R·7** | the one `MarkdownRenderer` / one `renderPreview` / one `dom-to-markdown` serializer; `![alt](/content-image/{id})`; `IsSafeImageSrc` | the edited blob is uploaded through the *same* lane and produced as the *same* `![alt](/content-image/{id})` value — byte-identical to the pre-lane behavior for the same id (IM·2) |
-| **C-MED** (ADR 0011) | the content-addressed store: id = SHA-256 of the payload; the two upload lanes' `MaxBytes` + `IsAllowed` guards | an edited blob is a new id → a new `MediaObject`; the guards, the seam, the audit all key off the id (IM·2) |
+| **C-MED** (ADR [0011](../adr/0011-media-and-file-storage.md)) | the content-addressed store: id = SHA-256 of the payload; the two upload lanes' `MaxBytes` + `IsAllowed` guards | an edited blob is a new id → a new `MediaObject`; the guards, the seam, the audit all key off the id (IM·2) |
 | **RE·1–RE·3** | the one `bindRichEditor`; the Image button posts to `/content-image` then splices the `<img data-cid>` | the Image button handler is the *only* RE code IM touches — it awaits `openImageEditor` first and uploads the returned blob *or* the original (IM·3, no new export surface beyond the two entry points) |
 
 IM adds **no** re-shape to any of these; it only adds one module and two
@@ -187,7 +187,7 @@ covered by the FACES (IM1/IM2), not the spec mirror.
 The lane is **done** when: the module exists and builds; the two call sites
 are wired (avatar + editor Image button); the C# spec mirror + artifact pin
 pass; the ADR (0075) and the README Roadmap carry the `IM` entry. The
-**re-open conditions** are the same as ADR 0025's "server-side transforms"
+**re-open conditions** are the same as ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)'s "server-side transforms"
 non-decision: a need for **automatic** resize on every upload, **bulk**
 transforms, or a **server-enforced** ceiling (the client edit is skippable
 and bypassable) — at which point the transform belongs in `Kumunita.Web`
@@ -196,11 +196,11 @@ IM·1 are re-opened.
 
 ---
 
-## ADR 0032 — moved content (D11 trim, 2026-11-02)
+## ADR [0032](../adr/0032-inline-editor-rendered-default-view.md) — moved content (D11 trim, 2026-11-02)
 
 ## Not decided here (explicit non-decisions)
 
-Each is a **future lane**, named — the ADR 0011 / 0025 / 0031 precedent holds:
+Each is a **future lane**, named — the ADR [0011](../adr/0011-media-and-file-storage.md) / 0025 / 0031 precedent holds:
 
 - **localStorage persistence** — remember the resident's view preference
   (source vs. pane) across sessions. A `localStorage` read on init + write
@@ -215,9 +215,9 @@ Each is a **future lane**, named — the ADR 0011 / 0025 / 0031 precedent holds:
   (a floating action button, a bottom-sheet, or a sticky-positioned toggle).
   A responsive CSS + JS concern.
 - **True `contenteditable` / third-party editor** (ProseMirror/Quill/Tiptap)
-  — **hard non-negotiable** out (D1, ADR 0031): it breaks `tsc`-only + the
+  — **hard non-negotiable** out (D1, ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)): it breaks `tsc`-only + the
   no-HTML-round-trip stance + RC's `ImageIds` source parse. Not a deferral;
-  a separate-architecture decision that would supersede ADR 0031.
+  a separate-architecture decision that would supersede ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md).
 
 
 ## Revisit when
@@ -226,7 +226,7 @@ Each is a **future lane**, named — the ADR 0011 / 0025 / 0031 precedent holds:
   shortcut / caret mapping — open the named IE-2 lane (a design doc + ADR),
   not an amendment to this ADR.
 - The **`tsc`-only / no-editor-dependency** stance is challenged — that is the
-  load-bearing constraint of ADR 0031's D1; relaxing it is itself a new ADR,
+  load-bearing constraint of ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)'s D1; relaxing it is itself a new ADR,
   not a code change.
 - The pane-only default proves *too* much of a shift (a resident repeatedly
   can't find the source) — that is a UX tuning of the default, revisitable
@@ -235,7 +235,7 @@ Each is a **future lane**, named — the ADR 0011 / 0025 / 0031 precedent holds:
 
 ---
 
-## ADR 0075 — moved content (D11 trim, 2026-11-02)
+## ADR [0075](../adr/0075-client-side-image-editing-crop-and-resize.md) — moved content (D11 trim, 2026-11-02)
 
 ## Not decided here
 

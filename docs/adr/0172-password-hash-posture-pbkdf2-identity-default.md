@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0172 — Password-hash posture: PBKDF2 (Identity default), no custom scheme
+# ADR [0172](0172-password-hash-posture-pbkdf2-identity-default.md) — Password-hash posture: PBKDF2 (Identity default), no custom scheme
 
 Status: Accepted
 Date: 2026-10-25
@@ -44,12 +44,12 @@ Nothing here registers a custom `PasswordHasher<T>` and nothing pins an
 iteration count — so the hash is the ASP.NET Identity default: **PBKDF2
 (HMAC-SHA256) at the framework's default work factor** (100 000 iterations in
 current releases). This is the same KDF the platform's own
-`docs/SECURITY.md` already names, twice, as the **decided** control:
+[`docs/SECURITY.md`](../SECURITY.md) already names, twice, as the **decided** control:
 
-- `SECURITY.md` §5 control table —
+- [`SECURITY.md`](../../SECURITY.md) §5 control table —
   *"PBKDF2 password hashing (Identity default; iteration count documented) |
   A2, A3 | §6 (decided)"*.
-- `SECURITY.md` §6 "Password storage (decided 2026-08-27; protects A2/A3)":
+- [`SECURITY.md`](../../SECURITY.md) §6 "Password storage (decided 2026-08-27; protects A2/A3)":
   *"ASP.NET Identity hashes passwords with PBKDF2 (HMAC-SHA256); the
   iteration count is configurable via `IdentityOptions` and we document the
   default rather than silently depending on it. **No custom password scheme**
@@ -74,12 +74,12 @@ pass was the *wording* of the close, not the posture.
    control — high-entropy one-time tokens at rest — and does not carry the
    password-hash row.)
 3. **Document the work factor rather than silently depending on it**
-   (`SECURITY.md` §6): the default is the .NET 10 ASP.NET Identity default
-   (100 000 iterations). This is recorded in `SECURITY.md` (already done) and
+   ([`SECURITY.md`](../../SECURITY.md) §6): the default is the .NET 10 ASP.NET Identity default
+   (100 000 iterations). This is recorded in [`SECURITY.md`](../../SECURITY.md) (already done) and
    here; if a future release changes the default, the `RequiredLength` /
    hasher block in `Program.cs` is the single seam to re-check.
 4. **Revisit trigger (not a defect today):** if the platform later runs a
-   *shared* VPS hosting multiple neighborhoods (the `SECURITY.md` §1
+   *shared* VPS hosting multiple neighborhoods (the [`SECURITY.md`](../../SECURITY.md) §1
    deployment assumption revisit), or if a credible offline-DB-exposure event
    occurs, re-evaluate a stronger KDF (argon2id) *at that seam*. At one
    neighborhood per instance, a self-hosted box, and a deny-by-default
@@ -92,12 +92,12 @@ pass was the *wording* of the close, not the posture.
   package, no migration, no hasher class. The password path (register, verify,
   reset, lockout) is byte-identical to the pre-ADR state.
 - **One line of doc correction.** The lane's `## Summary` table (and any
-  close-flip echo that repeats it) names **ADR 0172** as the AUTH-09
+  close-flip echo that repeats it) names **ADR [0172](0172-password-hash-posture-pbkdf2-identity-default.md)** as the AUTH-09
   disposition, replacing the "superseded by the F2 token-hash lane" claim.
 - **The "secret-at-rest" audit control is still met** — by the F2 token-hash
   lane (verify/setup tokens) *and* by this PBKDF2 posture (passwords). They
   are two rows, two controls; this ADR keeps them honestly separated.
 - **Consistency with the philosophy:** this is the "integrate the boundary,
   don't bolt on a component" move — the decision already lived in
-  `SECURITY.md`; the ADR is the record that makes the audit row and that
+  [`SECURITY.md`](../../SECURITY.md); the ADR is the record that makes the audit row and that
   decision agree, instead of letting the row dangle as a false "done."

@@ -52,7 +52,7 @@ it.
 
 ---
 
-## ADR 0114 — moved content (D11 trim, 2026-11-02)
+## ADR [0114](../adr/0114-logging-and-usage-analytics.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
@@ -60,7 +60,7 @@ it.
 
 **View location.** The U05 deliverable placed the analytics view at
 `Views/Admin/Analytics.cshtml`, but the `AdminAnalyticsController` is
-its own controller class (the ADR 0062 section-split precedent, matching
+its own controller class (the ADR [0062](../adr/0062-admin-surface-split.md) section-split precedent, matching
 every other `Admin*Controller` in this codebase: `AdminDateFormat`,
 `AdminQuiet`, `AdminGuests`, `AdminSignup`, …). ASP.NET Core MVC's view
 lookup for `AdminAnalyticsController.Index` searches

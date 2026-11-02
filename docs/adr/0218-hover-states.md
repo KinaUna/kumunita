@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0218 — Hover states: icon rail tooltips, folded nav, pagination
+# ADR [0218](0218-hover-states.md) — Hover states: icon rail tooltips, folded nav, pagination
 
 Status: Accepted
 

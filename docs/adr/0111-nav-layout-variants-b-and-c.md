@@ -41,7 +41,7 @@ the `kumunita.nav` cookie (`NavLayoutCookie`, `Security/NavLayoutCookie.cs`),
 mirroring `LocaleCookie`: `HttpOnly`, `SameSite=Lax`, 365-day max age, values
 `b` / `c`. It is read in the Web layer and passed to the layout as a plain
 string — never part of the identity and never an authorization decision
-(ADR 0001-B). It is a per-browser display preference, exactly like the
+(ADR [0001](0001-core-stack-and-identity-model.md)-B). It is a per-browser display preference, exactly like the
 language preference.
 
 **D3 — A public, CSRF-protected write endpoint.** `POST /nav-layout`
@@ -64,7 +64,7 @@ hidden-`returnUrl` + `✓`-on-active pattern the language picker already uses.
 This keeps the switch one menu away from the other resident preference and
 avoids a sixth flat navbar control.
 
-**D5 — UI strings go through the closed `kw-l` registry (ADR 0015).** Four
+**D5 — UI strings go through the closed `kw-l` registry (ADR [0015](0015-ui-view-localization-mechanics.md)).** Four
 new keys — `nav.more`, `nav_variant.label`, `nav_variant.row`,
 `nav_variant.rail` — are registered in **all four** dictionaries (en/de/fr/da).
 The parity pins (`KnownTranslationKeys_ParityTests`) require `DeValues` /

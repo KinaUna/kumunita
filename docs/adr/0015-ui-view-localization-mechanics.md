@@ -13,7 +13,7 @@ updated: 2026-11-02
 
 ## Context
 
-The `ML` lane (ADR 0005) shipped the **seams** of multilingual support — the two
+The `ML` lane (ADR [0005](0005-multilingual-support.md)) shipped the **seams** of multilingual support — the two
 content documents (`TranslationResource` / `LocalizedPage`), the
 `ITranslationProvider` read path (preference → default → `en`, per-string /
 per-page fallback), the `ILocalizationService` admin surface, the `LocaleCookie`
@@ -22,7 +22,7 @@ surface — and closed green. But its acceptance gate exercised the **part**
 (save a `TranslationResource` → the provider resolves it), not the **whole**
 (a resident actually seeing the platform in another language). Four gaps
 remained (re-verified against the code, 2026-09-12; full detail in
-`archive/lanes/multilingual-ui/plan-multilingual-ui.md`):
+[`archive/lanes/multilingual-ui/plan-multilingual-ui.md`](../archive/lanes/multilingual-ui/plan-multilingual-ui.md)):
 
 1. **No view resolved through the provider** — every in-scope view (nav,
    footer, Home, Posts, Groups, Directory, Profile, Account, Admin) carried
@@ -37,10 +37,10 @@ remained (re-verified against the code, 2026-09-12; full detail in
 4. **Discoverability** — the language picker was `[Authorize]`d, so a
    signed-out visitor had no way to choose a language.
 
-ADR 0005 is the **seam this ADR wires**: it defines *what* is translatable and
+ADR [0005](0005-multilingual-support.md) is the **seam this ADR wires**: it defines *what* is translatable and
 *how a string resolves*, and deliberately deferred the question of *how a
 Razor view emits a string* and *where the canonical `en` key set lives*. The
-`ML-UI` lane (ADR 0013's named-lane precedent — a capability with its own
+`ML-UI` lane (ADR [0013](0013-group-posts-membership-lane.md)'s named-lane precedent — a capability with its own
 short ID rather than a renumber of M4/M5/M6) settles those two remaining
 mechanics.
 
@@ -101,8 +101,8 @@ mechanics.
 - **Follow-on — UGC is untouched (M·3).** The view-localization path resolves
   **platform text only**; post / reply / group / announcement bodies are
   authored and rendered **as written**. Machine translation of UGC remains a
-  **deferred trust boundary** (ADR 0005 C) and, if it ever ships, a separate
+  **deferred trust boundary** (ADR [0005](0005-multilingual-support.md) C) and, if it ever ships, a separate
   opt-in lane with a third-party-boundary review.
-- **Cross-references:** ADR 0005 (the seam this ADR completes — the seam now
-  reaches the primary UI surface), and ADR 0013 (the named-lane-with-a-short-
+- **Cross-references:** ADR [0005](0005-multilingual-support.md) (the seam this ADR completes — the seam now
+  reaches the primary UI surface), and ADR [0013](0013-group-posts-membership-lane.md) (the named-lane-with-a-short-
   ID precedent that `ML-UI` follows rather than renumbering M4/M5/M6).

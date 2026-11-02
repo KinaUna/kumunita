@@ -21,31 +21,31 @@ updated: 2026-11-02
 > "**Guardian time limits — for a child's account, a parent/guardian sets
 > when the child may use the platform: allow or block certain hours of each
 > day and days of the week.**" M28 is a **new lane on the GU guardian surface**
-> (ADR 0028 / ADR 0038) — the **inverse of the M20 notification-quiet lane**
-> (ADR 0121): M20 lets a *resident* hold their own *notification emails* during
+> (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) / ADR [0038](../adr/0038-guardian-assignment.md)) — the **inverse of the M20 notification-quiet lane**
+> (ADR [0121](../adr/0121-notification-quiet-times.md)): M20 lets a *resident* hold their own *notification emails* during
 > a window they choose (a best-effort email deferral); M28 lets a *guardian*
 > gate a *child's* *whole-platform access* during a window the guardian chooses
 > (a hard sign-out). It reuses the M20 **pure-evaluator shape** (the
 > `QuietScheduleEvaluator.IsQuietNow(schedule, now, zone)` discipline,
-> wall-clock-first per ADR 0019) but flips the **owner** (guardian, not
+> wall-clock-first per ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)) but flips the **owner** (guardian, not
 > resident), the **polarity** (allowed/restricted, not quiet/held), and the
 > **effect** (a sign-out access gate, not an email deferral).
 >
-> **A lane on the frozen GU guardian surface + the frozen ADR 0019 zone
+> **A lane on the frozen GU guardian surface + the frozen ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone
 > resolution + the frozen M20 evaluator discipline.** Zero new bounded
 > context, zero new `IAuthorizationService` surface, zero new `AccessAction`,
 > zero new `AccessVia`, zero new adapter, zero new `Decide()` branch
 > (C-M28·5, D5). The **only** schema change is **one new document**
 > (`GuardianTimeLimitSchedule`, D2 — registered on the **existing `CoreDocTypes`**
 > GU surface, next to `GuardianLink`) **+ one new enum** (`TimeLimitMode`, D2)
-> **+ three additive seams on `IUserInfoService`** (D4, ADR 0006-E compatible
+> **+ three additive seams on `IUserInfoService`** (D4, ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible
 > ADDs) **+ one new middleware** (`TimeLimitMiddleware`, D5 — the
 > `BlockedAccountMiddleware` shape). The closed `kw-l` key set (14 keys ×
 > en/de/fr/da, §2.7) + the three acceptance-gate tests over the 20-test seam list
-> (§2.8) are locked in **ADR 0151 (Accepted, 2026-10-07)**.
+> (§2.8) are locked in **ADR [0151](../adr/0151-guardian-time-limits.md) (Accepted, 2026-10-07)**.
 >
 > **The frozen GU standing (the `GuardianLink` active-link read), the frozen
-> `BlockedAccountMiddleware` sign-out shape, and the frozen ADR 0019 zone
+> `BlockedAccountMiddleware` sign-out shape, and the frozen ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone
 > resolution are byte-identical** (C-M28·5/6). The time-limit verdict is a
 > **pure function** of (schedule, instant, effective zone) — not an
 > authorization decision (D3). The M20 `NotificationQuietSchedule` doc, the
@@ -56,9 +56,9 @@ updated: 2026-11-02
 > **Status.** **LOCKED.** The decisions D1–D9, the invariants C-M28·1…C-M28·7,
 > the FACES F1–F6, the §2.1 three-seam list, the §2.2–§2.5 doc + enum + evaluator +
 > middleware + surface pins, the §2.6 20-test seam list, the §2.7 `kw-l` key list,
-> the §2.8 gate, and the §2.9 drift-guard are locked in **ADR 0151 (Accepted,
+> the §2.8 gate, and the §2.9 drift-guard are locked in **ADR [0151](../adr/0151-guardian-time-limits.md) (Accepted,
 > 2026-10-07)**. The `[PROPOSED]` set in the register
-> `docs/archive/lanes/m28/plan-m28-guardian-time-limits.md` is the locked set
+> [`docs/archive/lanes/m28/plan-m28-guardian-time-limits.md`](../archive/lanes/m28/plan-m28-guardian-time-limits.md) is the locked set
 > this doc restates **verbatim** (the U00 handoff entry records the lock + the
 > one refinement in §1.a).
 >
@@ -66,7 +66,7 @@ updated: 2026-11-02
 > a sign-out, not a 403** (D5, C-M28·1) and **adds zero new authorization
 > surface** (D3, C-M28·5). The time-limit verdict is a pure function (D3) —
 > the frozen `IUserInfoService` GU standing read, the frozen
-> `BlockedAccountMiddleware` sign-out shape, and the frozen ADR 0019 zone
+> `BlockedAccountMiddleware` sign-out shape, and the frozen ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone
 > resolution are the **only** seams touched (three *additive* seams on
 > `IUserInfoService` + one *additive* doc on `CoreDocTypes` + one *additive*
 > middleware + one `?error=time-limit` login landing). It does **not** add a
@@ -77,22 +77,22 @@ updated: 2026-11-02
 
 ## Context
 
-The GU guardian lane (ADR 0028) shipped **account-level** supervision of a
+The GU guardian lane (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)) shipped **account-level** supervision of a
 child's account — suspend/lock (`Profile.Blocked`, the `BlockedAccountMiddleware`),
 curate community/group membership, approve a group invitation, dissolve the link,
-and (ADR 0038/0144) gate event RSVPs — but that supervision is **binary**: a
+and (ADR [0038](../adr/0038-guardian-assignment.md)/0144) gate event RSVPs — but that supervision is **binary**: a
 child is either fully blocked or fully open. There is no *time* dimension. A
 parent who wants "no platform from 22:00 to 07:00" has no path short of
 suspending the account — the wrong tool (a total block, not a windowed one, and
 it reads as a punishment in the audit log).
 
 M28 adds the **time dimension at the guardian layer**, as the **inverse of the
-M20 notification-quiet lane** (ADR 0121): M20 lets a *resident* hold their own
+M20 notification-quiet lane** (ADR [0121](../adr/0121-notification-quiet-times.md)): M20 lets a *resident* hold their own
 *notification emails* during a window (a best-effort email deferral); M28 lets a
 *guardian* gate a *child's* *whole-platform access* during a window (a hard
 sign-out). It reuses the M20 **pure-evaluator shape** (the
 `QuietScheduleEvaluator.IsQuietNow(schedule, now, zone)` discipline,
-wall-clock-first per ADR 0019) but flips the **owner** (guardian, not resident),
+wall-clock-first per ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)) but flips the **owner** (guardian, not resident),
 the **polarity** (allowed/restricted, not quiet/held), and the **effect** (a
 sign-out access gate, not an email deferral). The scope is the **whole platform,
 not a feature** (D1).
@@ -108,7 +108,7 @@ a GU supervisor can suspend a child's account (the `Profile.Blocked` flag, the
 and dissolve the link — but that supervision is **binary** (fully blocked or
 fully open). M28 adds a **windowed** layer: a per-child schedule (a `Blocked`
 window or an `Allowed` window over hours-of-day × days-of-week, evaluated in
-the **child's** effective zone, ADR 0019) that, when the child is **outside the
+the **child's** effective zone, ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)) that, when the child is **outside the
 allowed window**, **signs the child out** and lands them on a distinct
 "you're outside your allowed hours" login message (the `BlockedAccountMiddleware`
 shape, the `?error=blocked` landing pattern, but a distinct
@@ -118,7 +118,7 @@ Three things follow:
 
 1. **The time limit is *per-child*, set by the *guardian*.** One row per child
    (id = `ChildId`, the M20 `NotificationQuietSchedule` "one row per subject"
-   shape, ADR 0121 D2, with `ChildId` in place of `RecipientId`). A child with
+   shape, ADR [0121](../adr/0121-notification-quiet-times.md) D2, with `ChildId` in place of `RecipientId`). A child with
    two guardians shares **one** schedule (the `GuardianLink` multi-guardian
    shape — the second guardian sets/clears the **same** row via the same
    guardian-gated seam; there is no per-guardian schedule). The **child cannot
@@ -150,9 +150,9 @@ Three things follow:
   lane is new, ADR-gated (D9·3).
 - **Not enforcement-history auditing.** The middleware is silent (no per-request
   deny log). Emitting a `UsageEvent` for denied access is a future lane (D9·4,
-  the M13 ADR 0114 capture shape).
+  the M13 ADR [0114](../adr/0114-logging-and-usage-analytics.md) capture shape).
 - **Not a new authorization surface.** M28 rides the frozen GU standing read +
-  the frozen `BlockedAccountMiddleware` shape + the frozen ADR 0019 zone
+  the frozen `BlockedAccountMiddleware` shape + the frozen ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone
   resolution. It adds **no** `AccessAction` / `AccessVia` / `Decide()` branch /
   adapter / `IAuthorizationService` method (C-M28·5). The verdict is a pure
   function of (schedule, instant, effective zone) — not an authorization
@@ -180,8 +180,8 @@ the verdict in a **`TimeLimitMiddleware`** (the `BlockedAccountMiddleware`
 shape — sign-out + `?error=time-limit` landing) — so the M20 quiet lane, the
 frozen GU standing read, and the frozen `IAuthorizationService` surface keep
 working **unchanged**. This is D1 + D2 + D3 + D4 + D5 together — it is the whole
-point of the milestone, and it is what lets every other surface (the ADR 0028
-GU invariants G·1–G·5, the frozen `BlockedAccountMiddleware`, the ADR 0019 zone
+point of the milestone, and it is what lets every other surface (the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)
+GU invariants G·1–G·5, the frozen `BlockedAccountMiddleware`, the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) zone
 chain) keep working **unchanged**.
 
 ## Invariants (pinned, C-M28·1 … C-M28·7)
@@ -202,7 +202,7 @@ chain) keep working **unchanged**.
   `AccessVia`, no `Decide()` branch, no `IAuthorizationService` signature, no
   adapter. The frozen `IAuthorizationService` surface stays byte-identical.
   (D5/D7.)
-- **C-M28·6 — The zone is the child's effective zone (ADR 0019),
+- **C-M28·6 — The zone is the child's effective zone (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)),
   wall-clock-first.** (D3.)
 - **C-M28·7 — The child cannot set/clear their own time limit (no self-lane).**
   The only write is the guardian-gated (∪ GlobalAdmin) seam. (D6.)
@@ -224,8 +224,8 @@ chain) keep working **unchanged**.
 
 ## 2.1 — The frozen seam list (three `IUserInfoService` ADDs, exact C#)
 
-Three **additive** seams on `IUserInfoService` (ADR 0006-E compatible ADDs — the
-M27 / M3 / GU ADD precedent). The ADR 0006-E "named here (…)" list gains these
+Three **additive** seams on `IUserInfoService` (ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible ADDs — the
+M27 / M3 / GU ADD precedent). The ADR [0006](../adr/0006-module-boundary-contracts.md)-E "named here (…)" list gains these
 three methods. **No** `IAuthorizationService` method, **no** new `AccessAction` /
 `AccessVia`, **no** `Decide()` branch (C-M28·5). Namespace
 `Kumunita.Core.UserInfo`.
@@ -273,14 +273,14 @@ Task<GuardianTimeLimitSchedule?> GetActiveTimeLimitAsync(string childId);
 **Forbids:** a new method on `IAuthorizationService`, a new `AccessAction` /
 `AccessVia` / `Decide()` branch / adapter (C-M28·5), an *owner*-scope seam
 (a child writing their own schedule — C-M28·7), an unaudited guardian write
-(the write is **one** audited row, ADR 0028 §E), an audited *read* (the two
+(the write is **one** audited row, ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §E), an audited *read* (the two
 reads emit no row), or a direct `IDocumentSession.Store` from a controller
 (the three service seams are the only writes).
 
 ## 2.2 — New M28-owned Core types (doc + enum, exact C#)
 
 Namespace `Kumunita.Core.UserInfo`. The **mirror** of the M20
-`NotificationQuietSchedule` + `QuietScheduleMode` (ADR 0121 D2), per-child
+`NotificationQuietSchedule` + `QuietScheduleMode` (ADR [0121](../adr/0121-notification-quiet-times.md) D2), per-child
 (id = `ChildId`) rather than per-recipient.
 
 ```csharp
@@ -365,7 +365,7 @@ public sealed class GuardianTimeLimitSchedule
 
 **The `CoreDocTypes` registration** (U01 — the `GuardianTimeLimitSchedule`
 document is Marten-native with a conventional `ChildId` identity; the additive-
-surface delta is applied idempotently at boot — ADR 0004 §B.1, zero migration,
+surface delta is applied idempotently at boot — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1, zero migration,
 **no** new `*DocTypes` surface, **no** EF):
 
 ```csharp
@@ -463,7 +463,7 @@ function, D3).
 
 `Kumunita.Web.Security` (D5, C-M28·1/C-M28·5). The **exact**
 `BlockedAccountMiddleware` shape — scoped-resolution from `RequestServices`,
-the single-row load, the effective-zone resolution via the ADR 0019 chain, the
+the single-row load, the effective-zone resolution via the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) chain, the
 `IsAllowedNow` call, the `SignInManager.SignOutAsync` + the `?error=time-limit`
 redirect. **Zero** new authorization surface: the middleware does **not** call
 `IAuthorizationService`.
@@ -474,7 +474,7 @@ The exact pipeline (U04):
 2. **Resolve the subject** (the signed-in principal).
 3. **`IUserInfoService.GetActiveTimeLimitAsync(subject)`** (the enforcement
    read, §2.1) → `null` / `Enabled == false` → **pass** (the floor, C-M28·3).
-4. **Resolve the subject's effective zone** (the ADR 0019 chain via
+4. **Resolve the subject's effective zone** (the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) chain via
    `EffectiveTimezoneResolver` / the `Profile.TimeZone` override → platform
    default → `UTC` floor — the `EventReminderService` `TryResolveZone` shape).
 5. **`GuardianTimeLimitEvaluator.IsAllowedNow(schedule, now, zone)`** (D3) →
@@ -568,7 +568,7 @@ U04's 3 middleware, U06's 3 surface = **20**). The three acceptance-gate tests
 The exact closed set from the register's D7. Added to **all four** of the closed
 dictionaries in `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` —
 `EnValues` (the `en` floor, the canonical source text), `DeValues`, `FrValues`,
-`DaValues` (the ADR 0005 / 0015 `en`-floor / per-key shape: the seeder
+`DaValues` (the ADR [0005](../adr/0005-multilingual-support.md) / 0015 `en`-floor / per-key shape: the seeder
 materializes each key's `en` row on first boot; the non-`en` rows are the
 localized text). **A distinct namespace** — **not** the M20 `settings.quiet.*` /
 `admin.quiet.*` keys (those are the notification lane's, unchanged — D9). **U05
@@ -594,7 +594,7 @@ authors the COMPLETE set; U06 consumes** (U06 does not add a key).
 **The closed set is 14 keys × 4 languages = 56 strings.** The
 `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` + the new
 `GuardianTimeLimitKwLParityTests` (U05) enforce the 4-language set + non-empty
-values; the ADR 0015 / 0052 warm-boot backfill seeds them idempotently.
+values; the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) / 0052 warm-boot backfill seeds them idempotently.
 
 ## 2.8 — §gate (the three acceptance tests, U07 runs, U08 records)
 
@@ -691,8 +691,8 @@ gate names are byte-identical to the §2.8 pin.
   all four languages is about to be rendered — add it to U05's closed set first;
   do not inline a string (the parity pin will fail, and that is the point).
 - A unit other than **U09** is about to touch `Milestones.cs` /
-  `MilestonesTests.cs` / `WhatsNew.cs` / README §Roadmap / `STATUS.md` /
-  `ARCHITECTURE.md` — stop; only the close unit owns the roadmap + the close
+  `MilestonesTests.cs` / `WhatsNew.cs` / README §Roadmap / [`STATUS.md`](../STATUS.md) /
+  [`ARCHITECTURE.md`](../ARCHITECTURE.md) — stop; only the close unit owns the roadmap + the close
   flip (M28 is the **LAST** milestone — U09's reframe).
 - A unit needs *both* test assemblies green to exit **and** it is not U07/U08 —
   it is too big; split it per the Atomicity contract rather than running both.
@@ -730,7 +730,7 @@ one-line "why it is deferred":
    awareness surface is a new ADR.
 4. **Enforcement-history auditing** (which requests were denied) — deferred
    because the middleware is silent (D5, C-M28·2 — no per-request deny log); a
-   `UsageEvent` for denied access is the M13 ADR 0114 capture shape, a new ADR.
+   `UsageEvent` for denied access is the M13 ADR [0114](../adr/0114-logging-and-usage-analytics.md) capture shape, a new ADR.
 5. **Per-content time limits** (a future refinement of D9·2) — deferred because
    M28's scope is the whole platform (D1); per-content is a larger design. A
    follow-up lane with its own ADR.
@@ -746,8 +746,8 @@ one-line "why it is deferred":
   representation amendment (unlike M19's D2 array→`[Flags]`). The D2
   `GuardianTimeLimitSchedule` document + `TimeLimitMode` enum are authored
   verbatim as the register's prose block (a `bool` master + a two-value enum +
-  two `int[]` axes), mirroring ADR 0121 D2's `NotificationQuietSchedule`.
-  **ADR 0151 verified free** against `docs/adr/README.md` (index runs to 0150)
+  two `int[]` axes), mirroring ADR [0121](../adr/0121-notification-quiet-times.md) D2's `NotificationQuietSchedule`.
+  **ADR [0151](../adr/0151-guardian-time-limits.md) verified free** against [`docs/adr/README.md`](../adr/README.md) (index runs to 0150)
   and on disk (no `0151-*.md`). Status remains **Accepted**.
 
 ## M28 — Closed (recorded)
@@ -760,7 +760,7 @@ one-line "why it is deferred":
 > to "the roadmap is fully shipped" (zero `StatusNext` + all `StatusDone` —
 > a semantic reframe, not a rename), and adds the `WhatsNew.cs` `0.43.0` row
 > (the required **sixth** member of the close flip, the M27 "shipped with no
-> entry until caught in review" lesson — held). **No new ADR** (ADR 0151 was
+> entry until caught in review" lesson — held). **No new ADR** (ADR [0151](../adr/0151-guardian-time-limits.md) was
 > authored in U00); the close adds none.
 
 **The three acceptance tests (from U08's `### Run result (M28 acceptance gate
@@ -784,7 +784,7 @@ pin — U07 confirmed it; the close adds none). Zero new `AccessAction`, zero ne
 `AccessVia`, zero new `Decide()` branch, zero new `IAuthorizationService`
 signature.
 
-**The ADR pointer:** **ADR 0151** (`docs/adr/0151-guardian-time-limits.md`,
+**The ADR pointer:** **ADR [0151](../adr/0151-guardian-time-limits.md)** ([`docs/adr/0151-guardian-time-limits.md`](../adr/0151-guardian-time-limits.md),
 Accepted 2026-10-07; Amends 0028 + 0006-E; references 0121 / 0019 / 0004
 §B.1) — the decision record the close does **not** re-author.
 
@@ -794,7 +794,7 @@ toggle):**
 1. A *resident* self-service time limit (a non-guardian version) — new ADR.
 2. Per-feature / per-content restrictions (browse-yes / message-no) — new ADR.
 3. An awareness / reminder lane ("your parent has enabled time limits") — new ADR.
-4. Enforcement-history auditing (which requests were denied) — new ADR (the M13 ADR 0114 `UsageEvent` capture shape).
+4. Enforcement-history auditing (which requests were denied) — new ADR (the M13 ADR [0114](../adr/0114-logging-and-usage-analytics.md) `UsageEvent` capture shape).
 5. Per-content time limits — a larger design, new ADR.
 
 **The roadmap is complete.** M28 is the last milestone; after this close there
@@ -803,7 +803,7 @@ is **no** `StatusNext` milestone. The `Milestones.All` **order** is unchanged
 
 ---
 
-## ADR 0151 — moved content (D11 trim, 2026-11-02)
+## ADR [0151](../adr/0151-guardian-time-limits.md) — moved content (D11 trim, 2026-11-02)
 
 ## Amendments
 
@@ -811,7 +811,7 @@ is **no** `StatusNext` milestone. The `Milestones.All` **order** is unchanged
   No D# required a representation amendment (unlike M19's D2 array→`[Flags]`).
   The D2 `GuardianTimeLimitSchedule` document + `TimeLimitMode` enum are authored
   verbatim as the register's prose blocks (a `bool` master + a two-value enum +
-  two `int[]` axes), mirroring ADR 0121 D2's `NotificationQuietSchedule`. The
+  two `int[]` axes), mirroring ADR [0121](../adr/0121-notification-quiet-times.md) D2's `NotificationQuietSchedule`. The
   D7 closed kw-l set is 14 keys (13 `guardian.timelimit.*` + the single
   `account.time_limit.login_message`) × 4 languages. Status remains **Accepted**.
 
@@ -819,10 +819,10 @@ is **no** `StatusNext` milestone. The `Milestones.All` **order** is unchanged
 ## Supersedes
 
 - **None.** M28 **adds a time dimension to the GU guardian surface**; it does
-  not supersede an earlier ADR. It *rides* ADR 0028 (the GU standing + G·1–G·5
-  invariants + the §E audit-verb shape), ADR 0121 (the evaluator + doc shape it
-  mirrors, polarity-inverted), ADR 0019 (the wall-clock-first effective-zone
-  chain), ADR 0004 §B.1 (the additive doc type on the M1 surface), and ADR 0006-E
+  not supersede an earlier ADR. It *rides* ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) (the GU standing + G·1–G·5
+  invariants + the §E audit-verb shape), ADR [0121](../adr/0121-notification-quiet-times.md) (the evaluator + doc shape it
+  mirrors, polarity-inverted), ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) (the wall-clock-first effective-zone
+  chain), ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 (the additive doc type on the M1 surface), and ADR [0006](../adr/0006-module-boundary-contracts.md)-E
   (the additive-seam discipline). The GU invariants G·1–G·5, the frozen
   `GuardianLink` standing read, the `BlockedAccountMiddleware` sign-out shape,
   the frozen `IAuthorizationService` surface, and the entire M20 quiet lane are

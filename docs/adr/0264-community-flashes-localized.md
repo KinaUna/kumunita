@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0264 — Community controller flashes are localized
+# ADR [0264](0264-community-flashes-localized.md) — Community controller flashes are localized
 
 Status: Accepted
 Date: 2026-10-29

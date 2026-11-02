@@ -11,7 +11,7 @@ superseded_by: [adr-0106]
 updated: 2026-11-02
 ---
 
-# ADR 0073 — To-do group / community assignment and claim lane (self-claim of unassigned work)
+# ADR [0073](0073-todo-group-community-claim-lane.md) — To-do group / community assignment and claim lane (self-claim of unassigned work)
 
 Status: Accepted
 Date: 2026-09-25
@@ -27,7 +27,7 @@ the *existing* `AccessVia.Group` / `AccessVia.Community` values; **no new**
 
 ## Context
 
-ADR 0067 shipped the M5 to-do with a single targeting dimension: an
+ADR [0067](0067-m5-projects-todos-and-kanban.md) shipped the M5 to-do with a single targeting dimension: an
 **individual assignee** (`TodoItem.AssigneeId`). The standing matrix
 (C-M5·6, enforced server-side in `ProjectService`) is
 **creator ∪ assignee ∪ GlobalAdmin** for to-do mutations. That is the right
@@ -60,20 +60,20 @@ already models as "who this to-do is about."
 ### 1. "Addressed to" reuses the existing `Audience` + `ComponentId` — no new doc, no new migration
 
 A to-do is **addressed to a group** when one of its `Audience.Grants` is a
-`GrantKind.Group` grant to that group (the ADR 0013 group lane), and is
-**addressed to a community** when its `ComponentId` is set (the ADR 0036
-community branch; a resident's community membership per ADR 0012). The
+`GrantKind.Group` grant to that group (the ADR [0013](0013-group-posts-membership-lane.md) group lane), and is
+**addressed to a community** when its `ComponentId` is set (the ADR [0036](0036-community-visible-audience-default.md)
+community branch; a resident's community membership per ADR [0012](0012-community-membership-mandatory-and-moderator.md)). The
 existing audience editor in the to-do composer is therefore *already* the
 "addressed to" control — **no composer change is required**; the group grants
 and the community picker do the addressing. This keeps the single-source
-`Audience` (ADR 0001-B) authoritative and adds **zero** new document fields
+`Audience` (ADR [0001](0001-core-stack-and-identity-model.md)-B) authoritative and adds **zero** new document fields
 (`ProjectDocTypes` is untouched).
 
 The addressed-to projection is a **read** convenience: `ProjectsController`
 resolves the addressed groups' display names (`IUserInfoService.
 GetPublicGroupsAsync`, never a gate) into the row's `GroupNames`, and renders
 an "Addressed to: …" badge on the feed + detail. It is the same
-display-vs-standing separation ADR 0013/0036 already enforce.
+display-vs-standing separation ADR [0013](0013-group-posts-membership-lane.md)/0036 already enforce.
 
 ### 2. The claim is a new write lane — membership standing, not a `Decide()` branch
 
@@ -99,7 +99,7 @@ community. It deliberately **reuses** the existing `AccessVia` values —
 branch** (C-M5·11: the M5 lane stays an *adapter* over the frozen seams, not
 a new decision dimension). A claim is structurally distinct from the
 creator ∪ assignee ∪ GlobalAdmin mutation matrix: it is the *one* to-do write
-that is a **membership** decision (the ADR 0013/0036 shape), and it is
+that is a **membership** decision (the ADR [0013](0013-group-posts-membership-lane.md)/0036 shape), and it is
 gated to the *unassigned* state so it never collides with the assignee.
 
 ### 3. The unassigned pool is a feed *filter*, never a gate
@@ -138,10 +138,10 @@ dictionaries, preserving the parity pins): `projects.todo.claim`,
 
 - **No schema change.** Reusing `Audience` + `ComponentId` means `ProjectDocTypes`
   and the migration surface are untouched — the capability is pure standing +
-  projection, the ADR 0004 B-shape of "documents + projections, no event
+  projection, the ADR [0004](0004-data-persistence-and-schema-evolution.md) B-shape of "documents + projections, no event
   sourcing" stays intact.
 - **No authorization-surface change.** `IAuthorizationService` / `Decide()`
-  are frozen (ADR 0006 / C-M5·11); the claim reuses `AccessVia.Group` /
+  are frozen (ADR [0006](0006-module-boundary-contracts.md) / C-M5·11); the claim reuses `AccessVia.Group` /
   `AccessVia.Community`. The audit trail gains a new *action* string
   (`todo.claim`) on a known `AccessVia`, which the audit log already
   records verbatim.
@@ -162,4 +162,4 @@ dictionaries, preserving the parity pins): `projects.todo.claim`,
   `ClaimPost` pins (404 / 403 / redirect + `TempData`).
 - **Roadmap.** This is a **named lane under M5** (like the GP / media
   precedents) — M5 stays `StatusDone`; no milestone letter moves and no
-  renumber (the ADR 0013 "group posts: no milestone letter" precedent).
+  renumber (the ADR [0013](0013-group-posts-membership-lane.md) "group posts: no milestone letter" precedent).

@@ -11,7 +11,7 @@ superseded_by: [adr-0094]
 updated: 2026-11-02
 ---
 
-# ADR 0008 — Member self-leave lane (owner excepted)
+# ADR [0008](0008-member-self-leave-lane.md) — Member self-leave lane (owner excepted)
 
 Status: Accepted
 Date: 2026-09-10
@@ -19,7 +19,7 @@ Amends: C-M2·3 (docs/design/m2-directory-profiles-groups.md) — adds the self-
 
 ## Context
 
-M2's group-management lanes (U10's remove, plus ADR 0007's add and the m2b
+M2's group-management lanes (U10's remove, plus ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s add and the m2b
 invite/cancel lanes) all sit on the owner ∪ GlobalAdmin standing. As a
 result, a *plain member* of a group they didn't create can never leave it:
 their `POST /groups/{id}/remove-member` 404s (the route
@@ -33,7 +33,7 @@ commits the owner's own `GroupMembership` in one session), and owner
 departure is a *transfer* question this platform hasn't settled (there is no
 owner-transfer lane), so an owner who self-removes is rejected.
 
-ADR 0007's consequences section anticipates exactly this shape of change:
+ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s consequences section anticipates exactly this shape of change:
 "Adding a new write lane to groups in the future sits on
 `TryResolveOwnerSurface` by default; broadening any lane to 'any member'
 again is a breaking change that belongs in an ADR." This ADR is that ADR —
@@ -53,7 +53,7 @@ pattern):
   `userId` and `removedBy` the Core seam receives are both the actor's
   subject, minted from `KumunitaPrincipal.SubjectId(User)`. There is no
   channel through which a member could remove *someone else* through this
-  route — the self-lane is self by construction (ADR 0003 the same way:
+  route — the self-lane is self by construction (ADR [0003](0003-roles-and-moderator-scoping.md) the same way:
   SoD by structural identity, not a re-gate).
 - **Gate = the U10 reachability projection, not `TryResolveOwnerSurface`.**
   `LeaveGroup` resolves its surface through
@@ -76,7 +76,7 @@ pattern):
   `Action: group.remove-member, ActorId: <the member>, Via: Admin` —
   deliberate; the row's *actor* field is the self-leave fact, and we do
   not invent a third `Via` state or a new action verb for one lane (the
-  seam's SoD derivation stays the single source, ADR 0006-D: Web shapes
+  seam's SoD derivation stays the single source, ADR [0006](0006-module-boundary-contracts.md)-D: Web shapes
   HTTP, Core decides).
 - **Presentation.** `Groups/Detail.cshtml` member list per row:
   - the **owner's own row** carries no button (the Remove form is hidden
@@ -91,7 +91,7 @@ pattern):
 - **No Core change.** No new seam, no new document, no schema; the Core
   already supports "remove this (group, user) membership" and does not
   care whose standing performed it (its SoD lane is the `Via` derivation,
-  not an actor-standing gate — ADR 0006-D).
+  not an actor-standing gate — ADR [0006](0006-module-boundary-contracts.md)-D).
 
 ## Consequences
 
@@ -111,7 +111,7 @@ pattern):
   m2b invite lanes are untouched; re-adding someone who previously left is
   exactly the existing "adding someone already in is a no-op the form
   should not offer" path — they are no longer "in").
-- ADR 0007's "new lanes default to `TryResolveOwnerSurface`" remains the
+- ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s "new lanes default to `TryResolveOwnerSurface`" remains the
   default for *management* reach over others' rows; this is the recorded
   exception for the actor's own row, and it is the only one. Broadening
   *any* lane to remove *another* member is still a breaking change that

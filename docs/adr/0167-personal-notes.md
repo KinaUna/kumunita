@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0167 — Personal notes (M37) — every resident can keep private notes about anything (a post, a reply, a group, an announcement, a tag, a member) + optional folders + optional tags + self-management + search, in their own words
+# ADR [0167](0167-personal-notes.md) — Personal notes (M37) — every resident can keep private notes about anything (a post, a reply, a group, an announcement, a tag, a member) + optional folders + optional tags + self-management + search, in their own words
 
 Status: Accepted
 Date: 2026-10-16
@@ -50,7 +50,7 @@ Date: 2026-10-16
 
 ## Context
 
-The platform's M17 lane (ADR 0141) gave every resident a **bookmark**
+The platform's M17 lane (ADR [0141](0141-guardian-community-approval-lane.md)) gave every resident a **bookmark**
 surface: a private per-user list of posts / replies / groups they want to
 come back to. That is a **link** (a pointer to content that belongs to
 someone else), **not a note** (free-form text in the resident's own words
@@ -60,7 +60,7 @@ post, a reply, a group, an announcement, a tag, a member) + optional folders
 + optional tags + self-management + search, in their own words." M37 is the
 **M5-shaped** capability (a **new bounded context** + a **single surface** +
 a **closed kind set**), the 33rd context, and the **last milestone** on the
-roadmap. The compose-frozen-seams constraint (ADR 0006-D) and the
+roadmap. The compose-frozen-seams constraint (ADR [0006](0006-module-boundary-contracts.md)-D) and the
 self-managed pattern (M37·3) are the **load-bearing decisions**.
 
 ## Decision
@@ -118,8 +118,8 @@ self-managed pattern (M37·3) are the **load-bearing decisions**.
   ship, the close flip updates the **six** members: `Milestones.cs`
   (the `M37` entry → `StatusDone`, **no** successor),
   `MilestonesTests.cs` (the "last milestone has no successor" pin),
-  `README.md`, `STATUS.md`, `ARCHITECTURE.md` (the M37 row), and
-  **`WhatsNew.cs`** (the **required sixth member**, ADR 0110). See the
+  [`README.md`](../../README.md), [`STATUS.md`](../STATUS.md), [`ARCHITECTURE.md`](../ARCHITECTURE.md) (the M37 row), and
+  **`WhatsNew.cs`** (the **required sixth member**, ADR [0110](0110-platform-versioning-and-whats-new.md)). See the
   handoff note for the full close-flip detail.
 
 ## Consequences

@@ -11,18 +11,18 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0087 — Todo dependency lane (`TBD`): one `BlockedByTodoId?` on `TodoItem` — the "waiting on" pointer (a display chip + a feed filter + one write lane; **never a gate**, never a graph)
+# ADR [0087](0087-todo-dependency-blocked-by-lane.md) — Todo dependency lane (`TBD`): one `BlockedByTodoId?` on `TodoItem` — the "waiting on" pointer (a display chip + a feed filter + one write lane; **never a gate**, never a graph)
 
 Status: Accepted
 Date: 2026-09-25 (sign-off U00, 2026-09-25)
 Amends: **0067** (the M5 `Projects` context — this ADR adds **one optional field**
 to `TodoItem` (`BlockedByTodoId`, additive on the `ProjectDocTypes` surface, the
-ADR 0086 `ProjectId`-on-`TodoItem` precedent) and **additive seams** on the
+ADR [0086](0086-goals-projects-lane.md) `ProjectId`-on-`TodoItem` precedent) and **additive seams** on the
 frozen `IProjectService` — `ListTodosAsync` / `GetTodoAsync` gain the
 optional `blockedOnly` / `Blocker` surface, `UpdateTodoRequest` /
 `CreateTodoRequest` gain the optional fields, and one new `ListPickerTodosAsync`
-read lane — the same frozen-surface-amendment precedent ADR 0084 set for its
-`EmitAsync` overload and ADR 0085 for its `linkPath` param: the existing
+read lane — the same frozen-surface-amendment precedent ADR [0084](0084-per-target-notification-subscriptions.md) set for its
+`EmitAsync` overload and ADR [0085](0085-notification-item-link-and-reply-highlight.md) for its `linkPath` param: the existing
 signatures' required params and return shapes stay compatible and every
 existing call site compiles and behaves unchanged); **0073** (the
 `unassignedOnly` optional-filter precedent this lane's `blockedOnly`
@@ -34,13 +34,13 @@ new `Decide()` branch); **0015** (the `kw-l` registry — four new keys × 4
 languages); and **0024** (the soft-delete / dangling-association rule this
 lane reuses for the blocker's soft-delete → the chip degrades).
 `Milestones.cs` / the README Roadmap / `MilestonesTests.cs` **untouched** —
-a named lane within the M5/PL surface, not a milestone (the ADR 0086 named-
+a named lane within the M5/PL surface, not a milestone (the ADR [0086](0086-goals-projects-lane.md) named-
 lane precedent; `M7` stays the single `StatusNext`).
 
 ## Context
 
-M5 (ADR 0067) shipped the **work items** — assignable, hierarchical to-dos
-(`ParentId`) + statused boards, and PL (ADR 0086) added the higher level
+M5 (ADR [0067](0067-m5-projects-todos-and-kanban.md)) shipped the **work items** — assignable, hierarchical to-dos
+(`ParentId`) + statused boards, and PL (ADR [0086](0086-goals-projects-lane.md)) added the higher level
 (goals / projects) and the `ProjectId?` association. But the surface has no
 first-class way to say **"this to-do cannot proceed until that other to-do
 is done"** — the "waiting on" relationship. Today it is only implicit: board
@@ -51,8 +51,8 @@ one on a *different board* has no way to say so at all.
 
 Three already-accepted decisions constrain the shape of the fix:
 
-- **ADR 0067 freezes the `IProjectService` surface.** An ADD beyond it is a
-  **new ADR** (the ADR 0084 / 0085 frozen-surface-amendment precedent) — so
+- **ADR [0067](0067-m5-projects-todos-and-kanban.md) freezes the `IProjectService` surface.** An ADD beyond it is a
+  **new ADR** (the ADR [0084](0084-per-target-notification-subscriptions.md) / 0085 frozen-surface-amendment precedent) — so
   the `blockedOnly` filter, the `Blocker` read surface, the
   `BlockedByTodoId` / `ClearBlockedBy` write fields, and
   `ListPickerTodosAsync` this decision records are exactly what this ADR
@@ -61,7 +61,7 @@ Three already-accepted decisions constrain the shape of the fix:
   (C-M5·6, the `AssignTodoAsync` shape) — the write lane reuses it; a
   blocker is an *association* on the to-do, not a new resource with its own
   matrix.
-- **`KanbanStatuses` is a closed *display* vocabulary** (ADR 0069 — the
+- **`KanbanStatuses` is a closed *display* vocabulary** (ADR [0069](0069-kanban-drag-dnd-fixed-statuses-and-add-lane.md) — the
   stored value stays a plain string) — which is what makes "unblocked"
   **undecidable** on the server side (there is no canonical "done" state a
   to-do is *in*), and therefore why a blocker can only ever be a *hint*,
@@ -79,10 +79,10 @@ anyway — D5).
 ## Decision
 
 - **D1 — one optional pointer, additive, zero migration.** One
-  `string? BlockedByTodoId` on **`TodoItem`** (the ADR 0004 §B.1 / ADR 0086
+  `string? BlockedByTodoId` on **`TodoItem`** (the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 / ADR [0086](0086-goals-projects-lane.md)
   `ProjectId` additive shape; existing rows simply have `null`); registered
   on `ProjectDocTypes` with one `Index` on `(BlockedByTodoId)` (the
-  unnamed-computed-index constraint from ADR 0004 §B.1 noted there applies).
+  unnamed-computed-index constraint from ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 noted there applies).
   **The singular pointer is the design** — `ParentId?` / `GoalId?` /
   `ProjectId?` are all single-optional-FK idioms; a to-do waiting on *three*
   things uses the `ParentId` subtask structure or three to-dos, not a list.
@@ -120,7 +120,7 @@ anyway — D5).
   (`todo.update`, `TargetKind = "todo"`).
 - **D6 — the `blockedOnly` feed filter.** `ListTodosAsync` gains an
   optional `blockedOnly` (default `false`) — the `unassignedOnly` (ADR
-  0073) / `projectId` (ADR 0086) filter discipline: when `true`, only to-dos
+  0073) / `projectId` (ADR [0086](0086-goals-projects-lane.md)) filter discipline: when `true`, only to-dos
   with `BlockedByTodoId != null` are returned; it **narrows the candidate
   set, never the audience decision** (a to-do still only appears if the
   actor passes the `CanSeeAsync(Read)` pass). **`KanbanBoard` gains no
@@ -128,11 +128,11 @@ anyway — D5).
 - **D7 — the picker.** The to-do create + edit forms seed a `<select>` of
   the actor's readable, non-deleted to-dos (one `ListPickerTodosAsync` read
   lane over the same feed discipline) with a leading "None" option — the
-  ADR 0086 D9 project-picker / `SeedComponentPickerAsync` shape; the picker
+  ADR [0086](0086-goals-projects-lane.md) D9 project-picker / `SeedComponentPickerAsync` shape; the picker
   is a **display** surface, never a gate (it does not pre-check cycles — the
   service does, D3).
 - **D8 — `kw-l` keys.** Four new keys, **× 4 languages** (the `KnownTranslationKeys`
-  registry, the ADR 0052 warm-boot baseline backfill covers the non-`en`
+  registry, the ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) warm-boot baseline backfill covers the non-`en`
   rows): `todo.blocked_by` (the chip / form label),
   `todo.blocked_by_none` (the picker's "None" option),
   `todo.blocked_generic` (the chip fallback when the blocker is
@@ -142,7 +142,7 @@ anyway — D5).
   `AccessVia`, no new `Decide()` branch, no new adapter, no new bounded
   context, no new document (the `TodoItem` field is the whole schema
   change); every existing `IProjectService` call site compiles and behaves
-  **unchanged** (the ADR 0084 / 0085 frozen-surface-amendment precedent).
+  **unchanged** (the ADR [0084](0084-per-target-notification-subscriptions.md) / 0085 frozen-surface-amendment precedent).
 
 **Out of scope (→ follow-on lanes, own ADRs):** a `KanbanBoard.BlockedBy`
 field (boards are containers); a **multi-blocker** list / `TodoDependency`
@@ -160,7 +160,7 @@ its weight); and any **enforced** dependency (D2).
 ## Consequences
 
 - The `ProjectDocTypes` surface gains **one index** (`TodoItem.BlockedByTodoId`)
-  — delta-detected at boot (ADR 0004 §B.1), **zero migration** for existing
+  — delta-detected at boot (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1), **zero migration** for existing
   rows.
 - The frozen `IAuthorizationService` path is **untouched** (the chip reuses
   `CanAsync(Read)` over the existing `TodoItemToAuditableResource`) — no
@@ -175,8 +175,8 @@ its weight); and any **enforced** dependency (D2).
 - `ProjectsController` + the to-do `Create` / `Edit` / `Detail` views gain
   the picker + chip + feed toggle; the board `Detail` view's card gains the
   chip; the M5 route surface is **untouched**.
-- `KnownTranslationKeys.cs` gains 4 keys × 4 languages (the ADR 0015
-  registry; the ADR 0052 warm-boot backfill covers the non-`en` rows).
+- `KnownTranslationKeys.cs` gains 4 keys × 4 languages (the ADR [0015](0015-ui-view-localization-mechanics.md)
+  registry; the ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md) warm-boot backfill covers the non-`en` rows).
 - The lane is **additive and reusing** — no new bounded context, no new
   `AccessAction` / `AccessVia` / `Decide()` branch, no new document, no new
   editor module, no `Milestones.cs` move.

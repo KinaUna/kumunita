@@ -11,14 +11,14 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0030 — Role independence: elevated roles are composable, not mutually exclusive
+# ADR [0030](0030-role-independence-composable-elevated-roles.md) — Role independence: elevated roles are composable, not mutually exclusive
 
 Status: Accepted
 Date: 2026-09-14
 
 ## Context
 
-ADR 0003 defined three roles (Member, Moderator, GlobalAdmin) and ADR 0021 added a
+ADR [0003](0003-roles-and-moderator-scoping.md) defined three roles (Member, Moderator, GlobalAdmin) and ADR [0021](0021-translator-role-delegated-translation-editing.md) added a
 fourth (Translator), and stated the intended standing of each. The **authorization and
 read path** always treated a resident's roles as an independent *set*: the claim factory
 (`KumunitaClaimsPrincipalFactory.BuildRoleListAsync`) mints a `Kumunita.Role` claim for
@@ -94,6 +94,6 @@ Negative / accepted risks
   Y" behaviour.
 - `IIdentityService.SetRoleAsync`'s signature is breaking for any external caller. The
   only in-repo caller is `AdminController.SetRole` (updated); the tests were updated to
-  the new set-based shape. Per ADR 0006 the module surface is "frozen; changes are
+  the new set-based shape. Per ADR [0006](0006-module-boundary-contracts.md) the module surface is "frozen; changes are
   breaking" — this is an intentional, documented breaking change (this ADR), not a
   silent one.

@@ -11,7 +11,7 @@ superseded_by: [adr-0004, adr-0006, adr-0036, adr-0054, adr-0067, adr-0076, adr-
 updated: 2026-11-02
 ---
 
-# ADR 0001 — Core stack & identity model
+# ADR [0001](0001-core-stack-and-identity-model.md) — Core stack & identity model
 
 Status: Accepted
 Date: 2026-08-25
@@ -85,7 +85,7 @@ Negative / accepted risks
   features** (`FeatureSchemaBase` subclasses registered in `StoreOptions.Storage`,
   applied idempotently via `ApplyAllConfiguredChangesToDatabaseAsync()`) give reviewable,
   forward-only schema evolution. Auto-upgrade is dev-only and never run against
-  production. (Details and the Marten 9 note in ADR 0004 Decision B.)
+  production. (Details and the Marten 9 note in ADR [0004](0004-data-persistence-and-schema-evolution.md) Decision B.)
 - First feature costs more time while learning; later features cost the same or less.
 
 Revisit when

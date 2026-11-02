@@ -44,7 +44,7 @@ about.
 tells you to treat any boundary — a contract, not an accident:
 
 1. **Keep the core, differentiate around it.** Pull the domain-neutral core
-   (`README.md`, `START-HERE.md`, `anti-patterns.md`,
+   ([`README.md`](../../README.md), `START-HERE.md`, `anti-patterns.md`,
    `domains-of-integration.md`, `the-human-system.md`, `everyday-life.md`,
    `examples/`, `templates/`) close to verbatim. Write your own domain
    guide — Kumunita's is `the-platform-as-integrator.md` (a community
@@ -74,7 +74,7 @@ This is designed to be adopted by an agent, not just a person — that's
 part of why it lives in a plain, public, well-structured repo instead of a
 slide deck. A reasonable prompt for Kumunita:
 
-> Read `README.md` and `START-HERE.md` from
+> Read [`README.md`](../../README.md) and `START-HERE.md` from
 > `https://github.com/KinaUna/fractal_integration`. Write a domain guide
 > for the community platform (a shared place for one neighborhood) in the
 > same shape as `in-code.md`: the six principles turned into our
@@ -101,5 +101,5 @@ designed, visible thing — not an assumption.
 - [ ] A re-sync cadence set (quarterly is a reasonable default).
 
 That's the whole pattern: differentiate deliberately, link back explicitly,
-and revisit on a schedule. It's principles 1, 2, and 6 of `README.md`,
+and revisit on a schedule. It's principles 1, 2, and 6 of [`README.md`](../../README.md),
 pointed at the guidelines themselves.

@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0153 — Admin onboarding (a guided walk-through for a new GlobalAdmin through the seven most important initial settings)
+# ADR [0153](0153-admin-onboarding.md) — Admin onboarding (a guided walk-through for a new GlobalAdmin through the seven most important initial settings)
 
 Status: Accepted
 Date: 2026-10-08
@@ -19,7 +19,7 @@ Date: 2026-10-08
 ## Context
 
 A new **GlobalAdmin** who takes over the instance for the first time faces the
-*exact same* problem M22 (ADR 0132) solved for a new **resident**, one level
+*exact same* problem M22 (ADR [0132](0132-onboarding.md)) solved for a new **resident**, one level
 up: they must discover, in a sprawling `/admin` surface (the `/admin/platform`
 list + the `/admin` dashboard hub), the **seven most important initial
 settings** — **community name, languages, moderation, notifications, storage
@@ -28,9 +28,9 @@ that walks them through those seven *in order*, and **no completion record**
 so a second GlobalAdmin (or a returning first one) doesn't see the same
 walk-through again.
 
-M22 (ADR 0132) gave a **new resident** a short guided tour of the account-
+M22 (ADR [0132](0132-onboarding.md)) gave a **new resident** a short guided tour of the account-
 setup surface that already exists, a single completion stamp
-(`Profile.OnboardingCompletedAt`), and a dismissible banner. SITE (ADR 0150)
+(`Profile.OnboardingCompletedAt`), and a dismissible banner. SITE (ADR [0150](0150-site-content-customization.md))
 gave a **GlobalAdmin** a single-surface `/admin/site` edit page. But the **seven
 most important initial settings** are scattered across **six shipped admin
 surfaces** (the seventh — issue escalation — is a **placeholder**, see below),
@@ -53,29 +53,29 @@ see the same walk-through again.
 - **The completion state is one singleton doc, `null` = not-yet-guided**
   (D2). The `AdminOnboarding` doc is a **singleton** (one row per instance,
   `Id = "singleton"` sentinel, the exact `SiteContent` / `LocaleSettings`
-  shape, ADR 0005 B / ADR 0150) with exactly **one** additive member —
+  shape, ADR [0005](0005-multilingual-support.md) B / ADR [0150](0150-site-content-customization.md)) with exactly **one** additive member —
   `CompletedAt: DateTimeOffset?`, `null` = the floor (banner shows), non-null
   = completed (banner clears). It is registered in a new
-  `AdminOnboardingDocTypes` surface (ADR 0004 §B.1); the delta is applied
+  `AdminOnboardingDocTypes` surface (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1); the delta is applied
   idempotently at boot; **no EF migration**. The `SiteContent` +
   `LocaleSettings` docs are **untouched** (M30 adds a *new* doc in a *new*
-  context, ADR 0006).
+  context, ADR [0006](0006-module-boundary-contracts.md)).
 - **The read is a public admin surface** (D3). The completion-state read is
   `GlobalAdmin`-gated by the `[Authorize(Roles = GlobalAdmin)]` on the
   controller (the standard admin-scope gate, **not** a new authorization
-  surface — the thin-token rule, ADR 0001-B), and is **never audited** (a
+  surface — the thin-token rule, ADR [0001](0001-core-stack-and-identity-model.md)-B), and is **never audited** (a
   read, not an access decision). A missing `AdminOnboarding` row (a fresh boot
   before the seeder ran, or a test construction with no store) degrades to
   `CompletedAt = null` (not-yet-guided, the banner shows) — never a blank
   walk-through, never an error.
-- **The write is the ADR 0150 single-write-lane shape** (D4). One
+- **The write is the ADR [0150](0150-site-content-customization.md) single-write-lane shape** (D4). One
   `IAdminOnboardingService.CompleteAsync(actorBy)` lane that loads the
   singleton, stamps `CompletedAt = now`, and saves in one session (invariant
   C3); exactly **one** `AccessAudit` row per stamp (`Via = Admin`, action
   `admin_onboarding.complete`, `TargetKind` "admin-onboarding" — the
   `site.save` / `signup.set-open` / `timezone.set-default` singleton-toggle
   shape). The lane **upserts** the singleton (the `SiteContent` "one row per
-  instance" shape, the ADR 0150 D6 pin); **strong consistency** — the new
+  instance" shape, the ADR [0150](0150-site-content-customization.md) D6 pin); **strong consistency** — the new
   value is live on the very next `GetAsync` / banner read.
 - **The banner is the *affordance*, and it is non-blocking** (D5). A
   dismissible admin banner (the M22 `_OnboardingBanner` partial's admin
@@ -103,7 +103,7 @@ see the same walk-through again.
   `AdminOnboarding` doc is a **new** bounded context
   (`Kumunita.Core.AdminOnboarding`) with a **new** `AdminOnboardingDocTypes`
   registration surface; the `SiteContent` + `LocaleSettings` contexts are
-  **untouched** (the ADR 0006 module-boundary contract).
+  **untouched** (the ADR [0006](0006-module-boundary-contracts.md) module-boundary contract).
 
 ## Consequences
 
@@ -112,7 +112,7 @@ see the same walk-through again.
   limits → site content → issue escalation, each step linking into the
   existing admin surface that already owns it.
 - The **`/admin/onboarding` surface is the GlobalAdmin's walk-through page** —
-  a dedicated `AdminOnboardingController` in the ADR 0150 / ADR 0050 shape
+  a dedicated `AdminOnboardingController` in the ADR [0150](0150-site-content-customization.md) / ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) shape
   (the `GET /admin/onboarding` walk-through + the
   `POST /admin/onboarding/complete` completion stamp).
 - The **admin banner is the affordance** — a dismissible banner on the admin
@@ -120,7 +120,7 @@ see the same walk-through again.
   linking to `/admin/onboarding`; it clears on completion.
 - The **`SiteContent` + `LocaleSettings` docs are untouched** — M30 adds a
   *new* doc in a *new* context (`Kumunita.Core.AdminOnboarding`), not a new
-  field on an existing one (the ADR 0006 module-boundary contract keeps the
+  field on an existing one (the ADR [0006](0006-module-boundary-contracts.md) module-boundary contract keeps the
   three contexts independent).
 - The **M22 `Profile.OnboardingCompletedAt` field is untouched** — M22 is
   resident-scope, M30 is admin-scope; the two completion flags are
@@ -134,12 +134,12 @@ see the same walk-through again.
   resume-across-sessions (the M22 D8·1 deferral, verbatim), a "you haven't
   set X" detection engine (the M22 D8·2 deferral, verbatim), and an admin
   "onboarding completion rate" metric (the M22 D8·4 deferral, verbatim).
-- **No EF migration** (a new Marten doc type is additive per ADR 0004 §B.1;
+- **No EF migration** (a new Marten doc type is additive per ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1;
   the delta is applied idempotently at boot). **One new route**:
   `/admin/onboarding` (the GlobalAdmin's walk-through surface + the
   completion stamp). **No new `AccessAction` / `AccessVia` / `Decide()`
   branch / `IAuthorizationService` surface** (the read is a public admin
-  surface; the write is the ADR 0150 `GlobalAdmin`-gated single-write-lane
+  surface; the write is the ADR [0150](0150-site-content-customization.md) `GlobalAdmin`-gated single-write-lane
   shape, one `AccessAudit` row per stamp).
 - **No roadmap letter moves** — M30 stays the milestone it is; M31–M34 are
   untouched.

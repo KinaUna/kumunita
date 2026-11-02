@@ -59,12 +59,12 @@ detail).
   (`Id`; `EventId`; `UserId`; **`Status`** enum `Going | Maybe | No`; `At`,
   with a **unique `(EventId, UserId)` index** — last-write-wins; **no
   `AccessAudit` row on an RSVP**) — registered on a new surface
-  **`EventDocTypes`**. **Zero migrations for existing surfaces** (ADR 0004
+  **`EventDocTypes`**. **Zero migrations for existing surfaces** (ADR [0004](0004-data-persistence-and-schema-evolution.md)
   §B.1). *See the handoff note for the full field sets + index shapes.*
 - **The audience is the post `Audience`, reused verbatim.** **No new
   `Audience` field, no new `AudienceMode`, no new `AccessVia` value.** The
   frozen `Decide()` algorithm already covers every standing an event needs.
-  The composer seeds it **community-visible by default** (ADR 0036) via the
+  The composer seeds it **community-visible by default** (ADR [0036](0036-community-visible-audience-default.md)) via the
   `AudienceEditorModel` form surface verbatim.
 - **The decision path is the frozen `IAuthorizationService` through a new
   `EventToAuditableResource` adapter** (the `PostToAuditableResource` shape
@@ -83,12 +83,12 @@ detail).
   `Action` `event.create` / `event.update` / `event.publish` / `event.delete`
   — **no `event.rsvp` action**. *See the handoff note for the full table.*
 - **The draft / tag / media / language / delete lanes are reused, not
-  reinvented:** the `IsDraft` flag + `/my/drafts` lane (ADR 0037); the
-  `TagIds` (ADR 0044); the `ImageIds` + `AttachmentIds` (ADR 0025 / 0034); the
-  `LanguageCode` (ADR 0018); the `IsDeleted` flag + read-lane filter (ADR 0024).
+  reinvented:** the `IsDraft` flag + `/my/drafts` lane (ADR [0037](0037-draft-mode-author-only.md)); the
+  `TagIds` (ADR [0044](0044-tags.md)); the `ImageIds` + `AttachmentIds` (ADR [0025](0025-rich-content-markdown-and-content-images.md) / 0034); the
+  `LanguageCode` (ADR [0018](0018-ugc-authored-in-language-tag.md)); the `IsDeleted` flag + read-lane filter (ADR [0024](0024-author-soft-delete-lane.md)).
   **The translation lane is NOT extended to events in M4's own scope** — the
   user-added event-translation lane ships as a separate named lane under
-  **ADR 0059**.
+  **ADR [0059](0059-event-translations.md)**.
 - **The Web surface** — `EventController`: `GET /events` (the feed,
   `CanSeeAsync(Read)`-filtered so a private event's *existence* does not leak);
   `GET /events/{id}` (the detail view, the RSVP form, the RSVP list
@@ -107,7 +107,7 @@ follows the `AuditPurgeHandler` precedent **verbatim**: **`EventReminderService
   **`EventReminderHandler`** is a thin adapter that re-yields a fresh
   `EventReminderTick` (a `TimeoutMessage(TimeSpan.FromDays(1))`). The
   reminder's "when" renders in each **recipient's** own time zone + date-time
-  format (ADR 0019 / 0020). *See the handoff note for the full job shape.*
+  format (ADR [0019](0019-timezone-platform-default-and-resident-override.md) / 0020). *See the handoff note for the full job shape.*
 - **Pinned and gated.** The **25 pinned seam test names** (the design doc
   §3.7 is the master list, locked here) + the **three-test acceptance gate**
   (closed loop, handoff, part-vs-whole) + the **drift-guard** (the design doc
@@ -123,7 +123,7 @@ follows the `AuditPurgeHandler` precedent **verbatim**: **`EventReminderService
   *duplicating*: the `Event` gets private/community/public visibility, the
   correct `AccessVia` audit tag, and delegation for free (the `Decide()`
   algorithm is unchanged; only the `EventToAuditableResource` adapter is new).
-  The reminder's "when" renders through the **same** ADR 0019 / 0020
+  The reminder's "when" renders through the **same** ADR [0019](0019-timezone-platform-default-and-resident-override.md) / 0020
   resolution order the `kw-dt` TagHelper uses.
 - **The reminder email is a side effect on a working event, not the other way
   round** — the §6.4 job lands after the read + write lanes are green, and it
@@ -138,4 +138,4 @@ follows the `AuditPurgeHandler` precedent **verbatim**: **`EventReminderService
 - **Out of scope (deliberate non-decisions):** iCal export (M6),
   notifications-as-a-lane (M6), group events (a follow-on lane), per-resident
   reminder settings (a follow-on lane), and the `VerifyDigest` §6.4 job (stays
-  deferred). The event-translation lane shipped under **ADR 0059**.
+  deferred). The event-translation lane shipped under **ADR [0059](0059-event-translations.md)**.

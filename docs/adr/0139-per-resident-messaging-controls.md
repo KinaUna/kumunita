@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0139 — Per-resident messaging controls (opt-in + guardian's ceiling on the M9 lane)
+# ADR [0139](0139-per-resident-messaging-controls.md) — Per-resident messaging controls (opt-in + guardian's ceiling on the M9 lane)
 
 Status: Accepted | Date: 2026-10-04
 
@@ -24,8 +24,8 @@ Status: Accepted | Date: 2026-10-04
 
 ## Context
 
-M9 (ADR 0105) ships an **instance-level** messaging toggle + the 1:1
-conversation / message seams; the ADR 0028 GU surface ships the guardian's
+M9 (ADR [0105](0105-messaging.md)) ships an **instance-level** messaging toggle + the 1:1
+conversation / message seams; the ADR [0028](0028-guardian-controls-account-scope-supervision.md) GU surface ships the guardian's
 standing over a supervised child. What neither has is the **per-resident**
 control — a resident's opt-out and a guardian's ceiling. **Compose the frozen
 seams, never extend them** — the per-actor gate is a *read* seam on top of the
@@ -47,7 +47,7 @@ off ⇒ **no**; ceiling on ⇒ **no** (ceiling wins); else ⇒ **yes**.
   `false`, **zero migrations**); the write lane
   (`SetMessagingOptInAsync`) is the `CompleteOnboardingAsync` shape — one
   `SaveChangesAsync`, **no `AccessAudit` row**.
-- **D3 — The opt-in surface is a new `/settings/messaging` tab** (the ADR 0080
+- **D3 — The opt-in surface is a new `/settings/messaging` tab** (the ADR [0080](0080-settings-surface-split.md)
   settings-surface-split idiom): a fresh `MessagingSettingsController` (not a
   `LocaleController` extension — its constructor is pinned by tests), with
   `GET`/`POST` + one `_SettingsTabs` row.
@@ -68,11 +68,11 @@ off ⇒ **no**; ceiling on ⇒ **no** (ceiling wins); else ⇒ **yes**.
   *enforcement*.** The `/settings/messaging` page renders even when the
   instance is off; when the ceiling is on the checkbox is `disabled` and the
   POST is refused as a **user-presentable error** (a 404 would leak "you're
-  restricted" — the ADR 0028 G·3 pin).
+  restricted" — the ADR [0028](0028-guardian-controls-account-scope-supervision.md) G·3 pin).
 
 ## Consequences
 
-- **Frozen-surface, additive:** the ADR 0105 service contract, the ADR 0028
+- **Frozen-surface, additive:** the ADR [0105](0105-messaging.md) service contract, the ADR [0028](0028-guardian-controls-account-scope-supervision.md)
   guardian standing, and the frozen `IMessagingService` are **byte-identical**.
 - **Two additive `Profile` fields, zero migrations:** a fresh instance has both at the `false` floor.
 - **One new controller, one new settings tab, no new `*DocTypes` surface** —

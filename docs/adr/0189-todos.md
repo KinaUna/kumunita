@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0189 — To-dos: status chip, assignee, filter bar
+# ADR [0189](0189-todos.md) — To-dos: status chip, assignee, filter bar
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-27
-Relates to: ADR 0188 (shared list rows), ADR 0184 (detail pages)
+Relates to: ADR [0188](0188-projects-lists.md) (shared list rows), ADR [0184](0184-announcement-detail.md) (detail pages)
 
 ## Decision
 

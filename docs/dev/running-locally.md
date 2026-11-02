@@ -26,25 +26,25 @@ updated: 2026-11-02
 *Dev (Docker):* `docker compose up -d --build` — Postgres on
 `localhost:5433`, the app on `http://localhost:5080` (built from `Dockerfile`,
 running `Development` so the `mt` schema auto-applies on a fresh database —
-ADR 0004), and Mailpit for SMTP (`localhost:1025`, UI at `http://localhost:8025`).
+ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)), and Mailpit for SMTP (`localhost:1025`, UI at `http://localhost:8025`).
 Logins survive container rebuilds: the data-protection keyring persists in the
 `kumunita_dpkeys` named volume (same `/data/dataprotection-keys` container
 path as prod — COOLIFY §5.2), so `--build` recreations don't wipe session/
 antiforgery state.
 Smoke test: `GET /health` → `{"status":"ok","database":"ok","build":"<sha>",…}` and `/`
 renders the configured `Community__Name`. On a **fresh** database the versioned boot block
-initializes the `mt` schema with no operator step (ADR 0004) — the log shows **First boot**
+initializes the `mt` schema with no operator step (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)) — the log shows **First boot**
 exactly once, and subsequent boots are a no-op.
 
 **Sample data & demo accounts.** On a **fresh** database, the first-boot lane can seed a
 mock neighborhood so an instance is immediately exercisable — residents, groups, community
 + group posts with replies, events with RSVPs, tags, a resident blog, and de/fr/da event
-translations (ADR 0055, extended by ADR 0056). It is **opt-in via `SampleData__Enabled=true`**
+translations (ADR [0055](../adr/0055-development-sample-data-lane.md), extended by ADR [0056](../adr/0056-sample-data-opt-in-and-deploy-posture.md)). It is **opt-in via `SampleData__Enabled=true`**
 and first-boot only, so a real deployment that never sets the flag can never see it. A
 `SampleData__Enabled` instance that was already booted also gets the **missing** sample
 event `de` / `fr` / `da` translations backfilled on every warm boot — create-if-missing,
-idempotent, never overwriting a Translator's in-app edit (ADR 0060). Two postures, one
-seeder (ADR 0056):
+idempotent, never overwriting a Translator's in-app edit (ADR [0060](../adr/0060-event-translation-sample-backfill.md)). Two postures, one
+seeder (ADR [0056](../adr/0056-sample-data-opt-in-and-deploy-posture.md)):
 
 - **Development** (local dev loop, `appsettings.Development.json` / `docker-compose.yml`
   already set the flag) — the documented weak demo credentials below, printed to the log;
@@ -69,7 +69,7 @@ kept distinct from the real `kumunita.com`):
 | Carla | `carla@examplium.com` | `Resident123!` | resident; contact-opted-in; owns the public "Street Green" group |
 | David | `david@examplium.com` | `Resident123!` | resident; Prague timezone |
 
-**Deployed demo site recipe (ADR 0056).** A Coolify `Production` app + dedicated Postgres,
+**Deployed demo site recipe (ADR [0056](../adr/0056-sample-data-opt-in-and-deploy-posture.md)).** A Coolify `Production` app + dedicated Postgres,
 with `SampleData__Enabled=true`, the `examplium.com` `Community__*` / `SeedAdmin__*` names,
 and a **fresh** DB → first boot seeds the full neighborhood. The seed admin signs in with
 its one-time `SeedAdmin__` setup token (as on any real deployment), and the demo
@@ -80,21 +80,21 @@ step-by-step (including the disposable-DB caveat) is [the demo-site runbook](../
 Wipe everything with `docker compose down -v` and rebuild — the seeder re-seeds on the
 next first boot (it is idempotent: keyed by e-mail, and the pristine gate keeps it from
 ever re-running its content on a warm database — the only warm-boot write is the
-create-if-missing sample-event translation backfill, ADR 0060).
+create-if-missing sample-event translation backfill, ADR [0060](../adr/0060-event-translation-sample-backfill.md)).
 
-**Locking sample-account password changes (ADR 0138) and two-factor (MFA) (ADR 0194).** A
+**Locking sample-account password changes (ADR [0138](../adr/0138-sample-data-change-password-lock.md)) and two-factor (MFA) (ADR [0194](../adr/0194-sample-data-mfa-lock.md)).** A
 demo site's sample accounts are *shared* credentials — anyone who signs in as "Anna" signs in
 as the *same* account — so a visitor testing the demo could change one of those passwords (or
 enable two-factor, minting a TOTP secret + recovery codes that break the shared credential)
 and break the credential for the everyone else who uses it. On a `SampleData__Enabled`
 instance (and **only** there — a real deployment never carries the flag, so this surface is
 unreachable by construction), a `GlobalAdmin` can turn on a **change-password lock** (ADR
-0138) and a **two-factor (MFA) lock** (ADR 0194) at `/admin/platform` → **Sample data** →
+0138) and a **two-factor (MFA) lock** (ADR [0194](../adr/0194-sample-data-mfa-lock.md)) at `/admin/platform` → **Sample data** →
 `/admin/sample`: the demo accounts (the closed sample set) are then locked out of the
 resident self-serve "Change password" surface and the MFA settings surface
 (`/settings/security/mfa` — enrollment / recovery-rotation / disable), **except the sample
 `GlobalAdmin`**, whose own credential and MFA lane the admin must still be able to keep
-(ADR 0138 / 0194 sample-admin exemption). Real (non-sample) accounts are never affected. The
+(ADR [0138](../adr/0138-sample-data-change-password-lock.md) / 0194 sample-admin exemption). Real (non-sample) accounts are never affected. The
 two locks are independent `GlobalAdmin`-settled instance values (audited,
 `sample.set-password-lock` + `sample.set-mfa-lock`) and plain read decisions
 (`IsChangePasswordLockedForAsync` + `IsMfaLockedForAsync`), so the resident form, the locked

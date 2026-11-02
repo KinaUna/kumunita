@@ -19,14 +19,14 @@ directory/preview surfaces) — needs a place for the bytes and a rulebook for
 how they are served. The constraints the choice has to honor are the ones
 this codebase has already made:
 
-- **Privacy/audit model** (SECURITY.md §3, ADR 0006-C): access to
+- **Privacy/audit model** (SECURITY.md §3, ADR [0006](0006-module-boundary-contracts.md)-C): access to
   audience-restricted content is resolved per request and logged; a public
   path bypasses both.
-- **`Core` stays HTTP-free** (ADR 0006-D): the store seam must be a plain
+- **`Core` stays HTTP-free** (ADR [0006](0006-module-boundary-contracts.md)-D): the store seam must be a plain
   `byte[]/filename/contentType/actorId` interface, not `IFormFile`/`Stream`.
-- **Marten owns the domain documents** (ADR 0004 §B): the catalog entry must
+- **Marten owns the domain documents** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B): the catalog entry must
   be a document in `mt`, so it `pg_dump`s with the rest of the data.
-- **Lean + Boring, one database** (README principles; ADR 0002): no managed
+- **Lean + Boring, one database** (README principles; ADR [0002](0002-deployment-topology.md)): no managed
   bucket service, no SDK, no signed-URL machinery, no extra stateful backend.
 
 Two shapes were on the table. An **object store** (MinIO / S3-style behind
@@ -43,7 +43,7 @@ local volume.
 - **Storage primitive: a content-addressed byte store on a dedicated volume,
   behind an HTTP-free seam.** `Kumunita.Core.Media`:
   - `MediaObject` (a Marten doc in `mt` — registered on its own
-    `MediaDocTypes` doc surface, ADR 0004 §B.1): `Id` = the **lowercase-hex
+    `MediaDocTypes` doc surface, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1): `Id` = the **lowercase-hex
     SHA-256 of the payload** (the identity, the dedup key, and the catalog —
     one thing, not three), plus `Filename?` / `ContentType` / `SizeBytes` /
     `Created` / `CreatedById?` (who first stored each unique file — the
@@ -72,7 +72,7 @@ local volume.
   subject is the signed-in principal, minted server-side; never a path
   param), guards before any write (empty → `400`, `> Media__MaxBytes` →
   `413`, disallowed type → `415`, no file written), then `PutAsync` →
-  `SetProfileAvatarAsync` (the one `IUserInfoService` lane; ADR 0006-E
+  `SetProfileAvatarAsync` (the one `IUserInfoService` lane; ADR [0006](0006-module-boundary-contracts.md)-E
   compatible addition).
 - **Type + size boundaries at the upload edge.** Raster only
   (`image/jpeg|png|webp|gif` — **SVG excluded**: it is a document format
@@ -114,20 +114,20 @@ local volume.
   failure, not an implementation choice.
 - **`Core` stays HTTP-free.** `IFormFile`/`Stream` never cross the seam; the
   Web layer is responsible for `byte[]` / `filename` / `contentType` /
-  `actorId`. ADR 0006-D holds; the `Postman-free` unit test surface is the
+  `actorId`. ADR [0006](0006-module-boundary-contracts.md)-D holds; the `Postman-free` unit test surface is the
   `IMediaFileStore` (temp-dir) + `IMediaStore` (Postgres + temp dir) pair.
 - **`mt` catalog + volume payload = two restore surfaces.** OPS.md
   procedures 4 and 5 each gain the volume (snapshot + restore), and the
   integrity key is the content hash — so a *half*-restore (one surface
-  missing) degrades to avatar 404s, not data corruption. ADR 0004's
+  missing) degrades to avatar 404s, not data corruption. ADR [0004](0004-data-persistence-and-schema-evolution.md)'s
   "one `pg_dump` story" is amended in that one respect (see Amends).
 - **The upload boundary is a single chokepoint.** Type/size are decided
   once in `MediaOptions` (operator-tunable via `Media__*`) and enforced in
   `AvatarUpload` before any byte is written; the serving endpoint serves the
   *stored* `ContentType` (already validated at write) + nosniff — no second
   guess at read time.
-- **ADR 0006-D / ADR 0004 are not touched** for this lane — the `MediaObject`
-  doc and the `MediaDocTypes` surface are the ADR 0004 §B.1 shape (Marten
+- **ADR [0006](0006-module-boundary-contracts.md)-D / ADR [0004](0004-data-persistence-and-schema-evolution.md) are not touched** for this lane — the `MediaObject`
+  doc and the `MediaDocTypes` surface are the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 shape (Marten
   registers the POCO; `MediaDocTypes.Configure(opts)` is called once in
   `Program.cs`, the same call-site as `PostDocTypes`).
 - **Rejected: per-resident volume partition** (one subfolder per subject)

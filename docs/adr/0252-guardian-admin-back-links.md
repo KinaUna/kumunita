@@ -11,13 +11,13 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0252 — Guardian and admin pages use the accent back link
+# ADR [0252](0252-guardian-admin-back-links.md) — Guardian and admin pages use the accent back link
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-After ADR 0250 the group forms matched Post edit's accent back link. The Guardian pages and eleven admin pages still showed a grey
+After ADR [0250](0250-group-form-back-links.md) the group forms matched Post edit's accent back link. The Guardian pages and eleven admin pages still showed a grey
 link (`text-muted`, the admin ones also `small`). `Guardian/AddChild` also hard-coded "Back to your children".
 
 ## Decision

@@ -14,7 +14,7 @@ updated: 2026-11-02
 
 # Translation display (`TD`) — authored-in as a first-class variant + click-to-swap
 
-> **Abstract:** the **translation display (`TD`)** design — the **authored-in** language (ADR 0018's `Post.LanguageCode` / `PostReply.LanguageCode`) as a **first-class variant** + **click-to-swap**: the one language the item is written in becomes visible + switchable, over the ADR 0022 user-added-translation chip row. Invariants TD·1–TD·8, FACES TD1–TD8, the exact C# of the VM ADDs, the `data-*` set, and the pinned tests. **Who is it for:** a developer touching the translation-display surface; an agent that needs the variant-container shape. **When to read the rest:** before touching the `data-*` attributes, the click-to-swap, or the TD tests.
+> **Abstract:** the **translation display (`TD`)** design — the **authored-in** language (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)'s `Post.LanguageCode` / `PostReply.LanguageCode`) as a **first-class variant** + **click-to-swap**: the one language the item is written in becomes visible + switchable, over the ADR [0022](../adr/0022-user-added-post-reply-translations.md) user-added-translation chip row. Invariants TD·1–TD·8, FACES TD1–TD8, the exact C# of the VM ADDs, the `data-*` set, and the pinned tests. **Who is it for:** a developer touching the translation-display surface; an agent that needs the variant-container shape. **When to read the rest:** before touching the `data-*` attributes, the click-to-swap, or the TD tests.
 
 
 > **Three-tier contract.** This file is the **primary** tier of the TD lane:
@@ -24,16 +24,16 @@ updated: 2026-11-02
 > module contract, the pinned test names, and the drift guard. The register
 > (`docs/plans-milestones/plan-translation-display.md`) is the **secondary**
 > tier (unit-level deliverables + exit criteria).
-> `docs/archive/lanes/translation-display/translation-display-handoff-notes.md` is the
+> [`docs/archive/lanes/translation-display/translation-display-handoff-notes.md`](../archive/lanes/translation-display/translation-display-handoff-notes.md) is the
 > **scratch** tier (one short section per unit, appended, never rewritten).
 > When the three disagree, **this file wins for the pinned shapes**; the
 > register wins for *which files exist* and *what each unit does*.
 
 ## Context
 
-ADR 0022 shipped the *add-a-translation* lane and the post/reply detail
+ADR [0022](../adr/0022-user-added-post-reply-translations.md) shipped the *add-a-translation* lane and the post/reply detail
 surface shows the **added** rows as chips. But the **one language the item is
-written in** — ADR 0018's `Post.LanguageCode` / `PostReply.LanguageCode` — is
+written in** — ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)'s `Post.LanguageCode` / `PostReply.LanguageCode` — is
 invisible to that chip row. The chip row is computed only from the
 *added* `PostTranslation`/`ReplyTranslation` rows, so the authored-in
 language has no home on the surface. Three concrete defects result, all on
@@ -67,32 +67,32 @@ a data, rendering, or authorization concern.
 - The **click-to-swap** TS toggle (`translation-swap.ts`, `tsc`-only) and its
   `_Layout.cshtml` load.
 - The **add-lane exclusion** of the authored-in language.
-- The **soft-delete gating** (no chip row / swap on a deleted row, ADR 0024).
+- The **soft-delete gating** (no chip row / swap on a deleted row, ADR [0024](../adr/0024-author-soft-delete-lane.md)).
 
 **Out (named deferrals — not a renumber):**
 
-- The **announcement** surface (ADR 0018 tags it, but it has no
+- The **announcement** surface (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) tags it, but it has no
   added-translation chip row today and no chip row to swap — a separate,
   later lane if wanted).
-- The **ADR 0026** group/community name+description chip row (a different
+- The **ADR [0026](../adr/0026-group-community-name-description-translations.md)** group/community name+description chip row (a different
   record — `Component` — and a different surface).
-- Any **auto**-translation or `kumunita.locale`-driven re-render — ADR 0005
+- Any **auto**-translation or `kumunita.locale`-driven re-render — ADR [0005](../adr/0005-multilingual-support.md)
   §C forbids both; the swap here is an **explicit click**, not a preference.
-- The **ADR 0022 write lane** (add-translation standing + route actions) —
+- The **ADR [0022](../adr/0022-user-added-post-reply-translations.md) write lane** (add-translation standing + route actions) —
   unchanged.
-- Editing/adding translations themselves — ADR 0022's write lane is untouched.
+- Editing/adding translations themselves — ADR [0022](../adr/0022-user-added-post-reply-translations.md)'s write lane is untouched.
 
 ## Invariants (pinned for the TD lane)
 
 | id | Invariant | Pinned where |
 | --- | --- | --- |
-| **TD·1** | **The authored-in language is always a variant.** The item's own `LanguageCode` (ADR 0018) renders as the **first** chip and the **default-visible** title+body (post) / body (reply), even when **zero** `PostTranslation`/`ReplyTranslation` rows exist. **No "None yet" when the original is present.** | U03, U04, U06 |
+| **TD·1** | **The authored-in language is always a variant.** The item's own `LanguageCode` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)) renders as the **first** chip and the **default-visible** title+body (post) / body (reply), even when **zero** `PostTranslation`/`ReplyTranslation` rows exist. **No "None yet" when the original is present.** | U03, U04, U06 |
 | **TD·2** | **The chip row is a selector, not just a list.** Clicking any language chip (original or added) swaps the *main* title+body (post) / body (reply) to that variant; clicking the original chip returns to it. The swap is **display-only** (visibility toggle), never a re-render, fetch, or navigation. | U03, U04, U05 |
 | **TD·3** | **Server-rendered variants, client-toggled.** Every variant's title+body is rendered **server-side** (the same `MarkdownRenderer` the current `<details>` panels use) into a hidden container; the TS only toggles `display`. **No `innerHTML` of client data; no `data-*` HTML blobs; no re-fetch.** | U03, U04, U05 |
 | **TD·4** | **The authored-in language is never offered to add.** The "Add a …" candidate list **excludes** the item's own `LanguageCode` (post: `Model.OriginalLanguageCode`; reply: `r.OriginalLanguageCode`). | U03, U04 |
-| **TD·5** | **One source of truth per variant.** The original variant reads the post/reply's own `Title`/`Body`; each added variant reads its `PostTranslation`/`ReplyTranslation` row. No variant is synthesized or translated — UGC renders as authored (ADR 0005 §C, M·3 untouched). | U03, U04 |
-| **TD·6** | **The shared `LanguageOption` record is untouched.** The authored-in code is carried **additively** on `PostDetailViewModel`, `GroupPostDetailViewModel`, and `ReplyItem` — **not** by reshaping the 3-positional-arg `LanguageOption` (also the ADR 0026 shape). | U02 |
-| **TD·7** | **Zero Core / schema change.** No new document, no `PostTranslation`/`ReplyTranslation` row change, no migration (ADR 0004 §B.1 is not even engaged — the field already exists, ADR 0018). The ADR 0022 **write** lane and its route actions are unchanged. | U02, U06 |
+| **TD·5** | **One source of truth per variant.** The original variant reads the post/reply's own `Title`/`Body`; each added variant reads its `PostTranslation`/`ReplyTranslation` row. No variant is synthesized or translated — UGC renders as authored (ADR [0005](../adr/0005-multilingual-support.md) §C, M·3 untouched). | U03, U04 |
+| **TD·6** | **The shared `LanguageOption` record is untouched.** The authored-in code is carried **additively** on `PostDetailViewModel`, `GroupPostDetailViewModel`, and `ReplyItem` — **not** by reshaping the 3-positional-arg `LanguageOption` (also the ADR [0026](../adr/0026-group-community-name-description-translations.md) shape). | U02 |
+| **TD·7** | **Zero Core / schema change.** No new document, no `PostTranslation`/`ReplyTranslation` row change, no migration (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 is not even engaged — the field already exists, ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)). The ADR [0022](../adr/0022-user-added-post-reply-translations.md) **write** lane and its route actions are unchanged. | U02, U06 |
 | **TD·8** | **Progressive enhancement.** With JS disabled the **original** variant is visible and every added variant is present in the DOM (the swap degrades to "original shown, added variants as static text"); the swap is an enhancement, not a requirement. | U03, U04, U05 |
 
 ## FACES (pinned, 8)
@@ -105,7 +105,7 @@ a data, rendering, or authorization concern.
 | **TD4** | reply authored in Polish (no added translation) → the reply's chip row shows **Polish** (first, default-visible body), no "none yet". | TD·1 |
 | **TD5** | reply authored in Polish + added German → clicking **German** swaps the reply body to the German row; **Polish** swaps back. | TD·2/TD·5 |
 | **TD6** | the **group** post/reply detail (group lane) behaves **identically** to the community lane (same first-chip, swap, and exclusion). | TD·1–TD·5 |
-| **TD7** | a **soft-deleted** post (ADR 0024) shows its placeholder and **no** translation chips/swap; a soft-deleted reply shows its placeholder and **no** swap. | TD·1 (absence on delete) |
+| **TD7** | a **soft-deleted** post (ADR [0024](../adr/0024-author-soft-delete-lane.md)) shows its placeholder and **no** translation chips/swap; a soft-deleted reply shows its placeholder and **no** swap. | TD·1 (absence on delete) |
 | **TD8** | with JS **disabled**, the original is visible and the added variants are present as static text (no broken/blank content). | TD·8 |
 
 ## Pinned contract
@@ -157,7 +157,7 @@ dropped from the candidate set even when `CanTranslate` is true.
 
 The entire translation section (chips + variant containers + add-lane) renders
 **only** when the row is live: post `Model.Post.DeletedAt is null`; reply
-`r.DeletedAt is null`. A deleted row shows its existing ADR 0024 placeholder
+`r.DeletedAt is null`. A deleted row shows its existing ADR [0024](../adr/0024-author-soft-delete-lane.md) placeholder
 and no swap.
 
 ### TS module contract (exact)
@@ -205,7 +205,7 @@ The TD·1–TD·8 invariants, the TD1–TD8 FACES, the three VM ADDs
 variant-container structure, the add-lane exclusion rule, the soft-delete
 gating, the TS module contract, and the four pinned test names — **all frozen
 pins** in this file. The **untouched** set is equally frozen: the shared
-`LanguageOption` record (TD·6), all Core documents (TD·7), the ADR 0022
+`LanguageOption` record (TD·6), all Core documents (TD·7), the ADR [0022](../adr/0022-user-added-post-reply-translations.md)
 add-translation **write** lane + its route actions, and the M4/M5/M6 roadmap
 letters. Any mismatch between an entry read and these pins is a
 `## U<m> — Drift pause` per the unit-series rule.

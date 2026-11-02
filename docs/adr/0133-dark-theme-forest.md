@@ -11,7 +11,7 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0133 — Dark theme ("Forest") — an OS-following default with an explicit per-resident override, resolved entirely in CSS (no JS, no first-paint flash, CSP-safe)
+# ADR [0133](0133-dark-theme-forest.md) — Dark theme ("Forest") — an OS-following default with an explicit per-resident override, resolved entirely in CSS (no JS, no first-paint flash, CSP-safe)
 
 Status: Accepted
 Date: 2026-10-03
@@ -42,7 +42,7 @@ this repo's content-security policy and free of a first-paint flash).
   see `SECURITY`/`Program.cs` CSP notes).
 
 - **The override is a preference cookie, never a claim** (the thin-token rule,
-  ADR 0001-B — the same posture as `NavLayoutCookie`, ADR 0111, and
+  ADR [0001](0001-core-stack-and-identity-model.md)-B — the same posture as `NavLayoutCookie`, ADR [0111](0111-nav-layout-variants-b-and-c.md), and
   `LocaleCookie`). `ThemeCookie` (`Security/ThemeCookie.cs`) reads/writes a
   `kumunita.theme` cookie with the closed value set `auto | light | dark`
   (`auto` the default, `Normalize` the only parser, `HttpOnly` / `SameSite=Lax`).

@@ -48,7 +48,7 @@ updated: 2026-11-02
 - **`Program.cs:92-95` (Marten):**
   `var kumunitaConnection = builder.Configuration.GetConnectionString("Kumunita")
   ?? throw …`, then inside `AddMarten(opts => …)` the line **`opts.Connection(kumunitaConnection);`**.
-- **`Program.cs:474` (EF Core — the only EF in the tree, ADR 0004):**
+- **`Program.cs:474` (EF Core — the only EF in the tree, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)):**
   `builder.Services.AddDbContext<AppDbContext>(opts => opts.UseNpgsql(kumunitaConnection));`.
 
 Both consume the **same** `kumunitaConnection` local. Therefore **one** place to
@@ -170,7 +170,7 @@ receive the identical extended string:
   `Prefer`, no CA — so the dev container boots exactly as it does today. When the
   knobs are set (prod), both consumers enforce `Verify CA` + CA. **No code branch,
   no new DI, no new type in `Kumunita.Core`** — the Core-stays-HTTP-free and
-  ADR 0006 invariants hold because this is a Web-host config read, not a new
+  ADR [0006](../adr/0006-module-boundary-contracts.md) invariants hold because this is a Web-host config read, not a new
   bounded context or Core seam.
 
 **What F21.U2 does NOT do (pin the boundary):** no new `<PackageReference>`
@@ -204,11 +204,11 @@ done, and is not runnable in the unit-test harness (no prod CA, no prod host).
 
 ## 6. Invariants held (this pin + the unit it drives)
 
-- **ADR 0004 forward-only + "app role owns the DB"** — **preserved, not touched.**
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) forward-only + "app role owns the DB"** — **preserved, not touched.**
   F21 changes **how** the app connects (TLS), **not** who owns the DB, **not**
   the schema, **not** the migration path. F22 (the role demotion) is the unit that
   touches the ownership question; F21 does not.
-- **ADR 0006 module boundaries + Core stays HTTP-free** — **held.** The knob is a
+- **ADR [0006](../adr/0006-module-boundary-contracts.md) module boundaries + Core stays HTTP-free** — **held.** The knob is a
   **Web `Program.cs` config read**, not a new bounded context, not a Core seam,
   not a new type in `Kumunita.Core`. The Core consumers (Marten) receive the
   extended string through the **existing** `opts.Connection(…)` call — no Core

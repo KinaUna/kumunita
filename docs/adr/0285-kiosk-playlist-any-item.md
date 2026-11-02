@@ -11,13 +11,13 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0285 — Kiosk playlist: any item, per-entry duration, scroll and comments
+# ADR [0285](0285-kiosk-playlist-any-item.md) — Kiosk playlist: any item, per-entry duration, scroll and comments
 
 Status: Accepted
 Date: 2026-11-01
-Amends: ADR 0164 (kiosk mode)
+Amends: ADR [0164](0164-kiosk-mode.md) (kiosk mode)
 
-> **Abstract:** the `/settings/kiosk` playlist (ADR 0164) could only hold
+> **Abstract:** the `/settings/kiosk` playlist (ADR [0164](0164-kiosk-mode.md)) could only hold
 > three slide kinds (a Kanban board, the calendar, or the to-do list), every
 > slide stayed up for the same playlist-wide `ViewIntervalSeconds`, and a
 > slide taller than the screen was simply cut off. This ADR generalizes the
@@ -47,7 +47,7 @@ Amends: ADR 0164 (kiosk mode)
 
 ## Context
 
-The `/settings/kiosk` playlist (ADR 0164) could only hold three slide kinds:
+The `/settings/kiosk` playlist (ADR [0164](0164-kiosk-mode.md)) could only hold three slide kinds:
 a Kanban board, the calendar, or the to-do list. Every slide stayed up for the
 same playlist-wide `ViewIntervalSeconds`, and a slide whose content was taller
 than the screen was simply cut off.
@@ -57,7 +57,7 @@ entry has an item type, a specific item, how long it is shown, and what
 happens when it does not fit (scroll automatically, or not at all).
 
 What already exists and is kept: each slide iframes the item's **own route**
-(ADR 0164 M35·6) — the route re-runs its own read decision on every load
+(ADR [0164](0164-kiosk-mode.md) M35·6) — the route re-runs its own read decision on every load
 (M35·3), so the kiosk never needs an access branch of its own. `_Layout`
 marks a page framed by `/kiosk` with `body.kmb-kiosk` (now the `?kiosk=1`
 URL signal per **D7**); site.css then hides buttons, forms, tabs and nav.

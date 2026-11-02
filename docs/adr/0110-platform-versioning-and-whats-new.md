@@ -11,11 +11,11 @@ superseded_by: []
 updated: 2026-11-02
 ---
 
-# ADR 0110 — Platform versioning + the "What's new" lane (the `VN` lane)
+# ADR [0110](0110-platform-versioning-and-whats-new.md) — Platform versioning + the "What's new" lane (the `VN` lane)
 
 Status: Accepted
 Date: 2026-09-28
-Extends the **`kw-l` registry** (ADR 0015) + the **en/de/fr/da parity pins**,
+Extends the **`kw-l` registry** (ADR [0015](0015-ui-view-localization-mechanics.md)) + the **en/de/fr/da parity pins**,
 the **`Milestones.cs` static-platform-data precedent** (the "source-controlled
 static data — not configuration" convention the home page's roadmap and
 `RepositoryInfo` both follow), the **`_FlashToast` / `_PinnedAnnouncement`
@@ -43,10 +43,10 @@ The shape is already fixed by the surface's own precedents:
   static class` + `record` + `static IReadOnlyList<…>` in `Kumunita.Web`,
   pinned by Web tests (`MilestonesTests`). Versions are decided in the repo
   (they are a fact about the code that ships), not per-deployment — so a
-  version registry belongs with them, not in Marten (ADR 0004 §B keeps
+  version registry belongs with them, not in Marten (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B keeps
   Marten for domain documents; a changelog is not one) and not in the
   translation registry (changelog entries are copy, not UI chrome).
-- **UI chrome strings go through the closed `kw-l` registry (ADR 0015).**
+- **UI chrome strings go through the closed `kw-l` registry (ADR [0015](0015-ui-view-localization-mechanics.md)).**
   The section's eyebrow/heading/lead, the per-version "Version {v}" label,
   and the toast's label + link text are the six `whatsnew.*` keys —
   registered in **en/de/fr/da** (the parity pins move together). The
@@ -76,7 +76,7 @@ client module**, all additive:
    (ordered **newest-first**) and `static Version Latest` (the head).
    Version dates are fixed **ISO `yyyy-MM-dd`** strings — a fact about when
    the release shipped, not a user-visible timestamp, so **no `kw-dt`**
-   (ADR 0019/0020) and no timezone involvement.
+   (ADR [0019](0019-timezone-platform-default-and-resident-override.md)/0020) and no timezone involvement.
 2. **About page — the "What's new" section**
    (`Views/StaticPages/About.cshtml`, `id="whats-new"` anchor, between
    "The project" and the contact CTA band): eyebrow/heading/lead via the
@@ -89,11 +89,11 @@ client module**, all additive:
    `_PinnedAnnouncement`. Server-rendered unconditionally; carries
    `data-whatsnew-version="@WhatsNew.Latest.Version"`; resolves the
    `whatsnew.toast_label` / `whatsnew.toast_see` values in the request's
-   effective language (the ADR 0049 chain, the `_PinnedAnnouncement` seam)
+   effective language (the ADR [0049](0049-default-language-variant-selection.md) chain, the `_PinnedAnnouncement` seam)
    with `{v}` substituted; the `show` class in the markup (the `_FlashToast`
    contract — a JS-less first-run visitor still gets it); link
    `href="/about#whats-new"`; `role="status"`.
-4. **`client/lib/whatsnew-toast.ts`** (tsc-built, the ADR 0031
+4. **`client/lib/whatsnew-toast.ts`** (tsc-built, the ADR [0031](0031-wysiwyg-editor-and-toolbar.md)
    convention) — on load: if `localStorage["kumunita-whatsnew-seen-version"]`
    equals the toast's version, remove the toast silently; otherwise record
    the version and arm the Bootstrap `Toast` auto-hide (8 s, the
@@ -112,7 +112,7 @@ client module**, all additive:
 the existing `/about` route; the toast rides the existing layout). **The
 `Milestones.cs` / README Roadmap / `MilestonesTests.cs` triple is
 untouched** — the `VN` lane is a **named lane on the shipped surface**,
-not a milestone (the ADR 0013 GP / 0089 / 0093 / 0109 precedent), and the
+not a milestone (the ADR [0013](0013-group-posts-membership-lane.md) GP / 0089 / 0093 / 0109 precedent), and the
 roadmap stays the *forward* view while `WhatsNew` is the *backward* one.
 
 ## Consequences
@@ -136,5 +136,5 @@ roadmap stays the *forward* view while `WhatsNew` is the *backward* one.
   guard).
 - Amends nothing; additive on 0015 (the registry) + 0031 (tsc-only) +
   0049 (the effective-language chain) + the `_FlashToast` /
-  `_PinnedAnnouncement` seam (ADR 0015 D1 + ADR 0006-D) + the
+  `_PinnedAnnouncement` seam (ADR [0015](0015-ui-view-localization-mechanics.md) D1 + ADR [0006](0006-module-boundary-contracts.md)-D) + the
   `Milestones.cs` static-data precedent.

@@ -40,7 +40,7 @@ that hasn't priced it.
 
 ## Rollout & rollback
 Deployment path, migration, and a clean rollback / restore. (See
-[`../../docs/OPS.md`](../../docs/OPS.md).)
+[`../../docs/OPS.md`](../../OPS.md).)
 
 ## Risks
 Where is the integration most likely to break? Where could privacy or trust
