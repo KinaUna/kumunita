@@ -522,8 +522,10 @@ app's env or `appsettings.Production.json`:
      present — confirm the `max-age` value is `31536000`).
    - **`Permissions-Policy`** is now emitted on every response with a
      restrictive default (camera, microphone, geolocation, payment, usb,
-     fullscreen, picture-in-picture, web-share all disabled). No env value
-     needed; if a future feature legitimately needs one, opt it in here.
+     picture-in-picture, web-share all disabled). `fullscreen` is opted in as
+     `(self)` because the kiosk, events calendar, and projects board use the
+     Fullscreen API. No env value needed; if a future feature legitimately
+     needs one, opt it in here.
 
 ## Troubleshooting (quick)
 

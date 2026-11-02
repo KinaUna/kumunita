@@ -1084,12 +1084,14 @@ app.Use(async (context, next) =>
     {
         context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000";
     }
-    // Permissions-Policy (SEC U26, L7): a restrictive default — every feature is
-    // explicitly disabled (no camera/mic/geolocation/payment/usb, no fullscreen,
-    // no web-share). The platform has no legitimate need for any of these, so the
-    // fail-closed list is the safe floor; opt a feature in only if a feature needs it.
+    // Permissions-Policy (SEC U26, L7): a restrictive default — camera/mic/
+    // geolocation/payment/usb/web-share are disabled. Fullscreen is opted in
+    // (self) because three surfaces use the Fullscreen API: the kiosk display
+    // (kiosk.ts), the events calendar (calendar-fullscreen.ts), and the
+    // projects board (projects-board.ts). (self) scopes it to the document
+    // itself, not to third-party iframes.
     context.Response.Headers["Permissions-Policy"] =
-        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(), picture-in-picture=(), web-share=()";
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self), picture-in-picture=(), web-share=()";
     await next();
 });
 
