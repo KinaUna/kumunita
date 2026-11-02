@@ -1348,3 +1348,343 @@ behavior reframed to the calendar month. An unparseable / out-of-set
 
 **The three-test acceptance gate** (recorded by the lane's U07):
 **closed loop**, **handoff**, and **part-vs-whole**.
+
+
+---
+
+## ADR 0142 — Delete account (moved detail)
+
+*Source: `docs/adr/0142-delete-account.md`. Supersedes: ADR 0006.*
+
+### The seam detail (the two branches + both-branch invariants)
+
+`IIdentityService.DeleteAccountAsync(string targetSubjectId, string
+adminSubjectId)` is the single write lane. Two branches, one seam (the
+ADR 0138 self-serve/admin distinction):
+
+1. **Self-deletion** (`adminSubjectId == targetSubjectId`) — the resident
+   deletes their own account (the Web `POST /account/delete`, after
+   verifying their current password). **ADR 0142 D5 gate:** only a
+   `GlobalAdmin` may self-delete (a non-GlobalAdmin's invocation throws
+   `UnauthorizedAccessException` — the fail-closed pin). The audit row is
+   `Via: Owner`.
+2. **Admin-initiated** (`adminSubjectId != targetSubjectId`) — a
+   `GlobalAdmin` removes another resident (the Web `POST /admin/delete`).
+   The `RequireGlobalAdminAsync` gate applies. The audit row is `Via:
+   Admin`.
+
+**Both branches:**
+
+- **Last-GlobalAdmin guard** (the lockout pin): if the target holds the
+  `GlobalAdmin` role and they are the *only* `GlobalAdmin` on the
+  instance, the lane throws `InvalidOperationException` **before any
+  write** (the `OPS.md` §9 "Hand over admin" precedent). A lone
+  `GlobalAdmin` cannot self-delete; no admin may delete the last
+  `GlobalAdmin`. The recovery path is to promote a second `GlobalAdmin`
+  first. *Design consequence:* on the admin-initiated branch, the actor
+  must be a `GlobalAdmin` to pass the admin gate, so when the target is
+  also a `GlobalAdmin` there are at least two `GlobalAdmin`s and the guard
+  never fires — the guard is only reachable on the self branch. The Core
+  test `DeleteAccountAsync_AdminInitiated_TargetIsGlobalAdmin_GuardPasses_
+  BecauseActorIsAlsoGA` pins that the admin branch *can* delete a
+  `GlobalAdmin` target; `DeleteAccountAsync_SelfDeletion_LastGlobalAdmin_
+  ThrowsAndDoesNotWrite` pins the guard on the self branch.
+- **Pseudonymization** (the `OPS.md` §9 / data-model policy): the target's
+  `AccessAudit` rows *remain*, but their `ActorId` and
+  `EffectivePrincipalId` (when equal to the target) are rewritten to the
+  deterministic `deleted:{targetSubjectId}` tombstone. The tombstone is
+  *deterministic* (derived from the subject id, not a fresh GUID) so a
+  re-deletion re-attaches to the same tombstone.
+- **Membership removal** (the strong-consistency C4 invariant): the
+  target's `GroupMembership`, `ComponentMembership`, and
+  `ModeratorAssignment` rows are deleted. The next
+  `GetGroupIdsAsync` / `GetCommunityIdsAsync` read misses them.
+- **Profile deletion**: the target's `Profile` row is removed (their PII is
+  gone). The directory and every author-name resolution already falls back
+  to the raw subject id when the profile is absent (the
+  `profile?.DisplayName ?? authorId` idiom).
+- **Identity account deletion**: the target's ASP.NET Identity account is
+  deleted. The `PrivilegedStampMiddleware`'s existing "user was deleted
+  while signed in" branch is the *consequence* path — this lane is the
+  *cause* path.
+- **Exactly one audit row** (the `AuditPurgeSummary` "one summary, many
+  rows" shape): action `"account.delete"`, `TargetKind` "account",
+  `TargetId` the subject, `Via: Owner` or `Via: Admin` per the branch,
+  `Outcome: Allow`.
+- **Fail-closed / idempotency**: a missing target throws
+  `InvalidOperationException` before any write. A second call for the same
+  subject throws the same `InvalidOperationException` (the Identity row is
+  gone).
+
+### The cross-store ordering
+
+The lane commits the Marten writes (the pseudonymization + membership
+removal + profile deletion + the summary audit row) **first**, then deletes
+the Identity account (EF Core, the `identity` schema). The ordering
+inverts the register/verify lanes' ordering (the `mt` cleanup commits
+first, the identity row is removed second) so that a failure *between* the
+two leaves the account still present (a recoverable state) rather than the
+account gone with the trail still carrying the identity (an unrecoverable
+privacy violation).
+
+### The Web surfaces
+
+- **`GET /account/delete`** + **`POST /account/delete`** (the resident
+  self-serve surface, on the `AccountController` beside
+  `ChangePassword`). The form asks for the resident's current password
+  (verified server-side via `CheckPasswordAsync`) and an explicit
+  acknowledgment checkbox. **ADR 0142 D5 gate:** when the signed-in
+  resident is not a `GlobalAdmin`, the view renders the
+  `SelfDeletionRefused` notice (the ADR 0138
+  `ChangePasswordLockedViewModel` "surface-replaced-by-notice" shape,
+  generalized). On success the resident is signed out and redirected to
+  the login page with a positive confirmation.
+- **`POST /admin/delete`** (the GlobalAdmin removal surface, on the
+  `AdminController` beside `Block` / `Unblock`). A `GlobalAdmin` deleting
+  their own account through this surface is refused up-front — they use
+  `/account/delete` instead. The button is hidden on the admin's own row in
+  both the `Accounts.cshtml` list and the `Manage.cshtml` detail.
+
+### The translation keys
+
+One closed `account.delete.*` + `admin.delete_account.*` +
+`nav.delete_account` `kw-l` set × en/de/fr/da (the ADR 0015 closed-registry
+shape, the ADR 0138 `account.change_password.*` precedent), registered in
+`KnownTranslationKeys` and seeded by the `FirstBootSeeder`'s existing
+`en`-floor + `de`/`fr`/`da` baselines.
+
+---
+
+## ADR 0105 — M9: 1:1 resident messaging (moved detail)
+
+*Source: `docs/adr/0105-messaging.md`. Supersedes: ADR 0004.
+Superseded by: ADR 0165. Amended by: ADR 0139.*
+
+### D5 — The audit table
+
+| seam | `Action` | `TargetKind` | `TargetId` | `Via` | `Outcome` |
+|---|---|---|---|---|---|
+| `OpenConversationAsync` | `message.open` | `message` | conversation id | `Owner` | `Allow` |
+| `SendAsync` | `message.send` | `message` | conversation id | `Owner` | `Allow` |
+| `SetMessagingEnabledAsync` | `messaging.toggle` | `messaging.toggle` | `messaging.toggle` | `Admin` | `Allow` |
+
+**Reads emit no audit row** (list / thread-read / mark-read — the ADR
+0076 F11 personal-read shape).
+
+### The seam (the locked shape — the design doc §2.2 verbatim text)
+
+```csharp
+public interface IMessagingService
+{
+    Task<bool> IsMessagingEnabledAsync();
+    Task SetMessagingEnabledAsync(bool enabled, string actorId);
+
+    Task<ConversationRef> OpenConversationAsync(string actorId, string otherId);
+    Task<ConversationDetail> GetConversationAsync(string conversationId, string actorId, int page);
+    Task<ConversationList> ListConversationsAsync(string actorId, int page);
+
+    Task SendAsync(string conversationId, string actorId, string body);
+    Task MarkReadAsync(string conversationId, string actorId);
+}
+```
+
+`OpenConversationAsync` is **idempotent on the unordered pair** (the
+sorted `(ParticipantA, ParticipantB)` unique index is the witness).
+`MessagingService` composes `IDocumentStore` + the optional
+`NotificationService` (the ADR 0077/0083 optional-nudge-param idiom) +
+`IUserInfoService.GetProfileAsync` (frozen, the `OtherDisplayName`
+resolution, null-safe to the raw subject id) and is registered in
+`DependencyInjection.cs` in the `AddTransient<IMessagingService>` factory
+shape.
+
+### The tests (the pinned set — design doc §2.5 authoritative)
+
+Core: `MessagingServiceTests` over the `PostgresFixture` harness — 14 pins
+(2 toggle + 12 behavior; the leak pins
+`GetConversation_NonParticipant_404_Not403` /
+`GetConversation_GlobalAdminNonParticipant_404` /
+`ListConversations_OnlyOwn_NoLeak` are the D3 witnesses,
+`ToggleOff_AllSeamsRefuse_403` the D2 witness,
+`Send_OtherParticipant_GetsMessageNewNotification_Once` the D6 dedup
+witness). Web: `MessagesControllerTests` over NSubstitute
+(`IMessagingService` substituted, no Postgres — the
+`AnnouncementControllerTests` harness) — 10 pins.
+
+---
+
+## ADR 0047 — Static-page localization + backfill (moved detail)
+
+*Source: `docs/adr/0047-static-page-localization-and-backfill.md`.
+Supersedes: ADR 0043, ADR 2026.*
+
+### D1 — The read path (the four hard-coded routes)
+
+- **The four `Page`-backed routes only** — `/terms`, `/help`, `/privacy`,
+  `/conduct` — now render the body of the **matching** translation. The
+  `/about` route is **unchanged** (the product-story view, not a `Page`).
+- **One consistent read, then a single pick.** The controller reads the
+  page *and* its translations in one call —
+  `IPageService.ResolvePageAsync(path)` — and selects the
+  `PageTranslation` whose `LanguageCode` equals the request's **effective
+  language** (the ADR 0046 chain, resolved by the existing
+  `ITranslationProvider.ResolveEffectiveLanguageAsync` overloads).
+- **The floor is the `en` body.** When no `PageTranslation` row matches the
+  effective language, the route renders `page.Title` / `page.Body`. So
+  **the worst case is exactly today's behaviour** (the `en` body); the best
+  case is the matching translation.
+- **`en` is still the source of truth and the floor, forever (ADR 0042
+  D1, unchanged).** The ADR 0027 chip-swap display surface is **untouched**
+  (the `/pages/{path}` show surface keeps its variant chips).
+
+### D2 — The warm-boot backfill (create-if-missing)
+
+- **A new public seeder primitive, run on every warm boot.**
+  `FirstBootSeeder.BackfillPageTranslationsAsync(session, ct)` runs in the
+  **`else` branch** of the pristine gate in `SchemaBootstrap`. The
+  pristine-boot path is **unchanged**.
+- **Scoped to the four canonical pages, the `de` / `fr` / `da` rows
+  only.** For each of the `EnDefaultPages()` slugs (`terms` / `help` /
+  `privacy` / `conduct` — `about` excluded), the backfill creates the
+  `PageTranslation` row from the baseline if — and only if — no row for
+  that `(PageId, LanguageCode)` already exists. The created row is
+  byte-identical to what a fresh seed would have produced.
+- **Create-if-missing, never overwrite (ADR 0042 D1, held).** The `en`
+  `Page.Body` is never read or written by the backfill.
+- **Idempotent.** A second warm boot finds every row the first created and
+  skips all of them.
+- **This is the narrow exception to ADR 0042 D1's "no warm-reseed
+  mechanism," recorded as a decision, not a drift.**
+  > **Amended 2026-09-20 (ADR 0052):** the UI-string baselines **are** now
+  > backfilled on a warm boot too — the same create-if-missing, idempotent,
+  > never-overwrite shape.
+
+### D4 — The new `IPageService` read seam
+
+`IPageService.ResolvePageAsync(string path)` returns
+`(Page Page, IReadOnlyList<PageTranslation> Translations)` in **one
+document-session read**: the page resolved by the path plus the page's
+`PageTranslation` rows ordered by `LanguageCode`. A missing page is
+`KeyNotFoundException`; an existing page with no translations returns the
+page with an **empty** translation list. **Core stays HTTP-free (M·8 / ADR
+0001-B, held)** — the seam reads no cookie, no header, no `HttpContext`.
+
+### Revisit when
+
+- A **fifth canonical page** is added (a new `system/` slug in
+  `EnDefaultPages()`): D1's render and D2's backfill are both **generic
+  over the `EnDefaultPages()` slug set**, but the new page's `de` / `fr` /
+  `da` baselines must exist in the baseline registries first.
+- The **chip-swap (ADR 0027) surface** is wanted on the hard-coded routes:
+  that is a *new* display lane.
+- A **fifth language** joins the seeded baselines: D2's backfill is generic
+  over the baseline arrays, but the skip path must be re-confirmed for the
+  new code.
+
+---
+
+## ADR 0162 — Analytics history (M34) (moved detail)
+
+*Source: `docs/adr/0162-analytics-history.md`.*
+
+### The "derived, not captured" distinction (M34·1)
+
+M33 (ADR 0156) added a **capture lane** (a daily `StorageMetricsCaptureTick`
++ a `StorageMetricsSample` doc + a `StorageHistoryDocTypes` surface + a
+retention tick) because the M24 storage metrics are **point-in-time and
+non-derivable** — nothing was stored that would let you reconstruct a past
+day. **M13 is the opposite**: it already stores a `UsageEvent` row **per
+recognized request** with an `At` timestamp (C-M13·2), and already prunes
+them past a **365-day** platform constant (the M13 `UsagePurgeService`,
+D5). M34's over-time half is therefore **purely derived** — a new read that
+`GROUP`s the existing `UsageEvent` rows by UTC day. **M34 adds no new doc,
+no new capture tick, no new retention constant, and no new doc-type
+surface.**
+
+### D2 — The two new DTOs (the 2-member M34·1 ceilings)
+
+The `UsageDailyTotal` POCO (namespace `Kumunita.Core.Usage`) carries
+**exactly** 2 members: `Date` (DateTimeOffset, **UTC**) + `Total` (int —
+the count of `UsageEvent` rows whose `At` falls on that UTC day). The
+`UsageHistoryResult` record carries **exactly** 2 members: `WindowDays`
+(int) + `Points` (`IReadOnlyList<UsageDailyTotal>` — **ascending** by
+`Date`, **only the days present** in the window). **Not** an
+`IAuditableResource`; **not** a Marten document.
+
+### Named deferrals (each a future lane, own ADR)
+
+- **per-surface over-time chart** (the (day, surface) breakdown re-rendered
+  as a chart — M34 v1 renders the **total per day**).
+- **CSV export of the history** (M34 v1 has **no** export lane for the
+  history).
+- **capacity / growth projection** (a linear-regression "days to X"
+  estimate).
+- **resident-facing history** (M34 is `GlobalAdmin`-gated — no resident
+  surface).
+- **multi-week / month aggregation** (M34 v1 is daily granularity).
+- **the six-member close flip** until the milestone *ships* (U08 owns it —
+  M34·12).
+
+---
+
+## ADR 0167 — M37: Personal notes (moved detail)
+
+*Source: `docs/adr/0167-personal-notes.md`.*
+
+### D6 — The folder tree (the bounded-depth shape)
+
+Each resident has their own tree of `NoteFolder` rows, keyed on `OwnerId`
++ a bounded `ParentId` (depth ≤ 2: root → child → grandchild). A folder's
+`Name` is unique within the owner's tree (the `(OwnerId, ParentId, Name)`
+unique index is the witness). A note's `FolderId` is the **owner's** folder
+id. A folder's deletion **moves** its notes to the root (`FolderId =
+null`) — the note body is never lost.
+
+### D9 — The close flip (the six-member close flip, U06)
+
+M37 is the **last** milestone on the roadmap (no `M38` to promote). The M37
+close (U06) flips the roadmap parity **together**: `Milestones.cs` M37
+`StatusNext` → `StatusDone` (and **no** `M38` row); `MilestonesTests.cs`
+re-pinned to the **"last milestone, no successor"** pin; the README
+**Roadmap** (M37 → done) + the M37 **Status** line; `docs/STATUS.md`;
+`docs/ARCHITECTURE.md`'s value-chain table gains the **M37 row**; **and**
+`src/Kumunita.Web/WhatsNew.cs` gains the **M37 entry** (the **required
+sixth member** — ADR 0110). All six ship **in the same unit** (the M36
+close-flip precedent). *Forbids:* reordering M37; adding an `M38` row;
+editing a shipped milestone's text; breaking the `MilestonesTests` pins;
+flipping one surface and not the others; **omitting the `WhatsNew.cs`
+entry**.
+
+### Consequences — Neutral / cost (the full list)
+
+- **The named trade — the note body's permanence vs. the dangling-target
+  leak surface**: the row (and its body) survives its target's death
+  instead of being silently removed; the invariant that keeps that safe is
+  **C-M37·5** — the closed `pn.list.degraded` label with no title, link, or
+  id, + the author's own body.
+- **The list resolution is one extra read per row**, bounded by the
+  resident's own note count; each row resolves through the owning
+  surface's **existing** read seam (D7 — no new branch).
+- **The closed `TargetKind` set is deliberately nine-wide, not open**
+  (D1): adding a tenth kind is a **drift event** (the design doc's
+  §drift-guard).
+- **The folder tree is bounded in depth (≤ 2)** (D6): the "nested" shape,
+  not an arbitrary tree.
+
+### Follow-on lanes (each its own ADR)
+
+the "nudge the author on note" notification lane; note **sharing** /
+per-surface "top noted" stats; note **search**; the **platform-wide tag
+vocabulary** (the M26 `Tag` doc lane); **folder drag-and-drop
+reordering**; **note export**.
+
+### Amends (the frozen-surface ledger)
+
+Additive on **0118** (the M17 `Bookmark` personal-by-id precedent — a
+pointer generalized to a body + a folder tree + personal tags) + **0105**
+(the participant-by-id shape — the *primary* precedent for the zero-audit
+personal read + the non-owner non-leaky 404) + **0004 §B.1** (the
+`*DocTypes` parallel-surface shape) + **0006-C3** (the audit-always-on pin
+— the **only** audited call in M37 is the D3 write-lane check) + **0001-B**
+(the author's choice is absolute — a non-owner gets a non-leaky 404 and no
+audit row) + **0015** (the `kw-l` registry — the closed `pn.*` key block ×
+en/de/fr/da).
