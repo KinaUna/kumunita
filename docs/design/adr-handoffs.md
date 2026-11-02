@@ -1688,3 +1688,600 @@ personal read + the non-owner non-leaky 404) + **0004 §B.1** (the
 (the author's choice is absolute — a non-owner gets a non-leaky 404 and no
 audit row) + **0015** (the `kw-l` registry — the closed `pn.*` key block ×
 en/de/fr/da).
+
+## ADR 0119 — M18: Recurring events (moved detail)
+
+From `docs/adr/0119-recurring-events.md` (the M18 ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+
+**D2 — Closed rule shape (full).** `EventRecurrenceRule` is a closed struct:
+`Recurrence` (a `Recurrence` enum — `Daily` / `Weekly` / `Monthly` /
+`Yearly`), `Interval: int` (≥ 1, default 1), `Count: int?` (optional; the
+total number of occurrences including the head), `Ends: DateTimeOffset?`
+(optional; the last occurrence's `Start` must be ≤ `Ends`). `Count` and
+`Ends` are mutually exclusive in intent (the author picks one in the
+composer); if both are set, `Count` wins (the composer disables one when
+the other is set — D7). Forbids: a unit reaching for `BYDAY` /
+`BYMONTHDAY` / `BYSETPOS` / `EXRULE` or a general RFC 5545 `RRULE` parser.
+
+**D4 — Cascade on head edit (full).** Editing the head (via the existing
+`IEventService.UpdateAsync`) cascades the text / `Location` / `Capacity` /
+`Color` / `Audience` / `ReminderEnabled` / `LanguageCode` fields to all
+non-deleted occurrences (head included) in a single transaction. If the
+rule itself (`Recurrence` / `Interval` / `Count` / `Ends`) or the head's
+`Start` / `End` changes, the unit re-materializes the series: soft-delete
+all existing non-head occurrences, then expand the new rule from the new
+head `Start` and insert the new set (the head row itself is updated in
+place — its `Id` is stable). Forbids: a unit implementing a per-occurrence
+override surface, a unit that leaves stale occurrences after a rule change,
+or a unit that reassigns `Id`s on re-materialization.
+
+**D5 — Skip / undelete lanes (full).** A new author-only pair of seams on
+`IEventService` — `SkipOccurrenceAsync(eventId, actorId, ct)` (soft-delete
+one occurrence: `IsDeleted = true`; the head's `RecurrenceRule` is
+untouched, siblings untouched) and `UndeleteOccurrenceAsync(eventId,
+actorId, ct)` (un-soft-delete: `IsDeleted = false`). Both ride the frozen
+`EventToAuditableResource` + `IAuthorizationService` seams with the
+existing `event.edit`-shaped standing (the ADR 0014 / 0016 / 0017
+author-only edit precedent). A non-author actor gets a 404 (the frozen
+seam's "absent" shape — no leak). Forbids: a unit adding a new
+`AccessAction`, a unit that lets a non-author skip, or a unit that
+hard-deletes.
+
+**D6 — ICS unchanged (full).** The `IcsWriter` (M12) gains no `RRULE`
+emission. Because occurrences are materialized concrete rows (D1), the
+per-event file (`GET /events/{id}.ics`) and the subscription feed
+(`GET /events.ics`) each emit one `VEVENT` per materialized occurrence row
+in scope — exactly as they already do for any concrete event. The M12 ADR's
+"no `RRULE`" pin is superseded in scope (M18 is the `RRULE` home) but the
+shape it pinned (per-occurrence `VEVENT`, no rule line) is what M18
+implements. Forbids: a unit reaching for an `RRULE` line in the ICS
+output, or a unit that special-cases the head row in the ICS feed.
+
+**D7 — Composer + detail-page affordances (full).** The event composer
+(the `CreateAsync` / `UpdateAsync` form) gains a recurrence picker: a
+`Recurrence` select (None / Daily / Weekly / Monthly / Yearly), an
+`Interval` number input (≥ 1, default 1), and a radio for "Ends after"
+(`Count` number) vs. "Ends on" (`Ends` date). The event detail page gains
+a series chip when the row is part of a series (`RecurrenceHeadId != null`
+or the head row with `RecurrenceRule != null`): "Repeats {daily|weekly|
+monthly|yearly}, every {N} {day|week|month|year}" + (if `Count` set)
+"{Count} occurrences" + (if `Ends` set) "until {date}". For an author, the
+detail page gains two buttons when the row is a non-head occurrence: "Skip
+this occurrence" (`SkipOccurrenceAsync`) and — when `IsDeleted` — "Restore
+this occurrence" (`UndeleteOccurrenceAsync`). Forbids: a unit reaching for
+a series-level "edit all" affordance, a per-occurrence override editor, or
+a "delete entire series" button (a head edit that changes the rule
+re-materializes — D4 — but there is no separate "delete series" button).
+
+**D9 — `kw-l` key list (14 keys × en/de/fr/da).** All under `events.*`
+(the M4 events namespace — matching the existing `events.created` /
+`events.edited` keys; no new namespace): `events.recurrence.none` /
+`.daily` / `.weekly` / `.monthly` / `.yearly` (5 — the picker labels),
+`events.recurrence.interval` (1 — the "every N" label),
+`events.recurrence.ends_after` / `.ends_on` (2 — the radio labels),
+`events.recurrence.count` (1 — the "occurrences" noun),
+`events.recurrence.until` (1 — the "until {date}" prefix),
+`events.series.repeats` (1 — the detail-page series chip prefix),
+`events.series.skip` / `.restore` (2 — the author's skip / undelete
+buttons), `events.series.part_of` (1 — the "Part of a series" chip on
+non-head rows). **14 keys × 4 languages = 56 strings**, added to all four
+of the closed dictionaries in
+`src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — `EnValues` (the
+`en` floor, the canonical source text), `DeValues`, `FrValues`, `DaValues`
+(the ADR 0005 / 0015 `en`-floor / per-key shape: the seeder materializes
+each key's `en` row on first boot; the non-`en` rows are the localized
+text). Forbids: a unit reaching for a new `kw-l` namespace, an English-
+only key, or a key that leaks a non-localized "RRULE" / "iCal" term into a
+user-visible string.
+
+**D10 — Reminders unchanged (full).** The `EventReminderService` (M4 §6.4)
+already fires per concrete `Event` row in the window (`now < Start ≤ now +
+WindowHours`). Because M18 materializes occurrences as concrete rows (D1),
+the reminder job works unchanged — each occurrence is its own candidate,
+its own `remind:{eventId}:{userId}` idempotency key, its own email. No
+`EventReminderService` change in M18. Forbids: a unit "fixing" the
+reminder service to be series-aware, a unit that dedups reminders across a
+series, or a unit that changes the `remind:{eventId}:{userId}` key shape.
+
+**D11 — Deferred lanes (each gets its own ADR).** Per-occurrence overrides
+(change one occurrence's fields without touching the series); group-event
+recurrence (the M7 `CreateGroupEventAsync` surface); `EXRULE` / exception
+rules; richer RFC 5545 `RRULE` (`BYDAY` / `BYMONTHDAY` / `BYSETPOS`);
+cross-month / cross-year edge cases (the "31st of each month" / "last
+Friday" shapes).
+
+**Consequences — neutral / cost (full).** The named trade — write-time
+expansion for zero read-time complexity: M18 trades write-time work (expand
+the rule into N rows at create/edit) for zero read-time complexity (every
+read seam, RSVP, reminder, ICS, calendar, search, bookmark surface keeps
+working unchanged). The cost is that a long series (e.g. "weekly for 52
+weeks") materializes 52 rows at write time, and a rule change
+re-materializes them (the D4 cascade's branch). The alternative (a
+`RecurrenceRule` on the head + read-time expansion) would have touched
+every read seam, the RSVP model, the reminder job, the ICS writer, the
+calendar, the search, and the bookmarks — a far larger surface for the
+same user-visible result. M18 takes the write-time cost; the read surface
+stays frozen. The closed `Recurrence` set is deliberately four-wide, not
+open (D2): a new recurrence type joins the world with one enum value + one
+expansion branch; adding a `BYDAY` / `BYMONTHDAY` / `BYSETPOS` / `EXRULE`
+richness is a drift event. The cross-month / cross-year simplification is
+intentional: a `Monthly` rule on the 31st clamps to the target month's
+last day; a `Yearly` rule on Feb 29 clamps to Feb 28 in non-leap years.
+
+**Consequences — follow-on lanes (each its own ADR — the design doc's
+§deferred).** Per-occurrence overrides; group-event recurrence (the M7
+`CreateGroupEventAsync` surface); `EXRULE` / exception rules; richer RFC
+5545 `RRULE` (`BYDAY` / `BYMONTHDAY` / `BYSETPOS`); cross-month /
+cross-year edge cases (the "31st of each month" / "last Friday" shapes).
+
+## ADR 0169 — First day of week (moved detail)
+
+From `docs/adr/0169-first-day-of-week.md` (the ADR body is condensed; the
+Status/Context/Decision/Consequences record stays there with pointers here).
+
+**D1 — the preference: additive `Profile.FirstDayOfWeek` (full).** `Profile`
+(the existing `UserInfo` context doc) gains one field: `public int?
+FirstDayOfWeek { get; set; }` (0 = Sunday … 6 = Saturday, the .NET
+`DayOfWeek` index; `null` = the platform default, Monday). Additive on the
+existing doc — delta-detected, idempotent, zero migration (ADR 0004 §B.1).
+`null` means "use the default" — the exact `PageSize` shape. Marten's
+delta-detector adds the column on the next
+`ApplyAllConfiguredChangesToDatabaseAsync`; existing rows read back as
+`null`. No EF migration (not an Identity table — ADR 0004 §B).
+
+**D2 — the resolver: pure `WeekAnchor` (full code).** A small, testable,
+dependency-free type in `Kumunita.Core.Query` shared by the view, the Quiet
+picker, the Guardian picker, and the calendar:
+
+```csharp
+public static class WeekAnchor
+{
+    public const int Default = 1;   // Monday
+    public static int Resolve(int? preferred) =>
+        preferred is >= 0 and <= 6 ? preferred.Value : Default;
+    public static int[] OrderDays(int firstDay)
+    {
+        var days = new int[7];
+        for (var i = 0; i < 7; i++) days[i] = (firstDay + i) % 7;
+        return days;
+    }
+}
+```
+
+`Resolve` is total (any input, including `null` and out-of-range, yields a
+valid first-day). `OrderDays` is a pure permutation of `0`–`6` — the same
+set, a different order, so the submitted value of any picker is unchanged by
+the reorder. `Default = 1` is Monday, the audience's convention.
+
+**D3 — the write lane: `SetProfileFirstDayOfWeekAsync` (full).**
+`IUserInfoService` gains one seam mirroring `SetProfilePageSizeAsync`
+exactly: `Task SetProfileFirstDayOfWeekAsync(string subjectId, int?
+firstDayOfWeek, string actorBy)` (pass the default Monday, 1, to clear the
+preference back to the platform default). Owner-scope, fail-closed
+`KeyNotFoundException` on a missing profile, **zero** audit rows, **zero**
+new authorization surface.
+
+**D4 — the UI (full).** Set on `/settings/dateformat` (the natural home
+beside the date/time format it orders). The view gains a "First day of week"
+radio group rendered in the resident's own preferred order:
+
+```html
+<fieldset>
+  <legend>First day of week</legend>
+  @foreach (var d in Kumunita.Core.Query.WeekAnchor.OrderDays(Model.FirstDayOfWeek))
+  {
+    <label>
+      <input type="radio" name="firstDayOfWeek" value="@d"
+             @(Model.FirstDayOfWeek == d ? "checked" : "") />
+      @DayName(d)   @* localized name via the effective language's DateTimeFormatInfo *@
+    </label>
+  }
+</fieldset>
+```
+
+`LocaleController.BuildModel()` populates
+`FirstDayOfWeek = WeekAnchor.Resolve(profile?.FirstDayOfWeek)`. `SaveDateFormat`
+posts `firstDayOfWeek` and writes only when a valid `0`–`6` value is posted.
+The **reset** form posts `clear=1` **without** a day value, so the preference
+is left untouched — the two are independent preferences on independent fields.
+
+**D5 — the day pickers: reordered, named (full).** Both day pickers (Quiet-
+hours `daysOfWeek`, Guardian time-limit days) now render the **localized day
+name** (via the effective language's `DateTimeFormatInfo.GetDayName` /
+`CultureInfo.CurrentCulture.DateTimeFormat.GetDayName`) and **order** their
+options via `WeekAnchor.OrderDays(firstDay)` — the resident themselves for
+`/settings/quiet`, and the **child's** preference for the Guardian time-limit
+page (`ViewData["ChildFirstDayOfWeek"] = WeekAnchor.Resolve(childProfile?.
+FirstDayOfWeek)`). The value submitted is unchanged (the same `int` set,
+reordered) — the existing write lanes, validation, and stored data are all
+untouched.
+
+**D6 — the calendar: re-anchored, default byte-identical (full).**
+`EventController.Calendar` anchors its week and month grids to the *viewer's*
+first day. Week view: `anchorDate.AddDays(-WeekOffset(anchorDate))` where
+`WeekOffset(d) = ((int)d.DayOfWeek - firstDay + 7) % 7`. Month view: the grid
+spans the weeks covering the anchor month. **The default (Monday) path is
+byte-identical to the pre-existing formula** — the pre-existing month-grid
+code produced a *ragged* grid (e.g. 34 days for Sep-2026, not a clean 35),
+and the pinned test `Calendar_ViewMonth_WindowIsAnchorCalendarMonth` asserts
+`WindowDays[0] == gridMonday` + the exact count. To keep that invariant
+passing, the month case keeps the **original formula verbatim** when
+`firstDay` is the Monday default, and uses the clean full-weeks formula only
+for a non-Monday preference:
+
+```csharp
+if (firstDay == WeekAnchor.Default)
+{
+    // original formula, verbatim — ragged-month invariant + pinned test preserved
+    gridStart = monthStart.AddDays(-(((int)monthStart.DayOfWeek + 6) % 7));
+    gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - (int)monthEndInclusive.DayOfWeek) % 7));
+}
+else
+{
+    gridStart = monthStart.AddDays(-WeekOffset(monthStart));
+    // …clean full-weeks formula, firstDay-anchored
+}
+```
+
+**Consequences — the close-flip entries (moved).** `WhatsNew.cs` 0.65.0 (the
+required close-flip member, ADR 0110): "First day of week — a per-resident
+display preference (default Monday) that orders the Quiet-hours and Guardian
+time-limit day pickers and anchors the events calendar's week/month grid;
+additive `Profile` field + `WeekAnchor` resolver + owner-scope write lane;
+zero migration; zero new authorization surface" (2026-10-15). **A named
+lane, not a milestone:** the M-letter milestone ordering (`Milestones.cs`,
+README Roadmap, `MilestonesTests.cs`) is **byte-identical** (the ADR 0013
+`GP` / ADR 0011 `M4-adjacent` precedent); the close flips the doc-sync pair
+(README Roadmap + `STATUS.md` + `ARCHITECTURE.md`) + the `WhatsNew.cs` entry.
+
+## ADR 0067 — M5: Projects (to-dos + Kanban boards) (moved detail)
+
+From `docs/adr/0067-m5-projects-todos-and-kanban.md` (the ADR body is
+condensed; the Status/Context/Decision/Consequences record stays there with
+pointers here).
+
+**The four documents' full field sets (moved).** `TodoItem`: `Id`; `Title`
+(non-empty — the card label + adapter `Name`); `Body?` (optional Markdown —
+the one `MarkdownRenderer`, ADR 0025); `ComponentId?` (a feed filter, never a
+gate — C-M3·2); `AuthorId` (the standing owner); `AssigneeId?` (a `SubjectId`
+— display + standing, **never** an access gate); `Status?` (a **nullable
+string** — the state label; no status enum / registry / seeded vocabulary);
+`ParentId?` (the **sole** hierarchy mechanism — a subtask is a full to-do);
+`Audience?` (the **exact** post `Audience`, ADR 0001-B / 0036 — `null` =
+public, the frozen `Decide()` branch 5); `IsDeleted` (ADR 0024);
+`LanguageCode` (ADR 0018); `TagIds` (ADR 0044); `ImageIds` (ADR 0025);
+`AttachmentIds` (ADR 0034); `Created` / `Modified?`. **No** `BoardId` /
+`LaneId` / `Order` (a placement is a separate `BoardItemPlacement` record)
+and **no** `IsDraft`. `KanbanBoard`: `Id`; `Title`; `Description?` (Markdown,
+ADR 0025 shape); `ComponentId?`; `AuthorId`; `Audience?`; `IsDeleted`;
+`LanguageCode`; `Created` / `Modified?`; **no** `IsDraft`. `KanbanLane`:
+`Id`; `BoardId`; `Title`; `Status?` (the status a lane **imparts** on a to-do
+moved into it); `MaxItems?` (nullable int — the lane's capacity, **advisory**,
+refused not dropped); `Order` (0-based column order); `Created` / `Modified?`;
+**no** `Audience` (a lane's visibility is the board's).
+`BoardItemPlacement`: `Id`; `TodoItemId`; `BoardId`; `LaneId`; `Order`
+(0-based card order); `Created` / `Modified?`; **no** `Audience` (the
+placement's visibility is the to-do's **and** the board's; it is **not**
+itself an auditable resource).
+
+**`ProjectDocTypes` (moved).** A new document surface (the `EventDocTypes`
+pattern verbatim): `TodoItem` (conventional `Id` + a `(ComponentId, Created)`
+feed-ordering index + a `ParentId` index); `KanbanBoard` (conventional `Id` +
+a `(ComponentId, Created)` feed-ordering index); `KanbanLane` (conventional
+`Id` + a **unique** `(BoardId, Order)` index — the business-key convention,
+the `EventRsvp` shape); `BoardItemPlacement` (conventional `Id` + a **unique**
+`(BoardId, LaneId, Order)` index + a **unique** `(TodoItemId, BoardId)` index
+— a to-do appears on a board at most once). Zero migrations for existing
+surfaces.
+
+**The standing matrix (full table, moved).**
+
+| Action | Standing | `AccessVia` |
+|---|---|---|
+| **Create** (to-do / board) | any signed-in resident (becomes the author) | `Owner` |
+| **To-do mutations** (edit / assign / add-subtask / delete / reorder / move / copy) | **creator ∪ assignee ∪ GlobalAdmin** | `Owner` / `Admin` |
+| **Board / lane mutations** (lane CRUD, board delete) | **creator ∪ GlobalAdmin** (the lane is not its own standing surface) | `Owner` / `Admin` |
+
+`CheckCreateStanding` / `CheckEditStanding`-shaped helpers throw
+`UnauthorizedAccessException` (403) / `KeyNotFoundException` (404) exactly
+like `AnnouncementService`. The `actorRoles` parameter carries the principal's
+real role set. **`AssigneeId` is display + standing, never an access gate.**
+Every audited write lane stores its `AccessAudit` row in the caller's session
+(C3), `TargetKind = "todo"` / `"board"`, `Action` `todo.create` /
+`todo.update` / `todo.assign` / `todo.add_subtask` / `todo.delete` /
+`todo.move_within_lane` / `todo.move_to_lane` / `todo.move_to_board` /
+`todo.copy_to_board` / `board.create` / `board.update_lane` / `board.delete`.
+
+**The `IProjectService` seam (full list, moved).** Read lanes
+(`ListTodosAsync` / `GetTodoAsync` + subtasks / `ListBoardsAsync` /
+`GetBoardAsync` + lanes + per-lane cards); write lanes (`CreateTodoAsync` /
+`UpdateTodoAsync` / `AssignTodoAsync` / `AddSubtaskAsync` / `DeleteTodoAsync`
+/ `CreateBoardAsync` / `UpdateLaneAsync` / `DeleteBoardAsync`); placement +
+reorder lanes (`MoveTodoWithinLaneAsync` / `MoveTodoToAdjacentLaneAsync` /
+`MoveTodoToBoardAsync` / `CopyTodoToBoardAsync`). **Copy-to duplicates** (a
+new `TodoItem` — the copy's `AuthorId` is the actor — + a placement on the
+target board's first lane; the original is untouched); **move-to relocates**
+(the placement is removed from the source board and added to the target
+board's first lane). **No translation lane in M5's own scope** (a follow-on
+lane with its own ADR — the ADR 0022 / 0029 / 0048 / 0059 shape).
+
+**The board state machine (full, moved).** Lane-status auto-update — moving a
+to-do into a lane whose `Status` is non-null sets `TodoItem.Status` to that
+lane's status **in the same transaction** as the placement move (audited —
+C3); a lane with null `Status` leaves the to-do's status unchanged; the status
+icon is a client-side display mapping, never persisted. Lane limits are
+advisory backstops, refused not dropped — a move / copy **into** a lane at its
+`MaxItems` limit is **refused** (`InvalidOperationException` with the lane's
+`Title`; **nothing is written**); a reorder within a lane and a move *out* of
+a lane never trip the source limit. Hierarchy is `ParentId` only — a subtask
+is a full to-do; **delete cascades** to the descendant subtree; a `ParentId`
+that would create a cycle is refused.
+
+**The Web surface (full, moved).** `ProjectsController`
+(`Kumunita.Web.Controllers`): the to-do routes (`/projects/todos` feed —
+`CanSeeAsync(Read)`-filtered so a restricted to-do's *existence* does not
+leak; `/projects/todos/new` compose; `/projects/todos/{id}` detail — 404 on
+absent / 403 on denied) + the to-do action endpoints (edit / assign /
+add-subtask / delete); the board routes (`/projects/boards` feed;
+`/projects/boards/new` compose; `/projects/boards/{id}` detail — lanes as
+columns, cards with the status icon + assignee avatar + title + the dropdown
+menu) + the lane CRUD + placement endpoints (reorder / move left-right /
+move-to / copy-to). The nav entry is one line (the `Community` nav pattern).
+The `Post` / `Announcement` / `Page` / `Event` surfaces stay **untouched**.
+The board module is plain `client/lib` TS, tsc-only, zero dependencies —
+`client/lib/projects-board.ts`: every action is an **explicit POST**,
+CSRF-aware, then a **full re-render** — no optimistic local reordering, no
+HTML5 drag events (keyboard / menu driven — the ADR 0031 "explicit,
+server-authoritative" posture).
+
+**The localization + test + drift-guard pins (moved).** The new `projects.*`
+`kw-l` key block (design doc §2.6 — 19 keys) is present in all four seeded
+languages (en/de/fr/da). The **24 pinned seam test names** (design doc §2.7 /
+§2.8): 16 in `tests/Kumunita.Core.Tests/ProjectServiceTests.cs` (F1–F10, run
+over `PostgresFixture`) + 8 appended to
+`tests/Kumunita.Web.Tests/ProjectsControllerTests.cs` (NSubstitute, no
+Postgres). The **three-test acceptance gate** (design doc §2.9, gate unit
+U13): **closed loop** (create → list + board card + one aggregate row),
+**handoff** (assignee sees it + has standing; the non-assignee's view /
+standing exclude it), **part-vs-whole** (the 24 names pass together with the
+inherited M1–M4 anchors). The **drift-guard** (design doc §2.10): the four
+POCOs' field sets (including the no-`BoardId`/`LaneId`/`Order` / no-`IsDraft`
+pins), the two adapters (`TargetKind = "todo"` / `"board"` — the **exact**
+strings), the `IProjectService` full surface, the DTOs, the `ProjectDocTypes`
+surface, the standing matrix, the `kw-l` keys, the 16 Core + 8 Web test names,
+and the three-test gate — all frozen pins.
+
+**The canonical-names decision (moved).** The data model sketch
+(`Project` / `ProjectTask` / `ProjectMember`) is the pre-decision shape; the
+settled names are **`TodoItem`** / **`KanbanBoard`** / **`KanbanLane`** /
+**`BoardItemPlacement`** — "project" is not a distinct document in M5 (a to-do
+is the unit, a board is the container). The M5 close unit (U13) rewrites the
+[data model — Projects](../architecture/data-model.md) block + the
+[solution layout](../architecture/solution-layout.md) tree's `Projects/` line
+to these names.
+
+## ADR 0039 — Pages: a hierarchical, audience-restricted, translatable knowledge tree (moved detail)
+
+From `docs/adr/0039-pages-hierarchy-audience-translations.md` (the ADR body
+is condensed; the Status/Context/Decision/Consequences record stays there
+with pointers here).
+
+**The `Page` / `PageTranslation` field sets (moved).** `Page`: `Id`,
+`ParentId?` (hierarchy — `null` = a root), `Slug` (unique per parent),
+`Title`, `Body` (Markdown, authored-in language), **`Audience?`** (the
+**existing** `Kumunita.Core.Authorization.Audience` — *not* a new scope;
+`null` = public, the frozen `Decide()` branch 5), `AuthorId`,
+`ComponentId?` (moderator scoping), `LanguageCode` (ADR 0018 authored-in
+tag), `MountPoint?` (a nullable string tag — where a page appears in the
+UI), `Created` / `Modified?`, `IsDraft` (ADR 0037 idiom), `ImageIds` (RC
+ADR 0025 idiom), `AttachmentIds` (ATT ADR 0034 idiom). `PageTranslation`:
+`Id`, `PageId`, `LanguageCode`, `Title?`, `Body`, `AuthorId`, `Created` —
+`(PageId, LanguageCode)` unique index (the `PostTranslation` business-key
+convention; an explicit short index name if the auto-derived name exceeds
+Postgres's 64-char `NAMEDATALEN` limit, the `ann_tr_uidx_ann_lang`
+precedent).
+
+**The hierarchy mechanics (moved).** A page's canonical path is the chain
+of ancestor `Slug`s: `Page("/a/b/c")` ⇒ `a` (root) → `b` → `c`. The tree is
+a **forest** (any number of roots). A page is either a *folder* (has
+children, `Body` may be empty) or a *leaf* (has a `Body`), or both.
+"Folder" is not a type, it is "has ≥1 child". The `(ParentId, Slug)` unique
+index enforces one page per slug per parent (the `GroupMembership` business-
+key convention). A **cycle-guard + depth-cap** (e.g. 8) is validated in the
+write lane (the `PageService`), not a schema constraint (Marten has no FK).
+**Renaming a page** rewrites the *derived* paths of its subtree (paths are
+not stored, so a `Slug` change is a single-column write). **References from
+posts break by path, not by id** — the same property the RC content-image
+lane has.
+
+**The standing matrix (full table, moved).** Enforced server-side in the
+`PageService` (the `AnnouncementService.CreateAsync` C3 pattern):
+
+| Action | Standing | `AccessVia` |
+|---|---|---|
+| **Create** a page | GlobalAdmin ∪ (community Moderator, `ComponentId` = a community they moderate) | `Admin` / `Moderator` |
+| **Edit** a page's body / audience / hierarchy | its `AuthorId` ∪ GlobalAdmin ∪ (a Moderator of its `ComponentId`) | `Owner` / `Admin` / `Moderator` |
+| **Add a translation** | GlobalAdmin ∪ Translator ∪ (community Moderator, community-scoped) | `Admin` / `Moderator` |
+| **Publish** a draft | its `AuthorId` only (ADR 0037 pin) | `Owner` |
+| **Move / rename / delete** | GlobalAdmin ∪ (a Moderator of its `ComponentId`) — *not* a plain author | `Admin` / `Moderator` |
+
+**Every write lane** stores its `AccessAudit` row in the caller's session
+(invariant C3, ADR 0006), `TargetKind = "page"`, `Action` `page.create` /
+`page.update` / `page.translation.add` / `page.publish` / `page.delete` /
+`page.move`.
+
+**The translation standing + display (moved).** A `PageTranslation` row (the
+ADR 0022/0026/0029 shape) carries a user-added translation. **Standing** =
+GlobalAdmin ∪ Translator (ADR 0021/0022) **plus the community-Moderator lane
+for a community-scoped page** (`ComponentId` set and equal to a community the
+actor moderates — the ADR 0029 announcement lane, carried over). **Add-only**
+(ADR 0022); a wrong translation is corrected by the same standing adding the
+right one, the unique index preventing a duplicate. **Display** = the ADR 0027
+chip-swap, reused verbatim: the authored-in variant is the default visible
+one, a chip per `PageTranslation`, click to swap.
+
+**The Web surface (moved).** `PageController` (`Kumunita.Web.Controllers`):
+`GET /pages` (the tree browse, `CanSeeAsync(Read)`-filtered), `GET
+/pages/{**path**}` (the post view — title + rendered body via the *one*
+`MarkdownRenderer` + the ADR 0027 chip-swap, `CanAsync(Read)`-gated, 404 on
+absent, 403 on denied), `GET /pages/new` + `POST /pages/new` (compose — title,
+body, parent picker, the **`AudienceEditorModel`** verbatim, the ADR 0018
+language picker — WYSIWYG via `bindRichEditor`), `GET /pages/{id}/edit` +
+`POST /pages/{id}/edit` (the edit lane), `POST /pages/{id}/publish` /
+`delete` / `move` (the standing-gated actions). **`StaticPagesController`
+becomes a thin reader over the tree** — `/terms`, `/help`, `/about` resolve
+to the seeded page at that path (or the existing `/about` product-story
+fallback when truly absent); the three hard-coded routes are **kept**
+(backward-compatible) but **read from the tree**, so there is one store, not
+two. **Mount points** — the layout partials resolve "the page mounted at
+`X`" and render / `<a href>` it. **The editor** reuses
+`Views/Languages/PreviewPage.cshtml`'s existing `bindRichEditor` + RC content-
+image + ATT attachment wiring.
+
+**The data migration (absorb) — the 4-step sequence (moved).** (1) create the
+`Page` + `PageTranslation` tables (new doc types, ADR 0004 §B.1); (2) **seed
+the three default pages** (`about`, `terms`, `help`) as `Page` docs carrying
+the *current* `LocalizedPage` `en` bodies/titles, `Audience = null` (public),
+`MountPoint` set (`about` → `footer/community`), `LanguageCode = "en"` —
+**idempotent**; (3) **keep `LocalizedPage` read-only + non-destructive for
+one release** (the old `GetPageAsync` / `UpsertPageAsync` seam still works, so
+the old `StaticPagesController` fallback is *available* if the new route
+misbehaves); then (4) **delete the `LocalizedPage` surface** in U07, once the
+new route is green. **No seed reset, no schema-file change** for the new
+*fields*.
+
+**Consequences — full (moved).** The "mount point" concept is new and small
+(one nullable string column + one resolver), and it is the mechanism that
+makes the "about is in `footer/community`" requirement expressible without a
+special case. The only irreversible step is the absorb migration, and it is
+sequenced *last* (U07). The default-audience now matches posts (amended
+2026-09-17): posts default community-visible (ADR 0036); **pages now do too**
+(composer seeds `IsPublic = false`, `Audience.Community = true`, the first
+reachable `ComponentId`); ~~Previously "pages default public
+(`Audience = null`)"~~ — reversed to keep pages consistent with posts. A page
+author who wants a **public** page sets `IsPublic = true` (audience `null`),
+and one who wants a specific grant set picks that community / users / groups.
+The standing matrix is the existing role matrix re-checked server-side — no
+new role, no new `AccessVia`, no new `AccessAction`; a community Moderator's
+standing on a page is the *same* `moderator:{CommunityId}` claim the
+announcement translation lane (ADR 0029) already uses. The `LocalizedPage`
+retirement is the last unit and the only destructive step; a fresh instance's
+`/about` / `/terms` / `/help` are byte-identical to today (the seeded pages
+carry the same `en` bodies).
+
+**The `PG` lane pin (moved).** The lane is `PG` (a named lane, the `ML` / `GP`
+/ `RC` / `RE` convention — a short ID, *not* a renumber). M4 / M5 / M6 stay
+Events / Projects / Portability; no roadmap letter moves. The `PG` entry is
+added to `Milestones.All` **after `RE`** (a `StatusPlanned` entry — the
+"single in-progress milestone" pin (M4) is unchanged; the test's `Ids`
+ordered list gains `"PG"` in the same commit). The README Roadmap gains the
+`PG` row in the same commit.
+
+## ADR 0088 — Projects / to-dos / Kanban-board user-added translations (moved detail)
+
+From `docs/adr/0088-projects-todos-boards-translations.md` (the ADR body is
+condensed; the Status/Context/Decision/Consequences record stays there with
+pointers here).
+
+**D1 — The three translation rows (full, moved).** Three POCOs in
+`Kumunita.Core.Projects`, each mirroring `EventTranslation` (ADR 0059) but
+with the **Projects body-optional** adjustment: `TodoTranslation` (parent a
+`TodoItem` / `TodoItemId`), `BoardTranslation` (parent a `KanbanBoard` /
+`BoardId`), `ProjectTranslation` (parent a `Project` / `ProjectId`). Each
+row: `Id` (surrogate key), `<Parent>Id`, `LanguageCode` (the **target**
+language), `Title?` (a translation may re-title the parent or not — blank →
+`null`; the parent's own title is the display fallback), `Body?` (the
+translated body — the parent's `Body` for a to-do, its `Description` for a
+board / project. **Optional here — unlike `EventTranslation`, whose `Body` is
+required — because the M5 surfaces are title-usable**; the ADR 0079 / ADR 0070
+title-only precedent. At least one of `Title` / `Body` must be non-blank at
+write time — enforced server-side; the DB unique index only pins (parent,
+language)), `AuthorId` (the last actor to add / edit the row), `Created` (the
+last add / edit stamp). Registered on the **`ProjectDocTypes`** document
+surface with a **`(ParentId, LanguageCode)` unique index** per POCO,
+mirroring the `PostTranslation` / `AnnouncementTranslation` /
+`EventTranslation` business-key convention. The auto-derived index names stay
+under Postgres's 64-char `NAMEDATALEN` limit. **Zero migration for existing
+rows** (ADR 0004 §B.1 delta-detect).
+
+**D2 — Twelve `IProjectService` seams (full table, moved).** `IProjectService`
+gains exactly **12 methods** (3 entities × 4 seams), mirroring the add / read
+/ update / remove shape ADR 0048 / ADR 0059 settled. For `<E>` ∈ {`Todo`,
+`Board`, `Project`}: **read** `Get<E>TranslationsAsync(<e>Id)` →
+`IReadOnlyList<<E>Translation>` (rows ordered by `LanguageCode`; a **read, not
+a decision** — no authorization, no audit; the parent is still read through
+the existing `GetTodoAsync` / `GetBoardAsync` / `GetProjectAsync`); **add**
+`Add<E>TranslationAsync(<e>Id, languageCode, title?, body?, actorId,
+actorRoles, ct)` (stores the row + its `AccessAudit` row;
+`UnauthorizedAccessException` on a denied actor, `KeyNotFoundException` for an
+unknown parent, `ArgumentException` for a blank (title, body) pair);
+**update** `Update<E>TranslationAsync(...)` (edits the `(<e>Id, languageCode)`
+row; re-stamps `Created` + `AuthorId`; `KeyNotFoundException` for a missing
+row, `ArgumentException` for a blank pair); **remove**
+`Remove<E>TranslationAsync(...)` (deletes the row; `KeyNotFoundException` for
+a missing row). **Seam shape — the M5/PL convention (ADR 0067 §4), not the M3
+one:** like the existing `ProjectService` write lanes (and the M4
+`EventService`), these write lanes **self-compose** their own C3 session
+(`store.OpenSession(...)`); they carry **no `IDocumentSession` parameter**.
+The domain write and the `AccessAudit` row commit atomically in that one
+self-composed session (invariant C3).
+
+**D3 — The standing (full, moved).** A **pure role-claim check** (the M5 §3.4
+shape), enforced server-side by three new pure helpers
+`ProjectService.ResolveTodoTranslationStanding` /
+`ResolveBoardTranslationStanding` / `ResolveProjectTranslationStanding` (the
+C3 single-source pin). The matrix is the **translation** matrix, *not* the
+edit standing — the ADR 0059 author ∪ Translator ∪ GlobalAdmin matrix
+**plus the to-do's existing ADR 0067 assignee branch**: **The parent's
+creator** (`AuthorId`) — `AccessVia.Owner`; **The to-do's assignee** (to-do
+only) — `AccessVia.Admin` (the ADR 0067 assignee branch, the
+`TodoAuditViaFor` "least-distortion slot" precedent); **A Translator** (ADR
+0021) of **anyone's** row — `AccessVia.Admin`; **A GlobalAdmin** (ADR 0017)
+of **anyone's** row — `AccessVia.Admin`; **A plain Member** — **no** standing.
+This is *broader than* the existing edit standing (the M5 edit lanes are
+creator ∪ assignee (to-do) ∪ GlobalAdmin and **do not** include Translator):
+a Translator who cannot *edit* a to-do's title may still *translate* it. No
+new `AccessVia` member, no new role. A **pure display helper**
+`ProjectService.CanAdd<E>Translation(<parent>, actorId, actorRoles)` returns
+the matching resolver's `... is not null`, so the Web renders the add / edit
+/ remove controls with the exact matrix the write lanes re-check.
+
+**D4 — Audit (full, moved).** Each write lane stores one `AccessAudit` row in
+the self-composed session, committing atomically with the write (C3).
+`TargetId = <parent id>`, `Outcome = AccessOutcome.Allow`, and `Via` from the
+D3 standing. The existing `TargetKind` constants are reused verbatim
+(`TargetKindTodo` = `"todo"`, `TargetKindBoard` = `"board"`,
+`TargetKindProject` = `"project"`). The action strings are the ADR 0059
+`eventtranslation.*` idiom per entity: `todotranslation.add` / `.update` /
+`.remove` (Via `Owner` for creator, `Admin` for assignee / Translator /
+GlobalAdmin); `boardtranslation.add` / `.update` / `.remove` (Via `Owner` for
+creator, `Admin` for Translator / GlobalAdmin); `projecttranslation.add` /
+`.update` / `.remove` (same as board). The **read** lane writes **no** audit
+row. **No new `AccessAction`** is introduced.
+
+**D5 — The Web surface (full, moved).** `ProjectsController` gains **nine**
+thin POST lanes (3 entities × 3), all `[ValidateAntiForgeryToken]`:
+`POST /projects/todos/{id}/translations[/update|/remove]`,
+`POST /projects/boards/{id}/translations[/update|/remove]`,
+`POST /projects/projects/{id}/translations[/update|/remove]`. Each: an empty
+`id` → `NotFound()`; an unauthenticated caller → `ForbidResult`; a blank
+`languageCode` or a blank (title, body) pair → a shape error + redirect with
+**no** service write; a `KeyNotFoundException` → `NotFound()`; an
+`UnauthorizedAccessException` → `ForbidResult`; a success → `TempData["info"]`
++ redirect. The parent `GetAsync` precondition (C-M3·1) re-runs the row's read
+decision. **Display:** **Detail** — the detail view models carry the parent's
+translations + the enabled-language catalog (`LanguageOption`s with
+`HasTranslation`) + `CanTranslate` + `OriginalLanguageCode`; the title + body
+are wrapped in the ADR 0027 chip-swap markup (the to-do and board wrap their
+title + body in a single `data-td-group`; the project uses two groups —
+`"project-title"` / `"project-description"`); the authored-in variant is the
+first / default-visible one; the add / edit / remove controls are presented
+with the ADR 0082 idiom (the shared `⋮` action dropdown + Bootstrap modal).
+**ADR 0049** applies: when the viewer's current language has a translation,
+that variant is the default-visible one. **Feed** — per **ADR 0051**, each
+feed row shows the title / body in the viewer's current language when a
+translation exists, else the authored-in text. **Dependencies:**
+`ProjectsController` gains an optional `ITranslationProvider?` constructor
+parameter (last position, defaulting to `null`) + a private
+`SeedLanguageName(code)` helper + a `SeedLanguagePickerAsync()` mirror.
