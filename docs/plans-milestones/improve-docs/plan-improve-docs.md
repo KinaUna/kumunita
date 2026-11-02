@@ -1,0 +1,287 @@
+---
+id: plan-improve-docs
+title: "Plan: IMPROVE-DOCS — differentiate and link the documentation"
+tier: living
+kind: plan
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+lane: improve-docs
+related:
+  - docs/plans-milestones/done/improve/plan-improve.md
+  - docs/philosophy/START-HERE.md
+  - docs/philosophy/anti-patterns.md
+updated: 2026-11-02
+---
+
+# Plan: IMPROVE-DOCS — differentiate and link the documentation
+
+> **Abstract:** The second IMPROVE pass, docs first. The corpus (1 016 `.md`
+> files, ~249 k lines) is well *differentiated* but barely *linked*: 96 real
+> Markdown links in total, 978 files nobody links to, and the IMPROVE-lane
+> abstract/TL;DR gates grandfathered almost the whole baseline. This lane
+> (1) moves shipped-lane history to `docs/archive/`, (2) gives every doc YAML
+> front-matter + a `> **Abstract:**`, (3) splits the living docs by topic
+> behind per-audience entry pages, (4) caps ADRs at ~80 lines with rationale
+> moved to linked design docs, and (5) turns the gates from "don't grow" into
+> "shrink to zero". Units `D00`–`D14`; each is one small, self-documenting
+> commit (or a short series for the mechanical batches).
+>
+> **Read this if:** you are about to touch `docs/`, `README.md` or `AGENTS.md`,
+> or you are picking up the next `D`-unit. **Skip to:** [Units](#units).
+
+## Decisions already taken (2026-11-02)
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | How deep may this pass go? | **Full restructure** — living docs split, ADRs trimmed, design docs consolidated where it pays, history archived. |
+| 2 | Where does shipped-lane history live? | **`docs/archive/`** in this repo, references rewritten by script, a redirect map left behind. |
+| 3 | What is an ADR? | **A short decision record** (Status / Context / Decision / Consequences + front-matter), **~80-line cap**; longer rationale moves to the linked design doc. Patch-sized UI decisions stop getting new ADRs (they go in the lane's handoff notes). **ADR numbers are permanent** — the code cites them ~9 600 times. |
+| 4 | Header format | **YAML front-matter** (machine-readable) **+ a `> **Abstract:**` blockquote** (human-readable, the IMPROVE convention). |
+| 5 | How are living docs split? | **By topic, one fact in one place**, with **per-audience entry pages** that link into the topic docs. |
+
+Open decisions are asked one at a time, at the unit that needs them (marked
+**❓** below).
+
+## Why (evidence, collected 2026-11-02 at `61a3c7e`)
+
+| Measure | Value | Philosophy name |
+|---|---|---|
+| `.md` files / lines (excl. `wwwroot/lib`) | 1 016 / ~249 k | — |
+| …of which shipped-lane history (`plans-milestones/done/`) | 615 files | part sprawl (living + history mixed) |
+| Real Markdown links between docs | **96** | parts work, seams don't |
+| Files with **zero inbound** links | **978** | accidental integration (findable only by grep) |
+| Files with zero outbound links | 992 | — |
+| Broken relative links | 3 | silent coupling |
+| `docs/design/*.md` > 400 lines **without** an Abstract | **48 of 62** | signals without loops (gate `g` grandfathered them) |
+| Handoff notes > 600 lines without a TL;DR | **20** | same (gate `d` grandfathered them) |
+| `plan-*.md` > 600 lines without Abstract/TL;DR | 31 of 73 | — |
+| Living top-level docs with an abstract | **1 of 10** (`ARCHITECTURE.md`) | — |
+| ADRs by length: ≤80 / 81–150 / 151–300 / >300 | 102 / 57 / 102 / 21 | ADRs drifting into design docs |
+| ADR index rows vs files | 282 / 282 ✅ | (IMPROVE U01 held) |
+| Doc-path mentions of `plans-milestones/done/…` | 556 | — |
+| Code files mentioning `docs/…` paths | 46 (incl. `RepositoryInfo.cs` in-app links, `WhatsNew.cs`, tests reading the ADR index) | — |
+| `improve-check.ps1` wired into CI | **no** (manual) | signals without loops |
+
+The diagnosis in one line: **the parts are cheap, the linkage is rare** — the
+doc layer has every part it needs, and almost none of the seams are explicit.
+
+## Target shape
+
+```
+README.md                      front page: what, status, quickstart, "where to go next" (≤120 lines)
+AGENTS.md                      agent entry: the must-knows + links (≤120 lines; it is loaded every session)
+SECURITY.md                    GitHub-recognized vulnerability policy (the VDP), links to docs/security/
+docs/
+  README.md                    the docs map: tiers, conventions, entry pages
+  DOCS-CONVENTIONS.md          front-matter schema, tiers, abstract rule, ADR cap, linking rule
+  start/                       per-audience entry pages (links only, no facts)
+    resident.md  community-admin.md  platform-maintainer.md  developer.md  agent.md
+  architecture/                ARCHITECTURE.md split by section (hub stays at docs/ARCHITECTURE.md)
+  security/                    threat model, control map, open items, audit checklists C/D/P/R
+  ops/                         one runbook per procedure (provision, upgrade, backup, restore, …)
+  deploy/coolify/              the Coolify guide, one step per file + troubleshooting
+  dev/                         running locally, tests, CI cheatsheet, Razor doctrine, terminal/browser quirks
+  product/                     features, roadmap, deferred-by-design
+  philosophy/                  unchanged shape; front-matter + entry-page links
+  guides/                      user-guide conventions (in-app guide registry)
+  adr/                         short decision records, index generated from front-matter
+  design/                      living design references (current truth per subsystem)
+  archive/
+    README.md                  lane index: lane → design doc → ADRs → handoff
+    REDIRECTS.md               old path → new path (generated)
+    lanes/<lane>/…             former plans-milestones/done/<lane>/…
+tools/docs/                    docs-report, docs-check, link rewriter, front-matter stamper
+```
+
+### Front-matter schema (finalized in `D00`)
+
+```yaml
+---
+id: ops-backups                 # unique, stable; ADRs use adr-0242
+title: "Backups"
+tier: living | reference | archive
+kind: entry | guide | runbook | architecture | security | adr | design | plan | handoff | philosophy
+status: current | proposed | accepted | superseded | archived
+audiences: [resident, community-admin, platform-maintainer, developer, agent]
+related: [docs/adr/0004-data-persistence-and-schema-evolution.md]
+supersedes: []                  # ADRs / design docs
+superseded_by: []
+lane: m3b                       # where it came from, if anywhere
+updated: 2026-11-02
+---
+```
+
+The abstract rule: every doc over **60 lines** carries a `> **Abstract:**`
+in its first 15 lines (after the front-matter) answering *what is this*,
+*who is it for*, *when should I read the rest*. The TL;DR convention for
+handoff notes becomes the same rule (the name "Abstract" wins; existing
+`TL;DR` blocks are accepted as aliases).
+
+## Units
+
+Order rationale: **harness → move → stamp → split → trim → link → close.**
+The archive move goes early because it is mechanical and every later unit
+links to post-move paths; gates tighten last so no unit is blocked by
+a half-applied rule.
+
+### `D00` — Baseline, conventions, harness
+- Write `docs/DOCS-CONVENTIONS.md` (schema above, tiers, abstract rule,
+  ADR cap, "link, don't backtick" rule, "one fact, one place" rule).
+- Move the live tooling out of a `done/` folder: `improve-check.ps1` /
+  `improve-report.ps1` → `tools/docs/` (they would otherwise end up in the
+  archive in `D02`). Add `docs-report.ps1`: abstract and front-matter coverage,
+  inbound/outbound link counts, orphans, broken links, ADR length histogram.
+- Commit the baseline report next to this plan (the numbers above, script-reproduced).
+- // TODO ❓ wire `docs-check` into `.github/workflows/ci.yml` now (as
+  report-only) or only at `D14`?
+
+### `D01` — Docs map + per-audience entry pages
+- `docs/README.md` (the map) + `docs/start/{resident,community-admin,platform-maintainer,developer,agent}.md`.
+- Entry pages contain **links and one-line reasons only** — no facts — so
+  they cannot drift. They link to *current* paths and are updated by each
+  later unit as docs move (the entry pages are the seam this lane keeps green).
+- Resident / community-admin pages link to the in-app guide registry
+  (`docs/guides/CONVENTIONS.md`) and `philosophy/everyday-life.md` rather than
+  restating them.
+
+### `D02` — Archive move (scripted)
+- `git mv docs/plans-milestones/done/* docs/archive/lanes/` (keeps history/blame).
+- `tools/docs/rewrite-paths` rewrites the 556 doc references and the code
+  references; generates `docs/archive/REDIRECTS.md`.
+- **Code seams to check by hand:** `RepositoryInfo.cs` (in-app GitHub links —
+  a broken link here is a *resident-facing* bug), `WhatsNew.cs` (resident-facing
+  text that names doc paths), tests that read docs (e.g. `NavMoreFoldTests`
+  reads the ADR index), `Milestones.cs`.
+- `docs/plans-milestones/README.md` shrinks to the in-progress convention;
+  the done-lane conventions move to `docs/archive/README.md`.
+- // TODO ❓ leave one-line stub files at the old top-level lane folders for a
+  release, or rely on `REDIRECTS.md` alone?
+
+### `D03` — Archive tier: front-matter, abstracts, lane index
+- Stamp generated front-matter on all archived files (`tier: archive`,
+  `lane`, `kind` from filename pattern).
+- Abstracts for the 20 un-TL;DR'd handoff notes and 31 large unit plans
+  (batched, ~10 per commit; largest first: `m3b`, `pages`, `m11`, `esc`, `m10`, …).
+- `docs/archive/README.md`: one row per lane — milestone, one-line outcome,
+  design doc, ADRs, handoff note — **as real links**.
+
+### `D04` — Split `docs/OPS.md` → `docs/ops/`
+- One file per procedure (the 13 `###` sections map 1:1: provision, first
+  boot, upgrade, backups, restore, TLS, SMTP, monitoring, privacy operations,
+  hardening checklist, incident response, demo site, guide review) +
+  `environments.md` + `configuration-reference.md`.
+- `OPS.md` becomes the ops hub: abstract + table of procedures (when to use each).
+- Watch the "Upgrade" (150 lines) and "Hardening checklist" (90 lines) sections —
+  candidates to link to `docs/security/` instead of restating it.
+
+### `D05` — Split `docs/COOLIFY.md` → `docs/deploy/coolify/`
+- One file per numbered step (0 plan … 6 verify) + troubleshooting; step 5
+  "the app" (~310 lines) splits further by concern (env vars, volumes,
+  health checks, …).
+- Hub: an ordered checklist linking each step; the "switch to the runbook"
+  handoff becomes an explicit link into `docs/ops/`.
+
+### `D06` — Slim `AGENTS.md`
+- `AGENTS.md` is loaded into every agent session, so **its length is a
+  per-session cost**. Keep: start here, shape of the code, the one thing to
+  internalize, conventions, don't-pause rule, doc-sync rule — as short
+  paragraphs + links.
+- Move to `docs/dev/`: Razor verification doctrine, test-runner quirk, CI
+  known-failure cheatsheet, CI gates and pins, Postgres diagnostics, git
+  gotcha, browser quirk, terminal-command safety.
+- Re-check the `.github/copilot-instructions.md` de-duplication (IMPROVE U03 /
+  gate `c`) — the copilot file should *link* to the same `docs/dev/` pages.
+
+### `D07` — Slim `README.md`
+- Keep: what Kumunita is, status (one paragraph + link), principles (3 lines +
+  link to philosophy), quickstart, "where to go next" (→ `docs/start/`).
+- Move: Features (120 lines) → `docs/product/features.md`; Roadmap + Deferred
+  → `docs/product/roadmap.md` (link to `Milestones.cs`/`STATUS.md` as the
+  source of truth instead of restating it); Running → `docs/dev/running-locally.md`.
+
+### `D08` — Security docs → `docs/security/`
+- `SECURITY.md` split: why-first, trust boundaries, data classes, adversaries,
+  control map, decisions & open items — one file each.
+- `SECURITY-AUDIT.md` split: rules + cadence (hub), checklists C / D / P / R,
+  annual & trigger audits, audit log.
+- `SECURITY-VDP.md` → repo-root `SECURITY.md` (GitHub's recognized location
+  for the vulnerability policy); keep `/.well-known/security.txt` pointing at it.
+- Every control-map row links to the code seam and the ADR that decided it
+  (this is the prep for the later security/privacy integration pass).
+
+### `D09` — `ARCHITECTURE.md` → `docs/architecture/`
+- Keep the hub (it already has an abstract): philosophy link, stack, and a
+  map of sections.
+- Split the long sections: solution layout (~170 lines), identity & access
+  (~140), data model (~220), CQRS/Wolverine, localization, extension seams.
+- Fix the duplicate `## 9.` numbering (Localization / Testing).
+
+### `D10` — Design docs: living vs archived, abstracts, consolidation
+- // TODO ❓ the policy question for this unit: is a design doc the *current
+  truth* for its subsystem (kept up to date, `tier: reference`), or a
+  *snapshot of the lane that built it* (`tier: archive`, moves with the lane)?
+- Abstracts + front-matter for the 48 large docs without one.
+- Consolidation candidates (merge into one living reference, old files
+  become stubs or archive):
+  - `prod-hardening-f*.md` (18 files) → one hardening reference
+  - `m24` + `m33` storage metrics (+ history); `m13` + `m34` analytics (+ history)
+  - `events-calendar` + `events-calendar-dwm` + `m18` recurring events + `m4` events
+  - `rich-content` + `rich-editor` + `wysiwyg-editor` + `inline-editor`
+  - `m6` notifications + `m20` quiet times
+- Each design doc links forward to its ADRs and back to its archived lane.
+
+### `D11` — ADRs: front-matter, cap, rationale out
+- Stamp front-matter on all 282 (`status`, `supersedes`, `superseded_by`,
+  `related`, `design`). The ADR index becomes **generated** from front-matter
+  (the IMPROVE U01 gate stays, now trivially true).
+- Trim the **180 ADRs over 80 lines**, largest first (21 over 300 lines),
+  ~15 per commit: Decision and Consequences stay; Context shrinks to the
+  forces; options analysis, test lists and implementation notes move to the
+  linked design doc (or the archived handoff note if the design doc is archived).
+- New `docs/adr/TEMPLATE.md` and an "ADR or handoff note?" rule of thumb
+  (an ADR decides something a future change could get wrong; a copy/CSS
+  decision is a handoff-note line).
+
+### `D12` — Linking pass
+- Script: convert backtick mentions of existing doc paths and `ADR NNNN`
+  references *inside docs* into real relative links (code comments keep
+  `ADR NNNN` as is — the number is the stable key).
+- Fix the 3 broken links.
+- No generated "referenced by" sections (they churn every commit); the
+  generated indexes (ADR, archive lanes) carry the reverse direction.
+
+### `D13` — Philosophy folder fit-check
+- Light: front-matter, link the entry pages, verify `templates/` and
+  `examples/` are reachable, fix `templates/design-doc.md`'s broken link.
+- Check `adopting-fig.md` / `in-code.md` reflect the new doc conventions
+  (the docs *are* an integration seam the philosophy talks about).
+
+### `D14` — Gates and close
+- `tools/docs/docs-check.ps1` gates, with **baselines retired, not grandfathered**:
+  front-matter present on every doc; abstract on every doc over 60 lines;
+  ADR ≤ 80 lines; zero broken links; every living doc reachable from an
+  entry page (no living orphans); nothing new under `docs/archive/` except
+  at a lane close.
+- Wire into CI.
+- Close report: before/after table of the evidence metrics.
+- **Cold-read verification by a separate agent** that has not seen the work:
+  given five tasks (restore a backup, add an ADR, find why moderators can't
+  see private groups, onboard a new neighborhood, fix a Razor view), it must
+  reach the right doc from `docs/start/` in ≤3 hops, reading only abstracts
+  until the last hop.
+
+## Definition of done
+
+- Every metric in the evidence table moved in the right direction, reproduced by `docs-report`.
+- `README.md` and `AGENTS.md` ≤ 120 lines each; no living doc > 300 lines without being a hub.
+- Every doc has front-matter; every doc > 60 lines has an abstract.
+- No broken links; no living orphans; the gates run in CI.
+- The cold-read verification passes.
+
+## After this lane (not in scope)
+
+The same lens, applied in later lanes, one at a time: **code** (long
+functions and files → smaller units; the IMPROVE gates `a`, `e`, `f`),
+**security & privacy integration**, **UX per audience** (resident,
+community admin, platform maintainer), **integration for communities and
+society**, and **developer / agent experience** in the code itself.
