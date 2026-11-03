@@ -3,6 +3,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Query;
+using Kumunita.Core.Translations;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -68,6 +69,14 @@ public sealed class EventService : IEventService
     // existing test call sites keep compiling unchanged.
     private readonly Mentions.IMentionService? _mentions;
 
+    // C06 (ADR 0288) — the one shared translation-variant write lane. The events
+    // surface's add/update/remove translation methods are thin forwarders into
+    // this (the descriptor names the events quirks: author / Translator /
+    // GlobalAdmin standing via EventStandingPolicy, blank-title-normalize on
+    // Create, AuthorId/Created restamp on ApplyUpdate). The session is opened by
+    // the forwarder (the EventService owns its own write session, unlike PostService).
+    private readonly TranslationLane<Event, EventTranslation> _translationLane;
+
     public EventService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
         INotificationEmitter? notifications = null,
         Mentions.IMentionService? mentions = null)
@@ -77,6 +86,36 @@ public sealed class EventService : IEventService
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _notifications = notifications;
         _mentions = mentions;
+        _translationLane = new TranslationLane<Event, EventTranslation>(new TranslationDescriptor<Event, EventTranslation>
+        {
+            TargetKind = "event",
+            ActionPrefix = "eventtranslation",
+            Noun = "Event",
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Event e, object? _, string actorId, IReadOnlySet<string> actorRoles)
+                => EventStandingPolicy.ResolveTranslationStanding(e.AuthorId, actorId, actorRoles),
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Event>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<EventTranslation>()
+                .Where(t => t.EventId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new EventTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                EventId = id,
+                LanguageCode = lang,
+                Title = string.IsNullOrWhiteSpace(title) ? null : title,
+                Body = body,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (EventTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            {
+                row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+                row.Body = body;
+                row.AuthorId = actorId;
+                row.Created = now;
+            }
+        });
     }
 
     /// <summary>
@@ -1952,46 +1991,8 @@ public sealed class EventService : IEventService
         string eventId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(eventId))
-            throw new ArgumentException("An event id is required.", nameof(eventId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to translate.");
-
-        // Standing re-check (server-side, C3 single-source): author (Owner) OR
-        // Translator / GlobalAdmin (Admin). Events have no component-moderator
-        // standing (ADR 0054 §5).
-        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the event's author (or a Translator, or a GlobalAdmin) " +
-                "may add a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new EventTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            EventId = eventId,
-            LanguageCode = languageCode,
-            Title = string.IsNullOrWhiteSpace(title) ? null : title,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        session.Store(translation);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.add", "event", eventId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return translation;
+        return await _translationLane.AddAsync(session, eventId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IEventService.UpdateEventTranslationAsync"/>
@@ -2013,43 +2014,8 @@ public sealed class EventService : IEventService
         string eventId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(eventId))
-            throw new ArgumentException("An event id is required.", nameof(eventId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to edit.");
-
-        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the event's author (or a Translator, or a GlobalAdmin) " +
-                "may edit a translation of it.");
-
-        var row = await session.Query<EventTranslation>()
-            .Where(t => t.EventId == eventId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Event '{eventId}' has no translation for '{languageCode}'; nothing to edit.");
-
-        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-        row.Body = body;
-        row.AuthorId = actorId;
-        row.Created = DateTimeOffset.UtcNow;
-
-        session.Store(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.update", "event", eventId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return row;
+        return await _translationLane.UpdateAsync(session, eventId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IEventService.RemoveEventTranslationAsync"/>
@@ -2068,35 +2034,8 @@ public sealed class EventService : IEventService
         string eventId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(eventId))
-            throw new ArgumentException("An event id is required.", nameof(eventId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to remove.");
-
-        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the event's author (or a Translator, or a GlobalAdmin) " +
-                "may remove a translation of it.");
-
-        var row = await session.Query<EventTranslation>()
-            .Where(t => t.EventId == eventId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Event '{eventId}' has no translation for '{languageCode}'; nothing to remove.");
-
-        session.Delete(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.remove", "event", eventId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        await _translationLane.RemoveAsync(session, eventId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     // ─── U04 private helpers ───────────────────────────────────────────────
