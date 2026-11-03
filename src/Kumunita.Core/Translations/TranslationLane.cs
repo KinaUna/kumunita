@@ -92,7 +92,7 @@ public sealed record TranslationLane<TParent, TVar>
         string parentId,
         string languageCode,
         string? title,
-        string body,
+        string? body,
         string actorId,
         IReadOnlySet<string> actorRoles)
     {
@@ -100,8 +100,10 @@ public sealed record TranslationLane<TParent, TVar>
         if (string.IsNullOrEmpty(parentId)) throw new ArgumentException("A parent id is required.", nameof(parentId));
         if (string.IsNullOrWhiteSpace(languageCode))
             throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (_d.ValidateContent is null)
+            ValidateContentDefault(title, body);
+        else
+            _d.ValidateContent(title, body);
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(actorRoles);
 
@@ -118,6 +120,18 @@ public sealed record TranslationLane<TParent, TVar>
         session.Store(AccessAuditFactory.SingleTarget(actorId, _d.ActionPrefix + ".add", _d.TargetKind, parentId, via.Value));
         await session.SaveChangesAsync().ConfigureAwait(false);
         return row;
+    }
+
+    /// <summary>
+    /// The default content validation (applied when the descriptor does not
+    /// supply its own <see cref="TranslationDescriptor{TParent,TVar}.ValidateContent"/>):
+    /// at least one of <paramref name="title"/> or <paramref name="body"/> must
+    /// be non-blank — a translation with neither is not a translation.
+    /// </summary>
+    private static void ValidateContentDefault(string? title, string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
     }
 
     /// <summary>
@@ -140,7 +154,7 @@ public sealed record TranslationLane<TParent, TVar>
         string parentId,
         string languageCode,
         string? title,
-        string body,
+        string? body,
         string actorId,
         IReadOnlySet<string> actorRoles)
     {
@@ -148,8 +162,10 @@ public sealed record TranslationLane<TParent, TVar>
         if (string.IsNullOrEmpty(parentId)) throw new ArgumentException("A parent id is required.", nameof(parentId));
         if (string.IsNullOrWhiteSpace(languageCode))
             throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (_d.ValidateContent is null)
+            ValidateContentDefault(title, body);
+        else
+            _d.ValidateContent(title, body);
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(actorRoles);
 
@@ -291,11 +307,23 @@ public sealed record TranslationDescriptor<TParent, TVar>
     /// shape — its title/body normalization, its <c>Id</c> = <c>Guid.NewGuid().ToString("N")</c>).
     /// <paramref name="created"/> is the lane's <c>DateTimeOffset.UtcNow</c>.
     /// </summary>
-    public required Func<string, string, string?, string, string, DateTimeOffset, TVar> Create { get; init; }
+    public required Func<string, string, string?, string?, string, DateTimeOffset, TVar> Create { get; init; }
 
     /// <summary>
     /// Applies the update to an existing row (the surface's field writes + restamp quirk;
     /// <paramref name="now"/> is the lane's <c>DateTimeOffset.UtcNow</c>).
     /// </summary>
-    public required Action<TVar, string?, string, string, DateTimeOffset> ApplyUpdate { get; init; }
+    public required Action<TVar, string?, string?, string, DateTimeOffset> ApplyUpdate { get; init; }
+
+    /// <summary>
+    /// The surface's content validation for add/update (called by the lane before
+    /// the standing check; throws <see cref="ArgumentException"/> on a content
+    /// violation). When <c>null</c> (the default for the four surfaces with a
+    /// non-null <c>Body</c> — posts / events / announcements / pages), the lane
+    /// uses its built-in "a translation requires a non-empty body" check.
+    /// Surfaces with a different content contract (the projects family's
+    /// "a translation requires a title <i>or</i> a body", both nullable)
+    /// supply their own validation here.
+    /// </summary>
+    public Action<string?, string?>? ValidateContent { get; init; }
 }

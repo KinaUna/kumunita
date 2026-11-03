@@ -5,6 +5,7 @@ using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
+using Kumunita.Core.Translations;
 using Kumunita.Core.UserInfo;
 using Marten;
 using System.Linq.Expressions;
@@ -79,6 +80,18 @@ public sealed class ProjectService : IProjectService
     // so the existing test call sites keep compiling unchanged.
     private readonly Kumunita.Core.Mentions.IMentionService? _mentions;
 
+    // C06 (ADR 0288) — the one shared translation-variant write lane, one per
+    // parent type (TodoItem / KanbanBoard / Project). The 9 write methods
+    // (Add/Update/Remove × todo/board/project) are thin forwarders into these.
+    // The projects family's content contract differs from the four committed
+    // surfaces: title AND body are both nullable and the gate is "a translation
+    // requires a title OR a body" (not "a non-empty body") — supplied here via
+    // the descriptor's ValidateContent hook. Standing reads the parent's
+    // AuthorId (+ AssigneeId for a to-do) — no extra doc needed.
+    private readonly TranslationLane<TodoItem, TodoTranslation> _todoTranslationLane;
+    private readonly TranslationLane<KanbanBoard, BoardTranslation> _boardTranslationLane;
+    private readonly TranslationLane<Project, ProjectTranslation> _projectTranslationLane;
+
     public ProjectService(
         IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
         INotificationEmitter? notifications = null, ITranslationProvider? translator = null,
@@ -93,6 +106,109 @@ public sealed class ProjectService : IProjectService
         _localization = localization;
         _tags = tags;
         _mentions = mentions;
+        _todoTranslationLane = new TranslationLane<TodoItem, TodoTranslation>(new TranslationDescriptor<TodoItem, TodoTranslation>
+        {
+            TargetKind = TargetKindTodo,
+            ActionPrefix = "todotranslation",
+            Noun = "To-do",
+            ValidateContent = ProjectsTranslateContentOrBody,
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (TodoItem todo, object? _, string actorId, IReadOnlySet<string> actorRoles)
+                => ResolveTodoTranslationStanding(todo.AuthorId, todo.AssigneeId, actorId, actorRoles),
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<TodoItem>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<TodoTranslation>()
+                .Where(t => t.TodoItemId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new TodoTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                TodoItemId = id,
+                LanguageCode = lang,
+                Title = string.IsNullOrWhiteSpace(title) ? null : title,
+                Body = string.IsNullOrWhiteSpace(body) ? null : body,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (TodoTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
+            {
+                row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+                row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
+                row.AuthorId = actorId;
+                row.Created = now;
+            }
+        });
+        _boardTranslationLane = new TranslationLane<KanbanBoard, BoardTranslation>(new TranslationDescriptor<KanbanBoard, BoardTranslation>
+        {
+            TargetKind = TargetKindBoard,
+            ActionPrefix = "boardtranslation",
+            Noun = "Board",
+            ValidateContent = ProjectsTranslateContentOrBody,
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (KanbanBoard board, object? _, string actorId, IReadOnlySet<string> actorRoles)
+                => ResolveBoardTranslationStanding(board.AuthorId, actorId, actorRoles),
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<KanbanBoard>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<BoardTranslation>()
+                .Where(t => t.BoardId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new BoardTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                BoardId = id,
+                LanguageCode = lang,
+                Title = string.IsNullOrWhiteSpace(title) ? null : title,
+                Body = string.IsNullOrWhiteSpace(body) ? null : body,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (BoardTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
+            {
+                row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+                row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
+                row.AuthorId = actorId;
+                row.Created = now;
+            }
+        });
+        _projectTranslationLane = new TranslationLane<Project, ProjectTranslation>(new TranslationDescriptor<Project, ProjectTranslation>
+        {
+            TargetKind = TargetKindProject,
+            ActionPrefix = "projecttranslation",
+            Noun = "Project",
+            ValidateContent = ProjectsTranslateContentOrBody,
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Project project, object? _, string actorId, IReadOnlySet<string> actorRoles)
+                => ResolveProjectTranslationStanding(project.AuthorId, actorId, actorRoles),
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Project>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<ProjectTranslation>()
+                .Where(t => t.ProjectId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new ProjectTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ProjectId = id,
+                LanguageCode = lang,
+                Title = string.IsNullOrWhiteSpace(title) ? null : title,
+                Body = string.IsNullOrWhiteSpace(body) ? null : body,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (ProjectTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
+            {
+                row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+                row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
+                row.AuthorId = actorId;
+                row.Created = now;
+            }
+        });
+    }
+
+    // C06 (ADR 0288) — the projects-family content contract, shared by the
+    // todo / board / project descriptors: a translation requires a title OR a
+    // body (both are nullable — unlike the posts / events / announcements /
+    // pages surfaces, where a non-empty body is required).
+    private static void ProjectsTranslateContentOrBody(string? title, string? body)
+    {
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
     }
 
     // --- Sort (M26 U6) ---------------------------------------------------------
@@ -4057,42 +4173,8 @@ public sealed class ProjectService : IProjectService
         string todoItemId, string languageCode, string? title, string? body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(todoItemId))
-            throw new ArgumentException("A to-do id is required.", nameof(todoItemId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
-        if (todo is null)
-            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to translate.");
-
-        var via = ResolveTodoTranslationStanding(todo.AuthorId, todo.AssigneeId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the to-do's creator, its assignee, a Translator, or a GlobalAdmin " +
-                "may add a translation of it.");
-
-        var translation = new TodoTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            TodoItemId = todoItemId,
-            LanguageCode = languageCode,
-            Title = string.IsNullOrWhiteSpace(title) ? null : title,
-            Body = string.IsNullOrWhiteSpace(body) ? null : body,
-            AuthorId = actorId,
-            Created = DateTimeOffset.UtcNow
-        };
-
-        session.Store(translation);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "todotranslation.add", TargetKindTodo, todoItemId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return translation;
+        return await _todoTranslationLane.AddAsync(session, todoItemId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IProjectService.UpdateTodoTranslationAsync"/>
@@ -4100,43 +4182,8 @@ public sealed class ProjectService : IProjectService
         string todoItemId, string languageCode, string? title, string? body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(todoItemId))
-            throw new ArgumentException("A to-do id is required.", nameof(todoItemId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
-        if (string.IsNullOrWhiteSpace(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
-        if (todo is null)
-            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to edit.");
-
-        var via = ResolveTodoTranslationStanding(todo.AuthorId, todo.AssigneeId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the to-do's creator, its assignee, a Translator, or a GlobalAdmin " +
-                "may edit a translation of it.");
-
-        var row = await session.Query<TodoTranslation>()
-            .Where(t => t.TodoItemId == todoItemId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"To-do '{todoItemId}' has no translation for '{languageCode}'; nothing to edit.");
-
-        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-        row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
-        row.AuthorId = actorId;
-        row.Created = DateTimeOffset.UtcNow;
-
-        session.Store(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "todotranslation.update", TargetKindTodo, todoItemId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return row;
+        return await _todoTranslationLane.UpdateAsync(session, todoItemId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IProjectService.RemoveTodoTranslationAsync"/>
@@ -4144,35 +4191,8 @@ public sealed class ProjectService : IProjectService
         string todoItemId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(todoItemId))
-            throw new ArgumentException("A to-do id is required.", nameof(todoItemId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
-        if (todo is null)
-            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to remove.");
-
-        var via = ResolveTodoTranslationStanding(todo.AuthorId, todo.AssigneeId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the to-do's creator, its assignee, a Translator, or a GlobalAdmin " +
-                "may remove a translation of it.");
-
-        var row = await session.Query<TodoTranslation>()
-            .Where(t => t.TodoItemId == todoItemId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"To-do '{todoItemId}' has no translation for '{languageCode}'; nothing to remove.");
-
-        session.Delete(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "todotranslation.remove", TargetKindTodo, todoItemId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        await _todoTranslationLane.RemoveAsync(session, todoItemId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IProjectService.GetBoardTranslationsAsync"/>
@@ -4195,42 +4215,8 @@ public sealed class ProjectService : IProjectService
         string boardId, string languageCode, string? title, string? body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(boardId))
-            throw new ArgumentException("A board id is required.", nameof(boardId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
-        if (board is null)
-            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to translate.");
-
-        var via = ResolveBoardTranslationStanding(board.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the board's creator, a Translator, or a GlobalAdmin " +
-                "may add a translation of it.");
-
-        var translation = new BoardTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            BoardId = boardId,
-            LanguageCode = languageCode,
-            Title = string.IsNullOrWhiteSpace(title) ? null : title,
-            Body = string.IsNullOrWhiteSpace(body) ? null : body,
-            AuthorId = actorId,
-            Created = DateTimeOffset.UtcNow
-        };
-
-        session.Store(translation);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "boardtranslation.add", TargetKindBoard, boardId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return translation;
+        return await _boardTranslationLane.AddAsync(session, boardId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IProjectService.UpdateBoardTranslationAsync"/>
@@ -4238,43 +4224,8 @@ public sealed class ProjectService : IProjectService
         string boardId, string languageCode, string? title, string? body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(boardId))
-            throw new ArgumentException("A board id is required.", nameof(boardId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
-        if (board is null)
-            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to edit.");
-
-        var via = ResolveBoardTranslationStanding(board.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the board's creator, a Translator, or a GlobalAdmin " +
-                "may edit a translation of it.");
-
-        var row = await session.Query<BoardTranslation>()
-            .Where(t => t.BoardId == boardId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Board '{boardId}' has no translation for '{languageCode}'; nothing to edit.");
-
-        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-        row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
-        row.AuthorId = actorId;
-        row.Created = DateTimeOffset.UtcNow;
-
-        session.Store(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "boardtranslation.update", TargetKindBoard, boardId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return row;
+        return await _boardTranslationLane.UpdateAsync(session, boardId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IProjectService.RemoveBoardTranslationAsync"/>
@@ -4282,35 +4233,8 @@ public sealed class ProjectService : IProjectService
         string boardId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(boardId))
-            throw new ArgumentException("A board id is required.", nameof(boardId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
-        if (board is null)
-            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to remove.");
-
-        var via = ResolveBoardTranslationStanding(board.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the board's creator, a Translator, or a GlobalAdmin " +
-                "may remove a translation of it.");
-
-        var row = await session.Query<BoardTranslation>()
-            .Where(t => t.BoardId == boardId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Board '{boardId}' has no translation for '{languageCode}'; nothing to remove.");
-
-        session.Delete(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "boardtranslation.remove", TargetKindBoard, boardId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        await _boardTranslationLane.RemoveAsync(session, boardId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IProjectService.GetProjectTranslationsAsync"/>
@@ -4333,42 +4257,8 @@ public sealed class ProjectService : IProjectService
         string projectId, string languageCode, string? title, string? body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(projectId))
-            throw new ArgumentException("A project id is required.", nameof(projectId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
-        if (project is null)
-            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to translate.");
-
-        var via = ResolveProjectTranslationStanding(project.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the project's creator, a Translator, or a GlobalAdmin " +
-                "may add a translation of it.");
-
-        var translation = new ProjectTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            ProjectId = projectId,
-            LanguageCode = languageCode,
-            Title = string.IsNullOrWhiteSpace(title) ? null : title,
-            Body = string.IsNullOrWhiteSpace(body) ? null : body,
-            AuthorId = actorId,
-            Created = DateTimeOffset.UtcNow
-        };
-
-        session.Store(translation);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "projecttranslation.add", TargetKindProject, projectId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return translation;
+        return await _projectTranslationLane.AddAsync(session, projectId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IProjectService.UpdateProjectTranslationAsync"/>
@@ -4376,43 +4266,8 @@ public sealed class ProjectService : IProjectService
         string projectId, string languageCode, string? title, string? body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(projectId))
-            throw new ArgumentException("A project id is required.", nameof(projectId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
-        if (project is null)
-            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to edit.");
-
-        var via = ResolveProjectTranslationStanding(project.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the project's creator, a Translator, or a GlobalAdmin " +
-                "may edit a translation of it.");
-
-        var row = await session.Query<ProjectTranslation>()
-            .Where(t => t.ProjectId == projectId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Project '{projectId}' has no translation for '{languageCode}'; nothing to edit.");
-
-        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-        row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
-        row.AuthorId = actorId;
-        row.Created = DateTimeOffset.UtcNow;
-
-        session.Store(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "projecttranslation.update", TargetKindProject, projectId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return row;
+        return await _projectTranslationLane.UpdateAsync(session, projectId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IProjectService.RemoveProjectTranslationAsync"/>
@@ -4420,35 +4275,8 @@ public sealed class ProjectService : IProjectService
         string projectId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(projectId))
-            throw new ArgumentException("A project id is required.", nameof(projectId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
-        if (project is null)
-            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to remove.");
-
-        var via = ResolveProjectTranslationStanding(project.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the project's creator, a Translator, or a GlobalAdmin " +
-                "may remove a translation of it.");
-
-        var row = await session.Query<ProjectTranslation>()
-            .Where(t => t.ProjectId == projectId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Project '{projectId}' has no translation for '{languageCode}'; nothing to remove.");
-
-        session.Delete(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "projecttranslation.remove", TargetKindProject, projectId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        await _projectTranslationLane.RemoveAsync(session, projectId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     // --- Placement + reorder lanes (U06) — standing re-checked server-side ----
