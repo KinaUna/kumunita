@@ -3,7 +3,7 @@ id: plan-improve-docs
 title: "Plan: IMPROVE-DOCS — differentiate and link the documentation"
 tier: living
 kind: plan
-status: in-progress
+status: complete
 audiences: [developer, agent, platform-maintainer]
 lane: improve-docs
 related:
@@ -141,7 +141,7 @@ a half-applied rule.
 - `D11` — ✅ (commit `757413e3`, 2026-11-02)
 - `D12` — ✅ (commit `dc1dc91a`, 2026-11-02)
 - `D13` — ✅ (commit `badb2442`, 2026-11-02)
-- `D14` — not started
+- `D14` — ✅ (commit `319066be`, 2026-11-02)
 
 ### `D00` — Baseline, conventions, harness
 - Write [`docs/DOCS-CONVENTIONS.md`](../../DOCS-CONVENTIONS.md) (schema above, tiers, abstract rule,
@@ -595,6 +595,56 @@ a half-applied rule.
   see private groups, onboard a new neighborhood, fix a Razor view), it must
   reach the right doc from `docs/start/` in ≤3 hops, reading only abstracts
   until the last hop.
+- **Shipped 2026-11-02 (commit `319066be`):** the baselines are retired, not
+  grandfathered. The abstract window in `improve-check.ps1` /
+  `improve-report.ps1` now honors `DOCS-CONVENTIONS.md`'s "in its first 15
+  lines (after the front-matter)" — the 16 gate-`g` flags (and the 27 gate-`d`
+  entries) were a misread: those docs already carried a conformant
+  Abstract/TL;DR, the 12-line front-matter just pushed it past a window that
+  was (incorrectly) counting front-matter lines as body. The `gBaseline` /
+  `dBaseline` name lists are gone; the gates now fail on *any* violation with
+  no carve-out. `tools/docs/docs-check.ps1` landed (the CI-able close gate:
+  front-matter on every doc, Abstract on every non-ADR doc >60 lines, ADR
+  ≤250, zero broken links, no living orphans, archive frozen) and is wired
+  into `.github/workflows/ci.yml` as a dedicated `docs` job. The 5 docs still
+  without front-matter — [`README.md`](../../../README.md), [`AGENTS.md`](../../../AGENTS.md),
+  [`docs/STATUS.md`](../../STATUS.md), [`docs/adr/README.md`](../../adr/README.md),
+  [`docs/guides/CONVENTIONS.md`](../../guides/CONVENTIONS.md) — were stamped
+  (front-matter + Abstract; [`AGENTS.md`](../../../AGENTS.md) trimmed to stay ≤120
+  lines), and the 3 philosophy examples that crossed 60 lines after the
+  stamping gained an Abstract. **Before → after (evidence metrics, the D00
+  baseline → `docs-report.ps1`):**
+
+  | Measure | D00 baseline (2026-11-02 at `61a3c7e`) | after `D14` |
+  |---|---|---|
+  | `.md` files (excl. `wwwroot/lib`) | 1 016 | 1 089 (+73: the `D01`–`D10` hub/topic files + the `D14` stamping) |
+  | Real Markdown links between docs | **96** | **7 657** (+7 561: the `D12` linking pass + hub cross-refs) |
+  | Files with zero inbound links (orphans) | **978** | **484** (and **0** `tier:living` orphans — gate 5) |
+  | Broken relative links | 3 | **0** |
+  | Front-matter coverage | — (the schema was new in `D00`) | **1089 / 1089** (every doc) |
+  | `docs/design/*.md` >400 w/o Abstract (gate `g`) | **48 of 62** (U07 grandfathered) | **0** (baseline retired, all conform) |
+  | ADR length (≤250 / 251–400 / >400) | 251 / 33 / 1 | **285 / 0 / 0** |
+  | `improve-check.ps1` wired into CI | **no** (manual) | **yes** (the `docs` CI job + `ImproveCheck_Gate_Passes` test) |
+  | `improve-check.ps1` gate `g` | **RED** (16 beyond baseline) | **GREEN** (baseline-free) |
+
+  **Cold-read verification (5 tasks, ≤3 hops from `docs/start/`, abstracts
+  only until the last hop):** all **PASS** at **2 hops** each — restore a
+  backup → `start/platform-maintainer` → `docs/OPS.md` (hub) →
+  `docs/ops/restore.md`; add an ADR → `start/developer` →
+  `docs/adr/README.md` (index) → `docs/adr/TEMPLATE.md`; why moderators can't
+  see private groups → `start/community-admin` → `docs/adr/0010-private-groups.md`
+  (the entry page names the ADR in its own abstract); onboard a new
+  neighborhood → `start/platform-maintainer` → `docs/OPS.md` (hub) →
+  `docs/ops/provision.md`; fix a Razor view → `start/developer` →
+  `docs/dev/README.md` (hub) → `docs/dev/razor-verification.md`.
+  Verification: `pwsh tools/docs/docs-check.ps1` **exit 0** (all 6 gates green,
+  no baseline); `pwsh tools/docs/docs-report.ps1` broken links **0**,
+  front-matter **1089/1089**, ADR **285/0/0**; `pwsh tools/docs/improve-check.ps1`
+  **a–g all green** (d/g baseline-free); `dotnet build` **0 errors / 0
+  warnings**; `Kumunita.Web.Tests` **1249 passed / 0 failed**
+  (`ImproveCheck_Gate_Passes` now **GREEN** — gate `g` fixed);
+  `Kumunita.Core.Tests` **1682 passed / 0 failed / 2 pre-existing skips**
+  (exit 0).
 
 ## Definition of done
 
