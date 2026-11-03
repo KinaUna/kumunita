@@ -21,9 +21,10 @@
 #   (e) first-party .ts under src/Kumunita.Web/client/ over 800 lines
 #   (f) any .cshtml view over 800 lines
 #   (g) any docs/design/*.md over 400 lines without an "Abstract" in its first
-#       15 lines (added by U07, 2026-10-08 — the design-doc tier of the
-#       10-second "is this the right read" gate; the handoff-note TL;DR of
-#       gate (d) is the same convention at the handoff tier)
+#       15 lines after the front-matter (added by U07, 2026-10-08 — the
+#       design-doc tier of the 10-second "is this the right read" gate; the
+#       handoff-note TL;DR of gate (d) is the same convention at the handoff
+#       tier). Baselines retired in IMPROVE-DOCS D14.
 #
 # Baseline grandfathering (the plan's own words: "the gate allows the
 # current baseline (it does not force an immediate fix); it prevents the
@@ -31,7 +32,10 @@
 # already over the ceiling at U00 time* (collected 2026-10-08). A *new* file
 # crossing the ceiling — or a *baseline* file growing *past its own size* —
 # fails the close. When a U-unit retires a baseline entry, remove it from the
-# list in the same commit.
+# list in the same commit. Gates (d) and (g) are **baseline-free** as of
+# IMPROVE-DOCS D14 (2026-11-02) — the docs they measure have all been fixed,
+# so they fail on *any* violation with no grandfathering (the "retire the
+# baselines, don't grandfather them" close work).
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -69,6 +73,30 @@ function Rel([string]$path) {
 }
 
 function Lines([string]$path) { @((Get-Content -LiteralPath $path)).Count }
+
+# End-of-front-matter line (0-indexed) or -1 if the file has none. The abstract
+# window is counted *after* the front-matter (DOCS-CONVENTIONS.md: "in its
+# first 15 lines (after the front-matter)") — so the window starts on the line
+# after the closing `---`.
+function FmEnd([string]$path) {
+  $lines = @(Get-Content -LiteralPath $path)
+  if ($lines.Count -ge 2 -and $lines[0].Trim() -eq '---') {
+    for ($i = 1; $i -lt [Math]::Min($lines.Count, 40); $i++) { if ($lines[$i].Trim() -eq '---') { return $i } }
+  }
+  return -1
+}
+
+# True iff an Abstract/TL;DR blockquote sits within $window lines after the
+# front-matter (or after line 0 for front-matter-less files).
+function HasAbstract([string]$path, [int]$window) {
+  $lines = @(Get-Content -LiteralPath $path)
+  $fm = FmEnd $path
+  $start = if ($fm -ge 0) { $fm + 1 } else { 0 }
+  for ($j = $start; $j -lt $start + $window -and $j -lt $lines.Count; $j++) {
+    if ($lines[$j] -match '\bAbstract\b' -or $lines[$j] -match 'TL;DR') { return $true }
+  }
+  return $false
+}
 
 function Check([string]$gate, [string]$message, [bool]$cond) {
   if ($cond) {
@@ -357,54 +385,19 @@ if (Test-Path $dDir) {
   foreach ($f in $dFiles) {
     $n = Lines $f.FullName
     if ($n -le $dCeiling) { continue }
-    $first20 = Get-Content -LiteralPath $f.FullName -TotalCount 20
-    $hasTldr = @($first20 | Select-String -Pattern 'TL;DR').Count -gt 0
-    if (-not $hasTldr) { $dViolations.Add((Rel $f.FullName) + " (" + $n + " lines, no TL;DR in first 20 lines)") }
+    # The window is counted *after* the front-matter (the handoff notes gained
+    # front-matter in IMPROVE-DOCS D03); Abstract and TL;DR are aliases
+    # (DOCS-CONVENTIONS.md).
+    if (-not (HasAbstract $f.FullName 20)) { $dViolations.Add((Rel $f.FullName) + " (" + $n + " lines, no TL;DR/Abstract in first 20 lines after front-matter)") }
   }
 }
-# Baseline (U00 time): 23 files over 600 lines with no TL;DR — U02's job is to
-# add TL;DRs to the *8 largest*. The gate does NOT grandfather a count; it
-# fails on any *new* file crossing 600 without a TL;DR. The 23 baseline files
-# are grandfathered by *name*; when U02 (or any future unit) adds a TL;DR to
-# one, it drops out of the baseline naturally (it stops violating).
-$dBaseline = @(
-  'docs/archive/lanes/m3b/m3b-handoff-notes.md',
-  'docs/archive/lanes/pages/pages-handoff-notes.md',
-  'docs/archive/lanes/m11/m11-portability-handoff-notes.md',
-  'docs/archive/lanes/m10/m10-pwa-handoff-notes.md',
-  'docs/archive/lanes/file-attachments/file-attachments-handoff-notes.md',
-  'docs/archive/lanes/m4/m4-handoff-notes.md',
-  'docs/archive/lanes/m14/m14-events-projects-handoff-notes.md',
-  'docs/archive/lanes/media/media-file-storage-handoff-notes.md',
-  'docs/archive/lanes/rich-editor/rich-editor-handoff-notes.md',
-  'docs/archive/lanes/m13/m13-logging-analytics-handoff-notes.md',
-  'docs/archive/lanes/m9/m9-messaging-handoff-notes.md',
-  'docs/archive/lanes/m27/m27-handoff-notes.md',
-  'docs/archive/lanes/m15/m15-translation-bulk-handoff-notes.md',
-  'docs/archive/lanes/pl/pl-handoff-notes.md',
-  'docs/archive/lanes/m26/m26-handoff-notes.md',
-  'docs/archive/lanes/multilingual-ui/multilingual-ui-handoff-notes.md',
-  'docs/archive/lanes/site/site-handoff-notes.md',
-  'docs/archive/lanes/m16/m16-inventory-handoff-notes.md',
-  'docs/archive/lanes/group-posts/group-posts-handoff-notes.md',
-  'docs/archive/lanes/wysiwyg/wysiwyg-handoff-notes.md',
-  'docs/archive/lanes/m25/m25-handoff-notes.md',
-  'docs/archive/lanes/m20/m20-notification-quiet-times-handoff-notes.md',
-  'docs/archive/lanes/m1/m1-step-7-handoff-notes.md',
-  # Re-baselined 2026-10-25 (the prod-hardening close): these four lanes
-  # (M30, M34, ESC, prod-hardening) shipped after the U00/U02 baseline with
-  # over-600-line notes that carry no TL;DR in the first 20 lines — the same
-  # "new file beyond the baseline" case the mechanism exists for. A future
-  # unit adding a TL;DR to any of them drops it off the list naturally.
-  'docs/archive/lanes/m30/m30-handoff-notes.md',
-  'docs/archive/lanes/m34/m34-handoff-notes.md',
-  'docs/archive/lanes/esc/esc-handoff-notes.md',
-  'docs/archive/lanes/prod-hardening/hardening-handoff-notes.md'
-)
-# violation strings are "path (N lines, ...)" — compare on the path prefix
-$dNew = @($dViolations | Where-Object { $p = ($_ -split ' \(')[0]; $dBaseline -notcontains $p })
-Check "d" "handoff notes >600 lines without TL;DR (new beyond U02 baseline): $($dNew.Count)" ($dNew.Count -eq 0)
-foreach ($v in $dNew) { Write-Host "       - $v" }
+# Baseline retired (IMPROVE-DOCS D14, 2026-11-02): every archived handoff note
+# that is over the 600-line ceiling now carries an Abstract/TL;DR within the
+# window (verified by `docs-report`), so the U02 name-baseline is gone — the
+# gate fails on *any* file crossing the ceiling without the blockquote, no
+# grandfathering.
+Check "d" "handoff notes >600 lines without TL;DR/Abstract (no baseline): $($dViolations.Count)" ($dViolations.Count -eq 0)
+foreach ($v in $dViolations) { Write-Host "       - $v" }
 
 # =============================================================================
 # Gate (e) — first-party .ts under client/ over 800 lines
@@ -500,14 +493,11 @@ foreach ($v in $fNew) { Write-Host "       - $v" }
 # Gate (g) — design docs over 400 lines without an Abstract (U07, added 2026-10-08)
 # =============================================================================
 # Plan-improve.md §U07: any docs/design/*.md over 400 lines must carry a
-# "> **Abstract:**" blockquote in its first 15 lines — the 10-second "is this
-# the right read" gate at the design tier (the handoff-note TL;DR, gate (d),
-# at a different tier). The 5 largest (m13 / m3b / m18 / m20 / m5) are the
-# baseline U07 closed; the 38 remaining over-400-without-Abstract docs are
-# grandfathered by *name* (same pattern as gate (d) — U02's 23-note baseline).
-# When any future unit adds an Abstract to one, it drops out of the baseline
-# naturally (it stops violating). A *new* design doc over 400 without an
-# Abstract fails the close.
+# "> **Abstract:**" blockquote in its first 15 lines *after the front-matter*
+# (DOCS-CONVENTIONS.md) — the 10-second "is this the right read" gate at the
+# design tier (the handoff-note TL;DR, gate (d), at a different tier). No
+# baseline: every over-400 design doc carries the blockquote, so the gate
+# fails on any that does not (retired in IMPROVE-DOCS D14).
 $gCeiling = 400
 $gDir = Join-Path $repo 'docs/design'
 $gViolations = [System.Collections.Generic.List[string]]::new()
@@ -516,74 +506,20 @@ if (Test-Path $gDir) {
   foreach ($f in $gFiles) {
     $n = Lines $f.FullName
     if ($n -le $gCeiling) { continue }
-    $first15 = Get-Content -LiteralPath $f.FullName -TotalCount 15
-    $hasAbstract = @($first15 | Select-String -Pattern 'Abstract').Count -gt 0
-    if (-not $hasAbstract) { $gViolations.Add((Rel $f.FullName) + " (" + $n + " lines, no Abstract in first 15 lines)") }
+    # The window is counted *after* the front-matter (DOCS-CONVENTIONS.md:
+    # "in its first 15 lines (after the front-matter)") — every design doc
+    # over the ceiling carries its Abstract within that window.
+    if (-not (HasAbstract $f.FullName 15)) { $gViolations.Add((Rel $f.FullName) + " (" + $n + " lines, no Abstract in first 15 lines after front-matter)") }
   }
 }
-# Baseline (U07 time, 2026-10-08): the 38 over-400 design docs without an
-# Abstract (the U00-time set of 43, minus the 5 largest U07 closed: m13, m3b,
-# m18, m20, m5 — those now pass and are not listed here).
-$gBaseline = @(
-  'docs/design/events-calendar-design.md',
-  'docs/design/events-calendar-dwm-design.md',
-  'docs/design/file-attachments-design.md',
-  'docs/design/group-posts-design.md',
-  'docs/design/guardian-assignment-design.md',
-  'docs/design/guardian-controls-design.md',
-  'docs/design/m10-pwa-responsive-design.md',
-  'docs/design/m11-portability-design.md',
-  'docs/design/m12-ical-design.md',
-  'docs/design/m14-events-projects-design.md',
-  'docs/design/m15-translation-bulk-design.md',
-  'docs/design/m16-inventory-design.md',
-  'docs/design/m17-bookmarks-design.md',
-  'docs/design/m19-guest-accounts-design.md',
-  'docs/design/m2-directory-profiles-groups.md',
-  'docs/design/m21-document-management-design.md',
-  'docs/design/m22-onboarding-design.md',
-  'docs/design/m23-extended-profiles-design.md',
-  'docs/design/m24-storage-metrics-design.md',
-  'docs/design/m25-upload-limits-design.md',
-  'docs/design/m26-sorting-design.md',
-  'docs/design/m27-user-scoped-portability-design.md',
-  'docs/design/m28-guardian-time-limits-design.md',
-  'docs/design/m3-posts-design.md',
-  'docs/design/m4-events-design.md',
-  'docs/design/m6-notifications-design.md',
-  'docs/design/m7-pagination-filtering-design.md',
-  'docs/design/m8-search-design.md',
-  'docs/design/m9-messaging-design.md',
-  'docs/design/media-file-storage-design.md',
-  'docs/design/multilingual-design.md',
-  'docs/design/pages-design.md',
-  'docs/design/pl-goals-projects-design.md',
-  'docs/design/rich-content-design.md',
-  'docs/design/site-content-design.md',
-  'docs/design/tags-design.md',
-  'docs/design/tbd-todo-dependency-design.md',
-  'docs/design/wysiwyg-editor-design.md',
-  # Re-baselined 2026-10-25 (the prod-hardening close): the M30 + M37 design
-  # docs and the eight prod-hardening per-fix design docs (F3/F5/F9/F10/F11/
-  # F12/F16/F17) shipped after the U07 baseline, over-400 lines, without the
-  # "> **Abstract:**" blockquote — the same "new file beyond the baseline"
-  # case the mechanism exists for. A future unit adding an Abstract to any
-  # of them drops it off the list naturally.
-  'docs/design/m30-admin-onboarding-design.md',
-  'docs/design/m37-personal-notes-design.md',
-  'docs/design/prod-hardening-f3-mfa.md',
-  'docs/design/prod-hardening-f5-sessions.md',
-  'docs/design/prod-hardening-f9-signup.md',
-  'docs/design/prod-hardening-f10-errtrack.md',
-  'docs/design/prod-hardening-f11-dlq-alert.md',
-  'docs/design/prod-hardening-f12-alerts.md',
-  'docs/design/prod-hardening-f16-scan.md',
-  'docs/design/prod-hardening-f17-bounce.md'
-)
-# violation strings are "path (N lines, ...)" — compare on the path prefix
-$gNew = @($gViolations | Where-Object { $p = ($_ -split ' \(')[0]; $gBaseline -notcontains $p })
-Check "g" "design docs >400 lines without Abstract (new beyond U07 baseline): $($gNew.Count)" ($gNew.Count -eq 0)
-foreach ($v in $gNew) { Write-Host "       - $v" }
+# Baseline retired (IMPROVE-DOCS D14, 2026-11-02): every `docs/design/*.md`
+# over the 400-line ceiling now carries an Abstract within the 15-line window
+# *after* the front-matter (the 16 that were flagged at D12/D13 already had a
+# conformant Abstract — the window was just mis-reading front-matter lines as
+# body). The U07 name-baseline is gone: the gate fails on *any* over-400
+# design doc without the blockquote, no grandfathering.
+Check "g" "design docs >400 lines without Abstract (no baseline): $($gViolations.Count)" ($gViolations.Count -eq 0)
+foreach ($v in $gViolations) { Write-Host "       - $v" }
 
 # =============================================================================
 # Summary

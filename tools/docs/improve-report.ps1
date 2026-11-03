@@ -45,6 +45,26 @@ function Rel([string]$path) {
 }
 function Lines([string]$path) { @((Get-Content -LiteralPath $path)).Count }
 
+# True iff an Abstract/TL;DR blockquote sits within $window lines after the
+# front-matter (DOCS-CONVENTIONS.md: "in its first 15 lines (after the
+# front-matter)"); for front-matter-less files the window starts at line 0.
+function FmEnd([string]$path) {
+  $lines = @(Get-Content -LiteralPath $path)
+  if ($lines.Count -ge 2 -and $lines[0].Trim() -eq '---') {
+    for ($i = 1; $i -lt [Math]::Min($lines.Count, 40); $i++) { if ($lines[$i].Trim() -eq '---') { return $i } }
+  }
+  return -1
+}
+function HasAbstract([string]$path, [int]$window) {
+  $lines = @(Get-Content -LiteralPath $path)
+  $fm = FmEnd $path
+  $start = if ($fm -ge 0) { $fm + 1 } else { 0 }
+  for ($j = $start; $j -lt $start + $window -and $j -lt $lines.Count; $j++) {
+    if ($lines[$j] -match '\bAbstract\b' -or $lines[$j] -match 'TL;DR') { return $true }
+  }
+  return $false
+}
+
 Write-Host "IMPROVE report  (repo: $repo)"
 Write-Host ("-" * 78)
 
@@ -84,11 +104,11 @@ Write-Host ("  shared: {0}" -f $shared.Count)
 foreach ($s in $shared) { Write-Host "    - $s" }
 
 # --- 4. handoff TL;DR --------------------------------------------------------
-Write-Host "`n[4] handoff notes under done/ over 600 lines without a TL;DR in first 20 lines:"
+Write-Host "`n[4] handoff notes over 600 lines without a TL;DR/Abstract in first 20 lines after front-matter (baseline retired in D14):"
 $dDir = Join-Path $repo 'docs/archive/lanes'
 $d = Get-ChildItem -Path $dDir -Recurse -Filter '*-handoff-notes.md' -File |
-  ForEach-Object { $n = @((Get-Content $_.FullName)).Count; if ($n -gt 600) { [pscustomobject]@{ L=$n; F=(Rel $_.FullName); TLDR=@((Get-Content $_.FullName -TotalCount 20) | Select-String 'TL;DR').Count -gt 0 } } } |
-  Where-Object { -not $_.TLDR } |
+  ForEach-Object { $n = @((Get-Content $_.FullName)).Count; if ($n -gt 600) { [pscustomobject]@{ L=$n; F=(Rel $_.FullName); HAS=(HasAbstract $_.FullName 20) } } } |
+  Where-Object { -not $_.HAS } |
   Sort-Object L -Descending
 Write-Host ("  count: {0}" -f @($d).Count)
 foreach ($f in $d) { Write-Host ("    {0,5}  {1}" -f $f.L, $f.F) }
@@ -113,10 +133,10 @@ Write-Host ("  count: {0}" -f @($f).Count)
 foreach ($v in $f) { Write-Host ("    {0,5}  {1}" -f $v.L, $v.F) }
 
 # --- 7. design docs over 400 without an Abstract -----------------------------
-Write-Host "`n[7] docs/design/*.md over 400 lines without an Abstract in first 15 lines (U07 backlog):"
+Write-Host "`n[7] docs/design/*.md over 400 lines without an Abstract in first 15 lines after front-matter (baseline retired in D14):"
 $gDir = Join-Path $repo 'docs/design'
-$g = Get-ChildItem -Path $gDir -Filter '*.md' -File |
-  ForEach-Object { $n = @((Get-Content $_.FullName)).Count; if ($n -gt 400) { [pscustomobject]@{ L=$n; F=$_.Name; ABS=@((Get-Content $_.FullName -TotalCount 15) | Select-String 'Abstract').Count -gt 0 } } } |
+$g = Get-ChildItem -Path $gDir -Recurse -Filter '*.md' -File |
+  ForEach-Object { $n = @((Get-Content $_.FullName)).Count; if ($n -gt 400) { [pscustomobject]@{ L=$n; F=(Rel $_.FullName); ABS=(HasAbstract $_.FullName 15) } } } |
   Where-Object { -not $_.ABS } |
   Sort-Object L -Descending
 Write-Host ("  count: {0}" -f @($g).Count)

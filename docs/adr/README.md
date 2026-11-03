@@ -1,3 +1,24 @@
+---
+id: adr-index
+title: "Architecture Decision Records (index)"
+tier: reference
+kind: guide
+status: current
+audiences: [developer, agent, platform-maintainer]
+related:
+  - docs/adr/TEMPLATE.md
+  - docs/DOCS-CONVENTIONS.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the index of the 285 architecture decision records (ADRs) —
+> one row per ADR (number, title, status), generated from the ADRs'
+> front-matter. **Who is it for:** anyone finding or adding an ADR.
+> **When to read the rest:** before writing a new ADR (start from
+> [`TEMPLATE.md`](TEMPLATE.md)), or to locate the ADR that decided a specific
+> surface.
+>
+
 # Architecture Decision Records
 
 Lightweight records of significant technical decisions. Format: Status / Context /

@@ -1,3 +1,24 @@
+---
+id: status-detailed
+title: "Status (detailed)"
+tier: living
+kind: guide
+status: current
+audiences: [developer, agent, platform-maintainer]
+related:
+  - README.md
+  - docs/product/roadmap.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the detailed, milestone-by-milestone status narrative that
+> the README's `## Status` section points at — what has shipped, lane by
+> lane, with the ADR and design doc behind each. **Who is it for:** a developer
+> or agent who needs the shipped-surface history, or a maintainer verifying
+> what is done. **When to read the rest:** when a status question the README's
+> one-paragraph does not answer comes up.
+>
+
 # Status (detailed)
 
 The detailed status report referenced from the README's `## Status`

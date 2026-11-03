@@ -1,3 +1,24 @@
+---
+id: guides-conventions
+title: "User guides — conventions"
+tier: living
+kind: guide
+status: current
+audiences: [resident, community-admin, platform-maintainer]
+related:
+  - docs/adr/0057-user-guides-in-help-subtree-and-consistency-loop.md
+  - docs/philosophy/README.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the conventions for the resident-facing user guides — what a
+> guide is (and is not), the closed registry in the seeder's `GuidePages()`
+> arrays, and the twelve shipped guides mapped to their ADRs.
+> **Who is it for:** a developer or agent adding or editing a guide.
+> **When to read the rest:** before touching the guide registry or a
+> help-subtree page.
+>
+
 # User guides — conventions
 
 > **The lane:** `UG` (ADR [0057](../adr/0057-user-guides-in-help-subtree-and-consistency-loop.md)). The guides are resident-facing `Page` docs

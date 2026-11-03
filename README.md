@@ -1,3 +1,24 @@
+---
+id: kumunita-readme
+title: "Kumunita"
+tier: living
+kind: entry
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer, agent]
+related:
+  - docs/README.md
+  - docs/STATUS.md
+  - AGENTS.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the front page — what Kumunita is, its status, the five
+> principles, the tech stack, a quickstart, and "where to go next" (the
+> per-audience entry pages in `docs/start/`). **Who is it for:** anyone new to
+> the platform or the repo. **When to read the rest:** on your first look,
+> before choosing a door into the docs.
+>
+
 # Kumunita
 
 A self-hosted community platform for a single neighborhood. Residents can find

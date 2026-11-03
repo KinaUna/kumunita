@@ -11,6 +11,14 @@ related:
 updated: 2026-11-02
 ---
 
+> **Abstract:** the same three-shape example (differentiation / linkage /
+> what breaks) told with a road trip — the vehicle, route, schedule, stops and
+> people as the parts, the plan as the linkage, a great car on a great route
+> as the failure. **Who is it for:** readers who think in journeys and
+> logistics. **When to read the rest:** when the plain-language examples
+> didn't land and you'd rather think in trips.
+>
+
 # A Road Trip
 
 > Reach for this one if you think in journeys and logistics.
