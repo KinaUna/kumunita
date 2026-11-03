@@ -3,6 +3,7 @@ using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
+using Kumunita.Core.Translations;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -68,6 +69,15 @@ public sealed class PostService
     // `Mentions.MentionService` (composing the frozen `DirectoryService` read).
     private readonly Mentions.IMentionService? _mentions;
 
+    // ADR 0288 (IMPROVE-CODE C06) — the shared translation-variant write lane (a D6-legal
+    // `record` in the Translations module). The six post/reply write methods below are thin
+    // forwarders into these two lanes; the surface-specific data (standing matrix, the row's
+    // title/body shape, the reply's parent-post standing re-check) lives in the descriptor's
+    // functions, verbatim from the pre-C06 bodies. The read seams (Get*TranslationsAsync) stay
+    // here — their shape is surface-specific (the reply read is batched); the lane is the write seam.
+    private readonly TranslationLane<Post, PostTranslation> _postTranslationLane;
+    private readonly TranslationLane<PostReply, ReplyTranslation> _replyTranslationLane;
+
     public PostService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store,
         ITagService? tags = null,
         INotificationEmitter? notifications = null,
@@ -79,6 +89,57 @@ public sealed class PostService
         _tags = tags;
         _notifications = notifications;
         _mentions = mentions;
+
+        _postTranslationLane = new TranslationLane<Post, PostTranslation>(new TranslationDescriptor<Post, PostTranslation>
+        {
+            TargetKind = "post",
+            ActionPrefix = "posttranslation",
+            Noun = "Post",
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Post p, object? extra, string actorId, IReadOnlySet<string> actorRoles) =>
+                PostTranslationPolicy.ResolveTranslationStanding(p.GroupId.Length > 0, p.ComponentId, p.AuthorId, actorId, actorRoles),
+            LoadParent = (session, id) => session.LoadAsync<Post>(id),
+            Find = (session, id, lang) => session.Query<PostTranslation>().Where(t => t.PostId == id && t.LanguageCode == lang).FirstOrDefaultAsync(),
+            Create = (id, lang, title, body, actor, created) => new PostTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"), PostId = id, LanguageCode = lang,
+                Title = title, Body = body, AuthorId = actor, Created = created,
+            },
+            ApplyUpdate = (row, title, body, _, _) =>
+            {
+                row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+                row.Body = body;
+            },
+        });
+
+        _replyTranslationLane = new TranslationLane<PostReply, ReplyTranslation>(new TranslationDescriptor<PostReply, ReplyTranslation>
+        {
+            TargetKind = "reply",
+            ActionPrefix = "replytranslation",
+            Noun = "Reply",
+            LoadStandingExtra = async (IDocumentSession session, PostReply reply) =>
+            {
+                var parent = await session.LoadAsync<Post>(reply.PostId);
+                if (parent is null)
+                    throw new KeyNotFoundException($"Reply '{reply.Id}' has no parent post; nothing to translate.");
+                return (object)parent;
+            },
+            ResolveStanding = (PostReply reply, object? extra, string actorId, IReadOnlySet<string> actorRoles) =>
+            {
+                // The reply itself has no component (C-M3·1) — its standing reads the parent
+                // post's group/component scope and the reply's own AuthorId.
+                var parent = (Post)extra!;
+                return PostTranslationPolicy.ResolveTranslationStanding(
+                    parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
+            },
+            LoadParent = (session, id) => session.LoadAsync<PostReply>(id),
+            Find = (session, id, lang) => session.Query<ReplyTranslation>().Where(t => t.ReplyId == id && t.LanguageCode == lang).FirstOrDefaultAsync(),
+            Create = (id, lang, _, body, actor, created) => new ReplyTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"), ReplyId = id, Body = body, AuthorId = actor, Created = created,
+            },
+            ApplyUpdate = (row, _, body, _, _) => { row.Body = body; },
+        });
     }
 
     /// <summary>
@@ -1722,7 +1783,7 @@ public sealed class PostService
     /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
     /// <exception cref="UnauthorizedAccessException">The actor holds none of the
     /// author / GlobalAdmin / (community) component-moderator standings.</exception>
-    public async Task<PostTranslation> AddPostTranslationAsync(
+    public Task<PostTranslation> AddPostTranslationAsync(
         string postId,
         string languageCode,
         string? title,
@@ -1730,61 +1791,7 @@ public sealed class PostService
         string actorId,
         IReadOnlySet<string> actorRoles,
         IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to translate.");
-
-        var via = ResolveTranslationStanding(
-            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the post's author (or a moderator of the community, or an admin) " +
-                "may add a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new PostTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            PostId = postId,
-            LanguageCode = languageCode,
-            Title = title,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        // Audit row (ADR 0022 write-lane, the ModerationService.FileReportAsync
-        // precedent — a hand-written audit row with no CanAsync decision call):
-        // the Via tag records the standing the actor used (Owner / Moderator /
-        // Admin).
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "posttranslation.add",
-            TargetKind = "post",
-            TargetId = postId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
-    }
+        => _postTranslationLane.AddAsync(session, postId, languageCode, title, body, actorId, actorRoles);
 
     /// <summary>
     /// Adds a **user-added translation** of a reply in the **caller's** in-flight
@@ -1809,70 +1816,14 @@ public sealed class PostService
     /// is not found.</exception>
     /// <exception cref="UnauthorizedAccessException">The actor holds none of the
     /// author / GlobalAdmin / (community) component-moderator standings.</exception>
-    public async Task<ReplyTranslation> AddReplyTranslationAsync(
+    public Task<ReplyTranslation> AddReplyTranslationAsync(
         string replyId,
         string languageCode,
         string body,
         string actorId,
         IReadOnlySet<string> actorRoles,
         IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
-        if (reply is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to translate.");
-
-        // Standing mirrors the parent post's lane (community vs group) and the
-        // parent post's component scope — the reply itself has no component
-        // (C-M3·1), so the scope comes from the parent.
-        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
-        if (parent is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to translate.");
-
-        var via = ResolveTranslationStanding(
-            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the reply's author (or a moderator of the community, or an admin) " +
-                "may add a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new ReplyTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            ReplyId = replyId,
-            LanguageCode = languageCode,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "replytranslation.add",
-            TargetKind = "reply",
-            TargetId = replyId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
-    }
+        => _replyTranslationLane.AddAsync(session, replyId, languageCode, null, body, actorId, actorRoles);
 
     // ─── ADR 0048 — edit + delete lane for post/reply translations ───────
     // The ADR 0022 write lane was add-only (one row per (parent, language)
@@ -1919,60 +1870,10 @@ public sealed class PostService
     /// already have a row). One <c>SaveChangesAsync</c>.
     /// </para>
     /// </summary>
-    public async Task<PostTranslation> UpdatePostTranslationAsync(
+    public Task<PostTranslation> UpdatePostTranslationAsync(
         string postId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to update.");
-
-        var row = await session.Query<PostTranslation>()
-            .Where(t => t.PostId == postId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Post '{postId}' has no translation in '{languageCode}'; nothing to update.");
-
-        var via = ResolveTranslationStanding(
-            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the post's author (or a moderator of the community, or an admin) " +
-                "may edit a translation of it.");
-
-        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-        row.Body = body;
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "posttranslation.update",
-            TargetKind = "post",
-            TargetId = postId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
-    }
+        => _postTranslationLane.UpdateAsync(session, postId, languageCode, title, body, actorId, actorRoles);
 
     /// <summary>
     /// **Removes** the existing <see cref="PostTranslation"/> row for
@@ -1988,54 +1889,10 @@ public sealed class PostService
     /// error for this route — the Web layer offers the delete affordance
     /// only for languages that have a row). One <c>SaveChangesAsync</c>.
     /// </summary>
-    public async Task RemovePostTranslationAsync(
+    public Task RemovePostTranslationAsync(
         string postId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to remove.");
-
-        var row = await session.Query<PostTranslation>()
-            .Where(t => t.PostId == postId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Post '{postId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        var via = ResolveTranslationStanding(
-            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the post's author (or a moderator of the community, or an admin) " +
-                "may remove a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "posttranslation.remove",
-            TargetKind = "post",
-            TargetId = postId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-    }
+        => _postTranslationLane.RemoveAsync(session, postId, languageCode, actorId, actorRoles);
 
     /// <summary>
     /// **Updates** the existing <see cref="ReplyTranslation"/> row for
@@ -2049,63 +1906,10 @@ public sealed class PostService
     /// (ReplyId, LanguageCode) row is a
     /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
     /// </summary>
-    public async Task<ReplyTranslation> UpdateReplyTranslationAsync(
+    public Task<ReplyTranslation> UpdateReplyTranslationAsync(
         string replyId, string languageCode, string body,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
-        if (reply is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to update.");
-
-        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
-        if (parent is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to update.");
-
-        var row = await session.Query<ReplyTranslation>()
-            .Where(t => t.ReplyId == replyId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Reply '{replyId}' has no translation in '{languageCode}'; nothing to update.");
-
-        var via = ResolveTranslationStanding(
-            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the reply's author (or a moderator of the community, or an admin) " +
-                "may edit a translation of it.");
-
-        row.Body = body;
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "replytranslation.update",
-            TargetKind = "reply",
-            TargetId = replyId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
-    }
+        => _replyTranslationLane.UpdateAsync(session, replyId, languageCode, null, body, actorId, actorRoles);
 
     /// <summary>
     /// **Removes** the existing <see cref="ReplyTranslation"/> row for
@@ -2119,58 +1923,10 @@ public sealed class PostService
     /// row is a <see cref="KeyNotFoundException"/>. One
     /// <c>SaveChangesAsync</c>.
     /// </summary>
-    public async Task RemoveReplyTranslationAsync(
+    public Task RemoveReplyTranslationAsync(
         string replyId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
-        if (reply is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to remove.");
-
-        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
-        if (parent is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to remove.");
-
-        var row = await session.Query<ReplyTranslation>()
-            .Where(t => t.ReplyId == replyId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Reply '{replyId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        var via = ResolveTranslationStanding(
-            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the reply's author (or a moderator of the community, or an admin) " +
-                "may remove a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "replytranslation.remove",
-            TargetKind = "reply",
-            TargetId = replyId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-    }
+        => _replyTranslationLane.RemoveAsync(session, replyId, languageCode, actorId, actorRoles);
 
     /// <summary>
     /// The public ADR 0022 standing probe the Web layer calls to decide whether
@@ -2187,21 +1943,6 @@ public sealed class PostService
     public static bool CanAddTranslation(
         bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)
         => PostTranslationPolicy.CanAddTranslation(isGroupLane, componentId, rowAuthorId, actorId, actorRoles);
-
-    /// <summary>
-    /// The ADR 0022 translation standing resolver (shared by
-    /// <see cref="AddPostTranslationAsync"/> /
-    /// <see cref="AddReplyTranslationAsync"/> write lanes and
-    /// <see cref="CanAddTranslation"/>). C04: the rule moved to
-    /// <see cref="PostTranslationPolicy.ResolveTranslationStanding"/> — a thin
-    /// forwarder here keeps the write lanes' single source of truth
-    /// (<c>AccessVia.Owner</c> / <c>AccessVia.Admin</c> /
-    /// <c>AccessVia.Moderator</c>); the group lane has no
-    /// component-moderator standing (ADR 0007).
-    /// </summary>
-    private static AccessVia? ResolveTranslationStanding(
-        bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-        => PostTranslationPolicy.ResolveTranslationStanding(isGroupLane, componentId, rowAuthorId, actorId, actorRoles);
 
     /// <summary>
     /// <b>Reverse-lookup</b> read seam (RC U03, R·5): the first post (by

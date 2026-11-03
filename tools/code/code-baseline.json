@@ -28,7 +28,7 @@
     },
     {
       "id": "src/Kumunita.Core/Events/EventService.cs",
-      "max": 1064
+      "max": 1038
     },
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs",
@@ -48,11 +48,11 @@
     },
     {
       "id": "src/Kumunita.Core/Posts/PostService.cs",
-      "max": 1047
+      "max": 821
     },
     {
       "id": "src/Kumunita.Core/Projects/ProjectService.cs",
-      "max": 2494
+      "max": 2443
     },
     {
       "id": "src/Kumunita.Core/Tags/TagService.cs",
@@ -2257,12 +2257,6 @@
     {
       "from": "Posts",
       "to": "Authorization",
-      "symbol": "AccessAudit",
-      "count": 1
-    },
-    {
-      "from": "Posts",
-      "to": "Authorization",
       "symbol": "Audience",
       "count": 4
     },
@@ -2715,6 +2709,13 @@
       "to": "UserInfo",
       "symbol": "ProfileToAuditableResource",
       "count": 1
+    },
+    {
+      "from": "Translations",
+      "to": "Authorization",
+      "symbol": "AccessAuditFactory",
+      "count": 1,
+      "adr": "0288"
     },
     {
       "from": "Usage",
