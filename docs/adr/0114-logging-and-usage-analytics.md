@@ -1,29 +1,15 @@
-# ADR 0114 — M13: Logging and usage analytics
-
-Status: Accepted
-Date: 2026-09-28
-
-The **operator's feedback loop**, operator-local in two halves. The
-**logging half**: the host's logs land in dated files under a configurable
-directory (a BCL-only, hand-rolled file sink with daily rotation + a
-pinned day-count retention deleted at boot), the console sink
-(`docker logs`) unchanged. The **analytics half**: one `UsageEvent`
-document captured by a thin middleware (route **template** +
-`ActorId`-or-empty + `At`, nothing else — C-M13·2), aggregated by a Core
-service over a **pinned 7/30/90-day window**, rendered on one new
-GlobalAdmin-gated admin section (`/admin/analytics`) with a CSV export
-(`/admin/analytics/export`) — **no per-account data rendered anywhere**
-(C-M13·3) and **no third-party telemetry of any kind** (C-M13·1,
-SECURITY.md §5). Additive on ADR 0004 §B.1 (the `UsageDocTypes`
-parallel-surface shape), ADR 0006 (zero new authorization surface),
-ADR 0015 (the `kw-l` registry), ADR 0031 (the tsc-only discipline — no
-new JS in M13), ADR 0108 (the `AccessAudit` export-row precedent),
-ADR 0091 (the `tsvector` deferred lane — unaffected), ADR 0105 (the
-GlobalAdmin gate shape), and the `AuditPurgeService` / `AuditPurgeHandler`
-/ `AuditPurgeTick` shape (D5 verbatim). This ADR gives the operator
-**their feedback loop back**: the platform tells them how it is used,
-the logs survive the console buffer, and the privacy boundary (C-M13·1/2/3)
-is enforced by pins, not by discipline.
+---
+id: adr-0114
+title: "M13: Logging and usage analytics"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/analytics-subsystem.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -70,7 +56,7 @@ record, calls `Decide`, and on a `Record` decision writes one
 500). The two skip rules: no endpoint ⇒ skip (a true 404); static file
 ⇒ skip (noise). The `UsageEvent` is a **new** document on a **new**
 `UsageDocTypes` surface (the `PostDocTypes` / `ProjectDocTypes` precedent — one
-`*DocTypes.Configure(opts)` call per bounded context, ADR 0004 §B.1).
+`*DocTypes.Configure(opts)` call per bounded context, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).
 
 **D2 — A closed `SurfaceKey` list (26 top-level segments + `"other"`
 fallback).** The `SurfaceKey` pure static class maps the
@@ -95,13 +81,13 @@ the `UsageEvent` row is not an auditable resource). The
 
 **D4 — One GlobalAdmin-gated controller + view + CSV export.**
 `AdminAnalyticsController` (`[Authorize(Roles = Roles.GlobalAdmin)]`, the
-`AdminController` shape verbatim — the ADR 0105 "the gate is the role"
+`AdminController` shape verbatim — the ADR [0105](0105-messaging.md) "the gate is the role"
 posture): `GET /admin/analytics?window=7|30|90` (default 30) →
 `AnalyticsViewModel` → `Views/AdminAnalytics/Index.cshtml`; `GET
 /admin/analytics/export?window=7|30|90` → CSV + **exactly one
 `AccessAudit` row** (`TargetKind == "analytics"`, `Action ==
 "analytics.export"`, `ActorId == the current user's ClaimTypes.Subject`,
-`Via = AccessVia.Admin`, `Outcome = AccessOutcome.Allow` — the ADR 0108
+`Via = AccessVia.Admin`, `Outcome = AccessOutcome.Allow` — the ADR [0108](0108-portability-import-export.md)
 "portability.export" precedent verbatim). Ten `admin.analytics_*` `kw-l`
 keys × en/de/fr/da (the `KnownTranslationKeys_ParityTests` pin).
 
@@ -145,8 +131,8 @@ the Web pins are NSubstitute + a minimal `WebApplication` host (no
 Postgres). The three acceptance tests (§gate) are recorded by U06, not
 implemented as unit pins.
 
-**D8 — The U07 docs flip: `Milestones.cs` / `README.md` / `STATUS.md` /
-`ARCHITECTURE.md` / `MilestonesTests.cs` re-pinned.** M13 → `StatusDone`,
+**D8 — The U07 docs flip: `Milestones.cs` / [`README.md`](../../README.md) / [`STATUS.md`](../STATUS.md) /
+[`ARCHITECTURE.md`](../ARCHITECTURE.md) / `MilestonesTests.cs` re-pinned.** M13 → `StatusDone`,
 M14 → `StatusNext`, in one unit (U07), `MilestonesTests` re-pinned to M14
 (the C-M11·8 precedent verbatim — the exact-order pin M0…M14 unchanged).
 
@@ -169,10 +155,10 @@ tick — `UsagePurgeService` (Core, static) + `UsagePurgeHandler` (Web) +
 **What M13 does not ship (out — each a named follow-on lane, own ADR):**
 
 - **Charts** (a `client/lib` TS module over the existing table) — a
-  `tsc`-only module, the ADR 0031 discipline; the admin page is a table +
+  `tsc`-only module, the ADR [0031](0031-wysiwyg-editor-and-toolbar.md) discipline; the admin page is a table +
   a count for M13. **Own lane**, own ADR.
 - **Per-account activity views** (a rendering of the `ActorId` column) —
-  the C-M13·3 boundary says no, and **stays no**, unless ADR 0114 is
+  the C-M13·3 boundary says no, and **stays no**, unless ADR [0114](0114-logging-and-usage-analytics.md) is
   **revisited** (a deliberate privacy decision). **Own lane**, own ADR.
 - **Per-request detail views** (the raw `UsageEvent` table rendered as a
   page) — the raw table is the operator's **psql** surface, not a
@@ -195,7 +181,7 @@ tick — `UsagePurgeService` (Core, static) + `UsagePurgeHandler` (Web) +
   created-at column (its only delta is `ExternalId`); a "new residents"
   count needs a new column or a different source. **Own lane**, own ADR.
 - **The `tsvector` full-text search upgrade** — M8's own deferred lane
-  (ADR 0091 D4); M13's aggregation is a `COUNT(*)` over a window, not a
+  (ADR [0091](0091-search.md) D4); M13's aggregation is a `COUNT(*)` over a window, not a
   text query — the `tsvector` lane is unaffected by M13. **Own lane**
   (M8's, already named).
 
@@ -219,29 +205,3 @@ tick — `UsagePurgeService` (Core, static) + `UsagePurgeHandler` (Web) +
   neighborhood-scale instance does not need sampling; the capture is one
   `UsageEvent` row per recognized request, and the operator's psql
   surface handles the volume.
-
-## Amendments
-
-### 2026-10-02 — D4 view path correction
-
-**View location.** The U05 deliverable placed the analytics view at
-`Views/Admin/Analytics.cshtml`, but the `AdminAnalyticsController` is
-its own controller class (the ADR 0062 section-split precedent, matching
-every other `Admin*Controller` in this codebase: `AdminDateFormat`,
-`AdminQuiet`, `AdminGuests`, `AdminSignup`, …). ASP.NET Core MVC's view
-lookup for `AdminAnalyticsController.Index` searches
-`Views/AdminAnalytics/Index.cshtml` then `Views/Shared/Index.cshtml`
-(the `/Views/{Controller}/{Action}.cshtml` + shared format) — neither of
-which existed at `Views/Admin/Analytics.cshtml`, so every request to
-`/admin/analytics` 500'd with `InvalidOperationException: The view
-'Index' was not found`.
-
-The view is relocated to `Views/AdminAnalytics/Index.cshtml` (the path
-MVC searches, and the convention every other section-split controller
-already follows), and the controller action uses plain `View(model)`
-as all its sibling controllers do. The `_AdminNav` partial — still
-housed in `Views/Admin/` — is referenced from the relocated view via
-the site-root-absolute form `~/Views/Admin/_AdminNav.cshtml` (the same
-idiom `Guardian/Index.cshtml` already uses for its cross-folder
-`~/Views/Locale/_SettingsTabs.cshtml` reference). All other decisions
-in this ADR are unchanged.

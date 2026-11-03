@@ -1,13 +1,26 @@
-# ADR 0066 — Event calendar color: an author-picked chip/block background
+---
+id: adr-0066
+title: "Event calendar color: an author-picked chip/block background"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0066](0066-event-calendar-color-lane.md) — Event calendar color: an author-picked chip/block background
 
 Status: Accepted
 Date: 2026-09-12
 
 ## Context
 
-The M4 event surface (ADR 0054) already carries two pure-display fields —
+The M4 event surface (ADR [0054](0054-events-rsvp-reminders.md)) already carries two pure-display fields —
 `Event.Location` and `Event.Capacity` — written verbatim, never consulted as
-a gate. The calendar (EV-CAL ADR 0063 Month chips, EV-DWM ADR 0064 Day/Week
+a gate. The calendar (EV-CAL ADR [0063](0063-events-calendar-view.md) Month chips, EV-DWM ADR [0064](0064-events-calendar-dwm-views.md) Day/Week
 blocks) renders every event in the same neutral tone, so a resident scanning
 a busy month cannot distinguish events at a glance.
 
@@ -45,7 +58,7 @@ RSVP to the event.
   this rule, so the amber clash signal still wins over a colored background.
 - **Marten needs nothing.** A new scalar `string?` property is picked up by
   Marten's boot-time delta detection (`EventDocTypes` unchanged) — no manual
-  migration, consistent with ADR 0004 §B's column-addition behavior.
+  migration, consistent with ADR [0004](0004-data-persistence-and-schema-evolution.md) §B's column-addition behavior.
 
 ## Consequences
 

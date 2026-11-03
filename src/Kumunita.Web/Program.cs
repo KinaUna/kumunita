@@ -334,8 +334,9 @@ var marten = builder.Services.AddMarten(opts =>
     // M35 (ADR 0164, U03): the Kiosk bounded context's singleton doc
     // (KioskPlaylist, ADR 0004 §B.1 additive — one row per instance,
     // Id = "kiosk", the SiteContent / LocaleSettings shape, ADR 0005 B /
-    // ADR 0150). The KioskView entry is a value object nested in the
-    // singleton (not a standalone doc — M35·9). Without this call the doc
+    // ADR 0150; per resident since the ADR 0164 amendment). The KioskEntry
+    // (ADR 0285) is a value object nested in the playlist (not a standalone
+    // doc — M35·9). Without this call the doc
     // is invisible to Marten and a pristine boot never creates the
     // mt_doc_kioskplaylist table (the SITE / M29 / M30 / ESC precedent).
     // KioskDocTypes lives in Kumunita.Core (like the other *DocTypes), so
@@ -502,6 +503,9 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<Kumunita.Web.Services.IEscalationForwarder, Kumunita.Web.Services.EscalationForwarder>();
 // ADR 0175 — the cached platform-default palette read by _Layout.
 builder.Services.AddSingleton<Kumunita.Web.Services.PlatformPaletteProvider>();
+// ADR 0285 — the kiosk playlist editor's item picker (composes the M8 search
+// surfaces + the component list; no access logic of its own).
+builder.Services.AddScoped<Kumunita.Web.Services.IKioskItemCatalog, Kumunita.Web.Services.KioskItemCatalog>();
 
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
@@ -975,7 +979,7 @@ builder.UseWolverine(opts =>
     // Per-type service-location opt-ins (Wolverine 6.x default is
     // ServiceLocationPolicy.NotAllowed; 5.x was AllowedButWarn — see
     // WolverineOptions.ServiceLocationPolicy XML doc + wolverine#2584). The
-    // three services below are registered in Kumunita.Core/DependencyInjection.cs
+    // four services below are registered in Kumunita.Core/DependencyInjection.cs
     // as opaque lambda factories (or, for IUserInfoService, the impl's ctor
     // takes IServiceProvider? as a circular-dependency escape hatch — see
     // UserInfoService.cs lines 57-71), so the generated handler code cannot
@@ -984,16 +988,20 @@ builder.UseWolverine(opts =>
     // when you have to" — is the surgical alternative to a global
     // ServiceLocationPolicy change: the strict default stays in force for every
     // future opaque service (which will still fail fast at first dispatch), but
-    // these three known-good services are allowed to be service-located.
+    // these four known-good services are allowed to be service-located.
     //
-    // The failing handlers (EventReminderTick, NotificationFlushTick) are the
-    // only two §6.4 jobs whose handler signatures cross into opaque-land — the
-    // other three (AuditPurgeTick / UsagePurgeTick / StorageMetricsCaptureTick)
-    // take only IDocumentStore + IOptions<T>, both transparent. See the app
-    // log: "InvalidServiceLocationException … ServiceLocationPolicy.NotAllowed
-    // is in effect" on the first dispatch of each.
+    // The §6.4 jobs whose handler signatures cross into opaque-land are
+    // EventReminderTick (IMailerStage), NotificationFlushTick (IMailerStage +
+    // IUserInfoService) and StorageMetricsCaptureTick (IStorageMetricsService —
+    // added in M33, commit 6132f7d0, when the handler signature gained the
+    // IStorageMetricsService param; the opt-in was missed then and the envelopes
+    // went to the error queue). AuditPurgeTick / UsagePurgeTick take only
+    // IDocumentStore + IOptions<T>, both transparent, so need no opt-in. See
+    // the app log: "InvalidServiceLocationException … ServiceLocationPolicy.
+    // NotAllowed is in effect" on the first dispatch of each.
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Identity.IMailerStage>();
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Notifications.NotificationService>();
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Usage.IStorageMetricsService>();
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.UserInfo.IUserInfoService>();
 });
 
@@ -1076,12 +1084,14 @@ app.Use(async (context, next) =>
     {
         context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000";
     }
-    // Permissions-Policy (SEC U26, L7): a restrictive default — every feature is
-    // explicitly disabled (no camera/mic/geolocation/payment/usb, no fullscreen,
-    // no web-share). The platform has no legitimate need for any of these, so the
-    // fail-closed list is the safe floor; opt a feature in only if a feature needs it.
+    // Permissions-Policy (SEC U26, L7): a restrictive default — camera/mic/
+    // geolocation/payment/usb/web-share are disabled. Fullscreen is opted in
+    // (self) because three surfaces use the Fullscreen API: the kiosk display
+    // (kiosk.ts), the events calendar (calendar-fullscreen.ts), and the
+    // projects board (projects-board.ts). (self) scopes it to the document
+    // itself, not to third-party iframes.
     context.Response.Headers["Permissions-Policy"] =
-        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(), picture-in-picture=(), web-share=()";
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self), picture-in-picture=(), web-share=()";
     await next();
 });
 

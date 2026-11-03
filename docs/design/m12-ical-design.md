@@ -1,4 +1,21 @@
+---
+id: design-m12-ical
+title: "M12 — iCal (calendar export)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0112-ical-calendar-export.md
+  - docs/adr/0044-tags.md
+  - docs/adr/0015-ui-view-localization-mechanics.md
+updated: 2026-11-02
+---
+
 # M12 — iCal (calendar export of visible events) — design
+
+> **Abstract:** the **iCal (calendar export)** design — the events a resident can already see become something their calendar app can subscribe to: a per-event file (`GET /events/{id}.ics`, one `VEVENT`) and a subscription feed (`GET /events.ics`). **Zero Core schema change**; the ICS is a pure function over already-authorized `Event` rows, and the **file never carries a decision**. **Who is it for:** a developer touching the `IcsWriter` or the ICS routes; an agent that needs the closed property set. **When to read the rest:** before touching the ICS writer, the two routes, or the property ceiling.
+
 
 > **Milestone M12.** A **resident-facing calendar world seam**: the events a
 > resident can already see on `/events` become something their calendar app
@@ -8,12 +25,12 @@
 > change** (C-M12·5): no document, no `*DocTypes` line, no migration, no
 > `AccessAction` / `AccessVia` / `IAuthorizationService.Decide()` branch, no
 > `Audience` — the read lanes route through the **frozen**
-> `IEventService` read seams (`GetAsync` / `ListUpcomingAsync`, ADR 0054),
+> `IEventService` read seams (`GetAsync` / `ListUpcomingAsync`, ADR [0054](../adr/0054-events-rsvp-reminders.md)),
 > and the ICS rendering is a **pure function over already-authorized
 > `Event` rows**. **Zero new dependency** (D1): the emitter is hand-written,
 > BCL-only (the M11 `System.IO.Compression` precedent).
 >
-> **Status.** **LOCKED.** The decisions D1–D8 are locked in **ADR 0112
+> **Status.** **LOCKED.** The decisions D1–D8 are locked in **ADR [0112](../adr/0112-ical-calendar-export.md)
 > (Accepted, 2026-09-28)**. The `[PROPOSED]` set in the register
 > `plan-m12-ical.md` was refined **in favor of the source** where the source
 > contradicted the prose (drift guard, entries 1–2 below): the frozen
@@ -26,19 +43,19 @@
 > the caller may already see. The authorization was done *before* the rows
 > reach the emitter; the emitter is pure. And the **emitted subset is
 > closed** (C-M12·4) — the emitter never emits a property it was not told to
-> (the WY·3 subset pin, ADR 0031), so a calendar app parses it without vendor
+> (the WY·3 subset pin, ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)), so a calendar app parses it without vendor
 > extensions or warnings.
 
 ## Context
 
-M4 shipped events (ADR 0054); EV-CAL / EV-DWM / EV-NW (ADR 0063 / 0064 /
+M4 shipped events (ADR [0054](../adr/0054-events-rsvp-reminders.md)); EV-CAL / EV-DWM / EV-NW (ADR [0063](../adr/0063-events-calendar-view.md) / 0064 /
 0081) shipped the in-app calendar (month-anchored overview, day/week/month
-views, quick-create); EV-PAST (ADR 0109) added the past-events option. But
+views, quick-create); EV-PAST (ADR [0109](../adr/0109-events-past-lane.md)) added the past-events option. But
 the residents' **actual calendar app** — the one they already check, that
 pushes reminders onto their phone — has no access to this platform.
 ARCHITECTURE.md's M12 row names the step precisely: **"outcome + world
 seams — events land in the calendars residents already check."** M11
-(ADR 0108) closed the *data* world seam (the `*.kumunita` archive out, and
+(ADR [0108](../adr/0108-portability-import-export.md)) closed the *data* world seam (the `*.kumunita` archive out, and
 back). M12 closes the *calendar* world seam: the events a resident can
 already see on `/events` become something their calendar client can
 subscribe to.
@@ -60,17 +77,17 @@ verified against source:
    `End` / `Color` / `GroupId` / `IsDraft` / `IsDeleted` / `TagIds` /
    `Audience` / `AuthorId` (the field set the D4 map covers; `Start` /
    `End` are stored UTC `DateTimeOffset`).
-3. **The `Tag` / `TagTranslation` display-name idiom** (ADR 0044) — the
+3. **The `Tag` / `TagTranslation` display-name idiom** (ADR [0044](../adr/0044-tags.md)) — the
    CATEGORIES resolution call, pinned verbatim in §field-map (D4).
 4. **The attachment-serve shape** (ADR 0034) — `AttachmentController.
    ServeFile`: `Response.Headers["Content-Disposition"] = "attachment;
    filename=\"…\""`, `Response.Headers["X-Content-Type-Options"] =
    "nosniff"`, `return File(stream, contentType)`. M12's serve shape copies
    this (D3).
-5. **The `kw-l` closed-key registry** (ADR 0015) + the
+5. **The `kw-l` closed-key registry** (ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) + the
    `KnownTranslationKeys_ParityTests` en/de/fr/da parity pins — the two new
    affordance keys join it (D5).
-6. **The M6 notification-link lane** (ADR 0085) — the ADR 0085 / 0095
+6. **The M6 notification-link lane** (ADR [0085](../adr/0085-notification-item-link-and-reply-highlight.md)) — the ADR [0085](../adr/0085-notification-item-link-and-reply-highlight.md) / 0095
    links stay *inside* the app's cookie world; M12's "no token, ride the
    cookie" posture (D2) is the same posture applied to a subscription
    rather than a one-time link.
@@ -88,10 +105,10 @@ filename="…"` + `Cache-Control: no-store` + `X-Content-Type-Options:
 nosniff`; **two `kw-l` affordances × en/de/fr/da** (D5, §kw-l) — the detail
 page's "Add to calendar" link + the `/events` / calendar feed link; the
 **pinned test names** (D7, §pinned tests); and the **U05 docs flip** (D8) —
-`Milestones.cs` / `README.md` / `docs/STATUS.md` / `docs/ARCHITECTURE.md` /
+`Milestones.cs` / [`README.md`](../../README.md) / [`docs/STATUS.md`](../STATUS.md) / [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) /
 `MilestonesTests.cs` re-pin, all in one unit.
 
-**Out (each a named follow-on lane, ADR 0112 Consequences):** RSVP state in
+**Out (each a named follow-on lane, ADR [0112](../adr/0112-ical-calendar-export.md) Consequences):** RSVP state in
 the calendar file (`ATTENDEE` / `RSVP` — a privacy decision, own lane);
 recurring events (`RRULE` — M14 is the natural home); `VTODO` for
 projects/to-dos (a different calendar surface, own lane); ICS import
@@ -129,8 +146,8 @@ function.
   link row — D5); `src/Kumunita.Web/Views/Event/Index.cshtml` +
   `Views/Event/Calendar.cshtml` (the one feed link each — D5);
   `KnownTranslationKeys.cs` (the two new keys × 4 languages — D5);
-  `Milestones.cs` / `README.md` Roadmap / `docs/STATUS.md` /
-  `docs/ARCHITECTURE.md` / `tests/Kumunita.Web.Tests/MilestonesTests.cs`
+  `Milestones.cs` / [`README.md`](../../README.md) Roadmap / [`docs/STATUS.md`](../STATUS.md) /
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) / `tests/Kumunita.Web.Tests/MilestonesTests.cs`
   in the U05 close only (D8 / C-M12·7).
 - **Untouched (pinned):** the frozen `IEventService` / `EventService`
   public surface (the `IcsWriter` composes them, never re-scopes them —
@@ -164,7 +181,7 @@ here:
    never reads a clock, so it is deterministic + testable);
    `categoriesByEventId` = an **optional** per-event `Id → CATEGORIES
    display names` map (the caller resolves it from `Event.TagIds` via the
-   ADR 0044 display-name idiom — §field-map; `null` ⇒ no `CATEGORIES` on
+   ADR [0044](../adr/0044-tags.md) display-name idiom — §field-map; `null` ⇒ no `CATEGORIES` on
    any `VEVENT`). The return is the **entire** ICS file text — the
    `VCALENDAR` envelope + the `VEVENT`s — CRLF-terminated, 75-octet-folded,
    fully escaped, on the **pinned subset** (§ics). The emitter is **pure**:
@@ -200,7 +217,7 @@ here:
    the rows the seam already allowed — the decision is never re-derived,
    never leaked (C-M12·2). **Not a content-decision seam, not an audit
    verb** — the feed's `ListUpcomingAsync` already commits its own
-   aggregate `AccessAudit` row (the frozen ADR 0006/C3 lane); M12 adds
+   aggregate `AccessAudit` row (the frozen ADR [0006](../adr/0006-module-boundary-contracts.md)/C3 lane); M12 adds
    none.
 
 ## Feedback loops
@@ -229,7 +246,7 @@ final gate U05 records.
 **Privacy** is the whole point: the file carries **no** decision
 (C-M12·2) — the `Audience` / grant / membership / author-identity material
 is never in the ICS text, and the **no-`ORGANIZER`** pin (D4) means the
-author's identity is not named in a file that travels (the ADR 0028
+author's identity is not named in a file that travels (the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)
 "no standing to carry a secret" posture applied to the file form). The
 **boundary is the cookie** (F3): a stranger without a session gets the
 sign-in challenge — no event, not even its existence, leaks through the
@@ -358,7 +375,7 @@ channel, so there is no second feed.
 > **The closed property set.** The emitter emits **exactly** this, in this
 > order, and nothing else (C-M12·4). A property outside this set is a
 > **drift event** (record it in §drift-guard, resolve in favor of this
-> pin). This is the WY·3 subset pin (ADR 0031) applied to ICS: the emitter
+> pin). This is the WY·3 subset pin (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) applied to ICS: the emitter
 > never emits a property it was not told to.
 
 **The `VCALENDAR` envelope** (every file, one):
@@ -406,7 +423,7 @@ END:VEVENT
 - **`DTSTART` / `DTEND`** = `event.Start` / `event.End` (the stored UTC
   `DateTimeOffset`), formatted `yyyyMMddTHHmmss` + `Z`. The calendar app
   renders in **the subscriber's** local time (the point of the surface);
-  the ADR 0019/0020 in-app `kw-dt` rendering does **not** apply to a
+  the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)/0020 in-app `kw-dt` rendering does **not** apply to a
   calendar file (D1).
 - **`SUMMARY`** = `event.Title` (escaped). Always emitted.
 - **`DESCRIPTION`** = the **Markdown source** of `event.Body` (escaped,
@@ -440,8 +457,8 @@ pinned by the pinned-subset test):**
 | `VEVENT` (conditional) | `DESCRIPTION` (Body non-empty), `LOCATION` (Location set), `CATEGORIES` (names passed), `STATUS:CANCELLED` (IsDeleted) |
 
 **Never in the file (D4 — the "never" list, pinned):** `ORGANIZER`
-(no author identity in a file that travels — the ADR 0028 posture),
-`ATTENDEE` / `RSVP` (the author-only RSVP list — ADR 0054 §3.2 — is a
+(no author identity in a file that travels — the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) posture),
+`ATTENDEE` / `RSVP` (the author-only RSVP list — ADR [0054](../adr/0054-events-rsvp-reminders.md) §3.2 — is a
 privacy decision, own lane), `RRULE` (no recurring-event concept in the
 `Event` doc; M14 is the natural home), `VTODO` (a different surface),
 `Color` (app-internal display metadata), `Audience` / grant / membership
@@ -494,7 +511,7 @@ empty-feed tests):**
 | `STATUS` | `event.IsDeleted` | `CANCELLED` when `true` (see the §ics note) |
 | *(never)* | `Color`, `Audience`, `AuthorId`, RSVP, `GroupId`, `ComponentId`, `ReminderEnabled`, `LanguageCode` | **not emitted** (D4 "never" list) |
 
-**The `CATEGORIES` resolution call — the exact idiom (D4, the ADR 0044
+**The `CATEGORIES` resolution call — the exact idiom (D4, the ADR [0044](../adr/0044-tags.md)
 display-name idiom, the `PostsController.Detail` shape, verified against
 source):** the **Web layer** (U02 / U03) resolves the tag display names for
 the caller **before** calling the pure emitter, using the frozen
@@ -528,7 +545,7 @@ Core, HTTP- and store-free — C-M12·5). The **order** is the event's
 `TagIds` order **as filtered to readable tags**, then `OrderBy(DisplayedName,
 Ordinal)` (the stable pin above). A **dangling** `TagId` (a `Tag` row the
 actor cannot resolve) is **dropped**, not an error (the C-TG·1 "a broken
-reference renders as *nothing*" pin, the ADR 0044 idiom). If `tags` is
+reference renders as *nothing*" pin, the ADR [0044](../adr/0044-tags.md) idiom). If `tags` is
 `null` (a test site) or the event has no `TagIds`, **no** `CATEGORIES` is
 emitted for that event.
 
@@ -573,7 +590,7 @@ public async Task<IActionResult> CalendarFeed() { /* lane 2, §Seams #3 */ }
 - **Body:** the `IcsWriter.Build(page.Items, nowUtc, cat)` text (lane 2,
   §Seams #3).
 
-**The serve shape (both lanes, locked — the ADR 0034 / 0108 serve idiom,
+**The serve shape (both lanes, locked — the ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) / 0108 serve idiom,
 copied from `AttachmentController.ServeFile`):**
 
 | Header | Value (lane 1) | Value (lane 2) |
@@ -596,13 +613,13 @@ the subscription rides the cookie, not a token).
 
 ## §affordances — the two `kw-l` affordances (D5; U04 copies verbatim)
 
-Two quiet additions, both `kw-l`-labeled × **en/de/fr/da** (the ADR 0015
+Two quiet additions, both `kw-l`-labeled × **en/de/fr/da** (the ADR [0015](../adr/0015-ui-view-localization-mechanics.md)
 closed registry + the `KnownTranslationKeys_ParityTests` parity), **no new
 JS** (plain `<a>` links — the tsc-only discipline holds; C-M12·6):
 
 1. **The detail page** (`Views/Event/Detail.cshtml`) gains **one** link row
    — "Add to calendar" — a plain `<a href="/events/{id}.ics">` (lane 1)
-   styled as the existing secondary action (the ADR 0092 `.action-glyph-btn`
+   styled as the existing secondary action (the ADR [0092](../adr/0092-borderless-kebab-dropdown-triggers.md) `.action-glyph-btn`
    / the detail page's action-row idiom), labeled by the
    `events.ics.download` key. **Gated on nothing extra** — the page already
    only renders for a visible event (the caller passed `GetAsync`'s `Read`
@@ -630,7 +647,7 @@ values):
 
 **The pin:** both keys × all four languages, non-empty, registered in
 `KnownTranslationKeys` (the `events.past_empty` / `events.upcoming` block is
-the shape to copy — the ADR 0015 / 0052 registry + warm-boot backfill
+the shape to copy — the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) / 0052 registry + warm-boot backfill
 idiom). The `KwLRegistryConsistencyTests` view scan enforces that every
 literal `kw-l` key used in the three touched views is registered.
 
@@ -682,7 +699,7 @@ literal `kw-l` key used in the three touched views is registered.
   charset=utf-8` + `Content-Disposition: attachment` + `Cache-Control:
   no-store`; two `kw-l` affordances × en/de/fr/da; no new JS; no admin
   toggle (the feed is off *for a caller* simply by them not being signed in
-  — the ADR 0105 inverse-shape considered and rejected: a global
+  — the ADR [0105](../adr/0105-messaging.md) inverse-shape considered and rejected: a global
   kill-switch has no gear to turn, the cookie *is* the gate); the 404-not-
   403 shape on `/{id}.ics` (F3). Pinned by the Web surface pins (D7).
 
@@ -853,13 +870,13 @@ C-M12·7 docs flip (M12 → `StatusDone`, M13 → `StatusNext`):
 confirmed untouched by U01–U04 (the handoff note's `## U01`–`## U04`
 entries record zero drift pauses; U00 locked the two source-driven
 refinements before any code ran). M12 is closed at U05; the register's
-six unit plans are moved to `docs/plans-milestones/done/`.
+six unit plans are moved to `docs/archive/lanes/`.
 
 ## §deferred lanes — the Consequences hand-off (each a named follow-on, own ADR)
 
 - **RSVP state in the calendar file** (`ATTENDEE` / `RSVP` / the
   author's RSVP list) — an `ATTENDEE`/`RSVP` property would leak the
-  **author-only** RSVP list (ADR 0054 §3.2) and is a **privacy** decision.
+  **author-only** RSVP list (ADR [0054](../adr/0054-events-rsvp-reminders.md) §3.2) and is a **privacy** decision.
   **Own lane**, own ADR.
 - **Recurring events** (`RRULE`) — there is **no** recurring-event concept
   in the `Event` doc; **M14** ("Integration of Events and Projects") is the
@@ -923,3 +940,28 @@ an `RRULE`, a `VTODO`) moves the §ics list + the pinned-subset test
 **together**, and records the drift here. A future lane that adds a new
 `*DocTypes` event field that should reach the file moves the §field-map +
 the pinned tests **together**, and records the drift here.
+
+---
+
+## ADR [0112](../adr/0112-ical-calendar-export.md) — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Events/IcsWriter.cs` — new (the pure emitter; the only
+  new Core type; D6).
+- `src/Kumunita.Web/Controllers/EventController.cs` — the two new actions
+  (`EventIcs` + `CalendarFeed`) + the `CATEGORIES` resolution (D3/D4).
+- `src/Kumunita.Web/Views/Event/Detail.cshtml` — the one "Add to calendar"
+  link row (D5).
+- `src/Kumunita.Web/Views/Event/Index.cshtml` +
+  `src/Kumunita.Web/Views/Event/Calendar.cshtml` — the one feed link each
+  (D5).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` —
+  `events.ics.download` + `events.ics.feed` in en/de/fr/da (D5).
+- `src/Kumunita.Web/Milestones.cs` + [`README.md`](../../README.md) + [`docs/STATUS.md`](../STATUS.md) +
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `tests/Kumunita.Web.Tests/MilestonesTests.cs` —
+  the M12→`StatusDone` / M13→`StatusNext` flip (D8), in one unit.
+- **New tests** (the D7 pins): `tests/Kumunita.Core.Tests/IcsWriterTests.cs`
+  (the pure pins), `tests/Kumunita.Core.Tests/IcsFeedTests.cs` (the
+  composition pin), the Web route/surface pins, and the extended
+  `KnownTranslationKeys_ParityTests`.

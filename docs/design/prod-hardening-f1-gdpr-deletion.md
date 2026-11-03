@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f1-gdpr-deletion
+title: "F1 — complete GDPR deletion (DB-13)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0022-user-added-post-reply-translations.md
+updated: 2026-11-02
+---
+
 # Prod-hardening F1 — complete GDPR deletion — Part-0 design pin
+
+> **Abstract:** the **F1 GDPR deletion** design pin (Part-0, design-only) — makes a deleted account leave **no resident-authored content, no media bytes, no `MediaObject` catalog rows**: the closed list of content docs a deletion must remove per resident, the byte-store delete seam, the `MediaObject` owner field, the invariants, and the four pinned test names. Closes the 2026-10-22 audit DB-13. **Who is it for:** a developer executing F1 U2–U5; an agent that needs the closed delete list + the owner-field ground truth. **When to read the rest:** before touching the `DeleteAccountAsync` lane, the byte-store delete seam, or the F1 tests.
+
 
 > **Unit F1.U1 (design-only).** This is the Tier-1 pin that U2–U5 execute
 > mechanically against. It names the exact content-doc closed list, the
@@ -50,20 +65,20 @@ pinned tests.
 |---|---|---|---|
 | `Post` | `Posts/Post.cs` | `AuthorId` | the resident's posts |
 | `PostReply` | `Posts/PostReply.cs` | `AuthorId` | the resident's replies |
-| `PostTranslation` | `Posts/PostTranslation.cs` | `AuthorId` | user-added post translations (ADR 0022), nullable |
-| `ReplyTranslation` | `Posts/ReplyTranslation.cs` | `AuthorId` | user-added reply translations (ADR 0022), nullable |
+| `PostTranslation` | `Posts/PostTranslation.cs` | `AuthorId` | user-added post translations (ADR [0022](../adr/0022-user-added-post-reply-translations.md)), nullable |
+| `ReplyTranslation` | `Posts/ReplyTranslation.cs` | `AuthorId` | user-added reply translations (ADR [0022](../adr/0022-user-added-post-reply-translations.md)), nullable |
 | `Announcement` | `Announcements/Announcement.cs` | `AuthorId` | **only** where `AuthorId == resident`; platform announcements have `AuthorId == ""` and are **kept** |
 | `AnnouncementTranslation` | `Announcements/AnnouncementTranslation.cs` | `AuthorId` | nullable |
 | `AnnouncementComment` | `Announcements/AnnouncementComment.cs` | `AuthorId` | the resident's comments |
 | `Event` | `Events/Event.cs` | `AuthorId` | the resident's events |
-| `EventTranslation` | `Events/EventTranslation.cs` | `AuthorId` | nullable (ADR 0059) |
+| `EventTranslation` | `Events/EventTranslation.cs` | `AuthorId` | nullable (ADR [0059](../adr/0059-event-translations.md)) |
 | `EventRsvp` | `Events/EventRsvp.cs` | `UserId` | the resident's **own** RSVPs (not the event's authorship) |
 | `Project` | `Projects/Project.cs` | `AuthorId` | |
 | `ProjectGoal` | `Projects/ProjectGoal.cs` | `AuthorId` | |
 | `TodoItem` | `Projects/TodoItem.cs` | `AuthorId` | **not** `AssigneeId` — that is the assignee's, a different resident |
 | `KanbanBoard` | `Projects/KanbanBoard.cs` | `AuthorId` | the board the resident owns |
 | `TodoComment` | `Projects/TodoComment.cs` | `AuthorId` | |
-| `TodoTranslation` / `BoardTranslation` / `ProjectTranslation` | `Projects/*.cs` | `AuthorId` | nullable, user-added (ADR 0088) |
+| `TodoTranslation` / `BoardTranslation` / `ProjectTranslation` | `Projects/*.cs` | `AuthorId` | nullable, user-added (ADR [0088](../adr/0088-projects-todos-boards-translations.md)) |
 | `Page` | `Pages/Page.cs` | `AuthorId` | the resident's blog pages |
 | `PageTranslation` | `Pages/PageTranslation.cs` | `AuthorId` | nullable |
 | `InventoryItem` | `Inventory/InventoryItem.cs` | `AuthorId` | |
@@ -75,7 +90,7 @@ pinned tests.
 | `TagTranslation` | `Tags/TagTranslation.cs` | `AuthorId` | user-added tag translations |
 | `Conversation` | `Messaging/Conversation.cs` | `ParticipantA` ∪ `ParticipantB` | conversations where the resident holds a seat (two-principal union) |
 | `Message` | `Messaging/Message.cs` | `SenderId` (or via `Conversation`) | the resident's sent messages |
-| `PersonalNote` | `PersonalNotes/PersonalNote.cs` | `OwnerId` | the resident's notes (M37 / ADR 0167) |
+| `PersonalNote` | `PersonalNotes/PersonalNote.cs` | `OwnerId` | the resident's notes (M37 / ADR [0167](../adr/0167-personal-notes.md)) |
 | `NoteFolder` | `PersonalNotes/NoteFolder.cs` | `OwnerId` | |
 | `MediaObject` | `Media/MediaObject.cs` | `CreatedById` | the catalog rows + their bytes — see §4 (this is U4's set) |
 
@@ -203,14 +218,14 @@ public sealed class MediaObject
 
 ## 5. Invariants the fix must respect
 
-- **C3 — single write lane, one commit (ADR 0006).** Every Marten delete
+- **C3 — single write lane, one commit (ADR [0006](../adr/0006-module-boundary-contracts.md)).** Every Marten delete
   (content docs + `MediaObject` rows) happens in the **caller's existing
   `IDocumentSession`** opened in `DeleteCoreAsync`, and commits in the **single
   existing `SaveChangesAsync`**. No new session, no second Marten commit.
-- **Core stays HTTP-free (ADR 0006-D).** All of this lives in
+- **Core stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).** All of this lives in
   `Kumunita.Core.Identity.IdentityService` (Core). No Web types, no
   `IHttpContextAccessor`, no HTTP in the deletion path.
-- **ADR 0004 §B — two stores.** Marten owns the domain documents + the
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B — two stores.** Marten owns the domain documents + the
   `MediaObject` catalog; EF Core owns **only** the Identity account. The
   deletion touches both, exactly as the existing method does.
 - **Accepted cross-store window (ordering pin).** The existing method commits

@@ -1,21 +1,34 @@
-# ADR 0173 — Report targets: the "Report this…" lane for events, projects,
+---
+id: adr-0173
+title: "Report targets: the \"Report this…\" lane for events, projects,"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/report-targets/handoff-notes.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0173](0173-report-targets-lane.md) — Report targets: the "Report this…" lane for events, projects,
 boards, to-dos, and group posts
 
 Status: Accepted
 Date: 2026-10-27
-Extends the **M3b report-filing precedent** (ADR 0003 / the
+Extends the **M3b report-filing precedent** (ADR [0003](0003-roles-and-moderator-scoping.md) / the
 `ModerationService.FileReportAsync` post-lane and
 `FileReplyReportAsync` reply-lane, both with their `report.file` /
 `report.reply.file` audit-tag pins, the `AccessVia.Admin` two-negatives pin,
 and the `"filed"` Status-literal pin), the **`Report` document shape**
-(ADR 0004 §B.1 additive-surface convention — the additive
+(ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive-surface convention — the additive
 `TargetKind` / `TargetId` fields are delta-detected, idempotent,
-zero-migration), the **`_ReportModal` shared partial idiom** (the ADR 0082
-"one ⋮ dropdown" shape + the ADR 0118 modal idiom), the **frozen
+zero-migration), the **`_ReportModal` shared partial idiom** (the ADR [0082](0082-content-actions-dropdown.md)
+"one ⋮ dropdown" shape + the ADR [0118](0118-bookmarks.md) modal idiom), the **frozen
 `NotificationService.EmitAsync` seam** (the `ReportFiled` kind,
-`notification:report.filed:{reportId}` key — the ADR 0076 M6 surface,
+`notification:report.filed:{reportId}` key — the ADR [0076](0076-notifications-inbox-and-recipient-email.md) M6 surface,
 re-applied per-target), and the **closed `KnownTranslationKeys` registry +
-the en/de/fr/da parity pins** (ADR 0015 / ADR 0052). This ADR makes **any
+the en/de/fr/da parity pins** (ADR [0015](0015-ui-view-localization-mechanics.md) / ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md)). This ADR makes **any
 resident who can see an event, project, board, to-do, or group post file a
 moderation report against it** — the same standing the post and reply
 report lanes already have (C-M3b·1, the "any resident who can currently see
@@ -25,9 +38,9 @@ adapter** (the `ModerationService` compose-not-extend convention) and
 
 ## Context
 
-M3b (Moderation, ADR 0003) shipped the **report + assign + resolve**
+M3b (Moderation, ADR [0003](0003-roles-and-moderator-scoping.md)) shipped the **report + assign + resolve**
 machinery against **community posts** (`FileReportAsync`,
-`/posts/{id}/report`) and, in ADR 0023, **replies**
+`/posts/{id}/report`) and, in ADR [0023](0023-reply-report-target-lane.md), **replies**
 (`FileReplyReportAsync`, `/posts/{id}/replies/{replyId}/report`). The
 `Report` document, the `ModerationService` write lanes, the
 `AccessAudit` filing row (`AccessVia.Admin` — NOT `Report` — reserved for
@@ -36,9 +49,9 @@ ReportFiled` emission to the author (the 2026-09-25 no-reason-disclosure
 fix), and the moderation queue + resolve read paths all exist and are
 battle-tested.
 
-But the platform has **five other UGC surfaces** — **events** (M4, ADR 0054),
-**projects** (M5, ADR 0086), **Kanban boards** (PL, ADR 0147), **to-dos**
-(PL, ADR 0086), and **group posts** (GP, ADR 0013) — that a resident can
+But the platform has **five other UGC surfaces** — **events** (M4, ADR [0054](0054-events-rsvp-reminders.md)),
+**projects** (M5, ADR [0086](0086-goals-projects-lane.md)), **Kanban boards** (PL, ADR [0147](0147-todos-and-boards-tags.md)), **to-dos**
+(PL, ADR [0086](0086-goals-projects-lane.md)), and **group posts** (GP, ADR [0013](0013-group-posts-membership-lane.md)) — that a resident can
 see and that an author can (mistakenly or deliberately) populate with content
 that violates the community's norms. None of these five had a report
 affordance. The consequence: a resident who saw harassment on an event
@@ -61,7 +74,7 @@ No new `AccessAction`, no new `AccessVia`, no new `Decide()` branch, no new
 adapter. The `LoadReportTargetResourceAsync` helper (the
 `AssignReportAsync` / `UnlockAsync` / `ResolveReportAsync` read path)
 switches on `TargetKind` to load the correct document type and wrap it in
-its existing `ToAuditableResource` adapter — the ADR 0006 module-boundary
+its existing `ToAuditableResource` adapter — the ADR [0006](0006-module-boundary-contracts.md) module-boundary
 contract is intact (the `Moderation` context reads from `Events` /
 `Projects` / `Posts` through their frozen service seams, never through a
 new cross-context surface).
@@ -72,7 +85,7 @@ each `[Authorize]` + `[ValidateAntiForgeryToken]` +
 `[EnableRateLimiting("report")]` (the existing 10/hour/IP policy,
 re-used — no new rate-limit policy), and a new shared Razor partial
 (`_ReportModal`) that renders the Bootstrap 5 modal + POST form the five
-surfaces' ⋮ dropdowns target (the ADR 0082 modal idiom — the partial makes
+surfaces' ⋮ dropdowns target (the ADR [0082](0082-content-actions-dropdown.md) modal idiom — the partial makes
 no service call; the surface's own Read decision is the precondition; any
 signed-in resident who can see the target may file a report).
 
@@ -83,7 +96,7 @@ signed-in resident who can see the target may file a report).
 `"event" | "project" | "board" | "todo" | "grouppost"`; `null` for the
 original post/reply lanes) and `Report.TargetId` (string?, the target
 document's own id; `null` for post/reply) are added to the `Report`
-document. Both are **nullable** (the ADR 0004 §B.1 additive convention —
+document. Both are **nullable** (the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive convention —
 existing rows are unaffected; Marten's delta-detection creates the two
 columns on first boot, idempotent). `Report.PostId` and `Report.ReplyId`
 are **unchanged** (the original discriminators stay on their own lanes;
@@ -135,7 +148,7 @@ write-session shape). On success: `TempData["info"]` + redirect back to
 the surface (the `_BookmarkButton` obs-2 flash shape).
 
 **D5 — One shared partial: `_ReportModal`.**
-A Bootstrap 5 modal (the ADR 0082 modal idiom — the same `.modal.fade`
+A Bootstrap 5 modal (the ADR [0082](0082-content-actions-dropdown.md) modal idiom — the same `.modal.fade`
 container the translation modals use) with a POST form (anti-forgery token,
 optional `reason` textarea, the `posts.report_reason_placeholder` kw-l key
 × en/de/fr/da). The partial makes **no service call** (reporting is a
@@ -156,7 +169,7 @@ new `posts.{kind}_report_button` key (en floor in
 live inside a `<ul>`), after the dropdown's closing `</div>`.
 
 **D7 — The translation keys.**
-Five new keys, one per target kind, × en/de/fr/da (the ADR 0015 / ADR 0052
+Five new keys, one per target kind, × en/de/fr/da (the ADR [0015](0015-ui-view-localization-mechanics.md) / ADR [0052](0052-warm-boot-ui-string-baseline-backfill.md)
 parity pins): `posts.event_report_button`, `posts.project_report_button`,
 `posts.board_report_button`, `posts.todo_report_button`,
 `posts.grouppost_report_button`. The `posts.report_reason_placeholder` key
@@ -192,7 +205,7 @@ target-kind badge, title, author, and body preview for the new targets
 - **Zero new `AccessAction` / `AccessVia` / `Decide()` branch / adapter**
   (C-M3b·1, the compose-not-extend pin, re-applied).
 - **Zero migrations** (the two additive `Report` fields are delta-detected
-  — ADR 0004 §B.1).
+  — ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).
 - The `Report` document's `PostId` / `ReplyId` discriminators are
   **unchanged** for the original post/reply lanes (the `TargetKind` /
   `TargetId` pair is the new lane's identity; `null` `TargetKind` means

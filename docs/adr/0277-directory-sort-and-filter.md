@@ -1,10 +1,23 @@
-# ADR 0277 — Directory: name search, verified-only filter, and name sort
+---
+id: adr-0277
+title: "Directory: name search, verified-only filter, and name sort"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0277](0277-directory-sort-and-filter.md) — Directory: name search, verified-only filter, and name sort
 
 Status: Accepted
 Date: 2026-10-30
 Extends the **M2 directory surface** (`DirectoryController` / `DirectoryService`,
 the "show-everyone" catalog read) and reuses the **M26 sort-control lane**
-(ADR 0133 — the shared `Views/Shared/_Sort.cshtml` partial + `SortViewModel`
+(ADR [0133](0133-dark-theme-forest.md) — the shared `Views/Shared/_Sort.cshtml` partial + `SortViewModel`
 + `SortKeys.Parse` closed-allowlist parser) exactly as the FindPeople (M23) and
 Posts (M26) surfaces do. The user's ask is explicit: *"The Directory page needs
 sorting and filtering functions."*

@@ -1,9 +1,22 @@
-# ADR 0206 — Board header chips wrap
+---
+id: adr-0206
+title: "Board header chips wrap"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0206](0206-board-header-chip-wrap.md) — Board header chips wrap
 
 Status: Accepted
 
 ## Context
-Verification of the board header (ADR 0200) with a project link in light mode and
+Verification of the board header (ADR [0200](0200-projects-forms-board-header.md)) with a project link in light mode and
 at phone width. Desktop and phone were fine with real data. Injecting a long
 project title and an event chip showed the chip row overflow: header content 670px
 in a 364px card, clipping chips and the description.

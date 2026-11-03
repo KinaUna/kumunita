@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f2-token-hash
+title: "F2 — hash auth tokens at rest (AUTH-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0146-child-account-child-owns-password.md
+updated: 2026-11-02
+---
+
 # F2 — AUTH-02: hash auth tokens at rest (Part-0 design pin)
+
+> **Abstract:** the **F2 token-hash** design pin (Part-0, design-only) — **hash auth tokens at rest**: the single-use auth tokens `IdentityService` stores in cleartext (verify / setup) become hashed on write + compared on read, so a leaked DB does not expose usable tokens. Closes 2026-10-22 AUTH-02. **Who is it for:** a developer executing F2 U2; an agent that needs the hash-on-write / compare-on-read shape + the one scope note (the setup mint). **When to read the rest:** before touching the token write/read in `IdentityService`, or the F2 tests.
+
 
 **Fix:** F2 (report row **AUTH-02** — "hash tokens at rest"), severity bucket **data
 exposure**. **Kind:** `code`.
@@ -25,7 +40,7 @@ must not expose usable tokens.
   `.Where(t => t.Token == tokenValue && t.Kind == kind)` (first `.Where`, `:1506`).
   Call sites:
   - `:256` — `VerifyWithTokenAsync` (self-serve verify lane)
-  - `:310` — `VerifyAndSetPasswordAsync` (child / ADR 0146 lane)
+  - `:310` — `VerifyAndSetPasswordAsync` (child / ADR [0146](../adr/0146-child-account-child-owns-password.md) lane)
   - `:1251` — `CompleteSeedAdminSetupAsync` (seed-admin setup lane)
 - **Write (setup mint):** `FirstBootSeeder.cs:271` region — the `KindSetup` row sets
   `Token = token` (the **operator-held env token** `SeedAdmin__Token`), `FirstBootSeeder.cs:~274`.
@@ -119,7 +134,7 @@ call sites do **not** all present a raw secret. Tracing the Web layer:
 | Call site (`IdentityService.cs`) | Lane | What the **Web** passes in | Value class |
 |---|---|---|---|
 | `:256` `VerifyWithTokenAsync` | self-serve verify | `token.Token` — the **stored column value** (row loaded by `Id` via `AccountController.LoadUsableVerifyTokenAsync`, `session.LoadAsync<IdentityToken>(id)`) | **stored** |
-| `:310` `VerifyAndSetPasswordAsync` | child (ADR 0146) | `token.Token` — the **stored column value** (same `LoadAsync`-by-`Id` path) | **stored** |
+| `:310` `VerifyAndSetPasswordAsync` | child (ADR [0146](../adr/0146-child-account-child-owns-password.md)) | `token.Token` — the **stored column value** (same `LoadAsync`-by-`Id` path) | **stored** |
 | `:1251` `CompleteSeedAdminSetupAsync` | seed-admin setup | `model.SetupToken` — the **raw** env token the operator typed | **raw** |
 
 **Therefore the blanket "compare `Sha256Hex(tokenValue)`" in the plan is wrong for the
@@ -285,3 +300,27 @@ directly. Do **not** make `FindTokenAsync` public to test it; keep the public su
   `hardening-handoff-notes.md` (the hash choice, the §6 compat rule, the §8 scope notes,
   and "Next unit = **F2.U2**") — **written before stopping**.
 - **F3 is NOT started** — it is the next clean-slate agent after F2 completes.
+
+---
+
+## ADR [0146](../adr/0146-child-account-child-owns-password.md) — moved content (D11 trim, 2026-11-02)
+
+## Invariants (pinned)
+
+- **C-0146·1 — The child account is created password-less.**
+  `RegisterChildAccountAsync` leaves the account's `PasswordHash` empty;
+  a `CheckPasswordAsync` against any candidate fails until the child sets
+  it. (Pinned by
+  `ChildAccountPasswordTests.RegisterChildAccount_CreatesAnUnverifiedAccountWithNoPassword`.)
+- **C-0146·2 — The child's credential is set by the child, at the link.**
+  `VerifyAndSetPasswordAsync` sets the password the child supplied, flips
+  `Verified`, and consumes the token in one commit; the child's password
+  then signs them in (a re-fetched `CheckPasswordAsync` succeeds) and the
+  token is single-use (a second presentation is refused). (Pinned by
+  `ChildAccountPasswordTests.VerifyAndSetPassword_SetsTheChildsOwnCredential_AndSignsIn`.)
+- **C-0146·3 — The self-serve lane is unchanged.** A resident who signed
+  up with a password gets the confirm-only verify link; the
+  `AddChildForm` pin is now three fields (no `Password`). (Pinned by
+  `GuardianViewModelsTests.AddChildForm_Is_Form_Model_With_Three_Fields`
+  and the unchanged `AccountController.Signup` behavior.)
+

@@ -1,3 +1,16 @@
+---
+id: design-m36-mentions
+title: "M36 — Mentions"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0076-notifications-inbox-and-recipient-email.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # M36 — @mentions (design doc)
 
 > **Abstract:** This design settles the **"reach a neighbor by name"** question
@@ -81,7 +94,7 @@
 > (the seven surfaces), the `MentionRenderer` render-pass contract, the closed
 > mention `kw-l` key set (7 kinds × 4 keys), the `Preferences.cshtml` toggle
 > change, the pinned test names, the three-test acceptance gate, the drift
-> guard) + **ADR 0165** (the next free number after 0164 — U00 verified).
+> guard) + **ADR [0165](../adr/0165-mentions.md)** (the next free number after 0164 — U00 verified).
 >
 > **The frozen base (reused, unchanged).** M36 is built **on top of** the
 > existing M6 notification lane + the M2 directory + the frozen per-surface
@@ -98,12 +111,12 @@
 > / `ProjectService` / `AnnouncementService` / `MessagingService`
 > create-and-persist lanes — the `EmitAsync` call site, **additive** — M36·4),
 > and the **frozen `MarkdownRenderer`** (`RenderHtml` / `PlainTextPreview` — the
-> one-renderer pin, **untouched** — M36·6). It also rides the ADR 0006-D
+> one-renderer pin, **untouched** — M36·6). It also rides the ADR [0006](../adr/0006-module-boundary-contracts.md)-D
 > dependency-direction rule (**`Kumunita.Core` references no ASP.NET HTTP
 > types** — the `IMentionService` is a plain store-composing read, no
-> `HttpClient` in Core, M36·9), the ADR 0031 tsc-only discipline (the
+> `HttpClient` in Core, M36·9), the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) tsc-only discipline (the
 > `MentionRenderer` is a plain-tsc, no-dep, no-`any` module, M36·6), and the
-> ADR 0015 D1 `kw-l` provider-floor discipline (the `en` value is the source
+> ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline (the `en` value is the source
 > text, M36·7). All of these still bind **unchanged**. M36 adds **one new
 > shared module** (`Kumunita.Core.Mentions` — the `MentionTokens` pure helper +
 > the `IMentionService` seam, M36·1), **one Web render pass**
@@ -130,7 +143,7 @@
 > leaves every other `@` **plain text** (M36·6, M36-6). The **seven** mention
 > kinds are **resident-facing, opt-OUT** (M36·3), and the **`kw-l`** closed set
 > is **four-language** (M36·7). Core stays **HTTP-free + Wolverine-free**
-> (M36·9, ADR 0006-D). **M36 is the new last milestone** — the close flips M36 →
+> (M36·9, ADR [0006](../adr/0006-module-boundary-contracts.md)-D). **M36 is the new last milestone** — the close flips M36 →
 > done and promotes **no** successor (M36·10). After M36, a resident types
 > `@Ada` in any content surface and Ada is told — and everyone sees the name
 > link to Ada's page.
@@ -144,8 +157,8 @@ platform already has the pieces a mention needs; it lacks only the **detection**
 (who was mentioned) and the **render pass** (link the name):
 
 - **The notification lane** is all there: the M6 `EmitAsync` writer (the inbox
-  row + the best-effort email + the dedup + the quiet-hours gate (ADR 0121) +
-  the sample-suppression gate (ADR 0078)), the closed `NotificationKinds`
+  row + the best-effort email + the dedup + the quiet-hours gate (ADR [0121](../adr/0121-notification-quiet-times.md)) +
+  the sample-suppression gate (ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md))), the closed `NotificationKinds`
   vocabulary, and the per-kind settings toggle. M36 **reuses** these verbatim —
   it does not add a new notification mechanism (M36·4).
 - **The directory** is all there: the M2 `IDirectoryService` read seam
@@ -158,7 +171,7 @@ platform already has the pieces a mention needs; it lacks only the **detection**
   in the same transaction (the `PostService.CreateReplyAsync` + the
   `MessagingService.SendAsync` precedent). M36 **extends** each with one mention
   emission — the frozen method signatures + audit rows are **untouched** (M36·4).
-- **The renderer** is all there: the **one** `MarkdownRenderer` (the ADR 0025 /
+- **The renderer** is all there: the **one** `MarkdownRenderer` (the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) /
   0031 / 0033 one-renderer pin) already renders every content surface's Markdown
   body to HTML. M36's `MentionRenderer` runs a **post-render pass** over that
   output — the one-renderer pin is **preserved** (M36·6).
@@ -231,7 +244,7 @@ and does **not** add a username system (the named deferrals, §Scope).
   content write (M36·8); the frozen method signatures + audit rows are
   **untouched**;
 - the **`MentionRenderer` Web render pass** (M36·6) — a plain-tsc, no-dep,
-  no-`any` module (the ADR 0031 pin — the `expand-page.ts` / `calendar-fullscreen.ts`
+  no-`any` module (the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) pin — the `expand-page.ts` / `calendar-fullscreen.ts`
   precedent) **or** a server-side pass in the `MarkdownRenderer` boundary, that
   runs **after** `MarkdownRenderer.RenderHtml` and rewrites **only** the
   `@<DisplayName>` tokens that resolve (via the same `IMentionService`
@@ -262,10 +275,10 @@ and does **not** add a username system (the named deferrals, §Scope).
   the audience (a group post's members, an event's audience). In v1 a mention
   resolves to **exactly one** resident; a broadcast mention is a **future lane**
   (it would need a new kind + a new recipient-universe shape, and a settings
-  posture — the ADR 0084 per-target subscription shape).
+  posture — the ADR [0084](../adr/0084-per-target-notification-subscriptions.md) per-target subscription shape).
 - **A `Profile.Handle` / username system** — v1 matches against the **directory
   `DisplayName`** (the M2 surface, **untouched**); a stable, unique `@handle`
-  (a `Profile` schema delta, an ADR 0004 §B migration) is a **future lane**
+  (a `Profile` schema delta, an ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B migration) is a **future lane**
   (it would let a rename never break an old mention, and would make ambiguous
   names impossible — both of which v1 sidesteps by the inert rule, M36-5).
 - **Email-address mentions** (`@ada@example.com`) — out of scope; a mention is
@@ -313,7 +326,7 @@ run **M36·1 through M36·10** (contiguous).
   a token that matches **two or more** residents is **also inert** (ambiguous =
   no mention, never a guess — M36-5).
 - **M36·3 — The `post.mention` reserved kind is now wired, and six sibling kinds
-  join the closed vocabulary — one per in-scope surface.** ADR 0076 D2
+  join the closed vocabulary — one per in-scope surface.** ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D2
   reserved `post.mention` as the follow-on lane; M36 wires it on the **community
   post + reply** surface and adds **six** new `NotificationKinds` members, one
   per other in-scope surface: `group.post.mention` (group post + reply),
@@ -323,22 +336,22 @@ run **M36·1 through M36·10** (contiguous).
   **not** in `NotificationKinds.OptInKinds`; a fresh install with no preference
   row fires them). They trail the existing resident-facing kinds in
   `NotificationKinds.Known` (the closed, ordered set). The **admin-lane** kinds
-  (`account.signup` / `account.verified`) stay a separate lane (ADR 0077).
+  (`account.signup` / `account.verified`) stay a separate lane (ADR [0077](../adr/0077-admin-account-signup-verify-notification.md)).
 - **M36·4 — The mention idempotency key is per-recipient:
-  `notification:{kind}:{contentId}:{recipientId}`.** ADR 0076 D4 pins the key
+  `notification:{kind}:{contentId}:{recipientId}`.** ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D4 pins the key
   shape as `notification:{kind}:{stable-source-id}` and dedups on the **key
   alone** — the single-recipient kinds are safe because the recipient is
   deterministic. A mention is **multi-recipient**: one body may mention several
   residents. The recipient id is therefore **part of the key** (`:{recipientId}`)
   so each mentionee stores their own inbox row + gets their own email, while a
-  re-emission of the same (content, recipient) pair is still a no-op (ADR 0076
+  re-emission of the same (content, recipient) pair is still a no-op (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)
   D4 / F10 preserved). The `EmitAsync` call is in the **same transaction** as
-  the domain write (ADR 0076 D5 / C3 — one `SaveChangesAsync` commits the content
+  the domain write (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D5 / C3 — one `SaveChangesAsync` commits the content
   + the inbox row + the outbox envelope atomically).
 - **M36·5 — A mention is a *personal read*, not an `AccessAction` decision.
   Zero new `AccessAction` / `AccessVia` / `Decide()` branch /
   `IAuditableResource` adapter.** A mention notification is **the mentioned
-  resident's own data** (the ADR 0076 D3 shape, verbatim): the emitter stores an
+  resident's own data** (the ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D3 shape, verbatim): the emitter stores an
   inbox row + stages a best-effort email for the recipient — no
   `IAuthorizationService` call, **no** `AccessAudit` row emitted *by* the mention
   emission (F7). The **render pass** links `@Ada` to `/directory/{adaId}` — that
@@ -348,7 +361,7 @@ run **M36·1 through M36·10** (contiguous).
   / M12 iCal "a link is not a grant" posture).
 - **M36·6 — The render pass is a no-op for an unresolved `@` token, and a
   mention is a post-render pass — not a new Markdown construct.** The one-renderer
-  pin (ADR 0025 / 0031 / 0033) is preserved: `MarkdownRenderer.RenderHtml` is
+  pin (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / 0031 / 0033) is preserved: `MarkdownRenderer.RenderHtml` is
   **unchanged**. The mention is a **post-render pass** (`MentionRenderer` in the
   Web boundary) that runs *after* the Markdown → HTML render, scanning the
   rendered body for `@<DisplayName>` tokens that resolve to a non-blocked,
@@ -378,7 +391,7 @@ run **M36·1 through M36·10** (contiguous).
   is not told about content that may never be seen by anyone else). So M36's
   emitters run in the lane that makes the content **visible** — the **publish**
   seam for the draft-capable surfaces (post / group post / announcement — the
-  ADR 0037 author-only idempotent publish lane) and the **create** lane for the
+  ADR [0037](../adr/0037-draft-mode-author-only.md) author-only idempotent publish lane) and the **create** lane for the
   non-draft surfaces (page / event / to-do comment / message).
 - **M36·9 — Core stays HTTP-free + Wolverine-free; the shared module is a plain
   store-composing read over the frozen directory seam.** `Kumunita.Core.Mentions`
@@ -387,14 +400,14 @@ run **M36·1 through M36·10** (contiguous).
   M13 `IUsageAnalyticsService` / M25 `IStorageMetricsService` precedent).
   `IMentionService.ResolveAsync` composes the **frozen** `IDirectoryService` read
   seam to map display names → resident ids (a read, not a decision). There is
-  **no** `HttpClient` in Core (ADR 0006-D), **no** Wolverine handler, **no**
+  **no** `HttpClient` in Core (ADR [0006](../adr/0006-module-boundary-contracts.md)-D), **no** Wolverine handler, **no**
   outbound channel — the only outbound channel is the frozen M6 email lane
   (`IMailerStage`, already present).
 - **M36·10 — The six-member close flip lands in the final unit; M36 is the new
-  last milestone.** The `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md`
+  last milestone.** The `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md)
   / `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip lands in the final
   unit (the M35-U10 / M34-U08 precedent). The `WhatsNew.cs` registry gains one
-  new entry (newest-first, the next `0.x.0` row) naming M36 + ADR 0165. **M36 is
+  new entry (newest-first, the next `0.x.0` row) naming M36 + ADR [0165](../adr/0165-mentions.md). **M36 is
   the new last milestone** — the close flips `M36` from `StatusNext` to
   `StatusDone` and promotes **no** successor (the `MilestonesTests` pin changes
   from "no in-progress milestone" (M35's terminal state) to "`M36` is the single
@@ -419,7 +432,7 @@ each FACE; the drift-guard (Part 2) re-pins the invariant ↔ FACE binding.
   non-author resident stores **one** `Notification` inbox row **per mentionee**
   (kind = the surface's mention kind) + stages **one** best-effort email (unless
   the recipient is quiet / has the kind disabled / is a sample account in
-  production — the frozen M6 gates, ADR 0078 / 0121). The idempotency key is
+  production — the frozen M6 gates, ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) / 0121). The idempotency key is
   `notification:{kind}:{contentId}:{recipientId}` (M36·4).
 - **M36-3 — The render pass links a resolved mention to the directory page
   (M36·5 / M36·6).** The rendered body of any in-scope surface shows `@Ada` as
@@ -443,7 +456,7 @@ each FACE; the drift-guard (Part 2) re-pins the invariant ↔ FACE binding.
   (the pass skips text inside those elements).
 - **M36-7 — A mention in a draft body is inert (M36·8).** Saving a post / group
   post / announcement **as a draft** with a mention stores **no** `Notification`
-  row (the ADR 0037 draft is author-only); the mention **does** notify when the
+  row (the ADR [0037](../adr/0037-draft-mode-author-only.md) draft is author-only); the mention **does** notify when the
   author later publishes the draft. A page / event / to-do comment / message has
   no draft state — the mention notifies on create.
 - **M36-8 — Zero new authorization surface; the mention link grants no access
@@ -633,7 +646,7 @@ In **each** of the seven in-scope surfaces' **publishing** write lane, the
 additive mention-emitter step runs **after** the content is stored and **before**
 the single `SaveChangesAsync` (the M6 `CreateReplyAsync` emitter template —
 `EmitAsync` does not commit; the lane's own `SaveChangesAsync` is the single
-commit, ADR 0076 D5 / C3, M36·4). The frozen method signatures + audit rows of
+commit, ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D5 / C3, M36·4). The frozen method signatures + audit rows of
 each surface are **untouched**; the step is *inside* the lane (M36·4).
 
 **The shared call shape (pinned, M36·4):**
@@ -665,26 +678,26 @@ if (tokens.Count > 0)
   `notification:{kind}:{contentId}:{recipientId}` (M36·4) — the recipient id is
   **part of the key** so each mentionee stores their own inbox row + gets their
   own email, while a re-emission of the same (content, recipient) pair is a
-  no-op (ADR 0076 D4 / F10 preserved). The `{contentId}` is the stable id of the
+  no-op (ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) D4 / F10 preserved). The `{contentId}` is the stable id of the
   content row just stored (the post id / reply id / page id / event id / to-do
   comment id / group post id / announcement id / message id — the lane's own
   `Guid`); it is **not** regenerated per call.
 - `targetId` is **null** for all seven mention kinds (they are **not** in
-  `NotificationKinds.OptInKinds` — M36·3), so the ADR 0084 per-target
+  `NotificationKinds.OptInKinds` — M36·3), so the ADR [0084](../adr/0084-per-target-notification-subscriptions.md) per-target
   subscription gate short-circuits; the resident's per-kind **email** toggle
   still gates the **email** (the M6 D7 shape — the inbox row always stores, the
   email respects the preference).
 - the **frozen M6 gates** apply unchanged (the `EmitAsync` writer, not M36):
   the dedup on the key, the per-kind email preference gate (the resident's
-  opt-OUT toggle, M36-5), the **quiet-hours** gate (ADR 0121), and the
-  **sample-suppression** gate (ADR 0078 — a sample account in production stores
+  opt-OUT toggle, M36-5), the **quiet-hours** gate (ADR [0121](../adr/0121-notification-quiet-times.md)), and the
+  **sample-suppression** gate (ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) — a sample account in production stores
   no inbox row, no email, no side effects). M36 adds none of these; it only
   calls the writer.
 - the **draft gate** (M36·8, M36-7): the emitter runs only on the **publishing**
   lane — the **publish** seam for the draft-capable surfaces (post / group post
-  / announcement — the ADR 0037 author-only idempotent publish lane) and the
+  / announcement — the ADR [0037](../adr/0037-draft-mode-author-only.md) author-only idempotent publish lane) and the
   **create** lane for the non-draft surfaces (page / event / to-do comment /
-  message). A draft **save** runs **no** mention emitter (the ADR 0037 draft is
+  message). A draft **save** runs **no** mention emitter (the ADR [0037](../adr/0037-draft-mode-author-only.md) draft is
   author-only); the mention fires only when the author later **publishes**.
 
 **The seven surfaces + their kind + content path (pinned, M36·3 / M36·4):**
@@ -713,7 +726,7 @@ if (tokens.Count > 0)
 ### Part 2.4 — the `MentionRenderer` render-pass contract (M36·6, M36-3, M36-6)
 
 The render pass is a **plain-TS, no-dep, no-`any`** module
-(`client/lib/mention-renderer.ts`, the ADR 0031 `expand-page.ts` /
+(`client/lib/mention-renderer.ts`, the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) `expand-page.ts` /
 `calendar-fullscreen.ts` IIFE shape) that runs **after** the frozen
 `MarkdownRenderer.RenderHtml` (the one-renderer pin, **unchanged** — M36·6).
 It is a **display transform**, not a Markdown construct, and it is **idempotent**.
@@ -749,7 +762,7 @@ It is a **display transform**, not a Markdown construct, and it is **idempotent*
 - **idempotent**: the pass matches `@name` **text**, not `href`; running it
   twice over the same body yields the same output (an already-linked mention —
   its text is now inside an `<a>` — is skipped by the ancestor rule, M36-6).
-- **zero new npm package, zero build step** (M36·6, ADR 0031) — the pass is
+- **zero new npm package, zero build step** (M36·6, ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) — the pass is
   plain TS over the existing `client/lib` module; the tsc build picks it up with
   no new build step.
 
@@ -786,7 +799,7 @@ preference-label pair) — **7 kinds × 4 keys = 28 keys × four languages
   `notification.post.mention.subject` / `.body` templates are new (M36·7).
 - the **six new kinds** contribute all **four** keys each (badge + preference
   label + subject + body) — all new, all four languages (M36·7).
-- the **en floor** (the ADR 0015 D1 provider-floor discipline): the `en` value
+- the **en floor** (the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 provider-floor discipline): the `en` value
   is the **source text**; the `de` / `fr` / `da` values are U06's to author
   (M36·7 four-language pin). The subject ends in a sentence break and the body
   ends in a trailing space (the M6 `post.reply` shape — the UGC snippet is
@@ -849,7 +862,7 @@ group post / announcement) → **no** `Notification` row (M36·8, M36-7).
 ### Part 2.8 — the three-test acceptance gate (M36·8)
 
 U09 runs the three-part gate (the in-process `dotnet exec` path — the
-`AGENTS.md` test-runner quirk; **not** `dotnet test` / the `run_tests` tool):
+[`AGENTS.md`](../../AGENTS.md) test-runner quirk; **not** `dotnet test` / the `run_tests` tool):
 
 1. **`MentionsTests`** (Core) — the 8 test names in Part 2.7 **green** (the
    `MentionTokens` parser + the `IMentionService.ResolveAsync` inert rule).
@@ -864,7 +877,7 @@ U09 runs the three-part gate (the in-process `dotnet exec` path — the
 pin **green** (the `M36_Is_The_Single_InProgress_Milestone_And_The_Last` test —
 Part 2.9 confirms the re-pin is already in place). The gate is **PASS** when all
 four suites are green; any red is a **blocker**, not a stopping point (read the
-error, adjust, continue — the `AGENTS.md` "don't pause mid-task" doctrine).
+error, adjust, continue — the [`AGENTS.md`](../../AGENTS.md) "don't pause mid-task" doctrine).
 
 ### Part 2.9 — the drift guard
 
@@ -905,12 +918,12 @@ close):
   `M36_Is_The_Single_InProgress_Milestone_And_The_Last` + `Shipped_Milestones
   _Are_Marked_Done` (gains `M36`). U10 flips M36 `StatusNext` → `StatusDone`,
   adds **no** `M37` row, and adds the `WhatsNew.cs` `0.x.0` entry naming M36 +
-  ADR 0165 (the required sixth close-flip member).
+  ADR [0165](../adr/0165-mentions.md) (the required sixth close-flip member).
 
 **ADR confirmation (U00 verified, U02 re-confirmed):** **0165** is the next
 free number after **0164** (M35, kiosk) in the ADR index
-(`docs/adr/README.md`); the ADR `0165-mentions.md` is **present, Status:
-Accepted, dated 2026-10-12**. Part 2 is **ADR 0165's** D1–D10, pinned to the
+([`docs/adr/README.md`](../adr/README.md)); the ADR `0165-mentions.md` is **present, Status:
+Accepted, dated 2026-10-12**. Part 2 is **ADR [0165](../adr/0165-mentions.md)'s** D1–D10, pinned to the
 shapes above.
 
 **Drift-pause rule (U02–U10):** if a unit's entry reads reveal this Part 2

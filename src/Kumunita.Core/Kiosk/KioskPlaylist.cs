@@ -1,70 +1,62 @@
 namespace Kumunita.Core.Kiosk;
 
 /// <summary>
-/// The kiosk playlist (M35·2 — the **5-member ceiling**, no field
-/// outside this set, ADR 0164 D1 + the amendment's <see cref="DisplayMode"/>).
-/// A **per-resident** row (the
-/// <c>LocaleSettings</c> / per-user preference shape, ADR 0004
-/// §B.1): one row per signed-in user, <see cref="Id"/> set to the
-/// user's <b>subject id</b> (the actor id that configured it), so each
-/// resident's kiosk playlist is independent — the <c>/kiosk</c> display
-/// resolves the *viewer's* playlist, not a shared GlobalAdmin singleton.
+/// A resident's kiosk playlist (ADR 0164, reworked by ADR 0285). A
+/// **per-resident** row (the <c>LocaleSettings</c> / per-user preference
+/// shape, ADR 0004 §B.1): one row per signed-in user, <see cref="Id"/> set to
+/// the user's <b>subject id</b>, so the <c>/kiosk</c> display resolves the
+/// <em>viewer's</em> playlist.
 /// <para>
-/// The <see cref="Views"/> is the **ordered** slide list (list position =
-/// the slide order, not a stored field — the <see cref="KioskView"/> entries
-/// are a value object, not a standalone doc, M35·9). The two interval
-/// members are **display-only, never an access input** (M35·4, ADR 0164 D3):
-/// they configure the kiosk's auto-cycle / auto-refresh cadence; they are
-/// never a DB access column and never an authorization input.
+/// <see cref="Entries"/> is the **ordered** entry list (list position = the
+/// play order; the <see cref="KioskEntry"/> is a value object, not a
+/// standalone doc, M35·9). Every member is **display-only, never an access
+/// input** (M35·4, ADR 0164 D3).
 /// </para>
 /// <para>
-/// The <see cref="KioskPlaylist"/> is a **resident-set** config (the
-/// <c>LocaleSettingsService</c> / per-user preference write-lane
-/// convention): the standing to write it is any signed-in user, enforced by
+/// ADR 0285 replaced the old <c>Views</c> (Board / Calendar / Todos slides)
+/// and the playlist-wide <c>ViewIntervalSeconds</c> with
+/// <see cref="Entries"/> (any item type, each with its own duration, scroll
+/// behaviour and comments toggle), <see cref="DefaultDurationSeconds"/> and
+/// <see cref="ScrollSpeed"/>. A row saved before the change loads with an
+/// empty <see cref="Entries"/> (the old field is ignored), so the resident
+/// sees the <c>kiosk.empty</c> state until they save a new playlist — no
+/// migration (there were no live deployments).
+/// </para>
+/// <para>
+/// The write standing is any signed-in user over their own row, enforced by
 /// the Web gate (<c>[Authorize]</c>), not re-checked in the Core service
-/// (M35·1 — the <c>KioskService</c> adds **no** new <c>AccessAction</c> /
-/// <c>Decide()</c> branch / <c>IAuditableResource</c> adapter). The
-/// <see cref="KioskPlaylist"/> read emits **zero** <c>AccessAudit</c> rows
-/// (M35·5, ADR 0164 D5); the write commits exactly **one**
-/// <c>kiosk.save</c> <c>AccessAudit</c> row (<c>Via = Owner</c>, M35·5).
+/// (M35·1). The read emits **zero** <c>AccessAudit</c> rows (M35·5); the
+/// write commits exactly **one** <c>kiosk.save</c> row (<c>Via = Owner</c>).
 /// </para>
 /// </summary>
 public sealed class KioskPlaylist
 {
-    /// <summary>The per-resident identity key (the <b>subject id</b> of the
-    /// user who configured this playlist — one row per user, keyed on this
-    /// id).</summary>
+    /// <summary>The per-resident identity key (the subject id of the user who
+    /// configured this playlist).</summary>
     public string Id { get; set; } = string.Empty;
 
-    /// <summary>The **ordered** slide list (list position = the slide order,
-    /// not a stored field — the <see cref="KioskView"/> entries are a value
-    /// object, not a standalone doc, M35·9). An empty list (the default)
-    /// means "no slides configured" — the display renders the
-    /// <c>kiosk.empty</c> message (M35-8 FACE).</summary>
-    public IReadOnlyList<KioskView> Views { get; set; } = [];
+    /// <summary>The **ordered** entries (list position = the play order). An
+    /// empty list means "nothing configured" — the display renders the
+    /// <c>kiosk.empty</c> message (M35-8).</summary>
+    public IReadOnlyList<KioskEntry> Entries { get; set; } = [];
 
-    /// <summary>The slide-advance cadence in seconds (the kiosk's
-    /// <c>setInterval</c> view-advance timer). **Display-only, never an
-    /// access input** (M35·4, ADR 0164 D3). <c>&gt;= 5</c>; default
-    /// <c>30</c>.</summary>
-    public int ViewIntervalSeconds { get; set; } = 30;
+    /// <summary>The duration (seconds, <c>&gt;= 5</c>) the editor gives a new
+    /// entry. Each entry then carries its own
+    /// <see cref="KioskEntry.DurationSeconds"/>. Default <c>30</c>.</summary>
+    public int DefaultDurationSeconds { get; set; } = 30;
 
-    /// <summary>The content-refresh cadence in seconds (the kiosk's
-    /// <c>setInterval</c> content-refresh timer — **faster** than the view
-    /// cadence). **Display-only, never an access input** (M35·4, ADR 0164
-    /// D3). <c>&gt;= 2</c> and <c>&lt; ViewIntervalSeconds</c>; default
-    /// <c>10</c>.</summary>
+    /// <summary>The change-detection cadence in seconds (the kiosk checks the
+    /// current slide's content fingerprint on this interval and reloads it
+    /// only when it changed). <c>&gt;= 2</c>; default <c>10</c>.</summary>
     public int RefreshIntervalSeconds { get; set; } = 10;
 
-    /// <summary>The display mode (the ADR 0164 amendment "full page vs. full
-    /// screen" pin — a per-resident <em>display</em> preference, **display-only,
-    /// never an access input**, M35·4): <see cref="KioskDisplayMode.FullPage"/>
-    /// (the browser viewport, the ADR 0104 chrome-hide idiom) or
-    /// <see cref="KioskDisplayMode.FullScreen"/> (the browser's Fullscreen API
-    /// — the stage owns the whole monitor, the "shared physical display"
-    /// question M35 settles). Default <see cref="KioskDisplayMode.FullPage"/>
-    /// (a fresh row is the in-browser full-page shape; entering true
-    /// full-screen needs a user gesture, so the display degrades to full-page
-    /// where the gesture is unavailable).</summary>
+    /// <summary>Full page (the browser viewport) or full screen (the browser's
+    /// Fullscreen API) — the ADR 0164 amendment. Default
+    /// <see cref="KioskDisplayMode.FullPage"/>.</summary>
     public KioskDisplayMode DisplayMode { get; set; } = KioskDisplayMode.FullPage;
+
+    /// <summary>The auto-scroll speed for every entry set to
+    /// <see cref="KioskScrollBehavior.Auto"/> (ADR 0285 D4). Default
+    /// <see cref="KioskScrollSpeed.Medium"/>.</summary>
+    public KioskScrollSpeed ScrollSpeed { get; set; } = KioskScrollSpeed.Medium;
 }

@@ -1,4 +1,17 @@
-# ADR 0046 — Default-language fallback: browser `Accept-Language` match
+---
+id: adr-0046
+title: "Default-language fallback: browser `Accept-Language` match"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/events-calendar/events-calendar-handoff-notes.md]
+supersedes: [adr-0005]
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0046](0046-default-language-browser-accept-language-match.md) — Default-language fallback: browser `Accept-Language` match
 
 Status: Accepted
 Date: 2026-09-19
@@ -14,7 +27,7 @@ is in the catalog.
 
 ## Context
 
-ADR 0005 §C pins the resolution chain: **preferred-language cookie → instance
+ADR [0005](0005-multilingual-support.md) §C pins the resolution chain: **preferred-language cookie → instance
 default → `en` floor**, with the fallback discipline per-string (M·2). Today a
 resident who has never chosen a language sees the instance default on every
 page, whatever their browser speaks. The platform is being exercised in
@@ -39,14 +52,14 @@ default language.*
 - **When the cookie is absent** (no preference saved, or a blank/invalid
   cookie — the M·5 "no preference" shape), the per-request resolution tries a
   **match of the `Accept-Language` header against the enabled catalog**.
-  "Enabled" is read exactly as ADR 0015 / 0042/0045 read it: the
+  "Enabled" is read exactly as ADR [0015](0015-ui-view-localization-mechanics.md) / 0042/0045 read it: the
   `LanguageCatalog.Enabled` rows, ordered. A tag matching a **disabled**
-  language (ADR 0045's `da`-at-first-boot shape) is *not* a match — the
+  language (ADR [0045](0045-danish-preseeded-disabled.md)'s `da`-at-first-boot shape) is *not* a match — the
   suggestion does not outrun the catalog.
 - **If no tag matches** (header absent, no enabled match), the chain continues
   exactly as before: instance default → `en` floor, per-string (M·2). The new
   step is *insertive*, not a replacement — a misconfigured browser degrades to
-  the frozen ADR 0005 chain.
+  the frozen ADR [0005](0005-multilingual-support.md) chain.
 
 ### D2 — Matching rules (the `RequestLanguage` helper, Web layer)
 
@@ -65,17 +78,17 @@ default language.*
   toggle all ask *it* for the effective per-request signal, so the parse
   cannot drift between surfaces.
 
-### D3 — The Core seam: candidates, not headers (M·8 / ADR 0001-B hold)
+### D3 — The Core seam: candidates, not headers (M·8 / ADR [0001](0001-core-stack-and-identity-model.md)-B hold)
 
 - `ITranslationProvider` gains `ResolveEffectiveLanguageAsync(
   IReadOnlyCollection<string>? candidates)` — an **ordered candidate list**,
   deduplicated, first *enabled* match wins. The header itself never crosses
   the seam; the Web layer translates the browser signal into the candidate
   list and passes it in. Core stays HTTP-free (M·8); the language remains
-  never-a-claim (ADR 0001-B) — the candidates are a resolution input, not
+  never-a-claim (ADR [0001](0001-core-stack-and-identity-model.md)-B) — the candidates are a resolution input, not
   identity.
 - The existing `ResolveEffectiveLanguageAsync(string? preferred)` is
-  unchanged: `candidates` omitted ⇒ the frozen ADR 0005 chain. The old call
+  unchanged: `candidates` omitted ⇒ the frozen ADR [0005](0005-multilingual-support.md) chain. The old call
   shape (cookie → default → `en`) is a special case of the new one, so no
   pinned behavior in 0005/0015 moves — the parity and fallback tests keep
   passing as written.
@@ -93,20 +106,20 @@ setting. So:
 - **The account nav** marks the active language with a `(matched)` suffix in
   the dropdown only while the match (not a saved preference) is in effect.
 - The marker/notes are themselves localized — new `locale.browser_matched`,
-  `locale.browser_note`, `locale.browser_note_tail` keys in the ADR 0015
+  `locale.browser_note`, `locale.browser_note_tail` keys in the ADR [0015](0015-ui-view-localization-mechanics.md)
   registry, shipped in `en`/`de`/`fr`/`da` (the parity pin holds).
 
 ## Consequences
 
 - The per-request resolution now reads (in Web): the cookie, then the header;
-  the Core read seam reads only the candidate list. M·8, ADR 0001-B, and the
+  the Core read seam reads only the candidate list. M·8, ADR [0001](0001-core-stack-and-identity-model.md)-B, and the
   thin-token rule all hold — nothing here enters a claim, a cookie write, or
   an authorization decision.
 - Audit/SECURITY: a browser match grants no extra access. It only picks which
   *already-enabled* language the UI renders in; audience restriction and
   visibility are unchanged (the language choice never was an access control —
-  ADR 0005 §B).
-- ADR 0045's disabled-`da` shape is respected end-to-end: a Danish browser on
+  ADR [0005](0005-multilingual-support.md) §B).
+- ADR [0045](0045-danish-preseeded-disabled.md)'s disabled-`da` shape is respected end-to-end: a Danish browser on
   a first-boot instance sees the `en`-default UI, *not* a Danish one, because
   `da` is not an enabled row — the suggestion cannot leak a disabled language
   into the UI.
@@ -119,7 +132,7 @@ setting. So:
 - **Core** (`LocalizationServiceTests`, live Postgres): an enabled
   candidate resolves; a disabled candidate falls through to the default; a
   non-catalog tag falls through; candidate order is honored first-enabled-
-  wins; null/empty candidates reproduce the frozen ADR 0005 chain.
+  wins; null/empty candidates reproduce the frozen ADR [0005](0005-multilingual-support.md) chain.
 - **Web** (`ADR_0046_RequestLanguageTests`): `Accept-Language` parse and
   match (exact, primary-subtag, priority, case, disabled-exclusion, `q=0`,
   malformed-degrades, duplicate-keeps-highest); `Preference` (cookie beats

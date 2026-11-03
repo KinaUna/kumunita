@@ -1,11 +1,24 @@
-# ADR 0010 — Private groups: a membership/organizing unit, hidden from the audience pickers
+---
+id: adr-0010
+title: "Private groups: a membership/organizing unit, hidden from the audience pickers"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-events-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0010](0010-private-groups.md) — Private groups: a membership/organizing unit, hidden from the audience pickers
 
 Status: Accepted
 Date: 2026-09-10
 
 ## Context
 
-Two product wants collided with the group model as shipped after ADR 0009:
+Two product wants collided with the group model as shipped after ADR [0009](0009-group-description-display-and-edit-lane.md):
 
 - **Cluttered access lists.** Every group on the platform appears in both
   grant/access pickers (the profile's contact-visibility editor and the post
@@ -43,14 +56,14 @@ pickers show only users and public groups.
 
 - **`CreateGroupAsync` gains a defaulted parameter.**
   `CreateGroupAsync(ownerId, name, description, isPrivate = false)` — a
-  source-compatible extension per ADR 0006-E: every existing 3-arg caller binds
+  source-compatible extension per ADR [0006](0006-module-boundary-contracts.md)-E: every existing 3-arg caller binds
   unchanged and produces a public group; the create form's new "Private group"
   checkbox drives the `true` value.
 
-- **Two new named seams on `IUserInfoService`** (ADR 0006-E additions — the same
-  shape ADR 0009 established for the description lane):
+- **Two new named seams on `IUserInfoService`** (ADR [0006](0006-module-boundary-contracts.md)-E additions — the same
+  shape ADR [0009](0009-group-description-display-and-edit-lane.md) established for the description lane):
   - `SetGroupPrivacyAsync(groupId, isPrivate, updatedBy)` — the **write lane**
-    (owner ∪ GlobalAdmin standing, ADR 0007's new-lane rule). One session: load
+    (owner ∪ GlobalAdmin standing, ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s new-lane rule). One session: load
     the group, mutate `IsPrivate`, append one `AccessAudit` row (action
     **`group.update`**, `TargetKind` "group", `TargetId` = the group id) in the
     same transaction (invariant C3), one `SaveChangesAsync`. `Via` is derived
@@ -76,11 +89,11 @@ pickers show only users and public groups.
     the group is born hidden from the pickers (no owner action needed post-create).
   - **Detail** — the `/groups/{id}` header shows a "Private" badge when
     `IsPrivate`; an owner ∪ GlobalAdmin "Privacy" section (gated
-    `TryResolveOwnerSurface` — the same gate ADR 0009's description edit uses)
+    `TryResolveOwnerSurface` — the same gate ADR [0009](0009-group-description-display-and-edit-lane.md)'s description edit uses)
     carries a single "Private group" checkbox posted to
     `POST /groups/{id}/update-privacy`. One route, one form, both directions:
     unchecked = public, checked = private (a blank form value binds `false` to
-    the `bool isPrivate` parameter — the same shape ADR 0009's
+    the `bool isPrivate` parameter — the same shape ADR [0009](0009-group-description-display-and-edit-lane.md)'s
     "blank clears" mapping uses for the description).
 
 ## Consequences
@@ -94,17 +107,17 @@ pickers show only users and public groups.
   only users and **public** groups — the "mushroom hunters" style of reuse unit —
   and no "family" or "my circle" group crowds them.
 
-- **`group.update` gains a second field.** The audit verb ADR 0009 introduced for
+- **`group.update` gains a second field.** The audit verb ADR [0009](0009-group-description-display-and-edit-lane.md) introduced for
   the description lane now covers two mutable group fields: the description and
   the privacy state. The `Action = group.update` + `TargetId = groupId` pair is
   the audit row's identity; the two fields write through two distinct Core seams
   (`UpdateGroupDescriptionAsync` / `SetGroupPrivacyAsync`), each producing its
   own audit row on the same verb.
 
-- **ADR 0007's standing is consistent, not extended.** Every group write lane —
-  add/remove/invite/leave (ADR 0007/0008), description (ADR 0009), privacy
+- **ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s standing is consistent, not extended.** Every group write lane —
+  add/remove/invite/leave (ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)/0008), description (ADR [0009](0009-group-description-display-and-edit-lane.md)), privacy
   (this ADR) — sits on **owner ∪ GlobalAdmin**; the seam itself does not re-gate
-  (ADR 0006-D), the Web's `TryResolveOwnerSurface` does. The privacy lane is a
+  (ADR [0006](0006-module-boundary-contracts.md)-D), the Web's `TryResolveOwnerSurface` does. The privacy lane is a
   third consumer of the same standing.
 
 - **Non-decisions:**

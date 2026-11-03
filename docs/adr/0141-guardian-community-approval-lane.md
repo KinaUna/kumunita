@@ -1,17 +1,30 @@
-# ADR 0141 — GU community-approval lane: guardian approves / rejects a supervised child's community membership + group invitation
+---
+id: adr-0141
+title: "GU community-approval lane: guardian approves / rejects a supervised child's community membership + group invitation"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/guardian-event-rsvp-gate-design.md]
+supersedes: [adr-0028]
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0141](0141-guardian-community-approval-lane.md) — GU community-approval lane: guardian approves / rejects a supervised child's community membership + group invitation
 
 Status: Accepted
 Date: 2026-10-04
-Amends: ADR 0028 (GU — the standing is extended, not changed: the five
+Amends: ADR [0028](0028-guardian-controls-account-scope-supervision.md) (GU — the standing is extended, not changed: the five
 supervisory actions gain a **reject** on group invitations and an
-**approve / reject** on community membership), ADR 0083 / 0095 (the group-invite
+**approve / reject** on community membership), ADR [0083](0083-group-add-and-invite-notifications.md) / 0095 (the group-invite
 notification's *recipient* moves to the guardian when the invitee is a
 supervised child; the child-facing lane is unchanged for unsupervised invitees
 and for a guardian inviting their own child).
 
 ## Context
 
-ADR 0028 (GU) gave a guardian account-scope supervision over a child they
+ADR [0028](0028-guardian-controls-account-scope-supervision.md) (GU) gave a guardian account-scope supervision over a child they
 created: suspend / un-suspend, messaging + community restriction, **approve a
 group invitation sent to a child**, and dissolve. Two gaps in that surface
 are now the product want:
@@ -24,7 +37,7 @@ are now the product want:
    themselves. The guardian has no path to say no on the child's behalf.
 
 2. **A supervised child's *community* membership lands immediately when an
-   admin adds them.** ADR 0012 / the community-add lanes
+   admin adds them.** ADR [0012](0012-community-membership-mandatory-and-moderator.md) / the community-add lanes
    (`AddCommunityMemberAsync` / `SetCommunityMembershipAsync`) upsert the
    live `ComponentMembership` row on the admin's write. For an unsupervised
    resident that is correct; for a *supervised child* it bypasses the
@@ -32,18 +45,18 @@ are now the product want:
    `GetCommunityIdsAsync` (C4) before the guardian has seen or agreed to it.
 
 Both want the same shape, and both already have a precedent in the codebase:
-the **m2b owner-invited group lane** (ADR 0007, the `GroupInvitation`
-document) and the **ADR 0094 join-request lane** — a *pending* row the
+the **m2b owner-invited group lane** (ADR [0007](0007-group-management-lane-owner-or-globaladmin.md), the `GroupInvitation`
+document) and the **ADR [0094](0094-group-join-request-lane.md) join-request lane** — a *pending* row the
 resolver approves or declines, where **approving is what writes the live
-membership** and declining writes none. ADR 0141 carries that
+membership** and declining writes none. ADR [0141](0141-guardian-community-approval-lane.md) carries that
 pending-then-resolve shape to (a) the guardian's *reject* of a child's group
 invitation, and (b) a supervised child's *community* membership — where the
-**guardian is the resolver** (the `AccessVia.Guardian` standing, ADR 0028
+**guardian is the resolver** (the `AccessVia.Guardian` standing, ADR [0028](0028-guardian-controls-account-scope-supervision.md)
 G·2/G·3).
 
-The notification lane (ADR 0076 / 0083 / 0095) is the standing delivery
+The notification lane (ADR [0076](0076-notifications-inbox-and-recipient-email.md) / 0083 / 0095) is the standing delivery
 mechanism: the `Notification` inbox row + best-effort email, with the
-ADR 0095 `AcceptPath` / `DeclinePath` action links. ADR 0141 re-points the
+ADR [0095](0095-group-invite-accept-decline-links.md) `AcceptPath` / `DeclinePath` action links. ADR [0141](0141-guardian-community-approval-lane.md) re-points the
 group-invite notification's *recipient* to the child's guardian(s) when the
 invitee is supervised, and adds a new `guardian.community_invite` kind for the
 community lane — both deep-linking at the child's **manage-child page**
@@ -69,7 +82,7 @@ community lane — both deep-linking at the child's **manage-child page**
   invitation reuses the existing `GroupInvitation` row (its
   `InvitationStatus.Declined` terminal) — only the *resolver* and the audit
   verb are new (below). This keeps the group lane's single-row-per-(group,
-  user) shape and the child's self-accept GU gate exactly as ADR 0028
+  user) shape and the child's self-accept GU gate exactly as ADR [0028](0028-guardian-controls-account-scope-supervision.md)
   recorded them.
 
 ### The four new Core seams (exact)
@@ -84,7 +97,7 @@ Task<IReadOnlyList<CommunityMembershipRequest>> GetPendingCommunityMembershipReq
 
 - **Standing = the active `GuardianLink` for (guardian, child).** Every
   resolve lane runs `GuardActiveLinkAsync(session, guardianId, childId)`
-  first (the ADR 0028 G·2 live / G·3 deny-by-default gate, the
+  first (the ADR [0028](0028-guardian-controls-account-scope-supervision.md) G·2 live / G·3 deny-by-default gate, the
   `ApproveGroupInvitationAsync` precedent): no active row for the exact pair
   ⇒ `UnauthorizedAccessException` (the Web surfaces a 404 — a non-guardian
   learns nothing). The audit `Via` on every resolve row is
@@ -101,10 +114,10 @@ Task<IReadOnlyList<CommunityMembershipRequest>> GetPendingCommunityMembershipReq
   (`InviteGroupMemberAsync`) is *unchanged* (the invitation row already
   lands for a supervised child); only its **notification recipient** moves
   (below).
-- **The guardian's own curation lane is exempt (ADR 0028 preserved).** If the
+- **The guardian's own curation lane is exempt (ADR [0028](0028-guardian-controls-account-scope-supervision.md) preserved).** If the
   *actor* of a community add is one of the child's **active** guardians, the
   `ComponentMembership` row lands **immediately** with `Via: Guardian` — the
-  pre-existing ADR 0028 "the guardian curates their child's membership"
+  pre-existing ADR [0028](0028-guardian-controls-account-scope-supervision.md) "the guardian curates their child's membership"
   direct write (the `AddGroupMemberAsync` / `RemoveGroupMemberAsync`
   precedent), with **no** pending request and **no** self-notification (the
   actor is a recipient; a self-notification would be noise). Likewise a
@@ -136,12 +149,12 @@ Task<IReadOnlyList<CommunityMembershipRequest>> GetPendingCommunityMembershipReq
   all `TargetKind` `"component"` (the community family) or `"group"` (the
   reject family), `Outcome Allow`.
 - **The notification re-point + the two new kinds.** When a supervised child
-  is invited to a group, the ADR 0083 / 0095 emission's *recipient* becomes
+  is invited to a group, the ADR [0083](0083-group-add-and-invite-notifications.md) / 0095 emission's *recipient* becomes
   the child's **active guardian(s)** (one `Notification` row per active
   guardian, idempotency key suffixed with the guardian id so two guardians
   coexist) under the new kind `guardian.group_invite`, with `LinkPath` /
   `AcceptPath` / `DeclinePath` all pointing at
-  `/me/children/{childId}`. An unsupervised invitee keeps the ADR 0095
+  `/me/children/{childId}`. An unsupervised invitee keeps the ADR [0095](0095-group-invite-accept-decline-links.md)
   child-facing shape unchanged (kind `group.invite`, the self-lane GET links).
   The community lane emits a new kind `guardian.community_invite`, same
   per-guardian shape. Both kinds are **opt-OUT** (not in `OptInKinds`) — the
@@ -162,7 +175,7 @@ Task<IReadOnlyList<CommunityMembershipRequest>> GetPendingCommunityMembershipReq
   (`PendingCommunityRequests`). The notification's action links land on the
   existing standing-gated `Detail` GET (link-clickable, a non-guardian 404s)
   — the approve / reject themselves remain POSTs, so no new GET resolve
-  action is added (the ADR 0095 `AcceptInvitationLink` precedent is
+  action is added (the ADR [0095](0095-group-invite-accept-decline-links.md) `AcceptInvitationLink` precedent is
   deliberately *not* mirrored: the guardian's action is a write, and the
   deep-link is the read).
 
@@ -181,7 +194,7 @@ Task<IReadOnlyList<CommunityMembershipRequest>> GetPendingCommunityMembershipReq
 - **A guardian now has a full approve / reject pair** over a child's group
   invitation (previously approve-only), and an approve / reject pair over a
   child's community membership. The child's own *decline* self-lane on groups
-  is preserved (ADR 0028: the child may always say no); the child still has
+  is preserved (ADR [0028](0028-guardian-controls-account-scope-supervision.md): the child may always say no); the child still has
   **no self-accept** (the GU gate is unchanged) and **no self-lane at all** on
   community requests (there is no child-facing surface for them).
 - **Two new resident notification kinds** enter the closed
@@ -191,7 +204,7 @@ Task<IReadOnlyList<CommunityMembershipRequest>> GetPendingCommunityMembershipReq
   (the two `notifications.kind.*`, two `notifications.preference.*`, plus
   `guardian.pending_community_requests` / `guardian.no_community_requests` /
   `guardian.reject`) are registered × 4 languages in `KnownTranslationKeys`
-  (the ADR 0015 / ADR 0005 registry parity preserved; `en` is the provider
+  (the ADR [0015](0015-ui-view-localization-mechanics.md) / ADR [0005](0005-multilingual-support.md) registry parity preserved; `en` is the provider
   floor, so a fresh instance renders the English immediately).
 - **The `MembershipEditorModel` pin moves in the same commit** (the AGENTS.md
   drift-guard): `GuardianViewModelsTests` now pins a **six**-field record
@@ -211,5 +224,5 @@ Task<IReadOnlyList<CommunityMembershipRequest>> GetPendingCommunityMembershipReq
   unsupervised-unchanged lanes, and the re-request reset).
 - **`Milestones.cs` / the README Roadmap / `MilestonesTests.cs` are
   untouched** — this is a named GU extension on the already-shipped
-  guardian-controls surface (the ADR 0028 / 0038 precedent), not a new
+  guardian-controls surface (the ADR [0028](0028-guardian-controls-account-scope-supervision.md) / 0038 precedent), not a new
   M-letter milestone. M4 / M5 / M6 stay Events / Projects / Portability.

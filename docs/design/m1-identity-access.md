@@ -1,4 +1,20 @@
+---
+id: design-m1-identity-access
+title: "M1 — Identity, groups, delegation, authorization"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+  - docs/adr/0001-core-stack-and-identity-model.md
+updated: 2026-11-02
+---
+
 # Design Doc — M1: Identity, groups, delegation, authorization
+
+> **Abstract:** the **M1 identity** design — the **access model** every later milestone hangs off: identity lifecycle (signup, verify, setup-token bootstrap), the **audience / grant / delegation** documents, always-on `AccessAudit`, and the Wolverine side effects (`OutboxEmail`, `AuditPurge`), frozen by ADR [0006](../adr/0006-module-boundary-contracts.md). **Who is it for:** a developer touching the `IdentityService` / authorization seams; an agent that needs the access-model invariants. **When to read the rest:** before touching the identity lane, the audience/grant/delegation docs, or the audit side effects.
+
 
 > The "Seams & contracts" section is mandatory. Three tests run and
 > recorded at the end.
@@ -8,9 +24,9 @@
 M0 delivered the deployable substrate: solution layout, Docker + Coolify
 deploys, versioned `mt` boot block, `/health`, per-instance `Community`
 config. M1 builds the **access model** — the linkage every later milestone
-hangs its arrows off of (ARCHITECTURE.md §2). For M1 the three access
+hangs its arrows off of ([identity & access](../architecture/identity-access.md)). For M1 the three access
 modules go from architecture prose to living code behind the interfaces
-frozen in **ADR 0006**.
+frozen in **ADR [0006](../adr/0006-module-boundary-contracts.md)**.
 
 ## Goals / Non-goals
 
@@ -20,7 +36,7 @@ frozen in **ADR 0006**.
   admin manual-verify safety valve; one-time setup-token admin bootstrap
   (`SeedAdmin__Email` / `SeedAdmin__Token`, consumed on first login —
   OPS.md §2); role promote/demote + component-scope assignment
-  (`ModeratorAssignment`, ADR 0003).
+  (`ModeratorAssignment`, ADR [0003](../adr/0003-roles-and-moderator-scoping.md)).
 - **UserInfoModule** — `Profile` document (including `visibility: Audience`
   storage — M2 consumes it, M1 stores it), `Group` / `GroupMembership`,
   `DelegationGrant` (grant/revoke/documents).
@@ -36,7 +52,7 @@ frozen in **ADR 0006**.
   write — §6.2) and the `AuditPurge` scheduled job (tiered expiry, §6.4).
 - **Schema** — M1 domain documents are **Marten-native** (Marten owns their
   `mt` tables from the POCO shapes, applied through the same dev-loop +
-  boot path as M0; ADR 0004 §B.1). The one hand-rolled exception is
+  boot path as M0; ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1). The one hand-rolled exception is
   `mt."AdminOverride"` (operator-written in psql, app only reads it),
   contributed by a small `AuthorizationFeature` registered alongside
   M0's `KumunitaFeature`. `identity` schema: EF migrations for stock
@@ -44,7 +60,7 @@ frozen in **ADR 0006**.
   components seed (Safety, Maintenance, Social, Governance) + admin
   bootstrap, idempotent.
 - **Seam tests** — the invariant list under "Feedback loops" below, each
-  anchored to a frozen ADR 0006 invariant number.
+  anchored to a frozen ADR [0006](../adr/0006-module-boundary-contracts.md) invariant number.
 - **`/health` degraded state** — reports `degraded` when
   `EmailDeadLetter` count > 0 (§6.2).
 
@@ -70,7 +86,7 @@ alone) and deferred in README.md *Deferred (future, by design)*.
 **Surfaces**
 
 - Signup / verify / login; profile bootstrap (name, email, `visibility`
-  defaulting per ADR 0001-B — author's choice of audience, absolute by
+  defaulting per ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B — author's choice of audience, absolute by
   default).
 - `/admin` shell — roles + component scope (admin only), `/admin/audit`
   (GlobalAdmin), `/admin/break-glass` (consume `AdminOverride` once).
@@ -86,16 +102,16 @@ risk is a *wrong* access decision, not load).
 
 ## Parts affected
 
-- **`Kumunita.Core`:** new `Identity/` module (issues principal), `UserInfo/`, `Authorization/`; `Bootstrap/FirstBootSeeder` extended; the Wolverine-free business-logic seam of the side effects (`ISmtpSender` + `SmtpSender`, `IMailerStage`/`OutboxEmailStager`, `EmailDeadLetterWriter`, `AuditPurgeService` — all testable against `PostgresFixture`); schema: M1 Marten documents (POCO-derived `mt` tables) + hand-rolled `AuthorizationFeature` for `mt."AdminOverride"` (ADR 0004 §B.1).
+- **`Kumunita.Core`:** new `Identity/` module (issues principal), `UserInfo/`, `Authorization/`; `Bootstrap/FirstBootSeeder` extended; the Wolverine-free business-logic seam of the side effects (`ISmtpSender` + `SmtpSender`, `IMailerStage`/`OutboxEmailStager`, `EmailDeadLetterWriter`, `AuditPurgeService` — all testable against `PostgresFixture`); schema: M1 Marten documents (POCO-derived `mt` tables) + hand-rolled `AuthorizationFeature` for `mt."AdminOverride"` (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 - **`Kumunita.Web`:** signup/login/profile pages; `/admin` area; `/health` degraded wiring. Wolverine side-effects host: `WolverineFx` + `WolverineFx.Marten` packages, `src/Kumunita.Web/SideEffects/OutboxEmailHandler.cs` (durable `OutboxEmail` send + `Fault<OutboxEmail>` dead-letter hook) and `src/Kumunita.Web/SideEffects/AuditPurgeHandler.cs` (`AuditPurgeTick` self-rescheduling `TimeoutMessage`), wired in `Program.cs` (`UseWolverine`, `RetryWithCooldown`, `PublishFaultEvents`). Per the `IMailerStage` doc-comment convention ("Wolverine is a *Web* package"), Core references no Wolverine types.
 - **`tests/Kumunita.Core.Tests`:** seam tests (against the `PostgresFixture`'s fresh-scratch-DB shape — no fixture change needed) plus the step-7 side-effect harness (`SideEffectHarnessTests.cs` — dead-letter row shape, the failing-send handoff guarantee, `AuditPurge` tiering), written against the Wolverine-free business logic so no live message host is required.
 
 ## Seams & contracts (mandatory)
 
-- **Created:** the ADR 0006 interface set — `IIdentityService`,
+- **Created:** the ADR [0006](../adr/0006-module-boundary-contracts.md) interface set — `IIdentityService`,
   `IUserInfoService`, `IAuthorizationService` — plus shared vocabulary
   (`ThinPrincipal`, `Decision`, `VisibleSet`, `AccessAction`,
-  `IAuditableResource`). Change management per ADR 0006-E: these changes
+  `IAuditableResource`). Change management per ADR [0006](../adr/0006-module-boundary-contracts.md)-E: these changes
   are *breaking* and ADR-gated.
 - **Access model touched:** everything M1 builds *is* the access model.
   New contracts: `Audience { mode: Any|All, grants: [User|Group] }`;
@@ -121,7 +137,7 @@ risk is a *wrong* access decision, not load).
 
 ## Feedback loops
 
-- **Seam tests** (each cites ADR 0006 invariant):
+- **Seam tests** (each cites ADR [0006](../adr/0006-module-boundary-contracts.md) invariant):
   - empty-audience-denies under `All` (§C1) and the empty-audience guard
 	itself;
   - delegation action-out-of-scope → Deny with `Via = Delegation` and the
@@ -183,7 +199,7 @@ access decision, a leaked private detail").
   profile's `visibility`.
 - **Flexible — consumed (the named trade):** `Any`/`All` semantics are
   frozen before M3's real workloads prove `All` earns its edge
-  (ADR 0001-B revisit). Interface changes are ADR-gated: slower than
+  (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B revisit). Interface changes are ADR-gated: slower than
   ad-hoc, by design.
 - **Adaptive — strengthened:** `EmailDeadLetter` → degraded health →
   operator re-queue is a closed response path; audit rows are the
@@ -267,7 +283,7 @@ Evidence per test:
 | 2 | Handoff | `SideEffectHarnessTests.FailedSend_NeverRollsBackTheCommittedDomainWrite_TheHandoff` — the single designed handoff (staged email → durable send) is the only cross-seam, and its failure never tears down the on-platform state; `EmailDeadLetterCounterTests.GetCountAsync_ReflectsStoredDeadLetters_AgainstRealPostgres` — the handoff's failure signal is operator-visible via the production counter |
 | 3 | Part-vs-whole | the full invariant-anchored seam list below, all passing — the whole's insurance, run before M1 ships, not as follow-up |
 
-Seam-list → test mapping (each anchored to its ADR 0006 invariant):
+Seam-list → test mapping (each anchored to its ADR [0006](../adr/0006-module-boundary-contracts.md) invariant):
 
 | Invariant | Seam test(s) | Result |
 |-----------|--------------|--------|

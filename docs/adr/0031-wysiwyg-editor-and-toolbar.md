@@ -1,21 +1,22 @@
-# ADR 0031 — WYSIWYG editor + toolbar over the RC Markdown lane
-
-Status: Accepted
-Date: 2026-09-15
-Amends: 0025 (the *"Any WYSIWYG / third-party editor — the `tsc`-only
-constraint stands; the composer is a textarea with a Markdown hint"* non-
-decision — the `tsc`-only constraint **stands unchanged**; what changes is
-that the *composer surface* is now a split-view + toolbar, still no editor
-dependency. Does **not** supersede 0025; 0025's read-side decisions — the
-one renderer, the `ImageIds` model, the `/content-image` routes — are the
-frozen base this ADR builds on.)
+---
+id: adr-0031
+title: "WYSIWYG editor + toolbar over the RC Markdown lane"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0025]
+superseded_by: [adr-0032, adr-0033, adr-0086, adr-0107, adr-0165]
+updated: 2026-11-02
+---
 
 ## Context
 
-ADR 0025 (the rich-content lane, `RC`) delivered the **read** half of its
+ADR [0025](0025-rich-content-markdown-and-content-images.md) (the rich-content lane, `RC`) delivered the **read** half of its
 promise — *"a resident can bold a heading, start a list, or show a photo"* —
 by extending `MarkdownRenderer` with image support and switching every UGC
-body to render through it. ADR 0025's *"Not decided here"* section then
+body to render through it. ADR [0025](0025-rich-content-markdown-and-content-images.md)'s *"Not decided here"* section then
 **explicitly deferred** the write half:
 
 > **Any WYSIWYG / third-party editor** — the `tsc`-only constraint stands;
@@ -32,7 +33,7 @@ bold hand-types `**text**` and watches the raw markers while composing.
 The constraints the choice must honor (all pre-existing, carried from ADR
 0025):
 
-- **The `tsc`-only client convention** (ADR 0025 consequence: *"no editor
+- **The `tsc`-only client convention** (ADR [0025](0025-rich-content-markdown-and-content-images.md) consequence: *"no editor
   dependency enters `package.json`"*).
 - **One renderer** (RC R·1) — the read path is already `MarkdownRenderer`; a
   second renderer or an HTML → Markdown round-trip engine does not exist and
@@ -41,7 +42,7 @@ The constraints the choice must honor (all pre-existing, carried from ADR
   parsing the *body text*; a `contenteditable` DOM would fight that parse.
 - **Escape-first** (RC R·2) — the preview must hold the same construction as
   the renderer.
-- **Lean + Boring** (README principles, ADR 0002) — no new dependency, no new
+- **Lean + Boring** (README principles, ADR [0002](0002-deployment-topology.md)) — no new dependency, no new
   server surface.
 
 ## Decision
@@ -54,7 +55,7 @@ RC's `ImageIds` parse (which reads the *source* text, not a DOM). The boring,
 correct choice is a **split view**: the existing `<textarea>` (the *source*,
 the form field the server binds) above a **read-only rendered pane** that
 re-renders on every `input`. **No second renderer, no HTML round-trip, no
-dependency.** This is the "live preview pane" ADR 0025's composer line
+dependency.** This is the "live preview pane" ADR [0025](0025-rich-content-markdown-and-content-images.md)'s composer line
 promised and never shipped. (Layout: the toolbar, the source textarea, and
 the preview each sit on their own full-width row — toolbar on top, then
 source, then preview — a change to the CSS arrangement only; the D1–D3
@@ -137,41 +138,3 @@ render are untouched.
 - **The read path is unchanged** — `MarkdownRenderer` still renders every
   body; `PlainTextPreview` still strips the same markers; `ImageIds` is still
   derived server-side from the body text. RE regresses nothing RC shipped.
-
-## Not decided here (explicit non-decisions)
-
-Each is a **future lane**, named — the ADR 0011 / 0025 precedent holds:
-
-- **Undo/redo** (a custom history stack on the textarea) — the browser's
-  native `Ctrl+Z` is the floor; a lane names the history API explicitly.
-- **Blockquote (`> `) in the toolbar and preview** — requires extending
-  `MarkdownRenderer` **and** the client preview together (the RE·2 parity
-  holds only if both move in the same commit).
-- **WYSIWYG contenteditable / third-party editor** (ProseMirror/Quill/Tiptap)
-  — **hard non-negotiable** out (D1): it breaks `tsc`-only + the no-HTML-
-  round-trip stance + RC's `ImageIds` source parse. Not a deferral; a
-  separate-architecture decision.
-- **Tables / footnotes** in the toolbar or preview — RC's "intentionally out
-  of scope" set; a lane that adds them to `MarkdownRenderer` *and* the client
-  preview *together*.
-- **Drag-drop image reordering** — the body text is the order (RC stance); a
-  future lane may add it if the plain-text order proves insufficient.
-- **The gated image lanes** (un-gating the image button on Post Edit / Group
-  Edit / Announcement / replies) — **RC**, not RE. Each is a separate RC
-  follow-up with a different missing seam (the write-lane `ImageIds` seam
-  and/or the serve-branch adapter). Un-gating is a one-attribute removal, no
-  RE code.
-
-## Revisit when
-
-- A resident requests a feature in the "not decided here" list — open a
-  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment to
-  this ADR.
-- The **`tsc`-only / no-editor-dependency** stance is challenged — that is the
-  load-bearing constraint of D1; relaxing it is itself a new ADR, not a code
-  change.
-- The `src` allowlist needs a new accepted shape — extend
-  `MarkdownRenderer.IsSafeImageSrc` **and** the client mirror in the same
-  commit as the route that earns it (the ADR 0025 "revisit when" clause,
-  unchanged); a new *rejected* shape is not a revisit (rejection is the
-  default).

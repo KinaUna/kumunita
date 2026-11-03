@@ -1,8 +1,21 @@
-# ADR 0177 — Groups tile and friendly empty state
+---
+id: adr-0177
+title: "Groups tile and friendly empty state"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0094-group-join-request-lane.md, docs/adr/0175-palettes-and-feed-card.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0177](0177-groups-tile-and-empty-state.md) — Groups tile and friendly empty state
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0175 (UI refresh), ADR 0094 (public groups / join requests)
+Relates to: ADR [0175](0175-palettes-and-feed-card.md) (UI refresh), ADR [0094](0094-group-join-request-lane.md) (public groups / join requests)
 
 ## Decisions
 
@@ -14,7 +27,7 @@ and an auto-fill grid (min 260px) so phones get one column. No data changes: a g
 carries only Id, Name and MemberCount.
 
 **D2 — Whole tile is the link.** For groups the resident belongs to, the name link is a
-`stretched-link`. "Other public groups" tiles are not links (ADR 0094); their "Request to join"
+`stretched-link`. "Other public groups" tiles are not links (ADR [0094](0094-group-join-request-lane.md)); their "Request to join"
 button is now a quiet outline button (amber stays reserved for the page's one primary action,
 "Create a group").
 

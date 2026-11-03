@@ -1,4 +1,17 @@
-# ADR 0208 — Contrast pass (reduced-brightness check)
+---
+id: adr-0208
+title: "Contrast pass (reduced-brightness check)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0208](0208-contrast-pass.md) — Contrast pass (reduced-brightness check)
 
 Status: Accepted
 
@@ -15,10 +28,10 @@ transitions disabled. Anything under 4.5:1 (3:1 for large text) fails; under 5.5
 ## Findings and fixes (CSS only)
 - `.text-body-tertiary` (13 uses) is Bootstrap's 50% alpha ink: 3.0:1 in light ("No comments
   yet"). Now `--kmb-muted` (>= 4.7:1 in all four combinations).
-- Row-level red buttons in tables (`.btn-outline-danger` Block, `.btn-danger` Delete, ADR 0199):
+- Row-level red buttons in tables (`.btn-outline-danger` Block, `.btn-danger` Delete, ADR [0199](0199-admin-shared-look.md)):
   #dc3545 was 3.4-3.6:1 on dark and 4.45:1 on light. Now #b02a37 on light (>= 6:1) and #f08a94
   on dark, with matching hover/active fills.
-- Ember milestone id chip and Done pill (ADR 0201): accent amber on the light tint was 3.9:1;
+- Ember milestone id chip and Done pill (ADR [0201](0201-verification-round-3.md)): accent amber on the light tint was 3.9:1;
   the soft ink is used in light (the dark amber is 4.9:1 and unchanged).
 - Rescanned after the fix: no failures in any combination apart from the items below.
 
@@ -32,4 +45,4 @@ transitions disabled. Anything under 4.5:1 (3:1 for large text) fails; under 5.5
 ## Open
 - No reading at an actually reduced display brightness; contrast ratios are the proxy.
 - Pages not scanned: admin forms, modals, calendar, group posts/events lists, signed-out pages
-  (login was checked under ADR 0203).
+  (login was checked under ADR [0203](0203-signed-out-auth-verification.md)).

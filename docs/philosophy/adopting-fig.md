@@ -1,3 +1,26 @@
+---
+id: philosophy-adopting-fig
+title: "Adopting FIG in Your Own Project"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, developer]
+related:
+  - docs/philosophy/SOURCE.md
+  - docs/philosophy/anti-patterns.md
+  - https://github.com/KinaUna/fractal_integration
+updated: 2026-11-02
+---
+
+> **Abstract:** how to bring these guidelines into your own project —
+> repo, wiki, team handbook, or an AI-agent prompt — without losing the link
+> back to the FIG source: keep the core, differentiate around it, record the
+> sync, note deviations, re-sync on a cadence. **Who is it for:** someone
+> adopting the guidelines elsewhere (or an agent doing it for them).
+> **When to read the rest:** when the guidelines stop being something you
+> read and start being something you copy.
+>
+
 # Adopting FIG in Your Own Project
 
 > This doc is for when these guidelines stop being something you read and
@@ -44,7 +67,7 @@ about.
 tells you to treat any boundary — a contract, not an accident:
 
 1. **Keep the core, differentiate around it.** Pull the domain-neutral core
-   (`README.md`, `START-HERE.md`, `anti-patterns.md`,
+   ([`README.md`](../../README.md), `START-HERE.md`, `anti-patterns.md`,
    `domains-of-integration.md`, `the-human-system.md`, `everyday-life.md`,
    `examples/`, `templates/`) close to verbatim. Write your own domain
    guide — Kumunita's is `the-platform-as-integrator.md` (a community
@@ -74,7 +97,7 @@ This is designed to be adopted by an agent, not just a person — that's
 part of why it lives in a plain, public, well-structured repo instead of a
 slide deck. A reasonable prompt for Kumunita:
 
-> Read `README.md` and `START-HERE.md` from
+> Read [`README.md`](../../README.md) and `START-HERE.md` from
 > `https://github.com/KinaUna/fractal_integration`. Write a domain guide
 > for the community platform (a shared place for one neighborhood) in the
 > same shape as `in-code.md`: the six principles turned into our
@@ -101,5 +124,5 @@ designed, visible thing — not an assumption.
 - [ ] A re-sync cadence set (quarterly is a reasonable default).
 
 That's the whole pattern: differentiate deliberately, link back explicitly,
-and revisit on a schedule. It's principles 1, 2, and 6 of `README.md`,
+and revisit on a schedule. It's principles 1, 2, and 6 of [`README.md`](../../README.md),
 pointed at the guidelines themselves.

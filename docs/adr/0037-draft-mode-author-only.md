@@ -1,16 +1,15 @@
-# ADR 0037 — Draft mode: saved-but-not-published, author-only (community posts, group posts, announcements)
-
-Status: Accepted
-Date: 2026-09-18
-Amends: none (additive). Builds on the frozen base of **0004 §B.1**
-(additive-field schema evolution — a new `bool` column is detected and
-added, no schema-file change), **0006** (the module boundary contracts and
-the frozen `CanAsync` / `CanSeeAsync` signatures the gate composes with),
-**0013** (the group-post membership lane), **0014 / 0016 / 0024** (the
-author-only lane precedent — a pure `AuthorId == actorId` ordinal gate, no
-role branch, and the no-audit-row convention for author's own content),
-and **0036** (the community-visible audience decision a published post is
-evaluated against).
+---
+id: adr-0037
+title: "Draft mode: saved-but-not-published, author-only (community posts, group posts, announcements)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-design.md]
+supersedes: [adr-0004]
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -21,7 +20,7 @@ placeholder date. Before this lane the write path was binary: create meant
 **public under the author's chosen audience**, full stop. To withhold work
 in progress, a resident had to (a) hold it in a local editor and lose it on
 a refresh, (b) target the audience to just themselves and remember to
-re-target it later — which fights **ADR 0036** (the community-visible
+re-target it later — which fights **ADR [0036](0036-community-visible-audience-default.md)** (the community-visible
 default is the *right* answer for the common case, and a self-only target
 is the *wrong* lever for "not ready yet"), or (c) save, realize it's
 half-finished, and delete it.
@@ -47,7 +46,7 @@ simpler: **the author, and no one else — not a moderator, not even a
 scratchpad; it has not entered the public record at all, so none of the
 public-record rules (audience evaluation, audit, admin override) apply to
 it. This is exactly the **author-only, no-role-branch, no-audit-row** shape
-of ADR 0014, extended from "edit" to "read a not-yet-published item."
+of ADR [0014](0014-post-edit-lane-author-only.md), extended from "edit" to "read a not-yet-published item."
 
 ## Decision
 
@@ -57,7 +56,7 @@ of ADR 0014, extended from "edit" to "read a not-yet-published item."
   records `PostDraft` and `GroupPostDraft` each gain a trailing nullable
   `bool? IsDraft = null` so a caller that does not supply it produces a
   live item exactly as before (the `?? false` wiring at the create seam is
-  the only place the null becomes a concrete value). Per ADR 0004 §B.1 this
+  the only place the null becomes a concrete value). Per ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 this
   is a new nullable-by-default column the versioned schema detects and
   adds; no schema-file edit, no backfill (existing rows read `false`).
 
@@ -74,14 +73,14 @@ of ADR 0014, extended from "edit" to "read a not-yet-published item."
   public-record decision.** `PostService.GetPostAsync`,
   `PostService.GetGroupPostAsync`, and `AnnouncementService.GetAsync` each
   load the document and, if `IsDraft` is set, branch on the **pure**
-  `AuthorId == actorId` ordinal check (the ADR 0014 shape) *before* calling
+  `AuthorId == actorId` ordinal check (the ADR [0014](0014-post-edit-lane-author-only.md) shape) *before* calling
   `CanAsync` / `CanSeeGroupAsync`. The author gets the item and its
   replies; everyone else — a member, a component moderator, and a
   `GlobalAdmin` alike — gets the not-found result (`Post: null` / `null`)
   with **no `AccessAudit` row**, because a private scratchpad is not a
   restricted public record to be audited against. A `null` actor (a
   signed-out visitor) is denied on the same branch. The gate is composed
-  with, never inside, the frozen `AuthorizationService` seam (ADR 0006):
+  with, never inside, the frozen `AuthorizationService` seam (ADR [0006](0006-module-boundary-contracts.md)):
   the draft branch short-circuits before the authorization query runs.
 
 - **Publishing is an author-only, idempotent state flip.** The new seams
@@ -120,7 +119,7 @@ of ADR 0014, extended from "edit" to "read a not-yet-published item."
   non-author (a 403, since the community lane already distinguishes
   "exists but not for you" from "doesn't exist"). Group post:
   `POST /groups/{id}/posts/{postId}/publish` → `NotFoundResult` (the group
-  lane is fail-closed 404 for anything it can't confirm, the ADR 0013
+  lane is fail-closed 404 for anything it can't confirm, the ADR [0013](0013-group-posts-membership-lane.md)
   shape). Announcement: `POST /announcements/{id}/publish` →
   `ForbidResult` (non-author) / `NotFoundResult` (missing). All three map
   `UnauthorizedAccessException` and `KeyNotFoundException` from the core
@@ -155,13 +154,13 @@ of ADR 0014, extended from "edit" to "read a not-yet-published item."
   standing, produce **no audit row**, and are **not** subject to audience
   evaluation. A `GlobalAdmin` who is not the author cannot see a draft,
   cannot publish one, and cannot tell it exists — the same exclusivity
-  ADR 0014/0016/0024 give the author over editing. This is *by design*
+  ADR [0014](0014-post-edit-lane-author-only.md)/0016/0024 give the author over editing. This is *by design*
   stronger than the public-record rules; it is the correct trade for a
   "not made public yet" state.
 
 - **The gate is composed with, not inside, the frozen authorization
   seam.** The draft branch is a plain ordinal check that runs before
-  `CanAsync` / `CanSeeGroupAsync`, so it does not widen the ADR 0006
+  `CanAsync` / `CanSeeGroupAsync`, so it does not widen the ADR [0006](0006-module-boundary-contracts.md)
   boundary contract and cannot be reached through an admin-visibility
   branch. A future change to audience or admin rules cannot accidentally
   surface a draft.
@@ -179,51 +178,3 @@ of ADR 0014, extended from "edit" to "read a not-yet-published item."
   author soft-delete lane, which already respects `IsDraft`). Not part of
   this lane's scope; kept out so publishing and de-publishing stay the
   two explicit author acts.
-
-## Tests
-
-Behavior is pinned at the **core** seam (the sealed, un-substitutable
-`PostService` / `AnnouncementService` run against a real `postgres:18`
-via Testcontainers), in `tests/Kumunita.Core.Tests/PostDraftModeTests.cs`:
-
-- Feed exclusion for everyone — community feed, group feed, announcement
-  list, and pinned list all omit a draft from the author, a member, and a
-  `GlobalAdmin` alike, while a live item still surfaces to its audience.
-- **`Draft_TargetedCommunity_NotLeakedToGlobalAdmin`** — the precedence
-  pin: a community-targeted draft is absent even for the admin, asserting
-  the `&&`/`||` shape of `ListVisibleAsync`.
-- Detail author-only — `GetPostAsync`, `GetGroupPostAsync`, and
-  `AnnouncementService.GetAsync` return the draft to the author and
-  `null` to a non-author (incl. a `null` actor), with **no `AccessAudit`
-  row** written (the ADR 0014/0016/0024 no-audit-row convention).
-- Publish author-only / idempotent / throws — `PublishPostAsync` (both
-  community and group lanes) and `AnnouncementService.PublishAsync` flip
-  the flag for the author, deny a `GlobalAdmin` non-author
-  (`UnauthorizedAccessException`), throw on a missing id
-  (`KeyNotFoundException`), are idempotent on a live item (no re-stamp of
-  `Modified`), and preserve `Pinned` on the announcement.
-- `ListMyDraftsAsync` (both surfaces) returns **only** the actor's live
-  drafts — not another actor's, not a deleted draft.
-
-The Web thin-layer mapping is pinned in
-`tests/Kumunita.Web.Tests/AnnouncementControllerTests.cs` (the
-announcement lane is the interface-backed surface, substitutable via
-`IAnnouncementService`): `Publish` maps draft+author → publish + redirect
-to `Detail`, a non-author (even `GlobalAdmin`) → `ForbidResult` with no
-write, `UnauthorizedAccessException` → `ForbidResult`,
-`KeyNotFoundException` → `NotFoundResult`, anonymous → `UnauthorizedResult`;
-`Detail` flags `IsAuthor && IsDraft` for the author and `NotFound` for a
-non-author; `New` (POST) wires the `SaveAsDraft` checkbox onto the
-`Announcement.IsDraft` create field (checked → draft, unchecked → live).
-
-**Why there are no route-level Web tests for the post / group-post /
-My-Drafts lanes:** `PostService` is a `public sealed class` that returns
-`Marten.Linq.IMartenQueryable<T>` from `Query<T>()` — it cannot be faked
-under NSubstitute, so the announcement lane (interface-backed) is the
-substitutable Web surface. The post and group-post *behavior* (the exact
-draft gates, publish seam, and list filtering this ADR pins) is exhaustively
-covered at the core lane above; the Web post/group routes are thin
-`Result`-mapping wrappers over those already-pinned seams, and the
-`/my/drafts` index is a read-only projection of `ListMyDraftsAsync`. Pinning
-the core lane is therefore the behavior pin; the thin Web mapping is
-asserted on the interface-backed surface as the representative case.

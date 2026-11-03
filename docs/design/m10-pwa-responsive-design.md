@@ -1,4 +1,20 @@
+---
+id: design-m10-pwa-responsive
+title: "M10 — PWA and responsive design"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0107-pwa-and-responsive-design.md
+  - docs/adr/0031-wysiwyg-editor-and-toolbar.md
+updated: 2026-11-02
+---
+
 # M10 — PWA and responsive design — design
+
+> **Abstract:** the **PWA + responsive** design — an installable app shell (web manifest + icons + a quiet install affordance), a **GET-only allowlist** service worker that caches the shell and **never** touches signed-in content (a privacy boundary), and one deliberate 360-px phone-width pass over a closed surface inventory. **Who is it for:** a developer adding to the client pipeline or touching the service worker / responsive CSS; an agent that needs the allowlist and the no-auth-caching invariant. **When to read the rest:** before adding a `client/lib` module, the service worker, or phone-width rules.
+
 
 > **Milestone M10.** Front-end-only, greenfield: an installable app
 > shell (web manifest + two icon PNGs + one quiet localized install
@@ -9,7 +25,7 @@
 > (C-M10·6): no document, no service seam, no audit verb, no schema,
 > no `LocaleSettings` toggle.
 >
-> **Status.** **LOCKED.** The decisions D1–D10 are locked in **ADR 0107
+> **Status.** **LOCKED.** The decisions D1–D10 are locked in **ADR [0107](../adr/0107-pwa-and-responsive-design.md)
 > (Accepted, 2026-09-27)**. The decisions were **user-approved** before
 > U00 ran (the register's open-veto window closed with no veto recorded;
 > the U00 handoff entry records the lock). The `[PROPOSED]` markers in
@@ -52,7 +68,7 @@ blocks in `site.css`, with no systematic phone-width pass.
 
 M10 builds on verified, frozen seams:
 
-1. **The ADR 0031 tsc-only client pipeline** (verified against
+1. **The ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) tsc-only client pipeline** (verified against
    `tsconfig.json` — `client/**/*.ts` → `wwwroot/js`, `ES2022` modules,
    no bundler) — `pwa-install.ts` is the next self-wiring module (D5).
 2. **The CSP shipped in `Program.cs`** (verified against lines 486–512:
@@ -85,7 +101,7 @@ string/JSON pins, §pinned tests); the one new closed `kw-l` key
 `pwa.install` × 4 languages (D10); the U07 milestone flip
 (M10 → `StatusDone`, M11 → `StatusNext`).
 
-**Out (each a named follow-on lane, ADR 0107 Consequences):** PWA push
+**Out (each a named follow-on lane, ADR [0107](../adr/0107-pwa-and-responsive-design.md) Consequences):** PWA push
 notifications; the tablet (`768–991 px`) pass; offline authenticated
 pages; `maskable` icon refinement (per-OS adaptive sets); `screenshots`
 / `shortcuts` manifest enrichment.
@@ -119,7 +135,7 @@ generation script and a closed, pinned inventory — the cost is bounded
   (one new key × 4 languages — the only `Kumunita.Core` file touched,
   and it is the **closed-key registry, not a Core seam**; C-M10·6
   forbids seams/documents, a registered key is neither); `Milestones.cs`
-  / `README.md` Roadmap / `docs/STATUS.md` / `docs/ARCHITECTURE.md` in
+  / [`README.md`](../../README.md) Roadmap / [`docs/STATUS.md`](../STATUS.md) / [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) in
   the U07 close only (C-M10·8).
 - **Untouched (pinned):** `Program.cs` (the CSP header is byte-
   identical before and after M10 — F6); every `I…Service`,
@@ -152,7 +168,7 @@ M10 creates **no** service seam, adapter, or document. The contracts it
    `ServiceWorker_Allowlist_Matches_Design_Doc_Verbatim` test
    string-compares against §SW.
 3. **The install-module contract** (§install): `client/lib/pwa-install.ts`
-   is a self-wiring ES module (the ADR 0031 shape, the
+   is a self-wiring ES module (the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) shape, the
    `avatar.ts` / `flash-toast.ts` precedent) loaded from
    `_Layout.cshtml` at the `<body>` tail next to the existing
    `<script type="module" src="~/js/lib/avatar.js">` sibling. It
@@ -182,7 +198,7 @@ M10 creates **no** service seam, adapter, or document. The contracts it
 The seams are witnessed by tests, per D9:
 
 - **xUnit, `tests/Kumunita.Web.Tests/PwaManifestTests.cs`** (static
-  assets — the ADR 0043 SP-U04 "string pin, no TestServer" idiom):
+  assets — the ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md) SP-U04 "string pin, no TestServer" idiom):
   `Manifest_Json_Parses_And_Has_Required_Fields` (C-M10·1) ·
   `Manifest_Icon_192_And_512_Exist_In_Repo` (D4) ·
   `Layout_Contains_Manifest_Link` (contract 1) ·
@@ -264,7 +280,7 @@ migration, no seed, no toggle. Rollback is a normal code revert —
 **plus** the one SW-specific step: bump the cache name (or delete
 `wwwroot/sw.js`) so `activate` clears the old `kumunita-shell-v*` cache;
 the manifest + the icons revert with the code. No resident data is
-involved (C-M10·6). See `docs/OPS.md`.
+involved (C-M10·6). See [`docs/OPS.md`](../OPS.md).
 
 ## Risks
 
@@ -386,7 +402,7 @@ The four gates:
 floor** — the two public floor pages (`/`, `/about` — both verified
 routes; `/about` is `StaticPagesController.About`) + the layout CSS +
 the manifest + the **subset** of `client/lib` modules the
-**signed-out / public** shell actually loads (the ADR 0031 set minus
+**signed-out / public** shell actually loads (the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) set minus
 the signed-in-only modules: `api.js`-shaped fetch modules,
 `notifications-bell.js`, `projects-board.js`, `events-calendar*.js`,
 `image-editor.js`, `name-filter.js`, `page-form-visibility.js`,
@@ -478,9 +494,9 @@ is not M10's (D8: no `prefers-reduced-motion` work beyond it).
 
 | Surface | 360-px failure (pinned) | Fix class | D8 floor applicability |
 |---|---|---|---|
-| **Post/reply card** (`.airy-ann-row` + `.rc-body` + the `⋮` triggers, `Views/Posts/Detail.cshtml`) | the `.rc-body` rendered body's long code spans / unbroken URLs overflow the card; the `⋮` `.action-glyph-btn` (ADR 0092, `btn btn-sm`) hit area is ~23 px (sub-44); the reply row's action stack wraps | truncate + shrink (the existing line-1407 block already sets `.airy-ann-row` to a single column — extend it with `.rc-body { overflow-wrap: anywhere; }` + the `⋮` floor) | D8a: every `.action-glyph-btn` on the post/reply detail ≥ 44×44 (the floor's fix — a `min-width: 44px; min-height: 44px;` on the class at 360 px, or the markup's `padding` if U05 judges the pure-CSS floor insufficient — U05's unit plan allows the `Detail.cshtml` markup change for exactly this); D8b: `.action-glyph-btn:focus-visible` (the class already carries a `:focus` rule at `site.css` line 1834 — extend it with `:focus-visible` + a visible ring — the floor's fix) |
+| **Post/reply card** (`.airy-ann-row` + `.rc-body` + the `⋮` triggers, `Views/Posts/Detail.cshtml`) | the `.rc-body` rendered body's long code spans / unbroken URLs overflow the card; the `⋮` `.action-glyph-btn` (ADR [0092](../adr/0092-borderless-kebab-dropdown-triggers.md), `btn btn-sm`) hit area is ~23 px (sub-44); the reply row's action stack wraps | truncate + shrink (the existing line-1407 block already sets `.airy-ann-row` to a single column — extend it with `.rc-body { overflow-wrap: anywhere; }` + the `⋮` floor) | D8a: every `.action-glyph-btn` on the post/reply detail ≥ 44×44 (the floor's fix — a `min-width: 44px; min-height: 44px;` on the class at 360 px, or the markup's `padding` if U05 judges the pure-CSS floor insufficient — U05's unit plan allows the `Detail.cshtml` markup change for exactly this); D8b: `.action-glyph-btn:focus-visible` (the class already carries a `:focus` rule at `site.css` line 1834 — extend it with `:focus-visible` + a visible ring — the floor's fix) |
 | **Group card** (`.dir-card` + the `.airy-group-grid`, `Views/Groups/Index.cshtml`) | the `.dname` + `.daddr` stack can clip a long group name / address at 360 px | shrink (the existing line-1407 block already sets `.airy-group-grid` to one column — extend it with the `.dname` / `.daddr` `overflow-wrap` + the `.dfoot` min-height) | none (the card's link is Bootstrap-passing; the floor's witness) |
-| **Events calendar grid** (`#events-calendar`, the month grid + the `events-time-grid` week view, `Views/Events/Calendar.cshtml`) | the month grid's day cells can drop below a readable height at 360 px (the ADR 0081 single-line separators must hold); the week grid's 7 columns are **already** handled by the line-1694 block (horizontal scroll + the pinned ruler) — **verified existing** | pin (the line-1694 block is the fix; U05's pass is the day-cell ≥ 32 px **witness** + the single-line-separator hold) | none (the day cell is a display target, not a primary interactive element — the `⋮` triggers on the event rows are covered by the post/reply row's `.action-glyph-btn` floor) |
+| **Events calendar grid** (`#events-calendar`, the month grid + the `events-time-grid` week view, `Views/Events/Calendar.cshtml`) | the month grid's day cells can drop below a readable height at 360 px (the ADR [0081](../adr/0081-events-calendar-week-default-and-quick-create.md) single-line separators must hold); the week grid's 7 columns are **already** handled by the line-1694 block (horizontal scroll + the pinned ruler) — **verified existing** | pin (the line-1694 block is the fix; U05's pass is the day-cell ≥ 32 px **witness** + the single-line-separator hold) | none (the day cell is a display target, not a primary interactive element — the `⋮` triggers on the event rows are covered by the post/reply row's `.action-glyph-btn` floor) |
 | **Kanban board** (`.kanban-board` / `.kanban-lane` / `.kanban-cards`, `Views/Projects/BoardDetail.cshtml`) | the lane min-widths are **already** set by the line-2105 block (`.kanban-lane { min-width: 12rem }` = 192 px, `.kanban-lane-new { min-width: 10rem }`) — **verified existing**; the drag target stays usable at ≥ 192 px (U05's exit smoke asserts ≥ 280 px — the 12 rem floor is the **witness**, the 280 px is the **aspiration**; if the smoke finds < 280 px, that is a `## U05 — Drift pause`, not a drive-by); the card `⋮` `.action-glyph-btn` hit area is sub-44 | pin (the line-2105 block is the fix) + the `⋮` floor | D8a: every `.action-glyph-btn` on the board detail (board head / lane head / card head) ≥ 44×44 (the floor's fix, same class rule as the post/reply row); D8b: `.action-glyph-btn:focus-visible` (the floor's fix, same rule) |
 | **WYSIWYG split-view** (`.rc-editor` source\|preview split, `client/lib/rich-editor.ts` + the `.rc-editor-pane` rules at `site.css` line 1021) | the split view's two columns are too tight at 360 px — the source pane and the preview pane must collapse to **one column** (the source full-width, the preview hidden or below) | stack (add the `grid-template-columns: 1fr` + the preview pane's `order` / `display` under the 360 px boundary — the existing "1 column on mobile, 2 columns on desktop" comment in the pinned text is the contract; U05's CSS must not break the JS's layout assumptions — the drift check in U05's unit plan) | none (the editor's `:focus-visible` is the `contenteditable` pane's — `site.css` line 1034 already carries a visible `outline` — the pin is the witness) |
 | **Forms with the audience editor** (the composer forms + the audience panel, the `audience-toggle.ts` surface) | the audience panel's checkbox rows + the community/group select can overflow at 360 px | stack (the existing `audience-toggle` visibility is JS-driven — the CSS pass is the panel's `max-width: 100%` + the select's `width: 100%` under the 360 px boundary) | D8a: the form's `.btn` primary actions (Bootstrap-passing — the pin is the witness); the audience panel's checkbox labels (a `min-height: 44px` on the label row if the smoke finds sub-44 — U05's judgment, recorded in the handoff) |
@@ -514,7 +530,7 @@ exceptions to name"). The closed list (U04's half + U05's half):
 
 *U05's half (content + composer):*
 
-- every `.action-glyph-btn` (ADR 0092 — the `⋮` triggers on the post /
+- every `.action-glyph-btn` (ADR [0092](../adr/0092-borderless-kebab-dropdown-triggers.md) — the `⋮` triggers on the post /
   reply / group / event / board / lane / card heads — a
   `min-width: 44px; min-height: 44px` at 360 px, the single class rule
   covers every instance)
@@ -529,7 +545,7 @@ defaults cover the `.btn` / `form-control` / `.nav-link` /
 `.dropdown-item` pieces and are **excluded** from the list (by rule —
 D8b's register text: "Bootstrap's defaults cover most; the custom
 `.kmb-*` pieces are the exceptions to fix"). The closed list (the
-`.kmb-*` + the ADR 0092 class — the two custom pieces that do **not**
+`.kmb-*` + the ADR [0092](../adr/0092-borderless-kebab-dropdown-triggers.md) class — the two custom pieces that do **not**
 inherit Bootstrap's ring):
 
 - `.action-glyph-btn` (the `site.css` line-1828 block carries a
@@ -600,9 +616,9 @@ drift on the hexes).
 ## §install — the affordance shape + the `pwa.install` key (D5 + D10)
 
 **The module (the locked shape U03 mirrors — the `avatar.ts` /
-`flash-toast.ts` self-wiring precedent, ADR 0031):**
+`flash-toast.ts` self-wiring precedent, ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)):**
 `client/lib/pwa-install.ts` — a self-wiring ES module (no `export`
-consumers, no `export` at all — the ADR 0031 shape) that:
+consumers, no `export` at all — the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) shape) that:
 
 1. Guards on `typeof window === 'undefined'` (the no-op path — SSR /
    non-browser).
@@ -639,13 +655,13 @@ consumers, no `export` at all — the ADR 0031 shape) that:
 
 **No `LocaleSettings` toggle** (D10 — the register text: "a PWA
 surface is public-asset behavior, not a privacy-sensitive opt-in — the
-inverse of the ADR 0105 `MessagingEnabled` shape, and the design doc
+inverse of the ADR [0105](../adr/0105-messaging.md) `MessagingEnabled` shape, and the design doc
 records why it is *not* toggleable"). The reason, locked: the SW cache
 is **structurally incapable** of holding signed-in content (C-M10·2),
 so there is no resident privacy choice to make — the toggle would be a
 knob with no gear. The install affordance is a **display** surface
 (the OS's own install prompt, one quiet button), not an **access**
-surface. The inverse of ADR 0105 D2 is deliberate + recorded.
+surface. The inverse of ADR [0105](../adr/0105-messaging.md) D2 is deliberate + recorded.
 
 ## Invariants (C-M10·1–8 — locked)
 
@@ -669,7 +685,7 @@ surface. The inverse of ADR 0105 D2 is deliberate + recorded.
   the SW file is a same-origin `wwwroot/` asset (the `'self'` source);
   no inline `eval`, no remote code, no `unsafe-inline` for scripts.
   The install module is a self-wiring ES module like its siblings
-  (ADR 0031). The CSP header is **byte-identical** before and after
+  (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)). The CSP header is **byte-identical** before and after
   M10 (F6's pin).
 - **C-M10·4 · The responsive pass is closed + pinned.** Only the
   surfaces on the §Responsive inventory are touched in U04/U05; only
@@ -694,7 +710,7 @@ surface. The inverse of ADR 0105 D2 is deliberate + recorded.
   any browser without `beforeinstallprompt` (iOS) or in a non-secure
   context — no console error, no broken UI.
 - **C-M10·8 · Docs parity holds at the flip.** `Milestones.cs` /
-  `README.md` Roadmap / `docs/STATUS.md` / `docs/ARCHITECTURE.md`
+  [`README.md`](../../README.md) Roadmap / [`docs/STATUS.md`](../STATUS.md) / [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)
   (the value-chain table) all move M10 to `StatusDone` + M11 to
   `StatusNext` in the **same** unit (U07), and
   `tests/Kumunita.Web.Tests/MilestonesTests.cs` keeps its single-
@@ -765,7 +781,7 @@ U11 precedent; the spec is **authored + recorded**):**
    (C-M10·5).
 
 **xUnit — `tests/Kumunita.Web.Tests/PwaManifestTests.cs` (seven — the
-ADR 0043 SP-U04 "string pin, no TestServer" idiom; U01 creates the
+ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md) SP-U04 "string pin, no TestServer" idiom; U01 creates the
 class with 3, U02 extends with 2, U06 extends with the remaining 2):**
 
 1. `Manifest_Json_Parses_And_Has_Required_Fields` (U01; C-M10·1).
@@ -836,12 +852,12 @@ carries the per-unit entries):
   source) — the §icons provenance above is the locked text. (e) ADR
   number confirmed free: **0107** (the index ran 0001–0106; `0106` is
   the to-do self-assign lane, the current highest — verified against
-  `docs/adr/README.md`).
+  [`docs/adr/README.md`](../adr/README.md)).
 - **U03 (2026-09-27) — the install-label resolution moved
   server-side (mechanism clarification, not a rescope).** The §install
   locked text says the *module* renders the `pwa.install`
   `kw-l`-resolved label appended to `document.body`. The repo's
-  standing rule (ADR 0103 / ADR 0105 both name it; the
+  standing rule (ADR [0103](../adr/0103-navbar-notification-open-lane.md) / ADR [0105](../adr/0105-messaging.md) both name it; the
   `data-ie-label-*` / `_RichEditorToggle` pattern is the locked
   precedent) forbids the client resolving a `KnownTranslationKeys`
   key itself. The resolution: the label source is **server-rendered**
@@ -934,32 +950,32 @@ carries the per-unit entries):
   ServiceWorker_Cache` negative pin and the offline-shell pin are both
   unaffected (they assert on the allowlist + the two HTML-page
   strategies, not the fall-through mechanism). `sw.js`'s file header,
-  the ADR 0107 D2 text, and this §SW contract statement are amended
+  the ADR [0107](../adr/0107-pwa-and-responsive-design.md) D2 text, and this §SW contract statement are amended
   in step; no test string-pins the fall-through line (verified against
   `PwaManifestTests` — it string-pins only the `ALLOWLIST` array).
-- **ADR 0175 (2026-10-26) — the refreshed feed card adds one recorded
-  `@media (max-width: 575.98px)` block.** ADR 0175 D4 ("Card padding 24px /
+- **ADR [0175](../adr/0175-palettes-and-feed-card.md) (2026-10-26) — the refreshed feed card adds one recorded
+  `@media (max-width: 575.98px)` block.** ADR [0175](../adr/0175-palettes-and-feed-card.md) D4 ("Card padding 24px /
   gap 16px (16px / 12px on phones)") ships a second 575.98px block
   (`.airy-feed` gap, `.airy-post-card` padding, `.airy-post-title` size) at
-  the same Bootstrap `navbar-expand-sm` breakpoint as the ADR 0111 collapsed
+  the same Bootstrap `navbar-expand-sm` breakpoint as the ADR [0111](../adr/0111-nav-layout-variants-b-and-c.md) collapsed
   navbar block. This is a **recorded** drift entry (frozen pin #7's
   "count change without a recorded entry is a breach" — the record is this
-  line + the ADR 0175 D4 text), not a drive-by. The pinned counts move from
+  line + the ADR [0175](../adr/0175-palettes-and-feed-card.md) D4 text), not a drive-by. The pinned counts move from
   4 width + 1 collapsed + 1 motion + 2 dark = **8** to 4 width + 2
   collapsed + 1 motion + 2 dark = **9** `@media` occurrences;
   `PwaManifestTests.Site_Css_Media_Block_Boundary_Pinned` and
   `NavMoreFoldTests.Site_Css_Styles_Fold_State_Outside_Media_Block` both
   pin the new total in step.
-- **ADR 0179 (2026-10-26) — the event card adds one recorded
-  `@media (max-width: 575.98px)` block.** ADR 0179 ("Event card with date
+- **ADR [0179](../adr/0179-event-card.md) (2026-10-26) — the event card adds one recorded
+  `@media (max-width: 575.98px)` block.** ADR [0179](../adr/0179-event-card.md) ("Event card with date
   tile") ships a third 575.98px block (the date tile + the title/meta
   phone rule) at the same Bootstrap `navbar-expand-sm` breakpoint. This
   is a **recorded** drift entry (frozen pin #7), not a drive-by. The
   pinned total moves from 4 width + 2 collapsed + 1 motion + 2 dark =
   **9** to 4 width + 3 collapsed + 1 motion + 2 dark = **10** `@media`
   blocks; the two media pins above move in step.
-- **ADR 0180 (2026-10-26) — the event detail adds one recorded
-  `@media (max-width: 575.98px)` block.** ADR 0180 ("Event detail: rich
+- **ADR [0180](../adr/0180-event-detail.md) (2026-10-26) — the event detail adds one recorded
+  `@media (max-width: 575.98px)` block.** ADR [0180](../adr/0180-event-detail.md) ("Event detail: rich
   header") ships the fourth 575.98px block (the phone tile rule). This
   is a **recorded** drift entry (frozen pin #7), not a drive-by. The
   pinned total moves from 4 width + 3 collapsed + 1 motion + 2 dark =
@@ -967,13 +983,13 @@ carries the per-unit entries):
   blocks; the two media pins above move in step.
 - **Pages-tree touch target (2026-10-28) — the `.airy-page-list` touch
   row adds one recorded `@media (pointer: coarse)` block.** The pages
-  tree (the ADR 0160 nested-guide surface) applies the ADR 0107 Floor A
+  tree (the ADR [0160](../adr/0160-nested-help-guides-tabbed-surface-subpages.md) nested-guide surface) applies the ADR [0107](../adr/0107-pwa-and-responsive-design.md) Floor A
   a11y floor (the 44×44 px touch-target floor the M10 responsive pass set
   for the navbar / toasts / `.action-glyph-btn`) to the page branch rows:
   on a touch device the 44 px tall `<summary>` + the enlarged chevron are
   scoped by `@media (pointer: coarse)` so pointer devices keep the compact
   rows (commit `5efade9b`, "feat(pages): page tree — bigger touch target
-  on touch devices (pointer: coarse)…(ADR 0107 Floor A)"). This is a
+  on touch devices (pointer: coarse)…(ADR [0107](../adr/0107-pwa-and-responsive-design.md) Floor A)"). This is a
   **recorded** drift entry (frozen pin #7), not a drive-by. The pinned
   total moves from 4 width + 4 collapsed + 1 motion + 2 dark = **11** to
   4 width + 4 collapsed + 1 motion + **1 pointer:coarse** + 2 dark =
@@ -1004,3 +1020,137 @@ carries the per-unit entries):
   allowlist, the closed inventory, the closed a11y lists, the one
   closed key) — a design that claims no cost has not priced it; this
   one does (§FACES check, the trade named).
+
+---
+
+## ADR [0107](../adr/0107-pwa-and-responsive-design.md) — moved content (D11 trim, 2026-11-02)
+
+## Alternatives considered
+
+- **Ship the PWA push now** (the M6/M9 deferral's own ask) — rejected:
+  the push's surface is the M6 notification lane (the
+  `PushManager` registration + the `EmitAsync` push branch + the
+  admin's push-key management), a follow-on lane with its own ADR under
+  ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) and its own threat model (a push key is a secret the
+  platform would have to store — a Core surface M10 has no business
+  opening). M10 owns the prerequisite the deferral named, not the push
+  (D1).
+- **A global admin toggle for the PWA** (the ADR [0105](../adr/0105-messaging.md) `MessagingEnabled`
+  shape) — rejected: the toggle exists to gate a *privacy-sensitive
+  opt-in*; the PWA substrate holds no resident data (C-M10·2), so the
+  knob has no gear. Shipping it would add a `LocaleSettings` field + a
+  service seam + an audit verb — a Core surface — to gate nothing
+  (D10, the recorded inverse of ADR [0105](../adr/0105-messaging.md) D2).
+- **Tablet breakpoints in M10** (a `768–991 px` `md`-edge pass) —
+  rejected: D6's single-boundary rule pins the phone width; the site's
+  `container` + `col-*` system already handles the tablet range
+  acceptably, and a second boundary would double the closed inventory
+  U04/U05 have to fix + U06 has to pin. The tablet pass is a named
+  follow-on lane (Consequences), extendable under D6 without breaking
+  the M10 pin.
+- **A forced install banner** (a persistent "Install the app" strip or
+  modal) — rejected: the resident's device already gets the platform's
+  own nudge where the browser offers one (D5's one quiet button), and
+  iOS Safari's native share-sheet path is the fallback M10 does not
+  fight (F5). A banner would be a growth mechanic on a platform whose
+  value is the neighborhood's trust — the §Human-cost check's
+  "no persuasion" rule (C-M10·7's "quiet" pin).
+
+
+
+---
+
+## ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md) — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A **contact page** or a **separate cookie policy** is wanted — decide it
+  as a *new* lane (the D5 / D7 scope-out note is the standing position).
+- A **third-party cookie** is introduced (a future integration lane) — the
+  D5 "no third-party cookies exist or are planned" record must be amended
+  and SECURITY.md §2 / §5 re-reviewed (the ADR [0005](../adr/0005-multilingual-support.md) C trust-boundary
+  precedent).
+- The community **adds further `system/` pages at runtime** and wants them
+  in the footer column — the D4 "exactly five" record is the standing
+  position; extend it by amendment rather than by a unit-level override.
+
+
+---
+
+## ADR [0160](../adr/0160-nested-help-guides-tabbed-surface-subpages.md) — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+### 2026-10-10 — the non-`en` baselines ship with the guides (the default going forward)
+
+The original wording of D4 deferred the 17 nested guides' `de` / `fr` / `da`
+baselines to a later human Translator lane (the guides shipped `en`-only on
+first boot). User sign-off (2026-10-10) reverses that: **the hand-curated
+`de` / `fr` / `da` baselines for all 17 nested guides + the `settings` index
+now ship in the same lane as the `en` floor** — added to `DeGuidePages()` /
+`FrGuidePages()` / `DaGuidePages()`, seeded create-if-missing by
+`SeedGuideTranslationsAsync` and backfilled by
+`BackfillGuideTranslationsAsync` (which was fixed to walk the two-level guide
+subtree, not just `help`'s direct children). D4 is re-stated accordingly, and
+the count is corrected to **17 nested** (the original D2 prose said "18" — the
+table, `GuideParentMap()`, and the code all agree on 17).
+
+This makes "a guide ships its `en` floor *and* its `de` / `fr` / `da`
+hand-curated baselines" the **default for any new guide**, mirroring the
+four-surface set and the original top-level guides (ADR [0057](../adr/0057-user-guides-in-help-subtree-and-consistency-loop.md) D2). The
+"never machine-translated" clause (ADR [0005](../adr/0005-multilingual-support.md) C) is unchanged — the baselines
+are hand-written prose, not machine output.
+
+
+---
+
+## ADR [0111](../adr/0111-nav-layout-variants-b-and-c.md) — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — `nav.more` +
+  `nav_variant.{label,row,rail}` in en/de/fr/da.
+- `src/Kumunita.Web/Security/NavLayoutCookie.cs` — new (the `kumunita.nav`
+  preference cookie; `Read` defaults to B).
+- `src/Kumunita.Web/Controllers/NavLayoutController.cs` — new (`POST
+  /nav-layout`, CSRF-protected).
+- `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — the header branches on the
+  cookie (variant B default / variant C).
+- `src/Kumunita.Web/Views/Shared/_AccountNav.cshtml` — the nav-variant picker
+  sub-section in the account dropdown.
+- `src/Kumunita.Web/wwwroot/css/site.css` — the `kmb-rail*` / `kmb-topbar*`
+  surface + the fullbleed/expand extensions (responsive rules in the existing
+  media block).
+- **M11 (refined after ship):** `src/Kumunita.Web/wwwroot/sw.js` — the two
+  HTML shell pages go network-first so the switch renders immediately on
+  navigation (see the Service-worker interaction note above); the M10 design
+  doc `§SW` caching rule is updated to match. The switch's immediacy depends
+  on this strategy.
+
+
+---
+
+## ADR [0092](../adr/0092-borderless-kebab-dropdown-triggers.md) — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Web/wwwroot/css/site.css` (rename + comment)
+- `src/Kumunita.Web/Views/Announcement/Detail.cshtml`
+- `src/Kumunita.Web/Views/Event/Detail.cshtml`
+- `src/Kumunita.Web/Views/Groups/Detail.cshtml`
+- `src/Kumunita.Web/Views/Groups/PostDetail.cshtml`
+- `src/Kumunita.Web/Views/Page/Show.cshtml`
+- `src/Kumunita.Web/Views/Posts/Detail.cshtml` (post + reply triggers)
+- `src/Kumunita.Web/Views/Projects/BoardDetail.cshtml` (rename only)
+- `src/Kumunita.Web/Views/Projects/BoardIndex.cshtml`
+- `src/Kumunita.Web/Views/Projects/ProjectDetail.cshtml`
+- `src/Kumunita.Web/Views/Projects/TodoDetail.cshtml`
+- `src/Kumunita.Web/Views/Projects/TodosIndex.cshtml`
+- [`docs/adr/0070-board-edit-lane-and-board-polish.md`](../adr/0070-board-edit-lane-and-board-polish.md) (class name note)
+- [`docs/adr/0082-content-actions-dropdown.md`](../adr/0082-content-actions-dropdown.md) (trigger shape)
+- [`docs/adr/README.md`](../adr/README.md) (index)
+
+Amends 0070 (the class's home — renamed) + 0082 (the trigger shape it
+prescribed); additive on 0069 / 0071 (the `⋮` menu convention, unchanged).
+No changes to `Kumunita.Core`, no new routes, no new `kw-l` keys, no new
+client modules.

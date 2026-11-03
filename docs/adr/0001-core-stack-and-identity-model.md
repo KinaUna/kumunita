@@ -1,4 +1,17 @@
-# ADR 0001 — Core stack & identity model
+---
+id: adr-0001
+title: "Core stack & identity model"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: []
+superseded_by: [adr-0004, adr-0006, adr-0036, adr-0054, adr-0067, adr-0076, adr-0086]
+updated: 2026-11-02
+---
+
+# ADR [0001](0001-core-stack-and-identity-model.md) — Core stack & identity model
 
 Status: Accepted
 Date: 2026-08-25
@@ -66,13 +79,13 @@ Negative / accepted risks
 - Steeper learning curve than EF Core (Marten API, projections, handler conventions).
 - Email delivery is made reliable with **one** Wolverine durable handler (Postgres-backed
   invocation state), a 6-attempt/~24 h retry cap, and a small `EmailDeadLetter` table —
-  no new service, no queue broker (ARCHITECTURE.md §6.2).
+  no new service, no queue broker (see [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md)).
 - Smaller ecosystem / fewer ready-made answers than EF.
 - No EF migration tooling for the domain — instead Marten's own **versioned schema
   features** (`FeatureSchemaBase` subclasses registered in `StoreOptions.Storage`,
   applied idempotently via `ApplyAllConfiguredChangesToDatabaseAsync()`) give reviewable,
   forward-only schema evolution. Auto-upgrade is dev-only and never run against
-  production. (Details and the Marten 9 note in ADR 0004 Decision B.)
+  production. (Details and the Marten 9 note in ADR [0004](0004-data-persistence-and-schema-evolution.md) Decision B.)
 - First feature costs more time while learning; later features cost the same or less.
 
 Revisit when

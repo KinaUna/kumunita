@@ -1,4 +1,17 @@
-# ADR 0127 — Every navbar surface has a resident guide: the guide set is expanded to cover announcements, directory, people, inventory, bookmarks, documents, pages, and tags (one guide per remaining navbar item); the `help` page links all of them (the `UG` lane continues)
+---
+id: adr-0127
+title: "Every navbar surface has a resident guide: the guide set is expanded to cover announcements, directory, people, inventory, bookmarks, documents, pages, and tags (one guide per remaining navbar item); the `help` page links all of them (the `UG` lane continues)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0057]
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0127](0127-guide-set-covers-every-navbar-surface.md) — Every navbar surface has a resident guide: the guide set is expanded to cover announcements, directory, people, inventory, bookmarks, documents, pages, and tags (one guide per remaining navbar item); the `help` page links all of them (the `UG` lane continues)
 
 Status: Accepted
 Date: 2026-10-03
@@ -13,12 +26,12 @@ not a frozen number).
 
 ## Context
 
-ADR 0057 established the `UG` lane: resident-facing guides are `Page` docs
+ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) established the `UG` lane: resident-facing guides are `Page` docs
 nested under the canonical `help` page, an `en` code-owned floor plus curated
 `de`/`fr`/`da` baselines, held honest by a three-layer consistency loop
 (registry ↔ drift-pin test ↔ the `help` page's `## Guides` link list). Its
 D1 pinned the seeded set as a **"closed set"** — "a new guide is a new lane,
-not a silent addition" — and applied the ADR 0040 `PageKind` closed-set rule
+not a silent addition" — and applied the ADR [0040](0040-pages-system-and-user-kinds-and-blog-feed.md) `PageKind` closed-set rule
 to the guide set. The counts in that ADR ("twelve", "the eleven above") were
 correct *when it shipped* and have since grown as each capability shipped its
 own guide lane (`notifications`, `projects`); that growth is the lane
@@ -30,7 +43,7 @@ that have shipped but have **no guide**: **announcements**, **directory**,
 out / in), **bookmarks**, **documents** (community file store), **pages**
 (the `system`/community page tree), and **tags**. A resident who reaches any
 of these from the navbar has no "how do I …?" answer in the `help/` subtree —
-exactly the seam ADR 0057 opened (a surface with no resident guide).
+exactly the seam ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) opened (a surface with no resident guide).
 
 Two further gaps, both on the *discovery* side rather than the *content*
 side:
@@ -55,7 +68,7 @@ police.
 
 ### D1 — Eight new guides, one per remaining navbar surface
 
-Each new guide follows the ADR 0057 D1 shape exactly (so the existing drift-pin
+Each new guide follows the ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D1 shape exactly (so the existing drift-pin
 tests — which count *dynamically* — stay green): a direct child of the
 canonical `help` page, `Kind = System`, `Audience = null` (public), authored-in
 `en` with a curated `de`/`fr`/`da` baseline (never machine-translated),
@@ -82,18 +95,18 @@ The `"help"` body in all four `*DefaultPages()` methods gains a bullet for
 **each** of the eight new guides **and** for the previously-unlinked
 `notifications` guide, so the root `/help` page is a complete index of the
 `help/` subtree. The four-language `help` bodies remain structurally
-parallel (same bullets, same order) — the ADR 0042 D2 / ADR 0043 parity bar
+parallel (same bullets, same order) — the ADR [0042](0042-bundled-initial-language-pack.md) D2 / ADR [0043](0043-system-pages-shipped-and-discoverable.md) parity bar
 the baseline tests read. The `## Getting started` summary and the other three
 surfaces (`terms` / `privacy` / `conduct`) are unchanged.
 
 ### D3 — The "closed set" rule restated as a discipline, not a count
 
-ADR 0057's "exactly twelve" / "the eleven above" counts are superseded. The
+ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md)'s "exactly twelve" / "the eleven above" counts are superseded. The
 governing rule is the one that was *behind* them, now stated plainly:
 
 > **Every resident-facing surface reachable from the navbar has a guide in the
 > `help/` subtree, and the `help` page's `## Guides` list links it.** Adding a
-> guide is a new lane (ADR 0040 closed-set discipline) — not a silent edit —
+> guide is a new lane (ADR [0040](0040-pages-system-and-user-kinds-and-blog-feed.md) closed-set discipline) — not a silent edit —
 > and a shipped navbar surface with no guide is a seam to close, not an
 > accepted gap.
 
@@ -112,7 +125,7 @@ true. No test in the `UG` / `LS` / `SP` suites pins a literal guide count.
 - Re-seeding an existing instance is idempotent: the seeder/backfill walks the
   registry arrays and creates the eight guides + baselines if missing,
   refreshing only the `en` floor on re-seed (the non-`en` baselines are
-  community-owned and are never overwritten once set — ADR 0042 D1 / ADR 0057).
+  community-owned and are never overwritten once set — ADR [0042](0042-bundled-initial-language-pack.md) D1 / ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md)).
 - The `## Guides` list is the single source of "what is a guide" for the
   resident; if a future surface ships, its lane must add a guide **and** a
-  bullet here (D3), or the seam ADR 0057 closed reopens.
+  bullet here (D3), or the seam ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) closed reopens.

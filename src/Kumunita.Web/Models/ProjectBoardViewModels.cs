@@ -234,7 +234,11 @@ public sealed record BoardDetailViewModel(
     // (creator ∪ assignee ∪ GlobalAdmin) is the service's on the
     // POST /projects/todos/{id} lane.
     IReadOnlyDictionary<string, CardEditPrefill>? CardEditPrefills = null,
-    CardEditPicker? CardEditPicker = null);
+    CardEditPicker? CardEditPicker = null,
+    // ADR 0285 D6 — the list view (?view=list): the same lanes + cards
+    // rendered as rows grouped under lane headings (read-only). A display
+    // selector only, never an access input.
+    bool ListView = false);
 
 /// <summary>
 /// The **event picker** affordance on the board detail (ADR 0115 D3, the M14

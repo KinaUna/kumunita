@@ -1,10 +1,27 @@
+---
+id: design-guardian-controls
+title: "Guardian controls (account-scope supervision, `GU`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0028-guardian-controls-account-scope-supervision.md
+  - docs/adr/0012-community-membership-mandatory-and-moderator.md
+  - docs/adr/0013-group-posts-membership-lane.md
+updated: 2026-11-02
+---
+
 # Design Doc — Guardian controls (account-scope supervision of a child's account)
+
+> **Abstract:** the **guardian controls** design — **account-scope supervision of a child's account**: a guardian creates the child's account, suspends/locks it, curates its community + group memberships, approves a group invitation, and dissolves the link. A named lane (`GU`) pulled forward ahead of M4. **Who is it for:** a developer touching the GU guardian surface; an agent that needs the supervision invariants. **When to read the rest:** before touching the `GuardianLink` doc, the supervision lanes, or the consent shape.
+
 
 > The "Seams & contracts" section is mandatory. The three tests
 > (closed-loop? handoff? part-vs-whole?) are run and recorded at the end.
 >
 > **This is a named lane (`GU`), not an M-letter** — the same convention as
-> `GP`, `ML`, `ML-UI`, `TR`, `RC`, `TD` (ADR 0013's "named capability, not a
+> `GP`, `ML`, `ML-UI`, `TR`, `RC`, `TD` (ADR [0013](../adr/0013-group-posts-membership-lane.md)'s "named capability, not a
 > milestone letter"). It is **pulled forward ahead of M4** (Events), mirroring
 > how `ML` was pulled forward in 2026-09-12 so the platform could be exercised
 > in more than one language before the circle widened. M4/M5/M6 stay
@@ -13,12 +30,12 @@
 ## Context
 
 The platform is invitation-only and limited to one neighborhood's residents
-(`SECURITY.md` §1, ADR 0002). The realistic population is not only adults:
+([`SECURITY.md`](../../SECURITY.md) §1, ADR [0002](../adr/0002-deployment-topology.md)). The realistic population is not only adults:
 **there will be kids on the platform**, and integrating them well is part of
 what makes the place a *community* (`the-platform-as-integrator.md`). But
 online activity is also a real burden and a real risk for parents, and the
 platform is privacy-first — a child's *audience choices* are as absolute as an
-adult's (`SECURITY.md` §1, the "author's choice of audience is absolute by
+adult's ([`SECURITY.md`](../../SECURITY.md) §1, the "author's choice of audience is absolute by
 default" rule; the `part-vs-whole` test in `START-HERE.md`).
 
 Today the platform has **no notion of a minor and no notion of a guardian**.
@@ -29,14 +46,14 @@ The nearest primitives are all *adult-to-adult* or *owner-to-self*:
   standing to act *as* the owner (action-scoped, invariant C2). A guardian does
   **not** act *as* the child; the guardian holds a defined set of *controls over*
   the child's account. So this is a **new lane**, not a reuse — exactly the
-  pattern ADR 0013 used for group posts (a new `AccessVia` value, action-scoped
+  pattern ADR [0013](../adr/0013-group-posts-membership-lane.md) used for group posts (a new `AccessVia` value, action-scoped
   standing, one additive seam on a frozen surface).
 - **`Profile.Blocked`** (`UserInfo/Profile.cs`, the `IIdentityService.BlockAsync`
   / `UnblockAsync` GlobalAdmin suspension lane, enforced by
   `BlockedAccountMiddleware`) — a reversible account suspension that strips all
   standing. A "parent locks the child's account" is the **child-scoped analog**
   of this well-precedented lane.
-- **ADR 0012 community membership** (`AddCommunityMemberAsync` /
+- **ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md) community membership** (`AddCommunityMemberAsync` /
   `RemoveCommunityMemberAsync`, gated on `moderator:{id}` ∪ GlobalAdmin) —
   membership is the child's **posting/feed gate** on a component, so curating
   it *is* "allow/block access to communities."
@@ -45,7 +62,7 @@ The nearest primitives are all *adult-to-adult* or *owner-to-self*:
   a child receives, and the shape a "parent approves it" gate rides on.
 - **`AccessVia`** (`Authorization/Decision.cs`) — the audit "by what right"
   vocabulary; the last two values (`Admin`, `Group`) are **named-lane appends**
-  (the least-distortion slot, ADR 0006-E). A guardian standing fits the same slot.
+  (the least-distortion slot, ADR [0006](../adr/0006-module-boundary-contracts.md)-E). A guardian standing fits the same slot.
 
 The product want (2026-09-14), in the words it was given: **keep it simple,
 controls only, no invasion of privacy for now.** Concretely: a parent can add
@@ -78,9 +95,9 @@ letter. The roadmap letters **M4/M5/M6 stay Events / Projects / Portability**.
    directory already read) and can un-suspend it. A child-scoped version of the
    GlobalAdmin `BlockAsync` lane, audited `Via: Guardian`.
 3. **Allow / block communities & groups** — the guardian curates the child's
-   **memberships**: add or remove the child from a component (ADR 0012 lanes)
+   **memberships**: add or remove the child from a component (ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md) lanes)
    or a group (`AddGroupMemberAsync` / `RemoveGroupMemberAsync`). Membership is
-   the access gate (ADR 0012: "the posting gate, the composer's picker, the
+   the access gate (ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md): "the posting gate, the composer's picker, the
    feed … all read through this one seam"), so curating it *is* allowing or
    blocking the child's access — and it is **participation** control, not content
    reading.
@@ -100,19 +117,19 @@ letter. The roadmap letters **M4/M5/M6 stay Events / Projects / Portability**.
   child's audience-restricted posts, replies, or group posts; the child's
   `CanAsync` / `CanSeeAsync` are evaluated as if the child were a normal
   account. This is the cardinal rule **held, not deferred** — re-litigating it
-  later requires an ADR 0028 amendment (the ADR 0013 "deliberate not-available"
+  later requires an ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) amendment (the ADR [0013](../adr/0013-group-posts-membership-lane.md) "deliberate not-available"
   precedent).
 - **No reading who contacted / replied to the child** (a content-level read).
 - **No delegation of authorship** — the guardian does **not** post *as* the
   child (no `DelegationGrant`-style effective principal). The child's posts are
-  the child's, authored in the child's language tag (ADR 0018), unattributed to
+  the child's, authored in the child's language tag (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)), unattributed to
   the guardian.
 - **No blanket "block all communities" toggle** — participation control is
   per-member (add/remove), the same weight as the adult lanes; a dedicated
   blanket toggle is a follow-on if it earns its keep.
 - **Age / birthdate is not stored.** Standing comes from the **link itself**,
   not from a minor-PII field. (Storing a child's age would add a sensitive
-  class to `SECURITY.md` for no control that the link does not already give.)
+  class to [`SECURITY.md`](../../SECURITY.md) for no control that the link does not already give.)
 
 **Surfaces**
 
@@ -145,16 +162,16 @@ M1, heavier than a single-lane ADR.
   - `UserInfo/GuardianLink.cs` — the new relationship document (the
     `DelegationGrant` shape: `GuardianId`, `ChildId`, `Status` Active|Dissolved,
     `CreatedAt`, `DissolvedAt?`, `DissolvedBy?`). Registered on the **existing
-    `CoreDocTypes`** surface (ADR 0004 §B.1 — it rides `Schema.For<DelegationGrant>()`'s
+    `CoreDocTypes`** surface (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — it rides `Schema.For<DelegationGrant>()`'s
     neighbor; no new `*DocTypes`, no re-seed).
   - `UserInfo/IUserInfoService.cs` — the guardian-management seams (below).
   - `Authorization/Decision.cs` — `AccessVia.Guardian`, the **9th** value
-    appended after `Group` (the `Admin`/`Group` append precedent, ADR 0006-E).
+    appended after `Group` (the `Admin`/`Group` append precedent, ADR [0006](../adr/0006-module-boundary-contracts.md)-E).
   - `Identity` — **unchanged** as a frozen surface: the child-scoped
     suspend/un-suspend is a **new lane** that sets `Profile.Blocked` (a
     `UserInfo` doc) and audits `Via: Guardian`; the GlobalAdmin
     `BlockAsync`/`UnblockAsync` stay byte-identical.
-  - ADR 0012's `AddCommunityMemberAsync` / `RemoveCommunityMemberAsync` and the
+  - ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md)'s `AddCommunityMemberAsync` / `RemoveCommunityMemberAsync` and the
     group `AddGroupMemberAsync` / `RemoveGroupMemberAsync` — **admit the
     guardian standing** for a child target (a `Via: Guardian` branch); the
     m2b `AcceptGroupInvitationAsync` **gates on an active link** (refused for a
@@ -164,11 +181,11 @@ M1, heavier than a single-lane ADR.
   section of the profile surface), the add-a-child form, the membership editor,
   the pending-invitation approval list, the independence (dissolve) control.
   Thin over the Core seams; the failure shape is the existing lane's (404 on no
-  standing, the ADR 0008/0012 precedent — a non-guardian learns nothing).
+  standing, the ADR [0008](../adr/0008-member-self-leave-lane.md)/0012 precedent — a non-guardian learns nothing).
 - **`tests/Kumunita.Core.Tests`:** the seam tests (below) against the
   `PostgresFixture` fresh-scratch-DB shape.
-- **Docs (this lane's records):** this design doc; **ADR 0028**; the
-  `SECURITY.md` additions (a protected-class note for minors, adversary **A7**
+- **Docs (this lane's records):** this design doc; **ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)**; the
+  [`SECURITY.md`](../../SECURITY.md) additions (a protected-class note for minors, adversary **A7**
   — a hostile guardian over a minor — and the control-map row); the `README`
   Features + Roadmap and `Milestones.cs` `GU` entry (the README / `Milestones.cs`
   / `MilestonesTests.cs` trio moves together).
@@ -177,7 +194,7 @@ M1, heavier than a single-lane ADR.
 
 - **New standing: `AccessVia.Guardian` (the 9th value).** An additive enum
   value appended after `Group` — the **exact** precedent of the M1 `Admin`
-  (7th) and ADR 0013 `Group` (8th) appends: a value-addition, never a
+  (7th) and ADR [0013](../adr/0013-group-posts-membership-lane.md) `Group` (8th) appends: a value-addition, never a
   renumbering; stored audit rows are untouched. It is **action-scoped** to the
   five supervisory actions above and **never** to a content read (invariant
   G·3 below).
@@ -190,11 +207,11 @@ M1, heavier than a single-lane ADR.
   is a fresh `Active` row — a deliberate new act, not an undo).
 - **Access model touched — a *new standing on existing gates*, no new
   authorization lane on the frozen `IAuthorizationService`.** The content
-  authorization path (`CanAsync` / `CanSeeAsync`, ADR 0006-A) is **untouched**:
+  authorization path (`CanAsync` / `CanSeeAsync`, ADR [0006](../adr/0006-module-boundary-contracts.md)-A) is **untouched**:
   a child's content is read exactly as a normal account's. The guardian's
   standing is exercised on the **management** lanes (suspend, membership,
-  invitation), which live on `IUserInfoService` — so the ADR 0006 frozen
-  signatures stay byte-identical (the ADR 0013 "one additive lane, nothing else
+  invitation), which live on `IUserInfoService` — so the ADR [0006](../adr/0006-module-boundary-contracts.md) frozen
+  signatures stay byte-identical (the ADR [0013](../adr/0013-group-posts-membership-lane.md) "one additive lane, nothing else
   moves on the frozen surface" discipline). This is the lane's most important
   non-decision: **the guardian standing does not enter the content decision
   path at all.**
@@ -214,12 +231,12 @@ M1, heavier than a single-lane ADR.
     audits `guardian.suspend` / `guardian.unsuspend` (`Via: Guardian`, target
     the child account), C3. The GlobalAdmin `BlockAsync`/`UnblockAsync` are
     **unchanged**.
-  - **Community & group membership curation** — the ADR 0012
+  - **Community & group membership curation** — the ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md)
     `AddCommunityMemberAsync` / `RemoveCommunityMemberAsync` and the group
     `AddGroupMemberAsync` / `RemoveGroupMemberAsync` lanes **admit the guardian
     standing** for a child target: the existing standing gate (moderator ∪
     GlobalAdmin) gains a `guardian of the target child` branch, and the audit
-    row records the **narrower** standing — `Via: Guardian` (the ADR 0012
+    row records the **narrower** standing — `Via: Guardian` (the ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md)
     "record the narrower standing" rule). No new method; a new branch on the
     existing seams.
   - **Group-invitation approval** — `IUserInfoService.ApproveGroupInvitationAsync
@@ -231,7 +248,7 @@ M1, heavier than a single-lane ADR.
     active `GuardianLink`, the self-accept is refused
     (`InvalidOperationException` → the Web's error, never a 500); the child's
     **decline** stays open. This is the C-M2b·2 self-lane's "one recorded
-    exception for a supervised account" (the ADR 0008 owner-row-exception shape,
+    exception for a supervised account" (the ADR [0008](../adr/0008-member-self-leave-lane.md) owner-row-exception shape,
     carried to the supervised-child row).
   - `IUserInfoService.DissolveGuardianLinkAsync(linkId, actorId)` — the
     **independence lane**: moves the row `Active → Dissolved`
@@ -263,7 +280,7 @@ M1, heavier than a single-lane ADR.
   - **G·3 — Action-scoped, deny-by-default.** A guardian action outside the five
     supervisory actions (or on a target with no active link) is a Deny —
     including, explicitly, any content read. A scope unknown to old code denies
-    on new actions by default (ADR 0006-E).
+    on new actions by default (ADR [0006](../adr/0006-module-boundary-contracts.md)-E).
   - **G·4 — Formation is creation-based.** The `GuardianLink`'s standing basis is
     that the guardian *created* the child's account (`CreatedById`); there is no
     self-serve "claim guardianship over an existing account" lane.
@@ -279,7 +296,7 @@ M1, heavier than a single-lane ADR.
 > C#: the `GuardianLink` POCO, the `AccessVia.Guardian` value, the five
 > `IUserInfoService` guardian seams (three new methods, two branches on
 > existing lanes) + the invitation gate, the pinned seam-test names, and the
-> acceptance gate. ADR 0028 (already accepted) is the authority every pin
+> acceptance gate. ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) (already accepted) is the authority every pin
 > traces back to; this section is where the *exact* shape is frozen. **No code
 > is authored here** — the C# below is the contract U02–U06 will write; it is
 > pinned so the shape cannot drift between units.
@@ -368,8 +385,8 @@ public enum GuardianLinkStatus
 
 The **9th** value, appended **after `Group`** in
 `src/Kumunita.Core/Authorization/Decision.cs` (U03 authors). A value-addition,
-never a renumbering (the M1 `Admin` 7th / ADR 0013 `Group` 8th append
-precedent, ADR 0006-E):
+never a renumbering (the M1 `Admin` 7th / ADR [0013](../adr/0013-group-posts-membership-lane.md) `Group` 8th append
+precedent, ADR [0006](../adr/0006-module-boundary-contracts.md)-E):
 
 ```csharp
 public enum AccessVia
@@ -398,7 +415,7 @@ pause, not a deviation (unit-series rule §5).
 
 ### IUserInfoService guardian seams (exact C#)
 
-The **five** supervisory actions (ADR 0028 §C) — **three add new methods, two
+The **five** supervisory actions (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §C) — **three add new methods, two
 are branches on existing lanes** — each pinned to its exact signature, the
 standing gate (= active link), the audit verb + `Via`, the invariant, and the
 exceptions. **No new method is added for the two branch actions; the
@@ -430,14 +447,14 @@ Task UnsuspendChildAsync(string childId, string guardianId);
 
 **3. Membership curation — a branch on the existing four lanes** (U05). The
 existing `AddCommunityMemberAsync(componentId, userId, actorId, actorRoles)` /
-`RemoveCommunityMemberAsync(…)` (ADR 0012) **and**
+`RemoveCommunityMemberAsync(…)` (ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md)) **and**
 `AddGroupMemberAsync(groupId, userId, addedBy)` /
 `RemoveGroupMemberAsync(groupId, userId, removedBy)` **grow a `Via: Guardian`
 branch**: when the actor has an **active link over the target `userId`** (the
 child), the standing gate is satisfied and the audit row records the
-**narrower** standing `Via: Guardian` (the ADR 0012 "record the narrower
+**narrower** standing `Via: Guardian` (the ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md) "record the narrower
 standing" rule). **No new method; a branch. The four signatures are unchanged.**
-The ADR 0012 mandatory-community `InvalidOperationException` and the ADR 0008
+The ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md) mandatory-community `InvalidOperationException` and the ADR [0008](../adr/0008-member-self-leave-lane.md)
 group-owner-row exception are **preserved** (the branch adds a path, never
 removes one).
 
@@ -473,7 +490,7 @@ Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin);
 **gates**: if the invitee (the child) has an active `GuardianLink`, the
 self-accept is refused (`InvalidOperationException` → the Web's error, never a
 500). `DeclineGroupInvitationAsync` **stays open** (a child may always say
-no). This is the C-M2b·2 self-lane's one recorded exception (the ADR 0008
+no). This is the C-M2b·2 self-lane's one recorded exception (the ADR [0008](../adr/0008-member-self-leave-lane.md)
 owner-row-exception shape, carried to the supervised-child row).
 
 ### Pinned seam tests (exact names)
@@ -568,7 +585,7 @@ the drift; it does not reshape the pin.
     after a dissolve the child's self-accept is restored.
   - **Membership curation:** the guardian adds/removes the child from a
     component and a group; the audit rows record `Via: Guardian`; the child's
-    posting/feed gate (ADR 0012's single seam) reflects it on the next read.
+    posting/feed gate (ADR [0012](../adr/0012-community-membership-mandatory-and-moderator.md)'s single seam) reflects it on the next read.
 - **Production signals:** the audit log (`/admin/audit`) now answers "a parent
   suspended their child, by what right, when" (`guardian.suspend`,
   `Via: Guardian`) — a new, legible row class. No new `/health` signal (no new
@@ -578,7 +595,7 @@ the drift; it does not reshape the pin.
 ## Emergent impact
 
 - **The *Authority* chain gains a legibility row for the family case.** The
-  audit log (the "prove what happened" mechanism, `SECURITY.md` §3.1) now
+  audit log (the "prove what happened" mechanism, [`SECURITY.md`](../../SECURITY.md) §3.1) now
   records *who supervised a child's account, by what right, and when* —
   traceable forward (action → audit row) and backward (audit row → link →
   guardian), exactly the `domains-of-integration.md` chain, extended one step.
@@ -605,7 +622,7 @@ content (G·1).
 
 ## FACES check
 
-- **Stable — strengthened:** the family case (the ADR 0010 "a family is an
+- **Stable — strengthened:** the family case (the ADR [0010](../adr/0010-private-groups.md) "a family is an
   organizing unit" want) now has a *supervision* lane, not just a private-group
   one; a child's account can be suspended, curated, and handed over without a
   GlobalAdmin being in the loop for routine care — the place holds for families,
@@ -619,7 +636,7 @@ content (G·1).
   row is the record that it did.
 - **Flexible — consumed (the named trade):** the guardian standing is frozen
   action-scoped at five supervisory actions and *cannot* grow into a content
-  read without an ADR 0028 amendment. That is slower than ad-hoc — deliberately.
+  read without an ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) amendment. That is slower than ad-hoc — deliberately.
   A family that later wants "my parent can see what I posted" is told that is a
   new, separate, ADR-gated decision, not a toggle.
 - **Energizing — protected:** the parent is given one place to do the
@@ -630,9 +647,9 @@ content (G·1).
 ## Rollout & rollback
 
 - **Schema:** the `GuardianLink` document rides the existing `CoreDocTypes`
-  surface (ADR 0004 §B.1 — additive, delta-detected by Marten, idempotent, no
+  surface (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — additive, delta-detected by Marten, idempotent, no
   re-seed, no new `*DocTypes` file, no DDL change under Marten 9's JSONB
-  `data` column — the ADR 0010 `IsPrivate` upgrade-path precedent). The
+  `data` column — the ADR [0010](../adr/0010-private-groups.md) `IsPrivate` upgrade-path precedent). The
   `AccessVia.Guardian` value is an append (no stored row's meaning changes).
   Both are **additive** → re-deploying an older image over a forward-migrated
   database is safe (no `GuardianLink` rows exist until the lane ships; no audit
@@ -643,7 +660,7 @@ content (G·1).
   child to a normal account; the schema is additive, so the older image remains
   deployable. Restore: `pg_dump` of the single Postgres captures the
   `GuardianLink` rows with the rest (OPS.md).
-- **The trio moves together** (AGENTS.md contract): `README.md` Features +
+- **The trio moves together** (AGENTS.md contract): [`README.md`](../../README.md) Features +
   Roadmap carries `GU` as **Done**; `Milestones.cs` has `GU` as `StatusDone`
   with `M4` now the single `StatusNext` (the single-in-progress invariant
   preserved); `MilestonesTests.cs` is updated in the same commit so the build
@@ -655,7 +672,7 @@ content (G·1).
   G·4 (standing comes from *creating* the account — no self-serve claim over a
   stranger), G·1 (no content read, so the exposure is account-level, not the
   child's private life), and G·5 (the safety valve: a GlobalAdmin dissolves the
-  link or un-suspends the account, audited). Recorded in `SECURITY.md` as a
+  link or un-suspends the account, audited). Recorded in [`SECURITY.md`](../../SECURITY.md) as a
   named adversary + control row, not assumed away.
 - **The suspend lane could be used to silence a child.** The same control that
   keeps a child safe can lock a child out; G·5 is the counterweight, and the
@@ -663,7 +680,7 @@ content (G·1).
   GlobalAdmin reads when a child (or another adult) reports it.
 - **G·1 is the whole lane's honesty.** If the content path ever gains a
   `Via: Guardian` branch, the lane silently inverts the product's cardinal
-  rule. Pinned by the G·1 seam test and by the ADR 0028 "deliberate
+  rule. Pinned by the G·1 seam test and by the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) "deliberate
   not-available" record (a re-litigation requires an amendment).
 - **Formation + link in two Core calls.** The account (`IIdentityService`) and
   the link (`IUserInfoService`) are different modules; the Web must commit them
@@ -715,7 +732,7 @@ account out, without leaving the platform. It is the *linkage* (parent ↔ child
 
 ## GU — Closed (recorded) (2026-09-14)
 
-The GU lane (guardian controls, ADR 0028) is **shipped**. The five actions
+The GU lane (guardian controls, ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)) is **shipped**. The five actions
 (suspend/unsuspend, community + group membership curation, invitation
 approval) + formation (add-a-child, the usual verify-email flow) + the
 independence handover (dissolve, the GlobalAdmin safety valve) are live.
@@ -723,15 +740,30 @@ Standing is **account-scope only** — invariant **G·1** held: the guardian
 standing (`AccessVia.Guardian`, the 9th value) **never** resolves a content
 read; it is exercised only on the `IUserInfoService` management lanes.
 
-- **Decision record:** ADR 0028 (account-scope supervision; amends 0006,
+- **Decision record:** ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) (account-scope supervision; amends 0006,
   0003, 0012, m2b).
 - **Gate:** the 11 pinned seam tests + the 4 Web VM tests — see the
   `### Run result (GU acceptance gate — 2026-09-14)` section above (U10).
 - **Layout:** `GuardianLink` rides the existing `CoreDocTypes` surface (ADR
-  0004 §B.1, additive); `docs/ARCHITECTURE.md`'s `UserInfo/` line + doc-map
+  0004 §B.1, additive); the [solution layout](../architecture/solution-layout.md) `UserInfo/` line + doc-map
   carry the surface (U11).
 - **Non-decision (carried forward):** the GlobalAdmin `viaAdmin: true`
   dissolve shell (the admin surface) is **out of scope** here — it is a
-  separate admin-shell lane, not a GU one (ADR 0028 §C, the §D G·5 valve).
+  separate admin-shell lane, not a GU one (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §C, the §D G·5 valve).
 - **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane
   discipline: GU is not a renumber).
+
+---
+
+## ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) — moved content (D11 trim, 2026-11-02)
+
+## Related
+
+- **ADR [0005](../adr/0005-multilingual-support.md)** — multilingual support (platform text; §C UGC "never
+  translated" is *unchanged* by this ADR).
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** — additive schema-evolution pattern this field follows.
+- **ADR [0013](../adr/0013-group-posts-membership-lane.md)** — group posts (the `Post` document this tag rides on).
+- **ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016** — post edit lanes this tag is **editable** on
+  (amended 2026-09-13) and the reply edit lane it stays **frozen** on
+  (body-only, create-time tag).
+- **ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md)** — announcement edit lane this tag is **editable** on.

@@ -1,12 +1,25 @@
-# ADR 0248 — Announcement cards show a comment count
+---
+id: adr-0248
+title: "Announcement cards show a comment count"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0248](0248-announcement-card-comment-count.md) — Announcement cards show a comment count
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-ADR 0226 put a reply count in the footer of post cards in the community and group feeds. The ui-refresh plan listed the same for other
+ADR [0226](0226-feed-reply-count.md) put a reply count in the footer of post cards in the community and group feeds. The ui-refresh plan listed the same for other
 card lists. Events have no comments or replies in the data model, so there is nothing to count there. Announcements do have comments
-(ADR 0101), with two rules: only signed-in viewers can read them, and an admin can switch the whole feature off
+(ADR [0101](0101-announcement-comments-lane.md)), with two rules: only signed-in viewers can read them, and an admin can switch the whole feature off
 (`AnnouncementCommentsEnabled`).
 
 ## Decision

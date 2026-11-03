@@ -1,59 +1,25 @@
-# ADR 0080 — The /settings surface split: linkable section pages
-
-Status: Accepted
-Date: 2026-09-25
-Amended: 2026-09-30 (email section folded into the Language tab; the
-Children page adopted as a settings tab — see **Amendment (2026-09-30)** below)
-
-## Amendment (2026-09-30)
-
-Two surface refinements supersede parts of the original four-section decision
-below; everything not restated here still stands.
-
-- **The Email &amp; notification language section (ADR 0061) is folded into
-  the Language tab.** Rationale: it is another "which language" choice and
-  lived awkwardly as a lone picker on its own page. Concretely:
-  - `Views/Locale/EmailLanguage.cshtml` is **deleted**; its email picker +
-    reset block and the **help/account mount-slot link** (ADR 0039 §3.8) are
-    merged into `Views/Locale/Index.cshtml` (the Language tab), which now
-    `@inject`s `IPageService`.
-  - `LocaleController.SettingsEmailLanguage()` (the
-    `GET /settings/email-language` route) is **retired as a page** and now
-    `RedirectToAction(nameof(Index))` — the route is kept so saved links and
-    deep references still land on the page that owns the section.
-  - `SaveEmailLanguage` (the `POST /settings/email-language` lane, signature
-    and fail-closed handling unchanged) now redirects to **`Index`** (the
-    Language tab) instead of `SettingsEmailLanguage`.
-  - The tab strip is now **three settings tabs + Children** (see the next
-    bullet); the `Email & notification language` tab row and its active-case
-    are removed from `_SettingsTabs.cshtml`.
-  - `SettingsSectionSplitTests` is updated: the email GET pin now asserts the
-    redirect to `Index`, and the `SaveEmailLanguage` subject-null pin asserts
-    a redirect to `Index`.
-  - This supersedes the table row
-    `/settings/email-language` | `EmailLanguage` and the "help/account
-    … renders at the bottom of `EmailLanguage.cshtml`" bullet.
-
-- **The Children page (ADR 0028) becomes a settings tab.** The "Children"
-  entry is removed from the account dropdown (`_AccountNav.cshtml`) and the
-  `Guardian/Index.cshtml` view now renders the shared `_SettingsTabs.cshtml`
-  sub-nav (active tab = Children). Because the Guardian page's action is also
-  named `Index` (as is the Language tab), `_SettingsTabs.cshtml`'s active-tab
-  detection is now **controller-aware** (`controller == "Guardian"` →
-  Children; otherwise the `LocaleController` action switch). The tab label
-  reuses the already-registered `nav.children` key, so no new translation key
-  is introduced. This supersedes the "active tab is derived from the current
-  action name" and "four tabs" wording in the Decision.
+---
+id: adr-0080
+title: "The /settings surface split: linkable section pages"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
-The resident's settings surface (ADR 0005 B; the ADR 0019 time zone and
-ADR 0020 date & time format sections folded in, and ADR 0061's email &
+The resident's settings surface (ADR [0005](0005-multilingual-support.md) B; the ADR [0019](0019-timezone-platform-default-and-resident-override.md) time zone and
+ADR [0020](0020-date-format-platform-default-and-resident-override.md) date & time format sections folded in, and ADR [0061](0061-email-and-notification-language.md)'s email &
 notification language appended) was a single long scroll at
 `/settings/language`: the Language picker, the Time zone picker, the Date &
 time format picker, the Email & notification language picker, and the
 help/account mount-slot link — all on one `Index` page, in that order. The
-same two problems ADR 0062 named for `/admin` had built up here:
+same two problems ADR [0062](0062-admin-surface-split.md) named for `/admin` had built up here:
 
 - **No linkable, shareable, per-section address.** A resident (or a
   moderator pointing one at a setting) who wanted to "send someone straight
@@ -65,8 +31,8 @@ same two problems ADR 0062 named for `/admin` had built up here:
   on a page that also contained the language picker, the date-format picker,
   and the email-language picker.
 
-This is the same settled design question ADR 0062 recorded for the admin
-surface ("the shell is too much, split it"), so it follows the ADR 0062
+This is the same settled design question ADR [0062](0062-admin-surface-split.md) recorded for the admin
+surface ("the shell is too much, split it"), so it follows the ADR [0062](0062-admin-surface-split.md)
 pattern: **split the one page into linkable sections, each with its own
 route, and render a shared sub-nav.** This is a *surface change, not a
 capability change* — no write lane, seam, or model changes.
@@ -86,10 +52,10 @@ controllers.
 
   | Route | View | Section |
   |---|---|---|
-  | `/settings/language` | `Index` | **Language** (the ADR 0005 B picker + the ADR 0046 browser-match hint) |
-  | `/settings/timezone` | `Timezone` | **Time zone** (ADR 0019 — the `Profile.TimeZone` override) |
-  | `/settings/dateformat` | `DateFormat` | **Date & time format** (ADR 0020 — the `Profile.DateFormat` override) |
-  | `/settings/email-language` | `EmailLanguage` | **Email & notification language** (ADR 0061 — the `Profile.EmailLanguage` override) |
+  | `/settings/language` | `Index` | **Language** (the ADR [0005](0005-multilingual-support.md) B picker + the ADR [0046](0046-default-language-browser-accept-language-match.md) browser-match hint) |
+  | `/settings/timezone` | `Timezone` | **Time zone** (ADR [0019](0019-timezone-platform-default-and-resident-override.md) — the `Profile.TimeZone` override) |
+  | `/settings/dateformat` | `DateFormat` | **Date & time format** (ADR [0020](0020-date-format-platform-default-and-resident-override.md) — the `Profile.DateFormat` override) |
+  | `/settings/email-language` | `EmailLanguage` | **Email & notification language** (ADR [0061](0061-email-and-notification-language.md) — the `Profile.EmailLanguage` override) |
 
   Each section view keeps the `Model.<Section> is not null` guard so a
   signed-out render (the harness's null-subject path) still degrades cleanly.
@@ -117,7 +83,7 @@ controllers.
   so a resident lands on the page the form was on. The language `Save`
   keeps redirecting to `Index` (it is the landing tab).
 
-- **The help/account mount-slot link (ADR 0039 §3.8) moves to the last tab.**
+- **The help/account mount-slot link (ADR [0039](0039-pages-hierarchy-audience-translations.md) §3.8) moves to the last tab.**
   The "Help with your account" slot block — the `help/account` page link
   resolved via `PageMountResolver` — renders at the bottom of
   `EmailLanguage.cshtml` (the last settings section), out of the way of the
@@ -128,7 +94,7 @@ controllers.
 
 - **Deep-linkable settings sections.** `/settings/timezone`,
   `/settings/dateformat`, and `/settings/email-language` are now shareable
-  addresses — the ADR 0062 "send a colleague straight to the accounts page"
+  addresses — the ADR [0062](0062-admin-surface-split.md) "send a colleague straight to the accounts page"
   property, applied to the resident surface.
 - **Surface-only change.** No Core seam, doc type, migration, or translation
   key changed. `Kumunita.Core` stays HTTP-free; the four write lanes and
@@ -141,7 +107,7 @@ controllers.
   surface (the "must not depend on the settings view changes" invariant).
 - **The tab labels are the section titles.** Because the tab labels reuse the
   section-title keys, a resident sees each section's title twice on its own
-  page (tab + heading). That is accepted — it matches the ADR 0062 admin
+  page (tab + heading). That is accepted — it matches the ADR [0062](0062-admin-surface-split.md) admin
   sub-nav, where the tab and the section heading also share the same label,
   and it costs zero new translation keys.
 - **New test pins the split.** `SettingsSectionSplitTests` asserts each

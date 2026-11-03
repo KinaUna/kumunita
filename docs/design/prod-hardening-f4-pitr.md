@@ -1,9 +1,24 @@
+---
+id: design-prod-hardening-f4-pitr
+title: "F4 — PITR / WAL archiving (BKP-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0011-media-and-file-storage.md
+updated: 2026-11-02
+---
+
 # F4 — BKP-02: PITR / WAL archiving — Part-0 design pin
+
+> **Abstract:** the **F4 PITR** design pin (Part-0, design-only) — **PITR / WAL archiving** over the scheduled `pg_dump -Fc` logical dump: the recovery-point objective is today the dump interval (up to 24 h); F4 adds WAL archiving for point-in-time recovery between dumps. A pure-ops tool (no code); the owner-ops steps are pinned as open items, never assumed done. Closes 2026-10-22 BKP-02. **Who is it for:** the owner-operator executing F4 U3; an agent that needs the PITR shape + the owner-ops checklist. **When to read the rest:** before enabling WAL archiving, or running the F4 restore drill.
+
 
 > **Fix:** F4 (report row **BKP-02**) — kind **`code+ops`**.
 > **Status:** this is the **Part-0 design pin** (F4.U1). It is **design-only**:
 > no code, no build, no `.cs` touched. F4.U2 records "no code needed" (this is a
-> pure-ops tool — see §7); F4.U3 lands the `docs/OPS.md` §4/§5 update. The
+> pure-ops tool — see §7); F4.U3 lands the [`docs/OPS.md`](../OPS.md) §4/§5 update. The
 > owner-ops steps in §6 are **open items** — they are *pinned* here so the owner
 > executes them verbatim, and are **never assumed done**.
 > **Why it's a FAIL today:** the only DB backup is a scheduled `pg_dump -Fc`
@@ -22,7 +37,7 @@
   `kumunita`, offsite to object storage (S3 / Backblaze B2 / rclone), with a
   retention example ("7 daily, 4 weekly, 6 monthly") and a quarterly restore
   verification. A **second restore surface** — the media volume (`Media__RootPath`)
-  — is snapshotted beside its dump (ADR 0011).
+  — is snapshotted beside its dump (ADR [0011](../adr/0011-media-and-file-storage.md)).
 - **What's absent:** any **WAL archiving** and therefore any **PITR**. The RPO is
   the dump cadence, not near-continuous. This is exactly the audit's "RPO up to
   24 h."
@@ -34,11 +49,11 @@
   (OPS §4 example cron). The ops steps below therefore target the **prod VPS +
   the Coolify Postgres addon**, and must be expressible as addon config + host
   commands, not as a compose-file change to the dev container.
-- **Invariants this pin holds:** ADR 0004 (Marten owns the domain documents;
-  Postgres is the crown jewels); ADR 0011 (the media volume is a *separate*
+- **Invariants this pin holds:** ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) (Marten owns the domain documents;
+  Postgres is the crown jewels); ADR [0011](../adr/0011-media-and-file-storage.md) (the media volume is a *separate*
   restore surface and is **not** covered by WAL/PITR — see §5). PITR hardens
   **only the Postgres surface**; it does not change the schema-evolution model,
-  the module boundaries (ADR 0006), or the "Core stays HTTP-free" rule. It adds
+  the module boundaries (ADR [0006](../adr/0006-module-boundary-contracts.md)), or the "Core stays HTTP-free" rule. It adds
   **no app code path, no new bounded context, no new surface to provision** — it
   is host/DBA infrastructure, which is why F4 is `code+ops` with the code side
   expected to be empty (U2).
@@ -111,7 +126,7 @@ WAL stream; Postgres and pgBackRest do. Therefore:
   sink; F4's alert-on-failure in §6 is a **host cron** calling `pgbackrest check`
   and forwarding the result — it reuses the **F12 human alert channel**, which is
   itself a `code+ops` fix; F4 does not build the channel.)
-- **F4.U3 = the `docs/OPS.md` update** (the code-visible artifact of F4): add the
+- **F4.U3 = the [`docs/OPS.md`](../OPS.md) update** (the code-visible artifact of F4): add the
   PITR procedure, the retention/RPO numbers from §3, the "last verified" line
   (OPS's "Rules of the road"), and the alert-on-failure cron from §6 — into
   **§4 (Backups)** and **§5 (Restore)** — and record the owner-ops step as an
@@ -120,7 +135,7 @@ WAL stream; Postgres and pgBackRest do. Therefore:
 ## 5. Scope boundary — the media volume is NOT part of PITR
 
 **Explicit, so U3's OPS edit doesn't blur it:** PITR/WAL archiving covers the
-**Postgres surface only**. The **media volume** (`Media__RootPath`, ADR 0011) is a
+**Postgres surface only**. The **media volume** (`Media__RootPath`, ADR [0011](../adr/0011-media-and-file-storage.md)) is a
 separate byte store whose recovery is the existing **volume snapshot beside the
 dump** (OPS §4 "Second restore surface"). pgBackRest does **not** snapshot that
 volume, and PITR-ing Postgres to a point in time does **not** rewind the media
@@ -249,7 +264,7 @@ pgbackrest --stanza=<instance> restore --type=time --target="2026-10-23 14:50:00
 requires — the app neither reads nor writes the WAL stream. F4.U2 therefore
 records **"no code needed"** (per the plan's own allowance: *"If pure-ops, U2 =
 'no code needed' recorded."*). The only code-visible artifact of F4 is the
-**`docs/OPS.md` update** in F4.U3. Do **not** invent an app-side config knob to
+**[`docs/OPS.md`](../OPS.md) update** in F4.U3. Do **not** invent an app-side config knob to
 "make it code" — that would be a drive-by outside F4's pinned scope.
 
 ## 8. Explicit non-goals / out of scope for F4
@@ -261,7 +276,7 @@ records **"no code needed"** (per the plan's own allowance: *"If pure-ops, U2 =
 - **Rollback-as-restore** — the *app* rollback runbook is **F20** (DEP-04), which
   depends on F4; F4 provides the PITR primitive F20's "one-step rollback" restore
   step will call.
-- **A new bounded context / surface / schema** — none. F4 adds none (ADR 0006
+- **A new bounded context / surface / schema** — none. F4 adds none (ADR [0006](../adr/0006-module-boundary-contracts.md)
   preserved).
 
 ## 9. Exit contract for this pin (F4.U1)

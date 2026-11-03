@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f3-mfa
+title: "F3 — MFA for GlobalAdmin (AUTH-03)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # F3 — AUTH-03: MFA for `GlobalAdmin` (Part-0 design pin)
+
+> **Abstract:** the **F3 MFA** design pin (Part-0, design-only) — **MFA for `GlobalAdmin`** over the ASP.NET Identity 10.0.13 classic `UserManager` TOTP + recovery-code API (not the new `TwoFactor` surface): the TOTP provider + token store, the enroll/verify surface, the enforcement, and the tests. Closes 2026-10-22 AUTH-03. **Who is it for:** a developer executing F3 U2–U5; an agent that needs the Identity two-factor API ground truth. **When to read the rest:** before touching the GlobalAdmin MFA lane, the token store, or the F3 tests.
+
 
 **Fix:** F3 (report row **AUTH-03** — "MFA for `GlobalAdmin`"), severity bucket **data
 exposure**. **Kind:** `code`.
@@ -11,7 +26,7 @@ refine U4's seam.
 This is **Tier 1** (a design pin a later ~32K clean-slate agent re-reads verbatim). It is
 self-contained: F3.U2–U5 must not need to re-derive any of these decisions.
 
-> **Repo doctrine applied (from `AGENTS.md`):** "Before writing … code, check the actual
+> **Repo doctrine applied (from [`AGENTS.md`](../../AGENTS.md)):** "Before writing … code, check the actual
 > APIs in the current dependency versions in the `.csproj` files — do not copy a 'common'
 > pattern from memory." That applies to **ASP.NET Identity's two-factor API** as much as to
 > Marten/Wolverine. **Round-2 (this re-pin):** the 10.0.13 two-factor surface is the
@@ -67,7 +82,7 @@ There is **no second factor** anywhere in the sign-in path. A compromised
 
 ---
 
-## 2. Storage — **EF-owned Identity row + the token store; ADR 0004 preserved; NO new Marten doc; NO new migration**
+## 2. Storage — **EF-owned Identity row + the token store; ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) preserved; NO new Marten doc; NO new migration**
 
 > **ROUND-3 RE-PIN (commit `db4ce95b` — the F3.U2 round-2 build drift-pause that recorded the 4 exact compiler errors):** four members corrected to the **build-verified** 10.0.13 surface — `ValidateTwoFactorTokenAsync` → **`VerifyTwoFactorTokenAsync(user, provider, token)`** (the `Validate…` name is ABSENT — CS1061, 0 byte-level hits in the Core + Identity DLLs); `GenerateNewTwoFactorRecoveryCodesAsync(user)` → **`(user, number)`** (pass 10); `TwoFactorAuthenticatorSignInAsync(user, code)` → **`(code, isPersistent, rememberClient)`** (code-first, no user); `TwoFactorRecoveryCodeSignInAsync(user, code)` → **`(recoveryCode)`** (1-arg, no user). The round-2 tier (①) for these four is now **③ U2-build-verifies against the round-3 shape**. The rest of the round-2 model (the members that DID compile) is unchanged.
 
@@ -204,7 +219,7 @@ There is **no second factor** anywhere in the sign-in path. A compromised
 - **A new `MfaSecret` column on `AspNetUsers`** — *rejected.* The provider/`UserManager` owns the
   key; a bespoke column would bypass `AuthenticatorTokenProvider<T>` + the token store and is a
   new migration for zero benefit.
-- **A new `IdentityMfa` *Marten* doc** — *rejected on ADR 0004 grounds.* ADR 0004: "**Marten**
+- **A new `IdentityMfa` *Marten* doc** — *rejected on ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) grounds.* ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md): "**Marten**
   owns the domain documents … **EF Core is used only for ASP.NET Identity tables**." A TOTP secret
   + recovery codes + the enable flag are **Identity credential material** — they belong in the
   `identity` schema (the existing `AspNetUsers` / `AspNetUserTokens` tables), not as a `mt` doc.

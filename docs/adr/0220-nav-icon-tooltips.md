@@ -1,9 +1,22 @@
-# ADR 0220 — Tooltips for the icon-only top-row links
+---
+id: adr-0220
+title: "Tooltips for the icon-only top-row links"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0220](0220-nav-icon-tooltips.md) — Tooltips for the icon-only top-row links
 
 Status: Accepted
 
 ## Context
-ADR 0219 hides the link labels (Home, Announcements, Community, Groups) between 576 and 767px so the variant-B
+ADR [0219](0219-numbered-pages-narrow-topbar.md) hides the link labels (Home, Announcements, Community, Groups) between 576 and 767px so the variant-B
 top row fits. The icons then had no visible name.
 
 ## Decision

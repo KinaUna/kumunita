@@ -1,4 +1,17 @@
-# ADR 0009 — Group description: resident-facing display + owner ∪ GlobalAdmin edit
+---
+id: adr-0009
+title: "Group description: resident-facing display + owner ∪ GlobalAdmin edit"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/tags-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0009](0009-group-description-display-and-edit-lane.md) — Group description: resident-facing display + owner ∪ GlobalAdmin edit
 
 Status: Accepted
 Date: 2026-09-10
@@ -41,7 +54,7 @@ people who can reach the group, and correctable by the group's owner.
   `TargetKind` "group") in the same transaction (invariant C3), one
   `SaveChangesAsync`. Strong consistency (C4): the value is live on the next
   `GetGroupAsync` / `GetGroupsForUserAsync` call.
-- The standing is **owner ∪ GlobalAdmin**, per ADR 0007's new-lane rule
+- The standing is **owner ∪ GlobalAdmin**, per ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)'s new-lane rule
   (which already sets the default standing for future group write lanes):
   the Web route
   (`POST /groups/{id}/update-description`) resolves through

@@ -1,3 +1,25 @@
+---
+id: philosophy-domains
+title: "Domains of Integration — the Lens"
+tier: living
+kind: philosophy
+status: current
+audiences: [developer, platform-maintainer, community-admin]
+related:
+  - docs/philosophy/START-HERE.md
+  - docs/philosophy/further-reading.md
+  - docs/philosophy/anti-patterns.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the diagnostic lens — the nine domains the mind
+> already integrates (re-mapped onto the systems we build), the six native to
+> software, and the six that belong to the product reaching into a life.
+> **Who is it for:** the people designing or reviewing changes here.
+> **When to read the rest:** when a design feels wrong but nothing is
+> "broken" — name the domain it is failing at.
+>
+
 # Domains of Integration — the Lens
 
 > **The line to remember:** the parts are cheap; the linkage is what's rare.
@@ -235,7 +257,7 @@ shards, and caches are differentiated copies that must link back into one
 consistent whole.
 
 **In what we build:** Kumunita is deliberately a single Postgres, one
-instance per neighborhood (ADR 0001), so most of this is *latent* — but the
+instance per neighborhood (ADR [0001](../adr/0001-core-stack-and-identity-model.md)), so most of this is *latent* — but the
 moment a neighborhood outgrows one node, the local truth and the global
 truth must link. Keep the seams for that seam, don't bake the assumption
 that "one node is the whole."
@@ -466,7 +488,7 @@ a slice of it.
 **In Kumunita:** low-literacy and low-technical residents, low-connectivity
 contexts, and "who can actually use this" as design inputs, not
 afterthoughts. The median user is a part; the whole is the neighborhood.
-Kumunita is multilingual (ADR 0005) precisely because the design must reach
+Kumunita is multilingual (ADR [0005](../adr/0005-multilingual-support.md)) precisely because the design must reach
 the whole population, not just the median one.
 
 **The smell:** "it works for me"; a feature that quietly requires a

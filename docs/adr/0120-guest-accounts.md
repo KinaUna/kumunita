@@ -1,36 +1,15 @@
-# ADR 0120 — Guest accounts (limited-privilege, time-bounded accounts on the M1 identity surface)
-
-Status: Accepted
-Date: 2026-09-30
-
-The README roadmap names M19 — the **last** milestone in `Milestones.All` —
-exactly: "**Guest accounts**: limited-privilege accounts for consultants,
-coaches, teachers, speakers, entertainers, and similar community-adjacent
-roles who need a place in the platform without full resident standing;
-**admins set the limits on what a guest may access and for how long**."
-"admins set" is the **admin-settled standing** (D1/D2/D6); "what a guest may
-access" is a **closed surface set with an empty floor** (D4); "for how long"
-is a **bounded window on the allowance, evaluated per request** (D3). M19
-adds the *outside* of the resident circle: a limited, bounded guest standing.
-
-This ADR rides **frozen** seams, extending none of them:
-
-- **The M1 identity surface (ADR 0001)** — the thin-token / fat-authorization
-  split (ADR 0001-B), the additive standing fields on `Profile`
-  (`Verified` / `Blocked` — the ADR 0004 §B.1 additive-field precedent), and
-  the claim-mint at the Identity↔cookie seam (`KumunitaClaimsPrincipalFactory`).
-- **The frozen `IAuthorizationService` + `Decide()` (ADR 0006)** — M19 adds
-  **no** new `AccessAction`, **no** new `AccessVia`, **no** new adapter,
-  **no** branch in `Decide()` (C-M19·6).
-- **The composable-role / claim-append precedent (ADR 0030)** — D5's
-  `Roles.Guest` is a new claim *string* on the existing `Kumunita.Role`
-  claim *type*; the `ClaimTypes.All` set is **untouched**.
-- **The admin-settled policy + one audited write lane + `/admin` controller
-  (ADR 0050)** — D2's `SetGuestAccessAsync` mirrors
-  `SetSignupOpenAsync` exactly (load-or-create, store, one `AccessAudit` row
-  `Via = Admin` in the same session); D6's `/admin/guests` mirrors
-  `AdminSignupController` (dedicated controller, gate checked first on GET
-  + POST, affordances hidden-not-disabled).
+---
+id: adr-0120
+title: "Guest accounts (limited-privilege, time-bounded accounts on the M1 identity surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m19-guest-accounts-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -40,7 +19,7 @@ of the platform. The M1 identity surface already ships everything a guest
 needs to *be a real actor*: a real `User`, a real `Profile`, a real
 `SubjectId`, the thin-token / fat-authorization split, the
 `Verified`/`Blocked` additive standing fields, the claim-mint at the
-Identity↔cookie seam, and the `AccessAudit` lane. ADR 0050 already ships the
+Identity↔cookie seam, and the `AccessAudit` lane. ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) already ships the
 **admin-settled policy + one audited write lane + `/admin` controller**
 shape. What the surface does *not* have is the *outside* of the resident
 circle: a standing that is (a) **not** `Member` (the guest is outside the
@@ -49,7 +28,7 @@ guest *in* to specific surfaces, never to full membership), and (c) **bounded
 in time** (live only while `ValidFrom ≤ now < ValidUntil`).
 
 The constraint that shapes the decision is the same one that shaped ADR
-0030 and ADR 0050: **compose the frozen seams, never extend them.** The
+0030 and ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md): **compose the frozen seams, never extend them.** The
 guest is a *standing on the account* (an additive `Profile` flag + one small
 allowance document), not a new entity, not a parallel store, not a new
 bounded context (D1). The guest's "what may I see" is answered per request by
@@ -57,7 +36,7 @@ the **same** `CanAsync`/`CanSeeAsync` calls a resident uses — the guest
 simply carries a different standing (no `Member`, the `Guest` claim + the
 allowance set) into those decisions (D5). The "when" is **data** on the
 allowance (a bounded window read at the seam), not config and not a
-background job (D3 — the ADR 0050 "data, not config" posture). The one rule
+background job (D3 — the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) "data, not config" posture). The one rule
 that keeps M19 safe (C-M19·6): **zero new authorization surface** — the
 frozen `IAuthorizationService` seams, the audit log, and the resident
 standing are byte-identical after M19.
@@ -66,7 +45,7 @@ standing are byte-identical after M19.
 
 **D1 — The guest is a standing on the account, not a new `Profile`
 subclass.** A guest is expressed as an additive flag on the existing
-`Profile` (`bool IsGuest`, additive, ADR 0004 §B.1 — the `Blocked`/`Verified`
+`Profile` (`bool IsGuest`, additive, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 — the `Blocked`/`Verified`
 field precedent) **plus** a dedicated admin-settled **allowance document**
 (D2). The guest is still a real Identity account (real `User`, real
 `Profile`, real `SubjectId`) so the frozen authorization seams and the audit
@@ -80,7 +59,7 @@ guest's `SubjectId`) carries the *limited* standing: the bounded window
 (D3), the closed surface set (D4), and the settling admin. One **single
 audited write lane** on `IIdentityService`
 (`SetGuestAccessAsync(GuestAccess, string adminSubjectId)`) — the exact
-shape of ADR 0050's `SetSignupOpenAsync` (load-or-create, store, one
+shape of ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md)'s `SetSignupOpenAsync` (load-or-create, store, one
 `AccessAudit` row `Via = Admin` in the same session) — plus a plain read
 (`GetGuestAccessAsync`) the claim mint (U02) and the admin surface (U04)
 ride. The Web boundary owns the GlobalAdmin standing check; the Core seam
@@ -96,7 +75,7 @@ exactly as an unverified account is denied `Member`. No expiry job, no
 projection: the window is read at the Identity↔cookie seam
 (`KumunitaClaimsPrincipalFactory`), the same place `Verified`/`Blocked` are
 consulted. The "when" is settled by *data*, not config, and not a background
-job (the ADR 0050 "data, not config" posture). *Forbids:* a background
+job (the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) "data, not config" posture). *Forbids:* a background
 "expire the guest" job, a projection that lags the window, or an unbounded
 guest standing (no `ValidUntil`).
 
@@ -111,7 +90,7 @@ make a surface "just work."
 
 **D5 — The guest standing is a claim minted at the Identity↔cookie seam,
 riding the frozen authorization.** `Roles.Guest = "Guest"` is added to the
-`Roles` static class (the ADR 0030 composable-role / claim-append precedent —
+`Roles` static class (the ADR [0030](0030-role-independence-composable-elevated-roles.md) composable-role / claim-append precedent —
 a new claim string, the existing claim set untouched in shape; the
 `ClaimTypes.All` set is **untouched** — a guest's `Guest` role rides the
 existing `Kumunita.Role` claim *type*, a value not a new type).
@@ -122,7 +101,7 @@ community standing. The frozen `IAuthorizationService` seams are *untouched*.
 *Forbids:* a new branch in `Decide()` for guests, an extended `CanAsync`
 signature, or encoding guest standing in a relational table.
 
-**D6 — The admin surface is `/admin/guests`, GlobalAdmin-gated, the ADR 0050
+**D6 — The admin surface is `/admin/guests`, GlobalAdmin-gated, the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md)
 precedent.** A dedicated `AdminGuestsController` — **not** a new action on
 `AdminController` (whose constructor is pinned by two Web-layer test
 harnesses) — mirroring `AdminSignupController`: `[Route("admin/guests")]`,
@@ -137,7 +116,7 @@ surface that writes the allowance without a GlobalAdmin standing check.
 reach for them).** (1) Per-guest content *authors* (a guest posting into a
 group / an event note) — M19 is *read-only standing*. (2) Guest *invitations*
 (a resident invites a guest, the guest self-serves a password from an
-admin-sent link) — the ADR 0050 invitation-mechanism follow-on applied to
+admin-sent link) — the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) invitation-mechanism follow-on applied to
 guests. (3) *Per-surface fine-grained control* (a guest sees *some*
 announcements but not *some* events) — per-resource grants ride the existing
 audience machinery. (4) Guest *notification / messaging* (the M6 / M9
@@ -169,14 +148,14 @@ inside an M19 unit.
   appends exactly one `AccessAudit` row (`Via = Admin`,
   `Action = "guest.set-standing"`); the guest's content reads append the same
   `AccessAudit` rows a resident's reads do (the frozen seams, untouched). No
-  unaudited access (ADR 0006-E).
+  unaudited access (ADR [0006](0006-module-boundary-contracts.md)-E).
 - **The floor is least-privileged, not an error** (C-M19·4, D4): a guest with
   no surfaces signs in to a shell with no gated content — the closed
   `GuestSurface` set floors to nothing, and a typo / unknown value grants
   nothing (GATE-2's `GetGuestAccess_With_No_Allowance_Returns_Null` pin).
 - **Zero migrations** (D1/D2): the one additive `Profile.IsGuest` `bool` and
   the new `GuestAccess` document are delta-detected and applied
-  idempotently at boot (the ADR 0004 §B.1 additive-surface shape) — every
+  idempotently at boot (the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive-surface shape) — every
   existing account reads `IsGuest = false` (the pre-M19 state, unchanged).
 
 **Neutral / cost:**
@@ -209,61 +188,3 @@ inside an M19 unit.
 per-guest content authors (D7 lane 1); guest invitations (D7 lane 2);
 per-surface fine-grained control (D7 lane 3); guest notification / messaging
 (D7 lane 4); guest analytics / audit depth (D7 lane 5).
-
-## Amendments
-
-- **2026-09-30 — D2 `AllowedSurfaces` shape annotation: array → `[Flags]`
-  scalar.** The register's D2 prose block originally read
-  `GuestSurface[] AllowedSurfaces`. The `GuestSurface` enum is `[Flags]` (a
-  closed bit-flag union — D4), so the document carries a single scalar
-  `GuestSurface AllowedSurfaces` (defaulting to `GuestSurface.None`, the
-  empty floor) rather than an array. U00 pinned the scalar form in the
-  design doc's §4 + §9 (the authoritative C#) and U01/U02/U04 all implement
-  it. **The D4 *decision* is unchanged** — only the field's representation
-  moved from an array to a `[Flags]` scalar. Status remains **Accepted**.
-
-## Supersedes
-
-- **None.** M19 **adds a standing**; it does not supersede an earlier ADR.
-  It *rides* ADR 0001-B (thin token / fat authorization), ADR 0030
-  (composable roles / claim append), ADR 0004 §B.1 (additive surface), and
-  ADR 0050 (the admin-settled policy + one audited write lane + `/admin`
-  controller shape). The frozen `IAuthorizationService` seams, the
-  `AccessAudit` lane, and the resident standing are **unchanged**
-  (C-M19·1/2/6). This is stated explicitly so a later reader knows M19 is an
-  **additive standing, not a correction** — no earlier ADR's decisions are
-  revised or re-scoped by this one.
-
-## Affected files
-
-- `src/Kumunita.Core/Identity/GuestSurface.cs` — new (the `[Flags]`
-  `GuestSurface` enum) (D4).
-- `src/Kumunita.Core/Identity/GuestAccess.cs` — new (the `GuestAccess`
-  document) (D2).
-- `src/Kumunita.Core/UserInfo/Profile.cs` — the additive `IsGuest` flag (D1).
-- `src/Kumunita.Core/Identity/IIdentityService.cs` — the `GetGuestAccessAsync`
-  + `SetGuestAccessAsync` ADD (D2).
-- `src/Kumunita.Core/Identity/IdentityService.cs` — the implementations of the
-  two new members (the `SetSignupOpenAsync` body pattern, the single audited
-  write lane) (D2).
-- `src/Kumunita.Core/CoreDocTypes.cs` — the `Identity.GuestAccess` registration
-  (D2).
-- `src/Kumunita.Core/Identity/ThinPrincipal.cs` — the `Roles.Guest` constant
-  (the `ClaimTypes.All` set **untouched**) (D5).
-- `src/Kumunita.Web/Security/KumunitaClaimsPrincipalFactory.cs` — the new
-  `IIdentityService` dependency + the `Guest` mint branch (D5).
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four locale
-  files — the 10 `admin.guests_*` / `account.guest_welcome` `kw-l` keys in
-  en/de/fr/da (D6).
-- `src/Kumunita.Web/Controllers/AdminGuestsController.cs` +
-  `src/Kumunita.Web/Models/GuestAdminViewModel.cs` +
-  `src/Kumunita.Web/Views/AdminGuests/Index.cshtml` + the `/admin` index
-  affordance — the `/admin/guests` surface (D6, F1).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` —
-  the **end-of-roadmap** re-pin (M19 → `StatusDone`; no `StatusNext` remains)
-  (U05 close, in one unit).
-- **New tests** (the GATE-1…4 pins): `tests/Kumunita.Core.Tests/` — the
-  `SetGuestAccessAsync` / `GetGuestAccessAsync` seam pins (U01, GATE-3 /
-  C-M19·4); `tests/Kumunita.Web.Tests/` — the `GuestClaimMint` pins (U02,
-  GATE-1 / GATE-4) and the `AdminGuestsController` pins (U04, GATE-3 / D6).

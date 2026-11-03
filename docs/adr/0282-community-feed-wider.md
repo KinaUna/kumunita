@@ -1,4 +1,17 @@
-# ADR 0282 — Community feed: widen the feed column, keep the communities rail on the left
+---
+id: adr-0282
+title: "Community feed: widen the feed column, keep the communities rail on the left"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0282](0282-community-feed-wider.md) — Community feed: widen the feed column, keep the communities rail on the left
 
 Status: Accepted
 Date: 2026-11-01
@@ -51,7 +64,7 @@ This is presentation-only: no view-model, service, routing, schema, audit, or
 translation-key change. The `.airy-comm-layout` grid, the 230px rail, the
 mobile collapse, and the `@media` block count in `site.css` are all
 **unchanged** (no new `@media` block — the pin in `PwaManifestTests` holds).
-No `Milestones.cs` / README Roadmap / `WhatsNew.cs` / `STATUS.md` flip is
+No `Milestones.cs` / README Roadmap / `WhatsNew.cs` / [`STATUS.md`](../STATUS.md) flip is
 required: this is not a shipped capability, it is a layout refinement to an
 already-shipped surface.
 

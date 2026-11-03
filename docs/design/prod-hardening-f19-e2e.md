@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f19-e2e
+title: "F19 — E2E suite (TEST-03)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0050-admin-managed-signup-gate-open-or-invitation-only.md
+updated: 2026-11-02
+---
+
 # F19 — TEST-03: E2E suite (signup → verify → login → write) — Part-0 design pin
+
+> **Abstract:** the **F19 E2E suite** design pin (Part-0, design-only) — the **E2E suite** (signup → verify → login → write) as a **new** test concern with its own runner (Playwright) + project location, no C# seam to pin (the only pure-`code` fix in the lane that does not touch `src/`). The pin makes the flow, ports, selectors, and spec names concrete. Closes 2026-10-22 TEST-03. **Who is it for:** a developer executing F19 U2–U4; an agent that needs the runner + the spec-name pins. **When to read the rest:** before adding the E2E suite, the Playwright runner, or the spec names.
+
 
 > **F19.U1** design pin (Tier 1). F19.U2 and F19.U3 execute against this file;
 > F19.U4 is the CI-wiring open item.
@@ -110,7 +125,7 @@ and it makes the Mailpit extraction unambiguous (filter by the run's email).
 **Precondition (asserted first, fail-fast with a named error — do NOT loop):**
 GET `http://localhost:5080/account/signup` returns **200 AND renders the
 signup form** (an `<input name="Email">` is present). **If the
-`SignupClosed` notice renders instead (the ADR 0050 gate is closed — the
+`SignupClosed` notice renders instead (the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) gate is closed — the
 **live compose instance is currently in this state**, verified 2026-10-24:
 the form's `Email` input is absent), the suite fails with the explicit
 message *"signup gate is closed — open it via the admin settings surface
@@ -191,7 +206,7 @@ The plan's F19 entry splits the suite into two specs; **Flow B is the
 already-verified resident from Flow A is **not** required — Flow B is
 **self-contained**: it signs in with a **known sample account** (the compose
 `SampleData__Enabled: "true"` seeder's credentials — the repo memory
-`AGENTS.md` names the GlobalAdmin `admin@examplium.com` / `Admin123!`; the
+[`AGENTS.md`](../../AGENTS.md) names the GlobalAdmin `admin@examplium.com` / `Admin123!`; the
 seeder's other accounts use "documented demo credentials" — **U2 must read
 `src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs` to pick one
 *resident* (non-admin) account's email+password**, and record the choice in
@@ -298,7 +313,7 @@ no migration, no `Kumunita.slnx`** (the .NET solution stays the F14 gate's
    between runs (the volume + seeded sample data persist — the repo's
    "volumes persist" boot idiom).
 5. **The suite asserts; it does not mutate platform config** (§2.1
-   precondition): the ADR 0050 signup gate is **checked, not opened**, by the
+   precondition): the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) signup gate is **checked, not opened**, by the
    suite. Opening it is an owner/admin step (recorded as a §7 open item + a
    U4 CI-setup concern). The suite's only writes are the *resident's own*
    account + post — the flow's subject, not the platform.
@@ -317,7 +332,7 @@ no migration, no `Kumunita.slnx`** (the .NET solution stays the F14 gate's
 
 ## §6 — Open items (owner/CI, recorded, NOT assumed done)
 
-1. **The ADR 0050 signup gate must be OPEN for Flow A to run.** The live
+1. **The ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) signup gate must be OPEN for Flow A to run.** The live
    compose instance is **currently closed** (verified 2026-10-24: the
    `/account/signup` GET returns the `SignupClosed` notice, the form's
    `Email` input is absent). Flow A **fails fast with a named message**

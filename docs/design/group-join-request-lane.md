@@ -1,4 +1,20 @@
-# Design Doc — Resident join-request lane for public groups (ADR 0094)
+---
+id: design-group-join-request-lane
+title: "Resident join-request lane for public groups"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0094-group-join-request-lane.md
+  - docs/adr/0028-guardian-controls-account-scope-supervision.md
+updated: 2026-11-02
+---
+
+# Design Doc — Resident join-request lane for public groups (ADR [0094](../adr/0094-group-join-request-lane.md))
+
+> **Abstract:** the **resident join-request** design — a **join-request lane for public groups**: a resident requests to join a public group, the owner reviews/accepts/declines. **Supersedes the m2b deferral** *for public groups only* (the private-group owner∪member model ADR [0010](../adr/0010-private-groups.md) protected is untouched). Single-part unit doc pinning invariants JR·1..3, FACES F21–F26, and the seam shapes. **Who is it for:** a developer touching the join-request lane; an agent that needs the owner-review shape. **When to read the rest:** before touching the join-request doc, the accept/decline lane, or the F21–F26 faces.
+
 
 > **Single-part unit doc** (the m3b two-part split is unnecessary at this
 > lane's size). This doc pins **scope**, the **invariants** (`JR·1..3` + the
@@ -8,7 +24,7 @@
 > **acceptance gate**.
 >
 > **Lane, not a re-open:** this is a *new design unit* on the M2 groups
-> surface (precedent: m2b on the M2 groups surface, ADR 0013 / 0089 on the M3
+> surface (precedent: m2b on the M2 groups surface, ADR [0013](../adr/0013-group-posts-membership-lane.md) / 0089 on the M3
 > posts surface). The M2 / m2b pins — C-M2·1..3, C-M2b·1..3, F1–F20, the
 > U9/U10 view-model shape pins — **stay authoritative**; this lane's pins
 > reference them. The m2b owner-invited invitation lane is **kept
@@ -17,7 +33,7 @@
 > **Supersedes the m2b deferral:** the m2b design doc's "No join-request flow
 > — that would open the reader to owner∪member-less state" deferral is now
 > superseded *for public groups only*. The private-group owner∪member model it
-> protected is untouched (ADR 0010): a join-request is only ever offered on a
+> protected is untouched (ADR [0010](../adr/0010-private-groups.md)): a join-request is only ever offered on a
 > **public** group, and private groups stay owner-invite-only.
 
 ## Context
@@ -29,7 +45,7 @@ FACES). M2b deliberately deferred the *resident-initiated* direction: a
 resident who found a public group and wanted in had **no lane** — they could
 only wait to be invited.
 
-ADR 0094 adds that missing direction on top, as the **reverse of the m2b
+ADR [0094](../adr/0094-group-join-request-lane.md) adds that missing direction on top, as the **reverse of the m2b
 lane**:
 
 - **Direction:** the **resident requests**, the **owner ∪ GlobalAdmin
@@ -38,7 +54,7 @@ lane**:
 - **Public groups only.** The request button / card is rendered **only** for
   a group that is public *and* not already joined. A private group is never
   exposed to the join-request surface — the m2b owner∪member model it guarded
-  is unchanged (ADR 0010).
+  is unchanged (ADR [0010](../adr/0010-private-groups.md)).
 - **Coexistence:** the m2b invitation lane is untouched and stays the
   owner-initiated surface; the join-request lane is a second, resident-
   initiated add-path. They share the same standing, audit, and state-machine
@@ -58,7 +74,7 @@ lane**:
 2. The `CoreDocTypes` registration, `UniqueIndex(GroupId, UserId)` (the
    one-row-per-(group, user) business-key convention of `GroupMembership` /
    `GroupInvitation`).
-3. Six new named seams on `IUserInfoService` (ADR 0006-E compatible lane — no
+3. Six new named seams on `IUserInfoService` (ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible lane — no
    signature change to any pinned M1/M2/m2b method): four writes
    (`RequestToJoinGroupAsync`, `ApproveJoinRequestAsync`,
    `DeclineJoinRequestAsync`, `WithdrawJoinRequestAsync`) + two reads
@@ -73,10 +89,10 @@ lane**:
    `GroupsController`, and the two view additions (Index's "Other public
    groups" directory + "Your join requests" card; Detail's "Pending join
    requests" review surface).
-5. **`DeleteGroupAsync` cascade extension** (ADR 0093): deleting a group now
+5. **`DeleteGroupAsync` cascade extension** (ADR [0093](../adr/0093-group-delete-lane.md)): deleting a group now
    also removes its `GroupJoinRequest` rows, in the same session as the
    `Group` / `GroupMembership` / `GroupInvitation` removal.
-6. Nine new `kw-l` keys × 4 languages (ADR 0015 registry; the En/De/Fr/Da
+6. Nine new `kw-l` keys × 4 languages (ADR [0015](../adr/0015-ui-view-localization-mechanics.md) registry; the En/De/Fr/Da
    parity is preserved — see `KnownTranslationKeys`):
    `groups.join_requests`, `groups.join_requests_pending`,
    `groups.join_requests_note`, `groups.join_withdraw`,
@@ -93,20 +109,20 @@ lane**:
   handler is the notification lane; this lane is UI-only — the pending request
   row *is* the notification, the m2b "a pending invitation *is* the
   notification" shape). A "you have N requests" owner inbox lane is a future
-  lane (the ADR 0083 inbox surface is not re-opened here).
+  lane (the ADR [0083](../adr/0083-group-add-and-invite-notifications.md) inbox surface is not re-opened here).
 - The **`Community`** axis, `Directory`, or any `Group` surface other than the
   public `Groups` list + public group detail.
-- **Private groups** (ADR 0010) — the join-request surface is never rendered
+- **Private groups** (ADR [0010](../adr/0010-private-groups.md)) — the join-request surface is never rendered
   for them; they remain owner-invite-only.
 - The M2 / m2b pins — **unchanged**; this lane's close is its own
   `## Closed (recorded)` section in *this* doc.
-- **Delegation** on the join-request lane (ADR 0003 default-OFF is carried; a
+- **Delegation** on the join-request lane (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) default-OFF is carried; a
   delegate may not stand in for the requester in the self-lane — `JR·2`, the
   m2b `C-M2b·2` analogue).
 
 ## Invariants (pinned for the join-request lane)
 
-This lane is a *caller* of the ADR 0006 invariants (not an owner). It owns
+This lane is a *caller* of the ADR [0006](../adr/0006-module-boundary-contracts.md) invariants (not an owner). It owns
 **three** new invariants (`JR·1..3`) — the three behavioral rules this lane is
 the first unit to need in the resident-initiated direction — plus the
 **carried** M2/m2b pins that its reads / writes must keep holding.
@@ -116,20 +132,20 @@ the first unit to need in the resident-initiated direction — plus the
 | **JR·1** (lane-owned) | **SoD lane (the m2b `C-M2b·1` mirror).** Resolve (`ApproveJoinRequestAsync` / `DeclineJoinRequestAsync`) a join request ⇒ **owner ∪ GlobalAdmin only**. Web gate = the detail's `TryResolveOwnerSurface` (a plain member's POST 404s — the consistent write-lane failure shape). Audited `Via` is derived exactly like the invitation resolve lane: `resolvedBy == Group.OwnerId ⇒ Owner`, else `Admin` (the seam's single SoD source — the Web layer carries no form-bound owner id). | The approve/decline actions (F23/F24) are this lane's owner∪GlobalAdmin write surface. `Approve_Via_Owner_When_Resolver_Is_GroupOwner` + `Approve_Via_Admin_When_Resolver_Is_Not_The_Owner` + `Decline_AuditRow_Use_The_Resolver_Standing` pin the audit `Via` derivation. |
 | **JR·2** (lane-owned) | **Self-lane.** Request (`RequestToJoinGroupAsync`) / withdraw (`WithdrawJoinRequestAsync`) ⇒ the **requester only** — the withdraw actor must equal the row's `UserId`, **verified in Core** (not only by the Web gate). Web gate = "in my pending list, else 404" (read lane #1). A foreign caller throws `InvalidOperationException`; the Web maps it to an error, never a 500. | The request/withdraw actions (F22/F25) are this lane's *self*-SoD. `WithdrawBy_A_Foreign_Account_Throws_JR_2` + `Withdraw_Unknown_Group_Or_Pair_Throws` pin the Core wall; `RequestAndWithdraw_AuditRows_Use_The_Requesters_Own_Standing` pins the `Via=Owner` self-audit shape. |
 | **JR·3** (lane-owned) | **State machine (the m2b `C-M2b·3` mirror).** One row per (group, user) (the `UniqueIndex` business key); `Pending → {Approved, Declined, Withdrawn}`; **re-request resets to `Pending`**; an invalid transition (double-resolution, or resolve-after-resolution) ⇒ `InvalidOperationException`. `Withdrawn` is the self-lane terminal (the m2b owner's `Cancelled` analogue) — it drops the row off both pending lists and stays re-requestable. The two resolve stamps (`ResolvedAt`/`ResolvedBy`) clear on a re-request reset. | `Resolved_Row_Cannot_Approve_Decline_Or_Withdraw_Again_JR_3` + `ReRequest_After_Decline_Resets_To_Pending_JR_3` + `Requesting_The_Same_Pair_Twice_Keeps_One_Row_JR_3` pin each wall; the Web maps the `InvalidOperationException` to `TempData["error"]`. |
-| **C3** (carried — ADR 0006 + M1) | Every lane mutation writes its `AccessAudit` row in the **same transaction** (invariant C3): the `group.join.request` / `group.join.approve` / `group.join.decline` / `group.join.withdraw` rows, `TargetKind "group"`, `Outcome Allow`. | `Every_JoinRequest_Write_Appends_Its_AuditRow_C3` pins the four action ids on the `group` target-kind. |
+| **C3** (carried — ADR [0006](../adr/0006-module-boundary-contracts.md) + M1) | Every lane mutation writes its `AccessAudit` row in the **same transaction** (invariant C3): the `group.join.request` / `group.join.approve` / `group.join.decline` / `group.join.withdraw` rows, `TargetKind "group"`, `Outcome Allow`. | `Every_JoinRequest_Write_Appends_Its_AuditRow_C3` pins the four action ids on the `group` target-kind. |
 | **C4** (carried — M1) | **Approve ⇒ live membership** on the very next `GetGroupIdsAsync` / `GetGroupsForUserAsync` call. A **request** / **decline** / **withdraw** itself never touches membership (C4's lane is approve-only). | `Request_Then_Approve_Membership_LiveOnNextCall_C4` pins both the positive (approve does, live-on-next-call) and the negative (request does not). |
 | **C-M2·2** (carried — M2) | The **two new reads** (`GetPendingJoinRequestsForUserAsync`, `GetPendingJoinRequestsForGroupAsync`) append **no** `AccessAudit` row — they are candidate projections, not access decisions (C-M2·2 + C1). | `The_Two_JoinRequest_Read_Lanes_Append_No_AuditRow_CM2_2` pins the no-audit shape on both lanes. |
-| **ADR 0028 §C / G·2** (carried) | **GU supervised-child gate on approve.** A supervised child (an active `GuardianLink`) is refused on the approve lane, exactly as `AcceptGroupInvitationAsync` refuses one — the consent-decision wall, not the request wall. | `Approve_GatedForSupervisedChild` pins the wall. |
-| **ADR 0093** (carried) | **`DeleteGroupAsync` cascade.** Deleting a group removes its `GroupJoinRequest` rows in the same session as the `Group` / `GroupMembership` / `GroupInvitation` rows. | `DeleteGroup_Cascades_Its_JoinRequest_Rows` pins the cascade. |
-| **ADR 0006-E** (carried — ADR 0006) | All seam additions are **new named methods** on `IUserInfoService` — no signature change to any pinned M1/M2/m2b method. | The `IUserInfoService` "join-request additions" block is the single addition; no existing method is touched. |
+| **ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §C / G·2** (carried) | **GU supervised-child gate on approve.** A supervised child (an active `GuardianLink`) is refused on the approve lane, exactly as `AcceptGroupInvitationAsync` refuses one — the consent-decision wall, not the request wall. | `Approve_GatedForSupervisedChild` pins the wall. |
+| **ADR [0093](../adr/0093-group-delete-lane.md)** (carried) | **`DeleteGroupAsync` cascade.** Deleting a group removes its `GroupJoinRequest` rows in the same session as the `Group` / `GroupMembership` / `GroupInvitation` rows. | `DeleteGroup_Cascades_Its_JoinRequest_Rows` pins the cascade. |
+| **ADR [0006](../adr/0006-module-boundary-contracts.md)-E** (carried — ADR [0006](../adr/0006-module-boundary-contracts.md)) | All seam additions are **new named methods** on `IUserInfoService` — no signature change to any pinned M1/M2/m2b method. | The `IUserInfoService` "join-request additions" block is the single addition; no existing method is touched. |
 
 **ADRs the lane must keep holding** (pinned in the invariant rows above): ADR
 0006-A/B/C (the read/write/audit split — exercised through the
 `IUserInfoService` lane only, never the `IDocumentSession` overloads), ADR
-0006-D (Web shapes HTTP, Core decides), ADR 0003 (SoD default-OFF — the `JR·1`
-/ `JR·2` pins are its join-request face), ADR 0010 (private groups stay
-owner-invite-only — the lane never surfaces them), ADR 0028 (the GU wall on
-consent lanes), ADR 0093 (the group-delete cascade).
+0006-D (Web shapes HTTP, Core decides), ADR [0003](../adr/0003-roles-and-moderator-scoping.md) (SoD default-OFF — the `JR·1`
+/ `JR·2` pins are its join-request face), ADR [0010](../adr/0010-private-groups.md) (private groups stay
+owner-invite-only — the lane never surfaces them), ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) (the GU wall on
+consent lanes), ADR [0093](../adr/0093-group-delete-lane.md) (the group-delete cascade).
 
 ## FACES (join-request-added user-visible outcomes → invariant pins)
 
@@ -140,12 +156,12 @@ authority.
 
 | # | Outcome (what a resident sees / can do) | Pinned by |
 |---|---|---|
-| F21 | On `/groups`, a signed-in resident sees a **"Other public groups"** directory — the public groups they are **not** yet a member of — each with a **"Request to join"** button; groups they already belong to are not re-listed here (private groups never appear in it). | JR·1/·2 (the public + not-a-member gate) + ADR 0010 (private untouched) |
+| F21 | On `/groups`, a signed-in resident sees a **"Other public groups"** directory — the public groups they are **not** yet a member of — each with a **"Request to join"** button; groups they already belong to are not re-listed here (private groups never appear in it). | JR·1/·2 (the public + not-a-member gate) + ADR [0010](../adr/0010-private-groups.md) (private untouched) |
 | F22 | A resident who clicks **"Request to join"** on a public group they're not in creates a `Pending` request (self-lane, `Via Owner`); requesting the **same** public group again keeps a single row (JR·3 business key); the request does **not** make them a member. | JR·2 (self-lane) + JR·3 (one row per pair) + C4 (request never adds membership) |
 | F23 | On `/groups/{id}`, the **owner ∪ GlobalAdmin** sees a **"Pending join requests"** review surface (responder display name + approve / decline); a **plain member** sees neither (the `TryResolveOwnerSurface` gate 404s a member's approve/decline POST). | JR·1 (SoD) + C-M2·2 (the review reads never audit) |
-| F24 | The owner/admin **approves** a pending request — the `GroupMembership` lands **live on the very next** `GetGroupIdsAsync` / `GetGroupsForUserAsync` call (C4) and the responder's audit row carries the resolver standing (owner ⇒ `Owner`, admin ⇒ `Admin`); a **supervised child** is refused on approve (ADR 0028 §C). | C4 + JR·1 (Via) + ADR 0028 §C (GU wall) |
+| F24 | The owner/admin **approves** a pending request — the `GroupMembership` lands **live on the very next** `GetGroupIdsAsync` / `GetGroupsForUserAsync` call (C4) and the responder's audit row carries the resolver standing (owner ⇒ `Owner`, admin ⇒ `Admin`); a **supervised child** is refused on approve (ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §C). | C4 + JR·1 (Via) + ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §C (GU wall) |
 | F25 | On `/groups`, the requester sees a **"Your join requests"** card (the groups they requested, with a **Withdraw** button); **withdraw** drops the row off both lists (JR·3 `Withdrawn` terminal) and it stays re-requestable; a **foreign** resident cannot withdraw another's request (404 / error). | JR·2 (self-lane) + JR·3 (terminal + re-request) |
-| F26 | Every lane write (request / approve / decline / withdraw) commits an `AccessAudit` row in the **same transaction** as the domain write (C3) — and **delete-group** cascades the group's join-request rows (ADR 0093). | C3 + ADR 0093 |
+| F26 | Every lane write (request / approve / decline / withdraw) commits an `AccessAudit` row in the **same transaction** as the domain write (C3) — and **delete-group** cascades the group's join-request rows (ADR [0093](../adr/0093-group-delete-lane.md)). | C3 + ADR [0093](../adr/0093-group-delete-lane.md) |
 
 **FACES count (join-request): 6.** This count (and the invariant-pin per row)
 is the input the close needs to name the seam-test list and the acceptance
@@ -156,7 +172,7 @@ gate without re-deriving them (the M2 §2.7 drift-guard).
 > Every C# fragment below is **exact**: parameter lists, return types, and
 > namespaces are the contract the tests anchor to. The `IUserInfoService`
 > "join-request additions" block is the *only* change to the frozen M1/M2/m2b
-> lane (ADR 0006-E). No existing method's signature is touched.
+> lane (ADR [0006](../adr/0006-module-boundary-contracts.md)-E). No existing method's signature is touched.
 
 ### New Core types (`Kumunita.Core.UserInfo`)
 
@@ -205,12 +221,12 @@ Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForUserAsync(string 
 Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForGroupAsync(string groupId);
 ```
 
-**Write semantics (exact, per `JR·1..3` + C3 + C4 + ADR 0028 §C carried):**
+**Write semantics (exact, per `JR·1..3` + C3 + C4 + ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §C carried):**
 
 | Method | Precondition (else `InvalidOperationException`) | Post-state (same session) | `AccessAudit` row (same tx) |
 |---|---|---|---|
 | `RequestToJoinGroupAsync` | Group exists (re-request if a row exists in any status — JR·3) | Row = `Pending`, `RequestedAt=now`, stamps cleared; **no** `GroupMembership` lane | `group.join.request`, `TargetId=groupId`, `Via=Owner` (the requester's own standing) |
-| `ApproveJoinRequestAsync` | **GU gate first** (active `GuardianLink` on `userId` ⇒ refuse — ADR 0028 §C); group exists; row exists for `(groupId, userId)`; row is `Pending` (JR·3) | Row = `Approved` (stamps set); `GroupMembership` upserted with `AddedBy=resolvedBy` (C4 live-on-next-call) | `group.join.approve`, `TargetId=groupId`, `Via=Owner` iff `resolvedBy==Group.OwnerId` else `Admin` |
+| `ApproveJoinRequestAsync` | **GU gate first** (active `GuardianLink` on `userId` ⇒ refuse — ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §C); group exists; row exists for `(groupId, userId)`; row is `Pending` (JR·3) | Row = `Approved` (stamps set); `GroupMembership` upserted with `AddedBy=resolvedBy` (C4 live-on-next-call) | `group.join.approve`, `TargetId=groupId`, `Via=Owner` iff `resolvedBy==Group.OwnerId` else `Admin` |
 | `DeclineJoinRequestAsync` | Group exists; row exists for `(groupId, userId)`; row is `Pending` (JR·3) | Row = `Declined` (stamps set); **no** `GroupMembership` lane | `group.join.decline`, `TargetId=groupId`, `Via=Owner` iff `resolvedBy==Group.OwnerId` else `Admin` |
 | `WithdrawJoinRequestAsync` | Group exists; row exists for `(groupId, actorId)`; **actor == row.UserId** (JR·2 self-lane); row is `Pending` (JR·3) | Row = `Withdrawn` (stamps set — the requester); **no** `GroupMembership` lane | `group.join.withdraw`, `TargetId=groupId`, `Via=Owner` (the requester's own standing) |
 
@@ -265,7 +281,7 @@ the F21/F25 cards. `GroupsController.Detail` loads the group's pending
 requests via `GetPendingJoinRequestsForGroupAsync(group.Id)` and projects them
 to `PendingJoinRequestViewModel` (the requester's display name via
 `GetProfileAsync`) — the F23 review surface. Neither the controller nor the
-view has a channel to an owner-id form-bound field (ADR 0003 SoD by structural
+view has a channel to an owner-id form-bound field (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD by structural
 identity, carried from the m2b invite lane).
 
 ## Seam-test names (landed, `Kumunita.Core.Tests`)
@@ -289,11 +305,11 @@ The join-request lane's seam tests, in
 | `ReRequest_After_Decline_Resets_To_Pending_JR_3` | JR·3 (re-request reset) + F25's "re-request" |
 | `Requesting_The_Same_Pair_Twice_Keeps_One_Row_JR_3` | JR·3 (business-key, one row per pair) + F22 |
 | `Resolved_Row_Cannot_Approve_Decline_Or_Withdraw_Again_JR_3` | JR·3 (state machine, all resolve-after-resolution walls) |
-| `Approve_GatedForSupervisedChild` | ADR 0028 §C (the GU wall on approve) |
+| `Approve_GatedForSupervisedChild` | ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) §C (the GU wall on approve) |
 | `Every_JoinRequest_Write_Appends_Its_AuditRow_C3` | C3 (same-tx audit on all four writes) + F26 |
 | `The_Two_JoinRequest_Read_Lanes_Append_No_AuditRow_CM2_2` | C-M2·2 (read lanes never audit) + F23/F25's "card reads never audit" |
 | `The_Pending_Read_Lanes_Filter_And_Order_LiveRows_C4` | C-M2·2 (filter) + C4 (live-on-next-call on the read lanes) |
-| `DeleteGroup_Cascades_Its_JoinRequest_Rows` | ADR 0093 (the delete-group cascade) + F26 |
+| `DeleteGroup_Cascades_Its_JoinRequest_Rows` | ADR [0093](../adr/0093-group-delete-lane.md) (the delete-group cascade) + F26 |
 
 **Seam-test count (join-request): 18.** This count (and the pin per test) is
 the input the acceptance gate needs (the M2 §2.7 drift-guard).

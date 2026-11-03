@@ -1,4 +1,17 @@
-# ADR 0134 — Storage metrics (M24) — a read-only, `GlobalAdmin`-gated admin view of the media byte store: total used space, available space, user-content used space, and space used per user
+---
+id: adr-0134
+title: "Storage metrics (M24) — a read-only, `GlobalAdmin`-gated admin view of the media byte store: total used space, available space, user-content used space, and space used per user"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m24-storage-metrics-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0134](0134-storage-metrics.md) — Storage metrics (M24) — a read-only, `GlobalAdmin`-gated admin view of the media byte store: total used space, available space, user-content used space, and space used per user
 
 Status: Accepted
 Date: 2026-10-03
@@ -6,7 +19,7 @@ Date: 2026-10-03
 The README roadmap names M24 exactly: "**Storage metrics** — an admin view of
 storage: total used space, available space, user-content used space, and
 space used per user." M24 surfaces a **read-only** operator feedback lane over
-the *existing* media byte store + catalog (ADR 0011) that answers the four
+the *existing* media byte store + catalog (ADR [0011](0011-media-and-file-storage.md)) that answers the four
 questions the milestone name names — **how full is the volume**, **how much is
 left**, **how much is resident content**, and **who is storing the most** —
 without the operator leaving the box for `psql` / `du` / a volume-snapshot
@@ -22,8 +35,8 @@ it **does not reshape** `IMediaStore` or `MediaObject` — it only *reads* them
 
 M24 rides **frozen** seams, adding a small, read-only delta:
 
-- **The frozen ADR 0011 `IMediaStore` / `MediaObject` catalog** (Marten-owned,
-  ADR 0004 §B) — each unique file's `SizeBytes` + `CreatedById` (who first
+- **The frozen ADR [0011](0011-media-and-file-storage.md) `IMediaStore` / `MediaObject` catalog** (Marten-owned,
+  ADR [0004](0004-data-persistence-and-schema-evolution.md) §B) — each unique file's `SizeBytes` + `CreatedById` (who first
   stored it). M24 reads these; it adds **no** field, **no** document, **no**
   `*DocTypes` surface, **no** migration.
 - **The existing `Kumunita.Core.Usage` context** (created for M13's
@@ -44,7 +57,7 @@ rendered on the `GlobalAdmin`-gated `/admin/analytics` surface. It answers the
 
 M24 answers a **different** operator question the platform today cannot answer
 at all: **how full is the byte store, and who is using it?** The media byte
-store (ADR 0011) is a **dedicated local volume** (`LocalVolumeFileStore`)
+store (ADR [0011](0011-media-and-file-storage.md)) is a **dedicated local volume** (`LocalVolumeFileStore`)
 holding the content-addressed payloads, with a **`mt` catalog**
 (`MediaObject`) recording each unique file's `SizeBytes` and `CreatedById`.
 The operator can read either surface in `psql` or `du`, but the platform gives
@@ -61,13 +74,13 @@ title names:
 
 The constraints the choice must honor (all pre-existing, not new):
 
-- **`Core` stays HTTP-free** (ADR 0006-D): the new seam returns plain DTOs;
+- **`Core` stays HTTP-free** (ADR [0006](0006-module-boundary-contracts.md)-D): the new seam returns plain DTOs;
   the `/admin/storage` view model is Web-only (C-SM·3).
-- **Audit-by-default, but a read is not an auditable action** (ADR 0006-C,
+- **Audit-by-default, but a read is not an auditable action** (ADR [0006](0006-module-boundary-contracts.md)-C,
   the M13 "read = no row; export = one row" discipline): M24's read emits
   **zero** `AccessAudit` rows; it has no export lane in v1, so zero rows
   (C-SM·6).
-- **Marten owns the domain documents** (ADR 0004 §B): M24 reads the existing
+- **Marten owns the domain documents** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B): M24 reads the existing
   `MediaObject` catalog — **no** new document, **no** new DocTypes surface,
   **no** migration (C-SM·1).
 - **Lean + Boring, one database** (README principles): no new context, no new
@@ -135,7 +148,7 @@ is a **closed-loop** artifact (C-SM·7), not a re-implementation.
 **C-SM·1 — `IMediaStore` + `MediaObject` are frozen; the two
 `IMediaFileStore` ADDs are the only interface change (D2).** M24 adds **no**
 field, **no** document, **no** `*DocTypes` surface, **no** migration; it only
-*reads* the ADR 0011 catalog + volume.
+*reads* the ADR [0011](0011-media-and-file-storage.md) catalog + volume.
 
 **C-SM·2 — Read-only, zero writes (D1).** M24 opens a `QuerySession` (a read)
 + calls two volume-stat reads (reads); it emits **zero** writes, **zero**

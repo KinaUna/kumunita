@@ -1,0 +1,44 @@
+---
+id: start-developer
+title: "Developer entry"
+tier: living
+kind: entry
+status: current
+audiences: [developer]
+related:
+  - AGENTS.md
+  - docs/README.md
+  - docs/dev/README.md
+  - docs/DOCS-CONVENTIONS.md
+  - docs/philosophy/START-HERE.md
+  - docs/archive/lanes/improve-docs/plan-improve-docs.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the links a developer working in this repo is most likely
+> to want, each with a one-line reason. Links only, no facts — this page
+> cannot drift. **Who is it for:** a person who writes code in this repo.
+> **When to read the rest:** when you're about to write code, run tests, or
+> open a PR.
+
+# Developer entry
+
+You write code in this repo. The docs below are the ones that matter for
+*you*.
+
+| Link | Why |
+|---|---|
+| [`AGENTS.md`](../../AGENTS.md) | The must-knows for working in this repo — the shape of the code, the conventions, the doc-sync rule, and a pointer to the working doctrine. Loaded into every agent session; read it before your first commit. |
+| [`docs/dev/`](../dev/README.md) | The working doctrine — running locally, the Razor verification traps, the test-runner quirk + CI cheatsheet, the live-server debugging conventions, and the sandbox quirks. Read it when running the app, verifying a bug, running tests, reading CI, or debugging the live server. |
+| [`docs/DOCS-CONVENTIONS.md`](../DOCS-CONVENTIONS.md) | The shared rules every doc in this repo follows — the front-matter schema, the abstract rule, the ADR cap, the linking rule. Read before your first doc change. |
+| [`README.md`](../../README.md) | What Kumunita is — the front page (one-paragraph status, principles, quickstart, where to go next). |
+| [`docs/product/`](../product/roadmap.md) | What Kumunita does — the [feature list](../product/features.md) and the [roadmap + deferred-by-design](../product/roadmap.md) home (the source of truth for the milestone list is `src/Kumunita.Web/Milestones.cs`). |
+| [`docs/README.md`](../README.md) | The docs map — where things live, the tier model, the entry pages. |
+| [`docs/archive/lanes/improve-docs/plan-improve-docs.md`](../archive/lanes/improve-docs/plan-improve-docs.md) | The lane register for the (shipped) doc restructure — the `D00`–`D14` units, the evidence, the target shape. Frozen at the lane's close. |
+| [`docs/adr/`](../adr/README.md) | The ADR index — the deciding document for any non-obvious rule. |
+| [`docs/design/`](../design/m3b-moderation.md) | The current truth per subsystem (every doc `tier: reference` / `kind: design` + an Abstract, `D10`) — the **six subsystem hubs** are the doors in: [events](../design/events-subsystem.md) · [rich content](../design/rich-content-subsystem.md) · [notifications](../design/notifications-subsystem.md) · [storage metrics](../design/storage-metrics-subsystem.md) · [analytics](../design/analytics-subsystem.md) · [prod-hardening](../design/prod-hardening.md). |
+| [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The philosophy in one hour — the "why" behind the conventions. |
+| [`docs/philosophy/templates/design-doc.md`](../philosophy/templates/design-doc.md) | The design-doc template — the "Seams & contracts" section is mandatory; the three tests and the FACES check are the entry and exit gates. |
+
+The per-audience entry pages live under [`start/`](../README.md#per-audience-entry-pages)
+— this page is one of them.

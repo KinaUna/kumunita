@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f12-alerts
+title: "F12 — route alerts to a human (OBS-06)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F12 — OBS-06: route alerts to a human — Part-0 design pin
+
+> **Abstract:** the **F12 alert routing** design pin (Part-0, design-only) — **route alerts to a human**: the F11 `IAlertSink` seam fires, but the only binding is `NoopAlertSink` (does nothing). F12 gives the seam a **real channel** that reaches a human (a `SupportEmailAlertSink` Web binding). Depends on F11. Closes 2026-10-22 OBS-06. **Who is it for:** a developer executing F12 U2–U3; an agent that needs the `SupportEmailAlertSink` binding shape. **When to read the rest:** before touching the alert sink binding, the alert destination, or the F12 tests.
+
 
 > **Fix:** F12 (report row **OBS-06**) — kind **`code+ops`**.
 > **Status:** this is the **Part-0 design pin** (F12.U1). It is **design-only**:
@@ -26,8 +41,8 @@
 > alert fires to the `NoopAlertSink` default (a no-op) — NOT to a human"* — is
 > the exact gap this pin closes.
 
-> **Repo doctrine applied (from `AGENTS.md` + ADR 0006 + the F10/F11 precedent):**
-> *"Core stays HTTP-free"* (ADR 0006) — so the **seam + payload**
+> **Repo doctrine applied (from [`AGENTS.md`](../../AGENTS.md) + ADR [0006](../adr/0006-module-boundary-contracts.md) + the F10/F11 precedent):**
+> *"Core stays HTTP-free"* (ADR [0006](../adr/0006-module-boundary-contracts.md)) — so the **seam + payload**
 > (`IAlertSink`, `AlertEvent`) are **Core** (already landed, F11), and the
 > **channel** (the thing that delivers to a human) is a **Web + owner-ops**
 > concern. This is the **exact** `ISmtpSender` Core I/O-seam precedent: Core
@@ -42,7 +57,7 @@
 ## 1. Current state (grounded, not assumed)
 
 - **The `IAlertSink` seam is F11's, and it is in place.** `src/Kumunita.Core/Identity/AlertSink.cs`
-  holds the **three** types, all Core (ADR 0006):
+  holds the **three** types, all Core (ADR [0006](../adr/0006-module-boundary-contracts.md)):
   - `public interface IAlertSink { Task ReportAsync(AlertEvent alert, CancellationToken ct = default); }`
     — the **one-payload + ct** shape (the `ISmtpSender.SendAsync(OutboxEmail, ct)`
     precedent, `SmtpSender.cs:41`). Best-effort-at-the-boundary contract: a
@@ -133,7 +148,7 @@ Core `ISmtpSender`** (not a new seam):
   `ISmtpSender sender, Microsoft.Extensions.Options.IOptions<CommunityOptions> community,
   Microsoft.Extensions.Logging.ILogger<SupportEmailAlertSink> logger`.
   All three are **Core** types / BCL — the Web class depends on **no** new
-  package (ADR 0006 — the channel is Web, its dependencies are Core).
+  package (ADR [0006](../adr/0006-module-boundary-contracts.md) — the channel is Web, its dependencies are Core).
 - **`ReportAsync(AlertEvent alert, CancellationToken ct = default)`** — the
   **best-effort-at-the-boundary** impl (the `IAlertSink` contract, pin §1):
   - Compose **one** `OutboxEmail` from the `AlertEvent` (pin §2c):
@@ -302,7 +317,7 @@ Core `ISmtpSender`** (not a new seam):
 
 ## 5. The file list (per unit)
 
-- **F12.U1 (this pin):** `docs/design/prod-hardening-f12-alerts.md` (this file).
+- **F12.U1 (this pin):** [`docs/design/prod-hardening-f12-alerts.md`](prod-hardening-f12-alerts.md) (this file).
   **No `src/**` touched, no csproj touched, no `<PackageReference>` added, no
   build run.**
 - **F12.U2 (the channel sink, ≤2 files, Web):**
@@ -334,7 +349,7 @@ Core `ISmtpSender`** (not a new seam):
 
 ## 6. Build/test command (the repo test-runner quirk)
 
-> **The repo doctrine (from `AGENTS.md` + the F11 handoff notes):** on this
+> **The repo doctrine (from [`AGENTS.md`](../../AGENTS.md) + the F11 handoff notes):** on this
 > machine `dotnet test` discovery is **broken** (the xunit.v3 / VSTestBridge
 > "No tests found to run" / "Zero tests ran / Exit code: 5" quirk) — the
 > reliable path is to **build**, then run each test **assembly in-process**
@@ -396,7 +411,7 @@ dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
   resolves to a no-op (no network, no throw, no state — the off-by-default
   idiom honored by construction). The F12 channel is the **additive push** (gate
   met), not a replacement of the floor.
-- **Core stays HTTP-free** (ADR 0006) — the **seam + payload** are Core
+- **Core stays HTTP-free** (ADR [0006](../adr/0006-module-boundary-contracts.md)) — the **seam + payload** are Core
   (F11's, **untouched**); the **channel** is a **Web** class (`Program.cs` + the
   `SupportEmailAlertSink`), depending on the **Core** `ISmtpSender` /
   `CommunityOptions` (the `ISmtpSender` Core I/O-seam / Web transport split).

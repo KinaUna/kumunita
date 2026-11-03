@@ -53,7 +53,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
     // ── Pin 2 ─────────────────────────────────────────────────────────────
     // M35·2 (FACES M35-1): GetPlaylistAsync over a CONFIGURED singleton
     // returns the row — the ordered Views + the two intervals project through
-    // (the M35·2 5-member ceiling: Id sentinel + Views + ViewIntervalSeconds
+    // (Id + Entries + DefaultDurationSeconds (ADR 0285; was Views + ViewIntervalSeconds)
     // + RefreshIntervalSeconds + DisplayMode, the last the ADR 0164
     // amendment's full-page / full-screen preference).
 
@@ -70,8 +70,8 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
 
         Assert.NotNull(row);
         Assert.Equal(Admin, row!.Id);
-        Assert.Equal(2, row.Views.Count);
-        Assert.Equal(45, row.ViewIntervalSeconds);
+        Assert.Equal(2, row.Entries.Count);
+        Assert.Equal(45, row.DefaultDurationSeconds);
         Assert.Equal(15, row.RefreshIntervalSeconds);
         await store.DisposeAsync();
     }
@@ -110,10 +110,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
 
         await using var session = store.LightweightSession();
         await svc.SavePlaylistAsync(
-            views: [new KioskView { Kind = KioskViewKind.Board, BoardId = "board-1" }],
-            viewIntervalSeconds: 40,
-            refreshIntervalSeconds: 12,
-            displayMode: KioskDisplayMode.FullPage,
+            Draft([new KioskEntry { Type = KioskItemType.Board, ItemId = "board-1" }], 40, 12),
             actorId: Admin,
             session,
             ct);
@@ -150,10 +147,20 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
         // The ADR 0164 amendment "full page vs. full screen" pin: save a
         // non-default DisplayMode and pin that it persists + round-trips.
         var saved = await svc.SavePlaylistAsync(
-            views: [new KioskView { Kind = KioskViewKind.Todos, ComponentId = "comp-1" }],
-            viewIntervalSeconds: 50,
-            refreshIntervalSeconds: 20,
-            displayMode: KioskDisplayMode.FullScreen,
+            Draft(
+                [
+                    new KioskEntry
+                    {
+                        Type = KioskItemType.GroupPost, ItemId = "post-1", GroupId = "group-1",
+                        DurationSeconds = 45, Scroll = KioskScrollBehavior.Auto, ShowComments = true,
+                        Label = "Choir news",
+                    },
+                    new KioskEntry
+                    {
+                        Type = KioskItemType.Calendar, ItemId = null, CalendarView = "month",
+                    },
+                ],
+                50, 20, KioskDisplayMode.FullScreen, KioskScrollSpeed.Fast),
             actorId: Admin,
             session,
             ct);
@@ -166,11 +173,23 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
         // the DisplayMode preserved (the amendment's display-mode round-trip):
         var reloaded = await svc.GetPlaylistAsync(Admin, ct);
         Assert.NotNull(reloaded);
-        Assert.Equal(50, reloaded!.ViewIntervalSeconds);
+        Assert.Equal(50, reloaded!.DefaultDurationSeconds);
         Assert.Equal(20, reloaded.RefreshIntervalSeconds);
         Assert.Equal(KioskDisplayMode.FullScreen, reloaded.DisplayMode);
-        Assert.Single(reloaded.Views);
-        Assert.Equal(KioskViewKind.Todos, reloaded.Views[0].Kind);
+        Assert.Equal(KioskScrollSpeed.Fast, reloaded.ScrollSpeed);
+        // ADR 0285 — the entries round-trip in order with every member.
+        Assert.Equal(2, reloaded.Entries.Count);
+        var first = reloaded.Entries[0];
+        Assert.Equal(KioskItemType.GroupPost, first.Type);
+        Assert.Equal("post-1", first.ItemId);
+        Assert.Equal("group-1", first.GroupId);
+        Assert.Equal(45, first.DurationSeconds);
+        Assert.Equal(KioskScrollBehavior.Auto, first.Scroll);
+        Assert.True(first.ShowComments);
+        Assert.Equal("Choir news", first.Label);
+        Assert.Equal(KioskItemType.Calendar, reloaded.Entries[1].Type);
+        Assert.Null(reloaded.Entries[1].ItemId);
+        Assert.Equal("month", reloaded.Entries[1].CalendarView);
         await store.DisposeAsync();
     }
 
@@ -191,10 +210,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
 
         await using var session = store.LightweightSession();
         var saved = await svc.SavePlaylistAsync(
-            views: [new KioskView { Kind = KioskViewKind.Calendar, CalendarView = "week" }],
-            viewIntervalSeconds: 60,
-            refreshIntervalSeconds: 30,
-            displayMode: KioskDisplayMode.FullPage,
+            Draft([new KioskEntry { Type = KioskItemType.Calendar, CalendarView = "week" }], 60, 30),
             actorId: Admin,
             session,
             ct);
@@ -205,7 +221,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
         // pin — a single SaveChanges in the caller's transaction):
         var inSessionRow = await session.LoadAsync<KioskPlaylist>(Admin, ct);
         Assert.NotNull(inSessionRow);
-        Assert.Equal(60, inSessionRow!.ViewIntervalSeconds);
+        Assert.Equal(60, inSessionRow!.DefaultDurationSeconds);
 
         var inSessionAudits = await session.Query<AccessAudit>().ToListAsync(ct);
         Assert.Single(inSessionAudits);
@@ -224,7 +240,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
     /// <see cref="KioskDocTypes"/> M35 surface) +
     /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> (the
     /// <see cref="CoreDocTypes"/> surface — the M35·5 audit-count assertions
-    /// query it, so it must be registered). The <see cref="KioskView"/> entry
+    /// query it, so it must be registered). The <see cref="KioskEntry"/>
     /// is a value object nested in the singleton (not a standalone doc — M35·9),
     /// so it needs no separate registration.</summary>
     private async Task<IDocumentStore> BootStoreAsync()
@@ -257,20 +273,27 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var ct = TestContext.Current.CancellationToken;
         await using var w = store.LightweightSession();
-        var list = new List<KioskView>();
+        var list = new List<KioskEntry>();
         for (var i = 0; i < views; i++)
         {
-            list.Add(new KioskView { Kind = KioskViewKind.Board, BoardId = $"board-{i}" });
+            list.Add(new KioskEntry { Type = KioskItemType.Board, ItemId = $"board-{i}" });
         }
         w.Store(new KioskPlaylist
         {
             Id = Admin,
-            Views = list,
-            ViewIntervalSeconds = viewInterval,
+            Entries = list,
+            DefaultDurationSeconds = viewInterval,
             RefreshIntervalSeconds = refreshInterval,
         });
         await w.SaveChangesAsync(ct);
     }
+
+    /// <summary>ADR 0285 — a <see cref="KioskPlaylistDraft"/> for the save pins.</summary>
+    private static KioskPlaylistDraft Draft(
+        IReadOnlyList<KioskEntry> entries, int defaultDuration, int refreshInterval,
+        KioskDisplayMode displayMode = KioskDisplayMode.FullPage,
+        KioskScrollSpeed scrollSpeed = KioskScrollSpeed.Medium)
+        => new(entries, defaultDuration, refreshInterval, displayMode, scrollSpeed);
 
     /// <summary>The whole <see cref="AccessAudit"/> table (unsorted — the test
     /// inspects). The M35·5 zero/one-audit pins query this.</summary>

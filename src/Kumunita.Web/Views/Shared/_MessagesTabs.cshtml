@@ -46,12 +46,12 @@
     <ul class="nav nav-tabs kmb-tab-under-navbar mb-4" role="tablist">
         <li class="nav-item" role="presentation">
             <a class="nav-link @(isDirect ? "active" : string.Empty)" href="/messages">
-                @directLabel
+                <svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="#kmb-i-messages"/></svg>@directLabel
             </a>
         </li>
         <li class="nav-item" role="presentation">
             <a class="nav-link @(!isDirect ? "active" : string.Empty)" href="/group-messages">
-                @groupLabel
+                <svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="#kmb-i-group-messages"/></svg>@groupLabel
             </a>
         </li>
     </ul>

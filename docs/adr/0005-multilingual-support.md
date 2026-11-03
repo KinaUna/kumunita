@@ -1,7 +1,15 @@
-# ADR 0005 — Multilingual support (UI & static pages)
-
-Status: Accepted
-Date: 2026-08-27
+---
+id: adr-0005
+title: "Multilingual support (UI & static pages)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/group-events-design.md]
+supersedes: []
+superseded_by: [adr-0039, adr-0042, adr-0043, adr-0046, adr-0049, adr-0165]
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -28,13 +36,13 @@ platform's source language. Requirements:
 
 | Text kind | Owner | Stored | Translated by |
 |-----------|-------|--------|---------------|
-| UI strings (labels, buttons, toasts, flash) | platform (code keys) | `mt` — `TranslationResource` | GlobalAdmin / **Translator** (ADR 0021), in-app |
-| Static pages (terms, about, help) | platform + admin | `mt` — `LocalizedPage` per slug+language | GlobalAdmin / **Translator** (ADR 0021), in-app |
+| UI strings (labels, buttons, toasts, flash) | platform (code keys) | `mt` — `TranslationResource` | GlobalAdmin / **Translator** (ADR [0021](0021-translator-role-delegated-translation-editing.md)), in-app |
+| Static pages (terms, about, help) | platform + admin | `mt` — `LocalizedPage` per slug+language | GlobalAdmin / **Translator** (ADR [0021](0021-translator-role-delegated-translation-editing.md)), in-app |
 | User-generated content | residents | `mt` — domain documents | **never by default**; opt-in MT is deferred (C) |
 
 ### B. Languages and translations are data, not config
 
-One Postgres per instance (ADR 0004), so languages live in the `mt` schema as
+One Postgres per instance (ADR [0004](0004-data-persistence-and-schema-evolution.md)), so languages live in the `mt` schema as
 documents. Admins edit them in-app; changes take effect on the next request.
 No env var, no rebuild, no new service.
 
@@ -47,23 +55,23 @@ No env var, no rebuild, no new service.
 
 The **source language (`en`) ships with the code**: its catalog row and UI
 strings are embedded in the image and materialized into `mt` by the first-run
-seeder (ARCHITECTURE.md §8). Every other language is community-provided —
+seeder (see [deployment & configuration](../ARCHITECTURE.md)). Every other language is community-provided —
 typed in or imported by the admin — **with one bundled exception** (amended
-2026-09-18, ADR 0042): `de` and `fr` additionally ship as **bundled initial
+2026-09-18, ADR [0042](0042-bundled-initial-language-pack.md)): `de` and `fr` additionally ship as **bundled initial
 values** (catalog rows + full UI-string baselines + `terms` / `help` page
 bodies, seeded first-boot-only), editable in-app by a GlobalAdmin / Translator
-(ADR 0021); **`en` remains the only code-owned language.** See ADR 0042 for
+(ADR [0021](0021-translator-role-delegated-translation-editing.md)); **`en` remains the only code-owned language.** See ADR [0042](0042-bundled-initial-language-pack.md) for
 the locked ownership semantics.
 
 **Resolution order per request:** user's saved preference (cookie + settings
-page) → **browser `Accept-Language` match** (amended 2026-09-19, ADR 0046 —
+page) → **browser `Accept-Language` match** (amended 2026-09-19, ADR [0046](0046-default-language-browser-accept-language-match.md) —
 a *suggestion*, matched against the enabled catalog, never persisted, only
 when no cookie preference is saved) → instance default (`LocaleSettings`) →
 source language (`en`). Fallback is per-string / per-page, so a partially
 translated UI degrades gracefully: a resident never sees a blank label. The
 preference is a cookie — it is *not* a claim, per the thin-token rule
-(ADR 0001-B); the browser match is a per-request read signal, not a claim or
-a write path (ADR 0046).
+(ADR [0001](0001-core-stack-and-identity-model.md)-B); the browser match is a per-request read signal, not a claim or
+a write path (ADR [0046](0046-default-language-browser-accept-language-match.md)).
 
 ### C. User-generated content: optional, opt-in, deferred
 
@@ -76,7 +84,7 @@ a write path (ADR 0046).
 
 ### D. Management (in-app, audited)
 
-The `/admin/languages` surface is split by standing (ADR 0021):
+The `/admin/languages` surface is split by standing (ADR [0021](0021-translator-role-delegated-translation-editing.md)):
 
 **GlobalAdmin** manages the catalog under `/admin/languages`:
 
@@ -87,7 +95,7 @@ The `/admin/languages` surface is split by standing (ADR 0021):
   falls back to the default; `LocalizedPage` rows for it are retained, so
   re-adding the language restores the work.
 
-**GlobalAdmin or Translator** edits the translatable text (ADR 0021):
+**GlobalAdmin or Translator** edits the translatable text (ADR [0021](0021-translator-role-delegated-translation-editing.md)):
 
 - edit and preview static-page translations per language, and edit the UI
   strings; both with the per-language completeness view (which UI keys /
@@ -95,8 +103,8 @@ The `/admin/languages` surface is split by standing (ADR 0021):
 
 Adding/removing languages, reordering, and changing the default are
 GlobalAdmin actions and are **audited** like every other admin action
-(ARCHITECTURE.md §5). Translation saves are audited the same way, with the
-actor's account recorded on the row (ADR 0021 — `Via: Admin`, `ActorId` =
+(see [data model — audit retention & scope](../architecture/data-model.md)). Translation saves are audited the same way, with the
+actor's account recorded on the row (ADR [0021](0021-translator-role-delegated-translation-editing.md) — `Via: Admin`, `ActorId` =
 the GlobalAdmin *or* Translator).
 
 ## Consequences
@@ -105,7 +113,7 @@ Positive
 - A non-English-speaking neighborhood can run its entire platform in its own
   language without a code change or a deploy.
 - Platform texts are data: reviewable, diffable in the DB, and covered by the
-  existing single-`pg_dump` backup story (ADR 0004, OPS.md §4).
+  existing single-`pg_dump` backup story (ADR [0004](0004-data-persistence-and-schema-evolution.md), OPS.md §4).
 - UGC stays exactly what residents wrote — community trust is preserved.
 - One page engine + one tag-helper path for *all* platform text: no second
   mechanism for a future feature (federation, templates).
@@ -118,58 +126,4 @@ Negative / accepted risks
 - Translations are only as good as the person who wrote them. Mitigated by
   the per-language completeness view and per-string fallback (B, D).
 - Two people editing translations can collide — the standard optimistic-
-  concurrency story applies (HTTP 409, ARCHITECTURE.md §5).
-
-## Revisit when
-
-- A community actually needs MT of UGC — then decide C as a **new trust
-  boundary**, not a feature flag, and update SECURITY.md §5/§6.
-- Federation arrives (ADR 0001-B): the *platform* language catalog may move
-  with the IdP, but per-instance languages and translations stay local.
-
-## Amendments
-
-### 2026-09-18 — bundled initial language pack (ADR 0042)
-
-§B's "every other language is community-provided" is amended: **`de` and
-`fr` additionally ship as bundled initial values** — the pristine-boot
-seeder (the `IsPristineAsync` gate, ADR 0015) materializes the `de` / `fr`
-catalog rows, the full UI-string baselines from the code's
-`KnownTranslationKeys` registries, and the `de` / `fr` bodies of the seeded
-`terms` / `help` system pages. They are **seeded once, then community-
-owned** — an in-app edit (GlobalAdmin ∪ Translator, ADR 0021) is never
-overwritten by a later deploy. **`en` remains the only code-owned language**
-(code-wins upsert + provider floor, ADR 0015 D1/D2, unchanged). See
-**ADR 0042** for the full locked text (ownership semantics, the register
-choice, the `about`-via-registry decision, the `about.*` key contract).
-
-### 2026-09-18 — system pages shipped + discoverable (ADR 0043)
-
-§B's **static-page coverage** scope is widened: on a fresh instance the
-seeded platform-page set is now the **five-surface set** — the `about`
-product-story **view** (not a `Page` doc, the ADR 0039 U05 drift pin carried
-forward) plus the four `Page`-backed surfaces **Terms**, **Help**, **Privacy
-Policy**, and **Code of Conduct** (the last two new in ADR 0043, D1) — each
-of the four `Page` docs carrying `en` / `de` / `fr` bodies. The `de` / `fr`
-bodies of the two new pages follow the **same** ADR 0042 D1 ownership
-semantics (seeded once, then community-owned; `en` code-owned). The two new
-routes (`/privacy` / `/conduct`) join the hard-coded static set with the 404
-floor (ADR 0043 D2). See **ADR 0043** for the full locked text (the
-five-surface set, the route contract, the ownership re-statement, the
-discoverability decision, the content scope, and the unchanged standing
-matrix).
-### 2026-09-19 — UGC default variant selection (ADR 0049)
-
-§C's "never automatic" clause is **re-scoped**: the default-*visible*
-variant on the post/reply/announcement detail surfaces and the
-pinned-announcement banner is now the **viewer's current language**
-(§B's resolution order, as amended by ADR 0046) **when a human-added
-translation of the item exists in it** — otherwise the authored-in
-variant remains default-visible (the ADR 0027 floor). This is a
-display-only *default selection* of content that already exists in the
-DOM; it is not, and does not enable, machine translation: the
-deferred-MT clause, the no-third-party-send rule, and the "never
-silently translated" guarantee for *generated* text are all unchanged.
-See **ADR 0049** for the full locked text (the surface list, the
-resolution chain it reuses, the ADR 0027 swap/return path that stays
-touched, and the out-of-scope surfaces).
+  concurrency story applies (HTTP 409, see [data model — optimistic concurrency](../architecture/data-model.md)).

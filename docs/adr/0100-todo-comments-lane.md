@@ -1,15 +1,28 @@
-# ADR 0100 — Comments + replies on a to-do
+---
+id: adr-0100
+title: "Comments + replies on a to-do"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m9-messaging-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0100](0100-todo-comments-lane.md) — Comments + replies on a to-do
 
 Status: Accepted
 Date: 2026-09-26
-Extends the **M5 to-do surface** (ADR 0067 the standing matrix + the frozen
+Extends the **M5 to-do surface** (ADR [0067](0067-m5-projects-todos-and-kanban.md) the standing matrix + the frozen
 `IProjectService` convention + the service-owns-the-session / `CanAsync(Read)`
-gate / C3 audit row convention; ADR 0087 the "waiting on" blocker lane;
-ADR 0099 the board-added-card audience inheritance) and the **comment
+gate / C3 audit row convention; ADR [0087](0087-todo-dependency-blocked-by-lane.md) the "waiting on" blocker lane;
+ADR [0099](0099-todo-inherits-board-audience.md) the board-added-card audience inheritance) and the **comment
 precedent set**: the **C-M3·1** "comment-inherits the parent's single Read
 decision" rule (a comment/reply carries **no** `Audience` of its own — carried
-from the `Posts.PostReply` precedent), the **ADR 0018** authored-in language
-tag, the **ADR 0024** author-soft-delete shape, and the **ADR 0016**
+from the `Posts.PostReply` precedent), the **ADR [0018](0018-ugc-authored-in-language-tag.md)** authored-in language
+tag, the **ADR [0024](0024-author-soft-delete-lane.md)** author-soft-delete shape, and the **ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md)**
 reply-delete author-only rule. This ADR adds a new read+write capability to the
 to-do detail surface: residents can **comment** on a to-do and **reply** to
 another comment.
@@ -19,8 +32,8 @@ another comment.
 A to-do is a work item with a single, already-authorized audience decision
 (`CanAsync(Read)` over the to-do's `Audience`). The platform already carries a
 well-trodden shape for "attach lightweight prose to an authorized record": the
-`Posts.PostReply` / `Posts.Post` comment-and-reply surface (ADR 0016 the
-author-only reply delete, ADR 0018 the authored-in language tag, ADR 0024 the
+`Posts.PostReply` / `Posts.Post` comment-and-reply surface (ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) the
+author-only reply delete, ADR [0018](0018-ugc-authored-in-language-tag.md) the authored-in language tag, ADR [0024](0024-author-soft-delete-lane.md) the
 author soft-delete, and the C-M3·1 invariant that a reply carries **no**
 `Audience` of its own — its visibility inherits the parent post's single Read
 decision, so there is no second authorization evaluation and no read-time audit
@@ -40,17 +53,17 @@ the post:
   `TodoItem.ParentId` / C-M5·7 sole-hierarchy shape carried to the comment lane.
   A reply to a reply is not a distinct shape.
 - **Author-only soft-delete.** The comment's author may delete their own comment
-  (ADR 0024 stamp `DeletedAt`, ADR 0016 author-only); there is no moderator /
+  (ADR [0024](0024-author-soft-delete-lane.md) stamp `DeletedAt`, ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) author-only); there is no moderator /
   GlobalAdmin override branch on a comment's own delete.
 
-This is a **named lane on the already-shipped M5 surface** (like ADR 0086–0099)
+This is a **named lane on the already-shipped M5 surface** (like ADR [0086](0086-goals-projects-lane.md)–0099)
 — not a milestone, so `Milestones.cs` / the README Roadmap /
 `MilestonesTests.cs` are deliberately untouched.
 
 ## Decision
 
 A new document type `Projects.TodoComment` (registered on the `ProjectDocTypes`
-surface — the additive-schema shape, ADR 0004 §B.1) carries:
+surface — the additive-schema shape, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1) carries:
 
 ```csharp
 public sealed class TodoComment
@@ -71,8 +84,8 @@ until its author soft-deletes it), and **no attachments** (the ask was
 add-comment + reply-only; the to-do itself already carries the rich content +
 attachment surface).
 
-Two new lanes on `IProjectService` (the frozen seam, ADR 0006), each following
-the ADR 0067 service convention (the service opens its own session, runs
+Two new lanes on `IProjectService` (the frozen seam, ADR [0006](0006-module-boundary-contracts.md)), each following
+the ADR [0067](0067-m5-projects-todos-and-kanban.md) service convention (the service opens its own session, runs
 `CanAsync(Read)` over the to-do, writes the C3 audit row in the same session,
 and `SaveChangesAsync`s once):
 
@@ -85,13 +98,13 @@ and `SaveChangesAsync`s once):
    - **403** (`UnauthorizedAccessException`): the actor fails the to-do's
      `CanAsync(Read)` decision (the standing gate — C-M3·1).
    - On success: stores the row, materializes `LanguageCode` from the instance
-     default when unchosen (ADR 0018), commits a
+     default when unchosen (ADR [0018](0018-ugc-authored-in-language-tag.md)), commits a
      `todo.comment.create` / `TargetKind = "todo"` / `Via = Owner`
      `AccessAudit` row atomically (C3), and returns the comment.
 2. **`DeleteTodoCommentAsync(todoId, commentId, actorId, actorRoles)`** —
    - **404**: the to-do is missing / soft-deleted, or `commentId` does not
      resolve to a comment **under that to-do**.
-   - **403**: the actor is not the comment's author (author-only — ADR 0016
+   - **403**: the actor is not the comment's author (author-only — ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md)
      precedent; no moderator / GlobalAdmin override branch).
    - On success: stamps `DeletedAt` forward (the record is **kept**, never
      hard-deleted), commits a `todo.comment.delete` / `TargetKind = "todo"` /
@@ -128,7 +141,7 @@ include (`~/js/lib/rich-editor.js`).
 `.comment_audience_note`) added to **all four** locale dictionaries
 (en/de/fr/da) — the `KnownTranslationKeys_ParityTests` invariant holds.
 
-**Tests.** New `ProjectServiceTests` ADR 0100 pins:
+**Tests.** New `ProjectServiceTests` ADR [0100](0100-todo-comments-lane.md) pins:
 - `CreateTodoComment_TopLevel_StoresRowAndAuditRow` — a top-level comment
   stores the body, `LanguageCode = en`, a `todo.comment.create` / `Via = Owner`
   audit row, and is returned by `GetTodoAsync`.

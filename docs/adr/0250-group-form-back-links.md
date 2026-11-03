@@ -1,4 +1,17 @@
-# ADR 0250 — Group forms use the same back link as Post edit
+---
+id: adr-0250
+title: "Group forms use the same back link as Post edit"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0250](0250-group-form-back-links.md) — Group forms use the same back link as Post edit
 
 Status: Accepted
 Date: 2026-10-29

@@ -1,55 +1,22 @@
-# ADR 0122 — Document management (a shared, per-access-controlled repository of official documents, served as downloads)
-
-Status: Accepted
-Date: 2026-10-01
-
-The README roadmap names M21 exactly: "**Document management** — a shared
-repository for official documents, contracts, etc., with per-document access
-controls." "a shared repository for official documents, contracts, etc." is the
-**one new document + its catalog row** (D1); "with per-document access
-controls" is the **`Audience` reused verbatim** as the *entire* access story
-(ADR 0006-C1 deny-by-default, C-M21·1); "official" is the **authority standing
-on the upload** (`GlobalAdmin ∪ Moderator`, D5, §1.a A1); "served as a
-download" is the **`Content-Disposition: attachment` behind the `Read`
-decision** (D6, D7, C-M21·4/6).
-
-M21 rides **frozen** seams, extending none of them:
-
-- **The frozen `IAuthorizationService` `Read` path (ADR 0006)** — the single
-  decision path: `CanSeeAsync(Read)` for the feed (one aggregate `AccessAudit`
-  row) and `CanAsync(Read)` for the detail/download (one decision row, Deny →
-  404 not 403). M21 adds **no** new `AccessAction`, **no** new `AccessVia`,
-  **no** new `Decide()` branch, **no** new `IAuthorizationService` method, and
-  **no** new claim type (C-M21·2, D8) — it rides `Read` through **one new
-  `IAuditableResource` adapter** (`DocumentToAuditableResource`,
-  `TargetKind = "document"`) + a **new `DocumentService`** that composes the
-  two frozen seams exactly like `PostService`.
-- **The ADR 0011 `IMediaStore` content-addressed volume** — the bytes ride the
-  **frozen** `IMediaStore.PutAsync` / `IMediaStore.OpenReadAsync` (D3,
-  C-M21·6). M21 adds **no** new storage mechanism, no in-DB blob, no second
-  volume. `Document.MediaId` is the content-addressed blob id; the `Document`
-  row is the **catalog** (the authority for *access*), the blob is the
-  **content** (the authority for *bytes*); an orphan blob (no `Document` row)
-  is a 404.
-- **The ADR 0034 serve-behind-decision pattern** — the
-  `ContentImageController`/`AttachmentController` 5-step serve order
-  (validate id → 400; `Document` miss → 404; blob miss → 404; one
-  `CanAsync(Read)`, Deny → 404 not 403; allow → stream), the RFC 6266
-  `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff`, and
-  the **guards-before-write** ordering (empty → 400, oversize → 413,
-  disallowed type → 415, no file written) (D6, D7, D5).
-- **The ADR 0004 §B.1 additive-surface discipline** — the new `Document`
-  document is registered on a **new parallel additive `DocumentDocTypes`
-  surface** (the `BookmarkDocTypes` / `MediaDocTypes` shape — delta-detected,
-  idempotent, no seeding, **zero migrations**), wired with one line in
-  `Program.cs`'s `AddMarten` lambda (D1).
+---
+id: adr-0122
+title: "Document management (a shared, per-access-controlled repository of official documents, served as downloads)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
 The platform already ships **three** upload-and-serve capabilities over the
-same content-addressed byte store (ADR 0011): the **profile avatar**
-(inline-rendered), **inline content images** (ADR 0025), and **file
-attachments** on posts / replies / announcements (ADR 0034 — served as a
+same content-addressed byte store (ADR [0011](0011-media-and-file-storage.md)): the **profile avatar**
+(inline-rendered), **inline content images** (ADR [0025](0025-rich-content-markdown-and-content-images.md)), and **file
+attachments** on posts / replies / announcements (ADR [0034](0034-file-attachments-posts-replies-announcements.md) — served as a
 **download**). What the platform does *not* have is a **shared repository of
 official documents**: a place to keep the neighborhood's contracts, minutes,
 notices, and bylaws in one place, each readable **only by the people the
@@ -59,18 +26,18 @@ browser).
 
 The constraints the choice must honor (all pre-existing, not new):
 
-- **Audit-by-default** (SECURITY.md §3, ADR 0006-C): every audience-restricted
+- **Audit-by-default** (SECURITY.md §3, ADR [0006](0006-module-boundary-contracts.md)-C): every audience-restricted
   read is resolved per request and logged; the floor is **deny** (an empty
-  audience denies everyone — ADR 0006-C1).
-- **The `Audience` is the whole access story** (ADR 0006-D): "feature modules
+  audience denies everyone — ADR [0006](0006-module-boundary-contracts.md)-C1).
+- **The `Audience` is the whole access story** (ADR [0006](0006-module-boundary-contracts.md)-D): "feature modules
   never re-derive access" — the document's `Audience` is the *only* access
   carrier (C-M21·1); a component is a *feed organizer*, never a gate
   (`ComponentId = null` on the adapter, C-M21·3).
-- **`Core` stays HTTP-free** (ADR 0006-D): the bytes ride the frozen
+- **`Core` stays HTTP-free** (ADR [0006](0006-module-boundary-contracts.md)-D): the bytes ride the frozen
   `IMediaStore` `byte[]/filename/contentType/actorId` seam (D3).
-- **Marten owns the domain documents** (ADR 0004 §B): the `Document` row is a
+- **Marten owns the domain documents** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B): the `Document` row is a
   document in `mt` on a new additive `DocumentDocTypes` surface (D1).
-- **Lean + Boring, one database** (README principles, ADR 0002): no new byte
+- **Lean + Boring, one database** (README principles, ADR [0002](0002-deployment-topology.md)): no new byte
   store, no new catalog doc beyond the one `Document`, no new `AccessAction`,
   no new `IMediaStore` method, no new storage lane (D3, D8).
 
@@ -86,10 +53,10 @@ audience-restricted reads, and the audit lane is the frozen `IAuthorizationServi
 ## Decision
 
 **D1 — A new `Document` document, on its own additive `DocumentDocTypes`
-surface (ADR 0004 §B.1).** A new document `Kumunita.Core.Documents.Document`
+surface (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).** A new document `Kumunita.Core.Documents.Document`
 (a **new bounded context** alongside `Posts` / `Events` / `Pages`):
 `Id` (conventional string, `Guid "N"`), `Title`, `Summary?`, `MediaId` (the
-ADR 0011 content-addressed blob id), `Filename?`, `ContentType`, `SizeBytes`,
+ADR [0011](0011-media-and-file-storage.md) content-addressed blob id), `Filename?`, `ContentType`, `SizeBytes`,
 `Audience` (non-null — the **only** access carrier), `OwnerId` (the uploader),
 `Created`, `Modified?` (present, set only on a future replace — null in M21).
 Registered on a **new parallel additive surface** `DocumentDocTypes.Configure`
@@ -112,7 +79,7 @@ a new `IAuthorizationService` method, a new `AccessVia`, or a `DocumentService`
 that reads `GroupMembership`/`DelegationGrant` for its own access decisions
 (C-M21·2).
 
-**D3 — Bytes ride the **frozen** ADR 0011 `IMediaStore`; M21 adds **no** new
+**D3 — Bytes ride the **frozen** ADR [0011](0011-media-and-file-storage.md) `IMediaStore`; M21 adds **no** new
 storage lane.** `Document.MediaId` is the content-addressed id from
 `IMediaStore.PutAsync` (SHA-256, store-first, orphan-safe). Serving =
 `IMediaStore.OpenReadAsync` **behind the `Read` decision** (D6), with the
@@ -138,20 +105,20 @@ C-M21·5).
 **D5 — The upload/compose standing is the **authority lane**: `GlobalAdmin ∪
 Moderator`.** (Locked per §Amendments A1.) Posting an **official** document is
 an **authority act** — the Web boundary gates the compose form to the elevated
-standing (`GlobalAdmin ∪ Moderator`), the ADR 0017 "author-of-record ∪
+standing (`GlobalAdmin ∪ Moderator`), the ADR [0017](0017-announcement-edit-lane-author-or-globaladmin.md) "author-of-record ∪
 GlobalAdmin" shape generalized to the community's authority. The Core write
 lane `DocumentService.UploadAsync(DocumentUpload, actorId, IDocumentSession)`
 is **standing-agnostic** (it records `OwnerId = actorId`; it does **not**
-re-check roles — the Web boundary owns the standing check, the ADR 0006/ADR
+re-check roles — the Web boundary owns the standing check, the ADR [0006](0006-module-boundary-contracts.md)/ADR
 0017 convention). One write: the `Document` is stored in the **caller's**
-session (ADR 0006-E same-transaction) alongside the already-`PutAsync`'d blob
+session (ADR [0006](0006-module-boundary-contracts.md)-E same-transaction) alongside the already-`PutAsync`'d blob
 (D3). *Forbids:* any-resident upload, an unaudited direct `session.Store` from
 a controller, or a Core seam that re-derives the standing (the Web boundary
 owns it).
 
 **D6 — A document is a **download, not an inline render**
 (`Content-Disposition: attachment`).** The serve route (the
-`AttachmentController` / ADR 0034 download shape) streams
+`AttachmentController` / ADR [0034](0034-file-attachments-posts-replies-announcements.md) download shape) streams
 `IMediaStore.OpenReadAsync` **behind the `Read` decision**, with the stored
 `ContentType` + `Content-Disposition: attachment; filename="<stored-or-{id}.bin>"`
 (RFC 6266) + `X-Content-Type-Options: nosniff`. An official document is
@@ -198,7 +165,7 @@ its bytes + its download*, **not** a document-management *system*.
   (D5, F3), a resident sees the documents their audience allows (D4, F1, one
   aggregate audit row — GATE-2), a document is opened as a download behind its
   `Read` decision (D6, D7, F2, one decision row — GATE-3), and an empty-
-  audience document is visible to no one but its uploader (F4, ADR 0006-C1 —
+  audience document is visible to no one but its uploader (F4, ADR [0006](0006-module-boundary-contracts.md)-C1 —
   GATE-1). No new authorization surface (C-M21·2, GATE-4).
 - **Zero new authorization surface — the strongest form** (C-M21·2, D8): M21
   adds **no** new `AccessAction`, **no** new `AccessVia`, **no** branch in
@@ -207,14 +174,14 @@ its bytes + its download*, **not** a document-management *system*.
   decision path (D2) — the only new seam is **one** `IAuditableResource`
   adapter (`DocumentToAuditableResource`, `TargetKind = "document"`). The
   claim set (`ClaimTypes.All`) is **byte-identical** after M21 (the GATE-4 pin).
-- **The bytes ride ADR 0011 — zero new storage lane** (C-M21·6, D3):
+- **The bytes ride ADR [0011](0011-media-and-file-storage.md) — zero new storage lane** (C-M21·6, D3):
   `Document.MediaId` = the `IMediaStore` id; serving =
   `IMediaStore.OpenReadAsync` **behind the decision** with
   `Content-Disposition: attachment`; an **orphan** blob (no `Document` row) is a
   404 (the document is the authority for access — GATE-5).
 - **Zero migrations** (D1): the new `Document` document on the additive
   `DocumentDocTypes` surface is delta-detected and applied idempotently at boot
-  (the ADR 0004 §B.1 additive-surface shape) — every existing row is unchanged.
+  (the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive-surface shape) — every existing row is unchanged.
 
 **Neutral / cost:**
 
@@ -246,85 +213,3 @@ versioning / revision history (D9·1); full-text search within document bodies
 (D9·2); document comments / discussion (D9·3); a "new document posted"
 notification (D9·4); per-kind document taxonomy (D9·5); scheduled expiry /
 auto-purge (D9·6); edit-by-replacement / author soft-delete (D9·7).
-
-## Amendments
-
-- **2026-10-01 — Two additive amendments, locked in U00 (design doc §1.a;
-  the register's [PROPOSED] set locked as-is, these two surfaces amended
-  in-unit):**
-  - **A1 — D5's upload standing: locked at `GlobalAdmin ∪ Moderator`** (the
-    register's proposed set, confirmed). The roadmap word *official* is an
-    authority act (the ADR 0017 announcements precedent — elevated standing,
-    not any-resident); `Moderator` is the standing the repo already treats as
-    the community-authority lane (`PostService.CreatePostAsync` admits
-    `GlobalAdmin` ∪ a component-`Moderator` to post, ADR 0003/0017/0021);
-    narrowing to GlobalAdmin-only would starve a one-neighborhood deployment,
-    and widening to "author-of-record ∪ GlobalAdmin" would re-introduce the
-    "any-resident upload" D5's *Forbids* tail rules out. U03 enforces the set
-    at the Web compose boundary; `DocumentService.UploadAsync` remains
-    standing-agnostic.
-  - **A2 — C-M21·7's upload audit-row: locked to *no* `AccessAudit` row.**
-    The register's C-M21·7 text said the upload "appends exactly one
-    `AccessAudit` row"; that is **amended** to "one standing-gated write, **no**
-    `AccessAudit` row" to match the live codebase, where **writes do not emit
-    audit rows — only `Read` decisions do** (verified: `PostService.
-    CreatePostAsync` "the audit row is the caller's job … does not append an
-    audit row"; `AttachmentController.Upload` "**No audit row**: the write is
-    authenticated, not an audience-restricted read"; `AnnouncementService`
-    create "announcements have no audit lane at all"). The mechanism confirms
-    it: `AccessAudit` rows are produced **only** by the frozen
-    `IAuthorizationService` `CanAsync`/`CanSeeAsync` seams. C-M21·7 and
-    GATE-6 are amended accordingly; the §drift-guard gains a line forbidding an
-    upload audit row.
-
-## Supersedes
-
-- **None.** M21 **adds a shared document repository**; it does not supersede an
-  earlier ADR. It *rides* ADR 0006 (the frozen `Read` path + the `Audience`
-  deny-by-default), ADR 0001-B (the `Audience` written verbatim), ADR 0011 (the
-  `IMediaStore` content-addressed volume + the `MediaObject` catalog + the
-  guards-before-write ordering), ADR 0034 (the serve-behind-decision pattern +
-  the `Content-Disposition: attachment` + RFC 6266 download shape), ADR 0017
-  (the authority-standing compose shape D5 generalizes), ADR 0004 §B.1
-  (additive-surface discipline), and ADR 0006-D (Core stays HTTP-free + feature
-  modules never re-derive access). The ADR 0011 `IMediaStore`/`MediaObject`
-  seams, the frozen `IAuthorizationService` `Read` path, and the
-  `AttachmentAllowedContentTypes` / `AllowedContentTypes` allowlists are
-  **unchanged** (C-M21·2/6). This is stated explicitly so a later reader knows
-  M21 is an **additive document-management surface, not a correction** — no
-  earlier ADR's decisions are revised or re-scoped by this one.
-
-## Affected files
-
-- `src/Kumunita.Core/Documents/Document.cs` — new (the `Document` catalog row)
-  (D1).
-- `src/Kumunita.Core/Documents/DocumentDocTypes.cs` — new (the additive doc
-  surface) (D1); `src/Kumunita.Web/Program.cs` — the one `AddMarten` boot line
-  + DI wiring (D1, D2).
-- `src/Kumunita.Core/Documents/DocumentToAuditableResource.cs` — new (the
-  adapter, `TargetKind = "document"`) (D2).
-- `src/Kumunita.Core/Documents/DocumentService.cs` — new (the `ListAsync` feed
-  + the `GetAsync` detail + the `UploadAsync` write lane + the `DocumentListResult`
-  / `DocumentDetailResult` / `DocumentUpload` DTOs) (D2/D4/D5).
-- `src/Kumunita.Core/Media/MediaOptions.cs` — the additive `DocumentAllowedContentTypes`
-  / `ResolvedDocumentAllowedTypes` / `IsDocumentAllowed` document lane (D3).
-- `src/Kumunita.Web/Controllers/DocumentController.cs` — new (the index /
-  detail / new / upload POST / download GET actions + the 5-step serve order +
-  the guards-before-write + the `GlobalAdmin ∪ Moderator` compose gate) (D5/D6/D7).
-- `src/Kumunita.Web/Models/` — the `DocumentIndexViewModel` /
-  `DocumentDetailViewModel` / `DocumentUploadForm` view models.
-- `src/Kumunita.Web/Views/Documents/*` — the `Index` / `Detail` / `New` views +
-  the nav entry (U04).
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four locale
-  files — the 12 `documents.*` `kw-l` keys in en/de/fr/da (U04, the closed key
-  set §8 of the design doc).
-- `src/Kumunita.Web/Milestones.cs` + `README.md` + `docs/STATUS.md` +
-  `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the
-  **one** milestone flip (U05 close: M21 → `StatusDone` + M22 promoted to
-  `StatusNext`).
-- **New tests** (the GATE-1…6 pins): `tests/Kumunita.Core.Tests/` — the
-  empty-audience deny/allow pin (GATE-1), the feed aggregate-row pin (GATE-2),
-  the zero-new-authorization-surface pin (GATE-4), the upload single-write /
-  no-audit-row / standing pin (GATE-6); `tests/Kumunita.Web.Tests/` — the
-  detail/download decision-row + 404-on-deny pin (GATE-3) + the ADR 0011
-  download-disposition + orphan-404 pin (GATE-5).

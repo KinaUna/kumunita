@@ -2210,31 +2210,34 @@ public static class FirstBootSeeder
              "backups (the operator's job).\n"),
             ("kiosk", "Kiosk",
              "## Kiosk\n\n" +
-             "The **kiosk** is a full-page / full-screen display at " +
-             "**/kiosk** that automatically cycles through a list of your " +
-             "surfaces — a board, the calendar, the to-dos — on a set interval, " +
-             "and refreshes each view's content on a separate, faster interval. " +
-             "It is meant for a wall display, a TV, or a spare screen: sign in " +
-             "once, open **/kiosk**, and it runs on its own.\n\n" +
-             "**It is yours.** Each signed-in user has their **own** kiosk " +
-             "playlist (saved on your account, like your other settings), so " +
-             "what your **/kiosk** shows depends only on your choice — not on " +
-             "anyone else's. A view you could not see on its own page is simply " +
-             "skipped on the kiosk (the kiosk never shows you more than you " +
-             "could already see).\n\n" +
-             "**To set it up.** Open **Settings → Kiosk**. Choose the views to " +
-             "cycle through, top to bottom (pick a view in an empty slot to add " +
-             "one; set a slot to *—* to remove it; move a slide to a different " +
-             "slot to reorder). For a board slide, pick which board; for the " +
-             "calendar, pick day / week / month. Set the two cadences: how " +
-             "often the view *changes*, and how often the current view's " +
-             "content *refreshes*. Click **Save playlist**.\n\n" +
-             "**To see it run.** Open **/kiosk** (signed in as you) on the " +
-             "screen. It advances to the next slide on the view cadence and " +
-             "reloads each slide's content on the refresh cadence, forever — " +
-             "until you sign out.\n\n" +
-             "**Empty playlist.** A kiosk with no slides shows an empty " +
-             "message — configure one in **Settings → Kiosk** first.\n"),
+             "The **kiosk** is a full-page / full-screen display at **/kiosk** that " +
+             "plays a list of things you choose — a board, the calendar, a to-do, a " +
+             "project, an event, a page, an announcement, a community or group post — " +
+             "one after the other, and checks the one on screen for changes so it stays " +
+             "up to date. It is meant for a wall display, a TV, or a spare screen: sign " +
+             "in once, open **/kiosk**, and it runs on its own.\n\n" +
+             "**It is yours.** Each signed-in user has their **own** kiosk playlist " +
+             "(saved on your account, like your other settings), so what your " +
+             "**/kiosk** shows depends only on your choice. An item you could not see " +
+             "on its own page shows a short \"no access\" message instead (the kiosk " +
+             "never shows you more than you could already see).\n\n" +
+             "**To set it up.** Open **Settings → Kiosk** and click **Add entry**. " +
+             "Pick the entry's type, then search for the item (the list only offers " +
+             "items you can see). For a board, choose the board itself or a list of its " +
+             "to-dos; for the calendar, choose all communities or one, and day / week / " +
+             "month. Set how long the entry stays on screen, and what happens if it " +
+             "doesn't fit: no scrolling, or scroll automatically. Posts, announcements, " +
+             "to-dos and events can also show their comments (or, for an event, who is " +
+             "coming). Use the arrows to change the order, then click **Save playlist**.\n\n" +
+             "**Scrolling.** An entry set to scroll automatically moves down the page at " +
+             "the scroll speed you chose (slow, medium or fast), pausing at the top and " +
+             "the bottom. It stays on screen until it has reached the end, even if that " +
+             "takes longer than its duration; if it gets there sooner, it scrolls back to " +
+             "the top for the rest of its time.\n\n" +
+             "**To see it run.** Open **/kiosk** (signed in as you) on the screen. It " +
+             "plays the entries from top to bottom, over and over, until you sign out.\n\n" +
+             "**Empty playlist.** A kiosk with no entries shows an empty message — " +
+             "set one up in **Settings → Kiosk** first.\n"),
             ("members", "Group members",
              "## Group members\n\n" +
              "The **Members** tab of a group is where the group's people live — " +
@@ -3395,40 +3398,39 @@ public static class FirstBootSeeder
              "Sicherungen der Plattform (die Verantwortung des Betreibers).\n"),
             ("kiosk", "Kiosk",
              "## Kiosk\n\n" +
-             "Der **Kiosk** ist eine Vollbild-Anzeige unter **/kiosk**, " +
-             "die automatisch im Wechsel deine Oberflächen zeigt — ein Board, " +
-             "den Kalender, die Aufgaben — im Abstand eines Zeitraums, und " +
-             "dabei den Inhalt jeder Ansicht in einem kürzeren, schnelleren " +
-             "Abstand aktualisiert. Er ist für eine Wandanzeige, einen " +
-             "Fernseher oder einen leeren Bildschirm gedacht: einmal " +
-             "anmelden, **/kiosk** öffnen, und er läuft von allein.\n\n" +
-             "**Er ist deiner.** Jede angemeldete Person hat ihre " +
-             "**eigene** Kiosk-Wiedergabeliste (auf deinem Konto " +
-             "gespeichert, wie deine anderen Einstellungen), also zeigt " +
-             "dein **/kiosk** nur das an, was *du* gewählt hast — nicht, " +
-             "was andere gewählt haben. Eine Ansicht, die du auf ihrer " +
-             "eigenen Seite nicht sehen könntest, wird im Kiosk einfach " +
-             "übersprungen (der Kiosk zeigt dir nie mehr als du ohnehin " +
-             "sehen könntest).\n\n" +
-             "**Einrichten.** Öffne **Einstellungen → Kiosk**. Wähle die " +
-             "Ansichten, die im Wechsel gezeigt werden, von oben nach unten " +
-             "(in einem leeren Platz eine Ansicht wählen, um sie " +
-             "hinzuzufügen; einen Platz auf *—* setzen, um sie zu " +
-             "entfernen; eine Folie in einen anderen Platz verschieben, um " +
-             "die Reihenfolge zu ändern). Bei einer Board-Ansicht wählst " +
-             "du, welches Board; beim Kalender wählst du Tag / Woche / " +
-             "Monat. Setze die beiden Abstände: wie oft die Ansicht " +
-             "*wechselt* und wie oft der Inhalt der aktuellen Ansicht " +
-             "*aktualisiert* wird. Klicke auf **Wiedergabeliste " +
-             "speichern**.\n\n" +
-             "**Ansehen, wie er läuft.** Öffne auf dem Bildschirm " +
-             "**/kiosk** (angemeldet als du). Er geht im Abstand des " +
-             "Ansichts-Wechsels zur nächsten Folie und lädt den Inhalt " +
-             "jeder Folie im Aktualisierungs-Abstand nach — immer " +
-             "weiter, bis du dich abmeldest.\n\n" +
-             "**Leere Wiedergabeliste.** Ein Kiosk ohne Folien zeigt eine " +
-             "Leer-Meldung — richte vorher unter **Einstellungen → Kiosk** " +
-             "eine ein.\n"),
+             "Der **Kiosk** ist eine Vollbild-Anzeige unter **/kiosk**, die nacheinander " +
+             "zeigt, was du auswählst — ein Board, den Kalender, eine Aufgabe, ein " +
+             "Projekt, eine Veranstaltung, eine Seite, eine Ankündigung, einen Beitrag " +
+             "aus der Gemeinschaft oder einer Gruppe — und das gerade gezeigte Element " +
+             "auf Änderungen prüft, damit es aktuell bleibt. Er ist für eine Wandanzeige, " +
+             "einen Fernseher oder einen freien Bildschirm gedacht: einmal anmelden, " +
+             "**/kiosk** öffnen, und er läuft von allein.\n\n" +
+             "**Er ist deiner.** Jede angemeldete Person hat ihre **eigene** " +
+             "Kiosk-Wiedergabeliste (auf deinem Konto gespeichert, wie deine anderen " +
+             "Einstellungen), also zeigt dein **/kiosk** nur, was *du* gewählt hast. " +
+             "Ein Element, das du auf seiner eigenen Seite nicht sehen könntest, zeigt " +
+             "stattdessen einen kurzen Hinweis „kein Zugriff“ (der Kiosk zeigt dir nie " +
+             "mehr, als du ohnehin sehen könntest).\n\n" +
+             "**Einrichten.** Öffne **Einstellungen → Kiosk** und klicke auf **Eintrag " +
+             "hinzufügen**. Wähle die Art des Eintrags und suche dann das Element (die " +
+             "Liste bietet nur Elemente an, die du sehen kannst). Bei einem Board wählst " +
+             "du das Board selbst oder eine Liste seiner Aufgaben; beim Kalender alle " +
+             "Gemeinschaften oder eine, und Tag / Woche / Monat. Lege fest, wie lange der " +
+             "Eintrag angezeigt wird und was passiert, wenn er nicht auf den Bildschirm " +
+             "passt: kein Scrollen oder automatisch scrollen. Beiträge, Ankündigungen, " +
+             "Aufgaben und Veranstaltungen können auch ihre Kommentare zeigen (bei einer " +
+             "Veranstaltung, wer kommt). Ändere die Reihenfolge mit den Pfeilen und " +
+             "klicke dann auf **Playlist speichern**.\n\n" +
+             "**Scrollen.** Ein Eintrag mit automatischem Scrollen bewegt sich mit der " +
+             "gewählten Geschwindigkeit (langsam, mittel oder schnell) nach unten und " +
+             "hält oben und unten kurz an. Er bleibt so lange sichtbar, bis er das Ende " +
+             "erreicht hat, auch wenn das länger dauert als seine Anzeigedauer; ist er " +
+             "früher am Ende, scrollt er für den Rest seiner Zeit wieder nach oben.\n\n" +
+             "**Ansehen, wie er läuft.** Öffne auf dem Bildschirm **/kiosk** (angemeldet " +
+             "als du). Er zeigt die Einträge von oben nach unten, immer wieder, bis du " +
+             "dich abmeldest.\n\n" +
+             "**Leere Wiedergabeliste.** Ein Kiosk ohne Einträge zeigt einen " +
+             "Hinweis — richte zuerst einen unter **Einstellungen → Kiosk** ein.\n"),
             ("members", "Gruppenmitglieder",
              "## Gruppenmitglieder\n\n" +
              "Der **Mitglieder**-Tab einer Gruppe ist, wo die Leute der Gruppe " +
@@ -5675,35 +5677,36 @@ public static class FirstBootSeeder
              "platformens sikkerhedskopier (operatørens ansvar).\n"),
             ("kiosk", "Kiosk",
              "## Kiosk\n\n" +
-             "**Kiosken** er en fuldskærms-visning på **/kiosk**, der " +
-             "automatisk skifter imellem dine overflader — et board, " +
-             "kalendarium, opgaver — i et fast interval, og opdaterer " +
-             "hvert syns indhold i et kortere, hurtigere interval. Den er " +
-             "tænkt til et væggeskærm, en TV eller en ledig skærm: log " +
-             "ind én gang, åbn **/kiosk**, og den kører for sig selv.\n\n" +
-             "**Den er din.** Hver logget bruger har sin **egen** " +
-             "kiosk-liste (gemt på din konto, som dine andre " +
-             "indstillinger), så hvad din **/kiosk** viser afhænger kun af, " +
-             "hvad *du* har valgt — ikke hvad andre har valgt. En syn, du " +
-             "ikke kunne se på dens egen side, springes simpelthen over i " +
-             "kiosken (kiosken viser dig aldrig mere end du allerede kunne " +
-             "se).\n\n" +
-             "**Indstil den.** Åbn **Indstillinger → Kiosk**. Vælg de " +
-             "syns, der skiftes imellem, fra top til bund (vælg en syn i " +
-             "et tomt felt for at tilføje den; sæt et felt til *—* for at " +
-             "fjerne den; flyt et slide til et andet felt for at " +
-             "genordne). For et board-vælg, hvilket board; for " +
-             "kalendarium, vælg dag / uge / måned. Indstil de to " +
-             "intervaller: hvor ofte synet *skifter*, og hvor ofte det " +
-             "aktuelle syns indhold *opdateres*. Klik på **Gem " +
-             "liste**.\n\n" +
-             "**Se den køre.** Åbn **/kiosk** på skærmen (logget ind som " +
-             "dig). Den går til det næste slide i synskifte-intervallet " +
-             "og genindlæser hvert slides indhold i " +
-             "opdateringsintervallet — videre og videre, indtil du logger " +
-             "ud.\n\n" +
-             "**Tom liste.** En kiosk uden slides viser en tom-melding — " +
-             "indstil én først under **Indstillinger → Kiosk**.\n"),
+             "**Kiosken** er en fuldskærmsvisning på **/kiosk**, der viser det, du " +
+             "vælger — en tavle, kalenderen, en opgave, et projekt, en begivenhed, en " +
+             "side, en meddelelse, et opslag fra fællesskabet eller en gruppe — det ene " +
+             "efter det andet, og holder øje med ændringer i det, der vises, så det er " +
+             "opdateret. Den er tænkt til en vægskærm, et tv eller en ledig skærm: log " +
+             "ind én gang, åbn **/kiosk**, og den kører af sig selv.\n\n" +
+             "**Den er din.** Hver bruger, der er logget ind, har sin **egen** " +
+             "kiosk-afspilningsliste (gemt på din konto, ligesom dine andre " +
+             "indstillinger), så det, din **/kiosk** viser, afhænger kun af dit valg. " +
+             "Et element, du ikke kunne se på dets egen side, viser i stedet en kort " +
+             "besked om manglende adgang (kiosken viser dig aldrig mere, end du i " +
+             "forvejen kan se).\n\n" +
+             "**Sådan sætter du den op.** Åbn **Indstillinger → Kiosk** og klik på " +
+             "**Tilføj punkt**. Vælg punktets type, og søg derefter efter elementet " +
+             "(listen tilbyder kun elementer, du kan se). For en tavle vælger du selve " +
+             "tavlen eller en liste over dens opgaver; for kalenderen alle fællesskaber " +
+             "eller ét, og dag / uge / måned. Angiv, hvor længe punktet vises, og hvad " +
+             "der sker, hvis det ikke kan være på skærmen: ingen rulning, eller rul " +
+             "automatisk. Opslag, meddelelser, opgaver og begivenheder kan også vise " +
+             "deres kommentarer (for en begivenhed: hvem der kommer). Brug pilene til at " +
+             "ændre rækkefølgen, og klik så på **Gem afspilningsliste**.\n\n" +
+             "**Rulning.** Et punkt, der ruller automatisk, bevæger sig ned ad siden med " +
+             "den valgte hastighed (langsom, mellem eller hurtig) og holder en kort pause " +
+             "øverst og nederst. Det bliver på skærmen, til det har nået bunden, også " +
+             "hvis det tager længere end dets visningstid; når det bunden før, ruller " +
+             "det tilbage til toppen resten af tiden.\n\n" +
+             "**Se den køre.** Åbn **/kiosk** (logget ind som dig) på skærmen. Den viser " +
+             "punkterne fra top til bund, igen og igen, indtil du logger ud.\n\n" +
+             "**Tom afspilningsliste.** En kiosk uden punkter viser en tom besked — " +
+             "sæt en op under **Indstillinger → Kiosk** først.\n"),
             ("members", "Gruppemedlemmer",
              "## Gruppemedlemmer\n\n" +
              "**Medlemmer**-fanen i en gruppe er, hvor gruppens " +

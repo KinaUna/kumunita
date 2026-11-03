@@ -954,6 +954,65 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
         Assert.Equal(1, row.VisibleCount);
     }
 
+    // ── 30 — ADR 0285 — Browse_Projects_NewestFirst_VisibleOnly ────────────
+    //
+    // The kiosk picker's no-text browse: every visible project, newest first,
+    // capped at `take`; a project restricted to someone else is not offered
+    // (the same frozen CanSeeAsync as the search), and the browse emits the
+    // surface's own "search:projects" aggregate row.
+
+    [Fact]
+    public async Task Browse_Projects_NewestFirst_VisibleOnly()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t30-actor";
+        const string other = "u-m8-t30-other";
+
+        var baseCreated = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero);
+        for (var i = 0; i < 4; i++)
+            await Plant(store, new Project
+            {
+                Id = $"t30-p-{i}", ComponentId = ComponentId, AuthorId = actor,
+                Title = $"project {i}", Description = "x",
+                Created = baseCreated.AddHours(i),
+            });
+        await Plant(store, new Project
+        {
+            Id = "t30-hidden", ComponentId = ComponentId, AuthorId = other,
+            Title = "someone else's project", Description = "x",
+            Created = baseCreated.AddHours(10),
+            Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, other)]),
+        });
+
+        var hits = await svc.BrowseSurfaceAsync(SearchService.ProjectsSurface,
+            SearchScope.Community, actor, take: 3, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["t30-p-3", "t30-p-2", "t30-p-1"], hits.Select(h => h.Id).ToArray());
+        Assert.Single(await SearchAudit(store, "search:projects"));
+    }
+
+    // ── 31 — ADR 0285 — Browse_Anonymous_Empty_NoAuditRow ──────────────────
+
+    [Fact]
+    public async Task Browse_Anonymous_Empty_NoAuditRow()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+
+        await Plant(store, new Project
+        {
+            Id = "t31-p", ComponentId = ComponentId, AuthorId = "u-m8-t31-author",
+            Title = "garden plan", Description = "x", Created = DateTimeOffset.UtcNow,
+        });
+
+        var hits = await svc.BrowseSurfaceAsync(SearchService.ProjectsSurface,
+            SearchScope.Community, actorId: "", take: 10, TestContext.Current.CancellationToken);
+
+        Assert.Empty(hits);
+        Assert.Empty(await SearchAudit(store, "search:projects"));
+    }
+
     // ── Boot / composition / seed helpers ────────────────────────────────────
 
     /// <summary>

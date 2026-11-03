@@ -1,7 +1,15 @@
-# ADR 0019 — Timezone: platform default (admin) + per-resident override
-
-Status: Accepted
-Date: 2026-09-15
+---
+id: adr-0019
+title: "Timezone: platform default (admin) + per-resident override"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-design.md]
+supersedes: []
+superseded_by: [adr-0086]
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -20,7 +28,7 @@ until now those were rendered with the **server-local** clock (`.LocalDateTime`
 2. **It is the same time for everyone.** There is no notion that the *author's*
    or the *reader's* local time might be the meaningful one.
 
-The correct model is a **three-tier fallback**, mirroring the ADR 0005
+The correct model is a **three-tier fallback**, mirroring the ADR [0005](0005-multilingual-support.md)
 multilingual precedent exactly (platform default + user override + a hard
 floor):
 
@@ -29,15 +37,15 @@ floor):
 - A **per-resident override**, set in the resident's own settings, lets an
   individual who lives elsewhere see their own local time.
 - A **hard floor** of `UTC` ensures the system never renders in an
-  unspecified or OS-dependent zone — the same `en` floor ADR 0005 uses for
+  unspecified or OS-dependent zone — the same `en` floor ADR [0005](0005-multilingual-support.md) uses for
   language, and the same "data, not config" posture (a runtime data value on a
   document, not a restart-required config).
 
-This is the natural companion to ADR 0005 (multilingual). Both are "a
+This is the natural companion to ADR [0005](0005-multilingual-support.md) (multilingual). Both are "a
 platform-wide default that a resident can override" features, both are
 server-rendered, both are data-driven (no rebuild, no restart), and both use
 the same "admin writes a singleton + audited lane; resident writes their own
-setting" shape. ADR 0005 is about **language** (a *string* resolved per view);
+setting" shape. ADR [0005](0005-multilingual-support.md) is about **language** (a *string* resolved per view);
 this ADR is about **time** (an *instant* resolved per rendered timestamp).
 They share the "instance default + user override" shape but the resolution
 mechanics differ: language resolves a *string* to a *string*; timezone
@@ -46,12 +54,12 @@ converts a *stored instant* to a *wall-clock string* in the effective zone.
 ## Decision
 
 - **Add a `TimeZone` (IANA id, e.g. `UTC`, `Europe/Warsaw`, `America/New_York`)
-  field to two documents, both additive (ADR 0004 §B.1):**
+  field to two documents, both additive (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1):**
   - `Kumunita.Core.UserInfo.Profile.TimeZone` (`string?`) — the resident's
     personal override. `null` means "no override; use the platform default."
   - `Kumunita.Core.Localization.LocaleSettings.DefaultTimezone` (`string`,
     default `"UTC"`) — the platform default, on the **same singleton** that
-    holds `DefaultLanguageCode` (ADR 0005 B). A single "platform locale
+    holds `DefaultLanguageCode` (ADR [0005](0005-multilingual-support.md) B). A single "platform locale
     defaults" document, not a second singleton.
 
 - **Two write seams, one per audience, mirroring the language ADR exactly:**
@@ -87,11 +95,11 @@ converts a *stored instant* to a *wall-clock string* in the effective zone.
   The resolution lives in the **Web layer** (`EffectiveTimezoneResolver`,
   scoped, per-request, cached) — the Web boundary that already owns the
   per-request principal (the `kw-l` TagHelper's seam). Core never resolves; it
-  only stores the two values. This is the exact split the ADR 0005
+  only stores the two values. This is the exact split the ADR [0005](0005-multilingual-support.md)
   `TranslationProvider` / `ITranslationProvider` uses (Core stores, Web
   resolves per request).
 
-- **Rendering (`kw-dt` TagHelper, the ADR 0015 `kw-l` precedent):**
+- **Rendering (`kw-dt` TagHelper, the ADR [0015](0015-ui-view-localization-mechanics.md) `kw-l` precedent):**
   - A new `<kw-dt dt="…" format="…"></kw-dt>` element (a Razor view emits the
     real values, e.g. `<kw-dt dt="@Post.Created" format="g">`), a `TagHelper`
     in `Kumunita.Web.TagHelpers` (mirroring `kw-l`), that takes a
@@ -143,7 +151,7 @@ converts a *stored instant* to a *wall-clock string* in the effective zone.
 - **No config, no restart:** both values are **data** on `mt`-schema
   documents (a `Profile` field + a `LocaleSettings` field), not
   appsettings. A change is live on the very next request — the same
-  "M·4: data, not config" posture as ADR 0005's language default.
+  "M·4: data, not config" posture as ADR [0005](0005-multilingual-support.md)'s language default.
 
 ## Consequences
 
@@ -163,11 +171,11 @@ Positive
   missing resident override can produce a render in an unspecified zone. The
   `EffectiveTimezoneResolver` enforces it; `SetDefaultTimezoneAsync` validates
   before write; the seed materializes it on first boot.
-- **Mirrors the ADR 0005 precedent exactly.** The "admin writes a singleton +
+- **Mirrors the ADR [0005](0005-multilingual-support.md) precedent exactly.** The "admin writes a singleton +
   audited lane; resident writes their own setting; resolution is per-request"
   shape is the same, the seams are the same, the test pattern is the same.
   A developer who knows one knows the other. The `kw-dt` TagHelper is the
-  exact analog of the `kw-l` TagHelper (ADR 0015) — the same "per-request
+  exact analog of the `kw-l` TagHelper (ADR [0015](0015-ui-view-localization-mechanics.md)) — the same "per-request
   value rendered across many views" problem, the same solution.
 - **The 15 render sites are a drop-in replacement.** The format string is
   unchanged; only the zone changes. The views' `Modified is not null` guards
@@ -181,7 +189,7 @@ Negative / accepted risks
   (`EffectiveTimezoneResolver`) reads the same row through
   `GetDefaultTimezoneAsync()` at read time. They read the same row, so they
   agree — the same "two call sites that must keep the same `UTC` floor" risk
-  ADR 0005's language ADR names. The `GetDefaultTimezoneAsync` seam is the
+  ADR [0005](0005-multilingual-support.md)'s language ADR names. The `GetDefaultTimezoneAsync` seam is the
   single read path the Web uses; the Core service reads directly because it is
   in a write session.
 - **The `Zones()` picker is OS-dependent.** The `<select>` options are
@@ -189,7 +197,7 @@ Negative / accepted risks
   filtered to exclude the `*` pseudo-zones. A Windows host and a Linux host
   will enumerate different ids (Windows uses `America/New_York`, Linux uses
   `Europe/Warsaw`, etc.). This is **accepted**: the platform is
-  single-deployment (ADR 0002), the host's OS is the deployment's choice, and
+  single-deployment (ADR [0002](0002-deployment-topology.md)), the host's OS is the deployment's choice, and
   the `EffectiveTimezoneResolver.TryConvert` `catch` block treats an
   unrecognized id as "fall through to the next tier" (never a throw). A
   cross-OS admin (an admin on Windows setting a default that a Linux host
@@ -199,25 +207,8 @@ Negative / accepted risks
 - **The `TimeZone` field is a `string`, not a `TimeZoneInfo`.** Storing the
   id (not the object) is the correct choice (a `TimeZoneInfo` is not
   serializable, not comparable, and not a stable value to persist), and it
-  matches the ADR 0005 "store the code, resolve the string" pattern. The
+  matches the ADR [0005](0005-multilingual-support.md) "store the code, resolve the string" pattern. The
   cost is that a `TimeZoneInfo` must be re-resolved from the id on every
   render (the `EffectiveTimezoneResolver.TryConvert` lookup) — but the
   resolver caches its first resolution per request, so this is a single lookup
   per request, not per timestamp.
-
-## Related
-
-- **ADR 0005** — multilingual support (the "platform default + user override"
-  shape this ADR mirrors; §C UGC "never translated" is *unchanged* by this
-  ADR — this is a *display* change, not a *translation*).
-- **ADR 0004 §B.1** — additive schema-evolution pattern both new fields
-  follow (no re-seed, no breaking change).
-- **ADR 0002** — deployment topology (single-deployment, single-neighborhood;
-  the "host's OS is the deployment's choice" risk in the Consequences is
-  scoped by this ADR's single-deployment assumption).
-- **ADR 0015** — UI view-localization mechanics (the `kw-l` TagHelper this
-  ADR's `kw-dt` TagHelper mirrors; the same "per-request value rendered across
-  many views" problem, the same solution).
-- **ADR 0018** — UGC authored-in language tag (a different axis: that ADR
-  stores *what language* a piece of UGC is in; this ADR stores *what time zone*
-  to render timestamps in — the two are orthogonal and compose cleanly).

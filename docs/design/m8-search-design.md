@@ -1,26 +1,43 @@
+---
+id: design-m8-search
+title: "M8 — Search"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0091-search.md
+  - docs/adr/0090-pagination-and-filtering.md
+  - docs/adr/0018-ugc-authored-in-language-tag.md
+updated: 2026-11-02
+---
+
 # M8 — Search — design (Part 1 + Part 2)
+
+> **Abstract:** the **M8 search** design — the **first text search**: one nav search box, one `/search` surface over four content surfaces (posts, events, pages, announcements), community + group scopes, composed entirely on the **frozen** authorization seams and the M7 paging idiom. Part 1 pins scope + invariants + FACES; Part 2 the exact C# + pinned tests. **Who is it for:** a developer touching the search seam or the `/search` surface; an agent that needs the search-over-frozen-seams shape. **When to read the rest:** before touching the search service, the `/search` route, or the M7 paging reuse.
+
 
 > **Milestone M8.** The first text search: one nav search box, one `/search`
 > surface over four content surfaces (posts, events, pages, announcements),
 > community + group scopes, composed entirely on the **frozen**
-> authorization seams and the M7 paging idiom. **ADR 0091** is this
+> authorization seams and the M7 paging idiom. **ADR [0091](../adr/0091-search.md)** is this
 > milestone's decision record — **authored in this unit (U00)**, **Accepted
 > 2026-09-26**; the decisions D1–D8 are **locked** (the `[PROPOSED]` markers
 > in the lane plan `plan-m8-search.md` are the pre-lock shape and are
-> retired by this lock — the ADR 0090 precedent; **D1–D5 were confirmed by
+> retired by this lock — the ADR [0090](../adr/0090-pagination-and-filtering.md) precedent; **D1–D5 were confirmed by
 > the user 2026-09-26**, closing the open-veto window). The sealed-unit
 > register is
 > `docs/plans-milestones/in-progress/m8/plan-m8-search.md`; the scratch log
 > is `docs/plans-milestones/in-progress/m8/m8-handoff-notes.md` (one `## U#`
 > section per unit, appended, never rewritten).
 >
-> **Status.** **LOCKED.** The decisions D1–D8 are locked in **ADR 0091
+> **Status.** **LOCKED.** The decisions D1–D8 are locked in **ADR [0091](../adr/0091-search.md)
 > (Accepted, 2026-09-26)**; **Part 2** (the exact C# shapes of the seam,
 > the pinned test names, and the drift-guard) follows in the "Seams &
 > contracts" section below.
 >
 > **Roadmap confirm (U00):** `M8` is the single `StatusNext` on
-> `Milestones.cs` (M7 closed it that way; the ADR 0090 close record says so);
+> `Milestones.cs` (M7 closed it that way; the ADR [0090](../adr/0090-pagination-and-filtering.md) close record says so);
 > M8 is a **milestone**, not a named lane — the close unit (U04) flips
 > `Milestones.cs` / the README Roadmap / `MilestonesTests.cs` (the AGENTS.md
 > doc↔code parity contract).
@@ -55,7 +72,7 @@ M8 ships:
    `AccessAction` / `AccessVia` / adapter (C-M8·1 / C-M8·6).
 
 **The one thing every unit must respect:** this milestone is a **read lane
-and a UI lane on frozen seams** — the exact ADR 0090 discipline ("zero new
+and a UI lane on frozen seams** — the exact ADR [0090](../adr/0090-pagination-and-filtering.md) discipline ("zero new
 authorization surface, zero schema change"), plus the M8-specific
 **no-visibility-widening** pin (C-M8·2): search candidates are pre-filtered
 with the *same* predicates the canonical feeds use, so a search can never
@@ -77,7 +94,7 @@ composes without amending:
    verified: `.Where(a => !a.IsDraft && (a.Scope == AnnouncementScope.Public
    || (authed && a.Scope == AnnouncementScope.Community)))`. Note: the
    announcement lane is **flat** (no `CanSeeAsync` — `Scope` is the
-   boundary; ADR 0017 family), so search replicates that predicate and
+   boundary; ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md) family), so search replicates that predicate and
    audits per D7 rather than per-announcement.
 3. **`EventService`** (`Kumunita.Core/Events/EventService.cs`) — the
    community-feed predicate, verified: `!e.IsDeleted && !e.IsDraft &&
@@ -86,8 +103,8 @@ composes without amending:
    scope's (D3) event lane.
 4. **`IPageService`** (`Kumunita.Core/Pages/PageService.cs`) — the pages
    read; a page's candidate predicate is `!p.IsDraft && !p.IsDeleted`
-   (ADR 0037/0024 idioms, verified on the `Page` doc), then the **frozen**
-   `PageToAuditableResource` adapter + `CanSeeAsync` (ADR 0039's "PG adds
+   (ADR [0037](../adr/0037-draft-mode-author-only.md)/0024 idioms, verified on the `Page` doc), then the **frozen**
+   `PageToAuditableResource` adapter + `CanSeeAsync` (ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md)'s "PG adds
    an adapter, not a branch" — search reuses the adapter, never a branch).
 5. **The group seams** (frozen, ADR 0013) — `CanSeeGroupAsync(actor,
    groupId, targetPostId?)` and `CanSeeGroupFeedAsync(actor, groupId,
@@ -99,15 +116,15 @@ composes without amending:
    (`VisibleCount`/`HiddenCount`, `TargetId` null). M8 uses the aggregate
    shape only (D7). `AccessVia` / `AccessOutcome` are frozen enums
    (`Decision.cs`) — M8 appends **nothing**.
-7. **The M7 paging idiom** (ADR 0090) — the `HasMore` record-return signal
+7. **The M7 paging idiom** (ADR [0090](../adr/0090-pagination-and-filtering.md)) — the `HasMore` record-return signal
    (the `EventPage` / `AnnouncementPage` record shapes, verified), the
    `PagedViewModel.ForRoute` factory, the `_Pager` partial, and the `page`
    param discipline (floor to 1; the links carry the current filter values).
 8. **`PostgresFixture`** + the `M7PaginationSeamTests` harness
    (`tests/Kumunita.Core.Tests/`) — the Core test home (D8/D10 discipline,
-   the ADR 0090 D10 "split by seam" precedent).
+   the ADR [0090](../adr/0090-pagination-and-filtering.md) D10 "split by seam" precedent).
 
-## 3. Decisions (locked in ADR 0091)
+## 3. Decisions (locked in ADR [0091](../adr/0091-search.md))
 
 ### D1 · Surface — one `/search` page, not per-feed `?q=` (user-confirmed)
 
@@ -115,9 +132,9 @@ A single nav search box; `/search` renders per-surface sections.
 `surface=all` (the default) shows the top **5** hits per surface — a
 search-box answer, no pager. `surface=posts|events|pages|announcements`
 renders a **paged** list: `?page` discipline, the `HasMore` record signal,
-the `_Pager` partial — **no new pager idiom** (the ADR 0090 Consequences
+the `_Pager` partial — **no new pager idiom** (the ADR [0090](../adr/0090-pagination-and-filtering.md) Consequences
 hand-off, verbatim). The rejected alternative (per-feed `?q=` filters on all
-five list surfaces) is recorded in ADR 0091: it touches 5 controllers + 5
+five list surfaces) is recorded in ADR [0091](../adr/0091-search.md): it touches 5 controllers + 5
 views and no dedicated milestone; the README milestone shape is "Search"
 itself.
 
@@ -136,7 +153,7 @@ events of the viewer's **visible** groups, decided by the frozen
 `CanSeeGroupAsync` / `CanSeeGroupFeedAsync` (D6). **Anonymous with
 `scope=groups` degrades silently to community-only** results — no 403, no
 "you lack access" text: group membership is the access boundary
-(ADR 0010/0013) and the audience filter is *display*, never a refusal
+(ADR [0010](../adr/0010-private-groups.md)/0013) and the audience filter is *display*, never a refusal
 surface (the C-M7·2 discipline extended). A group the viewer cannot see
 contributes **zero** hits — not a hidden hit, not a count.
 
@@ -144,7 +161,7 @@ contributes **zero** hits — not a hidden hit, not a count.
 (user-confirmed)
 
 Postgres `ILIKE '%' || @q || '%'` over `Title` (where the surface has one)
-+ `Body`. No `tsvector`, no GIN index, no migration — the ADR 0004 §B
++ `Body`. No `tsvector`, no GIN index, no migration — the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B
 versioned-DDL lane is untouched because nothing is DDL. The match is
 **authoritative over the stored (Markdown/HTML) text** — a search for
 `bold` matches a body containing `**bold**`; that is honest for
@@ -160,7 +177,7 @@ the C-M7·5 shape extended to `q`).
 
 The stored `Title`/`Body` in the row's authored language. UGC translation
 rows (`PostTranslation`, `EventTranslation`, `PageTranslation`,
-`AnnouncementTranslation`) are **not** searched. ADR 0018 already records
+`AnnouncementTranslation`) are **not** searched. ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) already records
 `LanguageCode` as "safe to use for search" and names a "future
 language-scoped search" — that is the follow-up lane's entry, not M8's
 work. (Drift log entry 1 records the wording.)
@@ -176,8 +193,8 @@ canonical read uses (verified list in §2):
 | posts (group) | `p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft` | `CanSeeGroupAsync` per (group, post), as the group-feed read does |
 | events (community) | `!e.IsDeleted && !e.IsDraft && e.GroupId == string.Empty` | `CanSeeAsync` + `EventToAuditableResource` |
 | events (group) | `e.GroupId == groupId && !e.IsDeleted && !e.IsDraft` | `CanSeeGroupFeedAsync` / `CanSeeGroupAsync`, as `ListGroupEventsAsync` does |
-| pages | `!p.IsDraft && !p.IsDeleted` | `CanSeeAsync` + `PageToAuditableResource` (the ADR 0039 adapter, verbatim) |
-| announcements | `!a.IsDraft && (Public \|\| (authed && Community))` | none — the flat scope predicate **is** the boundary (ADR 0017 family); the audit row is search's own (D7) |
+| pages | `!p.IsDraft && !p.IsDeleted` | `CanSeeAsync` + `PageToAuditableResource` (the ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md) adapter, verbatim) |
+| announcements | `!a.IsDraft && (Public \|\| (authed && Community))` | none — the flat scope predicate **is** the boundary (ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md) family); the audit row is search's own (D7) |
 
 **No new `AccessAction`, no new `AccessVia`, no new adapter, no new
 `Decide()` branch** (C-M8·1). The match filter (`ILIKE`) is a *feed
@@ -216,7 +233,7 @@ decision" pin — `PostService.cs:1411` precedent, verified).
 
 ### D8 · Seam shape — one bounded context, one interface
 
-`Kumunita.Core.Search` (new bounded context, the ADR 0039 `Pages`
+`Kumunita.Core.Search` (new bounded context, the ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md) `Pages`
 precedent) with **one seam**:
 
 ```csharp
@@ -237,11 +254,11 @@ public interface ISearchService
 ```
 
 `SearchService` composes **only** `IDocumentStore`, `IAuthorizationService`,
-`IUserInfoService` (frozen seams; the ADR 0006-D "frozen composition"
+`IUserInfoService` (frozen seams; the ADR [0006](../adr/0006-module-boundary-contracts.md)-D "frozen composition"
 discipline) and is registered in `Kumunita.Core/DependencyInjection.cs` in
 the `AddTransient<ISearchService>` factory shape (the `IAnnouncementService`
 / `IPageService` precedent, verified). The interface exists so
-`SearchControllerTests` substitutes without Postgres (the ADR 0090 D10
+`SearchControllerTests` substitutes without Postgres (the ADR [0090](../adr/0090-pagination-and-filtering.md) D10
 "split by seam" test home).
 
 ## 4. Invariants (C-M8)
@@ -261,21 +278,21 @@ the `AddTransient<ISearchService>` factory shape (the `IAnnouncementService`
   an `AccessAudit` row's identity (C-M7·2 extended).
 - **C-M8·6 · Zero schema change.** No index, no document, no migration.
 - **C-M8·7 · Drafts and soft-deletes are invisible** — no draft, deleted,
-  or `IsDeleted` document is ever a hit (C1 / ADR 0037 / ADR 0024).
+  or `IsDeleted` document is ever a hit (C1 / ADR [0037](../adr/0037-draft-mode-author-only.md) / ADR [0024](../adr/0024-author-soft-delete-lane.md)).
 
 ## 5. FACES
 
 - **F1 · Anonymous can search** community surfaces (the nav box renders for
   guests — parity with the public feed surface).
 - **F2 · Group content is membership-gated; a non-member sees no hit and
-  no count** (C1; the ADR 0010 private-group pin extended).
+  no count** (C1; the ADR [0010](../adr/0010-private-groups.md) private-group pin extended).
 - **F3 · Drafts never leak** — a search for a draft's exact title returns
   nothing (C-M8·7).
 - **F4 · Every decided visit audits; empty / anonymous visits don't**
   (C-M8·3).
 - **F5 · The search box is keyboard-operable and localized** — the 11 new
   `kw-l` keys × 4 languages, `KnownTranslationKeys_ParityTests` enforces
-  (ADR 0015).
+  (ADR [0015](../adr/0015-ui-view-localization-mechanics.md)).
 - **F6 · Scope degradation is silent** — anonymous `scope=groups` yields
   community-only results, no 403, no "you lack access" text (D3).
 
@@ -284,7 +301,7 @@ top-5-per-section `all` view is a search-*box* answer, not a search
 *engine*; a resident looking for a 6th match clicks through to the
 single-surface paged view. At one-neighborhood scale (D4) the substring
 engine is the honest ceiling; `tsvector` FTS is the follow-up lane and
-costs a versioned migration (ADR 0004 §B) when the neighborhood outgrows
+costs a versioned migration (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B) when the neighborhood outgrows
 it. **Stable for flexible**: M8 adds one bounded context; it retires
 nothing.
 
@@ -305,7 +322,7 @@ No migration, no seed, no data change (C-M8·6) — rollout is a normal
 deploy. Rollback is a normal revert: the surface is purely additive;
 removing the `Search/` context, the controller, the view, and the nav box
 returns the pre-M8 state with zero residue (no rows written, no columns
-added). See `docs/OPS.md`.
+added). See [`docs/OPS.md`](../OPS.md).
 
 ## 8. Risks
 
@@ -439,7 +456,7 @@ new AccessAudit
 ## 2.4 Pinned tests
 
 **Core — `tests/Kumunita.Core.Tests/SearchServiceTests.cs`** (14, over
-`PostgresFixture` — the ADR 0090 D10 test home):
+`PostgresFixture` — the ADR [0090](../adr/0090-pagination-and-filtering.md) D10 test home):
 
 1. `Search_Posts_HitsTitleAndBody_CaseInsensitive`
 2. `Search_Posts_NeverReturnsDraftsOrSoftDeleted`
@@ -483,13 +500,13 @@ precedent):
 
 Append-only; each entry: date, unit, what diverged, the locked resolution.
 
-1. **2026-09-26, U00** — the lane plan's D5 quoted ADR 0018 loosely as
-   "`LanguageCode` is 'safe to use for search'". ADR 0018's actual text is
+1. **2026-09-26, U00** — the lane plan's D5 quoted ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) loosely as
+   "`LanguageCode` is 'safe to use for search'". ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)'s actual text is
    "this is what makes the field safe to use for search **and for a future
    'add a translation' lane**" (Decision), and its Consequences name "(b) a
    future **language-scoped search** — neither of which is in scope here".
    The decision (authored-in-only matching; cross-language search is the
-   follow-up lane ADR 0018 points at) is unchanged; the quotation is
+   follow-up lane ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) points at) is unchanged; the quotation is
    corrected to the exact text.
 2. **2026-09-26, U00** — the plan's D7 sketched `TargetKind: "search:posts"`
    *and* named `TargetId` as the surface carrier; the two stored
@@ -522,4 +539,33 @@ Append-only; each entry: date, unit, what diverged, the locked resolution.
    is what it is.
 
 *End of design doc. Part 1 is the authority on why; Part 2 is the
-authority on shape. The ADR 0091 is the authority on the decision record.*
+authority on shape. The ADR [0091](../adr/0091-search.md) is the authority on the decision record.*
+
+---
+
+## ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md) — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+- **Core (`Kumunita.Core.Tests`, DB-backed)** — `PageServiceTests`: the
+  standing matrix (create/edit/translate standing — GlobalAdmin /
+  community-Moderator / author / plain member), the `null`-audience-public
+  branch, the `Community` branch (the `A0036_*` family shape, a `PG_*`
+  family), the grants branch, the hierarchy cycle-guard + depth-cap, the
+  `GetByPath` resolution, the translation standing (the ADR [0029](../adr/0029-announcement-translations.md) matrix),
+  the soft-delete filter (a deleted page is absent from
+  `GetTreeAsync` / `GetByPathAsync`), the publish author-only pin.
+- **Web (`Kumunita.Web.Tests`)** — `PageControllerTests` (NSubstitute
+  `IPageService`, no live Postgres — the `AnnouncementControllerTests`
+  shape): the route map (`/pages`, `/pages/{path}`, `/about` → tree), the
+  404-vs-403 split, the tree filter, the mount-point resolution, the
+  composer/edit audience round-trip through the `AudienceEditorModel`.
+- **Renderer/editor parity** — a page body with the same Markdown markers a
+  post body uses renders identically (it does, by construction — one
+  `MarkdownRenderer`) and the `bindRichEditor` binding is byte-identical to
+  the post/announcement composer (it is — same
+  `textarea[data-rich-editor]`).
+- **`MilestonesTests.cs`** — the `Ids` ordered list gains `"PG"` (after
+  `"RE"`, before `"M4"`); the single-in-progress pin (M4) is unchanged; the
+  order + no-blank-title pins hold. The `Shipped_Milestones_Are_Marked_Done`
+  test is *not* affected (PG is `StatusPlanned`, not `StatusDone`).

@@ -1,8 +1,21 @@
-# ADR 0192 — Documents
+---
+id: adr-0192
+title: "Documents"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0182-form-look.md, docs/adr/0184-announcement-detail.md, docs/adr/0188-projects-lists.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0192](0192-documents.md) — Documents
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-27
-Relates to: ADR 0188 (list rows), ADR 0184 (detail pages), ADR 0182 (forms)
+Relates to: ADR [0188](0188-projects-lists.md) (list rows), ADR [0184](0184-announcement-detail.md) (detail pages), ADR [0182](0182-form-look.md) (forms)
 
 ## Decision
 
@@ -11,10 +24,10 @@ Relates to: ADR 0188 (list rows), ADR 0184 (detail pages), ADR 0182 (forms)
   surface so it works in all four palette/mode combinations. It is `aria-hidden`; the content type is still
   printed as text on the detail page, and the tile never carries the kind by colour alone.
 - List rows (`Document/Index.cshtml`): tile + title / summary / meta (size, date); Download is an outline
-  button. The rows are the shared row cards (ADR 0188). The size helper is the detail page's `FormatSize`.
+  button. The rows are the shared row cards (ADR [0188](0188-projects-lists.md)). The size helper is the detail page's `FormatSize`.
 - Detail: the tile sits beside the title; tag and folder labels are `.kmb-chip`; the file facts are a
   `.kmb-detail-card` with muted labels (`.kmb-meta-label`).
-- Upload and Edit forms already use `form > .card` and pick up the form look (ADR 0182).
+- Upload and Edit forms already use `form > .card` and pick up the form look (ADR [0182](0182-form-look.md)).
 
 ## Open
 

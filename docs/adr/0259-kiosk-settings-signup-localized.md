@@ -1,10 +1,23 @@
-# ADR 0259 — Kiosk Settings and Account/Signup are localized
+---
+id: adr-0259
+title: "Kiosk Settings and Account/Signup are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0259](0259-kiosk-settings-signup-localized.md) — Kiosk Settings and Account/Signup are localized
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-The hard-coded-English scan (after ADR 0258) listed Kiosk/Settings and Account/Signup as the next views. Kiosk Settings was fully English (title, headings,
+The hard-coded-English scan (after ADR [0258](0258-shared-close-and-tooltips.md)) listed Kiosk/Settings and Account/Signup as the next views. Kiosk Settings was fully English (title, headings,
 hints, table headers, option labels, aria-labels, placeholder, tip, buttons); Signup had the page title, the bot-check and disallowed-domain messages,
 the "resend confirmation" line and the "Sign in" link in English.
 
@@ -20,5 +33,5 @@ the "resend confirmation" line and the "Sign in" link in English.
 
 ## Not covered
 Applied and build- + test-verified in-repo (solution builds 0 errors; `Kumunita.Web.Tests` 1152/0 failed, `Kumunita.Core.Tests` 1621/0 failed). de/fr/da text is machine-written, review parked.
-The improve-check gate (a) ceiling for `KnownTranslationKeys.cs` was re-based 11859 → 12091 for these twenty-nine new keys (the same shipped-additions mechanism the ADR 0258 close used; annotated in the gate).
+The improve-check gate (a) ceiling for `KnownTranslationKeys.cs` was re-based 11859 → 12091 for these twenty-nine new keys (the same shipped-additions mechanism the ADR [0258](0258-shared-close-and-tooltips.md) close used; annotated in the gate).
 Remaining from the scan: Guardian status labels, controller flash/error messages, admin pages, Page/Index and page-tree leftovers.

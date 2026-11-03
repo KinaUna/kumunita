@@ -48,7 +48,6 @@
         else if (_navPath.StartsWith("/pages", StringComparison.OrdinalIgnoreCase)) activeNav = "pages";
         else if (_navPath.StartsWith("/tags", StringComparison.OrdinalIgnoreCase)) activeNav = "tags";
         else if (_navPath.StartsWith("/directory", StringComparison.OrdinalIgnoreCase)) activeNav = "directory";
-        else if (_navPath.StartsWith("/people", StringComparison.OrdinalIgnoreCase)) activeNav = "people";
     }
 
     // P0-6 (translation audit) — the client-JS strings bundle: the effective
@@ -162,7 +161,7 @@
     // floor), so a null/absent service only degrades to the raw kw-l text.
     string _navHome, _navAnnouncements, _navCommunity, _navGroups,
            _navEvents, _navProjects, _navInventory, _navBookmarks, _navNotes,
-           _navDocuments, _navPages, _navTags, _navDirectory, _navPeople;
+           _navDocuments, _navPages, _navTags, _navDirectory;
     if (SurfaceLabels is not null)
     {
         try
@@ -186,7 +185,6 @@
             _navPages        = await SurfaceLabels.GetLabelAsync("pages",        "nav.pages",         navLang);
             _navTags         = await SurfaceLabels.GetLabelAsync("tags",         "nav.tags",          navLang);
             _navDirectory    = await SurfaceLabels.GetLabelAsync("directory",    "nav.directory",     navLang);
-            _navPeople       = await SurfaceLabels.GetLabelAsync("people",       "nav.people",        navLang);
         }
         catch
         {
@@ -194,7 +192,7 @@
             _navHome = "Home"; _navAnnouncements = "Announcements"; _navCommunity = "Community";
             _navGroups = "Groups"; _navEvents = "Events"; _navProjects = "Projects";
             _navInventory = "Inventory"; _navBookmarks = "Bookmarks"; _navNotes = "Notes"; _navDocuments = "Documents";
-            _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory"; _navPeople = "People";
+            _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory";
         }
     }
     else
@@ -203,7 +201,7 @@
         _navHome = "Home"; _navAnnouncements = "Announcements"; _navCommunity = "Community";
         _navGroups = "Groups"; _navEvents = "Events"; _navProjects = "Projects";
         _navInventory = "Inventory"; _navBookmarks = "Bookmarks"; _navNotes = "Notes"; _navDocuments = "Documents";
-        _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory"; _navPeople = "People";
+        _navPages = "Pages"; _navTags = "Tags"; _navDirectory = "Directory";
     }
 }
 <!DOCTYPE html>
@@ -292,33 +290,26 @@
     // kmb-embed class above is SHARED with the onboarding walk-through modal,
     // which frames INTERACTIVE settings pages where the buttons ARE the point
     // — the kiosk is the opposite: a read-only wall display that wants ONLY
-    // the title / subtitle / content. The differentiator is the referrer: a
-    // kiosk iframe navigates from the /kiosk document, while the onboarding
-    // modal iframes from whatever page hosts the walk. Same-origin, so the
-    // Referer arrives intact; we match on the /kiosk path (the leading slash
-    // keeps it from over-matching e.g. /kiosk-admin). A header read failure
-    // degrades to "not kiosk" (the floor — the full page renders, exactly the
-    // kmb-embed "the safe floor is the full page" doctrine). The kmb-kiosk
-    // body class then drives the site.css kiosk rules (hide buttons / tabs /
-    // nav, stretch the content to fill the frame, tight margins).
-    bool kmbKiosk = kmbEmbed;
-    if (kmbKiosk)
-    {
-        try
-        {
-            var referrer = Context.Request.Headers["Referer"].ToString();
-            var qIndex = referrer.IndexOf('?');
-            var refPath = (qIndex >= 0 ? referrer.Substring(0, qIndex) : referrer);
-            kmbKiosk = refPath.Contains("/kiosk");
-        }
-        catch
-        {
-            kmbKiosk = false; // missing context — not kiosk (the floor).
-        }
-    }
+    // the title / subtitle / content. So the differentiator is "did /kiosk
+    // frame it?", answered by the ?kiosk=1 query param the kiosk appends to
+    // every slide href (ADR 0285 D7) — a URL value that arrives intact under
+    // the site's Referrer-Policy: no-referrer (F7), which suppresses the
+    // Referer a referrer test would need. The onboarding modal's iframes never
+    // carry ?kiosk=1, so they stay interactive (kmb-embed floor on both). A
+    // read failure degrades to "not kiosk" (the floor — full page renders).
+    // The kmb-kiosk class then drives the site.css kiosk rules (hide buttons /
+    // tabs / nav, stretch content, tight margins).
+    bool kmbKiosk = kmbEmbed
+        && string.Equals(Context.Request.Query["kiosk"].ToString(), "1", StringComparison.Ordinal);
+    // ADR 0285 D5 — a kiosk slide hides comment threads, replies and RSVP
+    // lists unless its playlist entry shows them; the kiosk passes
+    // ?kioskComments=1 on the framed route, and the kmb-kiosk-comments class
+    // lets site.css keep the .kmb-discussion sections visible. Display-only.
+    bool kmbKioskComments = kmbKiosk
+        && string.Equals(Context.Request.Query["kioskComments"].ToString(), "1", StringComparison.Ordinal);
 }
 
-<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null) @(kmbKiosk ? "kmb-kiosk" : null)">
+<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null) @(kmbKiosk ? "kmb-kiosk" : null) @(kmbKioskComments ? "kmb-kiosk-comments" : null)">
     <partial name="_IconSprite" />
     @* Flash toast — the one, uniform flash-message surface (TempData["info"]
        / ["error"]). Renders a fixed top-right Bootstrap toast when the
@@ -455,12 +446,6 @@
                                         <li><a class="dropdown-item text-dark @(activeNav == "pages" ? "active" : null)" href="/pages"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-pages"/></svg>@_navPages</a></li>
                                         <li><a class="dropdown-item text-dark @(activeNav == "tags" ? "active" : null)" href="/tags"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-tags"/></svg>@_navTags</a></li>
                                         <li><a class="dropdown-item text-dark @(activeNav == "directory" ? "active" : null)" asp-controller="Directory" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-directory"/></svg>@_navDirectory</a></li>
-                                        @* M23 (ADR 0123 F6) — the "People" nav
-                                           entry (the find-people surface, /people):
-                                           next to Directory, the same
-                                           asp-controller/asp-action dropdown-item
-                                           shape. *@
-                                        <li><a class="dropdown-item text-dark @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-people"/></svg>@_navPeople</a></li>
                                     </ul>
                                 </li>
                             }
@@ -596,15 +581,6 @@
                             <span class="visually-hidden">@_navDirectory</span>
                             <span class="kmb-rail-label">@_navDirectory</span>
                             <span class="kmb-rail-tip">@_navDirectory</span>
-                        </a>
-                        @* M23 (ADR 0123 F6) — the "People" nav entry (the
-                           find-people surface, /people): next to Directory in
-                           the rail, the same rail-btn shape (a two-people icon). *@
-                        <a class="kmb-rail-btn @(activeNav == "people" ? "active" : null)" asp-controller="FindPeople" asp-action="Index">
-                            <svg class="kmb-icon" width="20" height="20" aria-hidden="true"><use href="#kmb-i-people"/></svg>
-                            <span class="visually-hidden">@_navPeople</span>
-                            <span class="kmb-rail-label">@_navPeople</span>
-                            <span class="kmb-rail-tip">@_navPeople</span>
                         </a>
                     }
                 </nav>

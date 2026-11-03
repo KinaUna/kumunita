@@ -1,19 +1,32 @@
-# ADR 0157 — Site content hero-translation (the SITE-2 translation lane ADR 0150 §D5 named)
+---
+id: adr-0157
+title: "Site content hero-translation (the SITE-2 translation lane ADR 0150 §D5 named)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0157](0157-site-content-translation.md) — Site content hero-translation (the SITE-2 translation lane ADR [0150](0150-site-content-customization.md) §D5 named)
 
 Status: Accepted
 Date: 2026-10-10
 
 ## Context
 
-ADR 0150 (the SITE lane) shipped the `SiteContent` singleton — the
+ADR [0150](0150-site-content-customization.md) (the SITE lane) shipped the `SiteContent` singleton — the
 GlobalAdmin's edit surface for the two landing surfaces' hero eyebrow + lead
 text and the nine section toggles. The hero text defaults are byte-identical to
 the shipped `kw-l` strings (the `home.intro_eyebrow` / `home.intro_lead` /
-`about.eyebrow` / `about.lead` keys). ADR 0150 §D5 explicitly anticipated this
+`about.eyebrow` / `about.lead` keys). ADR [0150](0150-site-content-customization.md) §D5 explicitly anticipated this
 lane:
 
 > "A future **SITE-2 translation lane** (out of scope) would add a
-> `SiteContentTranslation` row shape keyed on the same strings; the ADR 0005
+> `SiteContentTranslation` row shape keyed on the same strings; the ADR [0005](0005-multilingual-support.md)
 > §B 'every other language is community-provided' clause is unchanged."
 
 Today a GlobalAdmin edits the hero text in English. A resident whose effective
@@ -22,7 +35,7 @@ from are **not** in the `KnownTranslationKeys` matrix for the hero fields
 (the hero text is admin-set, not a platform string). This ADR settles that
 gap: the GlobalAdmin can now **add, edit, and remove** translations of the two
 heroes' eyebrow + lead (home + about) **and the home hero's two supporting
-lines** (the "scope" + "FIG" lines, ADR 0150 SITE) into any enabled language,
+lines** (the "scope" + "FIG" lines, ADR [0150](0150-site-content-customization.md) SITE) into any enabled language,
 and a resident reading in that language sees the translated hero text.
 
 **Extension (2026-10-10, the hero-sub lane):** the home hero's two supporting
@@ -40,34 +53,34 @@ which is a separate surface.
 
 ## Decision
 
-- A new **`SiteContentTranslation`** doc (ADR 0157 D1). A **non-singleton**
+- A new **`SiteContentTranslation`** doc (ADR [0157](0157-site-content-translation.md) D1). A **non-singleton**
   document — one row per **language** (the `LanguageCode` is the business key,
   enforced unique by the `(LanguageCode)` index on the
-  `SiteContentDocTypes.Configure` surface, ADR 0004 §B.1 additive). The
+  `SiteContentDocTypes.Configure` surface, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive). The
   surrogate `Id` is a `string` (the `PostTranslation.Id` /
   `GroupTranslation.Id` convention). Six **optional** hero fields
   (`HomeHeroEyebrow` / `HomeHeroLead` / `HomeHeroSub1` / `HomeHeroSub2` /
   `AboutHeroEyebrow` / `AboutHeroLead` — all `string?`): a `null` or blank
-  field means "fall back to the singleton's value for that hero" (the ADR 0022
+  field means "fall back to the singleton's value for that hero" (the ADR [0022](0022-user-added-post-reply-translations.md)
   `PostTranslation.Title`-optional shape applied to all six hero fields).
   **At least one** of the six must be non-blank (the write seam enforces it,
-  not the shape — the ADR 0026 group/community "at least one non-blank" rule).
+  not the shape — the ADR [0026](0026-group-community-name-description-translations.md) group/community "at least one non-blank" rule).
   Plus `AuthorId` + `Created`.
 
-- **Standing: GlobalAdmin only** (ADR 0157 D2). The `SiteContent` singleton
-  has no per-resident owner — the ADR 0150 D8 write gate is
+- **Standing: GlobalAdmin only** (ADR [0157](0157-site-content-translation.md) D2). The `SiteContent` singleton
+  has no per-resident owner — the ADR [0150](0150-site-content-customization.md) D8 write gate is
   `[Authorize(Roles = GlobalAdmin)]` on the dedicated
-  `AdminSiteController`. The `Translator` standing (ADR 0021) is scoped to a
+  `AdminSiteController`. The `Translator` standing (ADR [0021](0021-translator-role-delegated-translation-editing.md)) is scoped to a
   parent's content lane (posts / groups / announcements) and does **not**
   qualify here: the site content has no per-item parent scope for the
   Translator to bind to. The Core write lanes (D3) are thin — they write the
   `AccessAudit` row (`Via = Admin`, action `sitetranslation.add` /
   `.update` / `.remove`, `TargetKind` "site", `TargetId` the language code)
-  and never call `IAuthorizationService` (the ADR 0150
+  and never call `IAuthorizationService` (the ADR [0150](0150-site-content-customization.md)
   `SiteContentService.SaveAsync` shape — the Web gate is the only place the
-  admin authorization is produced, ADR 0006-D).
+  admin authorization is produced, ADR [0006](0006-module-boundary-contracts.md)-D).
 
-- **The three write lanes** (ADR 0157 D3, the ADR 0022 + ADR 0048
+- **The three write lanes** (ADR [0157](0157-site-content-translation.md) D3, the ADR [0022](0022-user-added-post-reply-translations.md) + ADR [0048](0048-translation-edit-and-remove-lanes.md)
   post-translation shape adapted to the singleton):
   - `AddTranslationAsync(languageCode, homeEyebrow, homeLead, homeSub1,
     homeSub2, aboutEyebrow, aboutLead, actorBy)` — **upsert**: if a row for
@@ -83,25 +96,25 @@ which is a separate surface.
   All three are one session + one `AccessAudit` row (invariant C3),
   strong-consistency (invariant C4 — live on the very next render).
 
-- **The read seam** (ADR 0157 D4): `GetTranslationsAsync()` returns every
+- **The read seam** (ADR [0157](0157-site-content-translation.md) D4): `GetTranslationsAsync()` returns every
   `SiteContentTranslation` row ordered by `LanguageCode`. A public
-  landing-surface read (ADR 0150 D2) — world-readable, never an access
-  decision, never audited (the ADR 0022 `GetPostTranslationsAsync` "a read,
+  landing-surface read (ADR [0150](0150-site-content-customization.md) D2) — world-readable, never an access
+  decision, never audited (the ADR [0022](0022-user-added-post-reply-translations.md) `GetPostTranslationsAsync` "a read,
   not a decision" pin). A read failure degrades to an empty list.
 
-- **The Web surface** (ADR 0157 D5): three new POST actions on the existing
-  `AdminSiteController` (the ADR 0022 `PostsController.AddTranslation` /
+- **The Web surface** (ADR [0157](0157-site-content-translation.md) D5): three new POST actions on the existing
+  `AdminSiteController` (the ADR [0022](0022-user-added-post-reply-translations.md) `PostsController.AddTranslation` /
   `UpdateTranslation` / `RemoveTranslation` shape, adapted):
   - `POST /admin/site/translations` — add (or overwrite) a translation.
   - `POST /admin/site/translations/update` — update an existing translation.
   - `POST /admin/site/translations/remove` — remove a translation.
   The existing `[Authorize(Roles = GlobalAdmin)]` class gate is the standing
-  (the ADR 0150 D8 pin). The `AdminSiteViewModel` gains two `[BindNever]`
+  (the ADR [0150](0150-site-content-customization.md) D8 pin). The `AdminSiteViewModel` gains two `[BindNever]`
   display-only properties: `Languages` (the enabled catalog set, each with
-  its `HasTranslation` flag — the ADR 0022 `LanguageOption` shape) and
+  its `HasTranslation` flag — the ADR [0022](0022-user-added-post-reply-translations.md) `LanguageOption` shape) and
   `Translations` (the existing `SiteContentTranslation` rows). The
   `/admin/site` view gains a **hero text translations** section in the
-  posts/announcements detail style (the ADR 0082 / ADR 0027 shape): a
+  posts/announcements detail style (the ADR [0082](0082-content-actions-dropdown.md) / ADR [0027](0027-post-reply-translation-display-and-swap.md) shape): a
   **hero preview** that renders the default (English) version with **language
   chips to switch** between it and each existing translation (the
   `data-translation-chip` / `data-td-variant` swap mechanism in
@@ -115,7 +128,7 @@ which is a separate surface.
   hero-sub text fields (`HomeHeroSub1` / `HomeHeroSub2`) so the default
   (English) text is editable there.
 
-- **The render overlay** (ADR 0157 D6): the two hero surfaces
+- **The render overlay** (ADR [0157](0157-site-content-translation.md) D6): the two hero surfaces
   (`Views/Home/Index.cshtml` + `Views/StaticPages/About.cshtml`) resolve the
   effective language per request (the existing `effLang` variable), read the
   translations list (best-effort — a missing seam or read failure degrades to
@@ -130,19 +143,19 @@ which is a separate surface.
   byte-identical `platform.scope_home` / `platform.fig_home` strings), so they
   are customized and translated like the eyebrow + lead.
 
-- **No new bounded context, no new dependency, no EF migration** (ADR 0157
+- **No new bounded context, no new dependency, no EF migration** (ADR [0157](0157-site-content-translation.md)
   D7): the `SiteContentTranslation` doc is registered on the existing
-  `SiteContentDocTypes.Configure` surface (additive, ADR 0004 §B.1). The
+  `SiteContentDocTypes.Configure` surface (additive, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1). The
   `ISiteContentService` interface gains four methods (D3 read + D4 write
   lanes); the `SiteContentService` implements them. Core stays HTTP-free
-  (ADR 0006-D). The `SiteContent` singleton doc is **untouched** (D1 — the
+  (ADR [0006](0006-module-boundary-contracts.md)-D). The `SiteContent` singleton doc is **untouched** (D1 — the
   translation is a *new doc*, not a new field on the existing one, the ADR
   0150 D7 pin). The `kw-l` registry entries for the hero keys are
-  **untouched** (ADR 0150 D5 — the hero text is admin-set, not a
+  **untouched** (ADR [0150](0150-site-content-customization.md) D5 — the hero text is admin-set, not a
   platform string). The `Milestones.cs` / README / `MilestonesTests` /
   `WhatsNew.cs` close-flip is updated for this lane.
 
-- **No new `kw-l` keys** (ADR 0157 D8): the hero text is admin-authored,
+- **No new `kw-l` keys** (ADR [0157](0157-site-content-translation.md) D8): the hero text is admin-authored,
   not a platform string. The translation fields carry the admin's text
   verbatim; no `KnownTranslationKeys` parity test is affected. The
   `kw-l` key set is **untouched**.
@@ -155,12 +168,12 @@ which is a separate surface.
   left blank on the translation row falls back to the singleton's value.
 - A fresh instance that never touches the translation surface sees exactly
   the same hero text as today (the singleton's defaults, byte-identical to
-  the shipped `kw-l` text — ADR 0150 D4, SITE·3).
+  the shipped `kw-l` text — ADR [0150](0150-site-content-customization.md) D4, SITE·3).
 - The `SiteContent` singleton, the `SiteContentService.SaveAsync` lane, the
   `/admin/site` home/about form sections, and the `kw-l` registry are all
-  **untouched** (ADR 0150 D1 / D3 / D5 / D7 pins preserved).
+  **untouched** (ADR [0150](0150-site-content-customization.md) D1 / D3 / D5 / D7 pins preserved).
 - The `Translator` role is **not** a standing for site-content translations
-  (the site has no per-resident parent scope, ADR 0021 scope boundary).
+  (the site has no per-resident parent scope, ADR [0021](0021-translator-role-delegated-translation-editing.md) scope boundary).
 - 7 new Core tests (`SiteContentServiceTests`), 7 new Web tests
   (`AdminSiteControllerTests`), and the existing site-content tests are
   **untouched** (the `SiteContent` singleton shape is unchanged).

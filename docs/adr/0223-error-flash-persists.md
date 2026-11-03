@@ -1,9 +1,22 @@
-# ADR 0223 — Error flashes stay until dismissed
+---
+id: adr-0223
+title: "Error flashes stay until dismissed"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0223](0223-error-flash-persists.md) — Error flashes stay until dismissed
 
 Status: Accepted
 
 ## Context
-ADR 0217 removed five admin views' duplicate inline alerts and kept the layout toast as the one flash surface. That
+ADR [0217](0217-admin-appearance-check.md) removed five admin views' duplicate inline alerts and kept the layout toast as the one flash surface. That
 left an error flash (for example an invalid endpoint on `/admin/escalation`) vanishing after 5 s, before it could be
 read or acted on. About 218 controller call sites write `TempData["error"]`.
 

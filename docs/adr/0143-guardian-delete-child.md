@@ -1,4 +1,17 @@
-# ADR 0143 — Guardian deletes a child account: the 6th GU supervisory action that reuses the ADR 0142 deletion core, gated by an active `GuardianLink` and audited `Via: Guardian`
+---
+id: adr-0143
+title: "Guardian deletes a child account: the 6th GU supervisory action that reuses the ADR 0142 deletion core, gated by an active `GuardianLink` and audited `Via: Guardian`"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0143](0143-guardian-delete-child.md) — Guardian deletes a child account: the 6th GU supervisory action that reuses the ADR [0142](0142-delete-account.md) deletion core, gated by an active `GuardianLink` and audited `Via: Guardian`
 
 Status: Accepted
 Date: 2026-10-05
@@ -13,17 +26,17 @@ the single `account.delete` summary audit row, and the Identity-account
 deletion. This lane reuses that core verbatim; it does not re-implement
 the cascade); 0006 (the §A frozen `IIdentityService` surface gains one
 *additive* method, `DeleteChildAccountAsync`; the §E compatible-ADD
-precedent — the ADR 0013 / M3b `Moderate` ADD shape); 0003 (the
+precedent — the ADR [0013](0013-group-posts-membership-lane.md) / M3b `Moderate` ADD shape); 0003 (the
 audit-by-default rule — the deletion is one `account.delete` row with the
-narrower `Via: Guardian` standing, the ADR 0028 rule for every GU
+narrower `Via: Guardian` standing, the ADR [0028](0028-guardian-controls-account-scope-supervision.md) rule for every GU
 action)
 
 ## Context
 
-ADR 0028 froze the GU surface to **five** supervisory actions
+ADR [0028](0028-guardian-controls-account-scope-supervision.md) froze the GU surface to **five** supervisory actions
 (suspend, community curation, group curation, invitation approval,
 dissolve) and — deliberately — chose *suspension* (reversible) over
-*deletion*. ADR 0142 then added the full deletion lane, but its two
+*deletion*. ADR [0142](0142-delete-account.md) then added the full deletion lane, but its two
 branches are **self-serve** (a GlobalAdmin deleting *themselves*) and
 **admin-initiated** (a GlobalAdmin removing *another* resident). Neither
 branch admits the guardian standing: a guardian is neither the target nor
@@ -45,7 +58,7 @@ audit summary row) and differs in only two things: **who may invoke it**
 (`Guardian`, not `Owner`/`Admin`). Everything else — the last-GlobalAdmin
 guard, the pseudonymization, the membership removal, the single audit
 row, the Identity-account deletion, the "not a silent no-op on a second
-call" pin — is inherited from ADR 0142 unchanged.
+call" pin — is inherited from ADR [0142](0142-delete-account.md) unchanged.
 
 ## Decision
 
@@ -63,7 +76,7 @@ Task DeleteChildAccountAsync(string childId, string guardianId);
   must exist, else `UnauthorizedAccessException` (the Web's 404; the
   exact `GuardActiveLinkAsync` shape every other GU seam runs). No
   projection, no cache — a dissolve is live on the next read.
-- **Delegates to `DeleteCoreAsync`** (the ADR 0142 shared body) with
+- **Delegates to `DeleteCoreAsync`** (the ADR [0142](0142-delete-account.md) shared body) with
   `actorId: guardianId` and `via: Authorization.AccessVia.Guardian`.
   The last-GlobalAdmin guard still runs inside the core (a child is
   never a GlobalAdmin, so it is a no-op here — a child cannot be the
@@ -75,11 +88,11 @@ Task DeleteChildAccountAsync(string childId, string guardianId);
 - **The `GuardianLink` rows for the deleted child are dissolved
   in-band.** `DeleteCoreAsync` removes the child's memberships and
   profile but does not touch `GuardianLink` rows (a child can have one
-  *or two* guardians, ADR 0028 §B, and a co-guardian's row would dangle
+  *or two* guardians, ADR [0028](0028-guardian-controls-account-scope-supervision.md) §B, and a co-guardian's row would dangle
   pointing at a deleted account). This seam dissolves **every**
   `GuardianLink` row where `ChildId == childId` (any status) to
-  `Dissolved` in the same session — the ADR 0142 core takes an optional
-  in-band callback (the ADR 0142 self/admin branches pass no callback;
+  `Dissolved` in the same session — the ADR [0142](0142-delete-account.md) core takes an optional
+  in-band callback (the ADR [0142](0142-delete-account.md) self/admin branches pass no callback;
   this lane supplies one) so no row references the deleted account,
   and the co-guardian's `Index` list no longer shows the child on the
   next read (C4 strong-consistency). Each dissolved row is stamped
@@ -91,7 +104,7 @@ Task DeleteChildAccountAsync(string childId, string guardianId);
   runs *first* (the house convention every other GU seam follows — gate
   before existence; also keeps the response uniform for an existing vs.
   a non-existing target — both a 404, no account-existence oracle, the
-  ADR 0012/0013 "a non-guardian learns nothing" shape), then the
+  ADR [0012](0012-community-membership-mandatory-and-moderator.md)/0013 "a non-guardian learns nothing" shape), then the
   existence check (the `SuspendChildAsync` "load the profile, missing →
   `InvalidOperationException`" shape). A *second* call for an
   already-deleted child is refused by the standing gate (the successful
@@ -104,12 +117,12 @@ Task DeleteChildAccountAsync(string childId, string guardianId);
 - `GET /me/children/{childId}/delete` — the danger-zone confirm page.
   Standing-gated like `Detail` (an active link, else 404). Renders the
   consequences lede + the explicit acknowledgment checkbox (the ADR
-  0142 `DeleteAccountViewModel.Confirmed` precedent, the ADR 0138
+  0142 `DeleteAccountViewModel.Confirmed` precedent, the ADR [0138](0138-sample-data-change-password-lock.md)
   "dangerous action guard" shape).
 - `POST /me/children/{childId}/delete` — the write. The actor is the
   signed-in principal (never a form field). The checkbox must be
   checked (a bare `[Required]` on a bool accepts `false`, so the check
-  is explicit — the ADR 0142 precedent). A non-guardian's crafted POST
+  is explicit — the ADR [0142](0142-delete-account.md) precedent). A non-guardian's crafted POST
   is refused server-side (`UnauthorizedAccessException` → the 404
   shape, the fail-closed pin). On success: redirect to `Index` with a
   confirmation `TempData["info"]` (the `Dissolve` action's redirect
@@ -131,28 +144,28 @@ Task DeleteChildAccountAsync(string childId, string guardianId);
   removal, the profile removal, the Identity-account deletion, and the
   single `account.delete` audit row all land in one Marten session
   (`Via: Guardian`); the EF Identity deletion follows (the accepted
-  cross-store window ADR 0142 already documents).
-- **C·4 — Pseudonymization, not deletion (ADR 0142 §A, the
-  `SECURITY.md` §3.1 rule).** The child's audit rows remain (the
+  cross-store window ADR [0142](0142-delete-account.md) already documents).
+- **C·4 — Pseudonymization, not deletion (ADR [0142](0142-delete-account.md) §A, the
+  [`SECURITY.md`](../../SECURITY.md) §3.1 rule).** The child's audit rows remain (the
   community is still promised "prove what happened") but their
   `ActorId` / `EffectivePrincipalId` are rewritten to
   `deleted:{childId}`. The identity is gone, the fact remains.
-- **C·5 — No dangling standing (ADR 0028 §B, C4).** After a
+- **C·5 — No dangling standing (ADR [0028](0028-guardian-controls-account-scope-supervision.md) §B, C4).** After a
   successful delete, **no** `GuardianLink` row with
   `ChildId == childId` remains active or pending — every one is
   `Dissolved` — so a co-guardian's `Index` list and the child's
   standing gates all see the child as gone on the next read.
 
-### D. Audit — the ADR 0142 summary row, `Via: Guardian`
+### D. Audit — the ADR [0142](0142-delete-account.md) summary row, `Via: Guardian`
 
 Exactly one `AccessAudit` row: action `"account.delete"`,
 `TargetKind` `"account"`, `TargetId` the child's subject,
 `ActorId` the guardian, `Via: Guardian`. The `GuardianLink`
 dissolution does **not** write its own `guardian.dissolve` row — it is
-subsumed by the single `account.delete` summary row (the ADR 0142
+subsumed by the single `account.delete` summary row (the ADR [0142](0142-delete-account.md)
 "one summary, many rows" shape). The `Via: Guardian` tag is the
-distinction from ADR 0142's two branches: the same action verb, the
-narrower standing, the ADR 0028 rule that every GU action records the
+distinction from ADR [0142](0142-delete-account.md)'s two branches: the same action verb, the
+narrower standing, the ADR [0028](0028-guardian-controls-account-scope-supervision.md) rule that every GU action records the
 narrower `Via`.
 
 ## Consequences
@@ -165,34 +178,34 @@ narrower `Via`.
   is deliberate — the child is gone, so no standing over them remains;
   a re-assignment over the *same* (deleted) account is impossible (the
   account no longer exists), which is the correct outcome.
-- **The child's content is pseudonymized, not deleted** (ADR 0142 §A,
-  the `SECURITY.md` §3.1 policy). The user chose full deletion: the
+- **The child's content is pseudonymized, not deleted** (ADR [0142](0142-delete-account.md) §A,
+  the [`SECURITY.md`](../../SECURITY.md) §3.1 policy). The user chose full deletion: the
   account, profile, and memberships are removed; the audit trail
   survives with the identity replaced by a tombstone.
 - **The GlobalAdmin safety valve is unchanged (G·5).** A GlobalAdmin
-  may still delete any account through the ADR 0142 admin-initiated
+  may still delete any account through the ADR [0142](0142-delete-account.md) admin-initiated
   branch; this ADR adds no new admin surface and removes none.
-- **The resident-facing guide ships in the same lane (ADR 0057 D3).**
+- **The resident-facing guide ships in the same lane (ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D3).**
   The new sixth guardian action is documented in the `child-accounts`
   guide (a "To delete the account" step, en + de/fr/da) and in a new
   `deleting-an-account` guide (added to the `help` page's `## Guides`
   index and the ADR 0057 closed set, en + de/fr/da baselines, `docs/
   guides/CONVENTIONS.md` registry row). The guide update is the owed
   consistency step of this lane — a feature-without-guide would trip
-  the ADR 0057 D4 drift pin.
+  the ADR [0057](0057-user-guides-in-help-subtree-and-consistency-loop.md) D4 drift pin.
 
 ## Trade-offs (FACES)
 
 - **C**oherent (strengthened): the guardian surface now offers the full
   control pair the admin surface offers (suspend *and* delete), and the
   deletion reuses one core rather than branching into a third bespoke
-  cascade — the "one seam, many branches" shape the ADR 0142 core
+  cascade — the "one seam, many branches" shape the ADR [0142](0142-delete-account.md) core
   already established.
 - **A**daptive (strengthened): a mistreated child or an abandoned
   account now has a clean, audited, in-app removal path for the
   guardian — a closed response path, not a DB procedure.
 - **S**table (consumed): the deletion is irreversible by design (the
-  user's explicit choice, the ADR 0142 "not a silent no-op" pin). The
+  user's explicit choice, the ADR [0142](0142-delete-account.md) "not a silent no-op" pin). The
   cost is the lost account; the counterweight is the pseudonymized
   audit trail (the fact remains) and the GlobalAdmin surface (the G·5
   valve — an admin can still investigate, and can re-seed if a mistake
@@ -200,11 +213,11 @@ narrower `Via`.
 
 ## Rollout & rollback
 
-- **No schema change:** `GuardianLink` already exists (ADR 0028); this
+- **No schema change:** `GuardianLink` already exists (ADR [0028](0028-guardian-controls-account-scope-supervision.md)); this
   ADR only *dissolves* rows (a status write), it does not add columns.
-  ADR 0004 §B additive-discipline holds (no DDL, no re-seed).
+  ADR [0004](0004-data-persistence-and-schema-evolution.md) §B additive-discipline holds (no DDL, no re-seed).
 - **Additive interface:** `IIdentityService` gains one method (the
-  ADR 0013 / M3b ADD precedent); no existing caller's contract changes.
+  ADR [0013](0013-group-posts-membership-lane.md) / M3b ADD precedent); no existing caller's contract changes.
 - **Rollback:** remove the `GuardianController.DeleteChild` action +
   the `IIdentityService.DeleteChildAccountAsync` seam. No data
   migration (nothing new is stored).

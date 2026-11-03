@@ -1,4 +1,17 @@
-# ADR 0072 — Kanban board: the placeholder attributes joined the localized surface
+---
+id: adr-0072
+title: "Kanban board: the placeholder attributes joined the localized surface"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m11/m11-portability-handoff-notes.md]
+supersedes: [adr-0015]
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0072](0072-kanban-placeholder-attributes-localized.md) — Kanban board: the placeholder attributes joined the localized surface
 
 Status: Accepted
 Date: 2026-09-24
@@ -7,12 +20,12 @@ documented exception), 0067 (the M5 board surface this localizes)
 
 ## Context
 
-ADR 0067 shipped the M5 Kanban board: `Views/Projects/BoardDetail.cshtml` (the
+ADR [0067](0067-m5-projects-todos-and-kanban.md) shipped the M5 Kanban board: `Views/Projects/BoardDetail.cshtml` (the
 board with its lanes, cards, the add-to-do foot, and the add-lane placeholder
 lane) and `Views/Projects/BoardNew.cshtml` (the create form with its initial
 lane). Every visible label, button, hint, and empty state on that surface is
 wrapped in the `<kw-l>` TagHelper and resolved through the `ITranslationProvider`
-(ADR 0015). One class of string was left out:
+(ADR [0015](0015-ui-view-localization-mechanics.md)). One class of string was left out:
 
 - **The `placeholder` attributes on the board's input fields.** The add-to-do
   foot's `Title` input read `placeholder="@("To-do title")"`, the add-lane
@@ -21,7 +34,7 @@ wrapped in the `<kw-l>` TagHelper and resolved through the `ITranslationProvider
   `placeholder="@("Planned")"`. A resident with a non-`en` preference saw these
   three inputs in English while the rest of the same page was localized.
 
-This is the same class of exclusion ADR 0015 recorded — "HTML attributes
+This is the same class of exclusion ADR [0015](0015-ui-view-localization-mechanics.md) recorded — "HTML attributes
 (`placeholder`, `aria-label`, `title`) … are out of the TagHelper's reach by
 design and are left hardcoded." The reason holds for the *TagHelper* specifically
 (`<kw-l>` emits element **content**; it cannot wrap an attribute), but it is not
@@ -40,13 +53,13 @@ Two constraints bound the change:
   key-for-key in **all four** language dictionaries (`En` / `De` / `Fr` / `Da`)
   with non-empty values. A new key added to `EnValues` alone would fail the
   `DeValues_Keys_Match_AllKeys_Exactly_NoEmptyValues` (and `Fr` / `Da`) tests.
-- **The drift guard.** The reason ADR 0015 excluded attributes is not
+- **The drift guard.** The reason ADR [0015](0015-ui-view-localization-mechanics.md) excluded attributes is not
   "attributes" per se — it is that an attribute whose rendered value can **diverge
   from the registered key** (e.g. one that interpolates an inlined data value, or
   an `aria-label` built by concatenation like `"Actions for lane " + lane.Title`)
   would make the registry a lie. Simple, value-free placeholder copy has no such
   drift: the registered English *is* the rendered English, and the provider floor
-  (ADR 0015 D1) resolves the key to that exact English on every instance.
+  (ADR [0015](0015-ui-view-localization-mechanics.md) D1) resolves the key to that exact English on every instance.
 
 ## Decision
 
@@ -67,9 +80,9 @@ Two constraints bound the change:
   `placeholder` attribute (and, for the board detail inputs, the matching
   `aria-label`, which is the same fixed copy). A non-`en` resident now sees their
   language; an unregistered key falls back to the provider floor (`en` registry)
-  then to the raw key (ADR 0015) — identical safety to every other board string.
+  then to the raw key (ADR [0015](0015-ui-view-localization-mechanics.md)) — identical safety to every other board string.
 
-- **This is a *documented exception* to ADR 0015's HTML-attribute exclusion, not
+- **This is a *documented exception* to ADR [0015](0015-ui-view-localization-mechanics.md)'s HTML-attribute exclusion, not
   a reversal of it.** The exclusion stands for the cases that motivated it:
   value-interpolating attributes, `confirm()` dialogs, and C#-built markup are
   still out of scope (the TagHelper cannot wrap them, and registering a key whose
@@ -85,7 +98,7 @@ Two constraints bound the change:
   is untouched (it never reads the placeholder text), the `IProjectService`
   surface is untouched, and there is no schema or seeding change beyond the
   first-boot seeder's `en` upsert now picking up the three new keys (the
-  existing, already-mechanized path — ADR 0005 B).
+  existing, already-mechanized path — ADR [0005](0005-multilingual-support.md) B).
 
 ## Consequences
 
@@ -95,7 +108,7 @@ Two constraints bound the change:
   on the page. The `en` source text is unchanged, so a fresh `en` instance
   renders identically (the M·9 / M·12 floor is preserved).
 - **The registry gains three keys.** The parity tests pass because all four
-  dictionaries are updated together. The admin translation editor (ADR 0015 U6)
+  dictionaries are updated together. The admin translation editor (ADR [0015](0015-ui-view-localization-mechanics.md) U6)
   lists them under the closed `AllKeys` set with their English reference text, so
   a resident-facing translation can be added later through the existing editor
   with no further code change.

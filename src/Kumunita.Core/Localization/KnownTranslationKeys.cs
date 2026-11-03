@@ -302,6 +302,14 @@ public static class KnownTranslationKeys
             ["projects.board.title_hint"]    = "A short name for the board — the feed label.",
             ["projects.board.description_hint"] = "An optional description of what this board tracks. A board is usable title-only.",
             ["projects.board.back"]          = "← Back to boards",
+            ["projects.board.view_switch"] =
+                "Board view",
+            ["projects.board.view_board"] =
+                "Board",
+            ["projects.board.view_list"] =
+                "List",
+            ["projects.board.list_empty_lane"] =
+                "No cards in this lane.",
             ["projects.board.untitled"]      = "Untitled board",
             ["projects.board.delete"]        = "Delete board",
             ["projects.board.edit"]          = "Edit board",
@@ -786,10 +794,16 @@ public static class KnownTranslationKeys
             ["inventory.flash_item_deleted"] = "Item deleted.",
             ["inventory.flash_checked_out"] = "Item checked out.",
             ["inventory.flash_checked_in"] = "Item checked in.",
-            ["kiosk.flash_view_interval"] = "The view-interval must be at least 5 seconds.",
-            ["kiosk.flash_refresh_interval"] = "The refresh-interval must be at least 2 seconds and less than the view-interval.",
             ["kiosk.flash_store_unavailable"] = "The document store is unavailable.",
             ["kiosk.flash_saved"] = "The kiosk playlist has been saved.",
+            ["kiosk.flash_refresh_interval"] =
+                "The refresh interval must be at least 2 seconds.",
+            ["kiosk.flash_default_duration"] =
+                "The default duration must be between 5 and 3600 seconds.",
+            ["kiosk.flash_entry_item"] =
+                "Pick an item for every entry, or remove the entry.",
+            ["kiosk.flash_entry_duration"] =
+                "Each entry must be shown for between 5 and 3600 seconds.",
             ["languages.flash_added"] = "Language “{0}” ({1}) added.",
             ["languages.flash_enabled"] = "Language “{0}” enabled.",
             ["languages.flash_disabled"] = "Language “{0}” disabled.",
@@ -3830,7 +3844,6 @@ public static class KnownTranslationKeys
             ["kiosk.next_slide"]             = "Next view",
             ["kiosk.refreshed"]              = "Updated just now",
             ["kiosk.settings.title"]         = "Kiosk display",
-            ["kiosk.settings.view_interval"] = "Change view every (seconds)",
             ["kiosk.settings.refresh_interval"] = "Refresh content every (seconds)",
             ["kiosk.settings.display_mode"] = "Display mode",
             ["kiosk.settings.display_mode.full_page"] = "Full page (fill the browser window)",
@@ -3838,54 +3851,106 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.hint"] = "Full page fills your browser window; full screen also hides the browser's tabs and address bar (a user gesture is needed to enter it).",
             ["kiosk.settings.page_title"] =
                 "Kiosk settings",
-            ["kiosk.settings.intro"] =
-                "Configure your kiosk display: the ordered list of views it cycles through (top to bottom), and the two auto-cycle / auto-refresh cadences. This is your playlist — it only shapes what your own kiosk shows. To add a slide, pick a view in an empty slot. To remove one, set its view to — and save. To reorder, move a slide to a different slot. Then use “Preview the kiosk” below (signed in as you) to see it run.",
             ["kiosk.settings.display_heading"] =
                 "Display",
-            ["kiosk.settings.view_interval_hint"] =
-                "The slide-advance cadence (seconds, ≥ 5). Default 30.",
-            ["kiosk.settings.refresh_interval_hint"] =
-                "The content-refresh cadence (seconds, ≥ 2, and less than the view interval). Default 10.",
             ["kiosk.settings.playlist_heading"] =
                 "Playlist (top to bottom)",
             ["kiosk.settings.col_view"] =
                 "View",
-            ["kiosk.settings.col_community"] =
-                "Community",
             ["kiosk.settings.col_label"] =
                 "Label (optional)",
-            ["kiosk.settings.kind_none"] =
-                "— (none)",
-            ["kiosk.settings.kind_board"] =
-                "Board",
-            ["kiosk.settings.kind_calendar"] =
-                "Calendar",
-            ["kiosk.settings.kind_todos"] =
-                "To-dos",
             ["kiosk.settings.cal_day"] =
                 "Day",
             ["kiosk.settings.cal_week"] =
                 "Week",
             ["kiosk.settings.cal_month"] =
                 "Month",
-            ["kiosk.settings.community_placeholder"] =
-                "(blank = all)",
-            ["kiosk.settings.aria_slide_view"] =
-                "Slide {0} view",
-            ["kiosk.settings.aria_slide_board"] =
-                "Slide {0} board",
-            ["kiosk.settings.aria_slide_calendar"] =
-                "Slide {0} calendar view",
-            ["kiosk.settings.aria_slide_community"] =
-                "Slide {0} community",
-            ["kiosk.settings.aria_slide_label"] =
-                "Slide {0} label",
-            ["kiosk.settings.tip"] =
-                "Tip: only the View column decides which of the other columns a slide uses — the rest are ignored for that slide. A row set to — is left out of the cycle.",
             ["kiosk.settings.save"] =
                 "Save playlist",
             ["kiosk.settings.preview"] =
                 "Preview the kiosk",
+            ["kiosk.settings.intro"] =
+                "Choose what your kiosk display shows. Add an entry, pick its type and the item, and set how long it stays on screen and whether it scrolls when it doesn't fit. Entries play from top to bottom. This is your playlist; it only shapes your own kiosk. Then use “Preview the kiosk” below to see it run.",
+            ["kiosk.settings.refresh_interval_hint"] =
+                "How often the kiosk checks the slide on screen for changes (seconds, at least 2). Default 10.",
+            ["kiosk.settings.tip"] =
+                "With automatic scrolling, an entry stays on screen until it has scrolled to the end, even if that takes longer than its duration. If it reaches the end sooner, it scrolls back to the top for the rest of its time.",
+            ["kiosk.settings.default_duration"] =
+                "Default duration for new entries (seconds)",
+            ["kiosk.settings.default_duration_hint"] =
+                "New entries start with this duration (5–3600 seconds). Default 30.",
+            ["kiosk.settings.scroll_speed"] =
+                "Scroll speed",
+            ["kiosk.settings.scroll_speed_slow"] =
+                "Slow",
+            ["kiosk.settings.scroll_speed_medium"] =
+                "Medium",
+            ["kiosk.settings.scroll_speed_fast"] =
+                "Fast",
+            ["kiosk.settings.scroll_speed_hint"] =
+                "How fast entries set to scroll automatically move down the page.",
+            ["kiosk.settings.col_type"] =
+                "Type",
+            ["kiosk.settings.col_item"] =
+                "Item",
+            ["kiosk.settings.col_duration"] =
+                "Duration (seconds)",
+            ["kiosk.settings.col_scroll"] =
+                "If it doesn't fit",
+            ["kiosk.settings.scroll_none"] =
+                "No scrolling",
+            ["kiosk.settings.scroll_auto"] =
+                "Scroll automatically",
+            ["kiosk.settings.show_comments"] =
+                "Show comments",
+            ["kiosk.settings.board_view_board"] =
+                "Board",
+            ["kiosk.settings.board_view_list"] =
+                "List of to-dos",
+            ["kiosk.settings.type_none"] =
+                "Choose a type…",
+            ["kiosk.settings.type_board"] =
+                "Kanban board",
+            ["kiosk.settings.type_todo"] =
+                "To-do",
+            ["kiosk.settings.type_project"] =
+                "Project",
+            ["kiosk.settings.type_calendar"] =
+                "Calendar",
+            ["kiosk.settings.type_event"] =
+                "Event",
+            ["kiosk.settings.type_page"] =
+                "Page",
+            ["kiosk.settings.type_announcement"] =
+                "Announcement",
+            ["kiosk.settings.type_community_post"] =
+                "Community post",
+            ["kiosk.settings.type_group_post"] =
+                "Group post",
+            ["kiosk.settings.item_placeholder"] =
+                "Search, or pick from the list",
+            ["kiosk.settings.item_searching"] =
+                "Searching…",
+            ["kiosk.settings.item_no_results"] =
+                "Nothing found.",
+            ["kiosk.settings.item_error"] =
+                "Could not load items. Try again.",
+            ["kiosk.settings.item_unavailable"] =
+                "The item you picked is no longer available.",
+            ["kiosk.settings.add_entry"] =
+                "Add entry",
+            ["kiosk.settings.move_up"] =
+                "Move up",
+            ["kiosk.settings.move_down"] =
+                "Move down",
+            ["kiosk.settings.remove_entry"] =
+                "Remove",
+            ["kiosk.settings.entry_heading"] =
+                "Entry {0}",
+            ["kiosk.settings.empty"] =
+                "No entries yet. Use “Add entry” to put something on your kiosk.",
+            ["kiosk.settings.calendar_all"] =
+                "All communities",
             ["account.signup_bot_failed"] =
                 "The security check did not pass. Please try again.",
             ["account.signup_domain_disallowed"] =
@@ -4218,6 +4283,14 @@ public static class KnownTranslationKeys
             ["projects.board.title_hint"]    = "Ein kurzer Name für das Board — die Feed-Beschriftung.",
             ["projects.board.description_hint"] = "Eine optionale Beschreibung, was dieses Board nachverfolgt. Ein Board ist allein mit Titel nutzbar.",
             ["projects.board.back"]          = "← Zurück zu den Boards",
+            ["projects.board.view_switch"] =
+                "Board-Ansicht",
+            ["projects.board.view_board"] =
+                "Board",
+            ["projects.board.view_list"] =
+                "Liste",
+            ["projects.board.list_empty_lane"] =
+                "Keine Karten in dieser Spalte.",
             ["projects.board.untitled"]      = "Board ohne Titel",
             ["projects.board.delete"]        = "Board löschen",
             ["projects.board.edit"]          = "Board bearbeiten",
@@ -4689,10 +4762,16 @@ public static class KnownTranslationKeys
             ["inventory.flash_item_deleted"] = "Gegenstand gelöscht.",
             ["inventory.flash_checked_out"] = "Gegenstand ausgeliehen.",
             ["inventory.flash_checked_in"] = "Gegenstand zurückgegeben.",
-            ["kiosk.flash_view_interval"] = "Das Anzeigeintervall muss mindestens 5 Sekunden betragen.",
-            ["kiosk.flash_refresh_interval"] = "Das Aktualisierungsintervall muss mindestens 2 Sekunden betragen und kleiner als das Anzeigeintervall sein.",
             ["kiosk.flash_store_unavailable"] = "Der Dokumentenspeicher ist nicht verfügbar.",
             ["kiosk.flash_saved"] = "Die Kiosk-Wiedergabeliste wurde gespeichert.",
+            ["kiosk.flash_refresh_interval"] =
+                "Das Aktualisierungsintervall muss mindestens 2 Sekunden betragen.",
+            ["kiosk.flash_default_duration"] =
+                "Die Standarddauer muss zwischen 5 und 3600 Sekunden liegen.",
+            ["kiosk.flash_entry_item"] =
+                "Wähle für jeden Eintrag ein Element oder entferne den Eintrag.",
+            ["kiosk.flash_entry_duration"] =
+                "Jeder Eintrag muss zwischen 5 und 3600 Sekunden angezeigt werden.",
             ["languages.flash_added"] = "Sprache „{0}“ ({1}) hinzugefügt.",
             ["languages.flash_enabled"] = "Sprache „{0}“ aktiviert.",
             ["languages.flash_disabled"] = "Sprache „{0}“ deaktiviert.",
@@ -7554,7 +7633,6 @@ public static class KnownTranslationKeys
             ["kiosk.next_slide"]             = "Nächste Ansicht",
             ["kiosk.refreshed"]              = "Gerade aktualisiert",
             ["kiosk.settings.title"]         = "Kiosk-Anzeige",
-            ["kiosk.settings.view_interval"] = "Ansicht wechseln alle (Sekunden)",
             ["kiosk.settings.refresh_interval"] = "Inhalt aktualisieren alle (Sekunden)",
             ["kiosk.settings.display_mode"] = "Anzeigemodus",
             ["kiosk.settings.display_mode.full_page"] = "Vollseite (Browserfenster füllen)",
@@ -7562,54 +7640,106 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.hint"] = "Vollseite füllt dein Browserfenster; Vollbild blendet zusätzlich die Browser-Tabs und die Adressleiste aus (zum Betreten ist eine Benutzeraktion erforderlich).",
             ["kiosk.settings.page_title"] =
                 "Kiosk-Einstellungen",
-            ["kiosk.settings.intro"] =
-                "Richte deine Kiosk-Anzeige ein: die geordnete Liste der Ansichten, durch die sie wechselt (von oben nach unten), und die beiden Takte für automatischen Wechsel und Aktualisierung. Das ist deine Playlist — sie bestimmt nur, was dein eigener Kiosk zeigt. Um eine Folie hinzuzufügen, wähle in einem leeren Platz eine Ansicht. Um eine zu entfernen, setze ihre Ansicht auf — und speichere. Zum Umsortieren verschiebe eine Folie auf einen anderen Platz. Mit „Kiosk-Vorschau“ unten (als du angemeldet) siehst du sie laufen.",
             ["kiosk.settings.display_heading"] =
                 "Anzeige",
-            ["kiosk.settings.view_interval_hint"] =
-                "Takt des Folienwechsels (Sekunden, ≥ 5). Standard 30.",
-            ["kiosk.settings.refresh_interval_hint"] =
-                "Takt der Inhaltsaktualisierung (Sekunden, ≥ 2 und kleiner als das Ansichtsintervall). Standard 10.",
             ["kiosk.settings.playlist_heading"] =
                 "Playlist (von oben nach unten)",
             ["kiosk.settings.col_view"] =
                 "Ansicht",
-            ["kiosk.settings.col_community"] =
-                "Community",
             ["kiosk.settings.col_label"] =
                 "Beschriftung (optional)",
-            ["kiosk.settings.kind_none"] =
-                "— (keine)",
-            ["kiosk.settings.kind_board"] =
-                "Tafel",
-            ["kiosk.settings.kind_calendar"] =
-                "Kalender",
-            ["kiosk.settings.kind_todos"] =
-                "Aufgaben",
             ["kiosk.settings.cal_day"] =
                 "Tag",
             ["kiosk.settings.cal_week"] =
                 "Woche",
             ["kiosk.settings.cal_month"] =
                 "Monat",
-            ["kiosk.settings.community_placeholder"] =
-                "(leer = alle)",
-            ["kiosk.settings.aria_slide_view"] =
-                "Folie {0} Ansicht",
-            ["kiosk.settings.aria_slide_board"] =
-                "Folie {0} Tafel",
-            ["kiosk.settings.aria_slide_calendar"] =
-                "Folie {0} Kalenderansicht",
-            ["kiosk.settings.aria_slide_community"] =
-                "Folie {0} Community",
-            ["kiosk.settings.aria_slide_label"] =
-                "Folie {0} Beschriftung",
-            ["kiosk.settings.tip"] =
-                "Tipp: Nur die Spalte „Ansicht“ entscheidet, welche der anderen Spalten eine Folie verwendet — die übrigen werden für diese Folie ignoriert. Eine Zeile mit — wird im Wechsel ausgelassen.",
             ["kiosk.settings.save"] =
                 "Playlist speichern",
             ["kiosk.settings.preview"] =
                 "Kiosk-Vorschau",
+            ["kiosk.settings.intro"] =
+                "Wähle, was deine Kiosk-Anzeige zeigt. Füge einen Eintrag hinzu, wähle seine Art und das Element und lege fest, wie lange er angezeigt wird und ob er scrollt, wenn er nicht auf den Bildschirm passt. Die Einträge laufen von oben nach unten. Das ist deine Playlist; sie bestimmt nur deinen eigenen Kiosk. Mit „Kiosk-Vorschau“ unten siehst du, wie er läuft.",
+            ["kiosk.settings.refresh_interval_hint"] =
+                "Wie oft der Kiosk die angezeigte Folie auf Änderungen prüft (Sekunden, mindestens 2). Standard 10.",
+            ["kiosk.settings.tip"] =
+                "Mit automatischem Scrollen bleibt ein Eintrag sichtbar, bis er bis zum Ende gescrollt hat, auch wenn das länger dauert als seine Anzeigedauer. Ist er früher am Ende, scrollt er für den Rest seiner Zeit wieder nach oben.",
+            ["kiosk.settings.default_duration"] =
+                "Standarddauer für neue Einträge (Sekunden)",
+            ["kiosk.settings.default_duration_hint"] =
+                "Neue Einträge beginnen mit dieser Dauer (5–3600 Sekunden). Standard 30.",
+            ["kiosk.settings.scroll_speed"] =
+                "Scrollgeschwindigkeit",
+            ["kiosk.settings.scroll_speed_slow"] =
+                "Langsam",
+            ["kiosk.settings.scroll_speed_medium"] =
+                "Mittel",
+            ["kiosk.settings.scroll_speed_fast"] =
+                "Schnell",
+            ["kiosk.settings.scroll_speed_hint"] =
+                "Wie schnell sich Einträge mit automatischem Scrollen nach unten bewegen.",
+            ["kiosk.settings.col_type"] =
+                "Art",
+            ["kiosk.settings.col_item"] =
+                "Element",
+            ["kiosk.settings.col_duration"] =
+                "Dauer (Sekunden)",
+            ["kiosk.settings.col_scroll"] =
+                "Wenn es nicht passt",
+            ["kiosk.settings.scroll_none"] =
+                "Nicht scrollen",
+            ["kiosk.settings.scroll_auto"] =
+                "Automatisch scrollen",
+            ["kiosk.settings.show_comments"] =
+                "Kommentare zeigen",
+            ["kiosk.settings.board_view_board"] =
+                "Board",
+            ["kiosk.settings.board_view_list"] =
+                "Aufgabenliste",
+            ["kiosk.settings.type_none"] =
+                "Art wählen …",
+            ["kiosk.settings.type_board"] =
+                "Kanban-Board",
+            ["kiosk.settings.type_todo"] =
+                "Aufgabe",
+            ["kiosk.settings.type_project"] =
+                "Projekt",
+            ["kiosk.settings.type_calendar"] =
+                "Kalender",
+            ["kiosk.settings.type_event"] =
+                "Veranstaltung",
+            ["kiosk.settings.type_page"] =
+                "Seite",
+            ["kiosk.settings.type_announcement"] =
+                "Ankündigung",
+            ["kiosk.settings.type_community_post"] =
+                "Gemeinschaftsbeitrag",
+            ["kiosk.settings.type_group_post"] =
+                "Gruppenbeitrag",
+            ["kiosk.settings.item_placeholder"] =
+                "Suchen oder aus der Liste wählen",
+            ["kiosk.settings.item_searching"] =
+                "Suche …",
+            ["kiosk.settings.item_no_results"] =
+                "Nichts gefunden.",
+            ["kiosk.settings.item_error"] =
+                "Elemente konnten nicht geladen werden. Versuche es erneut.",
+            ["kiosk.settings.item_unavailable"] =
+                "Das gewählte Element ist nicht mehr verfügbar.",
+            ["kiosk.settings.add_entry"] =
+                "Eintrag hinzufügen",
+            ["kiosk.settings.move_up"] =
+                "Nach oben",
+            ["kiosk.settings.move_down"] =
+                "Nach unten",
+            ["kiosk.settings.remove_entry"] =
+                "Entfernen",
+            ["kiosk.settings.entry_heading"] =
+                "Eintrag {0}",
+            ["kiosk.settings.empty"] =
+                "Noch keine Einträge. Mit „Eintrag hinzufügen“ bringst du etwas auf deinen Kiosk.",
+            ["kiosk.settings.calendar_all"] =
+                "Alle Gemeinschaften",
             ["account.signup_bot_failed"] =
                 "Die Sicherheitsprüfung wurde nicht bestanden. Bitte versuche es erneut.",
             ["account.signup_domain_disallowed"] =
@@ -7937,6 +8067,14 @@ public static class KnownTranslationKeys
             ["projects.board.save"]          = "Enregistrer les modifications",
             ["projects.board.description_hint"] = "Une description optionnelle de ce que ce tableau suit. Un tableau est utilisable avec un titre seul.",
             ["projects.board.back"]          = "← Retour aux tableaux",
+            ["projects.board.view_switch"] =
+                "Vue du tableau",
+            ["projects.board.view_board"] =
+                "Tableau",
+            ["projects.board.view_list"] =
+                "Liste",
+            ["projects.board.list_empty_lane"] =
+                "Aucune carte dans cette colonne.",
             ["projects.board.untitled"]      = "Tableau sans titre",
             ["projects.board.delete"]        = "Supprimer le tableau",
             ["projects.board.create"]        = "Créer le tableau",
@@ -8326,10 +8464,16 @@ public static class KnownTranslationKeys
             ["inventory.flash_item_deleted"] = "Objet supprimé.",
             ["inventory.flash_checked_out"] = "Objet emprunté.",
             ["inventory.flash_checked_in"] = "Objet rendu.",
-            ["kiosk.flash_view_interval"] = "L’intervalle d’affichage doit être d’au moins 5 secondes.",
-            ["kiosk.flash_refresh_interval"] = "L’intervalle d’actualisation doit être d’au moins 2 secondes et inférieur à l’intervalle d’affichage.",
             ["kiosk.flash_store_unavailable"] = "Le stockage de documents est indisponible.",
             ["kiosk.flash_saved"] = "La liste de lecture du kiosque a été enregistrée.",
+            ["kiosk.flash_refresh_interval"] =
+                "L’intervalle d’actualisation doit être d’au moins 2 secondes.",
+            ["kiosk.flash_default_duration"] =
+                "La durée par défaut doit être comprise entre 5 et 3600 secondes.",
+            ["kiosk.flash_entry_item"] =
+                "Choisissez un élément pour chaque entrée, ou retirez l’entrée.",
+            ["kiosk.flash_entry_duration"] =
+                "Chaque entrée doit être affichée entre 5 et 3600 secondes.",
             ["languages.flash_added"] = "Langue « {0} » ({1}) ajoutée.",
             ["languages.flash_enabled"] = "Langue « {0} » activée.",
             ["languages.flash_disabled"] = "Langue « {0} » désactivée.",
@@ -11197,7 +11341,6 @@ public static class KnownTranslationKeys
             ["kiosk.next_slide"]             = "Vue suivante",
             ["kiosk.refreshed"]              = "Mis à jour à l'instant",
             ["kiosk.settings.title"]         = "Affichage du kiosque",
-            ["kiosk.settings.view_interval"] = "Changer de vue toutes les (secondes)",
             ["kiosk.settings.refresh_interval"] = "Actualiser le contenu toutes les (secondes)",
             ["kiosk.settings.display_mode"] = "Mode d'affichage",
             ["kiosk.settings.display_mode.full_page"] = "Page entière (remplir la fenêtre du navigateur)",
@@ -11205,54 +11348,106 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.hint"] = "Page entière remplit votre fenêtre de navigateur ; plein écran masque aussi les onglets et la barre d'adresse du navigateur (une action de l'utilisateur est nécessaire pour l'activer).",
             ["kiosk.settings.page_title"] =
                 "Paramètres du kiosque",
-            ["kiosk.settings.intro"] =
-                "Configurez l’affichage de votre kiosque : la liste ordonnée des vues qu’il fait défiler (de haut en bas) et les deux cadences de défilement et d’actualisation automatiques. C’est votre propre liste de lecture — elle ne façonne que ce que votre kiosque affiche. Pour ajouter une diapositive, choisissez une vue dans un emplacement vide. Pour en retirer une, mettez sa vue sur — et enregistrez. Pour réordonner, déplacez une diapositive vers un autre emplacement. Utilisez ensuite « Aperçu du kiosque » ci-dessous (connecté en tant que vous) pour la voir tourner.",
             ["kiosk.settings.display_heading"] =
                 "Affichage",
-            ["kiosk.settings.view_interval_hint"] =
-                "Cadence de changement de diapositive (secondes, ≥ 5). Par défaut 30.",
-            ["kiosk.settings.refresh_interval_hint"] =
-                "Cadence d’actualisation du contenu (secondes, ≥ 2 et inférieure à l’intervalle de vue). Par défaut 10.",
             ["kiosk.settings.playlist_heading"] =
                 "Liste de lecture (de haut en bas)",
             ["kiosk.settings.col_view"] =
                 "Vue",
-            ["kiosk.settings.col_community"] =
-                "Communauté",
             ["kiosk.settings.col_label"] =
                 "Libellé (facultatif)",
-            ["kiosk.settings.kind_none"] =
-                "— (aucune)",
-            ["kiosk.settings.kind_board"] =
-                "Tableau",
-            ["kiosk.settings.kind_calendar"] =
-                "Calendrier",
-            ["kiosk.settings.kind_todos"] =
-                "Tâches",
             ["kiosk.settings.cal_day"] =
                 "Jour",
             ["kiosk.settings.cal_week"] =
                 "Semaine",
             ["kiosk.settings.cal_month"] =
                 "Mois",
-            ["kiosk.settings.community_placeholder"] =
-                "(vide = toutes)",
-            ["kiosk.settings.aria_slide_view"] =
-                "Diapositive {0} vue",
-            ["kiosk.settings.aria_slide_board"] =
-                "Diapositive {0} tableau",
-            ["kiosk.settings.aria_slide_calendar"] =
-                "Diapositive {0} vue calendrier",
-            ["kiosk.settings.aria_slide_community"] =
-                "Diapositive {0} communauté",
-            ["kiosk.settings.aria_slide_label"] =
-                "Diapositive {0} libellé",
-            ["kiosk.settings.tip"] =
-                "Astuce : seule la colonne « Vue » détermine laquelle des autres colonnes une diapositive utilise — les autres sont ignorées pour cette diapositive. Une ligne réglée sur — est omise du cycle.",
             ["kiosk.settings.save"] =
                 "Enregistrer la liste",
             ["kiosk.settings.preview"] =
                 "Aperçu du kiosque",
+            ["kiosk.settings.intro"] =
+                "Choisissez ce que votre affichage kiosque montre. Ajoutez une entrée, choisissez son type et l’élément, puis indiquez combien de temps elle reste à l’écran et si elle défile lorsqu’elle ne tient pas. Les entrées s’affichent de haut en bas. C’est votre liste ; elle ne concerne que votre propre kiosque. Utilisez ensuite « Aperçu du kiosque » ci-dessous pour le voir fonctionner.",
+            ["kiosk.settings.refresh_interval_hint"] =
+                "Fréquence à laquelle le kiosque vérifie si la diapositive affichée a changé (secondes, au moins 2). Par défaut 10.",
+            ["kiosk.settings.tip"] =
+                "Avec le défilement automatique, une entrée reste à l’écran jusqu’à ce qu’elle ait défilé jusqu’en bas, même si cela prend plus de temps que sa durée. Si elle arrive en bas plus tôt, elle remonte en haut pour le reste de son temps.",
+            ["kiosk.settings.default_duration"] =
+                "Durée par défaut des nouvelles entrées (secondes)",
+            ["kiosk.settings.default_duration_hint"] =
+                "Les nouvelles entrées commencent avec cette durée (5 à 3600 secondes). Par défaut 30.",
+            ["kiosk.settings.scroll_speed"] =
+                "Vitesse de défilement",
+            ["kiosk.settings.scroll_speed_slow"] =
+                "Lente",
+            ["kiosk.settings.scroll_speed_medium"] =
+                "Moyenne",
+            ["kiosk.settings.scroll_speed_fast"] =
+                "Rapide",
+            ["kiosk.settings.scroll_speed_hint"] =
+                "Vitesse à laquelle les entrées en défilement automatique descendent dans la page.",
+            ["kiosk.settings.col_type"] =
+                "Type",
+            ["kiosk.settings.col_item"] =
+                "Élément",
+            ["kiosk.settings.col_duration"] =
+                "Durée (secondes)",
+            ["kiosk.settings.col_scroll"] =
+                "Si cela ne tient pas",
+            ["kiosk.settings.scroll_none"] =
+                "Pas de défilement",
+            ["kiosk.settings.scroll_auto"] =
+                "Défiler automatiquement",
+            ["kiosk.settings.show_comments"] =
+                "Afficher les commentaires",
+            ["kiosk.settings.board_view_board"] =
+                "Tableau",
+            ["kiosk.settings.board_view_list"] =
+                "Liste des tâches",
+            ["kiosk.settings.type_none"] =
+                "Choisir un type…",
+            ["kiosk.settings.type_board"] =
+                "Tableau kanban",
+            ["kiosk.settings.type_todo"] =
+                "Tâche",
+            ["kiosk.settings.type_project"] =
+                "Projet",
+            ["kiosk.settings.type_calendar"] =
+                "Calendrier",
+            ["kiosk.settings.type_event"] =
+                "Événement",
+            ["kiosk.settings.type_page"] =
+                "Page",
+            ["kiosk.settings.type_announcement"] =
+                "Annonce",
+            ["kiosk.settings.type_community_post"] =
+                "Publication de la communauté",
+            ["kiosk.settings.type_group_post"] =
+                "Publication de groupe",
+            ["kiosk.settings.item_placeholder"] =
+                "Rechercher ou choisir dans la liste",
+            ["kiosk.settings.item_searching"] =
+                "Recherche…",
+            ["kiosk.settings.item_no_results"] =
+                "Aucun résultat.",
+            ["kiosk.settings.item_error"] =
+                "Impossible de charger les éléments. Réessayez.",
+            ["kiosk.settings.item_unavailable"] =
+                "L’élément choisi n’est plus disponible.",
+            ["kiosk.settings.add_entry"] =
+                "Ajouter une entrée",
+            ["kiosk.settings.move_up"] =
+                "Monter",
+            ["kiosk.settings.move_down"] =
+                "Descendre",
+            ["kiosk.settings.remove_entry"] =
+                "Retirer",
+            ["kiosk.settings.entry_heading"] =
+                "Entrée {0}",
+            ["kiosk.settings.empty"] =
+                "Aucune entrée pour l’instant. Utilisez « Ajouter une entrée » pour mettre quelque chose sur votre kiosque.",
+            ["kiosk.settings.calendar_all"] =
+                "Toutes les communautés",
             ["account.signup_bot_failed"] =
                 "La vérification de sécurité a échoué. Veuillez réessayer.",
             ["account.signup_domain_disallowed"] =
@@ -11580,6 +11775,14 @@ public static class KnownTranslationKeys
             ["projects.board.save"]          = "Gem ændringer",
             ["projects.board.description_hint"] = "En valgfri beskrivelse af, hvad brættet følger. Et bræt kan bruges kun med et navn.",
             ["projects.board.back"]          = "← Tilbage til brætter",
+            ["projects.board.view_switch"] =
+                "Tavlevisning",
+            ["projects.board.view_board"] =
+                "Tavle",
+            ["projects.board.view_list"] =
+                "Liste",
+            ["projects.board.list_empty_lane"] =
+                "Ingen kort i denne kolonne.",
             ["projects.board.untitled"]      = "Bræt uden navn",
             ["projects.board.delete"]        = "Slet bræt",
             ["projects.board.create"]        = "Opret bræt",
@@ -11967,10 +12170,16 @@ public static class KnownTranslationKeys
             ["inventory.flash_item_deleted"] = "Genstand slettet.",
             ["inventory.flash_checked_out"] = "Genstand udlånt.",
             ["inventory.flash_checked_in"] = "Genstand afleveret.",
-            ["kiosk.flash_view_interval"] = "Visningsintervallet skal være mindst 5 sekunder.",
-            ["kiosk.flash_refresh_interval"] = "Opdateringsintervallet skal være mindst 2 sekunder og mindre end visningsintervallet.",
             ["kiosk.flash_store_unavailable"] = "Dokumentlageret er ikke tilgængeligt.",
             ["kiosk.flash_saved"] = "Kioskens afspilningsliste er gemt.",
+            ["kiosk.flash_refresh_interval"] =
+                "Opdateringsintervallet skal være mindst 2 sekunder.",
+            ["kiosk.flash_default_duration"] =
+                "Standardvarigheden skal være mellem 5 og 3600 sekunder.",
+            ["kiosk.flash_entry_item"] =
+                "Vælg et element for hvert punkt, eller fjern punktet.",
+            ["kiosk.flash_entry_duration"] =
+                "Hvert punkt skal vises i mellem 5 og 3600 sekunder.",
             ["languages.flash_added"] = "Sproget “{0}” ({1}) er tilføjet.",
             ["languages.flash_enabled"] = "Sproget “{0}” er aktiveret.",
             ["languages.flash_disabled"] = "Sproget “{0}” er deaktiveret.",
@@ -14812,7 +15021,6 @@ public static class KnownTranslationKeys
             ["kiosk.next_slide"]             = "Næste visning",
             ["kiosk.refreshed"]              = "Opdateret lige nu",
             ["kiosk.settings.title"]         = "Kiosk-display",
-            ["kiosk.settings.view_interval"] = "Skift visning hver (sekunder)",
             ["kiosk.settings.refresh_interval"] = "Opdater indhold hver (sekunder)",
             ["kiosk.settings.display_mode"] = "Visningstilstand",
             ["kiosk.settings.display_mode.full_page"] = "Hele siden (fyld browservinduet)",
@@ -14820,54 +15028,106 @@ public static class KnownTranslationKeys
             ["kiosk.settings.display_mode.hint"] = "Hele siden fylder dit browservindue; fuldskærm skjuler også browserens faner og adressefelt (det kræver en brugerhandling at aktivere).",
             ["kiosk.settings.page_title"] =
                 "Kiosk-indstillinger",
-            ["kiosk.settings.intro"] =
-                "Indstil din kiosk-visning: den ordnede liste over visninger, den skifter mellem (oppefra og ned), og de to takter for automatisk skift og opdatering. Det er din egen afspilningsliste — den former kun, hvad din egen kiosk viser. For at tilføje et slide skal du vælge en visning i en tom plads. For at fjerne et skal du sætte dets visning til — og gemme. For at omarrangere skal du flytte et slide til en anden plads. Brug derefter “Forhåndsvis kiosken” nedenfor (logget ind som dig) for at se den køre.",
             ["kiosk.settings.display_heading"] =
                 "Visning",
-            ["kiosk.settings.view_interval_hint"] =
-                "Takt for skift af slide (sekunder, ≥ 5). Standard 30.",
-            ["kiosk.settings.refresh_interval_hint"] =
-                "Takt for opdatering af indhold (sekunder, ≥ 2 og mindre end visningsintervallet). Standard 10.",
             ["kiosk.settings.playlist_heading"] =
                 "Afspilningsliste (oppefra og ned)",
             ["kiosk.settings.col_view"] =
                 "Visning",
-            ["kiosk.settings.col_community"] =
-                "Fællesskab",
             ["kiosk.settings.col_label"] =
                 "Etiket (valgfri)",
-            ["kiosk.settings.kind_none"] =
-                "— (ingen)",
-            ["kiosk.settings.kind_board"] =
-                "Tavle",
-            ["kiosk.settings.kind_calendar"] =
-                "Kalender",
-            ["kiosk.settings.kind_todos"] =
-                "Opgaver",
             ["kiosk.settings.cal_day"] =
                 "Dag",
             ["kiosk.settings.cal_week"] =
                 "Uge",
             ["kiosk.settings.cal_month"] =
                 "Måned",
-            ["kiosk.settings.community_placeholder"] =
-                "(tom = alle)",
-            ["kiosk.settings.aria_slide_view"] =
-                "Slide {0} visning",
-            ["kiosk.settings.aria_slide_board"] =
-                "Slide {0} tavle",
-            ["kiosk.settings.aria_slide_calendar"] =
-                "Slide {0} kalendervisning",
-            ["kiosk.settings.aria_slide_community"] =
-                "Slide {0} fællesskab",
-            ["kiosk.settings.aria_slide_label"] =
-                "Slide {0} etiket",
-            ["kiosk.settings.tip"] =
-                "Tip: Kun kolonnen “Visning” afgør, hvilke af de andre kolonner et slide bruger — de øvrige ignoreres for det slide. En række sat til — springes over i cyklussen.",
             ["kiosk.settings.save"] =
                 "Gem afspilningsliste",
             ["kiosk.settings.preview"] =
                 "Forhåndsvis kiosken",
+            ["kiosk.settings.intro"] =
+                "Vælg, hvad din kioskvisning viser. Tilføj et punkt, vælg dets type og elementet, og angiv, hvor længe det vises, og om det ruller, når det ikke kan være på skærmen. Punkterne afspilles fra top til bund. Det er din afspilningsliste; den bestemmer kun din egen kiosk. Brug derefter „Forhåndsvis kiosken“ nedenfor for at se den køre.",
+            ["kiosk.settings.refresh_interval_hint"] =
+                "Hvor ofte kiosken tjekker det viste dias for ændringer (sekunder, mindst 2). Standard 10.",
+            ["kiosk.settings.tip"] =
+                "Med automatisk rulning bliver et punkt på skærmen, til det har rullet helt ned, også selv om det tager længere end dets visningstid. Når det bunden før, ruller det tilbage til toppen resten af tiden.",
+            ["kiosk.settings.default_duration"] =
+                "Standardvarighed for nye punkter (sekunder)",
+            ["kiosk.settings.default_duration_hint"] =
+                "Nye punkter starter med denne varighed (5–3600 sekunder). Standard 30.",
+            ["kiosk.settings.scroll_speed"] =
+                "Rullehastighed",
+            ["kiosk.settings.scroll_speed_slow"] =
+                "Langsom",
+            ["kiosk.settings.scroll_speed_medium"] =
+                "Mellem",
+            ["kiosk.settings.scroll_speed_fast"] =
+                "Hurtig",
+            ["kiosk.settings.scroll_speed_hint"] =
+                "Hvor hurtigt punkter med automatisk rulning bevæger sig ned ad siden.",
+            ["kiosk.settings.col_type"] =
+                "Type",
+            ["kiosk.settings.col_item"] =
+                "Element",
+            ["kiosk.settings.col_duration"] =
+                "Varighed (sekunder)",
+            ["kiosk.settings.col_scroll"] =
+                "Hvis det ikke kan være der",
+            ["kiosk.settings.scroll_none"] =
+                "Ingen rulning",
+            ["kiosk.settings.scroll_auto"] =
+                "Rul automatisk",
+            ["kiosk.settings.show_comments"] =
+                "Vis kommentarer",
+            ["kiosk.settings.board_view_board"] =
+                "Tavle",
+            ["kiosk.settings.board_view_list"] =
+                "Liste over opgaver",
+            ["kiosk.settings.type_none"] =
+                "Vælg en type …",
+            ["kiosk.settings.type_board"] =
+                "Kanban-tavle",
+            ["kiosk.settings.type_todo"] =
+                "Opgave",
+            ["kiosk.settings.type_project"] =
+                "Projekt",
+            ["kiosk.settings.type_calendar"] =
+                "Kalender",
+            ["kiosk.settings.type_event"] =
+                "Begivenhed",
+            ["kiosk.settings.type_page"] =
+                "Side",
+            ["kiosk.settings.type_announcement"] =
+                "Meddelelse",
+            ["kiosk.settings.type_community_post"] =
+                "Opslag i fællesskabet",
+            ["kiosk.settings.type_group_post"] =
+                "Gruppeopslag",
+            ["kiosk.settings.item_placeholder"] =
+                "Søg, eller vælg fra listen",
+            ["kiosk.settings.item_searching"] =
+                "Søger …",
+            ["kiosk.settings.item_no_results"] =
+                "Intet fundet.",
+            ["kiosk.settings.item_error"] =
+                "Elementerne kunne ikke indlæses. Prøv igen.",
+            ["kiosk.settings.item_unavailable"] =
+                "Det valgte element er ikke længere tilgængeligt.",
+            ["kiosk.settings.add_entry"] =
+                "Tilføj punkt",
+            ["kiosk.settings.move_up"] =
+                "Flyt op",
+            ["kiosk.settings.move_down"] =
+                "Flyt ned",
+            ["kiosk.settings.remove_entry"] =
+                "Fjern",
+            ["kiosk.settings.entry_heading"] =
+                "Punkt {0}",
+            ["kiosk.settings.empty"] =
+                "Ingen punkter endnu. Brug „Tilføj punkt“ for at sætte noget på din kiosk.",
+            ["kiosk.settings.calendar_all"] =
+                "Alle fællesskaber",
             ["account.signup_bot_failed"] =
                 "Sikkerhedstjekket blev ikke bestået. Prøv igen.",
             ["account.signup_domain_disallowed"] =

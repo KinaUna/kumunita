@@ -80,6 +80,28 @@ jobs:
         run: dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
 
   # ---------------------------------------------------------------------------
+  # IMPROVE-DOCS D14 — the docs gate (front-matter, abstract, ADR cap, broken
+  # links, living orphans, archive frozen). Baselines retired, not grandfathered.
+  #
+  # A separate job (not a step in `test`): the docs gate reads the repo's
+  # Markdown layer and exits 0/1 — it has no .NET build, no Docker, and no
+  # test discovery. It is the CI-able close gate for the IMPROVE-DOCS lane;
+  # the human-facing report is `docs-report.ps1` (same scope, never exits
+  # non-zero).
+  #
+  # ubuntu-latest runners ship PowerShell 7 (`pwsh`) pre-installed, so no
+  # setup step is needed.
+  # ---------------------------------------------------------------------------
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Run docs gate
+        run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/docs-check.ps1
+
+  # ---------------------------------------------------------------------------
   # F19.U4 — the E2E job (TEST-03, `code`).
   #
   # This job is ADDED by F19.U4 on top of F14.U2's landed "test" job; the two

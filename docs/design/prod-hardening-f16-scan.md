@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f16-scan
+title: "F16 — scan uploads before serving (UPL-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F16 — UPL-02: scan uploads before serving — **Part-0 design pin**
+
+> **Abstract:** the **F16 upload scan** design pin (Part-0, design-only) — **scan uploads before serving**: the repo today serves media with `Content-Disposition: attachment` + `nosniff` as its **only** anti-malware mitigation (the browser-side control). F16 adds the **content-side** control: one small `IVirusScanner` Core seam + one `MediaObject.Quarantined` bool + one gate at the serve lane (a 404 refusal). The scanner is **ClamAV via the store** (a local daemon, not a third-party provider). Closes 2026-10-22 UPL-02. **Who is it for:** a developer executing F16 U2–U3; an agent that needs the `IVirusScanner` seam + the serve-lane gate. **When to read the rest:** before touching the `IVirusScanner` seam, the quarantine flag, or the F16 tests.
+
 
 **Lane:** prod-hardening (in-progress). **Fix F16** = the `code+ops` fix for
 the 2026-10-22 audit row **UPL-02** ("no scan step; files served
@@ -9,7 +24,7 @@ code, no build, no package, no migration in U1.
 
 **The one thing to internalize:** F16 is **not** a new feature and **not** a
 new bounded context. It adds **one small Core seam** (`IVirusScanner`,
-HTTP-free, ADR 0006-D) + **one bool on an existing doc** (`MediaObject.Quarantined`)
+HTTP-free, ADR [0006](../adr/0006-module-boundary-contracts.md)-D) + **one bool on an existing doc** (`MediaObject.Quarantined`)
 + **one gate at the serve lane** (a 404 refusal, the same posture the serve
 lane already uses for a store miss and a `Deny`). The repo today serves media
 with `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff` as
@@ -19,7 +34,7 @@ scanner flags. The scanner is **ClamAV via the store** — a local daemon, not a
 third-party HTTP provider, because (a) the deployment is self-hosted/T1 and
 ClamAV is the tool the audit already assumes (the owner-ops item is "run
 ClamAV on the prod volume"), and (b) a provider would need an HTTP client in
-Core, which violates ADR 0006-D (Core stays HTTP-free).
+Core, which violates ADR [0006](../adr/0006-module-boundary-contracts.md)-D (Core stays HTTP-free).
 
 ---
 
@@ -43,7 +58,7 @@ do today.
   doc type, **not** a new bounded context, and **not** a change to the
   `MediaDocTypes` *registration* (the surface stays `opts.Schema.For<MediaObject>()`;
   the POCO gains a property, Marten applies the new column idempotently at
-  boot — ADR 0004 §B).
+  boot — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B).
 - F16 does **not** change the serve headers (the `attachment` + `nosniff`
   mitigation stays), the allowlist gates, the quota gate (M24), or the F15
   lifecycle sweep.
@@ -56,14 +71,14 @@ do today.
 HTTP provider.**
 
 **Why (recorded, not guessed):**
-- **Self-hosted / T1 topology (ADR 0002)** — the deployment is one community's
+- **Self-hosted / T1 topology (ADR [0002](../adr/0002-deployment-topology.md))** — the deployment is one community's
   own container + Postgres; a local `clamd` daemon on the volume is the
   natural fit, and it carries **no external dependency** (no API key, no
   network egress, no PII leaving the box — the privacy-first model in
-  `SECURITY.md` is preserved). A provider API would send the community's
+  [`SECURITY.md`](../../SECURITY.md) is preserved). A provider API would send the community's
   uploaded bytes to a third party, which the repo's privacy stance does not
   assume.
-- **ADR 0006-D — Core stays HTTP-free** — a provider client would need an HTTP
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-D — Core stays HTTP-free** — a provider client would need an HTTP
   call *in* `Kumunita.Core` (where the scanner seam lives). ClamAV-via-daemon
   is a **local process/socket** call; the seam stays a pure
   "bytes in → verdict out" contract with no `HttpClient` (the `IMediaFileStore`
@@ -191,7 +206,7 @@ carries (C-MED·4, `MediaObject.cs:7`) — the quarantine state **must** survive
 restore, so it lives **on** the catalog doc, not in a separate store. A bool is
 the minimum state the pinned test needs (`Infected → 404`), and it is the
 smallest possible change to a frozen doc (a new property, Marten applies the
-column idempotently at boot — ADR 0004 §B; the `MediaDocTypes.Configure`
+column idempotently at boot — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B; the `MediaDocTypes.Configure`
 registration `opts.Schema.For<MediaObject>()` is **unchanged**,
 `src/Kumunita.Core/MediaDocTypes.cs:23`).
 
@@ -271,7 +286,7 @@ if (verdict is VirusScanStatus.Infected)
 > before the `CanAsync` decision). Placing it after the decision would let a
 > *denied* caller and an *infected* caller be indistinguishable only by luck, and
 > would burn an audit row for what is really a store refusal. **One commit,
-> one flag write** (C3 single-write-lane, ADR 0006 — the F15 §5
+> one flag write** (C3 single-write-lane, ADR [0006](../adr/0006-module-boundary-contracts.md) — the F15 §5
 > "catalog-row commits first" shape).
 >
 > **The scanner + the gate touch only `src/Kumunita.Core/**` (the seam + the
@@ -400,7 +415,7 @@ It drives the **serve lane** (§4/§5) with a **stub scanner** and asserts the
 
 ## 7. Invariants held by F16 (re-stated for U2/U3)
 
-- **Core stays HTTP-free (ADR 0006-D)** — `IVirusScanner` is a pure
+- **Core stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D)** — `IVirusScanner` is a pure
   "bytes in → verdict out" contract with **no** `HttpClient`, **no** Web types;
   the default impl drives a **local** ClamAV daemon (a process/socket), not an
   HTTP provider (the `ISmtpSender` "Core I/O-seam / Web transport" split — the
@@ -412,10 +427,10 @@ It drives the **serve lane** (§4/§5) with a **stub scanner** and asserts the
 - **No new bounded context / no new doc type** — F16 adds **one bool** to the
   existing `MediaObject` (the `MediaDocTypes` registration
   `opts.Schema.For<MediaObject>()` is **unchanged**; Marten applies the new
-  column idempotently at boot — ADR 0004 §B) + **one new seam**
+  column idempotently at boot — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B) + **one new seam**
   (`IVirusScanner`) + **three one-line gates**. No `MediaDocTypes` surface
   change, no new `*DocTypes` class.
-- **C3 single-write-lane / one-commit (ADR 0006)** — the flag-write is **one**
+- **C3 single-write-lane / one-commit (ADR [0006](../adr/0006-module-boundary-contracts.md))** — the flag-write is **one**
   `SaveChangesAsync` in the serve lane (the F15 §5 / F1.U4 single-commit shape);
   a re-serve short-circuits **before** any write (idempotent, §3).
 - **The no-leak 404 posture** — a quarantine refusal is **404, not 403**, zero
@@ -472,7 +487,7 @@ It drives the **serve lane** (§4/§5) with a **stub scanner** and asserts the
 ## 9. Exit contract for U1 (this unit)
 
 - **Landed:** this one file
-  (`docs/design/prod-hardening-f16-scan.md`). **No code, no build, no package,
+  ([`docs/design/prod-hardening-f16-scan.md`](prod-hardening-f16-scan.md)). **No code, no build, no package,
   no migration, no `src/**` change.**
 - **Internally consistent:** the scanner choice + seam shape + the
   fail-open/fail-closed default pinned against the repo precedent (§2, §2.1);

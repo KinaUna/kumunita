@@ -1812,6 +1812,47 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Null(danglingVm.ProjectTitle);
     }
 
+    // ── ADR 0285 D6 — the board list view ────────────────────────────────
+
+    /// <summary>
+    /// <c>GET /projects/boards/{id}?view=list</c> sets the list view on the
+    /// view model (the same lanes + cards); any other value — or none — is the
+    /// board view. A display selector only: the same single
+    /// <c>GetBoardAsync</c> read runs either way.
+    /// </summary>
+    [Theory]
+    [InlineData("list", true)]
+    [InlineData(" LIST ", true)]
+    [InlineData(null, false)]
+    [InlineData("board", false)]
+    [InlineData("grid", false)]
+    public async Task Board_ViewList_SetsListView(string? view, bool expected)
+    {
+        const string actor = "subj-285-list";
+        const string boardId = "board-285-list";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+            .Returns(new BoardDetailResult
+            {
+                Board = new KanbanBoard
+                {
+                    Id = boardId, Title = "List board", AuthorId = actor,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                },
+                Lanes = [],
+            });
+        projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+            .Returns(new ProjectPage([], false));
+
+        var controller = Build(projects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var result = await controller.BoardDetail(boardId, view);
+
+        var vm = Assert.IsType<BoardDetailViewModel>(Assert.IsType<ViewResult>(result).ViewData.Model);
+        Assert.Equal(expected, vm.ListView);
+        await projects.Received(1).GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>());
+    }
+
     // ── PL delete lanes (U09 — ADR 0086 / the design doc §9.6 Web names) ─────
 
     /// <summary>

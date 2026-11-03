@@ -1,15 +1,32 @@
+---
+id: design-m4-events
+title: "M4 — Events, RSVPs & reminders"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0054-events-rsvp-reminders.md
+  - docs/adr/0037-draft-mode-author-only.md
+  - docs/adr/0024-author-soft-delete-lane.md
+updated: 2026-11-02
+---
+
 # M4 — Events, RSVPs & reminders — design
 
+> **Abstract:** the **M4 events** design — the first **content-with-time** milestone: a new bounded context (`Kumunita.Core.Events`) with `Event` + `EventRsvp`, the `IEventService` seam, the `EventToAuditableResource` adapter, the `EventController` + views, and the **`EventReminders` scheduled job** (day-before reminders). The **feed** (the neighborhood's upcoming events), **RSVPs** (attending / not / maybe), and **reminders** in one. **Who is it for:** a developer touching the `IEventService` read seams or the RSVP lane; an agent that needs the `Event` / `EventRsvp` field shapes. **When to read the rest:** before touching the events context, the RSVP seam, the reminder job, or the calendar / ICS surfaces that build on M4.
+
+
 > **Milestone.** `M4` — the **coordination** arrow (the `M0`–`M6` roadmap
-> letters stay fixed: M5 stays Projects, M6 stays Portability). **ADR 0054**
+> letters stay fixed: M5 stays Projects, M6 stays Portability). **ADR [0054](../adr/0054-events-rsvp-reminders.md)**
 > (the next number after 0053) is this milestone's decision record. This file
 > is the **primary reference tier** (the exact seams every unit codes
 > against); the sealed-unit register is
-> `docs/plans-milestones/done/m4/plan-m4.md`; the scratch log is
-> `docs/plans-milestones/done/m4/m4-handoff-notes.md`.
+> [`docs/archive/lanes/m4/plan-m4.md`](../archive/lanes/m4/plan-m4.md); the scratch log is
+> [`docs/archive/lanes/m4/m4-handoff-notes.md`](../archive/lanes/m4/m4-handoff-notes.md).
 >
-> **Status.** Accepted (ADR 0054, 2026-09-20). All decisions marked
-> **[DECIDED]** are locked in ADR 0054; the ADR is the authoritative record,
+> **Status.** Accepted (ADR [0054](../adr/0054-events-rsvp-reminders.md), 2026-09-20). All decisions marked
+> **[DECIDED]** are locked in ADR [0054](../adr/0054-events-rsvp-reminders.md); the ADR is the authoritative record,
 > this doc is the primary reference tier for implementation.
 
 ## 1. What this milestone is
@@ -18,9 +35,9 @@ The first **content-with-time** milestone: a new bounded context
 `Kumunita.Core.Events` with two documents (`Event` + `EventRsvp`), one new
 document surface (`EventDocTypes`), one new service seam (`IEventService`), one
 new adapter (`EventToAuditableResource`), one new Web surface
-(`EventController` + views + the nav entry), and **one new §6.4 scheduled
+(`EventController` + views + the nav entry), and **one new [CQRS-lite §6.4 scheduled](../architecture/cqrs-lite-wolverine.md)
 job** (`EventReminders` — the second of the three jobs named in
-`docs/ARCHITECTURE.md` §6.4, alongside the shipped `AuditPurge` and the
+the [scheduled jobs](../architecture/cqrs-lite-wolverine.md), alongside the shipped `AuditPurge` and the
 deferred `VerifyDigest`):
 
 - **The feed** — a resident sees the neighborhood's upcoming events
@@ -30,23 +47,23 @@ deferred `VerifyDigest`):
   Maybe / No), the RSVP list visible to the author.
 - **The composer** — title, body (WYSIWYG, the *one* `bindRichEditor`),
   component picker, the `AudienceEditorModel` verbatim, language picker
-  (ADR 0018), `Start`/`End` datetime pickers, `Location`, `Capacity`,
+  (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)), `Start`/`End` datetime pickers, `Location`, `Capacity`,
   `ReminderEnabled` — plus the RC content-image + ATT attachment lanes.
 - **The standing lanes** — author-only edit, GlobalAdmin override
-  (the ADR 0014 / 0016 / 0017 precedent); publish author-only (ADR 0037);
-  soft-delete author lane (ADR 0024); the draft lane (`/my/drafts`, ADR 0037).
+  (the ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 / 0017 precedent); publish author-only (ADR [0037](../adr/0037-draft-mode-author-only.md));
+  soft-delete author lane (ADR [0024](../adr/0024-author-soft-delete-lane.md)); the draft lane (`/my/drafts`, ADR [0037](../adr/0037-draft-mode-author-only.md)).
 - **The reminder job** — the day before an event, every `Going` RSVP recipient
   (and the author, always) gets one email through the frozen
   `IMailerStage` + `OutboxEmail` + durable-handler trio.
 
 **The one thing every unit must respect:** this milestone is **additive and
-reusing.** It reuses the `Audience` doc (ADR 0001-B / 0036 — *reused*, not
+reusing.** It reuses the `Audience` doc (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036 — *reused*, not
 extended), the `IAuthorizationService.CanAsync(Read)` decision path (ADR
 0006) through an `EventToAuditableResource` adapter (the
 `PostToAuditableResource` shape verbatim, `TargetKind = "event"`), the
-`MarkdownRenderer` + `bindRichEditor` authoring surface (ADR 0025 / 0031),
-the content-image / attachment idiom (ADR 0025 / 0034), the `kw-dt` TagHelper
-(ADR 0019 / 0020), the `IMailerStage` + `OutboxEmail` seam (M1 step 7), and
+`MarkdownRenderer` + `bindRichEditor` authoring surface (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / 0031),
+the content-image / attachment idiom (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / 0034), the `kw-dt` TagHelper
+(ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020), the `IMailerStage` + `OutboxEmail` seam (M1 step 7), and
 the self-rescheduling `TimeoutMessage` job shape (the `AuditPurgeHandler`
 precedent). **No new `AccessAction`**, **no new `AccessVia` value**, **no new
 authorization path**, **no editor dependency**, **no new timezone or format
@@ -61,18 +78,18 @@ Read directly, not assumed:
    milestone mirrors verbatim (the 6-member surface in
    `Authorization/AccessAction.cs`: `Id` / `Name` / `OwnerId` / `Audience` /
    `ComponentId` / `TargetKind`); the `Name = Title ?? Body[..60]`
-   truncation idiom; the audience written verbatim (ADR 0001-B).
+   truncation idiom; the audience written verbatim (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B).
 2. **`Announcement` + `AnnouncementService`** (M3b) — the
-   **author-of-record ∪ GlobalAdmin** standing matrix (ADR 0017), the
+   **author-of-record ∪ GlobalAdmin** standing matrix (ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md)), the
    `CreateAsync` C3 pattern (standing re-checked server-side, the Web
    `[Authorize]` is a convenience pre-gate only), the 404-vs-403 split
    (`KeyNotFoundException` / `UnauthorizedAccessException`), the draft
-   pin (ADR 0037), and the soft-delete flag shape (ADR 0024).
+   pin (ADR [0037](../adr/0037-draft-mode-author-only.md)), and the soft-delete flag shape (ADR [0024](../adr/0024-author-soft-delete-lane.md)).
 3. **`Audience`** (`Authorization/Audience.cs`) — `Mode` + `Grants` + the
-   ADR 0036 `Community` branch; **`null` = public** (the frozen `Decide()`
+   ADR [0036](../adr/0036-community-visible-audience-default.md) `Community` branch; **`null` = public** (the frozen `Decide()`
    branch 5). The `AudienceEditorModel` + `BuildAudience()` single-source
    form surface (M2, reused by every composer).
-4. **`MarkdownRenderer` + `bindRichEditor`** (RC / RE, ADR 0025 / 0031 /
+4. **`MarkdownRenderer` + `bindRichEditor`** (RC / RE, ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / 0031 /
    0033) — the one renderer on the read path, the one editor on the write
    path; the RC content-image (`![alt](/content-image/{id})`) + ATT
    attachment (`[label](/attachment/{id})`) body idioms, the
@@ -82,7 +99,7 @@ Read directly, not assumed:
    subject, body, ct)` stores the `OutboxEmail` row in the caller's session
    and enqueues the durable envelope in the same transaction; the durable
    handler dispatches over SMTP on commit, retries, then dead-letters
-   (`EmailDeadLetter`, ARCHITECTURE.md §6.2).
+   (`EmailDeadLetter`, see [CQRS-lite & side effects — durable email handler](../architecture/cqrs-lite-wolverine.md)).
 6. **`AuditPurgeHandler` + `AuditPurgeTick` + `AuditPurgeService`** (M1) —
    the **§6.4 job precedent**: the business logic is a Wolverine-free static
    class in `Kumunita.Core`; the Web handler is a thin adapter that injects
@@ -92,18 +109,18 @@ Read directly, not assumed:
    (the delay is baked into the message type — every re-publish carries the
    same schedule). `EventReminders` is the second of the three §6.4 jobs;
    `VerifyDigest` stays deferred.
-7. **`kw-dt` TagHelper** (ADR 0019 / 0020) — the one timestamp renderer:
+7. **`kw-dt` TagHelper** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020) — the one timestamp renderer:
    per-request resolver (resident override → platform default → `UTC` floor)
    + format (resident override → platform default → Long floor).
-8. **`LocaleSettings` + `ILocalizationService`** (ADR 0005) — the
-   `LanguageCode` authored-in tag (ADR 0018) and the language catalog.
+8. **`LocaleSettings` + `ILocalizationService`** (ADR [0005](../adr/0005-multilingual-support.md)) — the
+   `LanguageCode` authored-in tag (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)) and the language catalog.
 9. **`DependencyInjection.cs`** (`Kumunita.Core`) — the per-feature
    registration shape ("add transient with the store injected") the
    `IEventService` registration follows.
 
 ## 3. The design decisions
 
-### 3.1 The `Event` field set  **[DECIDED — ADR 0054]**
+### 3.1 The `Event` field set  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md)]**
 
 ```csharp
 // Kumunita.Core.Events
@@ -141,24 +158,24 @@ invents one):
 
 | Field | Source idiom | Note |
 |---|---|---|
-| `Title` / `Body` / `LanguageCode` | `Post` / `Announcement` (ADR 0018) | authored-in tag + Markdown body; the one `MarkdownRenderer`; the one `bindRichEditor`. |
+| `Title` / `Body` / `LanguageCode` | `Post` / `Announcement` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)) | authored-in tag + Markdown body; the one `MarkdownRenderer`; the one `bindRichEditor`. |
 | `ComponentId` | `Post.ComponentId` | a feed filter, **never** a gate (C-M3·2). |
 | `AuthorId` | `Post.AuthorId` | the owner branch; the standing matrix's standing owner. |
 | `Start` / `End` | *new, this milestone* | the time. Rendered by the one `kw-dt`; the `Start` index drives feed ordering. |
 | `Location` / `Capacity` | *new, this milestone* | display metadata — `Capacity` is **not** a gate (no admission queue in M4). |
-| `Audience` | `Post.Audience` (ADR 0001-B / 0036) | `null` = public (branch 5); the `AudienceEditorModel` form surface verbatim. The composer seeds it **community-visible by default** (ADR 0036). |
+| `Audience` | `Post.Audience` (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036) | `null` = public (branch 5); the `AudienceEditorModel` form surface verbatim. The composer seeds it **community-visible by default** (ADR [0036](../adr/0036-community-visible-audience-default.md)). |
 | `ReminderEnabled` | *new, this milestone* | the §6.4 job's per-event opt-out; `true` floor. |
-| `IsDraft` | `Announcement.IsDraft` (ADR 0037) | the author-only draft pin + the `/my/drafts` lane. |
-| `IsDeleted` | `Post.IsDeleted` (ADR 0024) | soft-delete; filtered in the read lanes. |
-| `TagIds` / `ImageIds` / `AttachmentIds` | `Post` (ADR 0044 / 0025 / 0034) | the server-side body parse populates `ImageIds` / `AttachmentIds` (the client never sends them). |
+| `IsDraft` | `Announcement.IsDraft` (ADR [0037](../adr/0037-draft-mode-author-only.md)) | the author-only draft pin + the `/my/drafts` lane. |
+| `IsDeleted` | `Post.IsDeleted` (ADR [0024](../adr/0024-author-soft-delete-lane.md)) | soft-delete; filtered in the read lanes. |
+| `TagIds` / `ImageIds` / `AttachmentIds` | `Post` (ADR [0044](../adr/0044-tags.md) / 0025 / 0034) | the server-side body parse populates `ImageIds` / `AttachmentIds` (the client never sends them). |
 
 **Naming decision:** the canonical names are `Body` and `ReminderEnabled`
-(the plan's names, mirroring `Announcement.Body`). `docs/ARCHITECTURE.md` §5
+(the plan's names, mirroring `Announcement.Body`). The [data model](../architecture/data-model.md)
 sketches the event as `description` / `rsvpRequired` — that sketch is the
-pre-decision shape; **U12 (close) syncs the §5 block to these names** (per
-the AGENTS.md doc↔code parity rule).  **[DECIDED — ADR 0054]**
+pre-decision shape; **U12 (close) syncs the [data model Events](../architecture/data-model.md) block to these names** (per
+the AGENTS.md doc↔code parity rule).  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md)]**
 
-### 3.2 The `EventRsvp` shape  **[DECIDED — ADR 0054]**
+### 3.2 The `EventRsvp` shape  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md)]**
 
 ```csharp
 public enum RsvpStatus { Going, Maybe, No }
@@ -173,7 +190,7 @@ public sealed class EventRsvp
 }
 ```
 
-- **Last-write-wins concurrency** — the ARCHITECTURE.md §5 exception, keyed
+- **Last-write-wins concurrency** — the [data model](../architecture/data-model.md) exception, keyed
   per `(EventId, UserId)`: a conflicting RSVP write is a no-op or
   self-converging; the resident's latest status is simply the truth. The
   `EventDocTypes` surface registers a **unique** `(EventId, UserId)` index
@@ -183,7 +200,7 @@ public sealed class EventRsvp
 - **Reads:** the RSVP **list** is owner-only (the author sees their own
   event's RSVPs); a non-author sees only their **own** RSVP.
 
-### 3.3 The `EventToAuditableResource` adapter  **[DECIDED — ADR 0054]**
+### 3.3 The `EventToAuditableResource` adapter  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md)]**
 
 The `PostToAuditableResource` shape verbatim (the same 6-member
 `IAuditableResource` surface):
@@ -209,14 +226,14 @@ public sealed class EventToAuditableResource : IAuditableResource
 - `TargetKind = "event"` is the **exact** string — the aggregate audit row
   discriminator in `AccessAudit` (C3).
 
-### 3.4 The standing matrix  **[DECIDED — ADR 0054]**
+### 3.4 The standing matrix  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md)]**
 
 | Action | Standing | `AccessVia` |
 |---|---|---|
 | **Create** | any signed-in resident (becomes the author) | `Owner` |
 | **Edit** (body / time / audience / …) | the `AuthorId` ∪ GlobalAdmin | `Owner` / `Admin` |
-| **Publish** a draft | the `AuthorId` only (ADR 0037 pin) | `Owner` |
-| **Soft-delete** | the `AuthorId` ∪ GlobalAdmin (ADR 0024) | `Owner` / `Admin` |
+| **Publish** a draft | the `AuthorId` only (ADR [0037](../adr/0037-draft-mode-author-only.md) pin) | `Owner` |
+| **Soft-delete** | the `AuthorId` ∪ GlobalAdmin (ADR [0024](../adr/0024-author-soft-delete-lane.md)) | `Owner` / `Admin` |
 | **RSVP** | any resident who may read the event | *(no row — §3.2)* |
 
 - **Enforced server-side** in the `EventService` — the
@@ -229,19 +246,19 @@ public sealed class EventToAuditableResource : IAuditableResource
   `event.create` / `event.update` / `event.publish` / `event.delete` — **no**
   `event.rsvp` action (the RSVP is not an access decision).
 
-### 3.5 The draft / tag / media / language / delete lane reuse  **[DECIDED — ADR 0054]**
+### 3.5 The draft / tag / media / language / delete lane reuse  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md)]**
 
 Each is the **frozen** existing shape on `Event`, byte-for-byte the same
 field idiom the post / announcement / page surfaces already use — **no new
 mechanism** for any of them: the `IsDraft` flag + `/my/drafts` lane (ADR
-0037); the `TagIds` (ADR 0044); the `ImageIds` + `AttachmentIds` (ADR 0025 /
-0034, server-side body parse); the `LanguageCode` (ADR 0018); the `IsDeleted`
-flag + read-lane filter (ADR 0024). **The translation lane is NOT extended to
+0037); the `TagIds` (ADR [0044](../adr/0044-tags.md)); the `ImageIds` + `AttachmentIds` (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) /
+0034, server-side body parse); the `LanguageCode` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)); the `IsDeleted`
+flag + read-lane filter (ADR [0024](../adr/0024-author-soft-delete-lane.md)). **The translation lane is NOT extended to
 events in M4** — an `Event` is authored-in-language only in this milestone;
-the event-translation row (the ADR 0022/0026/0029 shape) is a follow-on lane
-that shipped separately under **ADR 0059**.
+the event-translation row (the ADR [0022](../adr/0022-user-added-post-reply-translations.md)/0026/0029 shape) is a follow-on lane
+that shipped separately under **ADR [0059](../adr/0059-event-translations.md)**.
 
-### 3.6 The `EventReminders` §6.4 job  **[DECIDED — ADR 0054]**
+### 3.6 The `EventReminders` §6.4 job  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md)]**
 
 - **`EventReminderService`** (Wolverine-free static class in
   `Kumunita.Core.Events`, the `AuditPurgeService` precedent):
@@ -258,7 +275,7 @@ that shipped separately under **ADR 0059**.
   scheme; the key's existing-row check is the no-double-send guard across
   ticks); (d) **no `AccessAudit` row** (a side effect, not an access decision
   — the verification-email posture). The reminder's "when" renders in each
-  **recipient's** own time zone + date-time format (ADR 0019 / 0020 — the
+  **recipient's** own time zone + date-time format (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020 — the
   `kw-dt` resolution order: the recipient's `Profile.TimeZone` / `Profile.DateFormat`
   override → the platform default → the `UTC` / `DateFormat.FloorFormat` floor),
   **not** a hard-coded UTC stamp (the recipient's `Profile` is the "actor" the
@@ -273,14 +290,14 @@ that shipped separately under **ADR 0059**.
   precedent verbatim; the 1-day delay is baked into the message type).
 - **`EventReminderOptions`** — the `AuditPurgeOptions` shape (a POCO of
   config; `WindowHours = 24` floor).
-- **Best-effort, re-runnable** (ARCHITECTURE.md §6.2): a failed SMTP send
+- **Best-effort, re-runnable** (see [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md)): a failed SMTP send
   dead-letters in `EmailDeadLetter`; the durable trio is **untouched** — the
   job only *stages* rows.
 - **Wiring:** `Program.cs` registers the `EventReminderTick` next to the
   `AuditPurgeTick` (the `IntegrateWithWolverine()` + `ApplyAllConfigured-
   ChangesToDatabaseAsync` trio precedent).
 
-### 3.7 The 25 pinned seam test names  **[DECIDED — ADR 0054 — the master list]**
+### 3.7 The 25 pinned seam test names  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md) — the master list]**
 
 U09 implements **exactly** these 25 names in
 `tests/Kumunita.Core.Tests/EventServiceTests.cs` (T01–T18) and
@@ -291,16 +308,16 @@ or re-scope of a name after this freeze is a **drift event** (§3.9):
 |---|-------------------|-------------|
 | T01 | `M4_MemberSeesUpcomingEventFeed` | §3.3; the feed (`CanSeeAsync(Read)` survivors, `Start` ordering) |
 | T02 | `M4_NullAudienceEventIsPublic` | §3.3; the `Decide()` branch 5 (unauthenticated sees it) |
-| T03 | `M4_CommunityAudienceSeesFeed` | §3.3; ADR 0036's `Community` branch (a member sees it; a non-member doesn't) |
+| T03 | `M4_CommunityAudienceSeesFeed` | §3.3; ADR [0036](../adr/0036-community-visible-audience-default.md)'s `Community` branch (a member sees it; a non-member doesn't) |
 | T04 | `M4_GrantsAudienceOnlyGranteeSees` | §3.3; the grant-list branch (an un-granted member is denied) |
-| T05 | `M4_DraftInvisibleToNonAuthor` | §3.5; ADR 0037 (a draft is invisible to everyone but the author) |
+| T05 | `M4_DraftInvisibleToNonAuthor` | §3.5; ADR [0037](../adr/0037-draft-mode-author-only.md) (a draft is invisible to everyone but the author) |
 | T06 | `M4_PlainMemberCreateAllowed` | §3.4; create standing (any signed-in resident) |
-| T07 | `M4_AuthorCanEditOwnEvent` | §3.4; owner edit (ADR 0014/0016/0017 shape) |
+| T07 | `M4_AuthorCanEditOwnEvent` | §3.4; owner edit (ADR [0014](../adr/0014-post-edit-lane-author-only.md)/0016/0017 shape) |
 | T08 | `M4_PlainMemberEditDenied` | §3.4; non-author edit ⇒ `UnauthorizedAccessException` (403) |
-| T09 | `M4_GlobalAdminOverrideEdit` | §3.4; GlobalAdmin override (ADR 0017 shape) |
-| T10 | `M4_PublishAuthorOnly` | §3.4; ADR 0037 pin (a non-author GlobalAdmin is denied) |
-| T11 | `M4_SoftDeleteExcludesFromFeedAndDetail` | §3.5; ADR 0024 (`IsDeleted` filtered from `ListUpcomingAsync` / `GetAsync`) |
-| T12 | `M4_AuthorSoftDeleteOwnEvent` | §3.5; the author delete lane (ADR 0024) |
+| T09 | `M4_GlobalAdminOverrideEdit` | §3.4; GlobalAdmin override (ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md) shape) |
+| T10 | `M4_PublishAuthorOnly` | §3.4; ADR [0037](../adr/0037-draft-mode-author-only.md) pin (a non-author GlobalAdmin is denied) |
+| T11 | `M4_SoftDeleteExcludesFromFeedAndDetail` | §3.5; ADR [0024](../adr/0024-author-soft-delete-lane.md) (`IsDeleted` filtered from `ListUpcomingAsync` / `GetAsync`) |
+| T12 | `M4_AuthorSoftDeleteOwnEvent` | §3.5; the author delete lane (ADR [0024](../adr/0024-author-soft-delete-lane.md)) |
 | T13 | `M4_RsvpLastWriteWins` | §3.2; the `(EventId, UserId)` upsert (Going→No→Going lands the latest) |
 | T14 | `M4_RsvpUniqueIndexOneRowPerUser` | §3.2; exactly one `EventRsvp` row per `(EventId, UserId)` |
 | T15 | `M4_RsvpListOwnerOnly` | §3.2; the RSVP list read is owner-only |
@@ -312,10 +329,10 @@ or re-scope of a name after this freeze is a **drift event** (§3.9):
 | T21 | `M4_ReminderAuthorAlwaysIncluded` | §3.6; the author is reminded even without an RSVP |
 | T22 | `M4_ReminderIdempotencyKeyShape` | §3.6; exactly one staged email per recipient, key `remind:{eventId}:{userId}` |
 | T23 | `M4_ReminderWritesNoAccessAuditRow` | §3.6; zero `AccessAudit` rows after `SendRemindersAsync` |
-| T24 | `M4_GlobalAdminOverrideEditEndToEnd` | §3.4; the part-vs-whole seam — a non-author GlobalAdmin edits (the `UpdateAsync` write lane, the ADR 0017 override), audit row tagged `Via = Admin` |
-| T25 | `M4_GlobalAdminOverrideDeleteEndToEnd` | §3.4; the part-vs-whole seam — a non-author GlobalAdmin soft-deletes (the `DeleteAsync` write lane, the ADR 0017 override), audit row tagged `Via = Admin` |
+| T24 | `M4_GlobalAdminOverrideEditEndToEnd` | §3.4; the part-vs-whole seam — a non-author GlobalAdmin edits (the `UpdateAsync` write lane, the ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md) override), audit row tagged `Via = Admin` |
+| T25 | `M4_GlobalAdminOverrideDeleteEndToEnd` | §3.4; the part-vs-whole seam — a non-author GlobalAdmin soft-deletes (the `DeleteAsync` write lane, the ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md) override), audit row tagged `Via = Admin` |
 
-### 3.8 The three-test acceptance gate  **[DECIDED — ADR 0054 — U11 records the run]**
+### 3.8 The three-test acceptance gate  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md) — U11 records the run]**
 
 | # | Test | Shape (what it proves) |
 |---|------|------------------------|
@@ -334,7 +351,7 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
 dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
 ```
 
-### 3.9 The drift-guard  **[DECIDED — ADR 0054 — frozen by this unit]**
+### 3.9 The drift-guard  **[DECIDED — ADR [0054](../adr/0054-events-rsvp-reminders.md) — frozen by this unit]**
 
 - **The `Event` field set** (§3.1) — the exact POCO above, including the
   `Body` / `ReminderEnabled` naming (the §5 naming decision). A re-shape
@@ -419,20 +436,20 @@ public sealed record EventReminderTick() : Wolverine.TimeoutMessage(TimeSpan.Fro
 `Event` (conventional `Id`) + a `(ComponentId, Start)` index (the feed
 ordering shape) + `EventRsvp` with a **unique** `(EventId, UserId)` index
 (the §3.2 last-write-wins exception). Zero migrations for existing
-surfaces — the two docs are new, the surface is additive (ADR 0004 §B.1).
+surfaces — the two docs are new, the surface is additive (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 
 ## 5. What this milestone is deliberately *not* (non-decisions)
 
 - **Not an admission queue.** `Capacity` is display metadata; there is no
   "waitlist" or "spot release" — `Going` RSVPs are the truth.
 - **Not event translations.** The `Event` is authored-in-language only (ADR
-  0018); the ADR 0022/0026/0029 translation lane is **not** extended to
+  0018); the ADR [0022](../adr/0022-user-added-post-reply-translations.md)/0026/0029 translation lane is **not** extended to
   events in M4 (a follow-on lane, own ADR).
 - **Not iCal / notifications-as-a-lane.** `events.ics` export is M6;
   per-resident reminder settings ("remind me N hours before") are a
   follow-on lane — the single 24-hour-before email is the M4 surface.
 - **Not group events.** A `Group`-scoped event channel is a follow-on lane
-  (the ADR 0013 membership-lane precedent would be the shape).
+  (the ADR [0013](../adr/0013-group-posts-membership-lane.md) membership-lane precedent would be the shape).
 - **Not a second mechanism, anywhere.** One audience, one decision path, one
   renderer, one editor, one email trio, one timezone/format resolver — the
   milestone *reuses* instead of *duplicating*.
@@ -442,7 +459,7 @@ surfaces — the two docs are new, the surface is additive (ADR 0004 §B.1).
 ## 6. Run result (M4 acceptance gate — 2026-09-21)  **[U11 — the record close; the full close is U12]**
 
 This is the **record** close (U11's unit — run the gate, record the result,
-author the e2e spec, record the gap). The **close** (the `ARCHITECTURE.md`
+author the e2e spec, record the gap). The **close** (the [`ARCHITECTURE.md`](../ARCHITECTURE.md)
 `Events/` flip, the README Roadmap, `Milestones.cs`, `MilestonesTests.cs`)
 is **U12** — out of scope for this record.
 
@@ -478,7 +495,7 @@ grant-scoped audience re-scope, the §3.8 row 2 pin):
 | # | Gate test (§3.8) | Evidence (actual test names — all passed) |
 |---|------|-------------------------------------------|
 | 1 | **closed loop** — an author creates a published event → it appears in the feed (`TargetKind = "event"` aggregate row, `VisibleCount ≥ 1`, `Outcome = Allow`); the author RSVPs `Going` → their RSVP is visible in the owner-only list | `EventServiceTests.M4_PlainMemberCreateAllowed` (T06, C3 — the create lane writes the `event.create` audit row), `EventServiceTests.M4_MemberSeesUpcomingEventFeed` (T01, C6 — the feed's `CanSeeAsync(Read)` lets the audience member see the event; the closed-loop `VisibleCount ≥ 1` is the observable), `EventServiceTests.M4_RsvpLastWriteWins` (T13, §3.2 — the `RsvpAsync` last-write-wins exception), `EventServiceTests.M4_RsvpListOwnerOnly` (T15, §3.2 — the owner-only RSVP-list read; the author sees their own event's RSVPs). |
-| 2 | **handoff** — a user added to the event's `Audience.Grants` **after** creation sees the event on the **next** request (strong consistency, no cache); the `Delegation` branch is the handoff-onto-a-delegate case | `EventServiceTests.M4_GrantsAudienceOnlyGranteeSees` (T04, C6 — the grant-scoped audience: only the grantee sees the event; the *next* `ListUpcomingAsync` call sees the live grant row — the strong-consistency lane), `EventServiceTests.M4_CommunityAudienceSeesFeed` (T03, ADR 0036 — the community-visible branch the handoff lane re-scopes over). |
+| 2 | **handoff** — a user added to the event's `Audience.Grants` **after** creation sees the event on the **next** request (strong consistency, no cache); the `Delegation` branch is the handoff-onto-a-delegate case | `EventServiceTests.M4_GrantsAudienceOnlyGranteeSees` (T04, C6 — the grant-scoped audience: only the grantee sees the event; the *next* `ListUpcomingAsync` call sees the live grant row — the strong-consistency lane), `EventServiceTests.M4_CommunityAudienceSeesFeed` (T03, ADR [0036](../adr/0036-community-visible-audience-default.md) — the community-visible branch the handoff lane re-scopes over). |
 | 3 | **part-vs-whole** — the 23 names in §3.7 are the **whole**; tests 1–2 are the **parts**; all must pass **together** in the same `Kumunita.Core.Tests` run as the inherited M1/M2/M3/M3b/PG anchors (no per-name isolation) | U09's 23 pinned `[Fact]`s in `tests/Kumunita.Core.Tests/EventServiceTests.cs` (T01 `M4_MemberSeesUpcomingEventFeed` · T02 `M4_NullAudienceEventIsPublic` · T03 `M4_CommunityAudienceSeesFeed` · T04 `M4_GrantsAudienceOnlyGranteeSees` · T05 `M4_DraftInvisibleToNonAuthor` · T06 `M4_PlainMemberCreateAllowed` · T07 `M4_AuthorCanEditOwnEvent` · T08 `M4_PlainMemberEditDenied` · T09 `M4_GlobalAdminOverrideEdit` · T10 `M4_PublishAuthorOnly` · T11 `M4_SoftDeleteExcludesFromFeedAndDetail` · T12 `M4_AuthorSoftDeleteOwnEvent` · T13 `M4_RsvpLastWriteWins` · T14 `M4_RsvpUniqueIndexOneRowPerUser` · T15 `M4_RsvpListOwnerOnly` · T16 `M4_RsvpWritesNoAccessAuditRow` · T17 `M4_AuditRowShape_Create` · T18 `M4_EventToAuditableResourceShape`) + `tests/Kumunita.Core.Tests/EventReminderServiceTests.cs` (T19 `M4_ReminderWindowFiltersOutsideEvents` · T20 `M4_ReminderGoingRsvpsOnly` · T21 `M4_ReminderAuthorAlwaysIncluded` · T22 `M4_ReminderIdempotencyKeyShape` · T23 `M4_ReminderWritesNoAccessAuditRow`) — **all 23 green** — **plus** the M1/M2/M3/M3b/PG-inherited anchors re-run unchanged in the same execution (`Kumunita.Core.Tests` 668/668, 0 failed). |
 
 **Gate status: all three tests PASS** (closed-loop · handoff · part-vs-whole;
@@ -488,11 +505,11 @@ the one Web red attributed to pre-existing kw-l drift, not the M4 family).
 **U13 addendum (verified, not assumed) — the GlobalAdmin-override seam fix.**
 The U09/U10 record above captured the freeze as then-built, where the
 `IEventService` edit/delete write lanes carried **no** `actorRoles` and the
-GlobalAdmin override (ADR 0017) was applied only at the Web boundary — leaving
+GlobalAdmin override (ADR [0017](../adr/0017-announcement-edit-lane-author-or-globaladmin.md)) was applied only at the Web boundary — leaving
 the §3.8 row-3 *part-vs-whole* gate red: a non-author GlobalAdmin could not
 edit/delete **end-to-end** through the service seam, and the `AccessVia` audit
 tag for an override edit/delete was mislabeled `Owner` (the actor was not the
-author). U13 closed that seam, **honoring the ADR** (ADR 0054 is unchanged —
+author). U13 closed that seam, **honoring the ADR** (ADR [0054](../adr/0054-events-rsvp-reminders.md) is unchanged —
 it was the authority the code now matches):
 
 - `IEventService.UpdateAsync` / `DeleteAsync` now take
@@ -503,7 +520,7 @@ it was the authority the code now matches):
   branches are exercised *in the service*.
 - The `event.update` / `event.delete` audit row tags the branch the actor
   qualified under (the new `AuditViaFor`): author → `AccessVia.Owner`,
-  non-author GlobalAdmin override → `AccessVia.Admin` (ADR 0054 §3.4, the
+  non-author GlobalAdmin override → `AccessVia.Admin` (ADR [0054](../adr/0054-events-rsvp-reminders.md) §3.4, the
   `Owner`/`Admin` matrix above). `event.create` / `event.publish` remain `Owner`.
 - Two new **integration** (part-vs-whole) seam tests added — **T24**
   `M4_GlobalAdminOverrideEditEndToEnd` and **T25**

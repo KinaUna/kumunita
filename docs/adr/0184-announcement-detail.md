@@ -1,8 +1,21 @@
-# ADR 0184 — Announcement detail
+---
+id: adr-0184
+title: "Announcement detail"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0180-event-detail.md, docs/adr/0183-announcements.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0184](0184-announcement-detail.md) — Announcement detail
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0183 (announcement cards), ADR 0180 (event detail)
+Relates to: ADR [0183](0183-announcements.md) (announcement cards), ADR [0180](0180-event-detail.md) (event detail)
 
 ## Decision
 
@@ -14,7 +27,7 @@ Relates to: ADR 0183 (announcement cards), ADR 0180 (event detail)
 - The translation selector is chip buttons; the shown language is `aria-pressed="true"` and
   highlighted. Initial `aria-pressed` is now server-rendered (previously set only after a click).
 - Comments are one bordered card each (`.kmb-ann-comment`); the composer is a `.kmb-detail-card`
-  with the rounded inputs and heading-font labels of ADR 0182.
+  with the rounded inputs and heading-font labels of ADR [0182](0182-form-look.md).
 
 ## Open
 

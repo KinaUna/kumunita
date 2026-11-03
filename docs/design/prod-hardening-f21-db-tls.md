@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f21-db-tls
+title: "F21 — app↔DB TLS (SRV-04)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # F21 — SRV-04: app↔DB TLS — Part-0 design pin
+
+> **Abstract:** the **F21 app↔DB TLS** design pin (Part-0, design-only) — **app↔DB TLS**: the Npgsql connection string carries **no `SslMode`** (default `Prefer`). F21's code side is a single Web-host env knob (a config read in `Program.cs` that appends `SslMode`/CA/trust to the one `ConnectionStrings:Kumunita` value); the owner-ops half (enable Postgres TLS on the prod addon) is an open item. Closes 2026-10-22 SRV-04. **Who is it for:** a developer executing F21 U2; an agent that needs the env-knob shape. **When to read the rest:** before touching the connection-string env knob, the `SslMode` config, or the F21 owner-ops step.
+
 
 > **Fix:** F21 (report row **SRV-04**) — kind **`code+ops`**, **dep: —** (no
 > code dependency). F21's **code side is a single Web-host env knob** — a config
@@ -33,7 +48,7 @@
 - **`Program.cs:92-95` (Marten):**
   `var kumunitaConnection = builder.Configuration.GetConnectionString("Kumunita")
   ?? throw …`, then inside `AddMarten(opts => …)` the line **`opts.Connection(kumunitaConnection);`**.
-- **`Program.cs:474` (EF Core — the only EF in the tree, ADR 0004):**
+- **`Program.cs:474` (EF Core — the only EF in the tree, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)):**
   `builder.Services.AddDbContext<AppDbContext>(opts => opts.UseNpgsql(kumunitaConnection));`.
 
 Both consume the **same** `kumunitaConnection` local. Therefore **one** place to
@@ -155,7 +170,7 @@ receive the identical extended string:
   `Prefer`, no CA — so the dev container boots exactly as it does today. When the
   knobs are set (prod), both consumers enforce `Verify CA` + CA. **No code branch,
   no new DI, no new type in `Kumunita.Core`** — the Core-stays-HTTP-free and
-  ADR 0006 invariants hold because this is a Web-host config read, not a new
+  ADR [0006](../adr/0006-module-boundary-contracts.md) invariants hold because this is a Web-host config read, not a new
   bounded context or Core seam.
 
 **What F21.U2 does NOT do (pin the boundary):** no new `<PackageReference>`
@@ -189,11 +204,11 @@ done, and is not runnable in the unit-test harness (no prod CA, no prod host).
 
 ## 6. Invariants held (this pin + the unit it drives)
 
-- **ADR 0004 forward-only + "app role owns the DB"** — **preserved, not touched.**
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) forward-only + "app role owns the DB"** — **preserved, not touched.**
   F21 changes **how** the app connects (TLS), **not** who owns the DB, **not**
   the schema, **not** the migration path. F22 (the role demotion) is the unit that
   touches the ownership question; F21 does not.
-- **ADR 0006 module boundaries + Core stays HTTP-free** — **held.** The knob is a
+- **ADR [0006](../adr/0006-module-boundary-contracts.md) module boundaries + Core stays HTTP-free** — **held.** The knob is a
   **Web `Program.cs` config read**, not a new bounded context, not a Core seam,
   not a new type in `Kumunita.Core`. The Core consumers (Marten) receive the
   extended string through the **existing** `opts.Connection(…)` call — no Core

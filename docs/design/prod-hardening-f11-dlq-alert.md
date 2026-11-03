@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f11-dlq-alert
+title: "F11 — alert on dead-letter exhaustion (JOB-02)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F11 — JOB-02: alert on dead-letter exhaustion — Part-0 design pin
+
+> **Abstract:** the **F11 dead-letter alert** design pin (Part-0, design-only) — **alert on dead-letter exhaustion**: the durable email path's terminal failure writes the `EmailDeadLetter` row + drives `/health` degraded, but **no alert fires** (the only signal is a `/health` poll). F11 adds the `IAlertSink` Core seam + the `AlertEvent` payload + the `NoopAlertSink` default + the `HandleFault` trigger wiring. Depends on F10. Closes 2026-10-22 JOB-02. **Who is it for:** a developer executing F11 U2–U3; an agent that needs the `IAlertSink` seam shape. **When to read the rest:** before touching the `IAlertSink` seam, the `AlertEvent` payload, or the F11 tests.
+
 
 > **Fix:** F11 (report row **JOB-02**) — kind **`code+ops`**.
 > **Status:** this is the **Part-0 design pin** (F11.U1). It is **design-only**:
@@ -27,8 +42,8 @@
 > no-op, and the `IAlertSink` default binding (`NoopAlertSink`) is what fires
 > (a structured log) — so **F11 closes by code regardless of `SENTRY_DSN`**.
 
-> **Repo doctrine applied (from `AGENTS.md` + ADR 0006 + the F10 precedent):**
-> *"Core stays HTTP-free"* (ADR 0006) — so the **seam + payload**
+> **Repo doctrine applied (from [`AGENTS.md`](../../AGENTS.md) + ADR [0006](../adr/0006-module-boundary-contracts.md) + the F10 precedent):**
+> *"Core stays HTTP-free"* (ADR [0006](../adr/0006-module-boundary-contracts.md)) — so the **seam + payload**
 > (`IAlertSink`, `AlertEvent`) are **Core** (the domain event "an alert-worthy
 > operational condition occurred" + its one-shot payload), and the **channel**
 > (Sentry / SMTP / structured log) is a **Web + owner-ops** concern. This is
@@ -119,7 +134,7 @@ Sentry channel as one of the seam's bindings** (not instead of the seam):
 
 | Reason | The grounding |
 |---|---|
-| **(a) ADR 0006 — Core stays HTTP-free.** The trigger point's *domain* payload is the `EmailDeadLetter` row (a Core type). A **direct** `Sentry.CaptureException(...)` call from the `HandleFault` path would make the **domain** dead-letter path **depend on a Web package** (`Sentry`) — inverting the `ISmtpSender` precedent (Core seam, Web channel). The `IAlertSink` seam keeps the **domain** in Core (the seam + payload) and the **channel** in Web/owner-ops. | `ISmtpSender` (Core) + `SmtpSender` registration (Core DI) + the Web binding; the F10 pin's own §7 "Core stays HTTP-free — the registration and the PII-scrubber are **Web** concerns." |
+| **(a) ADR [0006](../adr/0006-module-boundary-contracts.md) — Core stays HTTP-free.** The trigger point's *domain* payload is the `EmailDeadLetter` row (a Core type). A **direct** `Sentry.CaptureException(...)` call from the `HandleFault` path would make the **domain** dead-letter path **depend on a Web package** (`Sentry`) — inverting the `ISmtpSender` precedent (Core seam, Web channel). The `IAlertSink` seam keeps the **domain** in Core (the seam + payload) and the **channel** in Web/owner-ops. | `ISmtpSender` (Core) + `SmtpSender` registration (Core DI) + the Web binding; the F10 pin's own §7 "Core stays HTTP-free — the registration and the PII-scrubber are **Web** concerns." |
 | **(b) Off-by-default must be a **code** guarantee, not a `SENTRY_DSN` dependency.** If F11's alert fired *only* via Sentry, then with `SENTRY_DSN` **unset** (the default, the standing deferral) **no alert fires** — the JOB-02 FAIL would close **only if the owner sets the DSN** (an owner-ops step, NOT a code guarantee). The `IAlertSink` seam with a `NoopAlertSink`/`LogAlertSink` **default** binding means F11 **closes by code** (the alert *path* is wired + tested), and the Sentry binding is the **additive, DSN-gated** channel (the F10 idiom). | F10 pin §7 "OFF by default — with `SENTRY_DSN` unset … the pipeline is **byte-identical**" (the no-op-when-unset idiom F11's default binding mirrors). |
 | **(c) F12 + F18 reuse the same seam.** F12 (OBS-06, "route alerts to a human") and F18 (MAIL-06, "bounce/complaint/volume alarms") are **downstream** of F11 in the plan's dependency graph (F12 "dep: F10/F11", F18 "dep: F12"). They need **the same alert channel** pointed at a human / the mail provider. A **dedicated `IAlertSink` seam** is the **one** place F12/F18 bind their channels; a direct Sentry call would not generalize (a human channel is not Sentry). | The plan §F11 "reuses the F10 Sentry alert channel, **or a dedicated `IAlertSink` seam — pin**", and F12's "implement the `IAlertSink` chosen in F11 against this channel." |
 
@@ -293,7 +308,7 @@ public static async Task HandleFault(
 - **The alert fires AFTER the row commit** (the `WriteAndCommitAsync` call is
   unchanged; the `ReportAsync` call is additive, after it). **The `/health`
   degraded gate is UNCHANGED** (the `EmailDeadLetter` row count still drives
-  it — OPS §8, ARCHITECTURE.md §6.2). **F11 is additive, not a re-shape.**
+  it — OPS §8, [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md)). **F11 is additive, not a re-shape.**
 - **`IAlertSink? alertSink = null`** — the handler parameter is **nullable**
   (a method-injected parameter, the `Handle(OutboxEmail, ISmtpSender)`
   method-injection precedent in the same class). **Nullable** so the **existing
@@ -466,7 +481,7 @@ F10.U2 open-item (b) idiom).
 
 | File | The change | The pin |
 |------|-----------|---------|
-| `src/Kumunita.Core/Identity/AlertSink.cs` (NEW) | The `IAlertSink` interface + the `AlertEvent` record + the `NoopAlertSink` default impl (all in **one** file, the `SmtpSender.cs` `ISmtpSender` + `SmtpSender` in-one-file precedent). Core (ADR 0006 — the seam + payload + default are Core; the channel is Web). | pin §2a/§2b/§2c |
+| `src/Kumunita.Core/Identity/AlertSink.cs` (NEW) | The `IAlertSink` interface + the `AlertEvent` record + the `NoopAlertSink` default impl (all in **one** file, the `SmtpSender.cs` `ISmtpSender` + `SmtpSender` in-one-file precedent). Core (ADR [0006](../adr/0006-module-boundary-contracts.md) — the seam + payload + default are Core; the channel is Web). | pin §2a/§2b/§2c |
 | `src/Kumunita.Core/DependencyInjection.cs` | The **one** new line in `AddKumunitaCore`: `services.AddTransient<IAlertSink, NoopAlertSink>();` (the **default** binding, the `DependencyInjection.cs:369` `ISmtpSender` registration precedent). **No other** change (the `ISmtpSender` / `IMailerStage` / `IEmailDeadLetterCounter` registrations are **untouched**). | pin §3.2 |
 | `src/Kumunita.Web/SideEffects/OutboxEmailHandler.cs` | The **additive** `IAlertSink? alertSink = null` parameter on `HandleFault` + the **`ReportAsync` call after the `WriteAndCommitAsync` call** (the pin §3.0 block, the **`try/catch` swallow**). **No other** change (the `Handle` method, the `fault.Message` / `fault.Exception` / `fault.Attempts` reads, the `EmailDeadLetterWriter` call are **untouched**). | pin §3.0/§3.1 |
 | `src/Kumunita.Web/Program.cs` (OPTIONAL) | **IF** F11.U2 lands the `SentryAlertSink`: the **one** new line **inside the F10 `if (!string.IsNullOrWhiteSpace(builder.Configuration["SENTRY_DSN"]))` block**: `builder.Services.AddTransient<IAlertSink, SentryAlertSink>();` (the additive + flag-gated idiom, the F10.U2 registration-ordering precedent: the Web registration comes **after** `AddKumunitaCore`, so it wins the DI resolution **only when** the DSN is set). **IF** F11.U2 does NOT land the `SentryAlertSink`: **no `Program.cs` change** (the `NoopAlertSink` default is the binding, the off-by-default idiom). | pin §2d (optional) |
@@ -499,7 +514,7 @@ F10.U2 open-item (b) idiom).
   `enum` — open to F18's new kind without a type change). **F11 does NOT
   implement F18's alarm logic** (a provider-API poll, a threshold check, a
   volume counter). **No F18 alarm code in F11.**
-- **The `WhatsNew.cs` / `Milestones.cs` / `STATUS.md` / `ARCHITECTURE.md` /
+- **The `WhatsNew.cs` / `Milestones.cs` / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `docs/adr/` close-flip** (the six members) — the
   close-flip happens at **F22**, the lane's **last** unit. **F11 is not the
   lane's last unit** (F12–F22 remain). **Do NOT run the close-flip** in
@@ -534,7 +549,7 @@ F10.U2 open-item (b) idiom).
   `SentryAlertSink` binding) or land F12 (the human channel) — the F10 pin §7
   "OFF by default … the pipeline is byte-identical" idiom, applied to the
   alert path.
-- **Core stays HTTP-free** (ADR 0006) — the `IAlertSink` seam + the `AlertEvent`
+- **Core stays HTTP-free** (ADR [0006](../adr/0006-module-boundary-contracts.md)) — the `IAlertSink` seam + the `AlertEvent`
   payload + the `NoopAlertSink` default are **Core** (the domain "an
   alert-worthy event happened" + its one-shot payload + the default no-op
   binding). The **channel** (Sentry / SMTP / log) is a **Web + owner-ops**
@@ -625,7 +640,7 @@ F10.U2 open-item (b) idiom).
 ## 9. The pin's closed list (the F9.U1 / F10 pin §9 closed-list precedent)
 
 - **The alert-hook decision** — pin §2.0 (the **`IAlertSink` Core seam**, NOT
-  a direct Sentry call; the three grounded reasons: ADR 0006, off-by-default
+  a direct Sentry call; the three grounded reasons: ADR [0006](../adr/0006-module-boundary-contracts.md), off-by-default
   by code, F12/F18 reuse).
 - **The `IAlertSink` seam signature** — pin §2a (the `IAlertSink` interface +
   the `AlertEvent` record + the `NoopAlertSink` default, the

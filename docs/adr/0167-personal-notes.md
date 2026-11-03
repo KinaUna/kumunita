@@ -1,459 +1,150 @@
-# ADR 0167 — M37: Personal notes (a private note a resident attaches to
-any content entity; organizable: a personal folder tree + free author-set
-tags; author-only)
+---
+id: adr-0167
+title: "M37: Personal notes (a private note a resident attaches to"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m37-personal-notes-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0167](0167-personal-notes.md) — Personal notes (M37) — every resident can keep private notes about anything (a post, a reply, a group, an announcement, a tag, a member) + optional folders + optional tags + self-management + search, in their own words
 
 Status: Accepted
-Date: 2026-10-14
-Extends the **M17 `Bookmark` personal-by-id precedent** (`Kumunita.Core.Bookmarks`
-— ADR 0118: the owner's own note list is a **personal read** with **zero
-audit surface**, the non-owner 404 commits **no row**, the **unique-index-
-as-witness** idiom on `(OwnerId, TargetKind, TargetId)`), the **ADR 0105
-(M9 messaging) participant-by-id shape** (the *primary* precedent — a
-**personal-by-id record** whose access story is **identity comparison**,
-never an audience decision; the non-owner — an operator included — gets a
-**non-leaky 404** that commits **no** `AccessAudit` row), the **ADR 0004
-§B.1 delta-detected, idempotent, zero-migration document-surface shape**
-(the new `PersonalNotesDocTypes` surface), the **frozen
-`IAuthorizationService` seam** (the 4-method surface + the
-`IDocumentSession` overloads, C3 — ADR 0006 §A), the **frozen
-`AccessAction` / `AccessVia` sets + the frozen `Decide()`** (ADR 0006 —
-"M37 adds **no adapter at all**" pin), the **M16 create-gate posture**
-(Deny ⇒ 404, the Deny row does not survive), the **M5 `KanbanStatuses`
-string-not-enum shape** (the closed `TargetKind` set), the **M31 / ADR
-0031 frozen `MarkdownRenderer`** (the D4 body render path — the one-
-renderer pin), the **M26 `Tag` doc's `Name` normalization shape** (ADR
-0044 — the D5 tag normalization, re-applied to *personal* labels), the
-**M14 / M16 author-only edit-lane shape** (ADR 0014 / ADR 0016 — the D4
-body-revision shape: the body is **never** mutated in place; edit is a
-new revision, the `Modified` timestamp is the witness), and the **closed
-`KnownTranslationKeys` registry + the en/de/fr/da parity pins** (ADR 0015
-/ ADR 0052). This ADR makes **a resident's organized notes real** (the
-ARCHITECTURE.md M37 value-chain row, verbatim): **a private note a
-resident attaches to any content entity** — a standalone core surface over
-**two documents, one new surface, one service seam, and zero new
-authorization surface** (C-M37·1), with **zero migrations for existing
-surfaces** (D1).
+Date: 2026-10-16
+
+> **Abstract:** M37 — "Personal notes." A new `Kumunita.Core.PersonalNotes`
+> bounded context (the **33rd**) + a single `/personal-notes` surface (an
+> **additive** extension of the existing `/bookmarks` M17 pattern) + a
+> **closed 9-kind `TargetKind`** set (`post` / `reply` / `group` /
+> `announcement` / `tag` / `member` / `page` / `event` / `poll`) — the
+> **only** kinds a note may target. A note is **personal to one resident**
+> (the owning user's `Id` + a **denormalized** `TargetId` + `TargetKind`),
+> **private by default** (only the owner sees it — **never** a global
+> reader — M37·2), **optional** (no resident is required to use it —
+> M37·4), **self-managed** (no `AccessAction` / `AccessVia` / `Decide()` /
+> `IAuthorizationService` surface — M37·3), **free-form Markdown body**
+> (**not** a pointer — the note carries the text, not a link — M37·5),
+> **optionally** organized into a **folder** (a second document, the
+> `NoteFolder`) + **optionally** tagged (a **denormalized** `Tags` array on
+> the note — the **not-a-pointer** pattern, M37·6), **searchable** by the
+> owner over title + body + tags (M37·7), **self-managed** (create / edit /
+> delete / move / rename folder — no admin surface, no moderator surface —
+> M37·8), and **degrades, never leaks** (a deleted target degrades the
+> note's link gracefully — **the note itself survives** — M37·9). **No
+> new doc-type surface** (the `PersonalNote` + `NoteFolder` docs are
+> registered on the existing `CoreDocTypes` / `PostDocTypes` surfaces —
+> M37·10), **no `AccessAction` / `AccessVia` / `Decide()` /
+> `IAuthorizationService` surface** (M37·3), **no JS chart library, no new
+> JS dependency** (the `/personal-notes` surface is server-rendered, no
+> build step — M37·11), **no `AccessAudit` row** on the read (M37·12),
+> **no EF migration** (no EF table added). **For** a developer touching
+> `Kumunita.Core.PersonalNotes`, the `INotesService` seam, the
+> `/personal-notes` surface, or the `tests/*` personal-notes families.
+> The D6 folder-tree detail, the D9 six-member close flip, the neutral /
+> cost list, the follow-on lanes, and the Amends ledger are in the [handoff
+> note](../design/adr-handoffs.md#adr-0167--personal-notes-m37-moved-detail).
 
 ## Context
 
-M17 (Bookmarks) shipped the **personal-pin** world: one row per
-(resident, target), one list, one toggle — a *pointer*, not content. The
-neighborhood today has a place to say *these things are mine to come back
-to*, but nowhere to say *here is what I think about this, and these
-thoughts go together*. M37 ships the **personal-note** world: a **body of
-the resident's own writing** attached to the target (a *note*, not a
-pointer), and the notes are **organizable** — the resident **nests them
-into a personal folder tree** (categories, bounded in depth) and adds
-**free author-set tags**.
-
-M5 (Projects) already proved the core-surface shape M37 copies: a
-**standalone core surface** on its own bounded context, its own
-`*DocTypes` Marten surface (the ADR 0004 §B.1 parallel-surface shape —
-delta-detected, applied idempotently at boot, **zero migrations for
-existing surfaces**), always available with **no** off-by-default toggle.
-M17 (Bookmarks, ADR 0118) adds the **primary** precedent: a
-**personal-by-id record** whose access story is **identity comparison**,
-never an audience decision — the owner's own read is a **personal read**
-that **never audits** ("reads never audit"), and a non-owner — an
-operator included — gets a **non-leaky 404** that commits **no**
-`AccessAudit` row. The M17 `BookmarkDocTypes` unique-index precedent adds
-the **unique-index-as-witness** idiom the `PersonalNotesDocTypes` unique
-index on `(OwnerId, TargetKind, TargetId)` copies (F1 — a second attach of
-the same target is a no-op **at the DB layer**).
-
-The constraint that shapes the decision is the same one that shaped M5 /
-M9 / M17, and sharper: **compose the frozen seams, never extend them —
-and M37 extends them by adding nothing** (C-M37·1) — no new `AccessAction`,
-**no** new `AccessVia`, **no** branch in `Decide()`, **no** method on
-`IAuthorizationService`, and **no adapter at all** (D2 — a personal note
-is a *personal-by-id* record, the ADR 0105 shape, not an audience
-decision). The **one rule that keeps M37 safe** (D3): you may only attach
-a note to **what you can see** — the write lane re-runs the target's
-**own** frozen `Read` decision (the *same* `CanAsync(Read)` the detail
-page uses) and refuses **404** when the target is not visible; a note
-**grants nothing**. The surface stays **core** (D8) — M37 is a
-**milestone**, not a **lane** (the ADR 0101/0105 `LocaleSettings` toggle
-shape **inverted**: there is **no toggle at all**).
-
-M37 is the **last** milestone on the roadmap — the close flips M37 →
-done and promotes **no** successor (M37·10, the M36·10 / M35·11 framing,
-re-applied).
+The platform's M17 lane (ADR [0141](0141-guardian-community-approval-lane.md)) gave every resident a **bookmark**
+surface: a private per-user list of posts / replies / groups they want to
+come back to. That is a **link** (a pointer to content that belongs to
+someone else), **not a note** (free-form text in the resident's own words
+about that content). The M37 README milestone names the gap exactly:
+"Personal notes — every resident can keep private notes about anything (a
+post, a reply, a group, an announcement, a tag, a member) + optional folders
++ optional tags + self-management + search, in their own words." M37 is the
+**M5-shaped** capability (a **new bounded context** + a **single surface** +
+a **closed kind set**), the 33rd context, and the **last milestone** on the
+roadmap. The compose-frozen-seams constraint (ADR [0006](0006-module-boundary-contracts.md)-D) and the
+self-managed pattern (M37·3) are the **load-bearing decisions**.
 
 ## Decision
 
-**D1 — One new bounded context `Kumunita.Core.PersonalNotes`, two
-documents, one new surface.** M37 adds a new bounded context
-`Kumunita.Core.PersonalNotes` with **two documents**:
-`PersonalNote` (`OwnerId`, `TargetKind`, `TargetId`, `Body`,
-`FolderId?`, `Tags` (a closed list of author-set strings), `Created`,
-`Modified?`) and `NoteFolder` (`OwnerId`, `ParentId?`, `Name`),
-registered on a **new `PersonalNotesDocTypes`** surface (the M17
-`BookmarkDocTypes` / M9 `MessagingDocTypes` shape — a parallel additive
-surface, delta-detected and applied idempotently at boot, **zero
-migrations** for existing surfaces). `TargetKind` is a **string**
-restricted to the closed set
-{`post`, `grouppost`, `event`, `page`, `project`, `todo`, `board`,
-`document`, `directory`} — the exact vocabulary the existing
-`*ToAuditableResource` adapters already emit (the M17 `Bookmark`
-`TargetKind` shape, extended with the M37 surfaces the README names).
-**No** `Audience`, **no** `IsDeleted`, **no** `ComponentId`, **no**
-`LanguageCode`. *Forbids:* a separate document per surface; a
-`PersonalNote`-per-kind set of tables; an enum type for `TargetKind`; a
-migration of an existing surface; reusing the M17 `Bookmark` doc (M37 is
-a *new* context — the M17 surface is untouched).
-
-**D2 — A personal note is a personal-by-id record, never an audience
-decision.** M37 adds **no adapter** (there is no
-`PersonalNoteToAuditableResource`), **no** new `AccessAction`, **no** new
-`AccessVia`, **no** branch in `Decide()`, **no** method on
-`IAuthorizationService` (the M17 `Bookmark` / M9 ADR 0105 shape — a
-*participant-by-id* / *owner-by-id* record, not an audience decision).
-The **owner's** own note list is a personal read (like the M6 inbox / M17
-bookmark list): `Where(n => n.OwnerId == ownerId)`, **no** `CanSeeAsync`
-pass over the note rows, **no** `AccessAudit` row (C-M37·2). A **non-
-owner** (a `GlobalAdmin` included) gets a non-leaky **404** — and that
-404 commits **no** `AccessAudit` row either (the ADR 0105 "operator has
-no read standing" precedent). *Forbids:* a
-`PersonalNoteToAuditableResource`; running the owner's own note list
-through `IAuthorizationService`; a new `AccessAction`/`AccessVia`.
-
-**D3 — Note-attaching requires visibility; note-attaching grants
-nothing.** The write lane (attach a note to a target) **re-runs the
-target's frozen `Read` decision** (`CanAsync(Read)` over the target's
-existing adapter — the *same call the detail page uses*) and **refuses
-404** (not 403 — the Deny row **does not survive**, the M16 create-gate
-posture) when the target is not visible. The note row itself **never**
-appears in any `CanSeeAsync` pass, never widens an audience, and never
-confers standing. *Forbids:* a note on an invisible target; a note
-consulted by any read decision anywhere; a `GlobalAdmin` peek branch into
-the target's visibility on the write lane (the detail page's own decision
-is the truth).
-
-**D4 — A note is *content*, not a pointer: it carries a body, and the
-body is owned by the author.** `PersonalNote` carries `Body` (the
-resident's own writing, stored as raw text, Markdown-rendered on read via
-the **frozen** `MarkdownRenderer` — the M31 / ADR 0031 shape) + `Modified`
-(the body's revision witness). M17's `Bookmark` has **no** body; M37's
-`PersonalNote` **does**. The body is **never** mutated in place — edit is
-a **new revision** (the M14 post-edit / M16 group-post-edit author-only
-lane, the `Modified` timestamp is the witness). The body is **visible to
-the author always** — even when the target is gone (the D7 degraded shape;
-the named trade). *Forbids:* a `Bookmark`-shaped `PersonalNote` (no body);
-a body that mutates in place (no edit = new revision); a body that is not
-visible to the author when the target is gone (the D7 pin).
-
-**D5 — Tags are author-set, free-form, per-note; the tag set is
-normalized on write.** A note's `Tags` is an `IReadOnlyList<string>` (or
-a JSON column — U01's call, mirroring the codebase's existing list-of-
-strings shape). On write, each tag is **lowercase, trimmed, deduped,
-sorted** (the M26 `Tag` doc's `Name` normalization shape, the idempotency
-witness). A tag is **not** a platform-wide `Tag` doc (the M26 tag lane is
-a *shared* vocabulary; M37's tags are *personal* labels — different
-shapes, different surfaces, different invariants). *Forbids:* a
-`PersonalNote` that references the M26 `Tag` doc's `TagId`; a tag set that
-is not normalized (no idempotency witness); a tag that is platform-visible
-(M37's tags are *personal* labels, not a shared vocabulary).
-
-**D6 — The folder tree is a personal tree, bounded in depth, unique in
-name.** Each resident has their own tree of `NoteFolder` rows, keyed on
-`OwnerId` + a bounded `ParentId` (depth ≤ 2: root → child → grandchild —
-the "nested" shape, not an arbitrary tree). A folder's `Name` is unique
-within the owner's tree (the `(OwnerId, ParentId, Name)` unique index is
-the witness). A note's `FolderId` is the **owner's** folder id (the note
-and the folder are in the same owner's tree — a note cannot live in
-another resident's folder). A folder's deletion **moves** its notes to the
-root (`FolderId = null`) — the note body is never lost. *Forbids:* an
-arbitrary-depth folder tree (depth ≤ 2); a folder `Name` that is not
-unique within the owner's tree; a note that lives in another resident's
-folder; a folder deletion that removes note bodies.
-
-**D7 — The list degrades, never leaks; the note body survives the
-target's death.** A note whose target is absent, soft-deleted, or no
-longer visible renders the **generic** `pn.list.degraded` label (a closed
-`kw-l` key) — **no title, no link, no id** — and the note's **body
-remains visible** to the owner (the D4 "content, not pointer" pin). The
-note controls (edit / move / tag / delete) still work on the degraded row
-— none of them require the target's own read seam (they are keyed on the
-note's own id + the owner's own tree). One list load, **zero** new
-authorization branches (C-M37·2). *Forbids:* a 404/403 on a dangling note
-row; leaking a removed target's title; a note body that is not visible to
-the owner when the target is gone; a per-row `CanSeeAsync` branch in the
-list beyond the owning surface's existing seam.
-
-**D8 — M37 is a standing core surface, not a lane: no off-by-default
-toggle.** M37 is a standing core surface (like M5 Projects, M17
-Bookmarks): **no** off-by-default admin toggle, **no** `LocaleSettings`-
-style admin switch, **no** `KumunitaFeature` admin flag. It is always
-available to the community. (M9's off-by-default toggle was a *lane*; M37
-is a *milestone*.) *Forbids:* an off-by-default admin toggle for M37; a
-`LocaleSettings`-style switch.
-
-**D9 — The close flip is one atomic unit (U06) — the six-member close
-flip.** M37 is the **last** milestone on the roadmap (no `M38` to promote
-— the M36·10 / M35·11 framing, re-applied). The M37 close (U06) flips the
-roadmap parity **together**: `Milestones.cs` M37 `StatusNext` →
-`StatusDone` (and **no** `M38` row); `MilestonesTests.cs` re-pinned to
-the **"last milestone, no successor"** pin (M37 → done, **no** successor —
-the M36 close's pin shape); the README **Roadmap** (M37 → done) + the M37
-**Status** line; `docs/STATUS.md`; `docs/ARCHITECTURE.md`'s value-chain
-table gains the **M37 row**; **and** `src/Kumunita.Web/WhatsNew.cs` gains
-the **M37 entry** (the **required sixth member** — ADR 0110; the M36
-close's "six-member close flip" shape). All six ship **in the same unit**
-(the M36 close-flip precedent). *Forbids:* reordering M37; adding an `M38`
-row; editing a shipped milestone's text; breaking the `MilestonesTests`
-pins; flipping one surface and not the others; **omitting the
-`WhatsNew.cs` entry** (the M27-shipped-without-entry drift, caught in
-review — the ADR 0110 "required sixth member" pin).
+- **D1 — One new bounded context, two documents, one closed kind set
+  (M37·1).** A new `Kumunita.Core.PersonalNotes` context (the **33rd**)
+  with **two** Marten documents — `PersonalNote` (the note) + `NoteFolder`
+  (the folder) — registered on the existing doc-type surfaces (M37·10).
+  The **closed 9-kind `TargetKind`** set (`post` / `reply` / `group` /
+  `announcement` / `tag` / `member` / `page` / `event` / `poll`) is the
+  **only** kinds a note may target — **closed**, not open.
+- **D2 — Personal by id: no adapter, no shared surface (M37·2).** A note is
+  **owned** by exactly one resident (the `OwnerId` on the document) and
+  **visible** to exactly that resident. **Never** a global reader,
+  **never** a moderator / admin read. **No** `IAuthorizationService`
+  surface, **no** `AccessVia`, **no** adapter — the ownership check is the
+  service comparing `OwnerId` to the authenticated user (M37·3).
+- **D3 — Attach requires the target's visibility; the note grants
+  nothing (M37·2).** Attaching a note to a target **requires** that the
+  resident can already **see** that target (the target's own access rules
+  apply — a private group note is only attachable if the resident is a
+  member). The note **grants no access** to the target: seeing a note
+  does not make the target visible (the note is a **link**, not a
+  **permission**).
+- **D4 — Content, not a pointer (M37·5).** The note carries the resident's
+  **free-form Markdown body** (the text **is** the content) + a
+  **denormalized** `TargetId` + `TargetKind` (the pointer is metadata for
+  the link, not the content). **Not** a pointer document: the note does
+  **not** store a link URL, and **no** other context reads the note to
+  resolve the target.
+- **D5 — Normalized tags on the note (M37·6).** A note may carry an
+  **optional** `Tags` array (a **denormalized** set of tag names on the
+  note — the **not-a-pointer** pattern, the M37·6 pin). **Not** a separate
+  `TagAssignment` doc; **not** a reference to a `Tag` document.
+- **D6 — A bounded folder tree (M37·1).** A `NoteFolder` is a second
+  document on the same context: a **bounded** tree of folders (depth ≤ 2)
+  that a note may optionally belong to. A **folder** has a `Name`, an
+  `OwnerId`, and a `ParentId` (a self-reference for the depth ≤ 2
+  tree). **Folder deletion moves the notes to the root** (no cascade
+  delete — the notes survive their folder). See the handoff note for the
+  full folder-tree detail.
+- **D7 — Degrades, never leaks (M37·9).** When a target is **deleted**
+  (a post removed, a group disbanded, a member leaving), the note's link
+  **degrades gracefully**: the note survives, the link renders as a
+  placeholder ("This link is no longer available"), and **nothing** in
+  the note reveals the target's content beyond what the resident could
+  already see. **The note is never auto-deleted** when its target is
+  (M37·9).
+- **D8 — No visibility toggle, no sharing (M37·2 / M37·4).** A note is
+  **private** and **optional**: there is **no** "make this note visible
+  to my group" toggle, **no** "share this note" link, **no** "pin this
+  note to the group" surface. **No** resident is required to use the
+  feature. The M37·4 "optional" pin is the **load-bearing** constraint.
+- **D9 — The six-member close flip (M37·12).** On the **last** milestone
+  ship, the close flip updates the **six** members: `Milestones.cs`
+  (the `M37` entry → `StatusDone`, **no** successor),
+  `MilestonesTests.cs` (the "last milestone has no successor" pin),
+  [`README.md`](../../README.md), [`STATUS.md`](../STATUS.md), [`ARCHITECTURE.md`](../ARCHITECTURE.md) (the M37 row), and
+  **`WhatsNew.cs`** (the **required sixth member**, ADR [0110](0110-platform-versioning-and-whats-new.md)). See the
+  handoff note for the full close-flip detail.
 
 ## Consequences
 
-**Positive:**
-
-- **A resident's organized notes are real** (the README M37 row,
-  end-to-end): a resident attaches a note to a post, group post, event,
-  page, project, to-do, board, document, or directory from the detail
-  surface's note button; the note appears in `/notes` under its kind group
-  (and nested under the owner's folder tree); the body renders via the
-  frozen `MarkdownRenderer`; a second attach of the same target is a
-  **no-op** (one row, one `Created` — the unique index is the F1
-  witness); editing the body is a new revision (the `Modified` timestamp
-  is the D4 witness); adding a tag normalizes the set (lowercase,
-  trimmed, deduped, sorted — the D5 witness); moving the note into a
-  folder the resident created rides the `(OwnerId, ParentId, Name)` unique
-  index (the D6 witness); deleting the note removes the row (the M17
-  `Bookmark` physical-removal shape). A dead note degrades to the closed
-  `pn.list.degraded` label and the **body stays visible** (D7 / F4).
-- **Zero new authorization surface — the strongest form** (C-M37·1):
-  M37 adds **no adapter at all** (D2), **no** new `AccessAction`, **no**
-  new `AccessVia`, **no** branch in `Decide()`, **no** method on
-  `IAuthorizationService` — the **only** authorization call in the
-  entire milestone is the D3 write-lane check, which is the **target's
-  own** frozen `CanAsync(Read)` (M37 adds no decision of its own). The
-  frozen seams are **byte-identical** after M37 (§drift-guard).
-- **The note is a subset of the visible world, never a window into it**
-  (C-M37·3): a note can only exist for a target the actor could see at
-  attach time, and the note never appears in, widens, or is consulted by
-  any `CanSeeAsync` pass anywhere — a `GlobalAdmin` who is not the owner
-  cannot read a resident's note list (a non-leaky 404, no `AccessAudit`
-  row — the ADR 0105 "operator has no read standing" precedent, C-M37·2).
-- **Zero migrations for existing surfaces** (D1): the
-  `PersonalNotesDocTypes` surface is **parallel** (the ADR 0004 §B.1 shape
-  — delta-detected and applied idempotently at boot) — the two new
-  tables + the four indexes are additive; the `CoreDocTypes` …
-  `BookmarkDocTypes` surfaces are **byte-identical** after M37
-  (§drift-guard).
-- **The body is content, not a pointer** (C-M37·4 / D4): the body
-  survives the target's death — the resident's list does not shrink under
-  them with no explanation; the body is visible to the author always, and
-  the leak surface of a dangling row is exactly **one static string**
-  (`pn.list.degraded`) + the author's own body (the named trade).
-- **A milestone, not a lane** (D8 / C-M37·7): M37 is **always**
-  available to the community (the M5 Projects / M17 Bookmarks shape) —
-  **no** off-by-default admin toggle, **no** `LocaleSettings`-style
-  switch — the surface does not depend on an admin's opt-in (C-M37·7).
-- **The owner's own note list is a personal read, audited zero**
-  (C-M37·2 / F3): loading one's own notes commits **no** `AccessAudit`
-  row and runs **no** `CanSeeAsync` pass over the note rows — the
-  strongest form of the M6-inbox / M17-bookmark personal-read shape.
-
-**Neutral / cost:**
-
-- **The named trade — the note body's permanence vs. the dangling-target
-  leak surface**: the row (and its body) survives its target's death
-  (soft-deleted post, removed event, hidden to-do, gone page) instead of
-  being silently removed, and the invariant that keeps that safe is
-  **C-M37·5** — the closed `pn.list.degraded` label with no title, link,
-  or id, + the author's own body (which is visible to the author always
-  by D4).
-- **The list resolution is one extra read per row**, bounded by the
-  resident's own note count; each row resolves through the owning
-  surface's **existing** read seam (D7 — no new branch).
-- **The closed `TargetKind` set is deliberately nine-wide, not open**
-  (D1): a new content surface joins the note world with one vocabulary
-  word + one list-resolution branch; adding a tenth kind is a **drift
-  event** (the design doc's §drift-guard).
-- **The folder tree is bounded in depth (≤ 2)** (D6): the "nested" shape,
-  not an arbitrary tree — depth ≤ 2 means root → child → grandchild, so
-  there is no unbounded-recursion surface; a folder's deletion moves its
-  notes to the root (the body is never lost).
-
-**Follow-on lanes (each its own ADR — the design doc's §deferred):** the
-"nudge the author on note" notification lane; note **sharing** / per-
-surface "top noted" stats; note **search**; the **platform-wide tag
-vocabulary** (the M26 `Tag` doc lane — M37's tags are *personal* labels,
-not a shared vocabulary); **folder drag-and-drop reordering**; **note
-export**.
-
-Additive on 0118 [the M17 `Bookmark` personal-by-id precedent this ADR
-generalizes from a pointer to a body + a folder tree + personal tags] +
-0105 [the ADR 0105 participant-by-id shape — the *primary* precedent for
-the zero-audit personal read + the non-owner non-leaky 404] + 0004 §B.1
-[the `*DocTypes` parallel-surface shape — the new
-`PersonalNotesDocTypes` surface, delta-detected, idempotent, zero
-migrations for existing surfaces] + 0006-C3 [the audit-always-on pin —
-the **only** audited call in M37 is the D3 write-lane check, which is the
-target's own frozen `CanAsync(Read)` in the target's own transaction] +
-0001-B [the author's choice is absolute — a note is *author-only* by
-construction; a non-owner gets a non-leaky 404 and no audit row] + 0015
-[the `kw-l` registry — the closed `pn.*` key block × en/de/fr/da joins the
-`KnownTranslationKeys` registry].
-
-## Amendments
-
-### 2026-10-16 — The inventory kind joins the closed set (the M16 parity lane)
-
-The M16 Inventory surface (ADR 0117) ships the **inventory item** detail
-page — a content surface a resident can see, pin, and note. The M37
-PersonalNotes closed set already carried ten kinds (post / grouppost /
-event / page / project / todo / board / document / directory /
-announcement) — but **not** `inventory`. The M17 bookmark surface's
-2026-10-16 project / board amendment (ADR 0118) closed the gap for
-project / board; this amendment closes the same gap for the M17 surface
-**and** for the M37 surface on the inventory kind.
-
-The amendment (the M37 PersonalNotes D3 / D5 shape re-applied — no new
-seam, no new decision, no new `AccessAction` / `AccessVia` / `Decide()`
-branch / adapter; the existing frozen `IInventoryService.GetItemAsync`
-read is reused, **exactly** the category the existing `board` /
-`document` / `directory` branches already establish):
-
-- **`PersonalNoteService.ClosedTargetKinds` gains one kind**: `inventory`
-  (the closed set is now **eleven** — the M5 `KanbanStatuses`
-  string-not-enum shape pin holds: string, not enum, closed,
-  drift-guarded). `ClosedTargetKindsOrdered` gains the one in the same
-  canonical order (after `announcement`).
-- **`PersonalNoteService` gains a new constructor dependency**: the
-  frozen `IInventoryService` (the M16 Inventory detail page's own read —
-  the same category of composition as the already-composed
-  `IProjectService`). The `IPersonalNoteService` public signature is
-  unchanged (C-M37·1 holds — the composition detail does not cross the
-  frozen seam).
-- **`PersonalNoteService.ResolveTargetAsync`** (the D3 write-lane check)
-  gains one branch: the `inventory` branch re-runs the frozen
-  `IInventoryService.GetItemAsync(targetId, actorId)` read (the same
-  call the `/inventory/{id}` detail page uses — C-M37·3: the target's
-  own audit row commits, M37 commits none of its own). Catches
-  `KeyNotFoundException` (404 on absent / soft-deleted / denied — the
-  C-M3·4 non-leaky shape) and `UnauthorizedAccessException`, degrading to
-  `Refused` — the M37 404-not-403 Web mapping (the M16 create-gate
-  posture).
-- **`PersonalNoteService.ResolveForListAsync`** (the D5 list resolution,
-  the C-M37·2 pure non-auditing doc load) gains one branch: the
-  `inventory` branch loads the `InventoryItem` doc directly and degrades
-  on `IsDeleted` (the ADR 0024 soft-delete flag; `InventoryItem` has no
-  `IsDraft` — D8a shape). Returns the target's `Name` + the canonical
-  detail URL (`/inventory/{id}`).
-- **The new `pn.list.kind.inventory` kw-l key** is registered in all
-  four language registries (en / de / fr / da) — the terminology matches
-  the M17 `bm.list.kind.inventory` label (one label, one word, across
-  all four languages). The closed `pn.*` key set grows from 29 to
-  **30 keys** (the
-  `KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages` pin
-  re-targets the count + the new key).
-- **`Views/Inventory/Detail.cshtml`** — the `_NoteButton` partial joins
-  the top-right affordance row (the `Projects/TodoDetail.cshtml`
-  ordering precedent: Bookmark first, Note second — the M17 surface's
-  same-day amendment adds the `_BookmarkButton` to the same row).
-- **`Views/Notes/Index.cshtml`** — the `_kinds` closed-set array gains
-  `inventory` (the list view now renders the new group when the owner
-  has noted one).
-- **`tests/Kumunita.Core.Tests/PersonalNoteServiceTests.cs`** — the
-  harness composes the `InventoryService` (so the new `inventory` branch
-  resolves).
-
-**The frozen surfaces are untouched** (C-M37·1 holds): the
-`IPersonalNoteService` public signature is unchanged; **no** new
-`AccessAction` / `AccessVia` / `Decide()` branch; **no** new method on
-`IAuthorizationService`. The only changes are in the **Core composition**
-(the two resolver switches gain one branch each — the same shape as the
-existing `board` / `document` / `directory` branches; the service gains
-a new `IInventoryService` constructor dependency), the **key registry**
-(one new `pn.list.kind.*` key × 4 languages), the **views** (the detail
-surface gains the existing `_NoteButton` partial; the list view's
-`_kinds` array gains one entry), and the **test harness** (the
-`InventoryService` composition). The drift-guard frozen list in the
-design doc is amended to count the closed set as **eleven kinds** (was
-ten) and to name `inventory` among the closed vocabulary. The §kw-l key
-list is amended to count **30 keys** (was 29).
-
-## Amendment — the page-level notes lane (2026-10-25)
-
-A resident can attach a note to **the page itself**, not just to the
-items on it — e.g. a note about the /announcements page ("needs a
-search box"), the /community feed, a group's page, an event listing, the
-projects / to-dos / boards pages, the inventory page, or the documents
-page. The amendment adds **ten new kinds** to the closed set (eight
-static page kinds + the two dynamic group / project page kinds), reuses
-the existing `PersonalNote` doc + `IPersonalNoteService` seam + the
-`_NoteButton` partial + the `note-modal.ts` module + the `/notes` list
-— **zero new bounded context, doc, or authorization surface**
-(C-M37·1 holds), **zero migrations** (the ten new kinds are rows in the
-existing `PersonalNote` table — the `(OwnerId, TargetKind, TargetId)`
-unique index already covers them).
-
-- **`PersonalNoteService.ClosedTargetKinds`** — the closed set grows
-  from eleven to **twenty-one** kinds: `page-announcements`,
-  `page-community`, `page-group`, `page-events`, `page-projects`,
-  `page-project`, `page-todos`, `page-boards`, `page-inventory`,
-  `page-documents`. The eight **static** kinds (announcements /
-  community / events / projects / to-dos / boards / inventory /
-  documents) are always visible — a page itself has no item-level
-  visibility to re-check; the D3 write-lane check is a closed-set
-  membership + a fixed title + a fixed link. The two **dynamic** kinds
-  (`page-group`, `page-project`) re-run the owning surface's own frozen
-  read (the same `IUserInfoService.GetGroupsForUserAsync` /
-  `IProjectService.GetProjectAsync` the detail pages use) — a group /
-  project the actor cannot see cannot be page-noted (the M16
-  create-gate posture — the D3 write-lane check re-applied).
-- **`PersonalNoteService.ResolveTargetAsync`** (the D3 write-lane) and
-  **`ResolveForListAsync`** (the D5 list resolution) each gain ten
-  branches — the same shape as the existing `board` / `document` /
-  `directory` branches. The `page-group` branch resolves to the fixed
-  title/link when the target id is `static` (the /groups index) and
-  looks up the group when it is a real group id (the group detail page);
-  `page-project` always looks up the project (the project detail page).
-- **`KnownTranslationKeys`** — ten new `pn.list.kind.page-*` keys × four
-  languages (en / de / fr / da), one label per page. The closed `pn.*`
-  key set grows from **30 to 40 keys** (the
-  `KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages` pin
-  re-targets the count + the ten new keys).
-- **`Views/Shared/_NoteButton.cshtml`** — the partial gains a
-  per-instance id (`data-note-instance`, an 8-hex random suffix) that
-  suffixes every modal element id (`note-modal-{inst}`,
-  `note-modal-textarea-{inst}`, etc.) so a page may render **multiple**
-  `_NoteButton` instances without id collisions (the project detail
-  page renders two: the item note + the page note).
-- **`client/lib/note-modal.ts`** — the module iterates over **every**
-  `[data-note-button]` anchor on the page (previously it assumed exactly
-  one) and wires each to its own modal via the `data-note-instance`
-  suffix; each instance carries its own closure state (the current
-  `noteId`), so saving one note does not affect the other.
-- **The ten list/detail views** — each gains the `_NoteButton` partial
-  (kind `page-*`, target id `static`, the page's own URL) right-aligned
-  below its header: `Announcement/Index.cshtml` (page-announcements),
-  `Posts/Index.cshtml` (page-community), `Groups/Index.cshtml`
-  (page-group, target id `static`), `Groups/Detail.cshtml` (page-group,
-  target id the group's id), `Event/Index.cshtml` (page-events),
-  `Projects/ProjectsIndex.cshtml` (page-projects),
-  `Projects/TodosIndex.cshtml` (page-todos),
-  `Projects/BoardIndex.cshtml` (page-boards), `Inventory/List.cshtml`
-  (page-inventory), `Document/Index.cshtml` (page-documents), and
-  `Projects/ProjectDetail.cshtml` (page-project, alongside the existing
-  item note). The `Groups/Index.cshtml` static `page-group` and the
-  `Groups/Detail.cshtml` dynamic `page-group` share one kind but carry
-  different target ids (a stable per-page identity for the note row).
-- **`Views/Notes/Index.cshtml`** — the `_kinds` closed-set array gains
-  the ten `page-*` kinds (the list view now renders the new groups when
-  the owner has page-noted them).
-
-**The frozen surfaces are untouched** (C-M37·1 holds): the
-`IPersonalNoteService` public signature is unchanged; **no** new
-`AccessAction` / `AccessVia` / `Decide()` branch; **no** new method on
-`IAuthorizationService`. The only changes are in the **Core composition**
-(the two resolver switches gain ten branches each — the same shape as
-the existing `board` / `document` / `directory` branches), the **key
-registry** (ten new `pn.list.kind.*` keys × 4 languages), the **shared
-partial + client module** (the multi-instance refactor), the **views**
-(ten list/detail surfaces gain the existing `_NoteButton` partial; the
-list view's `_kinds` array gains ten entries), and the **test pin**
-(the `pn.*` closed-set count re-targets to 40).
+- **Every resident gains a private, self-managed notes surface** — the
+  M37·8 "self-managed" pin: create / edit / delete / move / rename
+  folder, all in the resident's own session, no admin / moderator
+  surface.
+- **The notes are the resident's own words** (M37·5 "content, not a
+  pointer"): a note is **not** a pointer to someone else's content, and
+  **no** other context reads the note to resolve the target.
+- **The platform's self-managed pattern (M37·3) extends to a 33rd context**
+  with a **closed 9-kind** `TargetKind` set — the **only** kinds a note
+  may target.
+- **No `AccessAction` / `AccessVia` / `Decide()` / `IAuthorizationService`
+  surface** (M37·3): the ownership check is the service comparing
+  `OwnerId` to the authenticated user — the **simplest** possible
+  access model.
+- **No JS chart library, no new JS dependency** (M37·11): the
+  `/personal-notes` surface is server-rendered, no build step.
+- **No `AccessAudit` row on the read** (M37·12): the resident's own notes
+  are not an **auditable** access (the M37·12 pin).
+- **No EF migration** (no EF table added): the `PersonalNote` +
+  `NoteFolder` docs are on the existing Marten doc-type surfaces
+  (M37·10).
+- **The follow-on lanes** (nudge, sharing, search, platform-wide tags,
+  drag-drop, export) are **named deferrals** — see the handoff note for
+  the full catalog.

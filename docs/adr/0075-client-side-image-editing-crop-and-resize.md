@@ -1,10 +1,15 @@
-# ADR 0075 — Client-side image editing (crop + resize) for avatars and inline images
-
-Status: Accepted
-Date: 2026-09-24
-Amends: 0025 (resolves its "server-side image transforms" non-decision as a client-side lane)
-Relates: 0011 (media/file storage), 0025 (rich content), 0031 (WYSIWYG editor, `tsc`-only)
-Design: docs/design/image-editor-design.md (`IM` lane — invariants IM·1–IM·3, FACES IM1–IM4)
+---
+id: adr-0075
+title: "Client-side image editing (crop + resize) for avatars and inline images"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/image-editor-design.md, docs/adr/0011-media-and-file-storage.md, docs/adr/0031-wysiwyg-editor-and-toolbar.md]
+supersedes: [adr-0025]
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -12,8 +17,8 @@ Residents upload images for two surfaces: **avatars** (`POST /profile/avatar`,
 the `ProfileController.AvatarUpload` lane) and **inline post images**
 (`POST /content-image`, the `ContentImageController.Upload` lane — the
 Image button in the WYSIWYG editor). Both lanes are frozen and correct, but
-they store the **bytes exactly as uploaded** (ADR 0011's stance, carried into
-ADR 0025's "Not decided here": *"Server-side image transforms (crop /
+they store the **bytes exactly as uploaded** (ADR [0011](0011-media-and-file-storage.md)'s stance, carried into
+ADR [0025](0025-rich-content-markdown-and-content-images.md)'s "Not decided here": *"Server-side image transforms (crop /
 resize) — bytes are stored as uploaded; a future lane adds the transform."*).
 
 That leaves two real gaps a resident hits immediately:
@@ -30,7 +35,7 @@ That leaves two real gaps a resident hits immediately:
 The transform has to be **optional** (a resident may upload a perfectly
 sized image and not want to fiddle with it) and it must not change the
 **contract** either surface already depends on: the `MediaObject` id is the
-SHA-256 of the payload (the content-addressed store, ADR 0011), so the
+SHA-256 of the payload (the content-addressed store, ADR [0011](0011-media-and-file-storage.md)), so the
 `/content-image/{id}` URL, the `IsSafeImageSrc` seam, the `![alt](...)`
 Markdown value, and the audit row all key off the *id*, not the bytes.
 
@@ -59,7 +64,7 @@ Markdown value, and the audit row all key off the *id*, not the bytes.
   file. No resident is forced to edit.
 - **Client-side only — no new dependencies, no server change.**
   - The canvas API and Bootstrap's modal are already in the page; the module
-    is `tsc`-only (ADR 0031's `package.json` stays `typescript`-only). No
+    is `tsc`-only (ADR [0031](0031-wysiwyg-editor-and-toolbar.md)'s `package.json` stays `typescript`-only). No
     new npm package.
   - No new .NET image library (there is no ImageSharp / SixLabors in the
     repo). `Kumunita.Core` stays HTTP-free; `IMediaStore` / `MediaObject` /
@@ -112,16 +117,3 @@ Markdown value, and the audit row all key off the *id*, not the bytes.
   `IMediaStore.PutAsync`, and the content-addressing + `IsSafeImageSrc` +
   serializer still all work against the id. This ADR deliberately does **not**
   add that seam now; it keeps the lane client-side and dependency-free.
-
-## Not decided here
-
-- **Rotation / flip / filter / draw** — the editor does crop + resize only.
-  A more capable editor (a full image library) is a future lane and would
-  almost certainly move server-side (see *Revisit when*).
-- **A stored "display width" on the `MediaObject`** — deliberately **not**
-  adopted; the stored bytes *are* the display size, so the renderer /
-  serializer need no per-image metadata. This is the invariant that keeps the
-  frozen contracts untouched.
-- **Per-image alt-text / caption in the editor** — alt is still the
-  file-name-minus-extension, 40-char rule (the RE image convention); caption
-  is not a lane.

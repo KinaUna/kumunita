@@ -83,14 +83,12 @@ public sealed class KioskService : IKioskService
 
     /// <inheritdoc />
     public async Task<KioskPlaylist> SavePlaylistAsync(
-        IReadOnlyList<KioskView> views,
-        int viewIntervalSeconds,
-        int refreshIntervalSeconds,
-        KioskDisplayMode displayMode,
+        KioskPlaylistDraft draft,
         string actorId,
         IDocumentSession session,
         CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(draft);
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An acting actor is required.", nameof(actorId));
 
@@ -109,10 +107,13 @@ public sealed class KioskService : IKioskService
             .ConfigureAwait(false)
             ?? new KioskPlaylist { Id = actorId };
 
-        row.Views                  = views;
-        row.ViewIntervalSeconds    = viewIntervalSeconds;
-        row.RefreshIntervalSeconds = refreshIntervalSeconds;
-        row.DisplayMode            = displayMode;
+        // ADR 0285 — the whole playlist is replaced by the draft (the entries
+        // are a value-object list; list position is the play order).
+        row.Entries                = draft.Entries.ToList();
+        row.DefaultDurationSeconds = draft.DefaultDurationSeconds;
+        row.RefreshIntervalSeconds = draft.RefreshIntervalSeconds;
+        row.DisplayMode            = draft.DisplayMode;
+        row.ScrollSpeed            = draft.ScrollSpeed;
 
         session.Store(row);
 

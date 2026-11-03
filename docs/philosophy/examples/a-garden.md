@@ -1,3 +1,24 @@
+---
+id: philosophy-example-garden
+title: "A Garden"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the same three-shape example (differentiation / linkage /
+> what breaks) told with a garden bed — the plants as the parts, the
+> gardener's matched attention as the linkage, treating it as "plants" as the
+> failure. **Who is it for:** readers who'd rather think about plants than
+> people. **When to read the rest:** when the plain-language examples didn't
+> land and you'd rather think in growing things.
+>
+
 # A Garden
 
 > Reach for this one if you'd rather think about plants than people.

@@ -1,10 +1,23 @@
-# ADR 0096 — Per-row read/unread toggle on the Notifications inbox
+---
+id: adr-0096
+title: "Per-row read/unread toggle on the Notifications inbox"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m6-notifications-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0096](0096-notification-read-unread-per-row-toggle.md) — Per-row read/unread toggle on the Notifications inbox
 
 Status: Accepted
 Date: 2026-09-26
-Extends **ADR 0076** (the M6 Notifications inbox + recipient-email lane, whose
+Extends **ADR [0076](0076-notifications-inbox-and-recipient-email.md)** (the M6 Notifications inbox + recipient-email lane, whose
 D3 "personal read" + F11 "no audit row" pins constrain this lane) and the
-**ADR 0076 / design-doc §6.2** frozen `NotificationService` surface (which
+**ADR [0076](0076-notifications-inbox-and-recipient-email.md) / design-doc §6.2** frozen `NotificationService` surface (which
 shipped with only the bulk `MarkAllReadAsync` state lane). This ADR adds the
 two **single-row** state lanes — `MarkReadAsync` / `MarkUnreadAsync` — and the
 Web's two POST routes + per-row toggle buttons that make each inbox row
@@ -16,7 +29,7 @@ The M6 inbox shipped with exactly one read/state affordance beyond the
 "mark **all** read" action: the resident can see which rows are read (the
 `ReadAt` null-vs-set distinction drives the row's muted style) and the
 "mark all read" bulk lane (`POST /notifications/mark-all-read`, the
-ADR 0076 / C-M6·8 D8 shape — one bulk `Update` over the recipient's unread
+ADR [0076](0076-notifications-inbox-and-recipient-email.md) / C-M6·8 D8 shape — one bulk `Update` over the recipient's unread
 rows). There was **no way to mark a single row read** and **no way to mark a
 single row unread again**.
 
@@ -29,14 +42,14 @@ intent is per-row, not bulk.
 
 The standing for the new surface is already settled by three precedents:
 
-- **A recipient-gated single-row write** — the ADR 0076 D3 pin ("the
+- **A recipient-gated single-row write** — the ADR [0076](0076-notifications-inbox-and-recipient-email.md) D3 pin ("the
   `RecipientId` is the whole access story; a personal lane, no
-  `IAuthorizationService`") + the C-M2b·2 / ADR 0007/0008 self-lane shape
+  `IAuthorizationService`") + the C-M2b·2 / ADR [0007](0007-group-management-lane-owner-or-globaladmin.md)/0008 self-lane shape
   ("the row must be in **MY** set, otherwise `KeyNotFoundException`"). The
   single-row mark-read/mark-unread is the same wall, narrower: load the row by
   its id, gate on `row.RecipientId == recipientId`, and only then mutate
   `ReadAt`.
-- **A state lane, not a read (no audit row)** — the ADR 0076 F11 pin
+- **A state lane, not a read (no audit row)** — the ADR [0076](0076-notifications-inbox-and-recipient-email.md) F11 pin
   ("an inbox read is a personal read, not an `AccessAction` decision; no
   audit row") applies to the read *and* the state lanes alike. Mutating one
   of the recipient's **own** rows is a personal state change, never an
@@ -55,7 +68,7 @@ No schema change (the existing `Notification.ReadAt` nullable field carries
 both states), no new index, no new bounded context, no new audit row.
 
 **Core — `NotificationService` (additive frozen-surface):** two methods,
-placed immediately after `MarkAllReadAsync` (the §6.2 listing, the ADR 0084
+placed immediately after `MarkAllReadAsync` (the §6.2 listing, the ADR [0084](0084-per-target-notification-subscriptions.md)
 additive-frozen-surface precedent — every existing call site keeps compiling
 unchanged):
 
@@ -103,7 +116,7 @@ shows a `btn btn-sm btn-outline-primary` **"Mark as read"** button (a
 
 **Localization — `KnownTranslationKeys.cs` (two new `kw-l` keys, ×4 languages):**
 `notifications.mark_read` + `notifications.mark_unread`, each present in all
-four dictionaries (the ADR 0061 all-4-languages pin):
+four dictionaries (the ADR [0061](0061-email-and-notification-language.md) all-4-languages pin):
 
 | key | en | de | fr | da |
 |---|---|---|---|---|
@@ -127,7 +140,7 @@ the foreign-recipient `KeyNotFoundException` shape.
 - **No schema change.** The existing `Notification.ReadAt` nullable field is
   the whole state story — `null` = unread, set = read. No new field, no new
   index, no `NotificationDocTypes` delta (Marten's delta-detection is unaffected).
-- **The frozen surface grows by two methods** (the ADR 0084/0085 additive
+- **The frozen surface grows by two methods** (the ADR [0084](0084-per-target-notification-subscriptions.md)/0085 additive
   precedent — the existing `EmitAsync` / `ListInboxAsync` /
   `CountUnreadAsync` / `MarkAllReadAsync` / preference lanes are untouched and
   keep compiling).
@@ -135,12 +148,12 @@ the foreign-recipient `KeyNotFoundException` shape.
   new `/notifications/{id}/mark-read` + `/notifications/{id}/mark-unread`
   POSTs), and the §6.2 frozen-surface listing + the "In (settled)" bullets
   reflect the two new methods / routes (done).
-- **ADR 0076 D3** (the personal-read pin) is amended to name the per-row state
+- **ADR [0076](0076-notifications-inbox-and-recipient-email.md) D3** (the personal-read pin) is amended to name the per-row state
   lanes as in-scope "personal read" (no audit row, no `IAuthorizationService`),
   and its Consequences bullet points to this ADR as the extension (done).
 - **CONVENTIONS.md** `notifications` guide row now names the per-row toggle
-  and cites ADR 0096 (done). The guide body itself is a separate lane (the
-  ADR 0039 "no roadmap letter moves" / guide-registry discipline) — the
+  and cites ADR [0096](0096-notification-read-unread-per-row-toggle.md) (done). The guide body itself is a separate lane (the
+  ADR [0039](0039-pages-hierarchy-audience-translations.md) "no roadmap letter moves" / guide-registry discipline) — the
   registry pointer is updated; the prose update is a follow-on guide-edit lane,
   not part of this ADR's delta.
 - **No new audit row, no new `AccessAction`, no new `AccessVia`.** The two

@@ -1,8 +1,21 @@
-# ADR 0198 — Account pages
+---
+id: adr-0198
+title: "Account pages"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0182-form-look.md, docs/adr/0197-profile-directory.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0198](0198-account-pages.md) — Account pages
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-28
-Relates to: ADR 0197 (profile), ADR 0182 (forms)
+Relates to: ADR [0197](0197-profile-directory.md) (profile), ADR [0182](0182-form-look.md) (forms)
 
 ## Decision
 

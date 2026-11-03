@@ -1,7 +1,15 @@
-# ADR 0023 — Reply as a report target (extending the M3b report lane)
-
-Status: Accepted
-Date: 2026-09-17
+---
+id: adr-0023
+title: "Reply as a report target (extending the M3b report lane)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m31-production-error-handling-design.md]
+supersedes: []
+superseded_by: [adr-0165]
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -38,7 +46,7 @@ row points at.
   queue / resolve read path stays on the single post key and
   `C-M3·1`'s "the reply has no own audience; seeing the post is what
   makes the reply visible" invariant is preserved verbatim. This is
-  an ADR 0004 §B.1 additive change: Marten delta-detects the new
+  an ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive change: Marten delta-detects the new
   column on boot (`ApplyAllConfiguredChangesToDatabaseAsync`),
   idempotent across re-seed, and pre-existing rows keep
   `ReplyId = null` with no migration or back-fill.
@@ -57,7 +65,7 @@ row points at.
   - Writes one `Report` row (`Status = "filed"`, the §2.3 item-2
     literal pin; `ReplyId = replyId`, `PostId = parent.Id`) and one
     `AccessAudit` row in the **same** session, one
-    `SaveChangesAsync` (C3 / ADR 0006-C — same-transaction, no
+    `SaveChangesAsync` (C3 / ADR [0006](0006-module-boundary-contracts.md)-C — same-transaction, no
     partial write).
   - The audit row carries a **distinct** `Action` + `TargetKind`
     from the post lane so the log can tell the two apart:
@@ -88,20 +96,20 @@ row points at.
 
 - **UI surface: one per-reply "Report this reply" disclosure in the
   post detail view.** `Views/Posts/Detail.cshtml` adds, inside each
-  reply `<li class="list-group-item">` (after the ADR 0016
+  reply `<li class="list-group-item">` (after the ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md)
   author-only edit `<details>` block), a native `<details>`
-  disclosure (the ADR 0016 per-reply-edit precedent — one per reply,
+  disclosure (the ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) per-reply-edit precedent — one per reply,
   no JS dependency, no id collision) containing a `reason` textarea +
   a submit button, posting to
   `POST /posts/{postId}/replies/{r.Id}/report` with an
   `@Html.AntiForgeryToken()`. The report form is shown on **every**
   reply (not gated on `r.IsAuthor`) — any resident who can see the
   parent post can report any reply under it, including their own;
-  the ADR 0016 author-only edit `<details>` is a separate concern
+  the ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) author-only edit `<details>` is a separate concern
   (it stays gated on `r.IsAuthor`). The button / labels reuse the
   existing `posts.report_*` keys plus one new
   `posts.reply_report_button` key ("Report this reply") — the
-  closed `KnownTranslationKeys` registry (ADR 0015 D2) is the single
+  closed `KnownTranslationKeys` registry (ADR [0015](0015-ui-view-localization-mechanics.md) D2) is the single
   source of truth; the seeder materializes the `en` floor row at
   first boot and the `kw-l` provider's floor covers `en`, so no new
   provider seam is needed.
@@ -171,7 +179,7 @@ Positive
   `ComponentId`-scoped, `Status`-driven lanes with the same
   `C-M3b·4` SoD gate. No new standing, no new route shape, no new
   `Status` literal.
-- The additive field (`Report.ReplyId`) is ADR 0004 §B.1: idempotent
+- The additive field (`Report.ReplyId`) is ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1: idempotent
   at boot, no migration, pre-existing rows keep `null` (post-target
   by default), and the four `Status`-literal pins in the design doc
   hold verbatim for both target kinds.
@@ -205,23 +213,3 @@ Negative / accepted risks
   Accepted: the report's existence and its `Status` lifecycle are
   independent of the reply's existence — a report is a record of an
   intake action, not a pointer that must out-resolve the target.
-
-## Revisit when
-
-- A **reply-edit** surface is wanted that lets a resident edit their
-  own reply after a report is filed (ADR 0016 already lets the
-  author edit the body pre-report; post-report editing is a new
-  decision).
-- A **reply-removal** lane (distinct from the M3b post-hide /
-  post-remove) is wanted — today the F3/F4 lanes operate on the
-  post; a reply-own hide/remove is a new seam + a new `PostStatus`
-  value (or a new `PostReply` field) on the `PostReply` POCO.
-- **Announcement replies** (if/when announcements grow a reply
-  surface) are requested — today the report lane is post-scoped, and
-  an announcement reply would need its own discriminator + the same
-  two-negative filing-tag pin.
-- A **second target kind** (e.g. a translation row, a group
-  description edit) is reportable — the `Report` POCO would need a
-  `TargetKind` discriminator beyond post/reply, and the
-  `Action` / `TargetKind` audit-row convention established here
-  would extend to the new kind.

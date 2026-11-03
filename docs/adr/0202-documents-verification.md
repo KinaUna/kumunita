@@ -1,9 +1,22 @@
-# ADR 0202 — Documents verification and detail fixes
+---
+id: adr-0202
+title: "Documents verification and detail fixes"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0202](0202-documents-verification.md) — Documents verification and detail fixes
 
 Status: Accepted
 
 ## Context
-ADR 0192 (patch 25) restyled Documents but was never previewed. Verified live
+ADR [0192](0192-documents.md) (patch 25) restyled Documents but was never previewed. Verified live
 with PDF, DOCX, XLSX, CSV, TXT and ZIP uploads in Ember dark/light and phone
 width (Forest light list too).
 

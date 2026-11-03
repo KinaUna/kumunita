@@ -1,3 +1,31 @@
+---
+id: philosophy-hub
+title: "Kumunita — Our Philosophy"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer, agent]
+related:
+  - docs/philosophy/START-HERE.md
+  - docs/philosophy/domains-of-integration.md
+  - docs/philosophy/anti-patterns.md
+  - docs/philosophy/everyday-life.md
+  - docs/philosophy/in-code.md
+  - docs/philosophy/in-product.md
+  - docs/philosophy/SOURCE.md
+  - docs/philosophy/adopting-fig.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the hub of Kumunita's development guidelines — the six principles
+> (quality is the quality of the linkage, differentiation is deliberate,
+> bugs and value live at the seams, feedback loops are a feature, emergent
+> properties can't be delegated, integration decays) plus the map of every
+> doc in the folder and where each fits. **Who is it for:** everyone, at the
+> level of "how we think." **When to read the rest:** before deciding which
+> of the other philosophy docs to open.
+>
+
 # Kumunita — Our Philosophy
 
 A neighborhood is a system of **differentiated parts whose integrated

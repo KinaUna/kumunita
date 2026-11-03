@@ -1,4 +1,20 @@
+---
+id: design-site-content
+title: "Site content customization (`SITE`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0149-home-intro-hide-preference.md
+  - docs/adr/0050-admin-managed-signup-gate-open-or-invitation-only.md
+updated: 2026-11-02
+---
+
 # Site content customization (`SITE`) — design
+
+> **Abstract:** the **site content customization (`SITE`)** design — a `SiteContent` singleton the community can edit (community name, about/help text, …) with per-field `Audience` access, a single audited write lane, and a best-effort read. Built on the `LocaleSettings` singleton and the single-write-lane shape; **additive** (no reshape of the frozen singletons). **Who is it for:** a developer touching the `SiteContent` doc or the site-content surface; an agent that needs the field-set ceiling. **When to read the rest:** before touching the `SiteContent` field set, the write lane, or the site-content routes.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the SITE
 > lane: it pins the invariants (SITE·1–SITE·9), the FACES (SITE1–SITE10),
@@ -20,9 +36,9 @@
 > guard).
 >
 > **The frozen base.** This lane is built **on top of** the `LocaleSettings`
-> singleton (ADR 0005 B), the singleton-toggle admin surface (ADR 0019 /
-> ADR 0020), the single-write-lane shape (ADR 0050), and the per-resident
-> `Profile.HideHomeIntro` preference (ADR 0149). All of these still bind
+> singleton (ADR [0005](../adr/0005-multilingual-support.md) B), the singleton-toggle admin surface (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) /
+> ADR [0020](../adr/0020-date-format-platform-default-and-resident-override.md)), the single-write-lane shape (ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)), and the per-resident
+> `Profile.HideHomeIntro` preference (ADR [0149](../adr/0149-home-intro-hide-preference.md)). All of these still bind
 > **unchanged** (re-anchored in §Frozen base below). SITE adds **no**
 > re-shape of `LocaleSettings`, **no** re-shape of
 > `Profile.HideHomeIntro`, **no** removal of a `kw-l` registry entry, and
@@ -31,25 +47,25 @@
 > bounded context (`Kumunita.Core.SiteContent`), one new service
 > (`ISiteContentService`), one new admin surface (`/admin/site`), and
 > conditional rendering in two existing views. **No EF migration** (a new
-> Marten doc type is additive per ADR 0004 §B.1; the delta is applied
+> Marten doc type is additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1; the delta is applied
 > idempotently at boot). **No new route for the read** (the existing `/` and
 > `/about` routes are unchanged — only what they render changes).
 >
 > **The `SiteContent` field set is the ceiling** (the 13 fields in the
 > register's "one thing" section — no field outside the field set may appear
-> in the doc, the ADR 0150 D1 pin). **The `kw-l` registry entries are the
-> floor** (the `home.*` / `about.*` / `platform.*` keys stay, the ADR 0150
-> D3 pin). **The ADR 0149 `Profile.HideHomeIntro` read is the frozen base**
-> (the per-resident preference is unchanged, the ADR 0150 D5 pin). **The
+> in the doc, the ADR [0150](../adr/0150-site-content-customization.md) D1 pin). **The `kw-l` registry entries are the
+> floor** (the `home.*` / `about.*` / `platform.*` keys stay, the ADR [0150](../adr/0150-site-content-customization.md)
+> D3 pin). **The ADR [0149](../adr/0149-home-intro-hide-preference.md) `Profile.HideHomeIntro` read is the frozen base**
+> (the per-resident preference is unchanged, the ADR [0150](../adr/0150-site-content-customization.md) D5 pin). **The
 > `LocaleSettings` singleton is untouched** (this lane adds a new doc, not a
-> new field on the existing one, the ADR 0150 D6 pin).
+> new field on the existing one, the ADR [0150](../adr/0150-site-content-customization.md) D6 pin).
 
 ## Value chain
 
-The `SP` lane (ADR 0043) shipped the four static pages (terms / help /
+The `SP` lane (ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md)) shipped the four static pages (terms / help /
 privacy / conduct) as admin-editable `Page` docs — an admin can now change
 what those pages say without a code change. The `LocaleSettings` singleton
-(ADR 0005 B) ships the admin-settled instance values (default language /
+(ADR [0005](../adr/0005-multilingual-support.md) B) ships the admin-settled instance values (default language /
 timezone / date format / sign-up gate / messaging) — an admin can now
 change how the platform *behaves* without a code change. But the two
 **landing surfaces** — `/` (the home) and `/about` (the about page) — are
@@ -94,7 +110,7 @@ sign-up gate / messaging. But the two **landing surfaces** — `/` and
 
 - `/home` = `Views/Home/Index.cshtml` (4 sections: hero, feature cards,
   "What's new" feed, roadmap). Sections 1+2 are wrapped in
-  `@if (!Model.HideIntro)` (ADR 0149). Section 3 is wrapped in
+  `@if (!Model.HideIntro)` (ADR [0149](../adr/0149-home-intro-hide-preference.md)). Section 3 is wrapped in
   `@if (Model.Feed is { } feed)`. Section 4 is unconditional.
 - `/about` = `Views/StaticPages/About.cshtml` (7 sections: hero, feature
   cards, scope, FIG philosophy, code/docs, "What's new" changelog, contact
@@ -108,31 +124,31 @@ add a word, short of a code change.
 
 ### The precedent shapes (frozen, verified by U00)
 
-- **ADR 0005 B** — the `LocaleSettings` singleton (`Id = "singleton"`
+- **ADR [0005](../adr/0005-multilingual-support.md) B** — the `LocaleSettings` singleton (`Id = "singleton"`
   sentinel, the additive-field convention, one row per instance). The
   `SiteContent` doc will be a **new** singleton in the same shape, **not** a
-  new field on `LocaleSettings` (ADR 0006 module-boundary contract).
-- **ADR 0019 / ADR 0020** — the singleton-toggle admin surface shape
+  new field on `LocaleSettings` (ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary contract).
+- **ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / ADR [0020](../adr/0020-date-format-platform-default-and-resident-override.md)** — the singleton-toggle admin surface shape
   (`/admin/timezone` / `/admin/dateformat`, `GlobalAdmin`-gated, one
   `AccessAudit` row per save).
-- **ADR 0050** — the single-write-lane shape (`AdminSignupController`, the
+- **ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)** — the single-write-lane shape (`AdminSignupController`, the
   `IsSignupOpen` best-effort read, the `SetSignupOpenAsync` audited write,
   the `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST, the
   `TempData["info"]` flash, the `RedirectToAction(nameof(Index))`
   redirect). The `AdminSiteController` will mirror this shape.
-- **ADR 0149** — the `Profile.HideHomeIntro` **per-resident** hide-intro
+- **ADR [0149](../adr/0149-home-intro-hide-preference.md)** — the `Profile.HideHomeIntro` **per-resident** hide-intro
   preference (composable, not replaced — the two intro sections render when
   **both** `!HideIntro` **and** the platform flag are true).
 
 ### The constraints that still bind
 
-- **ADR 0004 §B.1** — additive doc type (delta applied idempotently at boot,
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** — additive doc type (delta applied idempotently at boot,
   no EF migration). The `SiteContent` doc is a **new** Marten doc type, not
   a new field on an existing one.
-- **ADR 0006** — module-boundary contract. The `SiteContent` context is a
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)** — module-boundary contract. The `SiteContent` context is a
   **new** bounded context (`Kumunita.Core.SiteContent`), independent of
   `LocaleSettings` and the `Localization` context.
-- **ADR 0015 D1** — `kw-l` provider-floor discipline. The `kw-l` registry
+- **ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1** — `kw-l` provider-floor discipline. The `kw-l` registry
   entries stay (the `home.*` / `about.*` / `platform.*` keys are not
   removed, not re-shaped, not re-keyed).
 - **The `LS` / `SP` / `PG` test model** — the `FirstBootSeeder` default pin
@@ -151,10 +167,10 @@ add a word, short of a code change.
 
 - The `SiteContent` doc (a new `Kumunita.Core.SiteContent` context,
   `Id = "singleton"` sentinel, the 13 fields).
-- The `ISiteContentService` + `SiteContentService` (the ADR 0050
+- The `ISiteContentService` + `SiteContentService` (the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)
   single-write-lane shape — the `GetAsync()` read + the
   `SaveAsync(SiteContent content, string actorBy)` write).
-- The `SiteContentDocTypes.Configure(opts)` surface (the ADR 0004 §B.1
+- The `SiteContentDocTypes.Configure(opts)` surface (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
   additive doc type — the `opts.Schema.For<SiteContent>()` shape).
 - The `FirstBootSeeder` default (the exact shipped `kw-l` text,
   byte-identical — the `SeedSiteContentAsync` method, create-if-missing,
@@ -166,7 +182,7 @@ add a word, short of a code change.
   the hero text is `@Model.Site.HomeHeroEyebrow` /
   `@Model.Site.HomeHeroLead`; the sections are conditionally rendered).
 - The `/admin/site` surface (the `AdminSiteController` + the `AdminSite`
-  view + the `/admin/platform` link — the ADR 0050 shape).
+  view + the `/admin/platform` link — the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) shape).
 - The test pins (the `SiteContentSeederTests` / `SiteContentServiceTests` /
   `HomeControllerSiteContentTests` / `AdminSiteControllerTests` classes).
 
@@ -176,13 +192,13 @@ add a word, short of a code change.
   `SiteContentTranslation` row shape (the `PageTranslation` /
   `PostTranslation` precedent) + a `SiteContentTranslationDocTypes` surface
   + a `/admin/site` translation editor + the `KnownTranslationKeys` parity
-  pin for the new keys. The ADR 0005 §B "every other language is
+  pin for the new keys. The ADR [0005](../adr/0005-multilingual-support.md) §B "every other language is
   community-provided" clause is unchanged.
 - **Per-section editable text** — the feature cards' titles / bodies, the
   scope band's body, the FIG-philosophy band's body, and the code/docs
   band's lead are **show / hide only** in this lane. A future SITE-2 lane
   could add per-section editable text in the same `SiteContent` doc shape
-  (the `SiteContent` field set is additive per ADR 0004 §B.1).
+  (the `SiteContent` field set is additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 - **Per-section custom CTA buttons** — the home hero's "What it is & how it
   works" button is show / hide only; a future lane could add an editable
   URL + label.
@@ -196,14 +212,14 @@ and every FACES row references a stable number.
 
 | # | Invariant (one-line SITE note) |
 |---|------------------------------|
-| **SITE·1** | **The read is a public landing surface** — `/` and `/about` are world-readable (the static-page contract — the seeded canonical pages are public, `Page.Audience = null`, the ADR 0043 standing matrix). The `SiteContent` singleton is read by the same two controllers (`HomeController.Index` / `StaticPagesController.About`) and is **not** an access decision, **not** a claim (the thin-token rule, ADR 0001-B), and is read fresh per request (a save is live on the very next render — the ADR 0050 `IsSignupOpen` strong-consistency shape). A missing singleton (a fresh boot before the seeder ran, or a test construction with no store) degrades to the **shipped defaults** (the byte-identical `kw-l` text + every section shown) — never a blank page, never an error. |
-| **SITE·2** | **The write is the ADR 0050 single-write-lane shape** — one `ISiteContentService.SaveAsync(content, actorBy)` lane that loads the singleton, applies the field set, and saves in one session (invariant C3); exactly one `AccessAudit` row per save (`Via = Admin`, action `site.save`, `TargetKind` "site" — the `signup.set-open` / `timezone.set-default` / `dateformat.set-default` singleton-toggle shape). The lane **never load-or-creates a new row on a save** — it upserts the singleton (the `LocaleSettings` "one row per instance" shape, ADR 0005 B). Strong consistency (invariant C4): the new value is live on the very next `GetAsync` / render. |
+| **SITE·1** | **The read is a public landing surface** — `/` and `/about` are world-readable (the static-page contract — the seeded canonical pages are public, `Page.Audience = null`, the ADR [0043](../adr/0043-system-pages-shipped-and-discoverable.md) standing matrix). The `SiteContent` singleton is read by the same two controllers (`HomeController.Index` / `StaticPagesController.About`) and is **not** an access decision, **not** a claim (the thin-token rule, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B), and is read fresh per request (a save is live on the very next render — the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `IsSignupOpen` strong-consistency shape). A missing singleton (a fresh boot before the seeder ran, or a test construction with no store) degrades to the **shipped defaults** (the byte-identical `kw-l` text + every section shown) — never a blank page, never an error. |
+| **SITE·2** | **The write is the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) single-write-lane shape** — one `ISiteContentService.SaveAsync(content, actorBy)` lane that loads the singleton, applies the field set, and saves in one session (invariant C3); exactly one `AccessAudit` row per save (`Via = Admin`, action `site.save`, `TargetKind` "site" — the `signup.set-open` / `timezone.set-default` / `dateformat.set-default` singleton-toggle shape). The lane **never load-or-creates a new row on a save** — it upserts the singleton (the `LocaleSettings` "one row per instance" shape, ADR [0005](../adr/0005-multilingual-support.md) B). Strong consistency (invariant C4): the new value is live on the very next `GetAsync` / render. |
 | **SITE·3** | **The defaults are byte-identical to the shipped `kw-l` text** — the `SiteContent` default values (the `FirstBootSeeder` seed + the in-code fallback) are the **exact** `home.intro_eyebrow` / `home.intro_lead` / `about.eyebrow` / `about.lead` English strings from `KnownTranslationKeys.cs` (the `en` source text), and every section-toggle default is `true` (every section shown). An admin who never touches the surface sees exactly what a fresh instance ships today — the "keep it as is by default" requirement. The `LS_U04_SeederTests` / `PageServiceTests` "seeded defaults match the shipped text" pin carries this forward. |
-| **SITE·4** | **The `kw-l` registry entries stay** — the `home.*` / `about.*` / `platform.*` keys in `KnownTranslationKeys.cs` are **not** removed, not re-shaped, not re-keyed — they remain the **fallback** the `SiteContent` default values are derived from (the seeder reads the registry at seed time; the in-code fallback is the same text, hard-coded in `SiteContent`'s field defaults so a missing singleton degrades to the shipped text). The registry parity tests (`KnownTranslationKeys_ParityTests` / `KwLRegistryConsistencyTests`) are **untouched** — the view's `kw-l` wrap is replaced by a server-resolved `SiteContent` value, but the registry entries stay (they are still the canonical `en` source text; a future translation lane for the landing surface is **out of scope** — the ADR 0005 §B "every other language is community-provided" clause is unchanged). |
-| **SITE·5** | **The ADR 0149 `Profile.HideHomeIntro` per-resident preference is composable, not replaced** — the per-resident "hide the intro" checkbox (ADR 0149) and the platform-level "show the intro" flag (ADR 0150) are **independent**: the per-resident preference is a `Profile` field (ADR 0019 / ADR 0020 owner-scope shape, read in `HomeController.Index` and passed through `HomeViewModel.HideIntro`); the platform-level flag is a `SiteContent` field (read in the same `HomeController.Index` and passed through a new `HomeViewModel.ShowHomeIntro` field). The view's two intro sections render when **both** are true (the per-resident preference is the *resident's* choice to hide; the platform flag is the *admin's* choice to show — both must agree for the sections to appear). The "What's new" feed and the roadmap section are governed **only** by the platform flag (the per-resident preference never reaches them — the ADR 0149 pin is unchanged). |
-| **SITE·6** | **The `SiteContent` doc is a singleton (one row per instance)** — the `Id` is the sentinel `"singleton"` (the exact `LocaleSettings` shape, ADR 0005 B). The doc is registered in a new `SiteContentDocTypes.Configure(opts)` surface (the `PageDocTypes` / `MediaDocTypes` parallel surface, ADR 0004 §B.1); the delta is applied idempotently at boot (the M1/M3/Media dev-only loop / versioned-boot path). **No EF migration** (a new Marten doc type is additive per ADR 0004 §B.1; the existing `LocaleSettings` doc is **not** modified — this lane adds a *new* doc, not a new field on the existing one, because the landing-surface content is a distinct bounded concern from the locale settings, and the ADR 0006 module-boundary contract keeps the two contexts independent). |
-| **SITE·7** | **The `/admin/site` surface is the ADR 0050 shape** — `[Route("admin/site")]` + `[Authorize(Roles = GlobalAdmin)]` on a new `AdminSiteController` (a **dedicated** controller — the `AdminController`'s constructor is pinned by two Web-layer test harnesses (`AdminControllerBlockTests` / `AdminControllerMandatoryTests`), so a new dependency there would break them; a separate `/admin/site` surface mirrors `/admin/signup` / `/admin/timezone` / `/admin/dateformat` — the codebase already puts the platform-settled instance values on their own controllers). The GET seeds the form with the current singleton; the POST saves it (one `AccessAudit` row, the `signup.set-open` shape). The `/admin/platform` page gains one list-group row linking to `/admin/site` (the `SP U03` / `ADR 0050` discoverability pattern). |
-| **SITE·8** | **The `Milestones.cs` / README / `MilestonesTests` trio is untouched until the lane *ships* (U08 owns the close flip)** — the `MilestonesTests` pin that **M4** is the single `StatusNext` stays intact — a `SITE` row added as `StatusDone` (or a new `WhatsNew` entry, the required sixth member of the close flip) does not disturb it. The `WhatsNew.cs` registry gains one new entry (newest-first, the `0.42.0` row) naming the lane + the ADR 0150 — the M27 "shipped with no entry until caught in review" lesson (AGENTS.md) is held. |
+| **SITE·4** | **The `kw-l` registry entries stay** — the `home.*` / `about.*` / `platform.*` keys in `KnownTranslationKeys.cs` are **not** removed, not re-shaped, not re-keyed — they remain the **fallback** the `SiteContent` default values are derived from (the seeder reads the registry at seed time; the in-code fallback is the same text, hard-coded in `SiteContent`'s field defaults so a missing singleton degrades to the shipped text). The registry parity tests (`KnownTranslationKeys_ParityTests` / `KwLRegistryConsistencyTests`) are **untouched** — the view's `kw-l` wrap is replaced by a server-resolved `SiteContent` value, but the registry entries stay (they are still the canonical `en` source text; a future translation lane for the landing surface is **out of scope** — the ADR [0005](../adr/0005-multilingual-support.md) §B "every other language is community-provided" clause is unchanged). |
+| **SITE·5** | **The ADR [0149](../adr/0149-home-intro-hide-preference.md) `Profile.HideHomeIntro` per-resident preference is composable, not replaced** — the per-resident "hide the intro" checkbox (ADR [0149](../adr/0149-home-intro-hide-preference.md)) and the platform-level "show the intro" flag (ADR [0150](../adr/0150-site-content-customization.md)) are **independent**: the per-resident preference is a `Profile` field (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / ADR [0020](../adr/0020-date-format-platform-default-and-resident-override.md) owner-scope shape, read in `HomeController.Index` and passed through `HomeViewModel.HideIntro`); the platform-level flag is a `SiteContent` field (read in the same `HomeController.Index` and passed through a new `HomeViewModel.ShowHomeIntro` field). The view's two intro sections render when **both** are true (the per-resident preference is the *resident's* choice to hide; the platform flag is the *admin's* choice to show — both must agree for the sections to appear). The "What's new" feed and the roadmap section are governed **only** by the platform flag (the per-resident preference never reaches them — the ADR [0149](../adr/0149-home-intro-hide-preference.md) pin is unchanged). |
+| **SITE·6** | **The `SiteContent` doc is a singleton (one row per instance)** — the `Id` is the sentinel `"singleton"` (the exact `LocaleSettings` shape, ADR [0005](../adr/0005-multilingual-support.md) B). The doc is registered in a new `SiteContentDocTypes.Configure(opts)` surface (the `PageDocTypes` / `MediaDocTypes` parallel surface, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1); the delta is applied idempotently at boot (the M1/M3/Media dev-only loop / versioned-boot path). **No EF migration** (a new Marten doc type is additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1; the existing `LocaleSettings` doc is **not** modified — this lane adds a *new* doc, not a new field on the existing one, because the landing-surface content is a distinct bounded concern from the locale settings, and the ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary contract keeps the two contexts independent). |
+| **SITE·7** | **The `/admin/site` surface is the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) shape** — `[Route("admin/site")]` + `[Authorize(Roles = GlobalAdmin)]` on a new `AdminSiteController` (a **dedicated** controller — the `AdminController`'s constructor is pinned by two Web-layer test harnesses (`AdminControllerBlockTests` / `AdminControllerMandatoryTests`), so a new dependency there would break them; a separate `/admin/site` surface mirrors `/admin/signup` / `/admin/timezone` / `/admin/dateformat` — the codebase already puts the platform-settled instance values on their own controllers). The GET seeds the form with the current singleton; the POST saves it (one `AccessAudit` row, the `signup.set-open` shape). The `/admin/platform` page gains one list-group row linking to `/admin/site` (the `SP U03` / `ADR 0050` discoverability pattern). |
+| **SITE·8** | **The `Milestones.cs` / README / `MilestonesTests` trio is untouched until the lane *ships* (U08 owns the close flip)** — the `MilestonesTests` pin that **M4** is the single `StatusNext` stays intact — a `SITE` row added as `StatusDone` (or a new `WhatsNew` entry, the required sixth member of the close flip) does not disturb it. The `WhatsNew.cs` registry gains one new entry (newest-first, the `0.42.0` row) naming the lane + the ADR [0150](../adr/0150-site-content-customization.md) — the M27 "shipped with no entry until caught in review" lesson (AGENTS.md) is held. |
 | **SITE·9** | **a11y** — the two heroes' eyebrow + lead are still the first content in the DOM (the hero band is unchanged in shape — only the text source changes); the section toggles are **server-side** (a hidden section is **not in the DOM at all**, not `display: none` — a screen reader never sees it); the view's `aria-label` attributes are unchanged for the sections that are shown. |
 
 ## FACES (pinned, 10)
@@ -217,37 +233,37 @@ more invariants.
 | **SITE2** | The admin saves a field group on `/admin/site` → the `SiteContentService.SaveAsync` lane loads the singleton, applies the field set, and saves in one session; exactly **one** `AccessAudit` row is written (`Via = Admin`, action `site.save`, `TargetKind` "site"); the new value is **live on the very next render** (strong consistency). The lane **upserts** the singleton — no duplicate row. | SITE·2 |
 | **SITE3** | A fresh instance (the seeder has run, the admin has never touched `/admin/site`) renders `/` and `/about` with **exactly** the shipped `kw-l` text — the hero eyebrow, the hero lead, and every section shown. The `SiteContentSeederTests` pins assert the defaults are byte-identical to the `home.intro_eyebrow` / `home.intro_lead` / `about.eyebrow` / `about.lead` English strings from `KnownTranslationKeys.cs`. | SITE·3 |
 | **SITE4** | The `kw-l` registry entries (`home.*` / `about.*` / `platform.*` keys in `KnownTranslationKeys.cs`) are **untouched** — the view's `kw-l` wrap is replaced by a server-resolved `SiteContent` value, but the registry entries stay. The `KwLRegistryConsistencyTests` / `KnownTranslationKeys_ParityTests` pins are **green** (the registry entries are untouched). A future translation lane (out of scope) would add a `SiteContentTranslation` row shape keyed on the same strings. | SITE·4 |
-| **SITE5** | A resident who has set `Profile.HideHomeIntro = true` (ADR 0149) loads `/` — the two intro sections (hero + feature cards) are **hidden** even if the admin has `HomeShowFeatures = true` (the per-resident preference is the *resident's* choice to hide; the platform flag is the *admin's* choice to show — **both** must agree). Conversely, a resident who has `HideHomeIntro = false` (the default) sees the two intro sections **only if** the admin has `HomeShowFeatures = true`. The "What's new" feed and the roadmap section are governed **only** by the platform flag (`HomeShowRoadmap`) — the per-resident preference never reaches them. | SITE·5 |
+| **SITE5** | A resident who has set `Profile.HideHomeIntro = true` (ADR [0149](../adr/0149-home-intro-hide-preference.md)) loads `/` — the two intro sections (hero + feature cards) are **hidden** even if the admin has `HomeShowFeatures = true` (the per-resident preference is the *resident's* choice to hide; the platform flag is the *admin's* choice to show — **both** must agree). Conversely, a resident who has `HideHomeIntro = false` (the default) sees the two intro sections **only if** the admin has `HomeShowFeatures = true`. The "What's new" feed and the roadmap section are governed **only** by the platform flag (`HomeShowRoadmap`) — the per-resident preference never reaches them. | SITE·5 |
 | **SITE6** | The `SiteContent` doc is a **singleton** — one row per instance, `Id = "singleton"`. A second boot is **idempotent** (no duplicate row, no field change). The `SiteContentSeederTests.SecondBoot_IsIdempotent_NoDuplicateRow_NoFieldChange` pin asserts this. The `LocaleSettings` doc is **untouched** — this lane adds a *new* doc, not a new field on the existing one. | SITE·6 |
 | **SITE7** | The admin navigates to `/admin/site` (from the `/admin/platform` list-group row) — the GET seeds the form with the current singleton (both the Home and About sections). The admin edits the hero text or toggles a section and clicks **Save** — the POST saves the field group, writes one `AccessAudit` row, and redirects back to the GET. A non-`GlobalAdmin` is **denied** (the `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST). The `AdminSiteControllerTests` pins assert all four scenarios. | SITE·7 |
 | **SITE8** | The `Milestones.cs` / README / `MilestonesTests` trio is **untouched** until the lane *ships* (U08 owns the close flip). The `MilestonesTests` pin that M4 is the single `StatusNext` is **intact** through U01–U07. When U08 ships the close flip, the `Milestones.cs` registry gains one new entry (the `SITE` lane row, `StatusDone`), the README Roadmap gains one new row, and the `WhatsNew.cs` registry gains one new entry (the `0.42.0` row, newest-first). | SITE·8 |
 | **SITE9** | A visitor with a screen reader loads `/` or `/about` — the two heroes' eyebrow + lead are the **first content in the DOM** (the hero band is unchanged in shape — only the text source changes). A section that the admin has toggled off is **not in the DOM at all** (not `display: none`) — a screen reader never sees it. The visible sections' `aria-label` attributes are **unchanged** (the `a11y.*` keys in `KnownTranslationKeys.cs` are untouched). | SITE·9 |
-| **SITE10** | The `SiteContent` field set is the **complete** admin surface for the current scope — the 13 fields (the 4 text fields + the 9 toggle fields) are the **ceiling**: no field outside the field set may appear in the doc (the ADR 0150 D1 pin). A future SITE-2 lane **adds** fields (the `SiteContent` doc is additive per ADR 0004 §B.1); it does **not** re-shape the existing ones. The `/admin/site` view's two form sections (Home + About) expose **exactly** the 13 fields — no hidden fields, no reserved fields. | (register's "one thing" section) |
+| **SITE10** | The `SiteContent` field set is the **complete** admin surface for the current scope — the 13 fields (the 4 text fields + the 9 toggle fields) are the **ceiling**: no field outside the field set may appear in the doc (the ADR [0150](../adr/0150-site-content-customization.md) D1 pin). A future SITE-2 lane **adds** fields (the `SiteContent` doc is additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1); it does **not** re-shape the existing ones. The `/admin/site` view's two form sections (Home + About) expose **exactly** the 13 fields — no hidden fields, no reserved fields. | (register's "one thing" section) |
 
 ## Frozen base (unchanged)
 
 All of the following still bind **unchanged**; this lane does not re-shape
 any of them:
 
-- **ADR 0005 B** — the `LocaleSettings` singleton (`Id = "singleton"`
+- **ADR [0005](../adr/0005-multilingual-support.md) B** — the `LocaleSettings` singleton (`Id = "singleton"`
   sentinel, the additive-field convention, one row per instance). The
   `SiteContent` doc will be a **new** singleton in the same shape, **not** a
-  new field on `LocaleSettings` (ADR 0006 module-boundary contract).
-- **ADR 0019 / ADR 0020** — the singleton-toggle admin surface shape
+  new field on `LocaleSettings` (ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary contract).
+- **ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / ADR [0020](../adr/0020-date-format-platform-default-and-resident-override.md)** — the singleton-toggle admin surface shape
   (`/admin/timezone` / `/admin/dateformat`, `GlobalAdmin`-gated, one
   `AccessAudit` row per save).
-- **ADR 0050** — the single-write-lane shape (`AdminSignupController`, the
+- **ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)** — the single-write-lane shape (`AdminSignupController`, the
   `IsSignupOpen` best-effort read, the `SetSignupOpenAsync` audited write,
   the `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST, the
   `TempData["info"]` flash, the `RedirectToAction(nameof(Index))`
   redirect).
-- **ADR 0149** — the `Profile.HideHomeIntro` **per-resident** hide-intro
+- **ADR [0149](../adr/0149-home-intro-hide-preference.md)** — the `Profile.HideHomeIntro` **per-resident** hide-intro
   preference (composable, not replaced — the two intro sections render when
   **both** `!HideIntro` **and** the platform flag are true).
-- **ADR 0004 §B.1** — additive doc type (delta applied idempotently at boot,
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** — additive doc type (delta applied idempotently at boot,
   no EF migration).
-- **ADR 0006** — module-boundary contract.
-- **ADR 0015 D1** — `kw-l` provider-floor discipline.
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)** — module-boundary contract.
+- **ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1** — `kw-l` provider-floor discipline.
 - **The `LS` / `SP` / `PG` test model** — the `LS_U04_SeederTests` /
   `PageServiceTests` / `KwLRegistryConsistencyTests` /
   `KnownTranslationKeys_ParityTests` pins are untouched.
@@ -271,29 +287,29 @@ The following still bind **unchanged** and this lane does not re-shape any
 of them (re-anchored verbatim from Part 1's §Frozen base, for reference in
 the Part-2 context):
 
-- **ADR 0005 B** — the `LocaleSettings` singleton (`Id = "singleton"`
+- **ADR [0005](../adr/0005-multilingual-support.md) B** — the `LocaleSettings` singleton (`Id = "singleton"`
   sentinel, the additive-field convention, one row per instance). The
   `SiteContent` doc is a **new** singleton in the same shape, **not** a new
   field on `LocaleSettings`.
-- **ADR 0019 / ADR 0020** — the singleton-toggle admin surface shape
+- **ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / ADR [0020](../adr/0020-date-format-platform-default-and-resident-override.md)** — the singleton-toggle admin surface shape
   (`/admin/timezone` / `/admin/dateformat`, `GlobalAdmin`-gated, one
   `AccessAudit` row per save).
-- **ADR 0050** — the single-write-lane shape (`AdminSignupController`, the
+- **ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)** — the single-write-lane shape (`AdminSignupController`, the
   `IsSignupOpen` best-effort read, the `SetSignupOpenAsync` audited write,
   the `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST, the
   `TempData["info"]` flash, the `RedirectToAction(nameof(Index))` redirect).
   The `AdminSiteController` mirrors this shape exactly.
-- **ADR 0149** — the `Profile.HideHomeIntro` **per-resident** hide-intro
+- **ADR [0149](../adr/0149-home-intro-hide-preference.md)** — the `Profile.HideHomeIntro` **per-resident** hide-intro
   preference (composable, not replaced — the two intro sections render when
   **both** `!HideIntro` **and** `HomeShowFeatures` are true; the feed +
   roadmap are governed only by the platform flag).
-- **ADR 0004 §B.1** — additive doc type (delta applied idempotently at boot,
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** — additive doc type (delta applied idempotently at boot,
   no EF migration). The `SiteContent` doc is a **new** Marten doc type, not
   a new field on an existing one.
-- **ADR 0006** — module-boundary contract. The `SiteContent` context is a
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)** — module-boundary contract. The `SiteContent` context is a
   **new** bounded context (`Kumunita.Core.SiteContent`), independent of
   `LocaleSettings` and the `Localization` context.
-- **ADR 0015 D1** — `kw-l` provider-floor discipline. The `kw-l` registry
+- **ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1** — `kw-l` provider-floor discipline. The `kw-l` registry
   entries stay (the `home.*` / `about.*` / `platform.*` keys are not
   removed, not re-shaped, not re-keyed).
 - **The `LS` / `SP` / `PG` test model** — the `LS_U04_SeederTests` /
@@ -307,9 +323,9 @@ the Part-2 context):
 
 The `SiteContent` POCO (a new `Kumunita.Core.SiteContent` bounded context)
 carries **exactly 13 fields** — the 4 text fields + the 9 toggle fields.
-The field set is the **ceiling** (the ADR 0150 D1 pin): no field outside
+The field set is the **ceiling** (the ADR [0150](../adr/0150-site-content-customization.md) D1 pin): no field outside
 this set may appear in the doc. A future SITE-2 lane **adds** fields (the
-`SiteContent` doc is additive per ADR 0004 §B.1); it does **not** re-shape
+`SiteContent` doc is additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1); it does **not** re-shape
 the existing 13.
 
 | # | Field | Type | Default (the `en` source text / `true`) | `kw-l` key (the canonical `en` source text the default is derived from) | a11y note |
@@ -317,8 +333,8 @@ the existing 13.
 | 1 | `HomeHeroEyebrow` | `string` | `"A private home for one neighbourhood"` | `home.intro_eyebrow` | the home hero's eyebrow — the first content in the DOM (SITE·9); the hero band is unchanged in shape, only the text source changes. |
 | 2 | `HomeHeroLead` | `string` | `"One quiet place for everything your street does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours."` | `home.intro_lead` | the home hero's lead — the second content in the DOM (SITE·9); the hero band is unchanged in shape, only the text source changes. |
 | 3 | `HomeShowAboutButton` | `bool` | `true` | (none — a server-side show/hide toggle, not a UI string) | the home hero's "What it is & how it works" CTA button; when `false` the button is **not in the DOM at all** (not `display: none`), so a screen reader never sees it (SITE·9). |
-| 4 | `HomeShowFeatures` | `bool` | `true` | (none — a server-side show/hide toggle, not a UI string) | governs **both** of the home's intro sections (the hero band + the feature-cards band) together — the ADR 0149 "they hide and show as a pair" shape; when `false` **both** sections are **not in the DOM at all** (SITE·9), and the ADR 0149 `Profile.HideHomeIntro` per-resident preference is **additive** (a resident who set `HideHomeIntro = true` sees neither section regardless of this flag, SITE·5). |
-| 5 | `HomeShowRoadmap` | `bool` | `true` | (none — a server-side show/hide toggle, not a UI string) | the home's "The plan" roadmap section; when `false` the section is **not in the DOM at all** (SITE·9); the ADR 0149 `Profile.HideHomeIntro` per-resident preference **never reaches** this section (SITE·5 — it is governed only by this platform flag). |
+| 4 | `HomeShowFeatures` | `bool` | `true` | (none — a server-side show/hide toggle, not a UI string) | governs **both** of the home's intro sections (the hero band + the feature-cards band) together — the ADR [0149](../adr/0149-home-intro-hide-preference.md) "they hide and show as a pair" shape; when `false` **both** sections are **not in the DOM at all** (SITE·9), and the ADR [0149](../adr/0149-home-intro-hide-preference.md) `Profile.HideHomeIntro` per-resident preference is **additive** (a resident who set `HideHomeIntro = true` sees neither section regardless of this flag, SITE·5). |
+| 5 | `HomeShowRoadmap` | `bool` | `true` | (none — a server-side show/hide toggle, not a UI string) | the home's "The plan" roadmap section; when `false` the section is **not in the DOM at all** (SITE·9); the ADR [0149](../adr/0149-home-intro-hide-preference.md) `Profile.HideHomeIntro` per-resident preference **never reaches** this section (SITE·5 — it is governed only by this platform flag). |
 | 6 | `AboutHeroEyebrow` | `string` | `"Private by default"` | `about.eyebrow` | the about hero's eyebrow — the first content in the DOM of `/about` (SITE·9); the hero band is unchanged in shape, only the text source changes. |
 | 7 | `AboutHeroLead` | `string` | `"One home for everything your neighborhood does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours."` | `about.lead` | the about hero's lead — the second content in the DOM of `/about` (SITE·9); the hero band is unchanged in shape, only the text source changes. |
 | 8 | `AboutShowFeatures` | `bool` | `true` | (none — a server-side show/hide toggle, not a UI string) | the about's three feature cards; when `false` the section is **not in the DOM at all** (SITE·9). |
@@ -466,8 +482,8 @@ The read is the `SiteContentService.GetAsync()` call, made by the two
 landing-surface controllers (`HomeController.Index` /
 `StaticPagesController.About`). It is **best-effort** — a missing seam, a
 missing row, or a read failure degrades to the in-code fallback (the
-shipped defaults), and the page **always renders** (the ADR 0050
-`IsSignupOpenAsync` / ADR 0149 `HideHomeIntro` best-effort shape, SITE·1).
+shipped defaults), and the page **always renders** (the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)
+`IsSignupOpenAsync` / ADR [0149](../adr/0149-home-intro-hide-preference.md) `HideHomeIntro` best-effort shape, SITE·1).
 
 ```csharp
 // Kumunita.Core.SiteContent.SiteContentService (the read half)
@@ -518,7 +534,7 @@ public async Task<IActionResult> About()
 ### 2.4 the write-lane contract (exact C#)
 
 The write is the `SiteContentService.SaveAsync(content, actorBy)` lane —
-the ADR 0050 `SetSignupOpenAsync` single audited write-lane shape. It loads
+the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `SetSignupOpenAsync` single audited write-lane shape. It loads
 the existing row (a missing row is a **no-op** — the lane never
 load-or-creates; the seeder is the only writer that creates the row),
 applies the 13-field set from the caller's `SiteContent`, saves in one
@@ -724,14 +740,14 @@ this list** (unit-series rule 3). The names below are the **only** test
 names the SITE lane authors; a later unit that finds a mismatch is a
 `## U<m> — Drift pause` section in the handoff note, not a silent edit.
 
-**Core.Tests — `SiteContentServiceTests` (the ADR 0050 single-write-lane
+**Core.Tests — `SiteContentServiceTests` (the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) single-write-lane
 shape, SITE·2 / SITE·6):**
 
 1. `SiteContentServiceTests.GetAsync_MissingStore_ReturnsInCodeFallback` — a
    missing store (no row, a fresh boot before the seeder ran) degrades to
    the in-code fallback (a fresh `SiteContent` with every field at its
    shipped default — the byte-identical `kw-l` text + every section
-   shown); the read never throws, never returns null (SITE·1, the ADR 0050
+   shown); the read never throws, never returns null (SITE·1, the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)
    `IsSignupOpenAsync` best-effort shape).
 2. `SiteContentServiceTests.SaveAsync_WritesOneAccessAuditRow` — a save
    writes **exactly one** `AccessAudit` row (`Via = Admin`, action
@@ -761,21 +777,21 @@ SITE·3 / SITE·6):**
    create-if-missing / never-overwrites pattern, SITE·6).
 
 **Web.Tests — `HomeControllerSiteContentTests` (the `/home` read seam + the
-ADR 0149 composability, SITE·1 / SITE·5 / SITE·9):**
+ADR [0149](../adr/0149-home-intro-hide-preference.md) composability, SITE·1 / SITE·5 / SITE·9):**
 
 8. `HomeControllerSiteContentTests.FreshInstance_RendersShippedText_EverySectionShown` —
    a fresh instance (the in-code fallback) renders `/home` with **exactly**
    the shipped `kw-l` text (the hero eyebrow + lead) and **every** section
    shown (the hero band, the "What it is" CTA button, the feature-cards
    band, the roadmap; the "What's new" feed renders when the viewer is
-   signed-in, the ADR 0149 `HideHomeIntro = false` default, SITE·1 /
+   signed-in, the ADR [0149](../adr/0149-home-intro-hide-preference.md) `HideHomeIntro = false` default, SITE·1 /
    SITE·3).
 9. `HomeControllerSiteContentTests.SavedRow_HomeShowAboutButtonFalse_HidesHomeHeroButton` —
    a saved `SiteContent` row with `HomeShowAboutButton = false` renders the
    home hero **without** the "What it is & how it works" CTA button (the
    button is **not in the DOM at all**, not `display: none`, SITE·9).
 10. `HomeControllerSiteContentTests.ADR_0149_HideHomeIntroTrue_HomeShowFeaturesTrue_HidesHomeFeatureCards` —
-    a resident who set `Profile.HideHomeIntro = true` (ADR 0149) sees
+    a resident who set `Profile.HideHomeIntro = true` (ADR [0149](../adr/0149-home-intro-hide-preference.md)) sees
     **neither** of the two intro sections **even if** the admin has
     `HomeShowFeatures = true` (the per-resident preference is the
     *resident's* choice to hide; the platform flag is the *admin's* choice
@@ -794,18 +810,18 @@ SITE·2 / SITE·7):**
     both form sections (Home + About) with the **current** singleton (the
     `SiteContent` row in the store); a missing row degrades to the in-code
     fallback (the shipped defaults), so the form always renders (SITE·1,
-    the ADR 0050 `IsSignupOpenAsync` best-effort shape).
+    the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `IsSignupOpenAsync` best-effort shape).
 13. `AdminSiteControllerTests.POST_SaveHome_SavesFieldGroup_WritesOneAccessAuditRow` —
     the `POST /admin/site/save-home` saves the Home section's 5 fields
     (the About section's 8 fields are **unchanged** — the save is partial),
     writes **exactly one** `AccessAudit` row (`Via = Admin`, action
     `site.save`, `TargetKind` "site"), and redirects back to the GET
-    (SITE·2, the ADR 0050 `AdminSignupController.Save` shape).
+    (SITE·2, the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `AdminSignupController.Save` shape).
 14. `AdminSiteControllerTests.POST_SaveAbout_SavesFieldGroup_WritesOneAccessAuditRow` —
     the `POST /admin/site/save-about` saves the About section's 8 fields
     (the Home section's 5 fields are **unchanged** — the save is partial),
     writes **exactly one** `AccessAudit` row, and redirects back to the
-    GET (SITE·2, the ADR 0050 `AdminSignupController.SaveNotify` shape).
+    GET (SITE·2, the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `AdminSignupController.SaveNotify` shape).
 15. `AdminSiteControllerTests.POST_NonGlobalAdmin_IsDenied` — a non-`GlobalAdmin`
     (a signed-in resident, or an anonymous visitor) is **denied** the
     `POST /admin/site/save-home` / `POST /admin/site/save-about` actions
@@ -830,24 +846,24 @@ dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
 ```
 
 Plus the **regression pins** (the precedent shapes are unchanged — the
-`kw-l` registry entries are untouched, the ADR 0050 / ADR 0149 / ADR 019 /
-ADR 0020 shapes are unchanged, the close-flip trio is intact):
+`kw-l` registry entries are untouched, the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) / ADR [0149](../adr/0149-home-intro-hide-preference.md) / ADR 019 /
+ADR [0020](../adr/0020-date-format-platform-default-and-resident-override.md) shapes are unchanged, the close-flip trio is intact):
 
 - `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` **green**
   (the `home.*` / `about.*` / `platform.*` registry entries are **untouched** —
-  SITE·4, the ADR 0150 D3 pin).
-- `LS_U04_SeederTests` + `PageServiceTests` **green** (the ADR 0005 B / ADR
+  SITE·4, the ADR [0150](../adr/0150-site-content-customization.md) D3 pin).
+- `LS_U04_SeederTests` + `PageServiceTests` **green** (the ADR [0005](../adr/0005-multilingual-support.md) B / ADR
   0043 "seeded defaults match the shipped text" pins are unchanged).
 - `HomeControllerTests` + `StaticPagesControllerTests` **green** (the ADR
-  0149 `Profile.HideHomeIntro` read path is unchanged — SITE·5, the ADR 0150
+  0149 `Profile.HideHomeIntro` read path is unchanged — SITE·5, the ADR [0150](../adr/0150-site-content-customization.md)
   D5 pin).
 - `AdminSignupControllerTests` + `AdminControllerTests` **green** (the ADR
   0050 single-write-lane shape + the `AdminController` constructor pin are
   unchanged — SITE·7).
 - `MilestonesTests` **green** (the M4 single-`StatusNext` pin is intact —
-  SITE·8, the ADR 0150 D7 pin).
+  SITE·8, the ADR [0150](../adr/0150-site-content-customization.md) D7 pin).
 - `WhatsNewTests` **green** (the new `0.42.0` entry is present,
-  newest-first — SITE·8, the ADR 0150 D7 pin).
+  newest-first — SITE·8, the ADR [0150](../adr/0150-site-content-customization.md) D7 pin).
 
 **Runner (per AGENTS.md):** the `dotnet exec` path on the test assemblies,
 **not** `dotnet test` / VS Test Explorer (the xunit.v3 discovery quirk on
@@ -860,59 +876,59 @@ by a later unit is a `## U<m> — Drift pause` section in the handoff note
 (unit-series rule 6), **not** a silent edit:
 
 - **The 13-field `SiteContent` field set** (§2.2) — the **ceiling** (the
-  ADR 0150 D1 pin): no field outside the field set may appear in the doc;
-  a future SITE-2 lane **adds** fields (additive per ADR 0004 §B.1), it
+  ADR [0150](../adr/0150-site-content-customization.md) D1 pin): no field outside the field set may appear in the doc;
+  a future SITE-2 lane **adds** fields (additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1), it
   does **not** re-shape the existing 13.
-- **The `kw-l` registry entries** — the **floor** (the ADR 0150 D3 pin):
+- **The `kw-l` registry entries** — the **floor** (the ADR [0150](../adr/0150-site-content-customization.md) D3 pin):
   the `home.*` / `about.*` / `platform.*` keys in
   `KnownTranslationKeys.cs` are **not** removed, not re-shaped, not
   re-keyed; the registry parity tests (`KwLRegistryConsistencyTests` /
   `KnownTranslationKeys_ParityTests`) are **untouched**.
-- **The ADR 0149 `Profile.HideHomeIntro` read** — the **frozen base** (the
-  ADR 0150 D5 pin): the per-resident preference is **unchanged** (the
+- **The ADR [0149](../adr/0149-home-intro-hide-preference.md) `Profile.HideHomeIntro` read** — the **frozen base** (the
+  ADR [0150](../adr/0150-site-content-customization.md) D5 pin): the per-resident preference is **unchanged** (the
   `HomeController.Index` read of `Profile.HideHomeIntro` is untouched; the
   two intro sections render when **both** `!HideIntro` **and**
   `HomeShowFeatures` are true; the feed + roadmap are governed **only** by
   the platform flag).
-- **The `LocaleSettings` singleton** — **untouched** (the ADR 0150 D6 pin):
+- **The `LocaleSettings` singleton** — **untouched** (the ADR [0150](../adr/0150-site-content-customization.md) D6 pin):
   this lane adds a **new** doc, not a new field on the existing one; the
   `LocaleSettings` doc's shape (the `DefaultLanguageCode` /
   `DefaultTimezone` / `DefaultDateFormat` / `IsSignupOpen` /
   `NotifyAdminsOnSignup` / `AnnouncementCommentsEnabled` /
   `MessagingEnabled` / `QuietCheckMinutes` / … fields) is **unchanged**.
 - **The read-seam contract** (§2.3) — `ISiteContentService.GetAsync()` is
-  the ADR 0050 `IsSignupOpenAsync` best-effort shape (missing row / read
+  the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `IsSignupOpenAsync` best-effort shape (missing row / read
   failure degrades to the in-code fallback; never throws, never returns
   null; the page always renders).
 - **The write-lane contract** (§2.4) — `ISiteContentService.SaveAsync` is
-  the ADR 0050 `SetSignupOpenAsync` single audited write-lane shape (one
+  the ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md) `SetSignupOpenAsync` single audited write-lane shape (one
   session, one `AccessAudit` row, `Via = Admin`, action `site.save`,
   `TargetKind` "site"; strong consistency; upserts the singleton).
 - **The 15 pinned seam-test names** (§2.5) — verbatim, a unit may never
   introduce a test outside this list.
 - **The acceptance gate** (§2.6) — the exact command list + the regression
   pins; the gate is **green** only when every line passes.
-- **The frozen base** (§2.1) — ADR 0005 B / ADR 0019 / ADR 0020 / ADR 0050
-  / ADR 0149 / ADR 0004 §B.1 / ADR 0006 / ADR 0015 D1 / the `LS` / `SP` /
+- **The frozen base** (§2.1) — ADR [0005](../adr/0005-multilingual-support.md) B / ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / ADR [0020](../adr/0020-date-format-platform-default-and-resident-override.md) / ADR [0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)
+  / ADR [0149](../adr/0149-home-intro-hide-preference.md) / ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 / ADR [0006](../adr/0006-module-boundary-contracts.md) / ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 / the `LS` / `SP` /
   `PG` test model / the `Milestones.cs` / README / `MilestonesTests`
   close-flip trio — **unchanged**.
 
-*— Part 2 (seams & contracts) authored by U02 (2026-10-07). ADR 0150 is
+*— Part 2 (seams & contracts) authored by U02 (2026-10-07). ADR [0150](../adr/0150-site-content-customization.md) is
 drafted (Status: Accepted) in the same unit.*
 
 ## Amendments
 
-### 2026-10-22 — D3 save lane: upsert-on-missing (ADR 0170)
+### 2026-10-22 — D3 save lane: upsert-on-missing (ADR [0170](../adr/0170-site-content-save-upsert-on-missing.md))
 
 The SITE·2 pin's "**The lane never load-or-creates a new row on a save** —
 it upserts the singleton" is **amended**: a save on a missing row now
-**creates** the singleton (the ADR 0164 `KioskService` "upsert vs. no-op"
+**creates** the singleton (the ADR [0164](../adr/0164-kiosk-mode.md) `KioskService` "upsert vs. no-op"
 shape, the M35·2 pin). The upsert contract (exactly one row, never a
 second row — SITE·6) is unchanged; the strong-consistency contract
 (invariant C4) is now actually honored on the missing-row path (the new
 value is live on the very next `GetAsync`, exactly one `AccessAudit` row
 written). The `ISiteContentService.SaveAsync` seam signature and the
 audit-row shape are byte-identical. The sibling `SurfaceLabelsService`
-(ADR 0152, M29·6) carries the same no-op template and is **not** amended
-in this pass (ADR 0170 D5 — a separate follow-up if the latent-bug class
-is confirmed there). See **ADR 0170** for the full locked text.
+(ADR [0152](../adr/0152-admin-surface-labels.md), M29·6) carries the same no-op template and is **not** amended
+in this pass (ADR [0170](../adr/0170-site-content-save-upsert-on-missing.md) D5 — a separate follow-up if the latent-bug class
+is confirmed there). See **ADR [0170](../adr/0170-site-content-save-upsert-on-missing.md)** for the full locked text.

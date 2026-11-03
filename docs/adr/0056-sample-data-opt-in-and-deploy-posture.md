@@ -1,4 +1,17 @@
-# ADR 0056 — Sample-data opt-in: a flag-gated seeder with a deploy posture
+---
+id: adr-0056
+title: "Sample-data opt-in: a flag-gated seeder with a deploy posture"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/sec/sec-handoff-notes.md]
+supersedes: [adr-0055]
+superseded_by: [adr-0060]
+updated: 2026-11-02
+---
+
+# ADR [0056](0056-sample-data-opt-in-and-deploy-posture.md) — Sample-data opt-in: a flag-gated seeder with a deploy posture
 
 Status: Accepted
 Date: 2026-09-21
@@ -11,7 +24,7 @@ credentials in the non-Development case.
 
 ## Context
 
-ADR 0055 shipped a first-boot, **Development-only** mock neighborhood (a
+ADR [0055](0055-development-sample-data-lane.md) shipped a first-boot, **Development-only** mock neighborhood (a
 password-bearing admin, a scoped moderator, a translator, four residents, groups,
 announcements, posts/replies, events/RSVPs, tags, a resident blog, and de/fr
 translations). Its two hard constraints were:
@@ -31,7 +44,7 @@ neighborhood can click through). The `Development` wall is now in the way — th
 demo site must run in `Production` (the production error page, no dev-only
 schema auto-apply, the real HSTS/forwarded-header pipeline), so it cannot reach
 the seeder. And a `Production` instance is a **public site**: seeding it with the
-weak, documented, shared passwords (`Admin123!`, `Resident123!`, …) that ADR 0055
+weak, documented, shared passwords (`Admin123!`, `Resident123!`, …) that ADR [0055](0055-development-sample-data-lane.md)
 deliberately used for local dev would mean publishing a live credential to
 anyone — exactly the "it must never ship" failure the `Development` wall exists
 to prevent, reintroduced through the environment door.
@@ -48,19 +61,19 @@ stores **no weak credential on a public instance**.
   `SeedAdminOptions`), is bound in `Program.cs` and read at the seeder call site.
   The `IsDevelopment()` wall is removed from the gate. Absence (null/blank/omitted)
   is `false`, so a real deployment that does not carry the flag is **unreachable
-  by construction** — the ADR 0055 "it must never ship" property is now enforced
+  by construction** — the ADR [0055](0055-development-sample-data-lane.md) "it must never ship" property is now enforced
   by the *absence of an opt-in* rather than by the environment, which is the
   stronger guarantee: a `Production` instance with no flag seeds nothing, and a
   misconfigured `Production` instance *with* the flag is visibly different from
   a real one in its env diff.
 
-- **Two postures, one seeder.** The seeder keeps the ADR 0055 content and data
+- **Two postures, one seeder.** The seeder keeps the ADR [0055](0055-development-sample-data-lane.md) content and data
   model verbatim; it now takes `IMailerStage? mailer` + `string? adminEmail` and
   branches on their presence:
   - **Development posture** (`mailer == null`, i.e. the `Development` environment
     where `Program.cs` passes no mailer): the documented weak demo credentials
     (the README table), printed to the log; the seed admin keeps its
-    `SeedAdmin__` setup-token lane *plus* a weak demo password. This is ADR 0055
+    `SeedAdmin__` setup-token lane *plus* a weak demo password. This is ADR [0055](0055-development-sample-data-lane.md)
     unchanged.
   - **Deploy posture** (`mailer != null`, i.e. a non-Development instance with the
     flag set): the **seed-admin account keeps only its `SeedAdmin__` setup-token
@@ -79,11 +92,11 @@ stores **no weak credential on a public instance**.
 
 - **The seed-admin pairing is preserved.** In the deploy posture the seeder keys
   off `SeedAdmin__Email` (the same address `FirstBootSeeder` created the admin
-  under), not the ADR 0055 `AdminEmail` constant — so the first-boot admin is
+  under), not the ADR [0055](0055-development-sample-data-lane.md) `AdminEmail` constant — so the first-boot admin is
   *found*, its token lane is untouched, and the credentials e-mail is addressed
   to the operator's real admin mailbox. In Development it keeps keying off the
   constant (which `docker-compose.yml` keeps matched to `SeedAdmin__Email`, the
-  ADR 0055 paired invariant).
+  ADR [0055](0055-development-sample-data-lane.md) paired invariant).
 
 - **The random-password policy is satisfied.** The app's password policy
   (`Program.cs`: `RequiredLength = 8`, `RequireNonAlphanumeric = false`) is
@@ -109,7 +122,7 @@ stores **no weak credential on a public instance**.
   non-Development — the default for every real instance is "nothing," and the
   flag shows up in the env diff, so a demo instance is visibly distinct from a
   real one.
-- **Zero data-model change.** Same documents, same lanes, same ADR 0012
+- **Zero data-model change.** Same documents, same lanes, same ADR [0012](0012-community-membership-mandatory-and-moderator.md)
   visibility mechanism, same idempotency; the seeder's body is untouched except
   for the credential branching and the one staged e-mail.
 
@@ -125,15 +138,15 @@ stores **no weak credential on a public instance**.
   If an operator sets `SampleData__Enabled=true` on a *real* neighborhood by
   mistake, the demo accounts are seeded with random passwords and the admin gets
   the e-mail — recoverable (delete the demo accounts / re-seed) but a
-  configuration error. The `examplium.com` naming convention and the ADR 0055
+  configuration error. The `examplium.com` naming convention and the ADR [0055](0055-development-sample-data-lane.md)
   "test platform" pinned announcement both make a mis-seeded real instance
   obvious on first visit.
 - **A `Production` instance *without* the flag seeds nothing — unchanged from a
-  real deployment.** The only behavioral difference from ADR 0055 for real
+  real deployment.** The only behavioral difference from ADR [0055](0055-development-sample-data-lane.md) for real
   instances is that they no longer need to be in `Development` to be safe; the
   safe default is now simply "flag unset."
 - **The `test@examplium.com` support address and the `examplium.com` demo
   identities still appear on a deployed demo site** (via `Community__*` and the
   seeded profiles) — this is intentional and is the point of the demo; it is
   still a deliberately-fictional domain, kept distinct from the real
-  `kumunita.com` (the ADR 0055 convention, unchanged).
+  `kumunita.com` (the ADR [0055](0055-development-sample-data-lane.md) convention, unchanged).

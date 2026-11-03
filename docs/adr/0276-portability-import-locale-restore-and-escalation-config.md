@@ -1,27 +1,40 @@
-# ADR 0276 — Portability import: restore the archive's locale settings, and carry the escalation outbound config (endpoint + enabled only)
+---
+id: adr-0276
+title: "Portability import: restore the archive's locale settings, and carry the escalation outbound config (endpoint + enabled only)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0276](0276-portability-import-locale-restore-and-escalation-config.md) — Portability import: restore the archive's locale settings, and carry the escalation outbound config (endpoint + enabled only)
 
 Status: Accepted
 Date: 2026-10-30
-Extends the **ADR 0193 portability import modes** lane — specifically the
+Extends the **ADR [0193](0193-portability-import-modes.md) portability import modes** lane — specifically the
 `config.json` surface that travels alongside the `docs/` payload — and leans on
-**ADR 0159** (the escalation forwarding surface: `EscalationOutboundConfig`,
-the `/admin/escalation` endpoint + token + enabled switch), **ADR 0019**
+**ADR [0159](0159-escalation-authorization.md)** (the escalation forwarding surface: `EscalationOutboundConfig`,
+the `/admin/escalation` endpoint + token + enabled switch), **ADR [0019](0019-timezone-platform-default-and-resident-override.md)**
 (platform default time zone — the `LocaleSettings.DefaultTimezone` field) and
-**ADR 0050** (sign-up surface — the `LocaleSettings.IsSignupOpen` /
-`NotifyAdminsOnSignup` fields). ADR 0274 / ADR 0275 (the `KeepExisting` tag +
+**ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md)** (sign-up surface — the `LocaleSettings.IsSignupOpen` /
+`NotifyAdminsOnSignup` fields). ADR [0274](0274-portability-import-tag-merge.md) / ADR [0275](0275-portability-import-principal-merge.md) (the `KeepExisting` tag +
 principal merges) set the recent precedent this ADR follows: a deliberate,
 documented extension of the M11 "locked `§config` field set" (community /
 locale / `languages[]`), not a re-shape of the existing contract.
 
 ## Context
 
-ADR 0193's `CleanSlate` mode is the **restore** semantic: the archive becomes
+ADR [0193](0193-portability-import-modes.md)'s `CleanSlate` mode is the **restore** semantic: the archive becomes
 the instance's state (wipe, then re-materialize). Two parts of that state were
 not in fact being restored.
 
 **Locale settings — a real bug.** The archive's `config.json` carries the
 community's `Locale` block (default language, the **default time zone**
-(ADR 0019), the **default date format** (ADR 0020), and the **sign-up**
+(ADR [0019](0019-timezone-platform-default-and-resident-override.md)), the **default date format** (ADR [0020](0020-date-format-platform-default-and-resident-override.md)), and the **sign-up**
 switches — `IsSignupOpen` / `NotifyAdminsOnSignup` — plus the
 `AnnouncementCommentsEnabled` / `MessagingEnabled` surface toggles). But the
 apply path, `PortabilityApplyConfig`, wrote the `LocaleSettings` singleton row
@@ -39,7 +52,7 @@ side silently dropped them because the seeder's row was in the way.
 **Escalation outbound config — a design gap.** The `EscalationOutboundConfig`
 singleton (the `/admin/escalation` forwarding **endpoint**, the **enabled**
 switch, and the **plaintext outbound token**) is a first-class, operator-set
-row (ADR 0159), registered on the `EscalationDocTypes` surface and wired in
+row (ADR [0159](0159-escalation-authorization.md)), registered on the `EscalationDocTypes` surface and wired in
 `Program.cs`. It was absent from the portability surface in three places: it
 was not in the 44-doc inventory (so not exported, not wiped), not in the
 `config.json` POCO (so `ConfigExport` never read it), and not in the apply
@@ -52,7 +65,7 @@ back with it.
 The token is the complicating factor. It is a **plaintext outbound secret**
 the target posts to its forwarding endpoint (the same "credential" class the
 M11 `§principals` surface keeps out of the archive — the `PortabilityPrincipal`
-POCO is structurally incapable of carrying a password, ADR 0113 C-M11·2).
+POCO is structurally incapable of carrying a password, ADR [0113](0113-nav-row-overflow-fold.md) C-M11·2).
 The decision here applies that same boundary to the escalation surface: the
 **endpoint + enabled** travel; the **token does not**.
 
@@ -105,7 +118,7 @@ the default language, and the sign-up toggles that already travel in
 The **token** is a credential: plaintext, secret, and re-issuable. The
 platform's existing posture for credentials across the portability surface is
 to **not carry them** and to have the operator re-enter them on the target
-(passwords are re-set, not copied; ADR 0113 C-M11·2). Re-using that posture
+(passwords are re-set, not copied; ADR [0113](0113-nav-row-overflow-fold.md) C-M11·2). Re-using that posture
 keeps the "no-secret set" invariant uniform: an archive can never exfiltrate
 a secret by construction, not by a check that could regress. Re-entering the
 one forwarding token after a restore is cheap; a leaked token in every backup
@@ -119,4 +132,4 @@ it), no new index, no new authorization branch, no migration. The change is a
 config-surface extension (the `config.json` POCO + the apply path) + a bug fix
 (the locale restore), both within the already-shipped portability + escalation
 surfaces. `Milestones.cs` / README Roadmap / `MilestonesTests.cs` are
-byte-identical (a named lane on the shipped portability surface, ADR 0193).
+byte-identical (a named lane on the shipped portability surface, ADR [0193](0193-portability-import-modes.md)).

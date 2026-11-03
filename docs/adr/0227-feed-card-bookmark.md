@@ -1,10 +1,23 @@
-# ADR 0227 — Bookmark toggle in the feed card footer
+---
+id: adr-0227
+title: "Bookmark toggle in the feed card footer"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0227](0227-feed-card-bookmark.md) — Bookmark toggle in the feed card footer
 
 Status: Accepted
 
 ## Context
-ADR 0226 left the bookmark button of the feed card footer as a TODO because the card needs the viewer's bookmark
-state. Bookmarks already exist (ADR 0118): `IBookmarkService`, the `/bookmarks/toggle` and
+ADR [0226](0226-feed-reply-count.md) left the bookmark button of the feed card footer as a TODO because the card needs the viewer's bookmark
+state. Bookmarks already exist (ADR [0118](0118-bookmarks.md)): `IBookmarkService`, the `/bookmarks/toggle` and
 `/bookmarks/{kind}/{id}/remove` form POSTs, and `_BookmarkButton` on detail pages (resolving one card at a time).
 
 ## Decision

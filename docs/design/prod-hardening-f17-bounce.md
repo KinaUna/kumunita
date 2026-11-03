@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f17-bounce
+title: "F17 — bounce/complaint suppression (MAIL-03)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0078-sample-account-notification-suppression-in-production.md
+updated: 2026-11-02
+---
+
 # F17 — MAIL-03: bounce/complaint suppression — Part-0 design pin
+
+> **Abstract:** the **F17 bounce suppression** design pin (Part-0, design-only) — **bounce/complaint suppression**: a new `SuppressedAddress` doc (in the `Notifications` namespace) + the bounce/complaint detection that adds an address to it, so a bounced/complained recipient stops receiving the email half (the inbox row is unaffected). Closes 2026-10-22 MAIL-03. **Who is it for:** a developer executing F17 U2–U3; an agent that needs the `SuppressedAddress` doc shape. **When to read the rest:** before touching the `SuppressedAddress` doc, the bounce detection, or the F17 tests.
+
 
 > **F17.U1** design pin (Tier 1). F17.U2 and F17.U3 execute against this file.
 > No code, no build, no test run — the pin is the deliverable.
@@ -78,7 +93,7 @@ by the lowercased email — O(1), no index needed.
 
 ### §2.1 — The exact seam (grounded, not invented)
 
-The gate fires in **`NotificationService.EmitAsync`** (the ADR 0084 overload —
+The gate fires in **`NotificationService.EmitAsync`** (the ADR [0084](../adr/0084-per-target-notification-subscriptions.md) overload —
 the one with `targetId`/`linkPath`/`acceptPath`/`declinePath`), **immediately
 before the `await _mailer.StageAsync(...)` call** at
 `src/Kumunita.Core/Notifications/NotificationService.cs:361`:
@@ -126,7 +141,7 @@ await _mailer.StageAsync(session, idempotencyKey, profile.Email!, subject, email
   the same `LoadAsync` check in a follow-up if the owner wants full coverage
   (recorded as an open item, not assumed).
 - **It is additive, not a re-shape.** The existing gates in `EmitAsync`
-  (ADR 0084 per-target subscription gate at step 0, ADR 0078 sample-suppression
+  (ADR [0084](../adr/0084-per-target-notification-subscriptions.md) per-target subscription gate at step 0, ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) sample-suppression
   gate at step 2a, dedup at step 1) are **untouched**. The F17 gate is a new
   step (5c) inserted **after** the inbox row is stored (step 3) and the
   deferred-quiet check (step 5) and **before** the `StageAsync` call (step 5's
@@ -135,11 +150,11 @@ await _mailer.StageAsync(session, idempotencyKey, profile.Email!, subject, email
 - **It is a read-only lookup.** `session.LoadAsync<SuppressedAddress>(id)` —
   no write, no new audit row, no `SaveChangesAsync` in the gate itself. The
   skip is a `return notification` (the inbox row is already stored; the
-  caller's own `SaveChangesAsync` commits it). This matches the ADR 0078
+  caller's own `SaveChangesAsync` commits it). This matches the ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md)
   sample-suppression gate's shape (a `return null` short-circuit) — except
   F17 returns `notification` (not `null`) because the inbox row **is** stored
   (D7), only the email is skipped.
-- **Core stays HTTP-free (ADR 0006-D).** The gate is in `Kumunita.Core`
+- **Core stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).** The gate is in `Kumunita.Core`
   (`NotificationService`), a read-only `LoadAsync` on the caller's session.
   No HTTP types, no middleware. The ingest route (the provider webhook) is in
   `Kumunita.Web` — a separate concern, §3.
@@ -148,9 +163,9 @@ await _mailer.StageAsync(session, idempotencyKey, profile.Email!, subject, email
 
 The plan's invariant: "the gate is a read-only lookup … do NOT write a new
 audit row — the mail-out path already has its own opt-out at
-`NotificationService.cs:121`." Grounded: the ADR 0078 sample-suppression
+`NotificationService.cs:121`." Grounded: the ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) sample-suppression
 gate (line ~238) is a `return null` (no inbox row, no email, no audit row).
-The ADR 0084 per-target subscription gate (step 0) is a `return null` (same
+The ADR [0084](../adr/0084-per-target-notification-subscriptions.md) per-target subscription gate (step 0) is a `return null` (same
 shape). Neither writes an `AccessAudit` row. The F17 gate follows the same
 shape: a read + a return, no write. **No `AccessAudit` row is created.**
 The `SuppressedAddress` row itself is the record (written by the ingest, §3,
@@ -273,7 +288,7 @@ public sealed class MailSuppressionController : ControllerBase
 }
 ```
 
-**Core stays HTTP-free (ADR 0006-D):** `ISuppressionService` /
+**Core stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D):** `ISuppressionService` /
 `SuppressionService` are in `Kumunita.Core` (no HTTP types, no
 `IActionResult`, no `HttpContext`). The Web controller is the only place a
 `IActionResult` / `HttpContext` appears. The DI registration
@@ -377,10 +392,10 @@ store):**
    - A `ITranslationProvider` stub (NSubstitute) that returns fixed strings
      for the `notification.{kind}.subject` / `notification.{kind}.body` keys.
    - `VerificationOptions` with `SuppressForSampleAccountsInProduction = false`
-     (the ADR 0078 sample-suppression gate is **disabled** — the test is
-     driving the **F17** gate, not the ADR 0078 gate).
+     (the ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) sample-suppression gate is **disabled** — the test is
+     driving the **F17** gate, not the ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) gate).
    - `ISubscriptionService` (or the `IsSubscriptionEnabledForAsync` seam)
-     stubbed to return `true` (the ADR 0084 per-target gate is **disabled** —
+     stubbed to return `true` (the ADR [0084](../adr/0084-per-target-notification-subscriptions.md) per-target gate is **disabled** —
      the test is driving the **F17** gate).
 4. **Call `EmitAsync`** for the suppressed recipient:
    ```csharp
@@ -398,7 +413,7 @@ store):**
    |---|---|---|
    | **1. The email is NOT staged** | `Assert.Equal(0, mailer.StageAsyncCount)` | The gate fired: the `LoadAsync` returned the `SuppressedAddress` row → the `return notification` short-circuited **before** the `StageAsync` call. |
    | **2. The inbox row IS stored** | `var inbox = (await session.Query<Notification>().Where(n => n.IdempotencyKey == "notification:group.post:test-suppressed").FirstOrDefaultAsync(ct)); Assert.NotNull(inbox)` (query by `IdempotencyKey` — `LoadAsync` loads by the document `Id` (a Guid), not the key) | D7 — the inbox is the durable record; the email is the best-effort nudge. The gate skips the email, not the inbox row. |
-   | **3. No `AccessAudit` row is written** | `Assert.Empty((await session.Query<AccessAudit>().Where(a => a.Action.Contains("suppress")).ToListAsync(ct)))` (or a more precise filter on the actor/subject) | The plan's invariant: the gate is a read-only lookup, no new audit row. (The ADR 0078 / ADR 0084 gates also write no audit row — the F17 gate follows the same shape.) |
+   | **3. No `AccessAudit` row is written** | `Assert.Empty((await session.Query<AccessAudit>().Where(a => a.Action.Contains("suppress")).ToListAsync(ct)))` (or a more precise filter on the actor/subject) | The plan's invariant: the gate is a read-only lookup, no new audit row. (The ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) / ADR [0084](../adr/0084-per-target-notification-subscriptions.md) gates also write no audit row — the F17 gate follows the same shape.) |
 
 **The test does NOT assert** the fail-open / no-row path (a recipient with
 **no** `SuppressedAddress` row → the email **is** sent). That path is the
@@ -425,26 +440,26 @@ the gate is in Core, so the test is a Core test.
 
 ---
 
-## §5 — Invariants (from `AGENTS.md` + ADR 0006 + the plan)
+## §5 — Invariants (from [`AGENTS.md`](../../AGENTS.md) + ADR [0006](../adr/0006-module-boundary-contracts.md) + the plan)
 
 | # | Invariant | How F17 holds it |
 |---|---|---|
-| 1 | **Core stays HTTP-free (ADR 0006-D)** | The gate is in `Kumunita.Core` (`NotificationService`), a read-only `LoadAsync`. The ingest route is in `Kumunita.Web` (`MailSuppressionController`). `ISuppressionService` / `SuppressionService` have no HTTP types. |
+| 1 | **Core stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D)** | The gate is in `Kumunita.Core` (`NotificationService`), a read-only `LoadAsync`. The ingest route is in `Kumunita.Web` (`MailSuppressionController`). `ISuppressionService` / `SuppressionService` have no HTTP types. |
 | 2 | **C3 single-write-lane** | The `SuppressedAddress` write is one `SaveChangesAsync` (the `SuppressionService.SuppressAsync` method). The gate is a **read** (no write). The existing `EmitAsync` write path (the inbox row + the `StageAsync`) is **unchanged**. |
-| 3 | **The existing per-recipient opt-out is unchanged** | The ADR 0078 sample-suppression gate (`NotificationService.cs:238`) and the ADR 0084 per-target subscription gate (step 0) are **untouched**. The F17 gate is a **new** step (5c) inserted after them. The dedup gate (step 1) is **untouched**. |
+| 3 | **The existing per-recipient opt-out is unchanged** | The ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) sample-suppression gate (`NotificationService.cs:238`) and the ADR [0084](../adr/0084-per-target-notification-subscriptions.md) per-target subscription gate (step 0) are **untouched**. The F17 gate is a **new** step (5c) inserted after them. The dedup gate (step 1) is **untouched**. |
 | 4 | **The mail-out path's existing error handling is untouched** | The `StageAsync` call site (line 361) is **unchanged** — the F17 gate is inserted **before** it, not in place of it. The `OutboxEmailStager.StageAsync` method is **untouched**. The `SmtpSender` / `OutboxEmailHandler` (the durable-send path) is **untouched**. |
 | 5 | **The pinned test name is not a placeholder** | `SuppressedAddress_NotMailed` — a concrete, descriptive name. The next audit run diffs against it. |
 | 6 | **The owner-ops step is recorded, not assumed done** | The provider-webhook wiring (§3.5) is an **open item** in the handoff note. Until the owner runs it, the suppression list is empty and the gate is a no-op. |
 | 7 | **Server-rendered stack (no SPA)** | The ingest route is a minimal JSON endpoint (a webhook), not a user-facing page. The gate is a server-side read. No client-side JS. |
-| 8 | **Audit-by-default** | The gate writes **no** `AccessAudit` row (the plan's invariant, §2.3). The `SuppressedAddress` row itself is the record (the operator can query it). This is consistent with the ADR 0078 / ADR 0084 gates (neither writes an audit row). |
+| 8 | **Audit-by-default** | The gate writes **no** `AccessAudit` row (the plan's invariant, §2.3). The `SuppressedAddress` row itself is the record (the operator can query it). This is consistent with the ADR [0078](../adr/0078-sample-account-notification-suppression-in-production.md) / ADR [0084](../adr/0084-per-target-notification-subscriptions.md) gates (neither writes an audit row). |
 | 9 | **No new bounded context** | `SuppressedAddress` is in the existing `Notifications` bounded context (namespace `Kumunita.Core.Notifications`, surface `NotificationDocTypes`). No new context, no new `DependencyInjection` feature registration. |
-| 10 | **No `<PackageReference>`, no migration, no `.slnx` change** | The `SuppressedAddress` POCO is a new type in an existing project (`Kumunita.Core`). Marten's delta detection picks up the new doc at boot (ADR 0004 §B — the `Schema.For<T>()` addition is the migration; no hand-rolled `FeatureSchemaBase`). No new package. No solution change. |
+| 10 | **No `<PackageReference>`, no migration, no `.slnx` change** | The `SuppressedAddress` POCO is a new type in an existing project (`Kumunita.Core`). Marten's delta detection picks up the new doc at boot (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B — the `Schema.For<T>()` addition is the migration; no hand-rolled `FeatureSchemaBase`). No new package. No solution change. |
 
 ---
 
 ## §6 — The pin's exit contract (U1's deliverable)
 
-- **One new doc file:** `docs/design/prod-hardening-f17-bounce.md` (this file).
+- **One new doc file:** [`docs/design/prod-hardening-f17-bounce.md`](prod-hardening-f17-bounce.md) (this file).
 - **No `src/**` change.** No `<PackageReference>`. No migration. No `.slnx`
   change. No build. No test run.
 - **The five pin targets are grounded in the real repo** (grep + read the

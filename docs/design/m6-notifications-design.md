@@ -1,8 +1,25 @@
+---
+id: design-m6-notifications
+title: "M6 — Notifications"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0061-email-and-notification-language.md
+  - docs/adr/0076-notifications-inbox-and-recipient-email.md
+  - docs/adr/0096-notification-read-unread-per-row-toggle.md
+updated: 2026-11-02
+---
+
 # M6 — Notifications — design (Parts 1 + 2)
 
+> **Abstract:** the **notifications** design — the **shared awareness** arrow: a `Notification` inbox row (authoritative, always delivered in-app) + a **durable email half** (staged, flushed by a tick) that reaches the resident where they are. Two documents (`Notification`, `NotificationPreference`), the `NotificationKinds` closed set, the idempotency-key table, and the pinned seam tests. **Who is it for:** a developer touching the `NotificationService` or the email flush; an agent that needs the inbox-vs-email split. **When to read the rest:** before touching the notification lane, the email staging, or the `NotificationKinds` set.
+
+
 > **Milestone.** `M6` — the **shared awareness** arrow (the
-> `docs/ARCHITECTURE.md` §0 value-chain row: *"the platform reaches out to
-> the resident where they are"*, already pinned). **ADR 0076** is this
+> [value-chain milestone table](../ARCHITECTURE.md): *"the platform reaches out to
+> the resident where they are"*, already pinned). **ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)** is this
 > milestone's decision record — **authored Accepted by U01**; the decisions
 > D1–D11 below are the `[PROPOSED]` text U01 locked verbatim into it.
 >
@@ -10,7 +27,7 @@
 > carry the **exact C# shapes** (the two documents + `NotificationKinds`, the
 > `NotificationDocTypes` registration, the full `NotificationService` surface, the
 > idempotency-key table, the pinned test names, the gate, and the
-> drift-guard); **ADR 0076 (Accepted)** is the decisions source; the roadmap
+> drift-guard); **ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) (Accepted)** is the decisions source; the roadmap
 > trio (M5 `StatusDone` / M6 `StatusNext` / M7 `StatusPlanned`) is
 > **confirmed** on `Milestones.cs` + README + `MilestonesTests.cs` (a
 > confirmation, not a change). The sealed-unit register is
@@ -26,7 +43,7 @@
 ## 1. What this milestone is
 
 The next arrow — **shared awareness**: the platform reaches out to the
-resident *where they are* (`docs/ARCHITECTURE.md` §0: *"**M6** notifications |
+resident *where they are* (the [value-chain milestone table](../ARCHITECTURE.md): *"**M6** notifications |
 **shared awareness** — the platform reaches out to the resident where they
 are"*). M3 shipped **signal** (posts, replies, announcements, group posts,
 moderation); M4 shipped **coordination** (events, RSVPs, reminders); M5 shipped
@@ -57,15 +74,15 @@ strings.
 
 ### The ADRs that deferred a notification to M6
 
-- **ADR 0013** (group posts) — *notifications on new group posts*: M6 settles
+- **ADR [0013](../adr/0013-group-posts-membership-lane.md)** (group posts) — *notifications on new group posts*: M6 settles
   the `group.post` kind and its wired emitter (U04).
-- **ADR 0054** (notifications-as-a-lane) — the lane this milestone executes.
-- **ADR 0063 / 0064** (no new notifications) — the M5 projects lane deferred
+- **ADR [0054](../adr/0054-events-rsvp-reminders.md)** (notifications-as-a-lane) — the lane this milestone executes.
+- **ADR [0063](../adr/0063-events-calendar-view.md) / 0064** (no new notifications) — the M5 projects lane deferred
   notification to M6; M6 settles the `todo.assign` kind (person-only) and its
   emitter.
-- **ADR 0067** (notifications on assignment) — M6 settles the `todo.assign`
+- **ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md)** (notifications on assignment) — M6 settles the `todo.assign`
   kind; the *group / community* assignment notification stays a follow-on
-  lane (M5's `TodoItem` group / community claim lane, ADR 0073 / 0074).
+  lane (M5's `TodoItem` group / community claim lane, ADR [0073](../adr/0073-todo-group-community-claim-lane.md) / 0074).
 - **The GU/GA lanes** (guardian assignment) — *no email notification to the
   assigned guardian*: **still deferred after M6**; recorded as a follow-on
   lane, not lifted by this milestone.
@@ -77,16 +94,16 @@ strings.
   M6 settles the `event.reminder` kind by adding the **inbox row** (the email
   is M4's, the inbox row is M6's).
 
-### The one rule inherited from ADR 0061
+### The one rule inherited from ADR [0061](../adr/0061-email-and-notification-language.md)
 
 The per-recipient outbound-channel language resolution is **inherited, not
 re-invented**: the `NotificationService` resolves the recipient's
 `Profile.EmailLanguage` (via the frozen `IUserInfoService.GetProfileAsync` read
-seam) and passes it to the `ITranslationProvider` (ADR 0061's existing
-`preferredLanguageCode` → `DefaultLanguageCode` → `en` chain). ADR 0061
+seam) and passes it to the `ITranslationProvider` (ADR [0061](../adr/0061-email-and-notification-language.md)'s existing
+`preferredLanguageCode` → `DefaultLanguageCode` → `en` chain). ADR [0061](../adr/0061-email-and-notification-language.md)
 §Context: *"a resident may keep the UI in English but want reminders in
 German, or vice versa"* — the **recipient's choice is the authority**; the
-sender's language is irrelevant. ADR 0061 is future-proof by construction
+sender's language is irrelevant. ADR [0061](../adr/0061-email-and-notification-language.md) is future-proof by construction
 (*"when they land they read the same `Profile.EmailLanguage` field"*); M6 is
 that landing.
 
@@ -105,11 +122,11 @@ that landing.
   inbox + the `/notifications/preferences` editor + the `/notifications/
   unread-count` poller endpoint + the `/notifications/mark-all-read` POST +
   the `/notifications/{id}/mark-read` and `/notifications/{id}/mark-unread`
-  per-row toggles (ADR 0096)).
+  per-row toggles (ADR [0096](../adr/0096-notification-read-unread-per-row-toggle.md))).
 - The **one layout bell** (the unread count badge + the dropdown + the
   poller, on the `_AccountNav` partial).
 - The **one plain TS module** (`client/lib/notifications-bell.ts` — tsc-only,
-  no dependencies, the ADR 0031 pin).
+  no dependencies, the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) pin).
 - The **`kw-l` keys × 4 languages** (en/de/fr/da) — the inbox labels, the bell
   label, the settings toggles, the empty state, the "mark all read" action,
   the per-kind body / subject templates.
@@ -126,7 +143,7 @@ that landing.
 - **Per-kind sub-filters on the inbox** — the inbox is a single flat list;
   filtering by kind is a follow-on lane.
 - **Notification on assignment to a *group* or *community*** — M5's
-  `TodoItem` group / community claim lane (ADR 0073 / 0074); a follow-on lane.
+  `TodoItem` group / community claim lane (ADR [0073](../adr/0073-todo-group-community-claim-lane.md) / 0074); a follow-on lane.
   M6's `todo.assign` kind is *person-only*.
 - **Notification to the assigned guardian** — the GU / GA lanes: **still
   deferred after M6** (the GU/GA ADRs named this deferral and it is *not*
@@ -145,17 +162,17 @@ that landing.
 
 | # | Invariant | Decision |
 |---|-----------|----------|
-| **C-M6·1** | **One bounded context, two documents, one surface, additive.** `Kumunita.Core.Notifications` with `Notification`, `NotificationPreference`; one new surface `NotificationDocTypes` (the `ProjectDocTypes` pattern verbatim); Marten-native POCOs, conventional `string` `Id`, delta-detected + idempotent, no seeding, no EF, zero migrations for existing surfaces (ADR 0004 §B.1). | D1 |
+| **C-M6·1** | **One bounded context, two documents, one surface, additive.** `Kumunita.Core.Notifications` with `Notification`, `NotificationPreference`; one new surface `NotificationDocTypes` (the `ProjectDocTypes` pattern verbatim); Marten-native POCOs, conventional `string` `Id`, delta-detected + idempotent, no seeding, no EF, zero migrations for existing surfaces (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1). | D1 |
 | **C-M6·2** | **The kind vocabulary is a closed string set, code-owned.** `NotificationKinds` is a **static class** with **nine** `public const string` members (a code-owned, closed set — the M5 `KanbanStatuses` pattern; a resident *cannot* choose their own kind string — only the code's emitters can). **`PostMention` is reserved, not wired** (the constant + the `kw-l` keys exist; no emitter calls it in M6 — the mention-detection logic is a follow-on lane). The **other eight kinds** each have a **wired emitter** in M6 (U04 + the Web-side hook). | D2 |
-| **C-M6·3** | **A notification is a *personal read*, not an `AccessAction` decision.** A `Notification` row is **the recipient's own data** — the `RecipientId` is the whole access story; the inbox read lane does **not** call `IAuthorizationService` (there is no audience to evaluate, no `AccessAction` to check). **No `NotificationToAuditableResource` adapter exists** (a notification is not an *auditable resource* in the ADR 0006 sense). **No audit row is emitted for an inbox read** (the recipient reading their own notifications is not an *access decision* — the M1 `GetProfileAsync` owner-branch precedent). | D3 |
+| **C-M6·3** | **A notification is a *personal read*, not an `AccessAction` decision.** A `Notification` row is **the recipient's own data** — the `RecipientId` is the whole access story; the inbox read lane does **not** call `IAuthorizationService` (there is no audience to evaluate, no `AccessAction` to check). **No `NotificationToAuditableResource` adapter exists** (a notification is not an *auditable resource* in the ADR [0006](../adr/0006-module-boundary-contracts.md) sense). **No audit row is emitted for an inbox read** (the recipient reading their own notifications is not an *access decision* — the M1 `GetProfileAsync` owner-branch precedent). | D3 |
 | **C-M6·4** | **The idempotency key is the *emitter's* responsibility; a re-emission is a no-op.** Each emission supplies a **`notification:{kind}:{stable-source-id}`** idempotency key (the C3-envelope fix precedent — the `verify:{userId}:{attempt}` / `setup:{userId}` shape from the M1 step-7 plan, now with a `notification:` prefix). **The `IMailerStage.StageAsync` idempotency guarantee** (a duplicate key is a no-op, not a second email) is the **sole** dedup mechanism; the service does not re-check. **A re-emission of the same logical event is a no-op** (the C3 pin — the inbox row is stored once, the email is staged once, the envelope is published once). | D4 |
-| **C-M6·5** | **Email is *best-effort*; the inbox is the *durable* record.** The `IMailerStage.StageAsync` seam is called **in the same transaction** as the `Notification` row store (the C3 pin — the domain write + the outbox row + the envelope commit atomically). A failed send **never** rolls back the inbox row (the `EmailDeadLetterWriter` + the `/health` degraded gate — the ARCHITECTURE.md §6.2 posture). **The inbox is the primary channel; the email is the out-of-band nudge** (the M4 §6.4 event-reminder precedent). | D5 |
-| **C-M6·6** | **The per-recipient email language is the ADR 0061 resolution, verbatim.** The `NotificationService` resolves the recipient's `Profile.EmailLanguage` (via the frozen `IUserInfoService.GetProfileAsync` read seam) and passes it to the `ITranslationProvider` (the ADR 0061 seam). **The sender's language is irrelevant** (the recipient's choice is the authority — ADR 0061 §Context). **The UGC snippet in the email body** (a reply's body, a to-do's title) is **rendered in the sender's authored language** (ADR 0018 — the content's own language, not the recipient's). | D6 |
+| **C-M6·5** | **Email is *best-effort*; the inbox is the *durable* record.** The `IMailerStage.StageAsync` seam is called **in the same transaction** as the `Notification` row store (the C3 pin — the domain write + the outbox row + the envelope commit atomically). A failed send **never** rolls back the inbox row (the `EmailDeadLetterWriter` + the `/health` degraded gate — the [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) posture). **The inbox is the primary channel; the email is the out-of-band nudge** (the M4 [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) event-reminder precedent). | D5 |
+| **C-M6·6** | **The per-recipient email language is the ADR [0061](../adr/0061-email-and-notification-language.md) resolution, verbatim.** The `NotificationService` resolves the recipient's `Profile.EmailLanguage` (via the frozen `IUserInfoService.GetProfileAsync` read seam) and passes it to the `ITranslationProvider` (the ADR [0061](../adr/0061-email-and-notification-language.md) seam). **The sender's language is irrelevant** (the recipient's choice is the authority — ADR [0061](../adr/0061-email-and-notification-language.md) §Context). **The UGC snippet in the email body** (a reply's body, a to-do's title) is **rendered in the sender's authored language** (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) — the content's own language, not the recipient's). | D6 |
 | **C-M6·7** | **A resident who has disabled a kind in their preferences still gets the inbox row** (the inbox is the record; the email is the nudge — the preference governs the *email*, not the *inbox*). The `NotificationService.EmitAsync` **always** stores the `Notification` row; it **conditionally** calls `IMailerStage.StageAsync` (only if the recipient's `NotificationPreference.KindsEnabled` includes the kind, or is `null` / empty = all enabled). **No per-kind email-only vs inbox-only split** (the preference is a single list; the split is a follow-on lane). | D7 |
 | **C-M6·8** | **The inbox is a flat list, capped at 50; no pagination, no per-kind filter in M6.** `ListInboxAsync` returns the **most recent 50** `Notification` rows for the recipient (newest-first, `Created` descending). **No pagination in M6** (a neighborhood is small — 50 is the shape; a full archive is M7). **No per-kind filter in M6** (the flat list is the shape; filtering is a follow-on lane). **The "mark all read" action** sets `ReadAt = now` on **all** the recipient's unread rows (one `Update` — no per-row loop). | D8 |
 | **C-M6·9** | **The preferences document is *lean*.** `NotificationPreference` has **one** field: `KindsEnabled` (an `IReadOnlyList<string>`, the subset of the nine kind constants the resident has **enabled**; `null` / empty = **all enabled** — the lean-default). **A resident edits the toggles on `/notifications/preferences`** (the settings surface); the emitter reads the preference **at emit time**. **No per-kind sub-settings in M6** (the single list is the shape; sub-settings are a follow-on lane). | D9 |
-| **C-M6·10** | **The layout bell is a *poller*, not a push.** The `client/lib/notifications-bell.ts` module polls `GET /notifications/unread-count` at a **30-second interval** (a `setInterval`, the `client/lib` plain-TS precedent — no WebSocket, no SSE, no push; the ADR 0031 tsc-only / no-dependency pin). **The badge shows the unread count**; **the dropdown is a plain `fetch` + DOM render** (the `client/lib/api.ts` CSRF-aware fetch shape). **No live update in M6** (a WebSocket / SSE lane is a follow-on lane; the 30-second poll is the shape). | D10 |
-| **C-M6·11** | **Reuse, don't reinvent.** The M1 durable-email trio (`IMailerStage.StageAsync` + `OutboxEmailStager` + `OutboxEmailHandler` + `EmailDeadLetterWriter`), the ADR 0061 per-recipient outbound-channel language, the `kw-dt` TagHelper (ADR 0019 / 0020), the closed `KnownTranslationKeys` registry (ADR 0015), the plain `client/lib` tsc-only TS (ADR 0031) are all **frozen seams** — M6 adds **two documents + one surface + one service + one controller + one view set + one TS module**, not a branch. **No new `AccessAction`**, **no new `AccessVia`**, **no new `IAuditableResource` adapter**, **no new email mechanism**, **no new UI dependency**. | D11 |
+| **C-M6·10** | **The layout bell is a *poller*, not a push.** The `client/lib/notifications-bell.ts` module polls `GET /notifications/unread-count` at a **30-second interval** (a `setInterval`, the `client/lib` plain-TS precedent — no WebSocket, no SSE, no push; the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) tsc-only / no-dependency pin). **The badge shows the unread count**; **the dropdown is a plain `fetch` + DOM render** (the `client/lib/api.ts` CSRF-aware fetch shape). **No live update in M6** (a WebSocket / SSE lane is a follow-on lane; the 30-second poll is the shape). | D10 |
+| **C-M6·11** | **Reuse, don't reinvent.** The M1 durable-email trio (`IMailerStage.StageAsync` + `OutboxEmailStager` + `OutboxEmailHandler` + `EmailDeadLetterWriter`), the ADR [0061](../adr/0061-email-and-notification-language.md) per-recipient outbound-channel language, the `kw-dt` TagHelper (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020), the closed `KnownTranslationKeys` registry (ADR [0015](../adr/0015-ui-view-localization-mechanics.md)), the plain `client/lib` tsc-only TS (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) are all **frozen seams** — M6 adds **two documents + one surface + one service + one controller + one view set + one TS module**, not a branch. **No new `AccessAction`**, **no new `AccessVia`**, **no new `IAuditableResource` adapter**, **no new email mechanism**, **no new UI dependency**. | D11 |
 
 ## 4. FACES
 
@@ -172,11 +189,11 @@ that landing.
 | **F9** | a resident who has disabled a kind in their preferences **still gets the inbox row** but **not the email** | C-M6·7 |
 | **F10** | a re-emission of the same logical event (same idempotency key) is a **no-op** (no second inbox row, no second email) | C-M6·4 |
 | **F11** | the inbox read (`ListInboxAsync`, `CountUnreadAsync`) does **not** emit an audit row (a personal read, not an `AccessAction` decision) | C-M6·3 |
-| **F12** | the email is in the **recipient's** `Profile.EmailLanguage` (the ADR 0061 resolution), the UGC snippet is in the **sender's** authored language (ADR 0018) | C-M6·6 |
+| **F12** | the email is in the **recipient's** `Profile.EmailLanguage` (the ADR [0061](../adr/0061-email-and-notification-language.md) resolution), the UGC snippet is in the **sender's** authored language (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)) | C-M6·6 |
 
 ## 5. The design decisions
 
-Each is **[PROPOSED]** in this unit (U00); **U01** locks them into **ADR 0076**
+Each is **[PROPOSED]** in this unit (U00); **U01** locks them into **ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md)**
 and gives them exact C# shapes in Part 2.
 
 ### 5.1 One bounded context, two documents, one surface, additive (D1)
@@ -186,10 +203,10 @@ and gives them exact C# shapes in Part 2.
 `NotificationDocTypes` (the `ProjectDocTypes` pattern verbatim: the `EventDocTypes` /
 `ProjectDocTypes` precedent). Both are Marten-native POCOs with conventional
 `string` `Id`, delta-detected + idempotent, no seeding, no EF. **Zero
-migrations for existing surfaces** (ADR 0004 §B.1 additive — the two docs are
+migrations for existing surfaces** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive — the two docs are
 new; the surface is additive). *Forbids:* a third document, a migration on an
 existing surface, or an EF mapping for either doc. *Precedent reused:* the
-`ProjectDocTypes` registration surface verbatim (ADR 0004 §B).
+`ProjectDocTypes` registration surface verbatim (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B).
 
 ### 5.2 The kind vocabulary is a closed string set, code-owned (D2)
 
@@ -213,7 +230,7 @@ data** — the `RecipientId` is the whole access story; the inbox read lane
 (`ListInboxAsync`, `CountUnreadAsync`, `MarkAllReadAsync`) does **not** call
 `IAuthorizationService` (there is no audience to evaluate, no `AccessAction` to
 check — the recipient is the recipient). **No `NotificationToAuditableResource`
-adapter exists** (a notification is not an *auditable resource* in the ADR 0006
+adapter exists** (a notification is not an *auditable resource* in the ADR [0006](../adr/0006-module-boundary-contracts.md)
 sense; it is a personal row). **No audit row is emitted for an inbox read**
 (the recipient reading their own notifications is not an *access decision* —
 the M1 `GetProfileAsync` owner-branch precedent). *Forbids:* a new
@@ -247,30 +264,30 @@ prefix.
 **in the same transaction** as the `Notification` row store (the C3 pin — the
 domain write + the outbox row + the envelope commit atomically). A failed send
 **never** rolls back the inbox row (the `EmailDeadLetterWriter` + the `/health`
-degraded gate — the ARCHITECTURE.md §6.2 posture). **The inbox is the primary
+degraded gate — the [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) posture). **The inbox is the primary
 channel; the email is the out-of-band nudge** (the M4 §6.4 event-reminder
 precedent — the reminder email is the nudge, the event detail is the content).
 *Forbids:* an inbox-row rollback on send failure, a new email mechanism, or a
 synchronous send path. *Precedent reused:* the M1 durable-email trio
 (`IMailerStage.StageAsync` + `OutboxEmailStager` + `OutboxEmailHandler` +
-`EmailDeadLetterWriter`) and the ARCHITECTURE.md §6.2 "audience notification:
+`EmailDeadLetterWriter`) and the [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) "audience notification:
 best-effort" row.
 
-### 5.6 The per-recipient email language is the ADR 0061 resolution, verbatim (D6)
+### 5.6 The per-recipient email language is the ADR [0061](../adr/0061-email-and-notification-language.md) resolution, verbatim (D6)
 
 **[PROPOSED]** — pins C-M6·6. The `NotificationService` resolves the
 recipient's `Profile.EmailLanguage` (via the frozen
 `IUserInfoService.GetProfileAsync` read seam) and passes it to the
-`ITranslationProvider` (the ADR 0061 seam — the provider does the
+`ITranslationProvider` (the ADR [0061](../adr/0061-email-and-notification-language.md) seam — the provider does the
 `EmailLanguage` → `DefaultLanguageCode` → `en` chain). **The sender's language
-is irrelevant** (the recipient's choice is the authority — ADR 0061 §Context:
+is irrelevant** (the recipient's choice is the authority — ADR [0061](../adr/0061-email-and-notification-language.md) §Context:
 *"a resident may keep the UI in English but want reminders in German, or vice
 versa"*). **The UGC snippet in the email body** (a reply's body, a to-do's
-title) is **rendered in the sender's authored language** (ADR 0018 — the
+title) is **rendered in the sender's authored language** (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) — the
 authored-in language is the content's own language, not the recipient's). *The
 template subject / body is in the **recipient's** `EmailLanguage`.* *Forbids:*
 a new resolution path, a sender-language email, or a recipient-language UGC
-snippet. *Precedent reused:* ADR 0061 verbatim (the `ITranslationProvider`
+snippet. *Precedent reused:* ADR [0061](../adr/0061-email-and-notification-language.md) verbatim (the `ITranslationProvider`
 already does the resolution).
 
 ### 5.7 A resident who has disabled a kind still gets the inbox row (D7)
@@ -319,28 +336,28 @@ reused:* the M5 `KanbanLane.MaxItems?` nullable precedent (`null` means
 **[PROPOSED]** — pins C-M6·10. The `client/lib/notifications-bell.ts` module
 polls `GET /notifications/unread-count` at a **30-second interval** (a
 `setInterval`, the `client/lib` plain-TS precedent — no WebSocket, no SSE, no
-push; the ADR 0031 tsc-only / no-dependency pin). **The badge shows the unread
+push; the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) tsc-only / no-dependency pin). **The badge shows the unread
 count** (a Bootstrap `badge text-bg-danger` on the bell icon in the
 `_AccountNav` partial); **the dropdown is a plain `fetch` + DOM render** (the
 `client/lib/api.ts` CSRF-aware fetch shape). **No live update in M6** (a
 WebSocket / SSE lane is a follow-on lane; the 30-second poll is the "good
-enough" shape for a neighborhood-scale platform). *ADR 0103 amends the
+enough" shape for a neighborhood-scale platform). *ADR [0103](../adr/0103-navbar-notification-open-lane.md) amends the
 dropdown's link shape:* each item's label is the row's body with the per-row
-toggle text (ADR 0096) stripped, and each item deep-links to the inbox row's
+toggle text (ADR [0096](../adr/0096-notification-read-unread-per-row-toggle.md)) stripped, and each item deep-links to the inbox row's
 anchor (`/notifications#notif-{id}`); landing on that row auto-marks it read
-(the ADR 0096 single-row lane, 404-tolerated) and highlights it (the ADR 0085
+(the ADR [0096](../adr/0096-notification-read-unread-per-row-toggle.md) single-row lane, 404-tolerated) and highlights it (the ADR [0085](../adr/0085-notification-item-link-and-reply-highlight.md)
 D5 `.reply-highlight` flash) — that open-then-read behavior lives in
 `client/lib/notification-open.ts` (tsc-only, the same pin). *Forbids:* a
 WebSocket, SSE, or push mechanism; a new UI dependency. *Precedent reused:*
-the `client/lib/api.ts` CSRF-aware fetch shape and the ADR 0031 tsc-only pin.
+the `client/lib/api.ts` CSRF-aware fetch shape and the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) tsc-only pin.
 
 ### 5.11 Reuse, don't reinvent (D11)
 
 **[PROPOSED]** — pins C-M6·11. The M1 durable-email trio
 (`IMailerStage.StageAsync` + `OutboxEmailStager` + `OutboxEmailHandler` +
-`EmailDeadLetterWriter`), the ADR 0061 per-recipient outbound-channel language,
-the `kw-dt` TagHelper (ADR 0019 / 0020), the closed `KnownTranslationKeys`
-registry (ADR 0015), and the plain `client/lib` tsc-only TS (ADR 0031) are all
+`EmailDeadLetterWriter`), the ADR [0061](../adr/0061-email-and-notification-language.md) per-recipient outbound-channel language,
+the `kw-dt` TagHelper (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020), the closed `KnownTranslationKeys`
+registry (ADR [0015](../adr/0015-ui-view-localization-mechanics.md)), and the plain `client/lib` tsc-only TS (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) are all
 **frozen seams** — M6 adds **two documents + one surface + one service + one
 controller + one view set + one TS module**, not a branch. **No new
 `AccessAction`**, **no new `AccessVia`**, **no new `IAuditableResource`
@@ -349,7 +366,7 @@ new authorization path, a new email mechanism, or a new UI dependency.
 *Precedent reused:* every named seam verbatim (the M4 / M5 additive-and-reusing
 precedent).
 
-## 6. Part 2 (U01 — authored; ADR 0076 Accepted)
+## 6. Part 2 (U01 — authored; ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) Accepted)
 
 The shapes below are **exact**: a later unit copies them verbatim into `.cs`
 files. All timestamps are `DateTimeOffset` (the M4 `Event` / M5 `TodoItem`
@@ -751,8 +768,8 @@ under test, the FACE it pins, and the expectation). The **exact** test names
 | 3 | `/notifications/mark-all-read` | `POST` | 302 + the `ReadAt` set on all unread rows |
 | 4 | `/notifications/preferences` | `GET` | 200 + the toggles (the nine `NotificationKinds.Known` entries) |
 | 5 | `/notifications/preferences` | `POST` | 302 + the `KindsEnabled` update |
-| 6 | `/notifications/{id}/mark-read` | `POST` | 302 + the `ReadAt` set on that one row (ADR 0096) |
-| 7 | `/notifications/{id}/mark-unread` | `POST` | 302 + the `ReadAt` cleared on that one row (ADR 0096) |
+| 6 | `/notifications/{id}/mark-read` | `POST` | 302 + the `ReadAt` set on that one row (ADR [0096](../adr/0096-notification-read-unread-per-row-toggle.md)) |
+| 7 | `/notifications/{id}/mark-unread` | `POST` | 302 + the `ReadAt` cleared on that one row (ADR [0096](../adr/0096-notification-read-unread-per-row-toggle.md)) |
 
 ### 6.5 Acceptance gate
 
@@ -770,9 +787,9 @@ codes against these names, not a re-derivation):
 **The U10 recording (the close unit):** the gate result (pass / fail) is
 appended to the handoff note (`docs/plans-milestones/in-progress/notifications/
 notifications-handoff-notes.md`, the `## U10` section); the lane's unit files
-move `in-progress/notifications/` → `done/notifications/`; the roadmap trio
+move `in-progress/notifications/` → `archive/lanes/notifications/`; the roadmap trio
 is confirmed (M5 `StatusDone`, M6 `StatusNext` → `StatusDone`, M7
-`StatusPlanned` → `StatusNext`); the ARCHITECTURE.md §3 + §5 sync, the README
+`StatusPlanned` → `StatusNext`); the [data model](../architecture/data-model.md) + [modular monolith](../ARCHITECTURE.md) sync, the README
 Roadmap, and the handoff summary are all honest at ship time.
 
 ### 6.6 Drift-guard
@@ -794,5 +811,5 @@ confident) applies the fix, re-reads the affected sections, and continues.
 register's unit-series rule 2) — a unit that wants to change a pinned shape
 must record the drift first, then apply the fix, then continue. The U10
 close unit is the **sole** unit that rewrites the design doc's status header
-(the Part 1 → Part 2 transition, the ADR 0076 Accepted lock, the roadmap
+(the Part 1 → Part 2 transition, the ADR [0076](../adr/0076-notifications-inbox-and-recipient-email.md) Accepted lock, the roadmap
 trio confirmation) — all other units code against the frozen text.

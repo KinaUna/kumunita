@@ -1,8 +1,21 @@
-# ADR 0181 — Calendar tab restyle
+---
+id: adr-0181
+title: "Calendar tab restyle"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0063-events-calendar-view.md, docs/adr/0064-events-calendar-dwm-views.md, docs/adr/0081-events-calendar-week-default-and-quick-create.md, docs/adr/0173-report-targets-lane.md, docs/adr/0175-palettes-and-feed-card.md, docs/adr/0179-event-card.md, docs/adr/0180-event-detail.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0181](0181-calendar.md) — Calendar tab restyle
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0063/0064/0081 (calendar), ADR 0173/0175 (UI refresh), ADR 0179/0180 (events)
+Relates to: ADR [0063](0063-events-calendar-view.md)/0064/0081 (calendar), ADR [0173](0173-report-targets-lane.md)/0175 (UI refresh), ADR [0179](0179-event-card.md)/0180 (events)
 
 ## Decisions
 

@@ -1,4 +1,17 @@
-# ADR 0255 — The tag input hint no longer names the item
+---
+id: adr-0255
+title: "The tag input hint no longer names the item"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0255](0255-tag-hint-noun-free.md) — The tag input hint no longer names the item
 
 Status: Accepted
 Date: 2026-10-29

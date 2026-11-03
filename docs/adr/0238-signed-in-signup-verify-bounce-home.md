@@ -1,9 +1,22 @@
-# ADR 0238 — The already-signed-in bounce on sign-up and verify goes Home
+---
+id: adr-0238
+title: "The already-signed-in bounce on sign-up and verify goes Home"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0238](0238-signed-in-signup-verify-bounce-home.md) — The already-signed-in bounce on sign-up and verify goes Home
 
 Status: Accepted
 
 ## Context
-ADR 0234 made sign-in land on Home and deliberately left sign-up and verify on `/profile/edit`, because a new resident's first stop
+ADR [0234](0234-sign-in-landing-page.md) made sign-in land on Home and deliberately left sign-up and verify on `/profile/edit`, because a new resident's first stop
 should be their profile. That reasoning does not hold for the "already signed in" bounce: a person who is signed in and opens
 `/Account/Signup` or a verify link (a second tab, an old email) is not a new resident, and `/profile/edit` is a surprising place to land.
 

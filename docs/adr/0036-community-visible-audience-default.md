@@ -1,19 +1,21 @@
-# ADR 0036 — Community-visible audience: the default for new community posts
-
-Status: Accepted
-Date: 2026-09-17
-Amends: none (additive). Builds on the frozen base of **0001-B**
-(audience written **verbatim** by the author), **0006** (the decision
-order, the empty-audience-denies invariant C1, the `CanAsync` /
-`CanSeeAsync` frozen signatures), and **0012** (the
-`GetCommunityIdsAsync` read seam — explicit `ComponentMembership` rows ∪
-enabled ∩ mandatory components).
+---
+id: adr-0036
+title: "Community-visible audience: the default for new community posts"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: [adr-0001]
+superseded_by: [adr-0086, adr-0102]
+updated: 2026-11-02
+---
 
 ## Context
 
 The post composer's bootstrap default audience was **owner-only**: a new
 post with no grants was visible to its author and no one else (the
-empty-audience-denies invariant, ADR 0006-C1, applied to an empty grant
+empty-audience-denies invariant, ADR [0006](0006-module-boundary-contracts.md)-C1, applied to an empty grant
 list). That was the right bootstrap *default* at M1 (a self-only shape),
 but it is the **wrong default** for the *post* lane. In a single-
 neighborhood community platform, the overwhelming majority of posts a
@@ -24,7 +26,7 @@ they usually just want "everyone in my community", inverts the
 granularity: the picker is the *coarse* control forced on for the
 *fine* default.
 
-The audience model (ADR 0001-B) already has the right primitives: an
+The audience model (ADR [0001](0001-core-stack-and-identity-model.md)-B) already has the right primitives: an
 `Audience` is a grant list + a combine mode, and a post's audience is
 written **verbatim** by the author. What it lacked was a **first-class
 "all members of the target component" grant** — a way to say "my
@@ -33,7 +35,7 @@ write time — the membership changes over time — and the wrong shape —
 audience grants are *specific* user/group ids, not a set). Adding
 "all community members" as a *mode of the grant list* (a synthetic
 grant) would collide with the C1 invariant (empty-list semantics) and
-with ADR 0006's "the grant list is the explicit set" contract. It needed
+with ADR [0006](0006-module-boundary-contracts.md)'s "the grant list is the explicit set" contract. It needed
 to be a **distinct grant**, independent of the list.
 
 ## Decision
@@ -41,7 +43,7 @@ to be a **distinct grant**, independent of the list.
 - **`Audience.Community` is a new first-class flag on the `Audience`
   document, a *distinct grant* — not a mode of the `Grants` list.**
   `public bool Community { get; set; }` (default `false`, so existing
-  posts keep their owner-only behavior verbatim — ADR 0001-B's verbatim-
+  posts keep their owner-only behavior verbatim — ADR [0001](0001-core-stack-and-identity-model.md)-B's verbatim-
   write contract is untouched; the flag simply round-trips). A
   `true` flag with an **empty** `Grants` list is the "all community
   members" shape. The flag and the grant list are **independent**: a post
@@ -78,7 +80,7 @@ to be a **distinct grant**, independent of the list.
 - **`AccessVia.Community` is a new additive enum value**, the 10th in
   `AccessVia` (after `Owner` / `Audience` / `Delegation` / `Moderator` /
   `Report` / `BreakGlass` / `Admin` / `Group` / `Guardian`), following
-  the M1 `Admin` / ADR 0013 `Group` / ADR 0028 `Guardian` **append**
+  the M1 `Admin` / ADR [0013](0013-group-posts-membership-lane.md) `Group` / ADR [0028](0028-guardian-controls-account-scope-supervision.md) `Guardian` **append**
   precedent: an additive value, the nine frozen values untouched. It is
   the audit tag for "this decision allowed because the actor is a
   member of the target community and the post is community-visible" —
@@ -89,7 +91,7 @@ to be a **distinct grant**, independent of the list.
   D4 / C4 contract as the group set):
   `IUserInfoService.GetCommunityIdsAsync(actorId)` → the live
   `IReadOnlyCollection<string>` (explicit `ComponentMembership` rows ∪
-  enabled ∩ mandatory components, ADR 0012), materialized into a
+  enabled ∩ mandatory components, ADR [0012](0012-community-membership-mandatory-and-moderator.md)), materialized into a
   `HashSet<string>` (`StringComparer.Ordinal`) on the `ActorContext`
   alongside the existing `GroupIds`. The read seam and the write lanes
   (`SetCommunityMembershipAsync` / `ClearCommunityMembershipAsync`) are
@@ -102,7 +104,7 @@ to be a **distinct grant**, independent of the list.
   defaults `false`). The Community branch requires **both** a `true`
   flag **and** a non-null `ComponentId`, so a group post — which has the
   flag `false` *and* an empty component id — never reaches it. The group
-  lane's single-decision standing (ADR 0013 / ADR 0035 membership lane)
+  lane's single-decision standing (ADR [0013](0013-group-posts-membership-lane.md) / ADR [0035](0035-group-post-media-membership-lane.md) membership lane)
   is untouched. (The branch is also inert for any hypothetical
   component-agnostic target with `Community: true` and a null/empty
   `ComponentId` — the flag alone does nothing without a component.)
@@ -155,7 +157,7 @@ to be a **distinct grant**, independent of the list.
   community-visible *and* carry explicit user/group grants; the visible
   set is the union (a community member *or* an explicitly granted user).
   This is the "wider than the community" case, and it is the author's
-  verbatim choice (ADR 0001-B).
+  verbatim choice (ADR [0001](0001-core-stack-and-identity-model.md)-B).
 
 - **The C1 invariant's *scope* is now explicit.** C1 guards the *grant
   list* (and the `All`-mode vacuous-truth trap). The Community branch is
@@ -183,34 +185,3 @@ to be a **distinct grant**, independent of the list.
   never reaches the branch, so the flag is a no-op there. This is the
   safe default: a stray `Community: true` on a component-agnostic target
   cannot accidentally broaden visibility.
-
-## Tests
-
-- **Core (DB-backed, `AuthorizationServiceTests`)** — the `A0036_*`
-  family pins the branch end-to-end against the live `Decide()` path:
-  - `A0036_CommunityFlagAndMember_Allows_ViaCommunity` — flag on, member
-    of the component → **Allow**, `via Community` (not `Audience` — the
-    empty grant list would have denied; the branch short-circuits first).
-  - `A0036_CommunityFlagButNotMember_Denies` — flag on, **not** a member
-    → **Deny** (grant list empty → no fallback).
-  - `A0036_CommunityFlagButNullComponent_Inert` — flag on, `ComponentId`
-    null → **Deny** (the branch is inert without a component).
-  - `A0036_CommunityFlagFalse_EmptyGrants_OwnerOnly` — the pre-ADR-0036
-    shape (flag off, empty grants): a member who isn't the owner is
-    denied, the owner is allowed via `Owner` (the old behavior, pinned).
-  - `A0036_CommunityFlagPlusExplicitGrant_BothVisible` — flag on **and**
-    an explicit user grant: the community member sees it via `Community`,
-    the granted non-member sees it via `Audience` (the two grants
-    compose).
-- **Web (pure, `AudienceEditorModelCommunityTests`)** — the form-bound
-  `CommunityVisible` ↔ document `Community` round-trip, both directions:
-  - `BuildAudience_CommunityVisible_RoundTripsVerbatim` — checked /
-    unchecked both carry verbatim onto `Audience.Community`, with
-    `Mode` + `Grants` untouched.
-  - `BuildAudience_CommunityVisible_WithGrants_BothPreserved` — the flag
-    and the grant list are independent; both survive.
-  - `FromAudience_Community_RoundTripsVerbatim` — the edit-lane read
-    direction seeds `CommunityVisible` from `Audience.Community`; the
-    full build → from → build round-trip is stable (guards against a
-    regression that silently flips a community-visible post to
-    owner-only on the next edit save).

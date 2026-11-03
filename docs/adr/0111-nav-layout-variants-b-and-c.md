@@ -1,17 +1,15 @@
-# ADR 0111 — Navigation layout variants (the `kumunita.nav` preference, B default / C opt-in)
-
-Status: Accepted
-Date: 2026-09-30
-Extends the **`LocaleCookie` / `PublicLocaleController` preference idiom**
-(the "a preference cookie, never a claim — thin-token rule", ADR 0001-B /
-ADR 0005 B), the **`kw-l` registry + en/de/fr/da parity pins** (ADR 0015),
-the **`KwLRegistryConsistencyTests`** view↔registry scan, and the **M10
-U06 `site.css` media-block drift-guard pin** (`PwaManifestTests.
-Site_Css_Media_Block_Boundary_Pinned`). This ADR gives the shared top-nav
-**two resident-selectable layouts** — variant **B** (the compact top row
-with a single "More" menu, the **default**) and variant **C** (the icon
-rail + slim top bar, the **explicit opt-in**) — and lets each resident
-choose between them from the account menu.
+---
+id: adr-0111
+title: "Navigation layout variants (the `kumunita.nav` preference, B default / C opt-in)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -43,7 +41,7 @@ the `kumunita.nav` cookie (`NavLayoutCookie`, `Security/NavLayoutCookie.cs`),
 mirroring `LocaleCookie`: `HttpOnly`, `SameSite=Lax`, 365-day max age, values
 `b` / `c`. It is read in the Web layer and passed to the layout as a plain
 string — never part of the identity and never an authorization decision
-(ADR 0001-B). It is a per-browser display preference, exactly like the
+(ADR [0001](0001-core-stack-and-identity-model.md)-B). It is a per-browser display preference, exactly like the
 language preference.
 
 **D3 — A public, CSRF-protected write endpoint.** `POST /nav-layout`
@@ -66,7 +64,7 @@ hidden-`returnUrl` + `✓`-on-active pattern the language picker already uses.
 This keeps the switch one menu away from the other resident preference and
 avoids a sixth flat navbar control.
 
-**D5 — UI strings go through the closed `kw-l` registry (ADR 0015).** Four
+**D5 — UI strings go through the closed `kw-l` registry (ADR [0015](0015-ui-view-localization-mechanics.md)).** Four
 new keys — `nav.more`, `nav_variant.label`, `nav_variant.row`,
 `nav_variant.rail` — are registered in **all four** dictionaries (en/de/fr/da).
 The parity pins (`KnownTranslationKeys_ParityTests`) require `DeValues` /
@@ -123,24 +121,3 @@ is preserved.
   the SW is ever reverted to serving the cached page first, the switch will
   appear to lag again. The M10 design doc §SW caching rule is the source of
   truth for that strategy (refined, with this rationale).
-
-## Affected files
-
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — `nav.more` +
-  `nav_variant.{label,row,rail}` in en/de/fr/da.
-- `src/Kumunita.Web/Security/NavLayoutCookie.cs` — new (the `kumunita.nav`
-  preference cookie; `Read` defaults to B).
-- `src/Kumunita.Web/Controllers/NavLayoutController.cs` — new (`POST
-  /nav-layout`, CSRF-protected).
-- `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — the header branches on the
-  cookie (variant B default / variant C).
-- `src/Kumunita.Web/Views/Shared/_AccountNav.cshtml` — the nav-variant picker
-  sub-section in the account dropdown.
-- `src/Kumunita.Web/wwwroot/css/site.css` — the `kmb-rail*` / `kmb-topbar*`
-  surface + the fullbleed/expand extensions (responsive rules in the existing
-  media block).
-- **M11 (refined after ship):** `src/Kumunita.Web/wwwroot/sw.js` — the two
-  HTML shell pages go network-first so the switch renders immediately on
-  navigation (see the Service-worker interaction note above); the M10 design
-  doc `§SW` caching rule is updated to match. The switch's immediacy depends
-  on this strategy.

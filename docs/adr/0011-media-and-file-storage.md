@@ -1,14 +1,15 @@
-# ADR 0011 — Media & file storage: content-addressed local-volume bytes + a `mt` catalog
-
-Status: Accepted
-Date: 2026-09-11
-Amends: 0004 (Consequences Positive — "single `pg_dump` backup story"; the
-byte payload is the one surface that does not ride the dump — `OPS.md` gains
-the volume as a second backup/restore surface, ADR 0004 §B otherwise unchanged)
-Amended: 2026-10-26 (avatar *rendering* moved to a server-side presence
-check — the `<kw-avatar>` TagHelper decides whether to emit the `<img>` at
-all; the serving lane's 404 contract and every other decision in this ADR
-are unchanged — see **Amendment (2026-10-26)** below)
+---
+id: adr-0011
+title: "Media & file storage: content-addressed local-volume bytes + a `mt` catalog"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0004]
+superseded_by: [adr-0025, adr-0135, adr-0136]
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -18,14 +19,14 @@ directory/preview surfaces) — needs a place for the bytes and a rulebook for
 how they are served. The constraints the choice has to honor are the ones
 this codebase has already made:
 
-- **Privacy/audit model** (SECURITY.md §3, ADR 0006-C): access to
+- **Privacy/audit model** (SECURITY.md §3, ADR [0006](0006-module-boundary-contracts.md)-C): access to
   audience-restricted content is resolved per request and logged; a public
   path bypasses both.
-- **`Core` stays HTTP-free** (ADR 0006-D): the store seam must be a plain
+- **`Core` stays HTTP-free** (ADR [0006](0006-module-boundary-contracts.md)-D): the store seam must be a plain
   `byte[]/filename/contentType/actorId` interface, not `IFormFile`/`Stream`.
-- **Marten owns the domain documents** (ADR 0004 §B): the catalog entry must
+- **Marten owns the domain documents** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B): the catalog entry must
   be a document in `mt`, so it `pg_dump`s with the rest of the data.
-- **Lean + Boring, one database** (README principles; ADR 0002): no managed
+- **Lean + Boring, one database** (README principles; ADR [0002](0002-deployment-topology.md)): no managed
   bucket service, no SDK, no signed-URL machinery, no extra stateful backend.
 
 Two shapes were on the table. An **object store** (MinIO / S3-style behind
@@ -42,7 +43,7 @@ local volume.
 - **Storage primitive: a content-addressed byte store on a dedicated volume,
   behind an HTTP-free seam.** `Kumunita.Core.Media`:
   - `MediaObject` (a Marten doc in `mt` — registered on its own
-    `MediaDocTypes` doc surface, ADR 0004 §B.1): `Id` = the **lowercase-hex
+    `MediaDocTypes` doc surface, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1): `Id` = the **lowercase-hex
     SHA-256 of the payload** (the identity, the dedup key, and the catalog —
     one thing, not three), plus `Filename?` / `ContentType` / `SizeBytes` /
     `Created` / `CreatedById?` (who first stored each unique file — the
@@ -71,7 +72,7 @@ local volume.
   subject is the signed-in principal, minted server-side; never a path
   param), guards before any write (empty → `400`, `> Media__MaxBytes` →
   `413`, disallowed type → `415`, no file written), then `PutAsync` →
-  `SetProfileAvatarAsync` (the one `IUserInfoService` lane; ADR 0006-E
+  `SetProfileAvatarAsync` (the one `IUserInfoService` lane; ADR [0006](0006-module-boundary-contracts.md)-E
   compatible addition).
 - **Type + size boundaries at the upload edge.** Raster only
   (`image/jpeg|png|webp|gif` — **SVG excluded**: it is a document format
@@ -113,20 +114,20 @@ local volume.
   failure, not an implementation choice.
 - **`Core` stays HTTP-free.** `IFormFile`/`Stream` never cross the seam; the
   Web layer is responsible for `byte[]` / `filename` / `contentType` /
-  `actorId`. ADR 0006-D holds; the `Postman-free` unit test surface is the
+  `actorId`. ADR [0006](0006-module-boundary-contracts.md)-D holds; the `Postman-free` unit test surface is the
   `IMediaFileStore` (temp-dir) + `IMediaStore` (Postgres + temp dir) pair.
 - **`mt` catalog + volume payload = two restore surfaces.** OPS.md
   procedures 4 and 5 each gain the volume (snapshot + restore), and the
   integrity key is the content hash — so a *half*-restore (one surface
-  missing) degrades to avatar 404s, not data corruption. ADR 0004's
+  missing) degrades to avatar 404s, not data corruption. ADR [0004](0004-data-persistence-and-schema-evolution.md)'s
   "one `pg_dump` story" is amended in that one respect (see Amends).
 - **The upload boundary is a single chokepoint.** Type/size are decided
   once in `MediaOptions` (operator-tunable via `Media__*`) and enforced in
   `AvatarUpload` before any byte is written; the serving endpoint serves the
   *stored* `ContentType` (already validated at write) + nosniff — no second
   guess at read time.
-- **ADR 0006-D / ADR 0004 are not touched** for this lane — the `MediaObject`
-  doc and the `MediaDocTypes` surface are the ADR 0004 §B.1 shape (Marten
+- **ADR [0006](0006-module-boundary-contracts.md)-D / ADR [0004](0004-data-persistence-and-schema-evolution.md) are not touched** for this lane — the `MediaObject`
+  doc and the `MediaDocTypes` surface are the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 shape (Marten
   registers the POCO; `MediaDocTypes.Configure(opts)` is called once in
   `Program.cs`, the same call-site as `PostDocTypes`).
 - **Rejected: per-resident volume partition** (one subfolder per subject)
@@ -134,95 +135,3 @@ local volume.
   authorization job (C-MED·1), not an FS job. Rejected: **signed URLs /
   time-limited public links** — the app endpoint + per-request audit is the
   whole story; a signed URL bypasses the audit (C-MED·2).
-
-## Revisit when
-
-- A deployment wants **bytes off-box** (a shared VPS, a storage cost ceiling,
-  or a compliance requirement that the payload not sit on the app's disk) —
-  `IMediaFileStore` is the seam; a bucket-backed implementation replaces
-  `LocalVolumeFileStore` without touching `IMediaStore`, `MediaObject`, or
-  the serving route.
-- **Video / office docs / arbitrary downloads** ship (a follow-on lane) — the
-  `AllowedContentTypes` / `MaxBytes` boundary and the `ContentKind`-by-
-  content-type extension point are the seam this ADR is deliberately sized to
-  leave open, and the follow-on design doc should name them explicitly.
-- The **audit policy on Deny** changes (e.g. a follow-on lane wants to *not*
-  audit avatar denies) — C-MED·2 is the invariant; a change is itself a new
-  ADR, not a code change.
-
-## Amendment (2026-10-26)
-
-**Scope.** This amendment restates one consequence of the U8 "avatar form +
-`<img src="/profile/avatar/{subject}">` + monogram fallback" deliverable
-(§Decision "U8", §Consequences "Avatar is the reference consumer").
-Everything else in this ADR — the storage primitive, the HTTP-free seam,
-the content-hash integrity story, the FACES M1–M6 fail-closed 404 contract on
-the `GET /profile/avatar/{subjectId}` serving lane, the type/size boundary,
-and the two-restore-surface story — is unchanged.
-
-**What changed.** Previously every avatar slot in a Razor view shipped an
-`<img src="/profile/avatar/{subjectId}">` unconditionally and leaned on
-`client/lib/avatar.ts` (hiding the `<img>` and showing the `.avatar-mono`
-sibling on the browser's `error` event) to hide the broken image. That
-mechanism works but only *after* the browser has already made a request
-that the serving lane answers with 404 — the normal no-avatar case was a
-doomed fetch in the browser's network tab (and the dev-tools console) for
-every resident without an avatar. The serving lane's 404 is still the
-correct fail-closed contract for the *endpoint* (a direct URL request with
-no profile, a blocked profile, or no avatar set all 404 — FACES M3–M5);
-this amendment changes *how the views render*, not the endpoint.
-
-**The new mechanism.** Every avatar slot renders through the `<kw-avatar>`
-TagHelper (`src/Kumunita.Web/TagHelpers/AvatarTagHelper.cs`), which asks
-the `IAvatarPresenceChecker`
-(`src/Kumunita.Web/Security/AvatarPresenceChecker.cs`, a Web-layer read
-seam, **not** a frozen Core seam — Core stays HTTP-free, ADR 0006-D holds)
-whether the avatar actually resolves, and only then writes markup:
-
-- **Present** → the same `<img src="/profile/avatar/{subjectId}">` +
-  hidden `.avatar-mono` sibling the app always used (the `data-avatar-fallback`
-  + `client/lib/avatar.ts` swap stays as a belt-and-suspenders for the rare
-  render-then-delete race — the presence check is a read, the avatar could
-  be cleared between the check and the browser's fetch).
-- **Absent** → just the `.avatar-mono` circle (the resident's initial, or an
-  empty circle when the slot has no monogram channel), or nothing at all for
-  a slot that has neither — **no `<img>`, no request, no 404**.
-
-The presence check folds to `false` on exactly the set of conditions the
-serving lane 404s on (unknown profile, blocked profile, no `AvatarId`, or
-the media doc missing — the C-MED·7 "mt catalog and the volume are distinct"
-pin). The checker is a **read, never a decision** (ADR 0057 holds: the
-avatar lane is "all platform users"; no `IAuthorizationService.CanAsync`,
-no `AccessAudit` row, no new `AccessAction` / `AccessVia`), and it is
-**scoped** (one instance per request) so its per-subject cache makes a
-feed / comment list / board resolve one profile + media read per resident,
-not one per row (N+1 avoided; the "N+1 acceptable" precedent at the
-`PostsController` author display-name read is not reached here because the
-same reader serves every row on the page).
-
-**The reference-consumer consequence is restated.** ADR 0011's
-"Avatar is the reference consumer" pin (the follow-on lanes copy the
-C-MED·1/2/3/6 idiom) now applies to **both** the serving lane
-(`ProfileController.Avatar`, the frozen `GET /profile/avatar/{subjectId}`
-contract — unchanged) **and** the rendering lane (`<kw-avatar>` +
-`IAvatarPresenceChecker`). Follow-on lanes that need an avatar-style
-slot (e.g. the group-logo or badge-icon lanes named under
-"Follow-on lanes are a separate feature" above) should copy the
-`<kw-avatar>` idiom — present → `<img>` at the audited serving endpoint,
-absent → the slot's own placeholder — rather than shipping a raw `<img>`
-and leaning on a client-side error handler. `client/lib/avatar.ts` remains
-loaded in the layout (SECURITY.md §6 — no inline `on*`) as the
-secondary fallback for the present case; it is no longer the primary
-mechanism.
-
-**What did NOT change (explicit, so a future reader does not re-derive
-this from the code):**
-- The `GET /profile/avatar/{subjectId}` serving lane, its FACES M1–M6
-  outcomes, its `nosniff` header, and its "no audience decision / no audit
-  row" ADR 0057 shape — unchanged.
-- The `POST /profile/avatar` upload lane, its 400/413/415 guards, and its
-  store-first/profile-second ordering (C-MED·7) — unchanged.
-- The `IMediaStore` / `IMediaFileStore` seams, the `MediaObject` doc in
-  `mt`, the content-hash integrity story, and the two-restore-surface
-  (catalog + volume) backup contract — unchanged.
-- ADR 0057's "avatars are all platform users" pin — unchanged.

@@ -1,10 +1,15 @@
-# ADR 0025 — Rich content: Markdown bodies + in-content images
-
-Status: Accepted
-Date: 2026-09-14
-Amends: 0011 (the "follow-on lanes" non-decision is resolved for the
-post/reply/announcement/about lane specifically — group logos, badge icons,
-and other follow-on consumers remain future lanes, as ADR 0011 said)
+---
+id: adr-0025
+title: "Rich content: Markdown bodies + in-content images"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: [adr-0011]
+superseded_by: [adr-0031, adr-0034, adr-0035, adr-0075, adr-0086, adr-0165]
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -14,7 +19,7 @@ Two design questions were open in the platform:
 are raw plain text today — stored verbatim, rendered with
 `whitespace-pre-line` or raw `@Model.Body`, with no formatting at all. The
 platform already ships an escape-first Markdown renderer
-(`MarkdownRenderer`, `Kumunita.Web.Security`) that ADR 0005 A promised as
+(`MarkdownRenderer`, `Kumunita.Web.Security`) that ADR [0005](0005-multilingual-support.md) A promised as
 the "single page engine" for static pages — but every UGC surface
 deliberately ignores it. Adopting a second library (`Markdig` /
 `MarkdownSharp`) would add a dependency for a subset (headings, lists,
@@ -22,7 +27,7 @@ inline emphasis, links) that the existing ~200-line renderer already
 covers — minus images, which is the one extension this ADR makes.
 
 **(b) How are content images referenced and served?** Images exist nowhere
-but the profile avatar (ADR 0011's single consumer). ADR 0011's "Not
+but the profile avatar (ADR [0011](0011-media-and-file-storage.md)'s single consumer). ADR [0011](0011-media-and-file-storage.md)'s "Not
 decided here" section explicitly named "post attachments" as a follow-on
 lane, gated on the owning resource's audience, and did not register any
 seams, routes, or doc types for it.
@@ -34,11 +39,11 @@ The constraints the choice has to honor (all pre-existing, not new):
   open (tracking pixel, session-cookie-bearing fetch).
 - **The audit model** — every audience-restricted read is logged
   (SECURITY.md §3, C-MED·2); a public path bypasses both.
-- **`Core` stays HTTP-free** (ADR 0006-D) — the serving/upload boundary
+- **`Core` stays HTTP-free** (ADR [0006](0006-module-boundary-contracts.md)-D) — the serving/upload boundary
   is Web-layer; the Core seam is a plain id-based read.
-- **Marten owns the domain documents** (ADR 0004 §B) — any new field
-  rides the additive path (ADR 0004 §B.1).
-- **Lean + Boring, one database** (README principles, ADR 0002) — no new
+- **Marten owns the domain documents** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B) — any new field
+  rides the additive path (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).
+- **Lean + Boring, one database** (README principles, ADR [0002](0002-deployment-topology.md)) — no new
   rendering library for a subset the existing renderer already covers;
   no new `AccessAction`, no new `IMediaStore` method.
 
@@ -59,7 +64,7 @@ subset a one-neighborhood platform does not need.
 **(b) Content images are `MediaObject` docs referenced by `ImageIds` on
 the owning document.** Four additive fields — `Post.ImageIds`,
 `PostReply.ImageIds`, `LocalizedPage.ImageIds`, `Announcement.ImageIds`
-(all `IReadOnlyList<string>` of `MediaObject.Id` values, ADR 0004 §B.1
+(all `IReadOnlyList<string>` of `MediaObject.Id` values, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1
 additive) — are populated **server-side** by parsing the body's
 `/content-image/{id}` links on every create/edit write lane (the Web
 layer's job; Core stays HTTP-free AND body-parse-free). Serving is
@@ -70,17 +75,17 @@ verbatim) or directly (platform-page owner — public by construction).
 so orphan bytes are inert and existence never leaks. **No new
 `AccessAction`, no new `IMediaStore` seam, no new signature on the frozen
 `IAuthorizationService`** — the route copies the existing avatar idiom.
-Upload is `POST /content-image`, ADR 0011's boundary verbatim (allowlist,
+Upload is `POST /content-image`, ADR [0011](0011-media-and-file-storage.md)'s boundary verbatim (allowlist,
 10 MiB cap, guards-before-write 400/413/415, one `PutAsync`).
 
-This resolves ADR 0011's "follow-on lanes" non-decision **for the
+This resolves ADR [0011](0011-media-and-file-storage.md)'s "follow-on lanes" non-decision **for the
 post/reply/announcement/about lane specifically**. Group logos, badge
 icons, and any other follow-on consumer remain future lanes gated on
-their own owning resource, as ADR 0011 already said.
+their own owning resource, as ADR [0011](0011-media-and-file-storage.md) already said.
 
 ## Consequences
 
-- **The four `ImageIds` ADDs** ride the ADR 0004 §B.1 additive path
+- **The four `ImageIds` ADDs** ride the ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive path
   (delta-detected, idempotent, no seed reset — **zero migrations**).
   `Body` stays a `string` of Markdown source on every document; existing
   plain-text content re-renders under the Markdown rules (plain text is
@@ -91,14 +96,14 @@ their own owning resource, as ADR 0011 already said.
 - **The renderer gains one rule and one stricter allowlist**
   (`IsSafeImageSrc`, the `<img>` emission with `class="rc-image"`); the
   existing escape-first construction is untouched (R·2).
-- **The upload boundary is ADR 0011's guards verbatim** — the
+- **The upload boundary is ADR [0011](0011-media-and-file-storage.md)'s guards verbatim** — the
   `POST /content-image` lane is the second consumer of the same
   chokepoint (`MediaOptions.AllowedContentTypes` + `Media__MaxBytes`),
   so OPS.md's tunables stay the extension point.
 - **The composer is a textarea + a plain-TS module**, `tsc`-only —
   **no editor dependency enters `package.json`**. The image path is the
   WYSIWYG toolbar's Image button (`client/lib/rich-editor.ts`, the RE lane
-  — ADR 0031); the earlier standalone `insert-image.ts` chooser was removed
+  — ADR [0031](0031-wysiwyg-editor-and-toolbar.md)); the earlier standalone `insert-image.ts` chooser was removed
   once that button became the single image affordance (2026-09-15).
 - **Audit-by-default holds** (SECURITY.md §3): every served UGC image is
   the product of an audited `Read` Allow (or the logged Deny that 404s
@@ -110,38 +115,3 @@ their own owning resource, as ADR 0011 already said.
   `AccessAudit` rows by design (matching its body); platform-page images are
   public by construction and emit zero rows; every 404 path (store-miss,
   owner-miss, not-visible) emits zero rows.
-
-## Not decided here (explicit non-decisions)
-
-Each is a **future lane**, named, gated on its owning resource — the ADR
-0011 precedent holds:
-
-- **Video / audio attachment** — the `AllowedContentTypes` / `MaxBytes`
-  boundary is the seam; a future lane names them explicitly.
-- **Server-side image transforms** (crop / resize) — bytes are stored
-  as uploaded (the ADR 0011 stance); a future lane adds the transform.
-- **Multi-image reordering UI** — the body text is the order; a future
-  lane may add drag-drop if the plain-text order proves insufficient.
-- **Any WYSIWYG / third-party editor** — the `tsc`-only constraint
-  stands; the composer is a textarea with a Markdown hint.
-- **Tables / footnotes in the renderer** — the "intentionally out of
-  scope" set stays; the renderer's smallness is the point.
-
-(Group logos, badge icons, and other follow-on ADR 0011 consumers are
-already deferred by ADR 0011's own "not decided here" — this ADR's
-`Amends:` line resolves ADR 0011's "post attachments" lane for
-post/reply/announcement/about only; the rest remain future lanes, each
-gated on its *owning* resource's audience, as ADR 0011 said.)
-
-## Revisit when
-
-- A resident requests a feature in the "not decided here" list — open a
-  future-lane design doc + ADR (the ADR 0011 precedent), not an amendment
-  to this ADR.
-- The **audit policy on Deny** changes for a follow-on lane — C-MED·2 is
-  the invariant; a change is itself a new ADR, not a code change (ADR
-  0011's own "revisit when" clause, unchanged).
-- The `src` allowlist needs a new accepted shape (e.g. a future lane
-  serves from a different route prefix) — extend `IsSafeImageSrc` in the
-  same commit as the route that earns it; a new *rejected* shape is not a
-  revisit (rejection is the default).

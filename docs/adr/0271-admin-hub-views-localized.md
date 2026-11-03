@@ -1,4 +1,17 @@
-# ADR 0271 — Admin hub views are localized (Admin/*)
+---
+id: adr-0271
+title: "Admin hub views are localized (Admin/*)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0271](0271-admin-hub-views-localized.md) — Admin hub views are localized (Admin/*)
 
 Status: Accepted
 Date: 2026-10-29
@@ -15,7 +28,7 @@ headers, buttons, empty states and confirm/tooltip attributes.
   `admin.audit.*`, `admin.errorreport.*`, `admin.breakglass.*`, `admin.escalation.active`, and four shared `common.edit/preview/manage` (+ the existing `common.delete`).
   Existing keys reused where the text and context matched (`settings.timezone_title`, `settings.dateformat_title`, `admin.signup_title`, `labels.title`,
   `admin.quiet.title`, `admin.anncomments_title`, `admin.messaging_title`, `nav.account`, `nav.admin`, `admin.roles_heading`, `common.add/remove/name/save/email`).
-- Paragraphs with inline markup (the break-glass "once activated" note: `<em>` and a link to the audit log) become plain text, as for the Kiosk intro (ADR 0259):
+- Paragraphs with inline markup (the break-glass "once activated" note: `<em>` and a link to the audit log) become plain text, as for the Kiosk intro (ADR [0259](0259-kiosk-settings-signup-localized.md)):
   `kw-l` escapes its content and cannot carry markup.
 - Page titles set in `ViewData["Title"]` (e.g. "Admin — Communities") are not part of this batch.
 - The matcher skips comments, scripts and text already inside `kw-l`, and asserts every listed string was found.
@@ -24,4 +37,4 @@ headers, buttons, empty states and confirm/tooltip attributes.
 Not compiled or run (no .NET SDK here); de/fr/da text machine-written, review parked. Remaining admin-area English: AdminSite, AdminStorage, AdminSurfaceLabels, AdminHelp,
 AdminGuests, AdminStorageMetrics, AdminSetup, AdminQuiet, AdminPortability (next patch); Mfa and Sessions; admin page titles.
 
-The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 13243 -> 13575 on 2026-10-29 for the 84 new keys x en/de/fr/da of this lane (the ADR 0265/0266 shipped-additions mechanism).
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 13243 -> 13575 on 2026-10-29 for the 84 new keys x en/de/fr/da of this lane (the ADR [0265](0265-projects-flashes-localized.md)/0266 shipped-additions mechanism).

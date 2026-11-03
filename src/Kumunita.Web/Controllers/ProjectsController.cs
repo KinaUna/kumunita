@@ -2317,7 +2317,7 @@ public sealed class ProjectsController : Controller
     /// denied actor 403 (the C3 split).
     /// </summary>
     [HttpGet("/projects/boards/{id}")]
-    public async Task<IActionResult> BoardDetail(string id)
+    public async Task<IActionResult> BoardDetail(string id, string? view = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
@@ -2545,7 +2545,10 @@ public sealed class ProjectsController : Controller
             CanTranslate: !string.IsNullOrEmpty(actorId)
                           && ProjectService.CanAddBoardTranslation(result.Board.AuthorId, actorId, RoleSet(User)),
             OriginalLanguageCode: result.Board.LanguageCode,
-            Tags: boardTagRows);
+            Tags: boardTagRows,
+            // ADR 0285 D6 — "list" is the only other value; anything else is
+            // the board view (a display selector, never an error).
+            ListView: string.Equals(view?.Trim(), "list", StringComparison.OrdinalIgnoreCase));
         // ADR 0071 (amendment) — the "Add subtask" modal offers an optional
         // assignee picker. Seed the standing assignee options (verified,
         // non-self profiles) the way the Create / BoardNew views do, so the

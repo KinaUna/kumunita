@@ -1,10 +1,23 @@
-# ADR 0232 — Verification gaps: FAQ accordion in dark mode, MFA challenge, recovery code, lockout, PPTX/image upload
+---
+id: adr-0232
+title: "Verification gaps: FAQ accordion in dark mode, MFA challenge, recovery code, lockout, PPTX/image upload"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0232](0232-verification-gaps-faq-mfa-upload.md) — Verification gaps: FAQ accordion in dark mode, MFA challenge, recovery code, lockout, PPTX/image upload
 
 Status: Accepted
 
 ## Context
 Five checks were still open from the UI refresh: the dark-mode MFA challenge, recovery-code sign-in, the lockout branch,
-the FAQ accordion chevron in dark mode, and a real PPTX/image upload now that the Documents allow-list is open (ADR 0228).
+the FAQ accordion chevron in dark mode, and a real PPTX/image upload now that the Documents allow-list is open (ADR [0228](0228-housekeeping-light-dark-detail-rename-doc-types.md)).
 All were run live against the local dev app (seed admin account; the resident accounts have random passwords).
 
 ## Findings

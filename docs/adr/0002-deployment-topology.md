@@ -1,4 +1,17 @@
-# ADR 0002 — Deployment topology: one instance per neighborhood
+---
+id: adr-0002
+title: "Deployment topology: one instance per neighborhood"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/file-attachments-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0002](0002-deployment-topology.md) — Deployment topology: one instance per neighborhood
 
 Status: Accepted
 Date: 2026-08-25

@@ -1,9 +1,22 @@
-# ADR 0230 — Headed form sections, third batch (Document, Goal, Board, Profile)
+---
+id: adr-0230
+title: "Headed form sections, third batch (Document, Goal, Board, Profile)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0230](0230-headed-form-sections-3.md) — Headed form sections, third batch (Document, Goal, Board, Profile)
 
 Status: Accepted
 
 ## Context
-ADR 0224 and 0229 gave most create/edit forms headed section cards. Document New/Edit, Goal New, Board New/Edit and
+ADR [0224](0224-headed-form-sections.md) and 0229 gave most create/edit forms headed section cards. Document New/Edit, Goal New, Board New/Edit and
 Profile Edit were still flat (or, for Profile, headed by a `card-header` span rather than a heading).
 
 ## Decision

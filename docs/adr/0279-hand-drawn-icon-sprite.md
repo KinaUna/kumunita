@@ -1,4 +1,17 @@
-# ADR 0279 — Hand-drawn nav and account-menu icons from one sprite
+---
+id: adr-0279
+title: "Hand-drawn nav and account-menu icons from one sprite"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0279](0279-hand-drawn-icon-sprite.md) — Hand-drawn nav and account-menu icons from one sprite
 
 Status: Accepted
 Date: 2026-10-31

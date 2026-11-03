@@ -5,74 +5,214 @@
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
-    // Attribute / title texts can't use the kw-l TagHelper — resolved here, English floor when
-    // there is no provider (a non-HTTP render).
+    // Attribute / option texts and the client strings can't use the kw-l
+    // TagHelper — resolved here, English floor when there is no provider.
     async Task<string> Tr(string key, string en) => Translation is null ? en : await Translation.GetAsync(key, _kwL);
     ViewData["Title"] = await Tr("kiosk.settings.page_title", "Kiosk settings");
-    var ariaDisplayMode  = await Tr("kiosk.settings.display_mode", "Display mode");
-    var kindNone         = await Tr("kiosk.settings.kind_none", "— (none)");
-    var communityPh      = await Tr("kiosk.settings.community_placeholder", "(blank = all)");
-    var ariaSlideView    = await Tr("kiosk.settings.aria_slide_view", "Slide {0} view");
-    var ariaSlideBoard   = await Tr("kiosk.settings.aria_slide_board", "Slide {0} board");
-    var ariaSlideCal     = await Tr("kiosk.settings.aria_slide_calendar", "Slide {0} calendar view");
-    var ariaSlideComm    = await Tr("kiosk.settings.aria_slide_community", "Slide {0} community");
-    var ariaSlideLabel   = await Tr("kiosk.settings.aria_slide_label", "Slide {0} label");
 
-    // M35 (ADR 0164) — the kiosk playlist is a **fixed** set of slide slots
-    // (the register's example is exactly 5: board, calendar week, board,
-    // calendar today, todos). A fixed-slot editor is the "boring where it can
-    // be" pin (M35·7): no JS, no add/remove buttons, no drag-and-drop lib, no
-    // new npm package. Each slot is an independent row the resident fills in
-    // (a "— / none" kind leaves the slot empty) or clears; the slots' top-to-
-    // bottom order is the cycle order. "Remove a slide" = set its kind to
-    // "—", "reorder" = move the slide to a different slot.
-    //
-    // The view renders **all** of a row's kind-conditional fields (BoardId /
-    // CalendarView / ComponentId) on every row so that changing a row's Kind
-    // in the <select> still submits that row's other fields (a JS-free form:
-    // a <select> change does not re-render the row, so the other fields must
-    // be present in the DOM to round-trip). The controller (SettingsPost)
-    // applies the kind-conditional semantics — it reads only the field for
-    // the row's chosen kind and ignores the rest — so the always-present
-    // fields are harmless. This mirrors the KioskView 5-member ceiling
-    // (M35·2); no Enabled/blank discriminator field is added.
-    const int MaxSlides = 5;
+    var ariaDisplayMode = await Tr("kiosk.settings.display_mode", "Display mode");
+    var typeNone        = await Tr("kiosk.settings.type_none", "Choose a type…");
+    var itemPlaceholder = await Tr("kiosk.settings.item_placeholder", "Search, or pick from the list");
+    var itemUnavailable = await Tr("kiosk.settings.item_unavailable", "The item you picked is no longer available.");
+    var calendarAll     = await Tr("kiosk.settings.calendar_all", "All communities");
+    var entryHeading    = await Tr("kiosk.settings.entry_heading", "Entry {0}");
+    var moveUp          = await Tr("kiosk.settings.move_up", "Move up");
+    var moveDown        = await Tr("kiosk.settings.move_down", "Move down");
+    var removeEntry     = await Tr("kiosk.settings.remove_entry", "Remove");
+    var colType         = await Tr("kiosk.settings.col_type", "Type");
+    var colItem         = await Tr("kiosk.settings.col_item", "Item");
+    var colView         = await Tr("kiosk.settings.col_view", "View");
+    var colDuration     = await Tr("kiosk.settings.col_duration", "Duration (seconds)");
+    var colScroll       = await Tr("kiosk.settings.col_scroll", "If it doesn't fit");
+    var colLabel        = await Tr("kiosk.settings.col_label", "Label (optional)");
+    var showComments    = await Tr("kiosk.settings.show_comments", "Show comments");
+
+    // The closed type set (ADR 0285 D1), in the order the dropdown offers it.
+    var types = new (KioskItemType Type, string Label)[]
+    {
+        (KioskItemType.Board,         await Tr("kiosk.settings.type_board", "Kanban board")),
+        (KioskItemType.Todo,          await Tr("kiosk.settings.type_todo", "To-do")),
+        (KioskItemType.Project,       await Tr("kiosk.settings.type_project", "Project")),
+        (KioskItemType.Calendar,      await Tr("kiosk.settings.type_calendar", "Calendar")),
+        (KioskItemType.Event,         await Tr("kiosk.settings.type_event", "Event")),
+        (KioskItemType.Page,          await Tr("kiosk.settings.type_page", "Page")),
+        (KioskItemType.Announcement,  await Tr("kiosk.settings.type_announcement", "Announcement")),
+        (KioskItemType.CommunityPost, await Tr("kiosk.settings.type_community_post", "Community post")),
+        (KioskItemType.GroupPost,     await Tr("kiosk.settings.type_group_post", "Group post")),
+    };
+    var boardViews = new (KioskBoardView View, string Label)[]
+    {
+        (KioskBoardView.Board, await Tr("kiosk.settings.board_view_board", "Board")),
+        (KioskBoardView.List,  await Tr("kiosk.settings.board_view_list", "List of to-dos")),
+    };
+    var calendarViews = new (string View, string Label)[]
+    {
+        ("day",   await Tr("kiosk.settings.cal_day", "Day")),
+        ("week",  await Tr("kiosk.settings.cal_week", "Week")),
+        ("month", await Tr("kiosk.settings.cal_month", "Month")),
+    };
+    var scrolls = new (KioskScrollBehavior Scroll, string Label)[]
+    {
+        (KioskScrollBehavior.None, await Tr("kiosk.settings.scroll_none", "No scrolling")),
+        (KioskScrollBehavior.Auto, await Tr("kiosk.settings.scroll_auto", "Scroll automatically")),
+    };
+
+    // One editor row. `index` is the row's form index (a placeholder in the
+    // <template>; kiosk-settings.ts renumbers the rows in DOM order before
+    // submit). `row` is null for the template / a new row.
+    async Task EntryRow(string index, Kumunita.Web.Models.KioskEntryEditorRow? row, int duration)
+    {
+        var e = row?.Entry;
+        var type = e?.Type;
+        var itemText = row is null ? string.Empty
+            : type == KioskItemType.Calendar && string.IsNullOrEmpty(e!.ItemId) ? calendarAll
+            : row.ItemTitle ?? string.Empty;
+        var unavailable = row is not null && !row.ItemVisible;
+        var pickerId = "kiosk-item-" + index;
+        <li class="kmb-kiosk-entry" data-kiosk-entry data-type="@(type?.ToString() ?? "")">
+            <div class="kmb-kiosk-entry-head">
+                <span class="kmb-kiosk-entry-number" data-kiosk-number aria-hidden="true"></span>
+                <div class="kmb-kiosk-entry-actions" data-kiosk-actions hidden>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-kiosk-move="up" aria-label="@moveUp" title="@moveUp">↑</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-kiosk-move="down" aria-label="@moveDown" title="@moveDown">↓</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-kiosk-remove>@removeEntry</button>
+                </div>
+            </div>
+            <div class="kmb-kiosk-entry-grid">
+                <div class="kmb-kiosk-field">
+                    <label class="form-label" for="kiosk-type-@index">@colType</label>
+                    <select class="form-select" id="kiosk-type-@index" name="Entries[@index].Type" data-kiosk-type>
+                        <option value="" selected="@(type is null ? "selected" : null)">@typeNone</option>
+                        @foreach (var (t, label) in types)
+                        {
+                            <option value="@t" selected="@(type == t ? "selected" : null)">@label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="kmb-kiosk-field kmb-kiosk-field-item" data-kiosk-picker>
+                    <label class="form-label" for="@pickerId">@colItem</label>
+                    <input type="hidden" name="Entries[@index].ItemId" value="@(e?.ItemId ?? "")" data-kiosk-item-id />
+                    <input type="hidden" name="Entries[@index].GroupId" value="@(e?.GroupId ?? "")" data-kiosk-group-id />
+                    <input type="text" class="form-control @(unavailable ? "is-invalid" : null)" id="@pickerId"
+                           value="@itemText" placeholder="@itemPlaceholder" autocomplete="off"
+                           role="combobox" aria-autocomplete="list" aria-expanded="false"
+                           aria-controls="@(pickerId)-list" data-kiosk-search
+                           data-kiosk-selected="@itemText" disabled="@(type is null ? "disabled" : null)" />
+                    <ul class="kmb-kiosk-picker-list" id="@(pickerId)-list" role="listbox" data-kiosk-list hidden></ul>
+                    @if (unavailable)
+                    {
+                        <div class="invalid-feedback d-block">@itemUnavailable</div>
+                    }
+                </div>
+
+                <div class="kmb-kiosk-field" data-kiosk-show-for="Board">
+                    <label class="form-label" for="kiosk-board-view-@index">@colView</label>
+                    <select class="form-select" id="kiosk-board-view-@index" name="Entries[@index].BoardView">
+                        @foreach (var (v, label) in boardViews)
+                        {
+                            <option value="@v" selected="@((e?.BoardView ?? KioskBoardView.Board) == v ? "selected" : null)">@label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="kmb-kiosk-field" data-kiosk-show-for="Calendar">
+                    <label class="form-label" for="kiosk-cal-view-@index">@colView</label>
+                    <select class="form-select" id="kiosk-cal-view-@index" name="Entries[@index].CalendarView">
+                        @foreach (var (v, label) in calendarViews)
+                        {
+                            <option value="@v" selected="@((e?.CalendarView ?? "week") == v ? "selected" : null)">@label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="kmb-kiosk-field kmb-kiosk-field-narrow">
+                    <label class="form-label" for="kiosk-duration-@index">@colDuration</label>
+                    <input type="number" class="form-control" id="kiosk-duration-@index" name="Entries[@index].DurationSeconds"
+                           min="5" max="3600" step="1" value="@(e?.DurationSeconds ?? duration)" data-kiosk-duration />
+                </div>
+
+                <div class="kmb-kiosk-field">
+                    <label class="form-label" for="kiosk-scroll-@index">@colScroll</label>
+                    <select class="form-select" id="kiosk-scroll-@index" name="Entries[@index].Scroll">
+                        @foreach (var (sc, label) in scrolls)
+                        {
+                            <option value="@sc" selected="@((e?.Scroll ?? KioskScrollBehavior.None) == sc ? "selected" : null)">@label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="kmb-kiosk-field kmb-kiosk-field-check" data-kiosk-show-for="Todo Event Announcement CommunityPost GroupPost">
+                    <div class="form-check form-switch">
+                        <input type="hidden" name="Entries[@index].ShowComments" value="false" />
+                        <input class="form-check-input" type="checkbox" role="switch" id="kiosk-comments-@index"
+                               name="Entries[@index].ShowComments" value="true" checked="@(e?.ShowComments == true ? "checked" : null)" />
+                        <label class="form-check-label" for="kiosk-comments-@index">@showComments</label>
+                    </div>
+                </div>
+
+                <div class="kmb-kiosk-field kmb-kiosk-field-wide">
+                    <label class="form-label" for="kiosk-label-@index">@colLabel</label>
+                    <input type="text" class="form-control" id="kiosk-label-@index" name="Entries[@index].Label"
+                           value="@(e?.Label ?? "")" maxlength="120" />
+                </div>
+            </div>
+        </li>
+    }
 }
 @*
-  M35 (ADR 0164) — the /settings/kiosk per-resident settings surface (U05,
-  ADR 0164 amendment: any signed-in user edits their OWN playlist, not a
-  GlobalAdmin-shared singleton).
-  Two interval pickers (ViewIntervalSeconds >= 5, RefreshIntervalSeconds >= 2
-  and < ViewIntervalSeconds) + a fixed-slot playlist editor (each slot: a Kind
-  select Board/Calendar/Todos + the kind-conditional detail field + an
-  optional Label) + the kiosk.settings.* kw-l keys (U04 co-shipped all four
-  languages — M35·10). The board picker is seeded from the FROZEN M5
-  IProjectService.ListBoardsAsync seam (M35·3 / M35·9 — reused, not re-shape)
-  in the SettingsGet action. The form POSTs to /settings/kiosk; the controller
-  parses the Views[i].* indexed form fields + the two interval floors, then
-  calls IKioskService.SavePlaylistAsync (the one kiosk.save audit row,
-  Via = Owner, keyed on the resident's subject id, M35·5).
-  No new AccessAction / Decide() branch (M35·1 / M35·3). No new JS.
+  The /settings/kiosk per-resident playlist editor (ADR 0164 amendment;
+  reworked by ADR 0285). Display settings (display mode, default duration,
+  refresh interval, scroll speed) + an ordered entry list. Each entry: an
+  item type, the item (a search box with suggestions — kiosk-settings.ts asks
+  GET /settings/kiosk/items, which only offers items the resident can see),
+  the board / calendar view where it applies, the duration, the scroll
+  behaviour, the comments switch (types with comments / RSVPs) and an
+  optional label. kiosk-settings.ts adds, removes, reorders and renumbers the
+  rows; the controller reads Entries[i].* in index order. Without scripts the
+  stored rows still render and save, but rows can't be added and the item
+  search does not run. No new AccessAction / Decide() branch (M35·1 / M35·3).
 *@
+<style>
+  /* ADR 0285 — the playlist editor rows (scoped to this page). */
+  .kmb-kiosk-entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .75rem; }
+  .kmb-kiosk-entry { border: 1px solid var(--kmb-border); border-radius: var(--kmb-radius, 12px); padding: .75rem 1rem 1rem; background: var(--kmb-surface); }
+  .kmb-kiosk-entry-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; min-height: 2rem; }
+  .kmb-kiosk-entry-number { font-weight: 600; color: var(--kmb-ink-soft); }
+  .kmb-kiosk-entry-actions { display: flex; gap: .25rem; }
+  .kmb-kiosk-entry-actions[hidden] { display: none; }
+  .kmb-kiosk-entry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .75rem 1rem; align-items: end; }
+  .kmb-kiosk-field-item, .kmb-kiosk-field-wide { grid-column: span 2; }
+  .kmb-kiosk-field-check { align-self: center; padding-top: 1.5rem; }
+  .kmb-kiosk-field[hidden] { display: none; }
+  .kmb-kiosk-field-item { position: relative; }
+  .kmb-kiosk-picker-list { position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: .25rem 0; list-style: none; max-height: 16rem; overflow: auto; background: var(--kmb-surface); border: 1px solid var(--kmb-control-border, var(--kmb-border)); border-radius: var(--kmb-radius-input, 8px); box-shadow: 0 6px 16px rgba(0,0,0,.18); }
+  .kmb-kiosk-picker-list[hidden] { display: none; }
+  .kmb-kiosk-picker-list li { padding: .4rem .75rem; cursor: pointer; }
+  .kmb-kiosk-picker-list li[aria-selected="true"], .kmb-kiosk-picker-list li:hover { background: var(--kmb-tint-a, rgba(0,0,0,.06)); }
+  .kmb-kiosk-picker-list .kmb-kiosk-picker-sub { display: block; font-size: .8rem; color: var(--kmb-muted); }
+  .kmb-kiosk-picker-list .kmb-kiosk-picker-note { cursor: default; color: var(--kmb-muted); }
+  @@media (max-width: 575.98px) { .kmb-kiosk-field-item, .kmb-kiosk-field-wide { grid-column: auto; } }
+</style>
+
 @await Html.PartialAsync("~/Views/Locale/_SettingsTabs.cshtml")
 
 <h1>
     <kw-l key="kiosk.settings.title">Kiosk display</kw-l>
 </h1>
 <p class="text-muted">
-    <kw-l key="kiosk.settings.intro">Configure your kiosk display: the ordered list of views it cycles through (top to bottom), and the two auto-cycle / auto-refresh cadences. This is your playlist — it only shapes what your own kiosk shows. To add a slide, pick a view in an empty slot. To remove one, set its view to — and save. To reorder, move a slide to a different slot. Then use “Preview the kiosk” below (signed in as you) to see it run.</kw-l>
+    <kw-l key="kiosk.settings.intro">Choose what your kiosk display shows. Add an entry, pick its type and the item, and set how long it stays on screen and whether it scrolls when it doesn't fit. Entries play from top to bottom. This is your playlist; it only shapes your own kiosk. Then use “Preview the kiosk” below to see it run.</kw-l>
 </p>
 
-<form method="post" action="/settings/kiosk">
+<form method="post" action="/settings/kiosk" id="kiosk-settings-form">
     @Html.AntiForgeryToken()
 
-    @* ── The display mode + the two interval pickers (M35·4 — display-only,
-         never an access input) ── *@
+    @* ── The display settings (display-only, never an access input — M35·4) ── *@
     <div class="card mb-4 kmb-form-section">
     <div class="card-body">
     <h2 class="kmb-form-section-title"><kw-l key="kiosk.settings.display_heading">Display</kw-l></h2>
     <div class="row g-3">
-        <div class="col-sm-6 col-md-4">
+        <div class="col-sm-6 col-lg-3">
             <label for="DisplayMode" class="form-label">
                 <kw-l key="kiosk.settings.display_mode">Display mode</kw-l>
             </label>
@@ -88,117 +228,74 @@
                 <kw-l key="kiosk.settings.display_mode.hint">Full page fills your browser window; full screen also hides the browser's tabs and address bar (a user gesture is needed to enter it).</kw-l>
             </div>
         </div>
-        <div class="col-sm-6 col-md-4">
-            <label for="ViewIntervalSeconds" class="form-label">
-                <kw-l key="kiosk.settings.view_interval">Change view every (seconds)</kw-l>
+        <div class="col-sm-6 col-lg-3">
+            <label for="DefaultDurationSeconds" class="form-label">
+                <kw-l key="kiosk.settings.default_duration">Default duration for new entries (seconds)</kw-l>
             </label>
-            <input type="number" min="5" step="1" class="form-control"
-                   id="ViewIntervalSeconds" name="ViewIntervalSeconds"
-                   value="@Model.ViewIntervalSeconds" />
-            <div class="form-text"><kw-l key="kiosk.settings.view_interval_hint">The slide-advance cadence (seconds, ≥ 5). Default 30.</kw-l></div>
+            <input type="number" min="5" max="3600" step="1" class="form-control"
+                   id="DefaultDurationSeconds" name="DefaultDurationSeconds"
+                   value="@Model.DefaultDurationSeconds" />
+            <div class="form-text"><kw-l key="kiosk.settings.default_duration_hint">New entries start with this duration (5–3600 seconds). Default 30.</kw-l></div>
         </div>
-        <div class="col-sm-6 col-md-4">
+        <div class="col-sm-6 col-lg-3">
             <label for="RefreshIntervalSeconds" class="form-label">
                 <kw-l key="kiosk.settings.refresh_interval">Refresh content every (seconds)</kw-l>
             </label>
             <input type="number" min="2" step="1" class="form-control"
                    id="RefreshIntervalSeconds" name="RefreshIntervalSeconds"
                    value="@Model.RefreshIntervalSeconds" />
-            <div class="form-text"><kw-l key="kiosk.settings.refresh_interval_hint">The content-refresh cadence (seconds, ≥ 2, and less than the view interval). Default 10.</kw-l></div>
+            <div class="form-text"><kw-l key="kiosk.settings.refresh_interval_hint">How often the kiosk checks the slide on screen for changes (seconds, at least 2). Default 10.</kw-l></div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label for="ScrollSpeed" class="form-label">
+                <kw-l key="kiosk.settings.scroll_speed">Scroll speed</kw-l>
+            </label>
+            <select class="form-select" id="ScrollSpeed" name="ScrollSpeed">
+                <option value="Slow" selected="@(Model.ScrollSpeed == KioskScrollSpeed.Slow ? "selected" : null)"><kw-l key="kiosk.settings.scroll_speed_slow">Slow</kw-l></option>
+                <option value="Medium" selected="@(Model.ScrollSpeed == KioskScrollSpeed.Medium ? "selected" : null)"><kw-l key="kiosk.settings.scroll_speed_medium">Medium</kw-l></option>
+                <option value="Fast" selected="@(Model.ScrollSpeed == KioskScrollSpeed.Fast ? "selected" : null)"><kw-l key="kiosk.settings.scroll_speed_fast">Fast</kw-l></option>
+            </select>
+            <div class="form-text"><kw-l key="kiosk.settings.scroll_speed_hint">How fast entries set to scroll automatically move down the page.</kw-l></div>
         </div>
     </div>
     </div>
     </div>
 
-    @* ── The playlist editor (a fixed set of MaxSlides slots, top to bottom) ── *@
+    @* ── The playlist (top to bottom = play order) ── *@
     <div class="card mb-4 kmb-form-section">
     <div class="card-body">
     <h2 class="kmb-form-section-title"><kw-l key="kiosk.settings.playlist_heading">Playlist (top to bottom)</kw-l></h2>
-    @* A slot is "configured" when its index is within Model.Views.Count (the
-       stored slides, in order). Each row renders all three kind-conditional
-       fields (named Views[<i>].BoardId / .CalendarView / .ComponentId) so a
-       JS-free form round-trips them when the kind changes; the controller
-       applies the kind-conditional semantics (M35·2). The board picker is the
-       only seeded picker (M35·3 / M35·9); the Todos community filter is a
-       free-text component id (blank = all todos); the Label is optional. *@
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th scope="col" class="w-1">#</th>
-                    <th scope="col"><kw-l key="kiosk.settings.col_view">View</kw-l></th>
-                    <th scope="col"><kw-l key="kiosk.settings.kind_board">Board</kw-l></th>
-                    <th scope="col"><kw-l key="kiosk.settings.kind_calendar">Calendar</kw-l></th>
-                    <th scope="col"><kw-l key="kiosk.settings.col_community">Community</kw-l></th>
-                    <th scope="col"><kw-l key="kiosk.settings.col_label">Label (optional)</kw-l></th>
-                </tr>
-            </thead>
-            <tbody>
-                @for (var i = 0; i < MaxSlides; i++)
-                {
-                    var v = i < Model.Views.Count ? Model.Views[i] : null;
-                    var kind = v?.Kind ?? KioskViewKind.Board;
-                    <tr>
-                        <th scope="row" class="text-muted">@((i + 1))</th>
 
-                        @* Kind (the slot's identity — the controller skips a
-                           slot whose kind is blank / "—"). *@
-                        <td>
-                            <select class="form-select" name="Views[@i].Kind"
-                                    data-kiosk-kind="@(i)" aria-label="@string.Format(ariaSlideView, i + 1)">
-                                <option value="" selected="@(v is null ? "selected" : null)" disabled>
-                                    @kindNone
-                                </option>
-                                <option value="Board" selected="@(kind == KioskViewKind.Board && v is not null ? "selected" : null)"><kw-l key="kiosk.settings.kind_board">Board</kw-l></option>
-                                <option value="Calendar" selected="@(kind == KioskViewKind.Calendar ? "selected" : null)"><kw-l key="kiosk.settings.kind_calendar">Calendar</kw-l></option>
-                                <option value="Todos" selected="@(kind == KioskViewKind.Todos ? "selected" : null)"><kw-l key="kiosk.settings.kind_todos">To-dos</kw-l></option>
-                            </select>
-                        </td>
+    <div id="kiosk-entries-editor"
+         data-items-url="/settings/kiosk/items"
+         data-entry-heading="@entryHeading"
+         data-calendar-all="@calendarAll"
+         data-str-searching="@(await Tr("kiosk.settings.item_searching", "Searching…"))"
+         data-str-no-results="@(await Tr("kiosk.settings.item_no_results", "Nothing found."))"
+         data-str-error="@(await Tr("kiosk.settings.item_error", "Could not load items. Try again."))">
 
-                        @* Board id (Board rows; blank = no board chosen). *@
-                        <td>
-                            <select class="form-select" name="Views[@i].BoardId"
-                                    data-kiosk-board="@(i)" aria-label="@string.Format(ariaSlideBoard, i + 1)">
-                                <option value="" selected="@(v is null or { BoardId: null } ? "selected" : null)">&mdash;</option>
-                                @foreach (var (id, title) in Model.Boards)
-                                {
-                                    <option value="@id" selected="@(id == v?.BoardId ? "selected" : null)">@title</option>
-                                }
-                            </select>
-                        </td>
+        <p class="text-muted mb-3" data-kiosk-empty hidden="@(Model.Entries.Count > 0 ? "hidden" : null)">
+            <kw-l key="kiosk.settings.empty">No entries yet. Use “Add entry” to put something on your kiosk.</kw-l>
+        </p>
 
-                        @* Calendar view (Calendar rows; default week). *@
-                        <td>
-                            <select class="form-select" name="Views[@i].CalendarView"
-                                    data-kiosk-cal="@(i)" aria-label="@string.Format(ariaSlideCal, i + 1)">
-                                <option value="day" selected="@(v is { CalendarView: "day" } ? "selected" : null)"><kw-l key="kiosk.settings.cal_day">Day</kw-l></option>
-                                <option value="week" selected="@(v is null or { CalendarView: "week" or null } ? "selected" : null)"><kw-l key="kiosk.settings.cal_week">Week</kw-l></option>
-                                <option value="month" selected="@(v is { CalendarView: "month" } ? "selected" : null)"><kw-l key="kiosk.settings.cal_month">Month</kw-l></option>
-                            </select>
-                        </td>
+        <ol class="kmb-kiosk-entries" data-kiosk-entries>
+            @for (var i = 0; i < Model.Entries.Count; i++)
+            {
+                await EntryRow(i.ToString(System.Globalization.CultureInfo.InvariantCulture), Model.Entries[i], Model.DefaultDurationSeconds);
+            }
+        </ol>
 
-                        @* Community filter (Todos rows; blank = all todos). *@
-                        <td>
-                            <input type="text" class="form-control" name="Views[@i].ComponentId"
-                                   value="@(v?.ComponentId ?? "")"
-                                   placeholder="@communityPh"
-                                   data-kiosk-comp="@(i)" aria-label="@string.Format(ariaSlideComm, i + 1)" />
-                        </td>
+        <template data-kiosk-template>
+            @{ await EntryRow("__i__", null, Model.DefaultDurationSeconds); }
+        </template>
 
-                        @* The optional per-slide label. *@
-                        <td>
-                            <input type="text" class="form-control" name="Views[@i].Label"
-                                   value="@(v?.Label ?? "")"
-                                   data-kiosk-label="@(i)" aria-label="@string.Format(ariaSlideLabel, i + 1)" />
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <button type="button" class="btn btn-outline-secondary mt-3" data-kiosk-add hidden>
+            + <kw-l key="kiosk.settings.add_entry">Add entry</kw-l>
+        </button>
     </div>
 
     <p class="text-muted small mt-3 mb-0">
-        <kw-l key="kiosk.settings.tip">Tip: only the View column decides which of the other columns a slide uses — the rest are ignored for that slide. A row set to — is left out of the cycle.</kw-l>
+        <kw-l key="kiosk.settings.tip">With automatic scrolling, an entry stays on screen until it has scrolled to the end, even if that takes longer than its duration. If it reaches the end sooner, it scrolls back to the top for the rest of its time.</kw-l>
     </p>
     </div>
     </div>
@@ -208,3 +305,7 @@
         <a class="btn btn-link ms-2" href="/kiosk" target="_blank" rel="noopener"><kw-l key="kiosk.settings.preview">Preview the kiosk</kw-l></a>
     </div>
 </form>
+
+@section Scripts {
+    <script type="module" src="~/js/lib/kiosk-settings.js"></script>
+}

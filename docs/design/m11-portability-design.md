@@ -1,4 +1,20 @@
+---
+id: design-m11-portability
+title: "M11 — Portability (import/export)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0108-portability-import-export.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M11 — Portability (import/export) — design
+
+> **Abstract:** the **portability (import/export)** design — a GlobalAdmin moves the **whole instance** in and out as one versioned `*.kumunita` archive (content + media bytes + the identity *graph* + instance identity) with a **fail-closed, atomic** restore. The load-bearing invariant is the **no-secret boundary** (the archive travels the identity graph, never the credential material). **Who is it for:** a developer touching the `Portability` extractor/re-creator; an agent that needs the closed content inventory. **When to read the rest:** before touching the import/export lanes, the archive format, or the media-byte verification.
+
 
 > **Milestone M11.** A GlobalAdmin moves the **whole instance** in and out,
 > as data: one portable, **versioned** `*.kumunita` archive (the whole
@@ -10,7 +26,7 @@
 > the content's audiences/grants/delegations travel **as data**, the
 > decision engine is untouched.
 >
-> **Status.** **LOCKED.** The decisions D1–D10 are locked in **ADR 0108
+> **Status.** **LOCKED.** The decisions D1–D10 are locked in **ADR [0108](../adr/0108-portability-import-export.md)
 > (Accepted, 2026-09-27)**. The `[PROPOSED]` set in the register
 > `plan-m11-portability.md` was **user-approved before U00 ran** (the
 > open-veto window closed with no veto recorded; the U00 handoff entry
@@ -87,10 +103,10 @@ anywhere in the tree):
 2. **The ASP.NET Identity tables** in the `identity` schema (the
    **principals** — *not* the domain docs; the credential material lives
    here and **never travels**, C-M11·2).
-3. **The content-addressed media volume** (ADR 0011, C-MED·3/4/7): the
+3. **The content-addressed media volume** (ADR [0011](../adr/0011-media-and-file-storage.md), C-MED·3/4/7): the
    `MediaObject` catalog doc + the bytes at `{root}/{Id[0..2]}/{Id}` —
    the same layout the archive reuses, so import is a byte-copy.
-4. **The GlobalAdmin admin-surface house pattern** (ADR 0101/0105/0106):
+4. **The GlobalAdmin admin-surface house pattern** (ADR [0101](../adr/0101-announcement-comments-lane.md)/0105/0106):
    `[Authorize(Roles = GlobalAdmin)]` + one `AccessAudit` row `Via =
    Admin`, the `AdminMessagingController` shape to mirror; `AttachmentController`'s
    `Content-Disposition: attachment` streaming shape the `export` action
@@ -103,13 +119,13 @@ anywhere in the tree):
    §config).
 
 This is a **milestone** (a roadmap letter, not a named lane): the close
-unit (U07) flips `Milestones.cs` / the README Roadmap / `docs/STATUS.md` /
-`docs/ARCHITECTURE.md` + `MilestonesTests.cs` (the AGENTS.md doc↔code
+unit (U07) flips `Milestones.cs` / the README Roadmap / [`docs/STATUS.md`](../STATUS.md) /
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `MilestonesTests.cs` (the AGENTS.md doc↔code
 parity contract — C-M11·8). This design doc (authored U00, **LOCKED**) is
 the **primary tier**; the register
-`docs/plans-milestones/done/m11/plan-m11-portability.md` is the secondary tier;
+[`docs/archive/lanes/m11/plan-m11-portability.md`](../archive/lanes/m11/plan-m11-portability.md) is the secondary tier;
 the scratch handoff note is
-`docs/plans-milestones/done/m11/m11-portability-handoff-notes.md`.
+[`docs/archive/lanes/m11/m11-portability-handoff-notes.md`](../archive/lanes/m11/m11-portability-handoff-notes.md).
 
 ## Goals / Non-goals
 
@@ -126,7 +142,7 @@ re-creation with secrets reset + the config apply + the web surface + the
 (round-trip / no-secret / fail-closed, D9) + the **Web-surface pins** (U07).
 The **U07 milestone flip** (M11 → `StatusDone`, M12 → `StatusNext`).
 
-**Out (each a named follow-on lane, ADR 0108 Consequences — own ADRs):**
+**Out (each a named follow-on lane, ADR [0108](../adr/0108-portability-import-export.md) Consequences — own ADRs):**
 per-slice / cross-instance portability (one group's posts out; neighborhood
 A → B), import-merge (onto a diverged instance), the backup-automation /
 cron surface (OPS.md), and the other world-seam exports (M12 stays iCal).
@@ -143,7 +159,7 @@ the trust boundary rather than testing it: the archive is *structurally*
 incapable of carrying credential material (C-M11·2), so a stolen or
 mishandled `*.kumunita` file is data without the secrets, exactly the
 privacy posture the platform already holds for its other world-seams
-(ADR 0028 GU "no standing to carry a secret"; ADR 0034 the attachment
+(ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) GU "no standing to carry a secret"; ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) the attachment
 lane). The cost is the operator's — the surface is quiet (one audit row
 per action) and the only thing it asks of the operator is a deliberate
 click.
@@ -166,8 +182,8 @@ click.
   `portability.*` closed-key registry entries × 4 languages.
 - **`tests/Kumunita.Core.Tests/PortabilityRoundTripTests.cs`** (new) +
   **`tests/Kumunita.Web.Tests/AdminPortabilityControllerTests.cs`** (new).
-- **The U07 parity surfaces:** `Milestones.cs`, the `README.md` Roadmap,
-  `docs/STATUS.md`, `docs/ARCHITECTURE.md` (the value-chain table),
+- **The U07 parity surfaces:** `Milestones.cs`, the [`README.md`](../../README.md) Roadmap,
+  [`docs/STATUS.md`](../STATUS.md), [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) (the value-chain table),
   `MilestonesTests.cs`.
 
 **Unchanged (the frozen surface):** `IAuthorizationService` /
@@ -234,7 +250,7 @@ the instance** (C-M11·7), gated by the GlobalAdmin role, audited (C-M11·6),
 and quiet (the surface is hidden from a non-GlobalAdmin). The content's
 audiences/grants/delegations travel **as data** (they are Marten documents
 on the frozen surfaces), so the decision engine is untouched — the same
-ADR 0006 frozen-surface discipline ADR 0105 (messaging) applied to an
+ADR [0006](../adr/0006-module-boundary-contracts.md) frozen-surface discipline ADR [0105](../adr/0105-messaging.md) (messaging) applied to an
 operator lane.
 
 **Migration path:** none — M11 adds no document, no index, no migration
@@ -246,7 +262,7 @@ and create **no** `mt` tables.
 **Audited:** **yes** — the D5 surface. `export` and `import` each emit
 **exactly one** `AccessAudit` row (`TargetKind "portability"`, `Via = Admin`,
 verb `export` / `import`), emitted by the **service**, the controller adds
-none (the ADR 0105 `messaging.toggle` shape).
+none (the ADR [0105](../adr/0105-messaging.md) `messaging.toggle` shape).
 
 ## Feedback loops
 
@@ -282,7 +298,7 @@ produces anything other than that set is a regression (the C-M11·4 pin).
 
 **Privacy:** the archive is the trust boundary — it is **structurally**
 incapable of carrying credential material (C-M11·2), so a stolen or
-mishandled file is data without the secrets. This is the ADR 0028 GU
+mishandled file is data without the secrets. This is the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) GU
 precedent ("no standing to carry a secret") applied to the operator's own
 archive, and it is **stronger** than `pg_dump` (which carries the hashes).
 **Trust:** the fail-closed restore (C-M11·4) means a corrupt or
@@ -466,7 +482,7 @@ The `*.kumunita` is a ZIP (BCL `System.IO.Compression.ZipArchive`,
   testable; the U02 export loop writes them, the U05 apply loop reads
   them in the §inventory order).
 - **`media/{Id[0..2]}/{Id}`** — the media bytes at the **same**
-  content-addressed layout the local volume uses (ADR 0011
+  content-addressed layout the local volume uses (ADR [0011](../adr/0011-media-and-file-storage.md)
   C-MED·3/4/7; `Id` = the lowercase-hex SHA-256 of the payload). Import
   is a **byte-copy** and the dedup-by-content-hash is preserved
   (C-M11·3).
@@ -654,7 +670,7 @@ U06's `ApplyIdentityAsync` re-creator mirrors it **verbatim**):
 | `displayName` | `Profile.DisplayName` | the display identity (the directory / the composer). |
 | `verified` | `Profile.Verified` | the sign-in gate (an unverified account cannot sign in). |
 | `blocked` | `Profile.Blocked` | the suspension flag (a blocked account loses all standing). |
-| `roles` | the Identity `RoleManager` role names | the standing (`Member` / `Moderator` / `GlobalAdmin` / `Translator`) — composable (ADR 0030). |
+| `roles` | the Identity `RoleManager` role names | the standing (`Member` / `Moderator` / `GlobalAdmin` / `Translator`) — composable (ADR [0030](../adr/0030-role-independence-composable-elevated-roles.md)). |
 
 **The EXCLUDED credential fields (the C-M11·2 boundary — the single most
 load-bearing M11 invariant):** the principals projection **never** reads
@@ -803,14 +819,14 @@ Web-surface pins target verbatim):
 | Route | Action | Auth | Audit row (the service emits, the controller adds none) |
 |---|---|---|---|
 | `GET /admin/portability` | the index (the export button + the import upload form + the status area) | `[Authorize(Roles = GlobalAdmin)]` | — (a read, no audit) |
-| `GET /admin/portability/export` | streams the `*.kumunita` archive (`Content-Disposition: attachment`, the ADR 0034 shape) | `[Authorize(Roles = GlobalAdmin)]` | **one** `portability.export` — `TargetKind "portability"`, `Via = Admin`, verb `export` |
+| `GET /admin/portability/export` | streams the `*.kumunita` archive (`Content-Disposition: attachment`, the ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) shape) | `[Authorize(Roles = GlobalAdmin)]` | **one** `portability.export` — `TargetKind "portability"`, `Via = Admin`, verb `export` |
 | `POST /admin/portability/import` | applies the uploaded archive (the success / the closed-failure-set render) | `[Authorize(Roles = GlobalAdmin)]` | **one** `portability.import` — `TargetKind "portability"`, `Via = Admin`, verb `import` |
 
-- **All three** are `[Authorize(Roles = GlobalAdmin)]` (the ADR 0101/0105
+- **All three** are `[Authorize(Roles = GlobalAdmin)]` (the ADR [0101](../adr/0101-announcement-comments-lane.md)/0105
   admin-surface shape — a plain resident, **including a moderator**, never
   sees the surface; **no** break-glass read).
 - **Each** of `export` + `import` emits **exactly one** `AccessAudit` row
-  (the ADR 0105 `messaging.toggle` shape — `Via = Admin`), emitted by the
+  (the ADR [0105](../adr/0105-messaging.md) `messaging.toggle` shape — `Via = Admin`), emitted by the
   **service** (the controller adds none).
 - **Zero** new `AccessAction` / `AccessVia` / `IAuthorizationService.Decide()`
   branch / `Audience` (C-M11·7).
@@ -849,7 +865,7 @@ Web-surface pins target verbatim):
 - **C-M11·5 · Whole-instance, not per-slice.** M11 exports/imports the
   **entire** registered instance. Per-slice / cross-instance /
   import-merge are **follow-on lanes** (own ADRs), not M11 scope. Pinned
-  by the D1 deferral close in the design doc + the ADR 0108 Consequences.
+  by the D1 deferral close in the design doc + the ADR [0108](../adr/0108-portability-import-export.md) Consequences.
 
 - **C-M11·6 · The surface is GlobalAdmin + audited + quiet.** Export +
   import are `[Authorize(Roles = GlobalAdmin)]`, each emits **one**
@@ -867,7 +883,7 @@ Web-surface pins target verbatim):
   is unchanged).
 
 - **C-M11·8 · Docs parity holds at the flip.** `Milestones.cs` /
-  `README.md` Roadmap / `docs/STATUS.md` / `docs/ARCHITECTURE.md` all move
+  [`README.md`](../../README.md) Roadmap / [`docs/STATUS.md`](../STATUS.md) / [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) all move
   M11 to `StatusDone` + M12 to `StatusNext` in the **same** unit (U07),
   and `tests/Kumunita.Web.Tests/MilestonesTests.cs` keeps its
   single-in-progress pin passing (the AGENTS.md parity contract).
@@ -913,7 +929,7 @@ enforces the 4-language set):
 | `portability.status.failure` | the closed-failure-set render (the validate-rejected import) |
 
 Each × **4 languages** (`en` / `de` / `fr` / `da`), the closed-key
-registry shape (the ADR 0015 `KnownTranslationKeys` pin).
+registry shape (the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) `KnownTranslationKeys` pin).
 
 ## §drift-guard — the frozen pins + the drift log
 

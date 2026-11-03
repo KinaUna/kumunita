@@ -1,4 +1,17 @@
-# ADR 0062 — The /admin surface split: overview dashboard + linkable section pages
+---
+id: adr-0062
+title: "The /admin surface split: overview dashboard + linkable section pages"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m13-logging-analytics-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0062](0062-admin-surface-split.md) — The /admin surface split: overview dashboard + linkable section pages
 
 Status: Accepted
 Date: 2026-09-22
@@ -28,7 +41,7 @@ The natural fix is the one this repo has already applied to the per-account
 detail (step 1): **split the one page into linkable sections, each with its own
 route**, and leave a thin dashboard at the old address. This is a settled
 design question about the admin *surface layout* — the kind of decision the
-repo records as an ADR (like ADR 0053, which gave the community-translation
+repo records as an ADR (like ADR [0053](0053-community-translation-surface-own-page.md), which gave the community-translation
 surface its own page for the same "the shell is too much" reason).
 
 The constraint from the test harnesses (documented in

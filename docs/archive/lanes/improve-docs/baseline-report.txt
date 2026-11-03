@@ -1,0 +1,95 @@
+IMPROVE-DOCS report  (repo: /home/agent/projects/kumunita)
+------------------------------------------------------------------------------
+
+[1] front-matter coverage (--- in the first line):
+  total docs : 1021
+  with FM    : 2
+  without    : 1019
+     1943  docs/plans-milestones/done/m3b/m3b-handoff-notes.md
+     1909  docs/design/m13-logging-analytics-design.md
+     1550  docs/plans-milestones/done/pages/pages-handoff-notes.md
+     1467  docs/plans-milestones/done/m11/m11-portability-handoff-notes.md
+     1430  docs/plans-milestones/done/esc/plan-esc-escalation-authorization.md
+     1417  docs/plans-milestones/done/m10/m10-pwa-handoff-notes.md
+     1392  docs/plans-milestones/done/improve/handoff-notes.md
+     1391  docs/plans-milestones/done/m32/plan-m32-issue-submission-escalation.md
+     1305  docs/plans-milestones/done/m35/plan-m35-kiosk-mode.md
+     1299  docs/plans-milestones/done/m30/plan-m30-admin-onboarding.md
+     1288  docs/plans-milestones/done/m13/plan-m13-logging-analytics.md
+     1276  docs/plans-milestones/done/file-attachments/file-attachments-handoff-notes.md
+     1272  docs/design/m3b-moderation.md
+     1256  docs/plans-milestones/done/prod-hardening/hardening-handoff-notes.md
+     1250  docs/design/m20-notification-quiet-times-design.md
+     1229  docs/design/m18-recurring-events-design.md
+     1211  docs/design/m5-projects-design.md
+     1205  docs/plans-milestones/done/m33/plan-m33-storage-metrics-history.md
+     1196  docs/plans-milestones/done/m4/m4-handoff-notes.md
+     1131  docs/plans-milestones/done/site/plan-site.md
+    ... and 999 more
+
+[2] abstract coverage (docs >60 lines, Abstract/TL;DR in first 20 lines):
+  docs >60   : 863
+  with abs   : 29
+  without    : 834
+     1430  docs/plans-milestones/done/esc/plan-esc-escalation-authorization.md
+     1392  docs/plans-milestones/done/improve/handoff-notes.md
+     1391  docs/plans-milestones/done/m32/plan-m32-issue-submission-escalation.md
+     1305  docs/plans-milestones/done/m35/plan-m35-kiosk-mode.md
+     1299  docs/plans-milestones/done/m30/plan-m30-admin-onboarding.md
+     1288  docs/plans-milestones/done/m13/plan-m13-logging-analytics.md
+     1256  docs/plans-milestones/done/prod-hardening/hardening-handoff-notes.md
+     1205  docs/plans-milestones/done/m33/plan-m33-storage-metrics-history.md
+     1131  docs/plans-milestones/done/site/plan-site.md
+     1128  docs/plans-milestones/done/m34/plan-m34-analytics-history.md
+     1121  docs/plans-milestones/done/improve/improve-audit.md
+     1120  docs/plans-milestones/done/m30/m30-handoff-notes.md
+     1068  docs/plans-milestones/done/m27/plan-m27-user-scoped-portability.md
+     1059  docs/plans-milestones/done/guardian-assignment/plan-guardian-assignment.md
+     1048  docs/plans-milestones/done/m24/plan-m24-storage-metrics.md
+     1043  docs/plans-milestones/done/rich-editor/rich-editor-handoff-notes.md
+     1017  docs/design/m14-events-projects-design.md
+     1011  docs/plans-milestones/done/m13/m13-logging-analytics-handoff-notes.md
+     1009  docs/plans-milestones/done/m29/plan-m29-admin-surface-labels.md
+     1006  docs/design/m10-pwa-responsive-design.md
+    ... and 814 more
+
+[3] inbound/outbound link counts (relative .md links between docs):
+  total doc links : 96
+  orphans (0 in)  : 981
+  no outbound     : 999
+
+[4] broken relative links (target .md does not exist):
+  count: 3
+  docs/philosophy/templates/design-doc.md  ->  ../../docs/OPS.md
+  docs/plans-milestones/done/improve/improve-audit.md  ->  ../../philosophy/anti-patterns.md
+  docs/plans-milestones/done/improve/plan-improve.md  ->  ../philosophy/README.md
+
+[5] ADR length histogram (target ~80 lines):
+  total ADRs : 285
+  ≤80        : 103
+  81–150     : 58
+  151–300    : 103
+  >300       : 21
+      655  0118-bookmarks.md
+      518  0038-guardian-assignment.md
+      480  0057-user-guides-in-help-subtree-and-consistency-loop.md
+      466  0084-per-target-notification-subscriptions.md
+      459  0167-personal-notes.md
+      415  0164-kiosk-mode.md
+      395  0123-extended-profiles.md
+      381  0119-recurring-events.md
+      372  0117-inventory.md
+      369  0139-per-resident-messaging-controls.md
+      349  0115-integration-of-events-and-projects.md
+      337  0107-pwa-and-responsive-design.md
+      333  0144-guardian-event-rsvp-gate.md
+      330  0122-document-management.md
+      322  0116-translation-bulk.md
+      322  0135-upload-limits.md
+      321  0043-system-pages-shipped-and-discoverable.md
+      321  0108-portability-import-export.md
+      310  0121-notification-quiet-times.md
+      303  0039-pages-hierarchy-audience-translations.md
+      301  0044-tags.md
+------------------------------------------------------------------------------
+docs-report: done.

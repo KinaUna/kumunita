@@ -1,0 +1,42 @@
+---
+id: start-agent
+title: "Agent entry"
+tier: living
+kind: entry
+status: current
+audiences: [agent]
+related:
+  - AGENTS.md
+  - docs/README.md
+  - docs/dev/README.md
+  - docs/DOCS-CONVENTIONS.md
+  - docs/archive/lanes/improve-docs/plan-improve-docs.md
+  - docs/philosophy/START-HERE.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the links an AI agent working in this repo is most likely
+> to want, each with a one-line reason. Links only, no facts — this page
+> cannot drift. **Who is it for:** an AI assistant (Copilot, Claude,
+> Cursor, etc.) working in this repo. **When to read the rest:** before
+> touching code or docs in this session.
+
+# Agent entry
+
+You're an AI agent working in this repo. The docs below are the ones that
+matter for *you* — the things to read before you touch code or docs.
+
+| Link | Why |
+|---|---|
+| [`AGENTS.md`](../../AGENTS.md) | The must-knows — the shape of the code, the conventions, the "don't pause mid-task" rule, and a pointer to the working doctrine. Loaded into every agent session. |
+| [`docs/dev/`](../dev/README.md) | The working doctrine — the Razor verification traps, the test-runner quirk + CI cheatsheet + gates, the live-server debugging conventions, and the sandbox / browser / terminal quirks. Read it before verifying a bug, running tests, reading CI, or debugging the live server. |
+| [`docs/DOCS-CONVENTIONS.md`](../DOCS-CONVENTIONS.md) | The shared rules every doc in this repo follows — the front-matter schema, the abstract rule, the ADR cap, the linking rule, the "one fact, one place" rule. Read before your first doc change. |
+| [`docs/README.md`](../README.md) | The docs map — where things live, the tier model, the entry pages. |
+| [`docs/archive/lanes/improve-docs/plan-improve-docs.md`](../archive/lanes/improve-docs/plan-improve-docs.md) | The lane register for the (shipped) doc restructure — the `D00`–`D14` units, the evidence, the target shape. Frozen at the lane's close; the unit spec for the *current* task is the `AGENTS.md` + `docs/dev/` doctrine. |
+| [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The philosophy in one hour — the "why" behind the conventions, the integration argument that the seams are the point. |
+| [`docs/philosophy/templates/design-doc.md`](../philosophy/templates/design-doc.md) | The design-doc template — the "Seams & contracts" section is mandatory; use it when proposing a non-trivial change. |
+| [`docs/adr/`](../adr/README.md) | The ADR index — the deciding document for any non-obvious rule. The code cites ADR numbers ~9 600 times; the number is the stable key. |
+| [`docs/design/`](../design/m3b-moderation.md) | The current truth per subsystem (every doc `tier: reference` / `kind: design` + an Abstract, `D10`) — the **six subsystem hubs** are the doors in: [events](../design/events-subsystem.md) · [rich content](../design/rich-content-subsystem.md) · [notifications](../design/notifications-subsystem.md) · [storage metrics](../design/storage-metrics-subsystem.md) · [analytics](../design/analytics-subsystem.md) · [prod-hardening](../design/prod-hardening.md). |
+
+The per-audience entry pages live under [`start/`](../README.md#per-audience-entry-pages)
+— this page is one of them.

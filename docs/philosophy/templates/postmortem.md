@@ -1,3 +1,16 @@
+---
+id: philosophy-template-postmortem
+title: "Postmortem — template"
+tier: living
+kind: philosophy
+status: current
+audiences: [platform-maintainer, developer, community-admin]
+related:
+  - docs/philosophy/anti-patterns.md
+  - docs/ops/incident-response.md
+updated: 2026-11-02
+---
+
 # Postmortem: [incident]
 
 ## Summary & impact

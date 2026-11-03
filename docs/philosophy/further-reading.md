@@ -1,3 +1,24 @@
+---
+id: philosophy-further-reading
+title: "Further Reading — The Traditions Behind Fractal Integration"
+tier: living
+kind: philosophy
+status: current
+audiences: [developer]
+related:
+  - docs/philosophy/START-HERE.md
+  - docs/philosophy/domains-of-integration.md
+updated: 2026-11-02
+---
+
+> **Abstract:** optional entry points into the four traditions these
+> guidelines draw from — systems theory, cybernetics, modularity,
+> interpersonal neurobiology — each with a short note on where it shows up
+> in this folder. **Who is it for:** the curious, or the person handing a
+> skeptical colleague something with more weight behind it. **When to read
+> the rest:** when "why this matters" makes you want to check the source.
+>
+
 # Further Reading — The Traditions Behind Fractal Integration
 
 > Optional. Nothing here is required to use these guidelines — the whole

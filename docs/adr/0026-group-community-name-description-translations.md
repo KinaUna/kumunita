@@ -1,16 +1,24 @@
-# ADR 0026 — Group & community name/description translations
-
-Status: Accepted
-Date: 2026-09-20
+---
+id: adr-0026
+title: "Group & community name/description translations"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/tags-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
-ADR 0022 added a **user-added translation** lane for *posts* and *replies*:
+ADR [0022](0022-user-added-post-reply-translations.md) added a **user-added translation** lane for *posts* and *replies*:
 a human authoring a translation of an existing piece of UGC into another
 supported language. That lane is deliberately scoped to a post/reply's
 title + body — **not** to the names of the things that organize them.
 
-ADR 0021 (the `Translator` role) carries the same scope boundary, and names
+ADR [0021](0021-translator-role-delegated-translation-editing.md) (the `Translator` role) carries the same scope boundary, and names
 it explicitly:
 
 > **Scope boundary — community names are not in it.** … Community / group
@@ -19,10 +27,10 @@ it explicitly:
 > `Translator` does not edit them. **Extending translation to those names is
 > a separate feature, not part of this role.**
 
-And ADR 0005 §C keeps out of scope "translating user-generated content … a
+And ADR [0005](0005-multilingual-support.md) §C keeps out of scope "translating user-generated content … a
 separate, later feature." A group's name and description, and a community's
 (name and description), are exactly such content: they are authored on the
-resident surface (a group's name/description by its owner, ADR 0009) or by a
+resident surface (a group's name/description by its owner, ADR [0009](0009-group-description-display-and-edit-lane.md)) or by a
 GlobalAdmin (a community, the `/admin` lane), and rendered as written. Today
 a resident whose preferred language is not the language a group or community
 was named in still has to read it in the original.
@@ -56,7 +64,7 @@ language, without any of the control-plane standing.
 - **Add-only lane, at-least-one field.** There is no edit or remove of a
   translation row — the supported surface is "add a translation in a language
   that has none yet" (the unique index permits re-saving a language; there is
-  no separate "edit" or "delete" seam, matching ADR 0022's add-only shape).
+  no separate "edit" or "delete" seam, matching ADR [0022](0022-user-added-post-reply-translations.md)'s add-only shape).
   Unlike a post (which requires a non-blank body), a name/description
   translation allows either field to be blank — a neighbor may translate just
   the name ("Bike owners" → "Wolontariusze rowerów") or just the description.
@@ -64,23 +72,23 @@ language, without any of the control-plane standing.
   write is an `ArgumentException` (a translation with nothing in it is not a
   translation).
 
-- **Standing to add** is owned in Core (`UserInfoService`), per ADR 0006-D
+- **Standing to add** is owned in Core (`UserInfoService`), per ADR [0006](0006-module-boundary-contracts.md)-D
   ("the service owns the decision, not the Web"):
   - **Group lane** — the group's **owner** (an `AccessVia.Owner` audit tag),
     **∪ GlobalAdmin** ∪ **Translator** (both an `AccessVia.Admin` audit tag).
     The group's **member** is *not* a standing: membership is not the right to
     rename the group for others (a member may translate their own *post* in the
-    group, ADR 0022's author lane, but the group's *name* is the owner's
-    artifact, ADR 0009's owner∪GlobalAdmin edit standing).
+    group, ADR [0022](0022-user-added-post-reply-translations.md)'s author lane, but the group's *name* is the owner's
+    artifact, ADR [0009](0009-group-description-display-and-edit-lane.md)'s owner∪GlobalAdmin edit standing).
   - **Community lane** — **GlobalAdmin ∪ Translator** (both `AccessVia.Admin`).
     A community has **no owner** — its name/description is written by a
     GlobalAdmin (the `/admin` create/update lane, `Via: Admin`), so the
     component-moderator standing does not qualify (a moderator governs a
-    community's *members*, ADR 0012, not its name — the same
+    community's *members*, ADR [0012](0012-community-membership-mandatory-and-moderator.md), not its name — the same
     "the moderator governs its members, not its standing" rule as the
     mandatory toggle).
   - `Translator` is included in both lanes: this is the explicit realization of
-    ADR 0021's scope-boundary deferral — the `Translator` reaches the
+    ADR [0021](0021-translator-role-delegated-translation-editing.md)'s scope-boundary deferral — the `Translator` reaches the
     *platform* surface (UI strings + static pages); extending that reach to the
     *UGC names* they would otherwise be unable to touch is what this feature is.
     A component-moderator claim never qualifies, on either lane.
@@ -110,9 +118,9 @@ language, without any of the control-plane standing.
       `ActorId` / `EffectivePrincipalId` = the actor.
 
 - **Web surface — the read side shows what's there; the write side offers
-  what's missing.** Mirrors the ADR 0022 post/reply render exactly:
+  what's missing.** Mirrors the ADR [0022](0022-user-added-post-reply-translations.md) post/reply render exactly:
   - The **group detail** page (`/groups/{id}`) and the **community**
-    translation surface render: *(ADR 0053 — the community half moved off the
+    translation surface render: *(ADR [0053](0053-community-translation-surface-own-page.md) — the community half moved off the
     manage page to its own `/community/translations/{id}` page; the group
     half is unchanged on `/groups/{id}`.)*
     - the **available translations** as a chip per language, each expandable
@@ -132,17 +140,17 @@ language, without any of the control-plane standing.
     materializes their `en` rows and the provider floor covers `en`, so no new
     provider seam is needed. The translated **values** (the name/description
     text a neighbor writes) are **never** registry keys — they are UGC
-    translation rows, rendered as written (the M·3 exclusion ADR 0015/0021
+    translation rows, rendered as written (the M·3 exclusion ADR [0015](0015-ui-view-localization-mechanics.md)/0021
     both keep).
 
 - **Render scope.** The translated name/description is offered on the
   **detail / manage** surface (where the owner or the GlobalAdmin is already
   acting). The composer's community picker, the feed's community grouping, and
-  the group *list* are **out of scope** here — matching ADR 0022's
+  the group *list* are **out of scope** here — matching ADR [0022](0022-user-added-post-reply-translations.md)'s
   detail-view scope, a name on a list row staying in the authored language
   until its own per-language render lane is a later decision (see "Revisit
   when"). A resident's **preferred** language is what their browser already
-  uses for the UI (ADR 0005); whether a *list* should surface a group's name in
+  uses for the UI (ADR [0005](0005-multilingual-support.md)); whether a *list* should surface a group's name in
   that language is a separate, larger render decision.
 
 ## Consequences
@@ -151,9 +159,9 @@ Positive
 - A group or a community can now carry a human-authored translation of its
   name and description into any enabled language, visible to everyone who can
   already reach the parent — no new audience, no new moderation lane, no
-  machine-translation (ADR 0005 §C stays intact: this is *user-authored*, not
+  machine-translation (ADR [0005](0005-multilingual-support.md) §C stays intact: this is *user-authored*, not
   *machine* translation).
-- `Translator` finally has the reach ADR 0021 deferred: it can now translate
+- `Translator` finally has the reach ADR [0021](0021-translator-role-delegated-translation-editing.md) deferred: it can now translate
   the *names* it is forbidden to set — the scope boundary becomes a shipped
   feature instead of a permanent wall.
 - Standing is decided in Core and reused for both the decision and the UI
@@ -176,23 +184,9 @@ Negative / accepted risks
   group **member** still cannot (membership ≠ the right to rename for others).
 - The two new documents are a real schema delta. It is applied idempotently at
   boot by Marten (`ApplyAllConfiguredChanges`), the seeder is unaffected (no
-  seed rows — UGC translation rows are never seeded, ADR 0022 precedent), and
+  seed rows — UGC translation rows are never seeded, ADR [0022](0022-user-added-post-reply-translations.md) precedent), and
   the new UI keys are added to the closed `KnownTranslationKeys` registry, so
   no new provider seam is needed.
 - The name in a **list** (group list, community feed grouping) is still shown
   in its authored language — only the detail / manage surface renders a
   translated name. A per-language list render is the accepted deferral.
-
-## Revisit when
-
-- A **remove** or **correct** lane is wanted for a bad translation — that is a
-  new seam (an `Update*TranslationAsync` / `Delete*TranslationAsync` pair), not
-  a change to this add-only shape.
-- A **list** surface (the group list, the feed's community grouping, the
-  composer's community picker) should show a name in the resident's preferred
-  language — then the detail-page-only render scope breaks and the name needs a
-  per-language resolution at read time (a `TranslationProvider`-style seam), a
-  much larger change than the detail-surface lane this ADR ships.
-- A **community** should have an *owner* standing (rather than
-  GlobalAdmin∪Translator) — then the community lane's standing matrix gains an
-  `Owner` branch, which is a new decision (communities have no owner today).

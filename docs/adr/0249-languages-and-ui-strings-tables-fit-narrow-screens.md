@@ -1,4 +1,17 @@
-# ADR 0249 — The Languages and UI-strings tables fit narrow screens
+---
+id: adr-0249
+title: "The Languages and UI-strings tables fit narrow screens"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0249](0249-languages-and-ui-strings-tables-fit-narrow-screens.md) — The Languages and UI-strings tables fit narrow screens
 
 Status: Accepted
 Date: 2026-10-29
@@ -16,7 +29,7 @@ widths gave all the slack to the English reference. Both fit at 1200px and up.
   wrong once wrapped) and stops buttons stretching; the editable value input may shrink to 8rem instead of a sliver.
   The 3-column editor also gets `.kmb-fixed-cols` (fixed table layout, columns 28% / 32% / rest), because with automatic layout the key
   and value columns stayed at their minimum while the reference text took the rest.
-- **Below 576px** both tables use the existing stacked-card pattern (`kmb-stack-table`, ADR 0222): Languages rows show Enabled and
+- **Below 576px** both tables use the existing stacked-card pattern (`kmb-stack-table`, ADR [0222](0222-accounts-table-phones.md)): Languages rows show Enabled and
   UI strings captions and a wrapping action block; editor rows show Key, English reference and "Value in {code}" captions with the input
   and Save on one line. The captions are `data-label` attributes, resolved server-side from existing keys
   (`languages.th_enabled`, `languages.th_ui_strings`, `translations.editor.th_key`, `.th_en_reference`, `.th_value`); no new keys.

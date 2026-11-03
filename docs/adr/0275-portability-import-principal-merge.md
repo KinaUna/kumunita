@@ -1,9 +1,22 @@
-# ADR 0275 — Portability import (KeepExisting): merge principals by email, keep the existing profile
+---
+id: adr-0275
+title: "Portability import (KeepExisting): merge principals by email, keep the existing profile"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0275](0275-portability-import-principal-merge.md) — Portability import (KeepExisting): merge principals by email, keep the existing profile
 
 Status: Accepted
 Date: 2026-10-30
-Extends the **ADR 0193 portability import modes** lane (the `KeepExisting`
-merge semantic — "keep existing, add only what is new") and **ADR 0274**
+Extends the **ADR [0193](0193-portability-import-modes.md) portability import modes** lane (the `KeepExisting`
+merge semantic — "keep existing, add only what is new") and **ADR [0274](0274-portability-import-tag-merge.md)**
 (the `KeepExisting` tag merge — the same keep-first discipline, re-applied to
 the `Tag` / `TagTranslation` pair). It also leans on the **UI lane**
 (`DirectoryService` — the `/directory` page lists one row per
@@ -17,7 +30,7 @@ showed the same person twice.
 
 ## Context
 
-ADR 0274's tag merge was correct for tags because a tag's business key
+ADR [0274](0274-portability-import-tag-merge.md)'s tag merge was correct for tags because a tag's business key
 (`Slug`) is *carried on the document* and is stable across instances — two
 instances' copies of the same tag share the slug, so the merge can match them.
 A **principal** (an account + its `Profile` document) has no such stable,
@@ -31,7 +44,7 @@ target's admin are, to the document store, two strangers.
 
 The only stable, cross-instance identity a principal carries is its **email**
 (the `PortabilityPrincipal.Email` / `NormalizedEmail` fields — the one field a
-real-world operator would expect to be shared). ADR 0193's `KeepExisting`
+real-world operator would expect to be shared). ADR [0193](0193-portability-import-modes.md)'s `KeepExisting`
 already matches principals by email when it decides whether to re-create the
 **Identity account** (an account with a matching email is skipped — kept
 intact, roles re-applied additively). But it did **not** carry that decision to
@@ -44,7 +57,7 @@ the person **twice**. The content graph's principal references (every
 registry) were likewise left pointing at the archive's foreign `SubjectId`, a
 dangling id the target store has no account for.
 
-The constraint that keeps the merge safe is the one ADR 0193 and ADR 0274
+The constraint that keeps the merge safe is the one ADR [0193](0193-portability-import-modes.md) and ADR [0274](0274-portability-import-tag-merge.md)
 already enforce: **the existing row is kept intact, never overwritten; only new
 rows are added.** This ADR re-applies that same keep-first discipline to the
 `Profile` / principal pair, using a merge key the natural-identity skip cannot
@@ -65,7 +78,7 @@ returns an empty map (the wipe removed the target's accounts — there is nothin
 to merge into).
 
 `PortabilityApplyDocuments.ApplyAsync` gains a `principalMergeMap` parameter
-(ADR 0274's `defaultLanguageCode` parameter already threads the archive's config
+(ADR [0274](0274-portability-import-tag-merge.md)'s `defaultLanguageCode` parameter already threads the archive's config
 into the docs apply — the principal map is the same "computed upstream, applied
 here" shape). In `KeepExisting` mode (only), before the per-type loop, the
 service:
@@ -86,7 +99,7 @@ service:
    map (the existing profile is kept intact, never overwritten — the
    `/directory` entry is not doubled).
 
-This is the ADR 0274 tag merge's two-step shape, re-applied: a merge map
+This is the ADR [0274](0274-portability-import-tag-merge.md) tag merge's two-step shape, re-applied: a merge map
 (archive id → existing id) + a content re-point (the registry's closed field
 set) + a store-skip (the merged entity's own row). The `Tag` / `TagTranslation`
 and the `Profile` / principal pair share the same "identity guard is not a
@@ -125,8 +138,8 @@ is passed but empty in `CleanSlate` (the merge block is gated on
 - The merge is data-driven (the registry's `Target == "principal"` reference
   fields drive the content re-pointing; the `Profile` row is the only
   special-cased type, and only because its identity guard — `SubjectId` — is
-  not a unique index the ADR 0193 natural-identity skip can see, the same
-  reason ADR 0274's `Tag` is special-cased).
+  not a unique index the ADR [0193](0193-portability-import-modes.md) natural-identity skip can see, the same
+  reason ADR [0274](0274-portability-import-tag-merge.md)'s `Tag` is special-cased).
 - **Live-instance repair:** an instance that already accumulated duplicate
   directory entries from a pre-fix `KeepExisting` import still has them — the
   merge is forward only (a re-import merges new principals into existing ones;
@@ -134,12 +147,12 @@ is passed but empty in `CleanSlate` (the merge block is gated on
   the keep-first discipline forbids). The operator's path to a clean
   `/directory` page is a `CleanSlate` import (the default — it wipes then
   applies the archive's profiles as the single set) or the operator's
-  pre-import backup (the ADR 0108 D1 rollback path).
-- **The ADR 0274 `Tag` / `TagTranslation` merge and this ADR's `Profile` /
+  pre-import backup (the ADR [0108](0108-portability-import-export.md) D1 rollback path).
+- **The ADR [0274](0274-portability-import-tag-merge.md) `Tag` / `TagTranslation` merge and this ADR's `Profile` /
   principal merge are independent and composable:** a `KeepExisting` import
   over a live instance that already held both the archive's tags and the
   archive's principals merges both — the tags by slug + default-language name
-  (ADR 0274) and the principals by email (this ADR) — in the same apply pass,
+  (ADR [0274](0274-portability-import-tag-merge.md)) and the principals by email (this ADR) — in the same apply pass,
   with no interaction (the two merge maps are computed upstream, applied
   independently, and the content re-point is data-driven from the registry's
   closed field set for each `Target` separately).

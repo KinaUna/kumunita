@@ -1,17 +1,30 @@
-# ADR 0211 — Contrast pass, remaining pages
+---
+id: adr-0211
+title: "Contrast pass, remaining pages"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0211](0211-contrast-pass-remaining-pages.md) — Contrast pass, remaining pages
 
 Status: Accepted
 
 ## Context
-ADR 0208 scanned 17 pages and listed what it had not covered. This pass scans 14 admin pages,
+ADR [0208](0208-contrast-pass.md) scanned 17 pages and listed what it had not covered. This pass scans 14 admin pages,
 the calendar, group members/settings/events/post, the create forms (group post, group event,
 event, announcement, goal, inventory, document, page), account password/storage, and the open
 modals on 14 detail pages (forced visible, 13 on a post page alone), in Forest/Ember x
-light/dark, with patches 42-44 injected so only new findings show. Method as ADR 0208.
+light/dark, with patches 42-44 injected so only new findings show. Method as ADR [0208](0208-contrast-pass.md).
 
 ## Findings and fixes (CSS only)
 - `.btn-outline-danger` outside tables ("Remove", "Delete this group", the modal "Report"
-  buttons): #dc3545 was 3.4-4.5:1. The row-level fix (ADR 0208) now covers every
+  buttons): #dc3545 was 3.4-4.5:1. The row-level fix (ADR [0208](0208-contrast-pass.md)) now covers every
   `.btn-outline-danger`: #b02a37 on light, #f08a94 on dark.
 - `.btn-outline-warning` (admin "Make optional", 8 on /admin/communities): Bootstrap yellow
   on cream was 1.4:1 in light. #7a5100 (solid fill on hover) in light; dark unchanged.
@@ -25,7 +38,7 @@ light/dark, with patches 42-44 injected so only new findings show. Method as ADR
 - Solid `.btn-danger` outside tables (white on #dc3545 = 4.5:1).
 
 ## Open
-- Scan covers rendered text only: no icon-only controls, borders, or focus rings (ADR 0209).
+- Scan covers rendered text only: no icon-only controls, borders, or focus rings (ADR [0209](0209-focus-rings.md)).
 - Modals were scanned statically (forced open), not with their backdrop.
 - Pages needing specific data were not reached (multi-page pagination, error states, empty
   admin tables).

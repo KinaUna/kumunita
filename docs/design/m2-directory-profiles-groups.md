@@ -1,4 +1,20 @@
+---
+id: design-m2-directory-profiles-groups
+title: "M2 — Directory, profiles, groups"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+  - docs/adr/0003-roles-and-moderator-scoping.md
+updated: 2026-11-02
+---
+
 # Design Doc — M2: Directory, profiles, groups
+
+> **Abstract:** the **directory, profiles, groups** design — M1's stored access documents become three resident-facing surfaces: a **directory** of residents (each deciding what they share), a **profile editor** (visibility + contact visibility), and **groups** (membership / privacy / organizing unit). Part 1 pins scope + invariants + FACES; Part 2 the exact C# + test list. **Who is it for:** a developer touching the `Profile` / `Group` / `GroupMembership` seams; an agent that needs the candidate-filter rule. **When to read the rest:** before touching the directory, the profile editor, or the groups surface.
+
 
 > Part 1 of 2 (U1). Part 2 (U2) will append "Seams & contracts" and the test list.
 > Part 1 is scope, invariants, and FACES. Both parts pin the invariant numbers
@@ -26,11 +42,11 @@ M2 delivers three surfaces:
 - **Group management** (`/groups`): list, create, per-group add/remove
   member — so an audience can point at a named group, not only individuals.
 
-Per `ARCHITECTURE.md` §4.3, **M2 introduces no new authorization rule.** Every
-decision routes through the frozen `IAuthorizationService` (ADR 0006). M2 adds
+Per the [identity & access — access model](../architecture/identity-access.md), **M2 introduces no new authorization rule.** Every
+decision routes through the frozen `IAuthorizationService` (ADR [0006](../adr/0006-module-boundary-contracts.md)). M2 adds
 exactly one new read method on `IUserInfoService`
 (`GetProfilesAsync(verifiedOnly)`, a *new* method on a frozen interface — the
-compatible lane per ADR 0006-E, precedent the `IDocumentSession` overloads on
+compatible lane per ADR [0006](../adr/0006-module-boundary-contracts.md)-E, precedent the `IDocumentSession` overloads on
 `IAuthorizationService`) and one new adapter (`Profile` → `IAuditableResource`,
 `TargetKind = "directory"`, `Audience = Visibility`).
 
@@ -91,11 +107,11 @@ compatible lane per ADR 0006-E, precedent the `IDocumentSession` overloads on
 
 ## Invariants (pinned for M2)
 
-M2 is a *caller* of the ADR 0006 invariants, not an owner. The following M1
+M2 is a *caller* of the ADR [0006](../adr/0006-module-boundary-contracts.md) invariants, not an owner. The following M1
 invariants **must keep holding for the M2 surfaces**, and the seam tests for
 M2 (pinned by Part 2) will name each.
 
-| # | ADR 0006 invariant | How M2 uses it |
+| # | ADR [0006](../adr/0006-module-boundary-contracts.md) invariant | How M2 uses it |
 |---|---|---|
 | **C1** | Empty audience denies (both `Any` and `All`; explicit guard) | `Profile.Visibility = null` ⇒ profile hidden from everyone (owner branch is the only exception, see §Contact gating). `ContactVisibility` `null` ⇒ contact block hidden. Explicit `Any` + empty grant ⇒ `CanSeeAsync` returns deny. |
 | **C3** | Audit always on — Allow *and* Deny; one aggregate row per bulk; rows commit in the same transaction | Directory listing = one aggregate `AccessAudit` row (single + bulk, `targetKind = "directory"`, `visibleCount` / `hiddenCount`). Detail view (incl. contact block) = one `AccessAudit` row per profile decision. Profile/group writes ride on M1's `UpsertProfileAsync` / group-mutation transactions. No new audit shape. |
@@ -105,29 +121,29 @@ M2 (pinned by Part 2) will name each.
 **ADRs M2 must respect (not pin as invariants, but the code must not
 violate):**
 
-- **ADR 0001-B** — audience is user-defined; the *author's* choice is
+- **ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B** — audience is user-defined; the *author's* choice is
   absolute. M2's editor writes the author's choice verbatim; M2 does not
   second-guess, does not auto-add group grants.
-- **ADR 0003 §Separation of duties** — group list/create/membership is the
+- **ADR [0003](../adr/0003-roles-and-moderator-scoping.md) §Separation of duties** — group list/create/membership is the
   *group owner's* surface; only GlobalAdmin can demote/assign roles, no
   moderator scope is involved in M2's group surface, and a moderator
   **cannot** manage groups. A GroupOwner may add/remove only members *of
   their own group*. M2 does not touch `/admin` (M1's admin surface is
   unchanged).
-- **ADR 0006-D** (dependency direction) — `DirectoryService` (Core) depends
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-D** (dependency direction) — `DirectoryService` (Core) depends
   only on `IUserInfoService` + `IAuthorizationService`; the Web controllers
   (Web) depend on `DirectoryService`. No Web → Marten path.
-- **ADR 0006-E** (change lanes) — the *one* new method on `IUserInfoService`
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-E** (change lanes) — the *one* new method on `IUserInfoService`
   is a **compatible** addition (predecessor the `IDocumentSession`
   overloads). No breaking change to an existing signature.
 
 **M2 invariants (new, M2-owned, pinned for U3–U14)**
 
-- **C-M2·1 — Contact-gating (§9, ARCHITECTURE.md / M1 design doc).**
+- **C-M2·1 — Contact-gating (see [Testing](../ARCHITECTURE.md) / M1 design doc).**
   `ContactVisibility` is evaluated *only after* `Visibility` has allowed the
   profile. A viewer not allowed by `Visibility` never reaches the contact
   check — no row, no render of contact fields. This is a *composition* rule
-  over ADR 0006-C1/C6; the pin is the **ordering**, not a new deny guard.
+  over ADR [0006](../adr/0006-module-boundary-contracts.md)-C1/C6; the pin is the **ordering**, not a new deny guard.
 - **C-M2·2 — Candidate filter vs. authorization separation (ARCHITECTURE.md
   §4.3).** The *product query* of the directory ("verified residents;
   unverified viewer sees only themselves; unauthenticated viewer sees no
@@ -137,7 +153,7 @@ violate):**
   must not be logged as an access decision. If it leaks into
   `IAuthorizationService` it will be mis-audited and mis-attributed to the
   audience.
-- **C-M2·3 — Group surface SoD (ADR 0003).** Add/remove member on a `Group`
+- **C-M2·3 — Group surface SoD (ADR [0003](../adr/0003-roles-and-moderator-scoping.md)).** Add/remove member on a `Group`
   is permitted only to the group's owner or a GlobalAdmin. No other path.
 
 ## FACES (user-visible outcome → invariant pin)
@@ -153,15 +169,15 @@ reference that pin.
 | F2 | Directory listing reflects a membership change on my group the moment it happens — no refresh, no delay, no stale cache. | C4 |
 | F3 | Detail page: my contact block (email/phone) appears **only** when my `Visibility` allows the profile *and* my `ContactVisibility` allows the contact. | C-M2·1 + C1 |
 | F4 | Detail page: a viewer who is not allowed by `Visibility` never reaches the contact check (no email / phone rendered, no "hidden" placeholder). | C-M2·1 (ordering) |
-| F5 | Profile editor: `Visibility` and `ContactVisibility` each accept explicit `Any` / `All` with named users + groups; the author's choice is stored verbatim (ADR 0001-B). | ADR 0001-B + C1 (empty ⇒ deny) |
-| F6 | Profile editor: "View as [resident]" is a read-only preview of the same saved audience; it does not change state and is not a write path. | C-M2·1 (composition over the same audience) + ADR 0006-D (no new surface) |
+| F5 | Profile editor: `Visibility` and `ContactVisibility` each accept explicit `Any` / `All` with named users + groups; the author's choice is stored verbatim (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B). | ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B + C1 (empty ⇒ deny) |
+| F6 | Profile editor: "View as [resident]" is a read-only preview of the same saved audience; it does not change state and is not a write path. | C-M2·1 (composition over the same audience) + ADR [0006](../adr/0006-module-boundary-contracts.md)-D (no new surface) |
 | F7 | Group owner can create a group, add a member, remove a member; each action is live on the next directory render (F2) and audited (C3). A non-owner cannot manage the group. | C-M2·3 (SoD) + C3 + C4 |
 | F8 | Unverified viewer: sees **only themselves** in the directory (C-M2·2 candidate filter — *not* an access decision; no `AccessAudit` row for the filter itself). | C-M2·2 |
-| F9 | Delegation: a delegate acting for me inherits my standing on my profile's `Visibility` / `ContactVisibility` only for actions inside the grant's scope; out-of-scope is Deny with `Via = Delegation`. | ADR 0006-C2 (delegation action-scoped) — carried through the `Via` path from M1 |
+| F9 | Delegation: a delegate acting for me inherits my standing on my profile's `Visibility` / `ContactVisibility` only for actions inside the grant's scope; out-of-scope is Deny with `Via = Delegation`. | ADR [0006](../adr/0006-module-boundary-contracts.md)-C2 (delegation action-scoped) — carried through the `Via` path from M1 |
 | F10 | Every directory *list* decision, every *detail* decision (profile *and* contact block), and every group mutation (create / add / remove) commits an `AccessAudit` row in the same transaction as the domain write; Allow and Deny are both recorded. | C3 |
 | F11 | Bulk directory ≡ per-item directory: the aggregate `visibleCount` / `hiddenCount` equals the per-resident `CanSeeAsync` result computed one at a time over the same candidate set. | C6 (one matching pass) |
-| F12 | Moderator (any scope) cannot read a profile I have not shared with them, cannot manage a group I do not own, and cannot use the profile editor to peek at my `ContactVisibility`. Default OFF (ADR 0003) holds in M2 as it held in M1. | ADR 0003 + ADR 0006-C5 (carried through M1) |
-| F13 | The profile editor is the *single write surface* for `Visibility` / `ContactVisibility`; no other route in M2 mutates those fields. | ADR 0001-B + ADR 0006-D (single seam) |
+| F12 | Moderator (any scope) cannot read a profile I have not shared with them, cannot manage a group I do not own, and cannot use the profile editor to peek at my `ContactVisibility`. Default OFF (ADR [0003](../adr/0003-roles-and-moderator-scoping.md)) holds in M2 as it held in M1. | ADR [0003](../adr/0003-roles-and-moderator-scoping.md) + ADR [0006](../adr/0006-module-boundary-contracts.md)-C5 (carried through M1) |
+| F13 | The profile editor is the *single write surface* for `Visibility` / `ContactVisibility`; no other route in M2 mutates those fields. | ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B + ADR [0006](../adr/0006-module-boundary-contracts.md)-D (single seam) |
 | F14 | Groups surface is owner-scoped: my group list shows only groups I own (plus, if I'm a member, groups I belong to — read-only membership list is optional per scope note). Directory-level "groups I'm in" is **not** in M2. | C-M2·3 (SoD) + scope note above |
 | F15 | The *one* new `IUserInfoService` method (`GetProfilesAsync(verifiedOnly)`) is used *only* to produce the candidate set for F1 / F2 / F8 / F11 — never as a direct visible set. Its output never renders without passing F1's `CanSeeAsync` gate. | C-M2·2 + C1 + C6 |
 
@@ -174,7 +190,7 @@ without re-deriving them.
 - If a later unit (U3–U14) finds a mismatch between an implemented signature
   and the pin in this Part, **this doc wins**. The unit updates this file in
   the same commit and appends a one-line drift note to the handoff.
-- The invariant *numbers* (C1…C6 from ADR 0006; C-M2·1..3) are stable for the
+- The invariant *numbers* (C1…C6 from ADR [0006](../adr/0006-module-boundary-contracts.md); C-M2·1..3) are stable for the
   rest of M2. Adding a new invariant requires an ADR amendment; renaming or
   renumbering an existing one is a breaking change and is not allowed mid-M2.
 - A new FACES row (F16+) is added only by a unit that ships the outcome it
@@ -191,7 +207,7 @@ namespaces are the contract U3–U14 must implement against. If a later
 unit (U3–U14) discovers an implemented signature or a required M1 seam
 that does not exist verbatim here, the drift-guard (§2.7) applies:
 **this file wins**; the unit updates this file in the same commit and
-appends a one-line drift note to `docs/plans-milestones/done/m2-handoff-notes.md`.
+appends a one-line drift note to [`docs/archive/lanes/m2/m2-handoff-notes.md`](../archive/lanes/m2/m2-handoff-notes.md).
 
 Namespace conventions (matching M1):
 
@@ -201,7 +217,7 @@ Namespace conventions (matching M1):
 - Web-side composition: `Kumunita.Web.Controllers` /
   `Kumunita.Web.Models` (never in `Kumunita.Core`).
 
-The **one** frozen-interface addition M2 makes (ADR 0006-E compatible
+The **one** frozen-interface addition M2 makes (ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible
 lane; precedent: the `IDocumentSession` overloads on
 `IAuthorizationService` in M1): `IUserInfoService.GetProfilesAsync(bool)`.
 M2 introduces **one** new type on the frozen surface: the
@@ -214,7 +230,7 @@ assumed.
 
 Seams that exist as of M1. M2 *calls* them; M2 does not modify.
 
-`Kumunita.Core.Authorization.IAuthorizationService` (frozen, ADR 0006 §A):
+`Kumunita.Core.Authorization.IAuthorizationService` (frozen, ADR [0006](../adr/0006-module-boundary-contracts.md) §A):
 
 ```csharp
 public interface IAuthorizationService
@@ -289,7 +305,7 @@ public sealed class AccessAudit
 
 `Kumunita.Core.UserInfo.IUserInfoService` (frozen; the three `// M2 ADD`
 methods are the new ones — `GetProfilesAsync` landed U3, the two group reads
-landed U9 — all ADR 0006-E compatible lane):
+landed U9 — all ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible lane):
 
 ```csharp
 public interface IUserInfoService
@@ -363,7 +379,7 @@ public sealed record ProfileUpdate(
 `Kumunita.Core.UserInfo.Group` / `GroupMembership` (frozen; M2 reads `Group`
 for rendering; reads membership *only* through the frozen
 `CreateGroupAsync` / `AddGroupMemberAsync` / `RemoveGroupMemberAsync`
-seams — never directly on the access path, per ADR 0006-D):
+seams — never directly on the access path, per ADR [0006](../adr/0006-module-boundary-contracts.md)-D):
 
 ```csharp
 public sealed class Group
@@ -536,7 +552,7 @@ list shows only groups I own plus groups I belong to") requires *reading*
 `Group` documents keyed by `userId`. M1's frozen interface exposes
 `GetGroupIdsAsync` (a `HashSet<string>` of ids — no `Group` documents),
 but not a "groups for this user" read. **U9 confirmed M1 lacks it (drift
-branch 2), so U9 landed two M2 ADDs on `IUserInfoService` (ADR 0006-E
+branch 2), so U9 landed two M2 ADDs on `IUserInfoService` (ADR [0006](../adr/0006-module-boundary-contracts.md)-E
 compatible lane, mirroring §2.1's `GetProfilesAsync`)** — both now pinned
 in §2.1 and frozen by §2.7:
 
@@ -605,13 +621,13 @@ has *allowed* the profile (F3/F4 gating):
 after** the `Visibility` check has allowed the profile. A profile that
 fails `Visibility` never reaches the contact check; the contact row is
 *never* appended to `AccessAudit` for a hidden profile (F4 pin;
-`ARCHITECTURE.md` §9 "contact block never on a hidden profile").
+see [Testing](../ARCHITECTURE.md) — "contact block never on a hidden profile").
 
 **The *separate*-call pin (C6 compliance):** each of the two decisions
 (`Visibility` → profile; `ContactVisibility` → contact block) is a
 *distinct* `CanSeeAsync` call on the same shared `MatchGroups` core,
 over the same `[p]` candidate. They are not merged into one compound
-audience — ADR 0006-C6 says the *matching pass* is shared, not the
+audience — ADR [0006](../adr/0006-module-boundary-contracts.md)-C6 says the *matching pass* is shared, not the
 *audience object*. Drift-guard: if U11's editor writes a combined
 "profile + contact" audience in one shot, the contact-block tests in
 §2.5 fail.
@@ -637,7 +653,7 @@ invariant they exercise.
 - DirectoryServiceTests_U6.Unverified_SelfCandidate_NotAudited
 - DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated
 
-**Delegation on a profile (F9, ADR 0006-C2)**
+**Delegation on a profile (F9, ADR [0006](../adr/0006-module-boundary-contracts.md)-C2)**
 
 - DirectoryServiceTests_U6.DelegationOnProfile_OwnerBranch
 - AuthorizationServiceTests.C2_Delegate_InScope_BorrowsOwnersStanding_AllowsViaOwnerBranch
@@ -650,11 +666,11 @@ invariant they exercise.
 - UserInfoServiceTests.AddAndRemoveGroupMember_UpdatesMembershipAndWritesAudit
 - GroupsDetailViewModelTests.AddRemove_OnlyOwnerOrAdmin
 
-**Moderator default-OFF (F12, ADR 0003)**
+**Moderator default-OFF (F12, ADR [0003](../adr/0003-roles-and-moderator-scoping.md))**
 
 - UserInfoServiceTests.SetComponentModeratorAccessAsync_FlipsFlag_AuditViaAdminTargetComponent
 
-**Editor round-trip and preview (F5, F6, F13, ADR 0001-B)**
+**Editor round-trip and preview (F5, F6, F13, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B)**
 
 - ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated
 - ProfileEditViewModelTests.ProfileEditViewModel_Patch_Audiences_MatchTheEditors
@@ -738,21 +754,21 @@ Command: VS Test Explorer `run_tests` (filter `Project=Kumunita.Core.Tests` + `P
 
 **`Kumunita.Core.Tests` 86/86 passed. `Kumunita.Web.Tests` 29/29 passed. Total: 115/115, 0 failed.**
 
-Record (shape mirrored from M1 step 9 — `docs/design/m1-identity-access.md` lines 247–273):
+Record (shape mirrored from M1 step 9 — [`docs/design/m1-identity-access.md`](m1-identity-access.md) lines 247–273):
 
 | # | Test | Evidence (actual test names — all passed) |
 |---|------|-------------------------------------------|
 | 1 | **Closed-loop** (signup → verify → profile visible in directory → contact on if opt-in → hidden if visibility empty) | Core: `DirectoryServiceTests.ListAsync_Hides_Unverified` (F8 self-only for unverified viewer; verified resident excluded from `Visible` *and* `HiddenCount` *before* any `CanSeeAsync` ran — §2.3 candidate filter is a precondition, never an audit subject; C-M2·2), `DirectoryServiceTests_U6.ContactVisibility_FourShape_TrightTable` (§2.4 four-shape table against a `Visibility` that already allows the viewer — `null` row: 1 audit row (short-circuit); `Any+empty`/`All+empty`: 2 rows, contact = Deny; `Any+grant`/`All+grant`: 2 rows, contact = Allow; C-M2·1 + C1), `UserInfoServiceTests.GetProfilesAsync_VerifiedOnly_Filters` (the §2.3 candidate-filter source: `verifiedOnly:true` → verified only; both calls → zero `AccessAudit` rows; C-M2·2 at the seam), `UserInfoServiceGroupsU9Tests.GetGroupsForUserAsync_ReturnsOwnerUnionMember_ExcludesOther` (F14: the named-group source for an audience that references a *group* not just a user), `ProfileToAuditableResourceTests.Maps_All_Six_Fields` + `TargetKind_Is_Directory` (C6: `Audience` is *only* `Profile.Visibility`, never `ContactVisibility`; C3: `TargetKind = "directory"`). Web: `DirectoryIndexViewModelTests.Profile_Projection_Excludes_Contact_Fields` (F1 pin: hidden row's `Email`/`Phone` null even though `DirectoryViewModel` *can* carry them — "only allowed rows rendered, other fields not leaked"), `DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated` (§9 view-model pin: hidden ⇒ `ShowContactBlock=false` ⇒ contact null), `ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated` (write-boundary §9 pin: `ContactVisibility` settable only when `Visibility` is non-null). |
-| 2 | **Handoff** (the profile editor's audience choice is the single designed handoff) | The single designed handoff is `IUserInfoService.UpsertProfileAsync(profile, patch)` — the M1 frozen write seam (M1 design step 4 "single write lane"). M2 does *not* invent any new handoff. The directory's `CanSeeAsync` is a *decision*, not a handoff (ADR 0006-D). Evidence: `ProfileEditViewModelTests.ProfileEditViewModel_Patch_Audiences_MatchTheEditors` (`Patch`'s `Visibility` + `ContactVisibility` are two independent `Audience?` slots, written verbatim from the editor's two *separate* fields — no merged compound; actor identity is `KumunitaPrincipal.SubjectId(User)`, never form-bound — ADR 0001-B + C-M2·2 actor pin), `ProfileEditViewModelTests.ProfileEditViewModel_Patch_Off_Emits_NullGate_On_Emits_Audience` (editor's "off" switch → *null* `ContactVisibility` in the `Patch`, not a synthesized `Any+empty` audience — §2.4 "row 1 / not evaluated / short-circuit" is the *only* "off" representation), `UserInfoServiceTests.UpsertProfileAsync_CreatesWhenAbsent_LeavesNullPatchFieldsUntouched` (single-write-seam null-patch semantics: other `Patch` fields unaffected by a null `ContactVisibility`). |
+| 2 | **Handoff** (the profile editor's audience choice is the single designed handoff) | The single designed handoff is `IUserInfoService.UpsertProfileAsync(profile, patch)` — the M1 frozen write seam (M1 design step 4 "single write lane"). M2 does *not* invent any new handoff. The directory's `CanSeeAsync` is a *decision*, not a handoff (ADR [0006](../adr/0006-module-boundary-contracts.md)-D). Evidence: `ProfileEditViewModelTests.ProfileEditViewModel_Patch_Audiences_MatchTheEditors` (`Patch`'s `Visibility` + `ContactVisibility` are two independent `Audience?` slots, written verbatim from the editor's two *separate* fields — no merged compound; actor identity is `KumunitaPrincipal.SubjectId(User)`, never form-bound — ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B + C-M2·2 actor pin), `ProfileEditViewModelTests.ProfileEditViewModel_Patch_Off_Emits_NullGate_On_Emits_Audience` (editor's "off" switch → *null* `ContactVisibility` in the `Patch`, not a synthesized `Any+empty` audience — §2.4 "row 1 / not evaluated / short-circuit" is the *only* "off" representation), `UserInfoServiceTests.UpsertProfileAsync_CreatesWhenAbsent_LeavesNullPatchFieldsUntouched` (single-write-seam null-patch semantics: other `Patch` fields unaffected by a null `ContactVisibility`). |
 | 3 | **Part-vs-whole** (all of M2's invariants pass; no new rule invented) | The full M2-anchored seam list (U3–U11), all passing — names cite the *actual* landed `[Fact]` methods (the per-invariant rows in the next two tables enumerate them; §2.5's `F…`-name pins are unlanded drift — see drift note below) — **plus** the M1-inherited anchors (C1–C6, B, break-glass, `/health`) re-run unchanged and still passing. **35 M2-anchored unit specs (U3–U11: 13 Core + 22 Web) + 80 M1-inherited (73 Core + 7 Web) = 115/115, 0 failed.** The per-seam → invariant mapping for the 35 M2-anchored specs is in the two tables below; the M1-inherited rows follow unchanged. |
 
 Seam-list → invariant mapping (M2- *new* invariants only, anchored to their ADR/FACES row):
 
 | Invariant | Seam test(s) that anchor it (all passed) |
 |-----------|------------------------------------------|
-| **C-M2·1** (contact-gating: contact check runs *only after* `Visibility` allowed) | `DirectoryServiceTests_U6.ContactVisibility_FourShape_TrightTable` (service-layer: each of the 4 §2.4 rows — `null`/`Any+empty`/`Any+grant`/`All+empty`/`All+grant` — is evaluated against a `Visibility` that already allowed the viewer; the "not evaluated" row (1) produces exactly 1 `AccessAudit` row, the "evaluated" rows (2–5) produce exactly 2 (a distinct second `Can*` call, not a merged compound — C6), and the contact row's `Via`/`Outcome` match the decision); `DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated` (view-model layer: hidden row ⇒ `ShowContactBlock=false` ⇒ `Email`/`Phone=null` — "contact block never on a hidden profile", `ARCHITECTURE.md` §9); `ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated` (editor's write-boundary: `ContactVisibility` settable only when `Visibility` non-null — the editor does not *produce* a "hidden profile + contact opt-in" state) |
+| **C-M2·1** (contact-gating: contact check runs *only after* `Visibility` allowed) | `DirectoryServiceTests_U6.ContactVisibility_FourShape_TrightTable` (service-layer: each of the 4 §2.4 rows — `null`/`Any+empty`/`Any+grant`/`All+empty`/`All+grant` — is evaluated against a `Visibility` that already allowed the viewer; the "not evaluated" row (1) produces exactly 1 `AccessAudit` row, the "evaluated" rows (2–5) produce exactly 2 (a distinct second `Can*` call, not a merged compound — C6), and the contact row's `Via`/`Outcome` match the decision); `DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated` (view-model layer: hidden row ⇒ `ShowContactBlock=false` ⇒ `Email`/`Phone=null` — "contact block never on a hidden profile", see [Testing](../ARCHITECTURE.md)); `ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated` (editor's write-boundary: `ContactVisibility` settable only when `Visibility` non-null — the editor does not *produce* a "hidden profile + contact opt-in" state) |
 | **C-M2·2** (candidate filter ≠ access decision, §4.3; never logged as an audit row) | `DirectoryServiceTests.ListAsync_Hides_Unverified` (unverified row: exactly one candidate — the viewer themself — survives the §2.3 filter before `CanSeeAsync` runs; the filtered-out verified resident is absent from `Visible` *and* `HiddenCount`, and appears in *no* `AccessAudit` row as actor, effective principal, or target); `DirectoryServiceTests_U6.Unverified_SelfCandidate_NotAudited` (the *only* audit row for an unverified self-sighting is the Owner branch on their own profile); `UserInfoServiceTests.GetProfilesAsync_VerifiedOnly_Filters` (the candidate-filter *source*: `verifiedOnly:true` → verified set, `verifiedOnly:false` → all, and *neither* appends an `AccessAudit` row); `UserInfoServiceGroupsU9Tests.GetGroupsForUserAsync_AppendsNoAuditRow_CM2_2` (group-read is a *read*, not an access decision — zero audit rows); `UserInfoServiceGroupsU9Tests.GetGroupMembersAsync_LiveOnNextCall_C4_StrongConsistency` (per-group member read is also a read — no audit row) |
-**C-M2·3** (group SoD — owner ∪ GlobalAdmin only, on the *remove* lane; extended to the *add* lane by ADR 0007; amended by ADR 0008, which adds the member **self-leave** lane — any member, own row only, owner excepted — as the intentional lone deviation from the owner ∪ GlobalAdmin standing) | `DirectoryServiceTests_U6.GroupAddRemoveMember_ReflectedOnNext_Call_Profile`
+**C-M2·3** (group SoD — owner ∪ GlobalAdmin only, on the *remove* lane; extended to the *add* lane by ADR [0007](../adr/0007-group-management-lane-owner-or-globaladmin.md); amended by ADR [0008](../adr/0008-member-self-leave-lane.md), which adds the member **self-leave** lane — any member, own row only, owner excepted — as the intentional lone deviation from the owner ∪ GlobalAdmin standing) | `DirectoryServiceTests_U6.GroupAddRemoveMember_ReflectedOnNext_Call_Profile`
 
 Inherited M1 invariants (C1–C6, B, break-glass, `/health`) — unchanged, still passing in this run:
 
@@ -791,12 +807,12 @@ This design doc's §2.5 (the "22 seam tests" name list) freezes 22 `F[0-9]_`-pre
 
 **Closed forward-references (this commit):**
 
-1. `docs/ARCHITECTURE.md` §2 — `src/Kumunita.Core/Directory/  # M2 — not yet created` → closed (the `Directory` module name in ARCHITECTURE.md's §2 tree is a *forward-reference to the layout*, not a live module name — U5's `DirectoryService` landed in `src/Kumunita.Core/UserInfo/` per its frozen `Kumunita.Core.UserInfo` namespace; the ARCHITECTURE.md §2 line is now annotated with the recorded gate + counts pointing to this doc's § Acceptance Gate).
-2. `docs/design/m1-identity-access.md` — "Profile editing UI and directory visibility rules (M2)" → closed: "✓ M2 — see `docs/design/m2-directory-profiles-groups.md` § Acceptance Gate (recorded 2026-09-04)".
+1. [solution layout](../architecture/solution-layout.md) — `src/Kumunita.Core/Directory/  # M2 — not yet created` → closed (the `Directory` module name in [solution layout](../architecture/solution-layout.md)'s tree is a *forward-reference to the layout*, not a live module name — U5's `DirectoryService` landed in `src/Kumunita.Core/UserInfo/` per its frozen `Kumunita.Core.UserInfo` namespace; the [solution layout](../architecture/solution-layout.md) line is now annotated with the recorded gate + counts pointing to this doc's § Acceptance Gate).
+2. [`docs/design/m1-identity-access.md`](m1-identity-access.md) — "Profile editing UI and directory visibility rules (M2)" → closed: "✓ M2 — see [`docs/design/m2-directory-profiles-groups.md`](m2-directory-profiles-groups.md) § Acceptance Gate (recorded 2026-09-04)".
 
 ## M2 — Closed (recorded)
 
-**Closed 2026-09-04 by U15** (the final M2 unit; the M2→M3 handoff lives in `docs/plans-milestones/done/m2-handoff-notes.md` § Summary). This section freezes M2's closure. The M2→M3 handoff artifact is the *sole* one: this doc's § Acceptance Gate + the handoff-notes § Summary. There is no U16.
+**Closed 2026-09-04 by U15** (the final M2 unit; the M2→M3 handoff lives in [`docs/archive/lanes/m2/m2-handoff-notes.md`](../archive/lanes/m2/m2-handoff-notes.md) § Summary). This section freezes M2's closure. The M2→M3 handoff artifact is the *sole* one: this doc's § Acceptance Gate + the handoff-notes § Summary. There is no U16.
 
 **Recorded acceptance gate (the three tests, from U12 — see § Acceptance Gate above):**
 
@@ -806,15 +822,15 @@ This design doc's §2.5 (the "22 seam tests" name list) freezes 22 `F[0-9]_`-pre
 
 **Two doc updates folded into the closure (both landed by U12, confirmed consistent by U15):**
 
-1. `docs/ARCHITECTURE.md` §2 — the `Directory/` tree line now names the live module + the gate + the 115/0 count, pointing at this doc's § Acceptance Gate (confirmed consistent, line 82).
-2. `docs/design/m1-identity-access.md` — the "out of scope … profile editing UI and directory visibility rules (M2)" line is **closed** (`✓ M2 — shipped`, confirmed line 53). The line is retained (the surrounding "out of scope" list's ordering depends on it); it is *not* deleted.
+1. [solution layout](../architecture/solution-layout.md) — the `Directory/` tree line now names the live module + the gate + the 115/0 count, pointing at this doc's § Acceptance Gate (confirmed consistent, line 82).
+2. [`docs/design/m1-identity-access.md`](m1-identity-access.md) — the "out of scope … profile editing UI and directory visibility rules (M2)" line is **closed** (`✓ M2 — shipped`, confirmed line 53). The line is retained (the surrounding "out of scope" list's ordering depends on it); it is *not* deleted.
 
 **Deferred (still open after U1–U14; each is a clean M3 follow-up, none blocks M3):**
 
 | # | Deferred item | Source | M3 action (one line) |
 |---|---|---|---|
 | D1 | **§2.5 22-test-name drift** — §2.5's `F[0-9]_`-prefixed name pins do not exist in the landed `[Fact]` methods (U5/U6/U9/U10/U11 landed the same invariant coverage under different names). | U12 drift note | Rename the landed `[Fact]` methods to §2.5's pins **or** rewrite §2.5 to the landed names, with a §2.7 drift note in the same commit. |
-| D2 | **Playwright e2e runtime absent** — U13 authored `tests/Kumunita.Web.Tests/e2e-m2.spec.ts` (three specs) but paused: no `@playwright/test` dep, no fixture, no Postgres boot, no token channel in the repo. The specs are *not runnable*; `docs/ARCHITECTURE.md` §7 "Playwright e2e arrives later" is still a forward reference. | U13 (paused) | Land the bounded runtime (package + webServer/globalSetup booting Postgres + the `signup`/`login`/`lastCreatedGroupId` helpers in the spec footer); run the three specs and record the pass count in a new handoff-notes section (append-only). |
+| D2 | **Playwright e2e runtime absent** — U13 authored `tests/Kumunita.Web.Tests/e2e-m2.spec.ts` (three specs) but paused: no `@playwright/test` dep, no fixture, no Postgres boot, no token channel in the repo. The specs are *not runnable*; the [front-end](../ARCHITECTURE.md) "Playwright e2e arrives later" is still a forward reference. | U13 (paused) | Land the bounded runtime (package + webServer/globalSetup booting Postgres + the `signup`/`login`/`lastCreatedGroupId` helpers in the spec footer); run the three specs and record the pass count in a new handoff-notes section (append-only). |
 | D3 | **`Models/ProfileViewModel.cs` orphaned** — zero live references after U14 removed `AccountController.Profile` + `Views/Account/Profile.cshtml`; U11's `ProfileEditViewModel` already carries the `DisplayName` + `Email` bootstrap fields. | U14 deviation 1 | Safe to delete (or keep if a later unit wants the shape). Zero live references; a one-file surface-area prune. |
 | D4 | **`IUserInfoService` unused in `AccountController` ctor** — after U14, no `IUserInfoService` method is called in `AccountController.cs`; the ctor param is retained to avoid a M2-unit DI shape change. | U14 deviation 3 | Optional: drop `IUserInfoService` from the `AccountController` ctor (and its DI wiring in `Program.cs`) if a later unit owns the controller. |
 

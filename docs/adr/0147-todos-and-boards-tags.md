@@ -1,4 +1,17 @@
-# ADR 0147 — Tags on to-dos and Kanban boards
+---
+id: adr-0147
+title: "Tags on to-dos and Kanban boards"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0147](0147-todos-and-boards-tags.md) — Tags on to-dos and Kanban boards
 
 Status: Accepted
 Date: 2026-09-24
@@ -29,7 +42,7 @@ this ADR is additive on their decisions exactly as written.
 
 ## Context
 
-ADR 0044 landed tags as a *shared organizational primitive*: a small set of
+ADR [0044](0044-tags.md) landed tags as a *shared organizational primitive*: a small set of
 free subject labels an author attaches to content they may already edit,
 browsable and searchable *by* label without any of them becoming an access
 boundary. That primitive landed on **posts and blog pages**. It was
@@ -58,7 +71,7 @@ and the *attach/translate/read* mechanics are 0044's and are reused verbatim.
 
 `KanbanBoard` gains **`TagIds`** — `IReadOnlyList<string>` (default
 empty), the resolved `Tag` doc ids, the exact `TodoItem.TagIds` /
-`Post.TagIds` shape. It is an **ADR 0004 §B.1 additive field**:
+`Post.TagIds` shape. It is an **ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive field**:
 delta-detected by `ApplyAllConfiguredChangesToDatabaseAsync`, idempotent,
 no re-seed, no EF migration. It registers in `PortabilityDocTypes` as
 `A("TagIds", "Tag")` (an array-valued tag reference, the `TodoItem`

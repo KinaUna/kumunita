@@ -1,9 +1,25 @@
+---
+id: design-m26-sorting
+title: "M26 — Sorting"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0090-pagination-and-filtering.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # M26 — Sorting — design (Part 1)
+
+> **Abstract:** the **sorting** design — one canonical `SortSpec` value object + a per-surface **closed allowlist** of sort keys, threaded as an additive, default-preserving `SortSpec?` through the 18 paged list/search seams M7 paged, plus one shared Web `_Sort` control. **Who is it for:** a developer adding sorting to a paged seam; an agent that needs the `SortSpec` / `SortKeys` shape. **When to read the rest:** before touching `SortSpec`, a surface's sort allowlist, or the `_Sort` control.
+
 
 > **Milestone M26.** The one canonical **sorting** contract (a pure Core
 > `SortSpec` value object + a per-surface **closed allowlist** of sort keys)
 > threaded as an **additive, default-preserving** `SortSpec?` through the
-> **18 paged list/search seams** M7 (ADR 0090) paged, plus **one shared Web
+> **18 paged list/search seams** M7 (ADR [0090](../adr/0090-pagination-and-filtering.md)) paged, plus **one shared Web
 > `_Sort` control** (`SortViewModel`) whose current values ride the existing
 > `_Pager` links (the M7 D7 `FilterParams` mechanism), and a **closed `sort.*`
 > kw-l set** × en/de/fr/da. **Part 2** (the exact C# shapes of `SortSpec` /
@@ -30,7 +46,7 @@
 
 ## 1. Context
 
-M7 (ADR 0090, 2026-09-26) shipped **pagination** (the `?page=` param + the
+M7 (ADR [0090](../adr/0090-pagination-and-filtering.md), 2026-09-26) shipped **pagination** (the `?page=` param + the
 `HasMore` signal on every paged Core seam + the `_Pager` partial +
 `PagedViewModel` + the filter-reset rule) and **filtering** (the existing
 filters, frozen, made to paginate correctly). **M3** shipped the actual
@@ -89,7 +105,7 @@ regression — the pinned tests (U3–U9) exist to catch it. And the
   a surface's **closed allowlist** → a `SortSpec`, falling back to the
   surface's **default key/direction** on an unknown key or invalid
   direction — **never** a property/reflection lookup from the raw string).
-  HTTP-free, per C-SORT·3 (ADR 0006-D).
+  HTTP-free, per C-SORT·3 (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).
 - **The additive `SortSpec?` on the 18 paged seams** — each gains an
   **optional** parameter (Part 2 pins the exact position per seam); the
   existing `HasMore`/`page` contract is **untouched**; `null` → the
@@ -108,9 +124,9 @@ regression — the pinned tests (U3–U9) exist to catch it. And the
   registry and covered by `KnownTranslationKeys_ParityTests`.
 - **The pinned Core + Web tests** (Part 2 pins the exact names; the seam is
   the U3–U9 test-bearing units) + **the U17 acceptance gate**.
-- **ADR 0145** (Sorting: user-selectable order over the 18 paged
+- **ADR [0145](../adr/0145-sorting.md)** (Sorting: user-selectable order over the 18 paged
   list/search seams; the pure `SortSpec` + per-surface allowlists; the
-  default-preserving rule; the named non-decisions; the ADR 0090
+  default-preserving rule; the named non-decisions; the ADR [0090](../adr/0090-pagination-and-filtering.md)
   relationship) + **OPS / README Roadmap / `Milestones.cs` sync** (the
   `MilestonesTests.cs` parity contract).
 
@@ -134,7 +150,7 @@ the exact shapes):
    `GoalPage` / `ProjectPage` / `AnnouncementPage` / `DocumentListResult` /
    `ItemPage` / `TagPostPage` / `TagPagePage` / `ProfileTagPage` /
    `ProfileBioPage` / `SearchSurfacePage`** — the per-surface page records
-   (ADR 0090 D3 / the register's §Understanding table); the hardcoded
+   (ADR [0090](../adr/0090-pagination-and-filtering.md) D3 / the register's §Understanding table); the hardcoded
    `OrderBy`/`OrderByDescending` lives in each service, over the
    already-authorized candidate set. M26 changes **the order clause**,
    never the record shape (C-SORT·7).
@@ -167,7 +183,7 @@ the exact shapes):
 
 `record SortSpec(string Key, bool Descending)` + the pure
 `SortKeys.Parse(raw, allowed, defaultKey, defaultDir)` — **no HTTP, no
-`IFormFile`, no `ActionResult`** (C-SORT·3, ADR 0006-D, the M25 `C-UP·3`
+`IFormFile`, no `ActionResult`** (C-SORT·3, ADR [0006](../adr/0006-module-boundary-contracts.md)-D, the M25 `C-UP·3`
 precedent). The `?sort=`/`?dir=` query-param parsing and the view mapping
 are **Web-only** (the `SortViewModel` + the `_Sort` partial). The Core
 change is an **optional parameter + a `switch` over the closed key set** —
@@ -196,7 +212,7 @@ contract is **untouched**. *(C-SORT·2, C-SORT·5.)*
 
 Re-ordering **never** changes *which* rows are authorized — the
 `CanSeeAsync` call, the `AccessAudit` row, and the `HiddenCount` shape are
-all **untouched** (C-SORT·4, the ADR 0064 `?view=` display-selector
+all **untouched** (C-SORT·4, the ADR [0064](../adr/0064-events-calendar-dwm-views.md) `?view=` display-selector
 precedent + the M7 C-M7·2 "display-only" pin). A signed-in and an anonymous
 viewer on a visible surface get the **same** sort behavior (F10); a sorted
 read emits **zero** new `AccessAudit` rows vs. an unsorted read (F11).
@@ -226,7 +242,7 @@ row, not a new registry. *(F12 — the i18n floor.)*
 ### 4.7 **No** new document / context / schema (D-SORT·7)
 
 `SortSpec` is a **value object** (no Marten doc, no `DocTypes` surface, no
-`SchemaBootstrap` change) — the ADR 0004 §B / ADR 0006-D discipline
+`SchemaBootstrap` change) — the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B / ADR [0006](../adr/0006-module-boundary-contracts.md)-D discipline
 (C-SORT·7). **Zero** new `AccessAction`, **zero** new `AccessVia`, **zero**
 new bounded context, **zero** new index (C-SORT·4 / C-SORT·7, the M7
 "zero new authorization surface" precedent).
@@ -250,7 +266,7 @@ The **8 invariants**, each with a one-line M26 note (the exact ids/names are
 - **C-SORT·2 — default-preserving.** An absent/`null` `SortSpec` reproduces
   the surface's **current hardcoded order exactly** — no unsorted read's
   output changes (the U3–U9 tests pin this).
-- **C-SORT·3 — `Core` stays HTTP-free (ADR 0006-D).** `SortSpec` +
+- **C-SORT·3 — `Core` stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).** `SortSpec` +
   `SortKeys.Parse` are **pure** Core; the `?sort=`/`?dir=` parsing and the
   view mapping are **Web-only**.
 - **C-SORT·4 — sort is a display facet, never a gate.** Re-ordering never
@@ -369,10 +385,10 @@ rendering; the NSubstitute harness). **The U17 acceptance gate** (the
 three-test shape — closed-loop / handoff / part-vs-whole — per the M25
 `§2.5` precedent).
 
-**Docs (U12–U18):** `docs/design/m26-sorting-design.md` (Part 2, U2;
-the "M26 — Closed (recorded)" section, U18); **ADR 0145** (U13);
-`docs/OPS.md` (no new env vars — M26 is pure + additive, no deploy-time
-knob; the `sort.*` kw-l set is the only new surface); `README.md` (the M26
+**Docs (U12–U18):** [`docs/design/m26-sorting-design.md`](m26-sorting-design.md) (Part 2, U2;
+the "M26 — Closed (recorded)" section, U18); **ADR [0145](../adr/0145-sorting.md)** (U13);
+[`docs/OPS.md`](../OPS.md) (no new env vars — M26 is pure + additive, no deploy-time
+knob; the `sort.*` kw-l set is the only new surface); [`README.md`](../../README.md) (the M26
 Roadmap entry); `Milestones.cs` + `MilestonesTests.cs` (the C-SORT·6
 contract, U18).
 
@@ -395,13 +411,13 @@ contract, U18).
   `PagerLink` builder) — **no new pager idiom** (D-SORT·5).
 - **R5 — a new `AccessAudit` row (C-SORT·4 violated).**
   **Mitigation:** the `CanSeeAsync` call + the `AccessAudit` row + the
-  `HiddenCount` shape are **untouched** (the ADR 0064 `?view=`
+  `HiddenCount` shape are **untouched** (the ADR [0064](../adr/0064-events-calendar-dwm-views.md) `?view=`
   display-selector precedent + the M7 C-M7·2 "display-only" pin) + F11
   (the pinned test).
 - **R6 — a new document / context / schema (C-SORT·7 violated).**
   **Mitigation:** D-SORT·7 (the `SortSpec` is a value object; no Marten
-  doc, no `DocTypes` surface, no `SchemaBootstrap` change; the ADR 0004 §B
-  / ADR 0006-D discipline).
+  doc, no `DocTypes` surface, no `SchemaBootstrap` change; the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B
+  / ADR [0006](../adr/0006-module-boundary-contracts.md)-D discipline).
 - **R7 — an unresolvable `sort.*` label (F12 violated).**
   **Mitigation:** the `sort.*` set is registered on the `KnownTranslationKeys`
   registry + covered by `KnownTranslationKeys_ParityTests` (the
@@ -450,8 +466,8 @@ precedent). See `m26-u02.md`.
 
 ### 2.1 New Core-owned types (exact C#) — a new namespace `Kumunita.Core.Query`
 
-Both types are **HTTP-free** (C-SORT·3 / ADR 0006-D) and **pure**
-(C-SORT·7 — a value object + a static parser; the ADR 0004 §B / ADR 0006-D
+Both types are **HTTP-free** (C-SORT·3 / ADR [0006](../adr/0006-module-boundary-contracts.md)-D) and **pure**
+(C-SORT·7 — a value object + a static parser; the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B / ADR [0006](../adr/0006-module-boundary-contracts.md)-D
 discipline — no Marten doc, no `DocTypes` surface, no `SchemaBootstrap`
 change):
 
@@ -832,9 +848,9 @@ satisfies the C-SORT·6 single-in-progress contract and unblocks **M27
   per-lane Web sort tests + U17's `SortKwL_Resolves_En_De_Fr_Da`
   kw-l-resolution pin). **Both suites green** at close (U18 exit run).
 
-- **The ADR pointer.** `docs/adr/0145-sorting.md` — the decision record
+- **The ADR pointer.** [`docs/adr/0145-sorting.md`](../adr/0145-sorting.md) — the decision record
   for this lane (Status: **Accepted**); the ADR index
-  (`docs/adr/README.md`) carries the 0145 row appended after 0144. The
+  ([`docs/adr/README.md`](../adr/README.md)) carries the 0145 row appended after 0144. The
   8 invariants (C-SORT·1–8), the 12 FACES (F1–F12), the **18-surface
   catalog** (locked allowlists incl. the C-1/C-2/C-3 corrections), and the
   6 named non-decisions above are the ADR's normative core; the design
@@ -858,4 +874,4 @@ satisfies the C-SORT·6 single-in-progress contract and unblocks **M27
   plans follow the same sealed-unit shape as this one (the register at
   `docs/plans-milestones/plan-m27-*.md`, the unit plans in
   `docs/plans-milestones/in-progress/`, the close moving them to
-  `docs/plans-milestones/done/m27/`).
+  `docs/archive/lanes/m27/`).

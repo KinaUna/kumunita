@@ -1,28 +1,19 @@
-# ADR 0033 — WYSIWYG inline editing: the rendered pane is the editable surface
-
-Status: Accepted
-Date: 2026-09-15
-Amends: 0031 (D1's *"WYSIWYG = a split-view live preview, **not a
-`contenteditable`**"* non-decision — the **`tsc`-only** constraint, the
-one-renderer-on-the-read-path stance, the `ImageIds`-source-parse stance,
-and D2's no-second-upload / D3's client-preview-mirrors-RC consequences all
-**keep binding**. The **reversed** part is only the composer-surface
-non-decision *"true `contenteditable` / a third-party editor — hard
-non-negotiable out."* The user has **explicitly approved** this reversal
-(**2026-09-15**). Does **not** supersede 0031; it changes the composer
-surface — the rendered pane becomes `contenteditable`, the textarea becomes
-an editable Markdown source (two-way sync) — and adds **one** new pure serializer + **one** new pure
-sanitizer.)
-Amends: 0032 (the rendered-by-default view — **kept**; the pane is still
-the default view the resident lands on. What changes is that the pane is
-now **editable** (the resident types *in* it) and the `</>` toggle reveals
-an **editable Markdown source** (two-way sync) rather than a read-only
-mirror. The
-`tsc`-only / additive / no-new-route consequences of 0032 keep binding.)
+---
+id: adr-0033
+title: "WYSIWYG inline editing: the rendered pane is the editable surface"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/rich-content-subsystem.md]
+supersedes: [adr-0031, adr-0032]
+superseded_by: [adr-0165]
+updated: 2026-11-02
+---
 
 ## Context
 
-ADR 0031 (the rich-editor lane, `RE`) and ADR 0032 (the inline-editor lane,
+ADR [0031](0031-wysiwyg-editor-and-toolbar.md) (the rich-editor lane, `RE`) and ADR [0032](0032-inline-editor-rendered-default-view.md) (the inline-editor lane,
 `IE`) together shipped the split-view authoring surface: a toolbar, a source
 `<textarea>`, and a rendered preview pane on the 10 composer surfaces (16
 editor blocks / 10 view files — U0 verified). IE made the rendered pane the
@@ -34,7 +25,7 @@ path is to click `</>`, reveal the raw Markdown `<textarea>`, and hand-type
 exact inverse of what Gmail/Outlook do: a resident clicks the rendered text,
 puts the caret in it, and types.
 
-ADR 0031 D1 / ADR 0032 named the ceiling *"true `contenteditable` / a
+ADR [0031](0031-wysiwyg-editor-and-toolbar.md) D1 / ADR [0032](0032-inline-editor-rendered-default-view.md) named the ceiling *"true `contenteditable` / a
 third-party editor — hard non-negotiable out,"* on the grounds it would
 (a) break the `tsc`-only constraint, (b) introduce an HTML→Markdown
 round-trip engine, and (c) fight RC's `ImageIds` parse (which reads the
@@ -132,34 +123,3 @@ server surface**, and **no second renderer on the read path**.
   Markdown source (the textarea) with **two-way sync** — typing in the
   code view re-renders the pane, and typing in the pane updates the code
   view (the pane stays editable + visible in both states — WY·7).
-
-## Not decided here (explicit non-decisions)
-
-Each is a **future lane** (WY-2, if it comes), named — the ADR 0011 / 0025 /
-0031 precedent holds:
-
-- **Nested lists** — the WY·3 subset is flat `<ul>`/`<ol>` + `<li>`.
-- **Blockquotes / tables / footnotes / strikethrough** — no branch in
-  `MarkdownRenderer`; not in the subset (adding one is a lane that extends
-  `MarkdownRenderer` **and** the client serializer in the same commit).
-- **`execCommand`-based undo/redo** — the browser's native `contenteditable`
-  undo is the floor; a custom undo/redo is a future lane.
-- **Mobile-specific editing UX**, **caret-mapping between the pane and the
-  code view**, **localStorage persistence of the editing preference** — see
-  the design doc §Named deferrals.
-- **A third-party editor** (ProseMirror/Quill/Tiptap) — **still out**
-  (WY·8 / RE·3 `tsc`-only). This ADR uses `contenteditable` on a hand-rolled
-  serializer, **not** an editor framework.
-
-## Revisit when
-
-- A resident asks for nested lists, tables, blockquotes, or a custom
-  undo/redo — open the named WY-2 lane (a design doc + ADR), **not** an
-  amendment to this ADR.
-- The **`tsc`-only / no-editor-dependency** stance is challenged (e.g. a
-  request to adopt ProseMirror/Quill/Tiptap) — that is the load-bearing
-  constraint of ADR 0031 D1; relaxing it is itself a new ADR that would
-  supersede this one.
-- The **byte-identical body** guarantee (RC R·3 / WY·5) is challenged — that
-  is RC's `ImageIds` source-parse; changing it is a new ADR, not a code
-  change.

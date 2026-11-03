@@ -1,3 +1,29 @@
+---
+id: philosophy-start-here
+title: "START HERE — the philosophy in one hour"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer, agent]
+related:
+  - docs/philosophy/README.md
+  - docs/philosophy/everyday-life.md
+  - docs/philosophy/domains-of-integration.md
+  - docs/philosophy/anti-patterns.md
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/adopting-fig.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the whole philosophy in one hour — the one argument
+> (parts are cheap, the linkage is rare), the six principles, the three
+> tests (closed-loop, handoff, part-vs-whole), the FACES check, and a
+> deliberate 60-minute reading order through every doc in the folder.
+> **Who is it for:** anyone who has not read the philosophy yet — it is the
+> onboarding. **When to read the rest:** as the first philosophy read, or
+> when a doc in the folder stops making sense.
+>
+
 # START HERE — Kumunita's Philosophy, in one hour
 
 > **The line to remember:** the parts are cheap; the linkage is what's rare.
@@ -94,7 +120,7 @@ can name what it trades away before it's built.
 |---|--------------------------------------------|-------|--------------------------------|
 | − | `everyday-life.md`                         | 10 min| the same idea in plain language — start here if jargon isn't your language |
 | 0 | `START-HERE.md` (this page)                | 5 min | the one argument               |
-| 1 | `README.md`                                | 5 min | the six principles, in full    |
+| 1 | [`README.md`](../../README.md)                                | 5 min | the six principles, in full    |
 | 2 | `the-platform-as-integrator.md`            | 10 min| why the platform exists        |
 | 3 | `in-code.md`                               | 10 min| how we build code              |
 | 4 | `in-product.md`                            | 5 min | how we run the platform & community |

@@ -1,7 +1,15 @@
-# ADR 0050 — Admin-managed sign-up gate: open vs invitation-only
-
-Status: Accepted
-Date: 2026-09-16
+---
+id: adr-0050
+title: "Admin-managed sign-up gate: open vs invitation-only"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m19-guest-accounts-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -28,9 +36,9 @@ to flip the instance between **open** (residents may self-register) and
 without touching the host.
 
 The natural home is the same "instance value, admin-settled, `true`/sane floor"
-shape the two closest siblings already use — ADR 0019 (time zone) and ADR 0020
+shape the two closest siblings already use — ADR [0019](0019-timezone-platform-default-and-resident-override.md) (time zone) and ADR [0020](0020-date-format-platform-default-and-resident-override.md)
 (date format) — both of which store an admin-settled platform value on the
-`LocaleSettings` singleton (id `"singleton"`, ADR 0005 B), read it through a
+`LocaleSettings` singleton (id `"singleton"`, ADR [0005](0005-multilingual-support.md) B), read it through a
 plain service method, and write it through a **single audited** lane that appends
 exactly one `AccessAudit` row (`Via = Admin`) in the same session/commit. A
 boolean policy toggle is a weaker cousin of the same trio: a single admin-settled
@@ -52,10 +60,10 @@ sign-up today, and to reopen it.
   document, not a fourth.** `Kumunita.Core.Localization.LocaleSettings.IsSignupOpen`
   (`bool`, default `true`) joins `DefaultLanguageCode`, `DefaultTimezone`, and
   `DefaultDateFormat` on the **same** `mt`-schema document (id `"singleton"`,
-  the ADR 0005 B / ADR 0019 / ADR 0020 shape). One "platform defaults" document,
+  the ADR [0005](0005-multilingual-support.md) B / ADR [0019](0019-timezone-platform-default-and-resident-override.md) / ADR [0020](0020-date-format-platform-default-and-resident-override.md) shape). One "platform defaults" document,
   and a boolean is the cheapest member of the trio.
 
-- **Additive, migration-free (ADR 0004 §B.1).** The field defaults to `true`, so
+- **Additive, migration-free (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1).** The field defaults to `true`, so
   an existing `LocaleSettings` row reads as "open" without a migration, and a
   **fresh** instance — whose singleton is materialized by the seeder — also
   starts **open**. No migration file: Marten applies the added boolean column
@@ -67,7 +75,7 @@ sign-up today, and to reopen it.
   `settings is null || settings.IsSignupOpen`. The `null` clause is the floor:
   a missing or un-migrated row is treated as **open**, so a deployment can never
   be locked out of the very account-creation lane it needs to reach its admins.
-  (The inverse of ADR 0020's "blank reads as the floor" — here the floor is the
+  (The inverse of ADR [0020](0020-date-format-platform-default-and-resident-override.md)'s "blank reads as the floor" — here the floor is the
   *permissive* value, because the consequence of a wrong guess is lockout, not
   a cosmetic date format.)
 
@@ -81,11 +89,11 @@ sign-up today, and to reopen it.
     (`Action = "signup.set-open"`, `TargetKind = "signup"`, `TargetId = "signup"`,
     `Via = Admin`, `Outcome = Allow`, `ActorId = adminSubjectId`), committed in
     the same session. The Web boundary owns the GlobalAdmin standing check (the
-    Core seam does not re-check `User` — the ADR 0019/0020 split).
+    Core seam does not re-check `User` — the ADR [0019](0019-timezone-platform-default-and-resident-override.md)/0020 split).
 
 - **Admin surface (`/admin/signup`, GlobalAdmin-gated).** A dedicated
   `AdminSignupController` — **not** a new action on `AdminController` — mirroring
-  `AdminTimezoneController` (ADR 0019) and `AdminDateFormatController` (ADR
+  `AdminTimezoneController` (ADR [0019](0019-timezone-platform-default-and-resident-override.md)) and `AdminDateFormatController` (ADR
   0020) exactly: `[Route("admin/signup")]`,
   `[Authorize(Roles = Roles.GlobalAdmin)]`, a thin `View`/`Save` pair that maps
   the boolean to the two labeled options ("Open — residents can sign up" /
@@ -117,7 +125,7 @@ sign-up today, and to reopen it.
 
 - **No config, no restart.** The value is **data** on an `mt`-schema document,
   not appsettings — a change is live on the very next request (the same "data,
-  not config" posture as ADR 0019 / ADR 0020).
+  not config" posture as ADR [0019](0019-timezone-platform-default-and-resident-override.md) / ADR [0020](0020-date-format-platform-default-and-resident-override.md)).
 
 - **Out of scope (deliberately):** the invitation mechanism itself — the token
   lifecycle, expiry, and admin invite UX that the README Deferred section and
@@ -134,7 +142,7 @@ Positive
   documents that committed the instance to invitation-only before wider rollout
   now have the control they were waiting on: a GlobalAdmin can close self-service
   sign-up on the next request, and reopen it, with no rebuild and no host change.
-- **Mirrors the ADR 0019 / ADR 0020 precedent exactly.** The "admin writes a
+- **Mirrors the ADR [0019](0019-timezone-platform-default-and-resident-override.md) / ADR [0020](0020-date-format-platform-default-and-resident-override.md) precedent exactly.** The "admin writes a
   singleton + audited lane; the read seam floors to the sane value" shape is the
   same, the seams are the same, the test pattern is the same. A developer who
   knows the time-zone and date-format features knows this one; the `true` floor
@@ -145,7 +153,7 @@ Positive
   disabled), a closed instance presents no self-service path — not even to a
   hand-crafted form post. The refusal is a property of the write lane, not of the
   form.
-- **No migration, no lockout risk.** The field is additive (ADR 0004 §B.1) and
+- **No migration, no lockout risk.** The field is additive (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1) and
   floors to `true`, so a fresh or pre-existing instance is never accidentally
   locked out of account creation by a missing or stale row.
 
@@ -168,41 +176,3 @@ Negative / accepted risks
   already have accounts (including the development team's), which is the intent
   — "existing residents are unaffected" is stated in the admin surface's own
   lede.
-
-## Amendments
-
-### 2026-10-05 — the default flips from open to **invitation-only** (`false` floor)
-
-The gate, its audited write lane, and the `/admin/signup` surface are **unchanged**.
-Only the **default** a fresh (or un-migrated) instance reads as is amended — from the
-original permissive `true` floor to a restrictive `false` floor — so that **a GlobalAdmin
-can set up the platform before any resident can self-register**, and open sign-up becomes
-the explicit opt-in it was always meant to be (this is exactly the long-term default the
-README *Deferred* section and SECURITY.md §6 A2 both committed the instance to, and the
-original ADR's own "Negative / accepted risks" already framed "closed" as the intended
-posture).
-
-- **`LocaleSettings.IsSignupOpen`** — the field initializer defaults to `false` (was
-  `true`).
-- **`IsSignupOpenAsync()`** — the read floor flips: a missing singleton or an unset
-  value now yield **closed** (the `settings is not null && settings.IsSignupOpen` shape,
-  the same `false`-floor posture as `IsSamplePasswordChangeLockedAsync`). Only an
-  explicit `true` opens sign-up.
-- **Why this is safe.** The platform's own accounts are not gated by this value: the
-  first-boot **GlobalAdmin is created by the seeder** (`userManager.CreateAsync`, not the
-  `/account/signup` lane) and first-boot completion is a **separate** check
-  (`IsFirstBootSetupCompleteAsync` / the setup-token lane). So a `false` floor can never
-  lock the platform's own admin out of the account-creation surface it needs.
-- **What changes for operators.** A fresh instance now boots with the sign-up nav affordance
-  hidden and the self-service write refused until an admin opens the gate at
-  `/admin/signup`. A development or demo deployment that wants open sign-up must flip it to
-  "Open" once (or, for the sample-data demo, rely on its pre-seeded admin rather than
-  self-registration).
-- **The pinned test flips.** `IdentityServiceSignupPolicyTests.
-  IsSignupOpen_FreshInstance_FloorsToFalse_NoAuditRow` now asserts `false` on a fresh
-  instance (was `…FloorsToTrue…`); the `SetSignupOpenAsync` write-lane, audit-row, and
-  re-open tests are unchanged (they drive the explicit value, not the floor).
-- **Out of scope (unchanged).** The invitation mechanism (the token / link an invited
-  resident self-serves a password with) is still the follow-on that makes "closed" a place
-  a resident is invited *to* — this amendment only changes which side of the gate the
-  platform starts on.

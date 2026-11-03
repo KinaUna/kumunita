@@ -1,4 +1,17 @@
-# ADR 0014 — Post edit lane: author-only
+---
+id: adr-0014
+title: "Post edit lane: author-only"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m14-events-projects-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0014](0014-post-edit-lane-author-only.md) — Post edit lane: author-only
 
 Status: Accepted
 Date: 2026-09-12
@@ -17,15 +30,15 @@ delete and re-post (orphaning any one-level replies and losing the original
 
 Two already-accepted decisions constrain what the edit lane may be:
 
-- **ADR 0001-B** — the audience is the **author's choice, written verbatim**.
+- **ADR [0001](0001-core-stack-and-identity-model.md)-B** — the audience is the **author's choice, written verbatim**.
   There is no auto-augmentation and no platform-owned default; the author is
   the sole authority over *who* a post reaches.
-- **The moderator's role over a post is moderation, not authorship.** ADR 0003
+- **The moderator's role over a post is moderation, not authorship.** ADR [0003](0003-roles-and-moderator-scoping.md)
   and the M3b lane make a component moderator's lever `Hide` / `Remove` — a
   `Moderate` action audited against a **Moderate** decision — never
   *rewriting the author's words*.
 
-The parallel decision in the group lane, **ADR 0009** (group description:
+The parallel decision in the group lane, **ADR [0009](0009-group-description-display-and-edit-lane.md)** (group description:
 owner ∪ GlobalAdmin edit), is the closest analog — but it is the **wrong
 precedent to copy here**. A group description is an **organizational** field
 the *owner* curates on behalf of the group, so owner ∪ GlobalAdmin is the
@@ -51,15 +64,15 @@ a component moderator, not even a `GlobalAdmin` who is not the author.
   and a re-targeting edit (moving a post between components) is out of scope
   for an author-edit. `AuthorId`, `Created`, `Status`, and `GroupId` are
   likewise never touched by this lane. A `GroupId`-non-empty post is a
-  **group-lane** post (ADR 0013), whose create lane is the only authoring path
+  **group-lane** post (ADR [0013](0013-group-posts-membership-lane.md)), whose create lane is the only authoring path
   and whose access unit is membership — it has no component feed organizer to
-  edit. <b>Amended 2026-09-13:</b> the authored-in `LanguageCode` (ADR 0018)
+  edit. <b>Amended 2026-09-13:</b> the authored-in `LanguageCode` (ADR [0018](0018-ugc-authored-in-language-tag.md))
   is now also editable on this lane — a non-empty submitted code is written
   verbatim; a blank submission re-materializes through the shared resolver
   (instance default, `en` floor, never blanking a stored tag), mirroring the
-  ADR 0017 announcement-edit precedent where the tag was already editable.
+  ADR [0017](0017-announcement-edit-lane-author-or-globaladmin.md) announcement-edit precedent where the tag was already editable.
 
-- **The audience is written verbatim (ADR 0001-B).** The author re-chooses
+- **The audience is written verbatim (ADR [0001](0001-core-stack-and-identity-model.md)-B).** The author re-chooses
   the audience on edit exactly as on create; the seam stores the `Audience`
   value passed in, byte-for-byte, with no auto-augmentation and no platform
   default. The Web layer's single deserialization site is unchanged —
@@ -102,7 +115,7 @@ a component moderator, not even a `GlobalAdmin` who is not the author.
 - `Post.Modified` becomes a live field (it was `null`-only before this lane) —
   the first surface that reads it is the edit round-trip; any future
   "edited" badge or audit trail has a field to read.
-- The author-only standing is **deliberately narrower** than ADR 0009's
+- The author-only standing is **deliberately narrower** than ADR [0009](0009-group-description-display-and-edit-lane.md)'s
   owner ∪ GlobalAdmin: post text is the author's voice, so the author — and
   only the author — may edit it. This is the one place the platform's
   "GlobalAdmin can manage anything" story is **not** extended to a content
@@ -118,11 +131,11 @@ a component moderator, not even a `GlobalAdmin` who is not the author.
   author-blank-language-resolves-instance-default) pin the lane. No new verb
   enters the audit vocabulary: an author-edit is the author's own content
   change, not an access decision, so it writes **no** `AccessAudit` row (the
-  seam touches only the `Post` document, unlike ADR 0009's group lane which
+  seam touches only the `Post` document, unlike ADR [0009](0009-group-description-display-and-edit-lane.md)'s group lane which
   appends a `group.update` row).
 - Component re-targeting (moving a post between feed buckets) remains
   **out of scope** — a separate lane + decision if ever wanted. Group-post
-  editing has since been **settled** by **ADR 0016** (author-only,
+  editing has since been **settled** by **ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md)** (author-only,
   `Title` + `Body` editable, `Modified` stamped, group-lane 404 failure
   shape), with the component *reply*-edit lane left open as a separate
   decision.

@@ -1,27 +1,40 @@
-# ADR 0241 — Documents can be restored: Undo in the delete toast and a Deleted documents list
+---
+id: adr-0241
+title: "Documents can be restored: Undo in the delete toast and a Deleted documents list"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0239-document-uploader-attribution-and-delete-lane.md, docs/adr/0240-document-delete-confirm-and-modified-by-row.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0241](0241-document-restore-lane.md) — Documents can be restored: Undo in the delete toast and a Deleted documents list
 
 Status: Accepted
 Date: 2026-10-29
-Relates to: ADR 0239 (D4: "a future restore lane could clear DeletedAt / DeletedById"), ADR 0240 (delete confirmation)
+Relates to: ADR [0239](0239-document-uploader-attribution-and-delete-lane.md) (D4: "a future restore lane could clear DeletedAt / DeletedById"), ADR [0240](0240-document-delete-confirm-and-modified-by-row.md) (delete confirmation)
 
 ## Context
-ADR 0239 made delete a soft delete but shipped no way back, so a deleted document was gone from every screen. ADR 0240 added a
+ADR [0239](0239-document-uploader-attribution-and-delete-lane.md) made delete a soft delete but shipped no way back, so a deleted document was gone from every screen. ADR [0240](0240-document-delete-confirm-and-modified-by-row.md) added a
 confirmation as the first safeguard; this ADR adds the second, a restore lane.
 
 ## Decision
 - **`DocumentService.RestoreAsync(documentId, actorId, actorIsGlobalAdmin, session)`** clears `DeletedAt` and `DeletedById` and
-  stamps the new additive fields `RestoredAt` / `RestoredById` (ADR 0004 §B.1, no migration). Nothing else changes: audience, title,
+  stamps the new additive fields `RestoredAt` / `RestoredById` (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1, no migration). Nothing else changes: audience, title,
   file and `Modified` stay as they were, so the document returns exactly as it was. **Idempotent** (a live document is left alone).
   Allowed for the **owner or a GlobalAdmin**; anyone else is an `UnauthorizedAccessException`. This is the only elevated standing on
-  documents, and only for restore: ADR 0239 D3 (owner-only delete, no admin delete) is unchanged. The admin decision is taken at the
+  documents, and only for restore: ADR [0239](0239-document-uploader-attribution-and-delete-lane.md) D3 (owner-only delete, no admin delete) is unchanged. The admin decision is taken at the
   Web boundary from the principal (`KumunitaPrincipal.IsGlobalAdmin`), Core only receives the boolean.
 - **`DocumentService.ListDeletedAsync(actorId, actorIsGlobalAdmin, max = 200)`** lists soft-deleted documents, newest deletion first:
   the actor's own, or all of them for a GlobalAdmin. It is a list of titles and names to restore from, not a read of content: no
-  download, no summary, no audience decision, and no `AccessAudit` row (the ADR 0122 §1.a A2 write-lane convention).
+  download, no summary, no audience decision, and no `AccessAudit` row (the ADR [0122](0122-document-management.md) §1.a A2 write-lane convention).
   **Consequence to be aware of:** a GlobalAdmin sees the titles of deleted documents whose audience excluded them. Restoring does
   not widen that audience.
 - **Web routes:** `GET /documents/deleted` (the list, `Views/Document/Deleted.cshtml`, one POST form per row) and
-  `POST /documents/{id}/restore` (antiforgery; a non-owner non-admin gets 404, not 403, the ADR 0122 D7 posture; success flashes
+  `POST /documents/{id}/restore` (antiforgery; a non-owner non-admin gets 404, not 403, the ADR [0122](0122-document-management.md) D7 posture; success flashes
   `documents.flash_restored` and lands on the document's detail page). The feed header links to the list next to Upload and New folder.
 - **Undo in the toast:** after a delete the controller adds `TempData["info_action_url"]` (`/documents/{id}/restore`) and
   `["info_action_label"]` (`documents.undo`). `_FlashToast` renders an Undo button, a POST form with the antiforgery token, only when

@@ -1,10 +1,23 @@
-# ADR 0273 — Security settings views, the last leftovers and page titles are localized
+---
+id: adr-0273
+title: "Security settings views, the last leftovers and page titles are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0273](0273-security-settings-leftovers-and-page-titles-localized.md) — Security settings views, the last leftovers and page titles are localized
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-After ADR 0272 the remaining hard-coded English in views was the two security-settings pages (SecuritySettings/Mfa ~23 strings, Sessions ~9), a handful of leftovers, and 118 distinct
+After ADR [0272](0272-admin-site-and-settings-views-localized.md) the remaining hard-coded English in views was the two security-settings pages (SecuritySettings/Mfa ~23 strings, Sessions ~9), a handful of leftovers, and 118 distinct
 `ViewData["Title"]` strings that only feed the browser-tab `<title>` in `_Layout`.
 
 ## Decision
@@ -25,7 +38,7 @@ After ADR 0272 the remaining hard-coded English in views was the two security-se
 
 ## Not covered
 Not compiled or run (no .NET SDK here); de/fr/da machine-written, review parked. Composite titles with data (`Admin — {name}`, `{community} — manage`, `Moderation: report …`) stay English.
-Core service exception text stays English (ADR 0270). The hard-coded-English sweep of views and controllers is otherwise complete.
-The `improve-check.ps1` gate (a) pin on `KnownTranslationKeys.cs` was re-based **13975 -> 14687** by this ADR (the 178 new keys above × en/de/fr/da), the same shipped-additions mechanism as ADR 0265–0272; both the pin and this note are in the same commit, and the gate was not loosened.
+Core service exception text stays English (ADR [0270](0270-badrequest-bodies-localized.md)). The hard-coded-English sweep of views and controllers is otherwise complete.
+The `improve-check.ps1` gate (a) pin on `KnownTranslationKeys.cs` was re-based **13975 -> 14687** by this ADR (the 178 new keys above × en/de/fr/da), the same shipped-additions mechanism as ADR [0265](0265-projects-flashes-localized.md)–0272; both the pin and this note are in the same commit, and the gate was not loosened.
 The `improve-check.ps1` gate (f) pin on `Shared/_Layout.cshtml` was re-based **833 -> 853** by this ADR (the central page-title map above: the `Security/PageTitleKeys` lookup + effective-language resolution + English fallback in the `<title>` pass, 21 insertions / 1 deletion), the same shipped-additions mechanism as gate (a); both the pin and this note are in the same commit, and the gate was not loosened.
 The closed-set pin in `tests/Kumunita.Core.Tests/KnownTranslationKeys_ParityTests.cs` → `About_Keys_From_Adr_0042_D5_Are_Registered_NonEmpty` was re-based **13 -> 18** by this ADR (the five `about.cta.*` contact-band keys added to the registry above: `about.cta.heading`, `about.cta.write_to`, `about.cta.person_reads`, `about.cta.issue`, `about.cta.button`), the same re-baseline-and-annotate mechanism as the gate pins; the sibling pin in `tests/Kumunita.Web.Tests/PublicLocaleAndAboutTests.cs` → `About_View_Wraps_All_D5_Keys` was re-based the same way in the feature commit. The assertion was not loosened and the "no drift in either direction" set-equality check is preserved.

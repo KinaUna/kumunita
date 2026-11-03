@@ -60,15 +60,26 @@ public class HomeControllerTests
     }
 
     [Fact]
-    public async Task Index_NoFeed_ForAnonymous_Viewer()
+    public async Task Index_FeedPresentButEmpty_ForAnonymous_Viewer_Without_Seams()
     {
-        // The feed is signed-in only; an anonymous visitor (no SubjectId claim)
-        // gets null Feed — the view renders hero + roadmap only.
+        // ADR 0284 — the feed now renders for anonymous visitors too: the
+        // posts column is structurally empty for them (posts are always
+        // audience-restricted — Post.Audience is non-null so the frozen
+        // Decide() has no "public" branch), the announcements column is
+        // public-scope only (ListVisibleAsync with a null actor), and the
+        // pages column is public pages only (CanSeeAsync with an empty
+        // actor — branch 5, the public path).
+        //
+        // With no feed seams wired (a test construction with just the
+        // logger + options) every column degrades to empty, so the Feed is
+        // present but IsEmpty — the view's "nothing yet" note path.
         var controller = new HomeController(NullLogger<HomeController>.Instance, Options.Create(new CommunityOptions()));
         // No controller context ⇒ User is null ⇒ SubjectId null.
         var view = Assert.IsType<ViewResult>(await controller.Index());
 
         var vm = Assert.IsType<HomeViewModel>(view.ViewData.Model);
-        Assert.Null(vm.Feed);
+        Assert.NotNull(vm.Feed);
+        Assert.True(vm.Feed!.IsEmpty,
+            "With no feed seams wired, every column degrades to empty — the anonymous Feed must be IsEmpty.");
     }
 }

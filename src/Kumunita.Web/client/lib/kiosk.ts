@@ -1,84 +1,83 @@
 /**
- * Kiosk mode (M35, ADR 0164) — the /kiosk display's auto-cycle / auto-refresh
- * state machine (client/lib/kiosk.ts, tsc-built — the ADR 0031 / M35·7 pin).
+ * Kiosk mode (M35, ADR 0164; ADR 0285) — the /kiosk display's playback and
+ * change-detection state machine (client/lib/kiosk.ts, tsc-built — the
+ * ADR 0031 / M35·7 pin).
  *
- * Path-1 model (U04-resume): each slide iframes the surface's OWN route
- * (/projects/boards/{id}, /events/calendar?view=…, /projects/todos). The
- * kiosk adds no slide view of its own (M35·6 — reuse, not re-author); it drives
- * the iframe `src`. Re-pointing the `src` re-navigates the frame, which re-runs
- * the surface's own Read decision on the frozen board / calendar / todos read
- * seam (M35·3 — the same `Read`, re-run on every fetch, the M12 iCal
- * "authorization rides the cookie" precedent).
+ * Path-1 model (unchanged): each slide iframes the item's OWN route. The kiosk
+ * adds no slide view of its own (M35·6); re-pointing the iframe re-runs the
+ * item's own read decision (M35·3).
  *
- * Two independent `setInterval`s (the M35·4 / M35·7 pins — display-only, never
- * an access input):
- *   (1) ADVANCE — every `data-view-interval` s, move the visible slide to the
- *       next (wrapping to the first) and render it.
- *   (2) REFRESH — every `data-refresh-interval` s, re-render the CURRENT slide
- *       (re-pointing the iframe `src` re-navigates → fresh content).
+ * Playback (ADR 0285 D3 / D4 — display-only, never an access input):
+ *   - Each slide carries its own duration (`data-duration`, seconds); the
+ *     stage's `data-default-duration` is the fallback.
+ *   - A slide with `data-scroll="auto"` scrolls its page at the stage's
+ *     `data-scroll-speed` (slow / medium / fast) once the frame has loaded:
+ *     pause at the top, scroll to the bottom, pause again. The duration is a
+ *     minimum — the slide stays until the scroll has finished. If the scroll
+ *     finishes early, the page scrolls back to the top and stays there for
+ *     the rest of the duration (no second pass). Content that already fits
+ *     simply stays for its duration.
+ *   - Then the next slide (wrapping to the first).
+ *
+ * Change detection (the ADR 0164 amendment): every `data-refresh-interval`
+ * seconds, GET /kiosk/slide?slide=N for the slide on screen and reload the
+ * frame only when the returned fingerprint differs. A slide set to scroll is
+ * never reloaded mid-slide (it would reset the scroll); the new state is
+ * recorded and shown when the slide next comes round.
  *
  * A slide the viewer cannot see (`data-denied === "true"`) renders the
- * localized `kiosk.slide_denied` shape instead of an iframe (M35-5 FACE — no
- * content leak, no 404). The text is read from the P0-6 #kumunita-strings
- * bundle (the L(key, fallback) idiom the other client modules use) so it is
- * localized in the effective language; the en floor is the kw-l view text.
+ * localized `kiosk.slide_denied` shape instead of an iframe (M35-5).
  *
  * Self-guards: a clean no-op on any page without #kiosk-stage, so loading it
- * globally from _Layout.cshtml is safe (the expand-page.ts precedent).
- *
- * ADR 0031 pin: plain TS, no deps, no leaked globals, no `any`. No
- * document.write, no inline <script>, no fetch/JSON — the iframe IS the
- * content (M35·7 — zero new npm package, zero build step).
+ * globally from _Layout.cshtml is safe. Plain TS, no deps, no `any`.
  */
 (() => {
   'use strict';
 
   const stage = document.getElementById('kiosk-stage');
   if (!stage) return; // not a kiosk page → no-op (the global-load guard)
-  // Rebind to a definite const so the renderSlide closure below (a function
-  // expression, where TS does not carry the guard's CFA narrowing) sees a
-  // non-null type.
   const stageEl: HTMLElement = stage;
 
-  // ── Localized strings (P0-6, the #kumunita-strings bundle) ────────────────
+  // The P0-6 client-string bundle (the L(key, fallback) idiom).
   const S: Record<string, string> = (() => {
     const el = document.getElementById('kumunita-strings');
     try { return el ? JSON.parse(el.textContent || '{}') : {}; } catch { return {}; }
   })();
   const L = (key: string, fallback: string): string => S[key] || fallback;
 
-  // ── The two intervals (display-only, M35·4 — never an access input) ───────
-  const viewIntervalSec = parseInt(stage.getAttribute('data-view-interval') || '0', 10);
-  const refreshIntervalSec = parseInt(stage.getAttribute('data-refresh-interval') || '0', 10);
+  const positiveInt = (raw: string | null, fallback: number): number => {
+    const n = parseInt(raw || '', 10);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  };
 
-  // ── The display mode (the ADR 0164 amendment "full page vs. full screen"
-  //    pin, display-only, M35·4). "fullscreen" → the view renders a
-  //    .kmb-kiosk-fullscreen-btn button the user clicks to enter the browser's
-  //    Fullscreen API (the board's .kanban-fullscreen-toggle / calendar's
-  //    requestFullscreen precedent — the browser hides its own chrome and the
-  //    stage owns the whole monitor). "fullpage" (the default) → the stage
-  //    fills the browser viewport (the view's inline CSS handles that).
-  //    requestFullscreen needs a user gesture (a top-level page load is not
-  //    one), so the button is the gesture surface. The ✕ exit link (top-right)
-  //    still works in both modes; the browser's Esc also exits full screen.
+  const defaultDurationSec = positiveInt(stage.getAttribute('data-default-duration'), 30);
+  const refreshIntervalSec = positiveInt(stage.getAttribute('data-refresh-interval'), 0);
+
+  // ADR 0285 D4 — the readable scroll speeds (px per second) and the pause at
+  // the top and the bottom of the page.
+  const SCROLL_SPEEDS: Record<string, number> = { slow: 25, medium: 40, fast: 60 };
+  const scrollSpeed = SCROLL_SPEEDS[(stage.getAttribute('data-scroll-speed') || 'medium').toLowerCase()] ?? SCROLL_SPEEDS.medium;
+  const PAUSE_MS = 3000;
+  // A frame that never reports `load` still moves on after this grace period.
+  const LOAD_GRACE_MS = 15000;
+
+  // ── The FullScreen display mode (the ADR 0164 amendment) — unchanged ──
   const displayMode = (stage.getAttribute('data-display-mode') || 'fullpage').toLowerCase();
   if (displayMode === 'fullscreen') {
     const fsBtn = stageEl.querySelector<HTMLElement>('.kmb-kiosk-fullscreen-btn');
     const fsClose = stageEl.querySelector<HTMLElement>('.kmb-kiosk-fullscreen-close');
 
-    if (fsBtn && typeof (stageEl as HTMLElement).requestFullscreen !== 'function') {
-      // The Fullscreen API is unavailable (Safari iOS, etc.) — hide the button
-      // (the display degrades to full-page, the ADR 0104 chrome-hide shape).
+    if (fsBtn && typeof stageEl.requestFullscreen !== 'function') {
       fsBtn.hidden = true;
     } else if (fsBtn) {
       fsBtn.addEventListener('click', () => {
-        void (stageEl as HTMLElement).requestFullscreen?.();
+        void stageEl.requestFullscreen?.();
       });
     }
 
     if (fsClose) {
       fsClose.addEventListener('click', () => {
-        void (document as Document).exitFullscreen?.();
+        void document.exitFullscreen?.();
       });
     }
 
@@ -88,124 +87,232 @@
         fsBtn.setAttribute('aria-pressed', String(isFs));
         fsBtn.classList.toggle('kmb-kiosk-fs-active', isFs);
       }
-      if (fsClose) {
-        fsClose.hidden = !isFs;
-      }
+      if (fsClose) fsClose.hidden = !isFs;
     });
   }
 
-  // The per-slide meta (U04's contract): one .kmb-kiosk-slide-meta per slide,
-  // in order, each carrying data-index / data-href / data-denied / data-label.
-  // The meta array is the indexed source of truth for hrefs/denied/label
-  // (data-slide-count on the stage declares the same count).
   const slides = Array.from(stage.querySelectorAll<HTMLElement>('.kmb-kiosk-slide-meta'));
   const slideCount = slides.length;
-  if (slideCount === 0) return; // empty playlist → kiosk.empty shows; nothing to cycle
+  if (slideCount === 0) return; // empty playlist → kiosk.empty shows; nothing to play
 
   const DENIED_KEY = 'kiosk.slide_denied';
-  const DENIED_FALLBACK = "You don't have access to this view."; // the kw-l view text (en floor)
+  const DENIED_FALLBACK = "You don't have access to this view.";
 
-  // ── Build a slide element (the iframe or the localized denied shape) ──────
+  const isDenied = (meta: HTMLElement): boolean => meta.getAttribute('data-denied') === 'true';
+  const scrolls = (meta: HTMLElement): boolean =>
+    !isDenied(meta) && (meta.getAttribute('data-scroll') || '').toLowerCase() === 'auto';
+  const durationMs = (meta: HTMLElement): number =>
+    positiveInt(meta.getAttribute('data-duration'), defaultDurationSec) * 1000;
+
+  // ── Painting ────────────────────────────────────────────────────────────
+
   function buildDenied(): HTMLElement {
     const el = document.createElement('div');
     el.className = 'kmb-kiosk-denied';
-    el.textContent = L(DENIED_KEY, DENIED_FALLBACK); // M35-5 FACE: no leak, no 404
+    el.textContent = L(DENIED_KEY, DENIED_FALLBACK); // M35-5: no leak, no 404
     return el;
   }
 
-  function buildIframe(href: string, label: string): HTMLElement {
+  function buildIframe(href: string, label: string): HTMLIFrameElement {
     const el = document.createElement('iframe');
     el.className = 'kmb-kiosk-iframe';
-    el.src = href; // Path 1: the surface's own route (re-nav re-runs its Read, M35·3)
+    el.src = href; // the item's own route (re-navigation re-runs its Read, M35·3)
     el.title = label || 'Kiosk slide';
     return el;
   }
 
-  // ── Render one slide shape (iframe or denied) into the stage slot ─────────
-  // Exactly one slide element (iframe or denied shape) is visible at a time;
-  // the hidden meta divs, the exit link, and the title are left in place.
-  function paintShape(denied: boolean, href: string, label: string): void {
+  /** Swap the stage's slide element; returns the new iframe (or null). */
+  function paintShape(denied: boolean, href: string, label: string): HTMLIFrameElement | null {
     stageEl.querySelector<HTMLElement>(':scope > .kmb-kiosk-iframe')?.remove();
     stageEl.querySelector<HTMLElement>(':scope > .kmb-kiosk-denied')?.remove();
 
-    const el = denied ? buildDenied() : buildIframe(href, label);
-
-    // Quiet cross-fade (the .kmb-kiosk-fading state in site.css, built on the
-    // .3s opacity transition the view's inline <style> already declares).
+    const el: HTMLElement = denied || !href ? buildDenied() : buildIframe(href, label);
     el.classList.add('kmb-kiosk-fading');
     stageEl.appendChild(el);
     void el.offsetWidth; // force reflow so the opacity transition runs
     el.classList.remove('kmb-kiosk-fading');
+    return el instanceof HTMLIFrameElement ? el : null;
   }
 
-  // ── Render the slide at `i` from its meta (the initial / ADVANCE path) ────
-  // The meta div is the seed source for href / denied / label / fingerprint.
-  function renderSlide(i: number): void {
+  // ── Auto-scroll (ADR 0285 D4) ───────────────────────────────────────────
+
+  const sleep = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, Math.max(0, ms)));
+
+  /** Resolves when the frame has loaded (or after the grace period). */
+  function whenLoaded(frame: HTMLIFrameElement): Promise<boolean> {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (ok: boolean): void => { if (!done) { done = true; resolve(ok); } };
+      try {
+        const doc = frame.contentDocument;
+        if (doc && doc.readyState === 'complete' && doc.location.href !== 'about:blank') {
+          finish(true);
+          return;
+        }
+      } catch {
+        finish(false); // not same-origin (e.g. bounced elsewhere) → no scrolling
+        return;
+      }
+      frame.addEventListener('load', () => finish(true), { once: true });
+      window.setTimeout(() => finish(false), LOAD_GRACE_MS);
+    });
+  }
+
+  /**
+   * The element that scrolls the framed page: the document's own scroller,
+   * or — when the page scrolls inside a container instead — the descendant
+   * with the most hidden content.
+   */
+  function scrollTarget(frame: HTMLIFrameElement): HTMLElement | null {
+    let doc: Document | null = null;
+    try { doc = frame.contentDocument; } catch { return null; }
+    if (!doc) return null;
+    const root = (doc.scrollingElement || doc.documentElement) as HTMLElement | null;
+    if (root && root.scrollHeight - root.clientHeight > 2) return root;
+
+    const view = doc.defaultView;
+    if (!view) return null;
+    let best: HTMLElement | null = null;
+    let bestDistance = 2;
+    doc.querySelectorAll<HTMLElement>('main *').forEach((el) => {
+      const distance = el.scrollHeight - el.clientHeight;
+      if (distance <= bestDistance) return;
+      const overflow = view.getComputedStyle(el).overflowY;
+      if (overflow === 'auto' || overflow === 'scroll') {
+        best = el;
+        bestDistance = distance;
+      }
+    });
+    return best;
+  }
+
+  /** Scroll `el` to the bottom at the playlist speed; stops if `alive()` turns false. */
+  function scrollDown(el: HTMLElement, alive: () => boolean): Promise<void> {
+    return new Promise((resolve) => {
+      const start = el.scrollTop;
+      const distance = el.scrollHeight - el.clientHeight - start;
+      if (distance <= 0) { resolve(); return; }
+      const totalMs = (distance / scrollSpeed) * 1000;
+      let t0 = 0;
+      const step = (now: number): void => {
+        if (!alive()) { resolve(); return; }
+        if (!t0) t0 = now;
+        const progress = Math.min(1, (now - t0) / totalMs);
+        el.scrollTop = start + distance * progress;
+        if (progress < 1) window.requestAnimationFrame(step);
+        else resolve();
+      };
+      window.requestAnimationFrame(step);
+    });
+  }
+
+  // ── Playback ────────────────────────────────────────────────────────────
+
+  const fingerprints: (string | null)[] = slides.map((m) => m.getAttribute('data-fingerprint') || null);
+  let current = 0;
+  let showToken = 0;   // bumps on every show; stale async steps compare and stop
+  let advanceTimer: number | undefined;
+
+  function schedule(ms: number, token: number): void {
+    window.clearTimeout(advanceTimer);
+    advanceTimer = window.setTimeout(() => { if (token === showToken) advance(); }, Math.max(0, ms));
+  }
+
+  /** Run slide `i`'s timing on `frame` (already painted). */
+  async function play(i: number, frame: HTMLIFrameElement | null): Promise<void> {
+    const token = ++showToken;
     const meta = slides[i];
-    if (!meta) return;
-    paintShape(
-      meta.getAttribute('data-denied') === 'true',
+    const minMs = durationMs(meta);
+    const started = Date.now();
+    const alive = (): boolean => token === showToken;
+
+    if (!frame || !scrolls(meta)) {
+      schedule(minMs, token);
+      return;
+    }
+
+    // Backstop: whatever the frame does, the slide never hangs.
+    schedule(Math.max(minMs, LOAD_GRACE_MS) + 600000, token);
+
+    const loaded = await whenLoaded(frame);
+    if (!alive()) return;
+    const target = loaded ? scrollTarget(frame) : null;
+    if (!target) {
+      // Fits on the screen (or could not be read): just the duration.
+      schedule(minMs - (Date.now() - started), token);
+      return;
+    }
+
+    await sleep(PAUSE_MS);
+    if (!alive()) return;
+    await scrollDown(target, alive);
+    if (!alive()) return;
+    await sleep(PAUSE_MS);
+    if (!alive()) return;
+
+    const remaining = minMs - (Date.now() - started);
+    if (remaining > 0) {
+      // Done early: back to the top for the rest of the duration.
+      try { target.scrollTo({ top: 0, behavior: 'smooth' }); } catch { target.scrollTop = 0; }
+      schedule(remaining, token);
+    } else {
+      schedule(0, token);
+    }
+  }
+
+  function show(i: number): void {
+    const meta = slides[i];
+    const frame = paintShape(
+      isDenied(meta),
       meta.getAttribute('data-href') || '',
       meta.getAttribute('data-label') || '');
     fingerprints[i] = meta.getAttribute('data-fingerprint') || null;
+    void play(i, frame);
   }
 
-  // The last rendered content fingerprint per slide (ADR 0164 amendment — the
-  // "only reload when something changed" guard). The server-rendered initial
-  // slide is always slide 0 (the view's FirstSlide), so seed index 0 from its
-  // meta — the first REFRESH tick then only reloads slide 0 if its content
-  // genuinely changed. The other slides are seeded from their meta on first
-  // render (ADVANCE) and from the /kiosk/slide response after each REFRESH
-  // check. A null entry means "not yet rendered" (ADVANCE renders it, so a
-  // null can only be hit for the current slide if its check pre-dates a
-  // fresh load — the next ADVANCE re-stamps it).
-  const fingerprints: (string | null)[] = new Array(slideCount).fill(null);
-  fingerprints[0] = slides[0].getAttribute('data-fingerprint') || null;
-
-  let current = 0;
-
-  // (1) ADVANCE — next slide, wrapping to the first (every view-interval).
   function advance(): void {
     current = (current + 1) % slideCount;
-    renderSlide(current);
+    show(current);
   }
 
-  // (2) REFRESH — check the current slide for changes (every refresh-interval).
-  // ADR 0164 amendment — "only reload when something changed": fetch
-  // GET /kiosk/slide?slide=N (the CSRF-free GET the M35 design reserved for
-  // this purpose; the cookie is the authorization, the t param busts cache)
-  // and compare its Fingerprint to the last rendered one. Same → skip the
-  // iframe reload entirely (no flicker / re-navigation). Different → re-render
-  // (which also covers a visible↔denied flip) and store the new fingerprint.
-  // A refresh-in-flight guard prevents overlapping fetches when a check is
-  // slower than the interval; a fetch failure keeps the current slide and the
-  // next tick simply retries.
+  // ── Change detection (the ADR 0164 amendment) ───────────────────────────
+
   let refreshing = false;
   async function refresh(): Promise<void> {
     if (refreshing) return;
     refreshing = true;
+    const index = current;
     try {
-      const res = await fetch(`/kiosk/slide?slide=${current}&t=${Date.now()}`, { credentials: 'same-origin' });
-      if (!res.ok) return; // a transient failure → keep the current slide, retry next tick
+      const res = await fetch(`/kiosk/slide?slide=${index}&t=${Date.now()}`, { credentials: 'same-origin' });
+      if (!res.ok) return; // transient failure → keep the slide, retry next tick
       const data: { denied?: boolean; href?: string | null; fingerprint?: string | null } = await res.json();
       const fp = data.fingerprint ?? null;
-      if (fp !== null && fp === fingerprints[current]) return; // unchanged → no reload
-      // The label is display-only and rides the meta (the server response
-      // carries href / denied / fingerprint, not the per-slide label).
-      const label = slides[current] ? (slides[current].getAttribute('data-label') || '') : '';
-      paintShape(!!data.denied, data.href ?? '', label);
-      fingerprints[current] = fp;
+      if (fp !== null && fp === fingerprints[index]) return; // unchanged → nothing to do
+
+      // Record the new state on the slide's meta, so its next showing uses it.
+      const meta = slides[index];
+      meta.setAttribute('data-denied', data.denied ? 'true' : 'false');
+      meta.setAttribute('data-href', data.href ?? '');
+      meta.setAttribute('data-fingerprint', fp ?? '');
+
+      // A scrolling slide is not reloaded mid-slide (ADR 0285 D4); every
+      // other slide on screen reloads in place, keeping its remaining time.
+      if (index !== current || scrolls(meta)) return;
+      paintShape(!!data.denied, data.href ?? '', meta.getAttribute('data-label') || '');
+      fingerprints[index] = fp;
     } catch {
-      // Network error → keep the current slide; the next tick retries.
+      // A network blip — keep the current slide; the next tick retries.
     } finally {
       refreshing = false;
     }
   }
 
-  if (Number.isFinite(viewIntervalSec) && viewIntervalSec > 0) {
-    window.setInterval(advance, viewIntervalSec * 1000);
-  }
-  if (Number.isFinite(refreshIntervalSec) && refreshIntervalSec > 0) {
+  // ── Start: the server rendered slide 0 already ──────────────────────────
+
+  const firstFrame = stageEl.querySelector<HTMLIFrameElement>(':scope > .kmb-kiosk-iframe');
+  void play(0, firstFrame);
+
+  if (refreshIntervalSec > 0) {
     window.setInterval(() => { void refresh(); }, refreshIntervalSec * 1000);
   }
 })();

@@ -10,11 +10,11 @@
    — and uses its own `pl.tabs.projects` key (the lane boundary). *@
 @{
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "TodosIndex";
-    var tabs = new (string LabelKey, string Label, string Href)[]
+    var tabs = new (string LabelKey, string Label, string Href, string Icon)[]
     {
-        ("pl.tabs.projects",     "Projects", "/projects"),
-        ("projects.todo.title",  "To-dos",   "/projects/todos"),
-        ("projects.board.title", "Boards",   "/projects/boards"),
+        ("pl.tabs.projects",     "Projects", "/projects", "kmb-i-project-folder"),
+        ("projects.todo.title",  "To-dos",   "/projects/todos", "kmb-i-todos"),
+        ("projects.board.title", "Boards",   "/projects/boards", "kmb-i-boards"),
     };
     var activeLabel = action switch
     {
@@ -31,7 +31,7 @@
         var isActive = tab.Label == activeLabel;
         <li class="nav-item" role="presentation">
             <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href">
-                <kw-l key="@tab.LabelKey">@tab.Label</kw-l>
+                <svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="@("#" + tab.Icon)"/></svg><kw-l key="@tab.LabelKey">@tab.Label</kw-l>
             </a>
         </li>
     }

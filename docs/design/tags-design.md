@@ -1,4 +1,20 @@
+---
+id: design-tags
+title: "Tags (`TG`) — author-set subject labels"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0044-tags.md
+  - docs/adr/0013-group-posts-membership-lane.md
+updated: 2026-11-02
+---
+
 # Design Doc — Tags (`TG`): free author-set subject labels for posts and blog pages
+
+> **Abstract:** the **tags (`TG`)** design — **free author-set subject labels** for posts and blog pages: a shared `Tag` doc (author-created, reusable), the post/page `TagIds` reference, the tag picker, and the pinned seam-test names. Part 1 pins invariants + FACES; Part 2 the exact C# + tests. **Who is it for:** a developer touching the `Tag` doc or the `TagIds` reference; an agent that needs the shared-id shape. **When to read the rest:** before touching the tags context, the tag picker, or the `TagIds` field.
+
 
 > Part 1 of 2 (U1). Part 2 (U2) will append "Seams & contracts (Part 2, written
 > by U2)" with the exact C# shapes U3–U12 must match, the **pinned seam-test
@@ -7,7 +23,7 @@
 > parts pin the invariant / FACES numbers that every `TG` unit (U3–U12) must
 > match.
 >
-> Decisions source: **ADR 0044** (`docs/adr/0044-tags.md`, Accepted
+> Decisions source: **ADR [0044](../adr/0044-tags.md)** ([`docs/adr/0044-tags.md`](../adr/0044-tags.md), Accepted
 > 2026-09-19). Every invariant below cites a D# from that ADR; the ADR is the
 > sign-off gate and this doc turns it into exact shapes. The lane plan is
 > `plans-milestones/in-progress/tags/plan-tags.md` (the register).
@@ -16,10 +32,10 @@
 
 M3 + M3b shipped the content surface: posts, one-level replies, the component
 feeds (Safety / Maintenance / Social / Governance), the moderation loop, and
-the group-post lane (ADR 0013 — community and group posts share the `Post`
+the group-post lane (ADR [0013](../adr/0013-group-posts-membership-lane.md) — community and group posts share the `Post`
 doc). The `PG` (pages) lane shipped the resident knowledge tree — blog pages
-(`PageKind.User`) and the operator `System` pages (ADR 0039 / 0040). The
-frozen access model (ADR 0006) organizes everything by **audience**, by
+(`PageKind.User`) and the operator `System` pages (ADR [0039](../adr/0039-pages-hierarchy-audience-translations.md) / 0040). The
+frozen access model (ADR [0006](../adr/0006-module-boundary-contracts.md)) organizes everything by **audience**, by
 **Component** (a feed — one per post, a posting-membership boundary), by
 **Group** (a membership channel — one per post, the access gate), and by
 **author**.
@@ -28,25 +44,25 @@ None of those says *what a post is about*. A "Maple Street flood" post is
 simultaneously Safety and Maintenance and Social — yet it lives in exactly one
 Component, and the group lanes don't apply. There is also no tag *vocabulary*:
 a resident cannot see what subjects the neighborhood is actually posting
-about, or browse *by* subject (ADR 0044, Context). The two are the same gap —
+about, or browse *by* subject (ADR [0044](../adr/0044-tags.md), Context). The two are the same gap —
 the absence of a lightweight, **multi-valued, non-access** organizational
 label.
 
 **The `TG` lane is that label.** It carries: `Tag` / `TagTranslation` in a new
-`Kumunita.Core.Tags` context (the ADR 0011 shared-id-doc shape, exactly the
+`Kumunita.Core.Tags` context (the ADR [0011](../adr/0011-media-and-file-storage.md) shared-id-doc shape, exactly the
 `MediaObject` model), the additive `Post.TagIds` / `Page.TagIds` fields, the
 `TagService` (attach / translate / list / by-tag / suggest — all reads
 computed over content the actor may already read), the composer tag input on
 the post and blog-page editors, the `GET /tags` + `GET /tags/{slug}` browse,
 the `POST /api/tags/suggest` endpoint, and the `client/lib` autocomplete
-(ADR 0044 D1–D7).
+(ADR [0044](../adr/0044-tags.md) D1–D7).
 
 A tag is deliberately **not** a new organizing *surface* the way a Component
-is: it grants no membership, no access, no moderation scope (ADR 0044 D2/D8).
+is: it grants no membership, no access, no moderation scope (ADR [0044](../adr/0044-tags.md) D2/D8).
 It is an **edge between existing content** — which is exactly why the lane
-builds additively on the frozen access model without reopening ADR 0006, and
+builds additively on the frozen access model without reopening ADR [0006](../adr/0006-module-boundary-contracts.md), and
 why the tag list, the by-tag browse, and the autocomplete can all be **one
-access-scoped read seam** (ADR 0044 D5).
+access-scoped read seam** (ADR [0044](../adr/0044-tags.md) D5).
 
 **The arrow moved (understanding → shared awareness):** a subject's posts
 become findable *as a set*. Today a resident can understand one post in its
@@ -62,13 +78,13 @@ rule living in a comment instead of the invariant list below).
 **In scope**
 
 - `Tag` / `TagTranslation` — new POCOs in the **new bounded context
-  `Kumunita.Core.Tags`** (the ADR 0011 shared-id-doc shape, D1), registered in
+  `Kumunita.Core.Tags`** (the ADR [0011](../adr/0011-media-and-file-storage.md) shared-id-doc shape, D1), registered in
   the **new `TagDocTypes.Configure(StoreOptions)`** surface (the `PostDocTypes` /
   `MediaDocTypes` pattern), wired into both boot paths next to the existing
   `CoreDocTypes` / `PostDocTypes` / `MediaDocTypes` / `PageDocTypes` cluster.
 - `Post.TagIds` / `Page.TagIds` — additive `string[]` fields (default empty),
-  the ADR 0004 §B.1 additive pattern (D2). One field covers community *and*
-  group posts (ADR 0013); `Page.TagIds` is populated only on `PageKind.User`
+  the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive pattern (D2). One field covers community *and*
+  group posts (ADR [0013](../adr/0013-group-posts-membership-lane.md)); `Page.TagIds` is populated only on `PageKind.User`
   pages (D6).
 - `TagService` (`Kumunita.Core.Tags`) — the single feature service: **write
   lane** `AttachToPostAsync` / `AttachToPageAsync` / `AddTagTranslationAsync`
@@ -81,7 +97,7 @@ rule living in a comment instead of the invariant list below).
   `System`-page composer does **not** render the field (D6).
 - The `kw-l` registry keys (composer tag-field labels, browse-page headings,
   autocomplete empty-state) in `EnValues` / `DeValues` / `FrValues` — the
-  ADR 0015 parity family.
+  ADR [0015](../adr/0015-ui-view-localization-mechanics.md) parity family.
 - `GET /tags` (tag list: name + use-count, resolved in the viewer's
   language), `GET /tags/{slug}` (posts / blog pages tagged with it, each row
   linking to its own detail route), and `POST /api/tags/suggest` (the
@@ -92,7 +108,7 @@ rule living in a comment instead of the invariant list below).
   (`Kumunita.Web.Tests/`), and the fresh-boot manual pass. Test *names* are
   pinned by Part 2 (U2); this part pins the invariants / FACES they anchor.
 
-**Out of scope — future lanes (locked by ADR 0044 D8; this section is the
+**Out of scope — future lanes (locked by ADR [0044](../adr/0044-tags.md) D8; this section is the
 lane's M1-style close)**
 
 - **No tag merge / rename.** `Slug` is the literal typed string (D3); two
@@ -108,7 +124,7 @@ lane's M1-style close)**
   with a moderation lane (D8).
 - **No seeded / curated default tags** — free-for-all; no seeder row, no
   "suggested tags" pack (D8).
-- **No machine translation** of tag names (ADR 0005 §C boundary; D8) — a tag
+- **No machine translation** of tag names (ADR [0005](../adr/0005-multilingual-support.md) §C boundary; D8) — a tag
   translation is a human-set display name, like a `GroupTranslation` (ADR
   0022 / 0026 idiom).
 - **No usage analytics / auto-pruning** — the use-count in
@@ -127,24 +143,24 @@ lane's M1-style close)**
 
 The `TG` lane **owns** nine invariants (C-TG·1 … C-TG·9 — the behavioral
 rules this lane is the first to state for tags) and **calls on** the frozen
-ADR 0006 / ADR 0004 pins (C1, C3, ADR 0004 §B.1) that must keep holding. Every
-pin cites its decision in ADR 0044 (D1–D8); the seam tests (pinned by Part 2,
+ADR [0006](../adr/0006-module-boundary-contracts.md) / ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) pins (C1, C3, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1) that must keep holding. Every
+pin cites its decision in ADR [0044](../adr/0044-tags.md) (D1–D8); the seam tests (pinned by Part 2,
 U2) will name each by id.
 
 | # | Pin | How the lane holds it |
 |---|---|---|
-| **C-TG·1** (TG-owned) | A tag is a **label, never a gate**: no tag grants any access on any object, and no tag reveals a subject's existence behind unread content. The access model is untouched — no new `AccessAction`, no new `AccessVia` value, no new `Decide()` branch, no audience on a tag (ADR 0044 D2, D5; Consequences). | The three read surfaces are all callers of the one base query (C-TG·2); the tag itself is computed *over* the content's existing `Read` decision, never a gate of it. Tests assert the absence (F3 / F4). |
-| **C-TG·2** (TG-owned) | The **base read query** is *"the set of `Tag` rows used on at least one `Post` / `PageKind.User` `Page` the viewer may already read"*; the tag list, the by-tag results, and autocomplete all **derive from it**, and autocomplete is **capped at ≤ 10** (ADR 0044 D5). | Privacy is structural, not a per-surface check: because the base query is already scoped to readable content, a tag used only behind unread content never appears in any of the three surfaces (D5). Global tag enumeration is excluded by design (it would leak a subject's existence). |
-| **C-TG·3** (TG-owned) | **By-tag group-lane exclusion:** a group post's `TagIds` never make it appear in a non-member's by-tag results; the post's **own** `Read` decision (the ADR 0013 membership lane; the ADR 0035 `PostReadDecision` seam) is applied **before** the post is returned (ADR 0044 D5; Consequences). | The by-tag read reuses the post's existing `Decide()` / `MatchGroups` pass — the tag grants nothing and adds no feed lane (ADR 0013 lane exclusivity unchanged). Test asserts the exclusion (F3). |
-| **C-TG·4** (TG-owned) | **`Slug` is the business key** — the literal typed string **lowercased + trimmed** (not accent-folded, not URL-canonicalized, not cross-language-merged), validated to a safe charset (≤ 64 chars); `Name` / `TagTranslation.Name` are **display** values resolved per-viewer (ADR 0044 D3). | `sanitation` and `Hygiène` are two tags, both valid, both in the list — a tag is **one document with per-language names**, not N near-duplicates (D3). The write seam derives the `Slug` from the typed string; the author never types a slug directly. |
-| **C-TG·5** (TG-owned) | **The creator owns the name:** a non-creator attacher **cannot** add / overwrite a `TagTranslation`; the tag's `CreatedBy` ∪ GlobalAdmin can (an `AccessVia.Owner` / `AccessVia.Admin` audit tag) (ADR 0044 D4). | Attach is free (the object's existing edit standing, D4); translate is the creator's lane — "the name is the creator's artifact," the ADR 0009 / 0026 rule carried to tags. Standing is resolved in Core (the `CanAttach*` / `CanTranslateTag` probes), never from a UI affordance. Tests F6 / F7 / F8. |
-| **C-TG·6** (TG-owned) | **Blog-only on pages:** `Page.TagIds` is non-empty only on `PageKind.User` pages; the `PageKind.System` write lane **refuses** a non-empty `TagIds` set (the shape permits it, the write lane rejects it) (ADR 0044 D2, D6). | About / Terms / Help / Privacy *are* their subject (platform chrome, ADR 0040 / 0043) — tagging them is incoherent (D6). The `System`-page composer does not render the field; the `PageService` create / update lane rejects a non-empty set. Test F5. |
-| **C-TG·7** (TG-owned) | **No seeding:** a fresh instance has **zero** tags; there is no seeder row, no "suggested tags" pack, no admin tag-management surface beyond the GlobalAdmin break-glass standing (ADR 0044 D8). | Free-for-all: tags come into existence only when an author attaches one (D4's create branch). The `/tags` page is empty on a fresh instance until content exists. Tests F12 + F11 (no re-seed on warm reboot). |
-| **C-TG·8** (TG-owned) | **Reads emit no `AccessAudit` row:** `ListForActorAsync` / `ListPostsByTagAsync` / `ListPagesByTagAsync` / `SuggestAsync` are plain reads with **no authorization gate of their own and no audit row** — the ADR 0022 / 0026 "a read, not a decision" pin, C-M3·1 carried over (ADR 0044 D7). | The access decision is the *content's* existing `Read`, not the tag's; the row is only ever rendered on a surface that already required the referenced content's reach. A dedicated `Can` / audit on a tag read would be a redundant second decision (the C1 / C3 split, below). Tests `List_EmitsNoAuditRow` / `Suggest_EmitsNoAuditRow`. |
-| **C-TG·9** (TG-owned) | **Writes audit exactly one row:** attach / create / translate each resolve standing (→ `UnauthorizedAccessException` when denied) and, on success, write **one** hand-written `AccessAudit` row in the caller's session, single `SaveChangesAsync` — `tag.attach` (`TargetKind = "post"` / `"page"`), `tag.create` (`TargetKind = "tag"`), `tagtranslation.add` (`TargetKind = "tag"`); `Via` = `Owner` / `Admin` (ADR 0044 D7; the C3 idiom). | The C3 idiom (audit-on-write in the same transaction) applied to the tag lane. Detach is part of the same edit lane (re-saving the object's `TagIds`) (D7). There is **no** "delete tag" seam — a tag whose content is all removed is simply unreachable by the base query (D7 / D8). Tests F1 + the three audit-row tests. |
-| **C1** (ADR 0006) | Empty audience denies; a tag **never widens** a post's audience (ADR 0044 D2, D5). | The by-tag read reuses the post's existing `Decide()`, not a new branch; `Tag` carries no `Audience` (D1). |
-| **C3** (ADR 0006) | Audit always on for the **write** lanes (attach / create / translate); **reads** carry no row (ADR 0044 D7, realized as C-TG·8 / C-TG·9). | One `AccessAudit` row per write in the same transaction (C-TG·9); zero rows on reads (C-TG·8). |
-| **ADR 0004 §B.1** | `Tag` / `TagTranslation` are **Marten-native** POCOs, registered in `TagDocTypes` (new parallel surface), delta-detected, idempotent, **no seeding**, no EF migration; `Post.TagIds` / `Page.TagIds` are **additive fields** — a pre-existing post's `TagIds` read back **empty** after a warm re-boot (ADR 0044 D1, D2, D8). | The `PostDocTypes` / `MediaDocTypes` registration pattern exactly (D1 Consequences: additive, no migration). The `TagId, LanguageCode` pair is the DB-enforced business key (a `UniqueIndex`, the ADR 0026 convention). Test F11. |
+| **C-TG·1** (TG-owned) | A tag is a **label, never a gate**: no tag grants any access on any object, and no tag reveals a subject's existence behind unread content. The access model is untouched — no new `AccessAction`, no new `AccessVia` value, no new `Decide()` branch, no audience on a tag (ADR [0044](../adr/0044-tags.md) D2, D5; Consequences). | The three read surfaces are all callers of the one base query (C-TG·2); the tag itself is computed *over* the content's existing `Read` decision, never a gate of it. Tests assert the absence (F3 / F4). |
+| **C-TG·2** (TG-owned) | The **base read query** is *"the set of `Tag` rows used on at least one `Post` / `PageKind.User` `Page` the viewer may already read"*; the tag list, the by-tag results, and autocomplete all **derive from it**, and autocomplete is **capped at ≤ 10** (ADR [0044](../adr/0044-tags.md) D5). | Privacy is structural, not a per-surface check: because the base query is already scoped to readable content, a tag used only behind unread content never appears in any of the three surfaces (D5). Global tag enumeration is excluded by design (it would leak a subject's existence). |
+| **C-TG·3** (TG-owned) | **By-tag group-lane exclusion:** a group post's `TagIds` never make it appear in a non-member's by-tag results; the post's **own** `Read` decision (the ADR [0013](../adr/0013-group-posts-membership-lane.md) membership lane; the ADR [0035](../adr/0035-group-post-media-membership-lane.md) `PostReadDecision` seam) is applied **before** the post is returned (ADR [0044](../adr/0044-tags.md) D5; Consequences). | The by-tag read reuses the post's existing `Decide()` / `MatchGroups` pass — the tag grants nothing and adds no feed lane (ADR [0013](../adr/0013-group-posts-membership-lane.md) lane exclusivity unchanged). Test asserts the exclusion (F3). |
+| **C-TG·4** (TG-owned) | **`Slug` is the business key** — the literal typed string **lowercased + trimmed** (not accent-folded, not URL-canonicalized, not cross-language-merged), validated to a safe charset (≤ 64 chars); `Name` / `TagTranslation.Name` are **display** values resolved per-viewer (ADR [0044](../adr/0044-tags.md) D3). | `sanitation` and `Hygiène` are two tags, both valid, both in the list — a tag is **one document with per-language names**, not N near-duplicates (D3). The write seam derives the `Slug` from the typed string; the author never types a slug directly. |
+| **C-TG·5** (TG-owned) | **The creator owns the name:** a non-creator attacher **cannot** add / overwrite a `TagTranslation`; the tag's `CreatedBy` ∪ GlobalAdmin can (an `AccessVia.Owner` / `AccessVia.Admin` audit tag) (ADR [0044](../adr/0044-tags.md) D4). | Attach is free (the object's existing edit standing, D4); translate is the creator's lane — "the name is the creator's artifact," the ADR [0009](../adr/0009-group-description-display-and-edit-lane.md) / 0026 rule carried to tags. Standing is resolved in Core (the `CanAttach*` / `CanTranslateTag` probes), never from a UI affordance. Tests F6 / F7 / F8. |
+| **C-TG·6** (TG-owned) | **Blog-only on pages:** `Page.TagIds` is non-empty only on `PageKind.User` pages; the `PageKind.System` write lane **refuses** a non-empty `TagIds` set (the shape permits it, the write lane rejects it) (ADR [0044](../adr/0044-tags.md) D2, D6). | About / Terms / Help / Privacy *are* their subject (platform chrome, ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md) / 0043) — tagging them is incoherent (D6). The `System`-page composer does not render the field; the `PageService` create / update lane rejects a non-empty set. Test F5. |
+| **C-TG·7** (TG-owned) | **No seeding:** a fresh instance has **zero** tags; there is no seeder row, no "suggested tags" pack, no admin tag-management surface beyond the GlobalAdmin break-glass standing (ADR [0044](../adr/0044-tags.md) D8). | Free-for-all: tags come into existence only when an author attaches one (D4's create branch). The `/tags` page is empty on a fresh instance until content exists. Tests F12 + F11 (no re-seed on warm reboot). |
+| **C-TG·8** (TG-owned) | **Reads emit no `AccessAudit` row:** `ListForActorAsync` / `ListPostsByTagAsync` / `ListPagesByTagAsync` / `SuggestAsync` are plain reads with **no authorization gate of their own and no audit row** — the ADR [0022](../adr/0022-user-added-post-reply-translations.md) / 0026 "a read, not a decision" pin, C-M3·1 carried over (ADR [0044](../adr/0044-tags.md) D7). | The access decision is the *content's* existing `Read`, not the tag's; the row is only ever rendered on a surface that already required the referenced content's reach. A dedicated `Can` / audit on a tag read would be a redundant second decision (the C1 / C3 split, below). Tests `List_EmitsNoAuditRow` / `Suggest_EmitsNoAuditRow`. |
+| **C-TG·9** (TG-owned) | **Writes audit exactly one row:** attach / create / translate each resolve standing (→ `UnauthorizedAccessException` when denied) and, on success, write **one** hand-written `AccessAudit` row in the caller's session, single `SaveChangesAsync` — `tag.attach` (`TargetKind = "post"` / `"page"`), `tag.create` (`TargetKind = "tag"`), `tagtranslation.add` (`TargetKind = "tag"`); `Via` = `Owner` / `Admin` (ADR [0044](../adr/0044-tags.md) D7; the C3 idiom). | The C3 idiom (audit-on-write in the same transaction) applied to the tag lane. Detach is part of the same edit lane (re-saving the object's `TagIds`) (D7). There is **no** "delete tag" seam — a tag whose content is all removed is simply unreachable by the base query (D7 / D8). Tests F1 + the three audit-row tests. |
+| **C1** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Empty audience denies; a tag **never widens** a post's audience (ADR [0044](../adr/0044-tags.md) D2, D5). | The by-tag read reuses the post's existing `Decide()`, not a new branch; `Tag` carries no `Audience` (D1). |
+| **C3** (ADR [0006](../adr/0006-module-boundary-contracts.md)) | Audit always on for the **write** lanes (attach / create / translate); **reads** carry no row (ADR [0044](../adr/0044-tags.md) D7, realized as C-TG·8 / C-TG·9). | One `AccessAudit` row per write in the same transaction (C-TG·9); zero rows on reads (C-TG·8). |
+| **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** | `Tag` / `TagTranslation` are **Marten-native** POCOs, registered in `TagDocTypes` (new parallel surface), delta-detected, idempotent, **no seeding**, no EF migration; `Post.TagIds` / `Page.TagIds` are **additive fields** — a pre-existing post's `TagIds` read back **empty** after a warm re-boot (ADR [0044](../adr/0044-tags.md) D1, D2, D8). | The `PostDocTypes` / `MediaDocTypes` registration pattern exactly (D1 Consequences: additive, no migration). The `TagId, LanguageCode` pair is the DB-enforced business key (a `UniqueIndex`, the ADR [0026](../adr/0026-group-community-name-description-translations.md) convention). Test F11. |
 
 **Count: 12** (nine TG-owned + three called-on pins). This count (and the
 invariant-pin per row) is the input U2 needs to name the seam-test list and
@@ -169,7 +185,7 @@ the test names Part 2 pins must reference those pins by id.
 | F8 | A **GlobalAdmin** rewords any tag (the break-glass standing) — one `tagtranslation.add` row, `Via = Admin`. | C-TG·5 (creator ∪ GlobalAdmin) + C-TG·9 |
 | F9 | A `de`-preferring actor typing `hy` in the composer gets the `de` name **`hygiène`** in the autocomplete even if the `Slug` is `sanitation` — the display name is resolved in the **viewer's language**; the `Slug` match is the fallback branch. | C-TG·2 (the base query, display resolution) + C-TG·4 (`Slug` is identity, `Name` is display) |
 | F10 | Autocomplete is **capped** — at most 10 suggestions, regardless of how many readable tags match the prefix. | C-TG·2 (the ≤ 10 cap) |
-| F11 | A **pre-existing** post's `TagIds` read back **empty** after a warm re-boot — the additive field landed with no re-seed and no data loss (the ADR 0004 §B.1 no-reseed pin). | ADR 0004 §B.1 (additive, idempotent, no seeding) |
+| F11 | A **pre-existing** post's `TagIds` read back **empty** after a warm re-boot — the additive field landed with no re-seed and no data loss (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 no-reseed pin). | ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 (additive, idempotent, no seeding) |
 | F12 | A **fresh instance** has **zero** tags and an **empty** `/tags` page — no seed rows, no "suggested tags" pack, nothing to browse until a resident attaches. | C-TG·7 (no seeding) |
 
 **FACES count: 12.** This count (and the invariant-pin per row) is the input
@@ -191,21 +207,21 @@ rule §6 in the register).
 Namespace conventions:
 
 - New bounded context: **`Kumunita.Core.Tags`** (`Tag`, `TagTranslation`,
-  `ITagService` / `TagService`, `TagItem`) — the ADR 0011 shared-id-doc
-  shape, exactly the ADR 0011 `MediaObject` model (D1).
+  `ITagService` / `TagService`, `TagItem`) — the ADR [0011](../adr/0011-media-and-file-storage.md) shared-id-doc
+  shape, exactly the ADR [0011](../adr/0011-media-and-file-storage.md) `MediaObject` model (D1).
 - Registration surface: `Kumunita.Core.TagDocTypes` (the `PostDocTypes` /
   `PageDocTypes` pattern; U3 lands it).
 - Frozen surfaces the lane *calls but does not modify*:
   `Kumunita.Core.Authorization.IAuthorizationService`, the
   `Kumunita.Core.UserInfo.IUserInfoService` read seams, and
   `Kumunita.Core.Localization.ITranslationProvider` (display-name resolution,
-  ADR 0005). **U2 adds no method to any frozen interface** (the
+  ADR [0005](../adr/0005-multilingual-support.md)). **U2 adds no method to any frozen interface** (the
   `PostService_MakesNoNewModerateCall` pin, §2.4 #24).
 - Web-side composition: `Kumunita.Web.Controllers` / `Kumunita.Web.Models`
   (never in `Kumunita.Core`).
 
 **Count reconciliation (U1 → U2):** U1's body pins **12 invariants**
-(nine TG-owned C-TG·1…C-TG·9 + C1, C3, ADR 0004 §B.1) and **12 FACES**
+(nine TG-owned C-TG·1…C-TG·9 + C1, C3, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1) and **12 FACES**
 (F1–F12). U2 confirms both counts and pins the §2.4 test list accordingly —
 **24 named tests**, each anchored to an invariant id and/or FACES row from
 Part 1. No C-TG·10 is introduced by this section.
@@ -369,7 +385,7 @@ public static class TagDocTypes
 ### 2.2 New TG-owned Core types (exact C#)
 
 Namespace `Kumunita.Core.Tags`. Both documents are **Marten-native** POCOs
-with the conventional `string Id` identity (ADR 0004 §B.1, D1; the
+with the conventional `string Id` identity (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1, D1; the
 `FeatureSchemaBase` carve-out is **not** used — it is reserved for
 operator-written tables).
 
@@ -416,7 +432,7 @@ public sealed class TagTranslation
 }
 ```
 
-**Additive fields on existing documents** (ADR 0004 §B.1, D2 — the
+**Additive fields on existing documents** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1, D2 — the
 `Post.Status` / `GroupId` / `LanguageCode` / `ImageIds` history):
 
 ```csharp
@@ -431,7 +447,7 @@ public IReadOnlyList<string> TagIds { get; set; } = [];
 ```
 
 > **Shape note:** the register's U2 §2.2 shorthand says `string[]`; this repo's
-> additive array fields (`Post.ImageIds`, ADR 0025) are
+> additive array fields (`Post.ImageIds`, ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)) are
 > `IReadOnlyList<string>` with an empty-collection initializer — U4 lands the
 > field in the repo idiom (the *additive, default-empty* pin is what §2.6
 > freezes, not the literal array type).
@@ -445,11 +461,11 @@ anything is stored (C-TG·9).
 
 | # | Action | Standing that qualifies | Denied outcome | Via (audit tag) |
 |---|---|---|---|---|
-| 1 | Attach to a **community post** | The post's **author** (ADR 0014 / 0016 author-only lane) ∪ GlobalAdmin (the ADR 0016 edit-lane shape) | `UnauthorizedAccessException` | `Owner` / `Admin` |
-| 2 | Attach to a **group post** | The post's **author** (ADR 0013 group lane); no component-moderator standing (ADR 0007) | `UnauthorizedAccessException` | `Owner` / `Admin` |
-| 3 | Attach to a **`PageKind.User` blog page** | The page's **author** ∪ GlobalAdmin (ADR 0040) | `UnauthorizedAccessException` | `Owner` / `Admin` |
+| 1 | Attach to a **community post** | The post's **author** (ADR [0014](../adr/0014-post-edit-lane-author-only.md) / 0016 author-only lane) ∪ GlobalAdmin (the ADR [0016](../adr/0016-group-post-and-reply-edit-lane-author-only.md) edit-lane shape) | `UnauthorizedAccessException` | `Owner` / `Admin` |
+| 2 | Attach to a **group post** | The post's **author** (ADR [0013](../adr/0013-group-posts-membership-lane.md) group lane); no component-moderator standing (ADR [0007](../adr/0007-group-management-lane-owner-or-globaladmin.md)) | `UnauthorizedAccessException` | `Owner` / `Admin` |
+| 3 | Attach to a **`PageKind.User` blog page** | The page's **author** ∪ GlobalAdmin (ADR [0040](../adr/0040-pages-system-and-user-kinds-and-blog-feed.md)) | `UnauthorizedAccessException` | `Owner` / `Admin` |
 | 4 | Attach to a **`PageKind.System` page** with a non-empty `TagIds` set | **Refused outright** (C-TG·6, D6) — no standing qualifies | `UnauthorizedAccessException` (or `ArgumentException`) | — (no write, no row) |
-| 5 | **Translate** (add / overwrite a `TagTranslation`) | The tag's **`CreatedBy`** ∪ **GlobalAdmin** (break-glass) — the ADR 0009 / 0026 "the name is the creator's artifact" rule (C-TG·5, D4) | `UnauthorizedAccessException` | `Owner` / `Admin` |
+| 5 | **Translate** (add / overwrite a `TagTranslation`) | The tag's **`CreatedBy`** ∪ **GlobalAdmin** (break-glass) — the ADR [0009](../adr/0009-group-description-display-and-edit-lane.md) / 0026 "the name is the creator's artifact" rule (C-TG·5, D4) | `UnauthorizedAccessException` | `Owner` / `Admin` |
 
 Attach on a *new* `Slug` additionally writes the `tag.create` row (the actor
 becomes `CreatedBy`) — the C-TG·9 two-row shape pinned by F1.
@@ -461,8 +477,8 @@ an `AccessAudit` row (C-TG·8); no shape widens a content's audience (C1).
 
 | # | Surface | Shape (over the base query) |
 |---|---|---|
-| 1 | **Tag list** (`ListForActorAsync`) | Distinct `Tag` rows of the base query, each with a use-count and the display name resolved to the actor's language (ADR 0005 order: preferred → `TagTranslation` → base `Name`). Empty on a fresh instance (C-TG·7, F12). |
-| 2 | **Posts by tag** (`ListPostsByTagAsync`) | The base query's posts whose `TagIds` contains the tag; each post passed through its **own** `Read` decision (the ADR 0013 group lane / ADR 0035 `PostReadDecision` seam) **before** it is returned (C-TG·3, F3/F4). |
+| 1 | **Tag list** (`ListForActorAsync`) | Distinct `Tag` rows of the base query, each with a use-count and the display name resolved to the actor's language (ADR [0005](../adr/0005-multilingual-support.md) order: preferred → `TagTranslation` → base `Name`). Empty on a fresh instance (C-TG·7, F12). |
+| 2 | **Posts by tag** (`ListPostsByTagAsync`) | The base query's posts whose `TagIds` contains the tag; each post passed through its **own** `Read` decision (the ADR [0013](../adr/0013-group-posts-membership-lane.md) group lane / ADR [0035](../adr/0035-group-post-media-membership-lane.md) `PostReadDecision` seam) **before** it is returned (C-TG·3, F3/F4). |
 | 3 | **Pages by tag** (`ListPagesByTagAsync`) | The base query's `PageKind.User` pages whose `TagIds` contains the tag; same per-page `Read` decision (C-TG·3). |
 | 4 | **Autocomplete** (`SuggestAsync`) | The base query filtered by `starts_with(displayName, prefix) OR starts_with(slug, prefix)` — `displayName` resolved in the viewer's language (F9); **capped at ≤ 10** (F10). |
 
@@ -492,7 +508,7 @@ FACES row and/or invariant anchor from Part 1:
 13. `F9_AutocompleteMatchesViewerLanguage_DisplayName` — F9, C-TG·4 (D3/D5 display).
 14. `F9_AutocompleteMatchesViewerLanguage_Slug` — F9, C-TG·4 (the slug fallback branch).
 15. `F10_AutocompleteCappedAtTen` — F10, C-TG·2 (the ≤ 10 cap).
-16. `F11_PreExistingPostTagIdsReadBackEmptyAfterReboot` — F11, ADR 0004 §B.1 (D2, no re-seed).
+16. `F11_PreExistingPostTagIdsReadBackEmptyAfterReboot` — F11, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 (D2, no re-seed).
 17. `F12_FreshInstanceHasZeroTags` — F12, C-TG·7 (D8).
 18. `Attach_WritesOneAuditRow_tag_attach` — C-TG·9 (D7), F1.
 19. `Create_WritesOneAuditRow_tag_create` — C-TG·9 (D7), F1, C-TG·4.
@@ -500,7 +516,7 @@ FACES row and/or invariant anchor from Part 1:
 21. `List_EmitsNoAuditRow` — C-TG·8 (D7).
 22. `Suggest_EmitsNoAuditRow` — C-TG·8 (D7).
 23. `Slug_Derivation_Lowercase_Trim_Charset` — C-TG·4 (D3).
-24. `PostService_MakesNoNewModerateCall` — the ADR 0006-D lane pin: the tag
+24. `PostService_MakesNoNewModerateCall` — the ADR [0006](../adr/0006-module-boundary-contracts.md)-D lane pin: the tag
     lane composes only `IAuthorizationService` + the frozen `IUserInfoService`
     read seams, never a new seam on a frozen interface.
 
@@ -517,8 +533,8 @@ The three-test shape (mirroring M3 §2.5):
 | # | Test | Shape (the TG reading of the M2/M3 lane) |
 |---|---|---|
 | 1 | **Closed loop** | The author attaches `sanitation` to a post → the tag appears in the author's tag list **and** by-tag view on the next request; the audit trail gains exactly one `tag.attach` row + one `tag.create` row (C-TG·9, F1). |
-| 2 | **Handoff** | A group member is **added after the post was created** and sees the tag on the **next** request — strong consistency (the ADR 0004 §B.1 / Marten live-read shape, F3's flip); the *creator reword* case (a second language name set by the creator surfaces to all viewers on their next read) is the "handoff to the creator" reading of the same pin (F6, C-TG·5). |
-| 3 | **Part-vs-whole** | The 24-test list in §2.4 is the **whole**; closed-loop + handoff are the **parts**; all — plus the ADR 0006 (C1 / C3) and ADR 0004 §B.1 inherited anchors re-run unchanged — must pass together for the gate to record. U12's record cites the *actual* landed test names (drift lane: if a U2-pinned name did not land verbatim, U12 updates §2.4 in the same commit and records a one-line drift in the handoff note). |
+| 2 | **Handoff** | A group member is **added after the post was created** and sees the tag on the **next** request — strong consistency (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 / Marten live-read shape, F3's flip); the *creator reword* case (a second language name set by the creator surfaces to all viewers on their next read) is the "handoff to the creator" reading of the same pin (F6, C-TG·5). |
+| 3 | **Part-vs-whole** | The 24-test list in §2.4 is the **whole**; closed-loop + handoff are the **parts**; all — plus the ADR [0006](../adr/0006-module-boundary-contracts.md) (C1 / C3) and ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 inherited anchors re-run unchanged — must pass together for the gate to record. U12's record cites the *actual* landed test names (drift lane: if a U2-pinned name did not land verbatim, U12 updates §2.4 in the same commit and records a one-line drift in the handoff note). |
 
 **The gate is recorded by U12** (per the register: U11 is the fresh-boot
 manual pass; U12 is "run + record the acceptance gate"; U13 is the docs-sync
@@ -532,7 +548,7 @@ register): **this file wins** — the unit that finds a mismatch pauses,
 records the pause (what it found, the exact lines/files, and what it needs),
 and does not guess.
 
-- The **12** invariants from Part 1 (C-TG·1 … C-TG·9, C1, C3, ADR 0004 §B.1) —
+- The **12** invariants from Part 1 (C-TG·1 … C-TG·9, C1, C3, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1) —
   the *numbers* (not the prose) are stable for the rest of the lane; rename /
   renumber is a breaking change. Part 2's §2.4 / §2.5 names hang off them.
 - The **12** FACES rows (F1–F12) in Part 1 — the *count* is a handoff field
@@ -569,3 +585,21 @@ and does not guess.
 > or larger set), the **2** tables (5 + 4 rows), and the **3** acceptance-gate
 > tests (closed-loop / handoff / part-vs-whole) are the *frozen counts* of
 > Part 2.
+
+---
+
+## ADR [0026](../adr/0026-group-community-name-description-translations.md) — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A **remove** or **correct** lane is wanted for a bad translation — that is a
+  new seam (an `Update*TranslationAsync` / `Delete*TranslationAsync` pair), not
+  a change to this add-only shape.
+- A **list** surface (the group list, the feed's community grouping, the
+  composer's community picker) should show a name in the resident's preferred
+  language — then the detail-page-only render scope breaks and the name needs a
+  per-language resolution at read time (a `TranslationProvider`-style seam), a
+  much larger change than the detail-surface lane this ADR ships.
+- A **community** should have an *owner* standing (rather than
+  GlobalAdmin∪Translator) — then the community lane's standing matrix gains an
+  `Owner` branch, which is a new decision (communities have no owner today).

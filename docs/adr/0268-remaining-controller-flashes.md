@@ -1,10 +1,23 @@
-# ADR 0268 — Remaining resident-facing controller flashes are localized
+---
+id: adr-0268
+title: "Remaining resident-facing controller flashes are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0268](0268-remaining-controller-flashes.md) — Remaining resident-facing controller flashes are localized
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-After the Admin controllers (ADR 0267), 49 literal flash messages remained in Account, Inventory, Kiosk, Languages, Locale, MessagingSettings, Moderation,
+After the Admin controllers (ADR [0267](0267-admin-flashes-localized.md)), 49 literal flash messages remained in Account, Inventory, Kiosk, Languages, Locale, MessagingSettings, Moderation,
 ReportTargets, SecuritySettings and Tag (UserPortability and AdminPortability already localize through their own `T` helper).
 
 ## Decision
@@ -20,4 +33,4 @@ Not compiled or run (no .NET SDK here); de/fr/da text machine-written, review pa
 
 Compiled and run 2026-10-29 (build clean; `Kumunita.Web.Tests` 1156 tests, 0 failed).
 
-The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 12839 -> 12975 on 2026-10-29 for the 34 new keys x en/de/fr/da of this lane (the ADR 0265/0266 shipped-additions mechanism).
+The improve-check.ps1 `KnownTranslationKeys.cs` pin was re-based 12839 -> 12975 on 2026-10-29 for the 34 new keys x en/de/fr/da of this lane (the ADR [0265](0265-projects-flashes-localized.md)/0266 shipped-additions mechanism).

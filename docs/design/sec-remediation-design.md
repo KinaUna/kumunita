@@ -1,4 +1,19 @@
+---
+id: design-sec-remediation
+title: "Security-audit remediation (`SEC`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # SEC — Security-audit remediation — design doc
+
+> **Abstract:** the **security-audit remediation** design — closes each finding of the 2026-10-30 static review (3 High, 5 Medium, 8 Low) with **one named regression test**, in units small enough for a fresh agent. Part 1 (this) pins context, scope, invariants, and the findings register; Part 2 the fix shapes + acceptance gate. **Who is it for:** a developer executing a SEC finding; an agent that needs the findings register + the one-test-per-finding rule. **When to read the rest:** before touching a SEC finding, its regression test, or the drift-guard.
+
 
 > Part 1 (this): Context, Scope, Invariants, Findings register. Written by U1.
 > Part 2 (fix shapes, config keys, signatures, test names, acceptance gate,
@@ -11,7 +26,7 @@ A **static** security review of `main` @ `bdcaff7` (2026-10-30) found **3 High,
 executed** — no live server, no exploit, no dependency scan (the scan is deferred
 to U3). The authorization core, the CSP/XSS posture, SQL parameterization,
 file-path handling and the MFA primitives held up. The gaps are places where
-code drifted from `docs/SECURITY.md` §5–§6 (the control map and the open-items
+code drifted from [`docs/SECURITY.md`](../SECURITY.md) §5–§6 (the control map and the open-items
 register).
 
 This lane's job is to close each finding with **one named regression test**, in
@@ -28,7 +43,7 @@ marked *re-verify in U2* until U2 re-anchors them against the current tree.
     owner must record `## Decision — L1` in the handoff note before U28 proceeds.
   - **L8c** (within U27's finding, but the log-forging sub-item is *parked*) —
     sanitize user-supplied strings before logging so logs can't be forged. This
-    is the `SECURITY.md` §6 open item "Log hygiene … so logs can't be forged";
+    is the [`SECURITY.md`](../../SECURITY.md) §6 open item "Log hygiene … so logs can't be forged";
     it stays open and is named as deferred, not fixed by this lane.
 - **Out (explicitly not part of this lane):**
   - New features or capability additions.
@@ -78,7 +93,7 @@ Source: Appendix A of the lane plan (static audit of `main` @ `bdcaff7`,
 | L5 | Low | Container runs as root; floating image tags; CI actions pinned by tag, no `permissions:` | `Dockerfile`, `.github/workflows/ci.yml` | (hardening) | U25 |
 | L6 | Low | Dev compose publishes Postgres with default credentials, Development mode | `docker-compose.yml` | (dev hygiene) | U26 |
 | L7 | Low | HSTS scope, `AllowedHosts: *`, `security.txt` URL from `Request.Host`, no `Permissions-Policy` | `Program.cs:951`, `appsettings.json:12`, `WellKnownController.cs` | S-3 | U26 |
-| L8 | Low | Sample-account limiter exemption and form-body read inside limiter; non-constant-time break-glass compare; **log-forging open item (parked)** | `Program.cs:586-595`, `IdentityService.cs`, `SECURITY.md` | S-6 | U27 (L8c parked) |
+| L8 | Low | Sample-account limiter exemption and form-body read inside limiter; non-constant-time break-glass compare; **log-forging open item (parked)** | `Program.cs:586-595`, `IdentityService.cs`, [`SECURITY.md`](../../SECURITY.md) | S-6 | U27 (L8c parked) |
 
 **Parked sub-items (counted in the register, deferred by owner decision):**
 
@@ -186,7 +201,7 @@ public sealed class AdminTwoFactorMiddleware
 ```
 Read role from the `Kumunita.Role` claim (`ThinPrincipal.Role` const, `ClaimShaping.cs:36`). GlobalAdmin + `!TwoFactorEnabled` + not sample → allow only the pinned enrolment/logout/static prefixes, else `302 → /settings/security/mfa`. Non-admins and enrolled admins pass through.
 
-**U8 — register + reconcile:** `Program.cs` — one `app.UseMiddleware<AdminTwoFactorMiddleware>()` **after** `UseAuthentication`, **before** `UseAuthorization`. `AccountController.cs:907` — update the comment so the redirect is documented as a *convenience*, the middleware as the *control*. `docs/SECURITY.md` — name the middleware as the 2FA control.
+**U8 — register + reconcile:** `Program.cs` — one `app.UseMiddleware<AdminTwoFactorMiddleware>()` **after** `UseAuthentication`, **before** `UseAuthorization`. `AccountController.cs:907` — update the comment so the redirect is documented as a *convenience*, the middleware as the *control*. [`docs/SECURITY.md`](../SECURITY.md) — name the middleware as the 2FA control.
 
 **U9 — `ForwardedHeadersSetup`** (new `src/Kumunita.Web/Security/ForwardedHeadersSetup.cs`):
 ```csharp
@@ -197,7 +212,7 @@ public static class ForwardedHeadersSetup
 ```
 Builds `ForwardedHeadersOptions`: `ForwardedHeaders.XForwardedFor | XForwardedProto`, `ForwardLimit = 1`, trusted networks from `ReverseProxy:KnownNetworks` (CIDR) + `ReverseProxy:KnownProxies` (IPs). Default = loopback + RFC1918. **Throws `InvalidOperationException` on an unparsable CIDR** (fail the boot, not open).
 
-**U10 — wire + Secure + doc:** `Program.cs:961` → replace `app.UseForwardedHeaders()` with the config-driven setup (move the `builder.Services` call to the DI block near `:41`); outside `Development`, set `Cookie.SecurePolicy = CookieSecurePolicy.Always` for the Identity + antiforgery cookies. `docs/COOLIFY.md` — "Verify forwarded headers" checklist (expected `Strict-Transport-Security`, `Set-Cookie …; secure`, two-IP lockout test). `docs/SECURITY.md` §6 — proxy-trust decision. Test **only if** options resolve from a built `ServiceProvider` without booting; else record "no test, because the host cannot be built in unit scope" and rely on U9's tests.
+**U10 — wire + Secure + doc:** `Program.cs:961` → replace `app.UseForwardedHeaders()` with the config-driven setup (move the `builder.Services` call to the DI block near `:41`); outside `Development`, set `Cookie.SecurePolicy = CookieSecurePolicy.Always` for the Identity + antiforgery cookies. [`docs/COOLIFY.md`](../COOLIFY.md) — "Verify forwarded headers" checklist (expected `Strict-Transport-Security`, `Set-Cookie …; secure`, two-IP lockout test). [`docs/SECURITY.md`](../SECURITY.md) §6 — proxy-trust decision. Test **only if** options resolve from a built `ServiceProvider` without booting; else record "no test, because the host cannot be built in unit scope" and rely on U9's tests.
 
 **U11 — clients send tokens:** the seven actions' **Razor forms already call `@Html.AntiForgeryToken()`** (verified at `Directory/Detail.cshtml:70`, `Messages/Index.cshtml:97`, `Posts/Detail.cshtml:587`, `Groups/PostDetail.cshtml:698`, `Community/Manage.cshtml` via `@Url.Action`), and the client fetch helper `client/lib/api.ts` (`apiFetch`) already sets `RequestVerificationToken`. **No JS module fetches any of the seven routes** (grep confirms). **U11's deliverable is therefore likely empty / a no-op**: it verifies the table `action → file → token-mechanism` and records it; it makes **no** edits unless a client is found without a token. If a raw `<form action="…">` is found *without* `@Html.AntiForgeryToken()`, convert to `asp-controller`/`asp-action` or add the token.
 
@@ -210,11 +225,11 @@ public sealed record ArchiveLimits(int MaxEntries, long MaxEntryBytes, long MaxT
 ```
 `KumunitaArchive.ReadAsync`/`ReadEntryBytesAsync` (`:327`/`:353`) take an optional `ArchiveLimits?` (default = `Default`); count **real bytes read** (not `entry.Length`); reject duplicate entry names; throw `InvalidDataException`.
 
-**U14 — import media gate + rate limit:** the media block at `UserPortabilityService.cs:1172` must run the same size/quota/type decision as `IUploadGate` (`Security/UploadGate.cs` → `StorageLimits.Decide`). Because the gate is Web-only (ADR 0006-D keeps Core HTTP-free), add the **one new interface in the lane** `IImportMediaPolicy` in Core with a single method, implemented in Web; or pin the seam if the decision already lives in a reachable Core seam. `UserPortabilityController.cs:129` (`import`) and `:253` (`import/resolve`) gain `[EnableRateLimiting("upload")]` + `[RequestSizeLimit(…)]`.
+**U14 — import media gate + rate limit:** the media block at `UserPortabilityService.cs:1172` must run the same size/quota/type decision as `IUploadGate` (`Security/UploadGate.cs` → `StorageLimits.Decide`). Because the gate is Web-only (ADR [0006](../adr/0006-module-boundary-contracts.md)-D keeps Core HTTP-free), add the **one new interface in the lane** `IImportMediaPolicy` in Core with a single method, implemented in Web; or pin the seam if the decision already lives in a reachable Core seam. `UserPortabilityController.cs:129` (`import`) and `:253` (`import/resolve`) gain `[EnableRateLimiting("upload")]` + `[RequestSizeLimit(…)]`.
 
 **U15 — anonymous writes:** add `[EnableRateLimiting("report")]` (new policy, one `AddWindow` line in `Program.cs` near `:629-651`) to `HomeController.cs:271` and to the token-auth `EscalationInboundController.cs:67` / `MailSuppressionController.cs:66` (token-auth but still anonymous-write); `[EnableRateLimiting("write")]` on `IssueController.cs:56`. `[MaxLength(4000)]` on `ErrorReportFormModel.Description` (`:29`) and the issue free-text fields. Skip any action that already has a limiter.
 
-**U16 — `/health`:** `HealthController.cs` — anonymous + token-unset → minimal payload (veto 4); replace `string.Equals` (`:73-74`) with `CryptographicOperations.FixedTimeEquals` on UTF-8 bytes (length-guarded); cache the `ISmtpHealthCheck` result ~60 s (small `IMemoryCache`). Update **only** the `HealthControllerTests` methods that assert the old public-by-default (e.g. `Get_When_DatabaseReachable_Returns_200_And_OkShape` `:55` if it asserts the full payload anonymously). `docs/COOLIFY.md` — the setting + new default.
+**U16 — `/health`:** `HealthController.cs` — anonymous + token-unset → minimal payload (veto 4); replace `string.Equals` (`:73-74`) with `CryptographicOperations.FixedTimeEquals` on UTF-8 bytes (length-guarded); cache the `ISmtpHealthCheck` result ~60 s (small `IMemoryCache`). Update **only** the `HealthControllerTests` methods that assert the old public-by-default (e.g. `Get_When_DatabaseReachable_Returns_200_And_OkShape` `:55` if it asserts the full payload anonymously). [`docs/COOLIFY.md`](../COOLIFY.md) — the setting + new default.
 
 **U17 — stamp every sign-in:** `AccountController.cs` `ConfirmAndSignInAsync` (`:685`, `HttpContext.SignInAsync` at `:719`) and `SecuritySettingsController.cs` `:250` (`HttpContext.SignInAsync`) must attach `AuthenticationProperties.Items["kumunita.stamp"]` = the user's current security stamp (the key the `RevocationStampMiddleware.cs:121` reads). `VerifySignInStampTests`.
 
@@ -361,9 +376,9 @@ No new failures vs. the U3 baseline.
 **Deferred list** (carried out of the lane, each with its owner action):
 
 1. **L1 / U28 — account enumeration** — parked, no owner decision.
-2. **L8c — log-forging** (user-supplied strings into `ILogger`) — parked per lane Assumptions; `SECURITY.md` §6 marks it still open.
+2. **L8c — log-forging** (user-supplied strings into `ILogger`) — parked per lane Assumptions; [`SECURITY.md`](../../SECURITY.md) §6 marks it still open.
 3. **"To pin" digests** (U25, network-blocked): `node:22` (Dockerfile stage 1); `postgres:18` + `axllent/mailpit:latest` (`docker-compose.yml`, dev-only). Resolve via token-authenticated pull and pin.
-4. **Operator live-config checks** (D-9, `SECURITY-AUDIT.md` §4): `ReverseProxy:KnownNetworks` (H3); `Health__Token` (M4); `AllowedHosts` + `WellKnown__BaseUrl` (L7); ClamAV `VirusScan__Host`/`Port` (L2); `Security:RevocationStamp:RequiredAfter` (M5).
+4. **Operator live-config checks** (D-9, [`SECURITY-AUDIT.md`](../SECURITY-AUDIT.md) §4): `ReverseProxy:KnownNetworks` (H3); `Health__Token` (M4); `AllowedHosts` + `WellKnown__BaseUrl` (L7); ClamAV `VirusScan__Host`/`Port` (L2); `Security:RevocationStamp:RequiredAfter` (M5).
 5. **Dedup-by-hash keeps the first uploader's declared type** (U22 flag) — follow-up decision, not a finding.
 6. **M11 operator-lane `InvalidDataException` surfacing** (U14 `Noticed`) — `AdminPortabilityController` resident-import still returns 500 on `InvalidDataException`; outside SEC resident-lane scope.
 7. **Stale `HealthOptions.cs` doc-comment** (U16 `Noticed`) — the "back-compat: full payload without token" comment is stale after the M4 flip; one-line refresh owed.
@@ -380,10 +395,10 @@ No new failures vs. the U3 baseline.
 
 **Consistency checks (U31, 2026-10-31):**
 
-- ✅ All 16 findings (H1–H3, M1–M5, L1–L8) have a row in `SECURITY-AUDIT.md` §8.
+- ✅ All 16 findings (H1–H3, M1–M5, L1–L8) have a row in [`SECURITY-AUDIT.md`](../SECURITY-AUDIT.md) §8.
 - ✅ Both `Drift pause` entries (U21, U23) have matching `## Decision —` sections in the handoff note.
 - ✅ `## Summary` present in handoff note; deferred list matches this section.
 - ✅ U1–U31 all present in `plan-sec-remediation.md`.
-- `README.md` has no lane list — that deliverable is skipped.
+- [`README.md`](../../README.md) has no lane list — that deliverable is skipped.
 
-Lane sealed. A human moves the folder from `in-progress/sec/` to `done/sec/`.
+Lane sealed. A human moves the folder from `in-progress/sec/` to `archive/lanes/sec/` (the close move, now recorded under `docs/archive/lanes/sec/`).

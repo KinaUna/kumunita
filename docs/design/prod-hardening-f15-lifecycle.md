@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f15-lifecycle
+title: "F15 — byte-store lifecycle / retention (UPL-04)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F15 — UPL-04: byte-store lifecycle / retention — **Part-0 design pin**
+
+> **Abstract:** the **F15 byte-store lifecycle** design pin (Part-0, design-only) — **byte-store lifecycle / retention**: a recurring housekeeping job (the same "tick + Wolverine-free service + thin web handler + boot seed" shape as the five existing jobs) that **deletes the `MediaObject` catalog rows + their volume bytes older than the retention cutoff**. Re-uses F1's byte-delete seam. Closes 2026-10-22 UPL-04. **Who is it for:** a developer executing F15 U2–U3; an agent that needs the lifecycle-tick shape. **When to read the rest:** before touching the `MediaLifecycleTick` job, the retention cutoff, or the F15 tests.
+
 
 **Lane:** prod-hardening (in-progress). **Fix F15** = the `code` fix for the
 2026-10-22 audit row **UPL-04** (byte-store lifecycle/retention — "no
@@ -47,14 +62,14 @@ rather than inventing a new value or a new config surface:
 
 | Precedent | Where | Constant |
 |---|---|---|
-| M13 usage-row retention (ADR 0114 D5) | `src/Kumunita.Core/Usage/UsagePurgeService.cs` — `public const int RetentionDays = 365;` | **365** |
-| M33 storage-sample retention (ADR 0156 M33·7) | `src/Kumunita.Core/Usage/StorageMetricsCaptureService.cs` — `public const int RetentionDays = 365;` | **365** |
+| M13 usage-row retention (ADR [0114](../adr/0114-logging-and-usage-analytics.md) D5) | `src/Kumunita.Core/Usage/UsagePurgeService.cs` — `public const int RetentionDays = 365;` | **365** |
+| M33 storage-sample retention (ADR [0156](../adr/0156-storage-metrics-history.md) M33·7) | `src/Kumunita.Core/Usage/StorageMetricsCaptureService.cs` — `public const int RetentionDays = 365;` | **365** |
 
 **Why a constant, not a knob** (mirrored from `UsagePurgeService`'s XML doc):
 the retention has **no per-instance reason to vary** — an operator who wants a
 different value edits the constant and redeploys. The per-instance config knob
-is a **named deferral** in both precedents (the ADR 0114 D5 "a platform
-constant" + ADR 0156 M33·7 "a per-instance knob is a named deferral"), and F15
+is a **named deferral** in both precedents (the ADR [0114](../adr/0114-logging-and-usage-analytics.md) D5 "a platform
+constant" + ADR [0156](../adr/0156-storage-metrics-history.md) M33·7 "a per-instance knob is a named deferral"), and F15
 keeps that deferral. This is the **deliberate inversion** of the
 `AuditPurgeService` "cutoff is per-instance config" principle: usage /
 storage / media retention are all *platform-wide housekeeping*, not a
@@ -104,7 +119,7 @@ public sealed record MediaLifecycleTick()
 
 A new **static** `MediaLifecycleService` in `Kumunita.Core`, the
 **Wolverine-free** shape of `UsagePurgeService` / `StorageMetricsCaptureService`
-(ADR 0006-D: Core stays HTTP-free — **no** `IHttpContextAccessor`, **no** Web
+(ADR [0006](../adr/0006-module-boundary-contracts.md)-D: Core stays HTTP-free — **no** `IHttpContextAccessor`, **no** Web
 types). It owns the constant (§2) and the delete logic (§5):
 
 ```csharp
@@ -268,7 +283,7 @@ Task<bool> DeleteIfExistsAsync(string contentId, CancellationToken ct = default)
    - `foreach (var id in expired) session.Delete<MediaObject>(id);`
    - `await session.SaveChangesAsync(ct);` — **commit the catalog-row deletes
      first** (the `UsagePurgeService` / `StorageMetricsCaptureService`
-     single-commit shape; C3 single-write-lane, ADR 0006).
+     single-commit shape; C3 single-write-lane, ADR [0006](../adr/0006-module-boundary-contracts.md)).
 3. **After** the commit (byte deletes are filesystem ops, **not** in the
    session — the F1.U4 "post-commit" ordering, verbatim):
    - `foreach (var id in expired) { try { await media.DeleteIfExistsAsync(id, ct); }
@@ -325,10 +340,10 @@ plan's F15.U3 spec). It asserts the U1 algorithm end-to-end:
 - **Server-rendered stack / no new bounded context** — F15 is a job, not a
   context; no `PostDocTypes`/`CoreDocTypes`/`MediaDocTypes` surface change
   (the sweep *reads* existing docs; it adds no new doc type).
-- **Core stays HTTP-free (ADR 0006-D)** — `MediaLifecycleService` (Core) has
+- **Core stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D)** — `MediaLifecycleService` (Core) has
   **no** Web types, **no** `IHttpContextAccessor`; the Web `Handler` is the
   thin adapter (the house shape).
-- **C3 single-write-lane / one-commit (ADR 0006)** — all catalog-row deletes
+- **C3 single-write-lane / one-commit (ADR [0006](../adr/0006-module-boundary-contracts.md))** — all catalog-row deletes
   in **one** session, **one** `SaveChangesAsync`; byte deletes are post-commit
   filesystem ops, not in the session.
 - **F1 seam re-used as-is** — `IMediaFileStore.DeleteIfExistsAsync` is
@@ -369,7 +384,7 @@ plan's F15.U3 spec). It asserts the U1 algorithm end-to-end:
 ## 9. Exit contract for U1 (this unit)
 
 - **Landed:** this one file
-  (`docs/design/prod-hardening-f15-lifecycle.md`). **No code, no build, no
+  ([`docs/design/prod-hardening-f15-lifecycle.md`](prod-hardening-f15-lifecycle.md)). **No code, no build, no
   package, no migration, no `src/**` change.**
 - **Internally consistent:** retention rule pinned (365-day platform constant,
   §2); the recurring/lock/idempotent shape pinned against the repo precedent

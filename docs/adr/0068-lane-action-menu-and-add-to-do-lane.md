@@ -1,4 +1,17 @@
-# ADR 0068 — Lane action menu: rename / limit / status / move + add-to-do foot
+---
+id: adr-0068
+title: "Lane action menu: rename / limit / status / move + add-to-do foot"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: [adr-0067]
+superseded_by: [adr-0069, adr-0071]
+updated: 2026-11-02
+---
+
+# ADR [0068](0068-lane-action-menu-and-add-to-do-lane.md) — Lane action menu: rename / limit / status / move + add-to-do foot
 
 Status: Accepted
 Date: 2026-09-23
@@ -6,7 +19,7 @@ Amends: 0067
 
 ## Context
 
-ADR 0067 shipped the M5 board: a `KanbanBoard` with its `KanbanLane` columns,
+ADR [0067](0067-m5-projects-todos-and-kanban.md) shipped the M5 board: a `KanbanBoard` with its `KanbanLane` columns,
 a `TodoItem` (the movable card), and a `BoardItemPlacement` binding a to-do to a
 lane at an `Order`. The board detail page
 (`Views/Projects/BoardDetail.cshtml`) rendered each lane's edit form — the
@@ -27,7 +40,7 @@ Three gaps:
 
 Two already-accepted decisions constrain this lane:
 
-- **ADR 0067 §2.3 freezes the `IProjectService` surface.** "An ADD beyond this
+- **ADR [0067](0067-m5-projects-todos-and-kanban.md) §2.3 freezes the `IProjectService` surface.** "An ADD beyond this
   list is a **new ADR**." So the two new seams this decision introduces —
   `MoveLaneAsync` and `AddTodoToLaneAsync` — are exactly what this ADR records.
 - **Board/lane standing (C-M5·6)** is `creator ∪ GlobalAdmin` over the
@@ -45,7 +58,7 @@ Two already-accepted decisions constrain this lane:
   form inside the menu.
 
 - **Rename / Set limit / Set status reuse the existing lane-update seam**
-  (`ProjectService.UpdateLaneAsync`, the ADR 0067 `board.update_lane` lane). No
+  (`ProjectService.UpdateLaneAsync`, the ADR [0067](0067-m5-projects-todos-and-kanban.md) `board.update_lane` lane). No
   new service or controller method for these three: each menu item is a form
   that POSTs to the existing
   `POST /projects/boards/{id}/lanes/{laneId}` route. **Set limit** and
@@ -99,7 +112,7 @@ Two already-accepted decisions constrain this lane:
   simply does not appear).
 
 - **The six new strings are registered through `kw-l`** (the
-  `KnownTranslationKeys` en/de/fr/da blocks, the ADR 0015 hard-gate test
+  `KnownTranslationKeys` en/de/fr/da blocks, the ADR [0015](0015-ui-view-localization-mechanics.md) hard-gate test
   `KwLRegistryConsistencyTests`): `projects.board.lane.rename`,
   `projects.board.lane.set_limit`, `projects.board.lane.set_status`,
   `projects.board.lane.move_left`, `projects.board.lane.move_right`, and
@@ -108,12 +121,12 @@ Two already-accepted decisions constrain this lane:
 ## Consequences
 
 - A board detail page is **quiet by default** — a lane's head shows its title
-  (and status/limit badge, per ADR 0067) and a ⋮ menu; no orphaned inputs or
+  (and status/limit badge, per ADR [0067](0067-m5-projects-todos-and-kanban.md)) and a ⋮ menu; no orphaned inputs or
   save button when nothing is being edited. Each edit (rename, limit, status,
   move) is a one-field form, which is what keeps a lane a *column* rather than a
   form.
 - Two new verbs enter the `board.*` audit vocabulary (`board.move_lane`,
-  `board.add_todo`) alongside the ADR 0067 ones; both audit against the
+  `board.add_todo`) alongside the ADR [0067](0067-m5-projects-todos-and-kanban.md) ones; both audit against the
   **board** (the lane and the new to-do's placement are not themselves
   auditable resources — C-M5·3).
 - `MoveLaneAsync`'s park-and-swap is the one M5 write lane that commits more
@@ -123,7 +136,7 @@ Two already-accepted decisions constrain this lane:
   only ever in a valid position, so a failure mid-swap leaves the board in a
   sensible (partially moved) state rather than a corrupted one.
 - **No new document, no new schema, no migration:** the lane and the
-  placement shapes are unchanged from ADR 0067; only the write seam and the
+  placement shapes are unchanged from ADR [0067](0067-m5-projects-todos-and-kanban.md); only the write seam and the
   view surface change. The ProjectDocTypes `(BoardId, Order)` unique index is
   what forces the park-and-swap and is untouched.
 - `Move left` / `Move right` are **only rendered** for a lane that actually

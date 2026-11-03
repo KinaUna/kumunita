@@ -1,3 +1,16 @@
+---
+id: design-m32-issue-submission-escalation
+title: "M32 — Issue submission & escalation"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0155-issue-submission-escalation.md
+  - docs/adr/0154-production-error-handling.md
+updated: 2026-11-02
+---
+
 # M32 — Issue submission & escalation (design doc)
 
 > **Abstract:** This design settles the **rest of the error-report
@@ -56,19 +69,19 @@
 > shape, the `KUMUNITA_ESCALATION_ENDPOINT` config read shape, the closed
 > `issue.*` / `errorreport.resolve.*` / `errorreport.escalate.*` `kw-l` key
 > set, the 19 pinned test names, the acceptance gate, the drift guard) +
-> **ADR 0155**.
+> **ADR [0155](../adr/0155-issue-submission-escalation.md)**.
 >
 > **The frozen base (reused, unchanged).** M32 is built **on top of** the
-> M31 `ErrorReports` surface (ADR 0154 — the `ErrorReport` 11-member doc, the
+> M31 `ErrorReports` surface (ADR [0154](../adr/0154-production-error-handling.md) — the `ErrorReport` 11-member doc, the
 > `IErrorReportService` 3-method surface, the `ErrorReportDocTypes`
-> registration surface) and the ADR 0004 §B.1 Marten-native / additive-field
+> registration surface) and the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 Marten-native / additive-field
 > pattern (the M32 four additive fields **ride** the existing
 > `.Schema.For<ErrorReport>()` — the idempotent delta at boot, **no new
-> registration surface**). It also rides the ADR 0001-B thin-token rule (the
-> admin surface is `[Authorize(Roles = GlobalAdmin)]`), the ADR 0006-D
+> registration surface**). It also rides the ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B thin-token rule (the
+> admin surface is `[Authorize(Roles = GlobalAdmin)]`), the ADR [0006](../adr/0006-module-boundary-contracts.md)-D
 > dependency-direction rule (**`Kumunita.Core` references no ASP.NET HTTP
 > types** — the `IEscalationForwarder` is a **Web-layer** service, the first
-> outbound HTTP in the codebase), and the ADR 0015 D1 `kw-l` provider-floor
+> outbound HTTP in the codebase), and the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor
 > discipline (the `en` value is the source text). All of these still bind
 > **unchanged**. M32 adds **four additive `ErrorReport` fields** (M32·3),
 > **one additive `TriageStatus` value** (`resolved`, M32·2), **one additive
@@ -84,7 +97,7 @@
 > `AccessAction` / `Decide()` branch / `IAuthorizationService` surface
 > (M32·10), and **no** persistence of the escalation endpoint (M32·6). It is
 > **additive**. **No EF migration** (the additive fields are a string /
-> nullable string / `DateTimeOffset?` on an existing doc — ADR 0004 §B.1
+> nullable string / `DateTimeOffset?` on an existing doc — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
 > idempotent delta at boot).
 >
 > **The `ErrorReport` field set ceiling is re-pinned** (the M32 15-member set
@@ -113,7 +126,7 @@
 > `errorreport.resolve.*` / `errorreport.escalate.*` key in four languages**
 > (M32·9). The M30 onboarding step-7 route **re-points** from
 > `/admin/announcements` to `/admin/error-reports` (M32·11). The
-> `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+> `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
 > `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip is **U08's**
 > (M32·12). There is **no new authorization surface** (M32·10) and **no new
 > bounded context / doc** (M32·1). After M32, every `ErrorReport` row can
@@ -221,7 +234,7 @@ per-report attachment (the named deferrals, §Scope).
   retry queue, no signing.
 - **The per-report attachment** — a file on the issue. The M31 `ErrorReport`
   doc is text-only; a future lane may add it.
-- **The `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+- **The `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip** until the
   milestone *ships* (U08 owns it — the `WhatsNew.cs` `0.48.0` entry is
   appended by U08, not by an earlier unit).
@@ -232,24 +245,24 @@ per-report attachment (the named deferrals, §Scope).
   context.** The M32 lanes ride the **M31** `ErrorReport` doc + the
   `Kumunita.Core.ErrorReports` context + the `IErrorReportService` seam. M32
   adds **no new bounded context** and **no new doc** (the M31 "one new
-  context, one new doc, ADR 0154 D1" is M31's, not M32's). M32 **extends**
+  context, one new doc, ADR [0154](../adr/0154-production-error-handling.md) D1" is M31's, not M32's). M32 **extends**
   the `ErrorReport` doc additively (M32·3), adds one seam to
   `IErrorReportService` (M32·8), and rides the existing
   `ErrorReportDocTypes.Configure` surface (the additive fields are
-  Marten-detected at boot — ADR 0004 §B.1 idempotent delta, **no new
+  Marten-detected at boot — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta, **no new
   registration surface**).
 - **M32·2 — The `TriageStatus` value set is extended additively, never
-  re-shaped.** M31 closed the set to `{"new", "triaged"}` (ADR 0154 D2). M32
+  re-shaped.** M31 closed the set to `{"new", "triaged"}` (ADR [0154](../adr/0154-production-error-handling.md) D2). M32
   **adds** `"resolved"` to make `{"new", "triaged", "resolved"}` (a string
-  field — ADR 0004 §B.1, no migration). M32 never re-shapes `new` or
+  field — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1, no migration). M32 never re-shapes `new` or
   `triaged`; the two M31 values keep their exact strings. `resolved` is the
   **terminal** state (a `resolved` report is not re-opened in M32 — there is
   no re-open lane).
 - **M32·3 — The `ErrorReport` doc field set is extended additively.** M31's
-  11-member ceiling (ADR 0154 D1) is M31's pin. M32 adds **exactly four**
+  11-member ceiling (ADR [0154](../adr/0154-production-error-handling.md) D1) is M31's pin. M32 adds **exactly four**
   fields (`Origin` / `ResolvedAt?` / `ResolvedBy?` / `ResolutionNote?`) — the
   15-member M32 ceiling, the M31 11 unchanged. **No M31 field is re-shaped**
-  (the M31 11 keep their exact names, types, and nullability). ADR 0155 re-
+  (the M31 11 keep their exact names, types, and nullability). ADR [0155](../adr/0155-issue-submission-escalation.md) re-
   pins the **15-member M32 ceiling**.
 - **M32·4 — The general issue-submission lane is public, anonymous-safe,
   non-blocking.** The `/issues/new` form is **not** inside a `[Authorize]`
@@ -262,7 +275,7 @@ per-report attachment (the named deferrals, §Scope).
   500 back to the resident (the M31·5 pin).
 - **M32·5 — Core stays HTTP-free; the escalation HTTP lives in the Web
   layer.** The `IErrorReportService.MarkResolvedAsync` seam (the
-  local-resolution write lane) does **no** outbound HTTP (ADR 0006-D —
+  local-resolution write lane) does **no** outbound HTTP (ADR [0006](../adr/0006-module-boundary-contracts.md)-D —
   "Core stays HTTP-free"; the `Kumunita.Core` references no ASP.NET HTTP
   types). The escalation **forwarding** (the outbound POST) is a **Web-layer**
   concern: a new `IEscalationForwarder` (a small interface +
@@ -316,12 +329,12 @@ per-report attachment (the named deferrals, §Scope).
 - **M32·10 — The admin surface is GlobalAdmin-gated; no new authz surface.**
   The `/admin/error-reports/{id}` detail view + the resolve + escalate actions
   are `[Authorize(Roles = GlobalAdmin)]` (the standard admin gate, the
-  thin-token rule ADR 0001-B, the M31·4 / M31·9 precedent). **No new
+  thin-token rule ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B, the M31·4 / M31·9 precedent). **No new
   `AccessAction`, no new `Decide()` branch, no new `IAuthorizationService`
   surface** (M32·10). The general issue lane (`/issues/new`) is **public**
   (no authz gate — the M31·2 precedent). The `Via` tag on the
   resolve/escalate audit rows is **`AccessVia.Admin`** (the M31
-  mark-as-triaged precedent, ADR 0154 D5). The `Via` tag on the general-issue
+  mark-as-triaged precedent, ADR [0154](../adr/0154-production-error-handling.md) D5). The `Via` tag on the general-issue
   submission row is `AccessVia.Resident` (a non-blank `SubjectId`) or
   `AccessVia.Anonymous` (a blank `SubjectId`) — the M31·5 D5 pin, unchanged.
 - **M32·11 — The M30 onboarding step-7 route re-points.** The M30 register
@@ -335,10 +348,10 @@ per-report attachment (the named deferrals, §Scope).
   (the `adminonboarding.step_escalation` keys are **reused**), **no new step**
   (the seven-step set is **unchanged**, the M30·7 closed set).
 - **M32·12 — The six-member close flip is U08's responsibility.** The
-  `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+  `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip lands in U08.
   The `WhatsNew.cs` registry gains one new entry (newest-first, the `0.48.0`
-  row) naming M32 + ADR 0155 — the M27 "shipped with no entry until caught in
+  row) naming M32 + ADR [0155](../adr/0155-issue-submission-escalation.md) — the M27 "shipped with no entry until caught in
   review" lesson (AGENTS.md) is held.
 
 ## FACES (pinned, 10)
@@ -491,7 +504,7 @@ public sealed record ErrorReportDraft(
 
 **The Web-layer `IEscalationForwarder` seam (the M32·5 pin — the first
 outbound HTTP in the codebase).** Namespace `Kumunita.Web.Services`,
-**not** `Kumunita.Core` (ADR 0006-D — Core stays HTTP-free; unit-series rule
+**not** `Kumunita.Core` (ADR [0006](../adr/0006-module-boundary-contracts.md)-D — Core stays HTTP-free; unit-series rule
 7 forbids an outbound `HttpClient` call in `Kumunita.Core`):
 
 ```csharp
@@ -592,7 +605,7 @@ keeps compiling and the Escalate action renders the
 
 ### 2.2 new M32-owned Core types (exact C#)
 
-**The `ErrorReport` doc — the 15-member M32 ceiling (M32·3, ADR 0155 D1).**
+**The `ErrorReport` doc — the 15-member M32 ceiling (M32·3, ADR [0155](../adr/0155-issue-submission-escalation.md) D1).**
 The M31 11 are **frozen** (exact names, types, nullability — M32·1 / M32·3);
 M32 adds **exactly four** fields. No field outside this set may appear in
 the doc; no M31 field is re-shaped. This is the **field ceiling** the U07
@@ -636,7 +649,7 @@ public sealed class ErrorReport
 }
 ```
 
-**The `TriageStatus` value set in M32** (M32·2, ADR 0155 D2): exactly
+**The `TriageStatus` value set in M32** (M32·2, ADR [0155](../adr/0155-issue-submission-escalation.md) D2): exactly
 `{"new", "triaged", "resolved"}`. The two M31 values keep their exact
 strings; `"resolved"` is the **terminal** state (no re-open lane — the named
 deferral, §Scope Out).
@@ -676,7 +689,7 @@ single `opts.Schema.For<ErrorReport>().Index(x => x.TriageStatus).Index(x =>
 x.Created);` block in
 `src/Kumunita.Core/ErrorReports/ErrorReportDocTypes.cs` is the **only**
 registration surface; the four additive fields are **Marten-detected at
-boot** (the ADR 0004 §B.1 idempotent delta — a new `string` / `string?` /
+boot** (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta — a new `string` / `string?` /
 `DateTimeOffset?` on an existing doc type, no migration). **No new
 `.Schema.For` call, no new registration surface, no `Kumunita.Core` DI
 change** (M32·1). **No EF migration.**
@@ -685,11 +698,11 @@ change** (M32·1). **No EF migration.**
 
 The **19 keys** (verbatim from the register's Assumptions; the exact set is
 **frozen** by the §2.6 drift guard). Each with its **en** value — the source
-text, the ADR 0015 D1 `kw-l` provider-floor discipline. The `de` / `fr` /
+text, the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline. The `de` / `fr` /
 `da` values are **U06's** to author (the M30·6 four-language pin; the
 `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` closure
 asserts every key is present, non-empty, in all four languages, M32·9). The
-M31 `errorreport.*` key set (the 20 keys of ADR 0154 D8) is the **floor** —
+M31 `errorreport.*` key set (the 20 keys of ADR [0154](../adr/0154-production-error-handling.md) D8) is the **floor** —
 M32 **adds** this set, it does **not** re-author or drop any M31 key (M32·1).
 
 | # | Key | en value (source text) |
@@ -911,4 +924,4 @@ The following are **frozen pins**; any mismatch found by a later unit is a
 *Part 2 (U02) end. The ADR 0155 (`docs/adr/0155-issue-submission-escalation
 .md`, `Status: Draft`) is the companion document — it names the Decision /
 Consequences that this design doc pins in detail. The ADR index
-(`docs/adr/README.md`) gains the 0155 row (`Status: Draft`).*
+([`docs/adr/README.md`](../adr/README.md)) gains the 0155 row (`Status: Draft`).*

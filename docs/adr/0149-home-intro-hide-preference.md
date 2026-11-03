@@ -1,4 +1,17 @@
-# ADR 0149 — Home intro sections: a per-resident "hide and show me the feed" preference
+---
+id: adr-0149
+title: "Home intro sections: a per-resident \"hide and show me the feed\" preference"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/site-content-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0149](0149-home-intro-hide-preference.md) — Home intro sections: a per-resident "hide and show me the feed" preference
 
 Status: Accepted
 Date: 2026-10-07
@@ -31,7 +44,7 @@ than scrolling.
   (for a signed-in resident) or, when there is no feed, on the roadmap.
 - It is a **pure display preference** — it changes what this resident sees on
   `/` and nothing else. It is never an access decision, never a claim
-  (thin-token rule, ADR 0001-B), and it is read fresh per request (the next
+  (thin-token rule, ADR [0001](0001-core-stack-and-identity-model.md)-B), and it is read fresh per request (the next
   visit reflects the change, with no rebuild / restart). Anonymous visitors
   always see both sections (there is no subject to resolve a preference
   against) — the hero remains the public landing surface.
@@ -42,7 +55,7 @@ than scrolling.
   new `HomeViewModel.HideIntro` field (default `false`). The view wraps the
   two sections in `@if (!Model.HideIntro) { … }`; the "What's new" feed and the
   roadmap are untouched, so a hidden-intro page simply starts lower.
-- The write is the ADR 0019 / ADR 0020 owner-scope single-write-lane shape,
+- The write is the ADR [0019](0019-timezone-platform-default-and-resident-override.md) / ADR [0020](0020-date-format-platform-default-and-resident-override.md) owner-scope single-write-lane shape,
   mirrored from `SetProfilePageSizeAsync`: a new
   `IUserInfoService.SetProfileHideHomeIntroAsync(subjectId, hideHomeIntro,
   actorBy)` lane that loads the profile, sets the one flag, and saves in one
@@ -51,7 +64,7 @@ than scrolling.
   missing profile (`KeyNotFoundException`, the `SetProfileTimezoneAsync` pin —
   the lane never load-or-creates). Strong consistency (invariant C4): the new
   value is live on the very next `GetProfileAsync` call.
-- The resident-facing surface is a new **Home page** section in the ADR 0080
+- The resident-facing surface is a new **Home page** section in the ADR [0080](0080-settings-surface-split.md)
   tabbed settings: `GET /settings/home` + `POST /settings/home`
   (`LocaleController.SettingsHome` / `SaveHome`) rendering one on/off checkbox
   ("Hide the intro sections and show me the feed right away"). Unlike the
@@ -59,7 +72,7 @@ than scrolling.
   is the reset (unchecked is the `false` floor). The section joins the
   `_SettingsTabs` sub-nav as a "Home page" tab, active on
   `LocaleController.SettingsHome`.
-- The `Profile.HideHomeIntro` field is an **additive** field per ADR 0004
+- The `Profile.HideHomeIntro` field is an **additive** field per ADR [0004](0004-data-persistence-and-schema-evolution.md)
   §B.1 (delta-detected, idempotent, no re-seed, no EF migration, no new
   `*DocTypes` surface) — the 13th additive `Profile` field, like
   `PageSize`. The `false` default means every existing account is
@@ -67,7 +80,7 @@ than scrolling.
 - New UI strings (`settings.home_title` / `_lede` / `_label` / `_note` /
   `_save` / `_flash_hide` / `_flash_show`) land in the
   `KnownTranslationKeys` closed set for all four shipped languages (en, de,
-  fr, da) — the ADR 0015 D1 provider-floor discipline; the en source text is
+  fr, da) — the ADR [0015](0015-ui-view-localization-mechanics.md) D1 provider-floor discipline; the en source text is
   the fallback.
 
 ## Consequences
@@ -80,7 +93,7 @@ than scrolling.
   cookie, not a claim, not a global setting) — it travels with the resident,
   is visible to no one else, and cannot gate any access.
 - `IUserInfoService` gains one member (a compatible addition to the frozen
-  surface, ADR 0006-A — the `SetProfilePageSizeAsync` precedent); the single
+  surface, ADR [0006](0006-module-boundary-contracts.md)-A — the `SetProfilePageSizeAsync` precedent); the single
   concrete `UserInfoService` is the only implementer.
 - The home page's first two sections are now conditional: the markup is
   unchanged except that they sit inside one `@if`, and the section that

@@ -1,8 +1,21 @@
-# ADR 0175 — Palettes (Forest / Ember) and the refreshed feed card
+---
+id: adr-0175
+title: "Palettes (Forest / Ember) and the refreshed feed card"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md, docs/adr/0111-nav-layout-variants-b-and-c.md, docs/adr/0133-dark-theme-forest.md, docs/adr/0150-site-content-customization.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0175](0175-palettes-and-feed-card.md) — Palettes (Forest / Ember) and the refreshed feed card
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-26
-Relates to: ADR 0133 (Forest dark theme), ADR 0111 (nav variants), ADR 0150 (site content customization)
+Relates to: ADR [0133](0133-dark-theme-forest.md) (Forest dark theme), ADR [0111](0111-nav-layout-variants-b-and-c.md) (nav variants), ADR [0150](0150-site-content-customization.md) (site content customization)
 
 ## Context
 
@@ -27,7 +40,7 @@ dark scopes with `color-scheme` + `light-dark()`.)
 platforms can tell them apart); a member may override from the account menu
 (`kumunita.palette` cookie, per host; `POST /palette`; "Platform default" clears it).
 Resolution: member cookie → platform default → forest. The default is a new additive field
-`SiteContent.DefaultPalette` (ADR 0150 / ADR 0004 §B.1, default `forest`), edited on
+`SiteContent.DefaultPalette` (ADR [0150](0150-site-content-customization.md) / ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1, default `forest`), edited on
 `/admin/site` (`POST /admin/site/save-palette`, one `site.save` audit row, partial-save shape).
 `_Layout` reads it through `PlatformPaletteProvider`, an in-process cached singleton
 (5 min TTL, invalidated by the admin save; any failure degrades to forest). The two

@@ -42,25 +42,17 @@ public interface IKioskService
 
     /// <summary>
     /// Saves the <see cref="KioskPlaylist"/> row for <paramref name="actorId"/>
-    /// (the acting resident's own playlist — the ADR 0164 amendment) — the
-    /// per-resident write-lane (M35·5 — exactly **one** <c>kiosk.save</c>
-    /// <c>AccessAudit</c> row, <c>TargetKind = "kiosk"</c>, <c>Via = Owner</c>).
-    /// <paramref name="displayMode"/> is the resident's full-page / full-screen
-    /// preference (display-only, never an access input — M35·4) and is persisted
-    /// with the row. **Within the caller's session** (in-transaction with any
-    /// surrounding work — the M3 <c>CreatePostAsync</c> same-transaction precedent).
-    /// **Upsert**: a missing row is created (the register's M35·2 pin — a
-    /// resident can configure their playlist on a fresh instance without a
-    /// seeder; ADR 0170 moved the <c>SiteContentService.SaveAsync</c> template
-    /// to the same upsert shape, so the two services are on parity — a save
-    /// is never a silent no-op). The caller owns the session's
-    /// lifetime and must dispose it.
+    /// (the acting resident's own playlist) from <paramref name="draft"/>
+    /// (ADR 0285 — the entries, default duration, refresh interval, display
+    /// mode and scroll speed; all display-only, never an access input, M35·4).
+    /// Exactly **one** <c>kiosk.save</c> <c>AccessAudit</c> row
+    /// (<c>TargetKind = "kiosk"</c>, <c>Via = Owner</c>, M35·5), **within the
+    /// caller's session** (the M3 <c>CreatePostAsync</c> same-transaction
+    /// precedent). **Upsert**: a missing row is created (M35·2, ADR 0170
+    /// parity). The caller owns the session's lifetime and must dispose it.
     /// </summary>
     Task<KioskPlaylist> SavePlaylistAsync(
-        IReadOnlyList<KioskView> views,
-        int viewIntervalSeconds,
-        int refreshIntervalSeconds,
-        KioskDisplayMode displayMode,
+        KioskPlaylistDraft draft,
         string actorId,
         IDocumentSession session,
         CancellationToken ct = default);

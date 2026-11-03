@@ -1,0 +1,31 @@
+@* The /directory · /people section sub-nav (the _EventsTabs.cshtml Bootstrap
+   nav-tabs idiom, ADR 0062). The "People" surface (find-people, /people) was
+   moved out of the top nav bar (ADR 0123 F6's nav entry) into this tab strip
+   on the Directory page — Directory and People are now sibling tabs of one
+   section, so a resident switches between the full catalog and the find-
+   people forms without leaving the section. The active tab is derived from
+   the current controller (the DirectoryController owns /directory, the
+   FindPeopleController owns /people), so the strip can sit on both landing
+   pages and deep-link to whichever tab the viewer is on. *@
+@{
+    var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "";
+    var activeLabel = controller.Equals("FindPeople", StringComparison.OrdinalIgnoreCase)
+        ? "People"
+        : "Directory";
+    var tabs = new (string LabelKey, string Label, string Href, string Icon)[]
+    {
+        ("nav.directory", "Directory", "/directory", "kmb-i-directory"),
+        ("nav.people",    "People",    "/people",    "kmb-i-people"),
+    };
+}
+<ul class="nav nav-tabs kmb-tab-under-navbar mb-4" role="tablist">
+    @foreach (var tab in tabs)
+    {
+        var isActive = tab.Label == activeLabel;
+        <li class="nav-item" role="presentation">
+            <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href">
+                <svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="@("#" + tab.Icon)"/></svg><kw-l key="@tab.LabelKey">@tab.Label</kw-l>
+            </a>
+        </li>
+    }
+</ul>

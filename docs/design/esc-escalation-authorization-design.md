@@ -1,3 +1,16 @@
+---
+id: design-esc-escalation-authorization
+title: "Escalation & authorization (`ESC`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0154-production-error-handling.md
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # ESC — Escalation authorization + receiving inbox (design doc)
 
 > **Abstract:** This design closes the **authorization + receiving** gap that
@@ -30,7 +43,7 @@
 > **named lane** (the `ESC` id — **not** a roadmap renumber; the M33 / M34
 > order is untouched, the ADR 013 / 089 / 093 / 109 "named lane, not a
 > renumber" precedent). It is a **capability on the M31 / M32 `ErrorReports`
-> surface** (ADR 0154 + ADR 0155): it **reuses** the M32 `ErrorReport` doc +
+> surface** (ADR [0154](../adr/0154-production-error-handling.md) + ADR [0155](../adr/0155-issue-submission-escalation.md)): it **reuses** the M32 `ErrorReport` doc +
 > the `Kumunita.Core.ErrorReports` context + the `IErrorReportService` seam
 > + the M32 `EscalationForwarder` + the `KUMUNITA_ESCALATION_ENDPOINT` env
 > var and **extends them additively** (the two new docs + the
@@ -68,22 +81,22 @@
 > the `AcceptInboundAsync` seam, the four additive `ErrorReport` fields, the
 > `EscalationForwarder` token + DB-config change, the closed `escalation.*`
 > `kw-l` key set, the pinned test names, the acceptance gate, the drift guard)
-> + **ADR 0159**.
+> + **ADR [0159](../adr/0159-escalation-authorization.md)**.
 >
 > **The frozen base (reused, unchanged).** ESC is built **on top of** the
-> M32 `ErrorReports` surface (ADR 0155 — the `ErrorReport` 15-member doc, the
+> M32 `ErrorReports` surface (ADR [0155](../adr/0155-issue-submission-escalation.md) — the `ErrorReport` 15-member doc, the
 > `IErrorReportService` 4-method surface, the `ErrorReportDocTypes`
 > registration surface, the M32 `EscalationForwarder`, and the
 > `KUMUNITA_ESCALATION_ENDPOINT` env-var fallback) and the M31 `ErrorReports`
-> surface (ADR 0154). It also rides the ADR 0004 §B.1 Marten-native /
+> surface (ADR [0154](../adr/0154-production-error-handling.md)). It also rides the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 Marten-native /
 > additive-field pattern (the ESC four additive fields **ride** the existing
 > `.Schema.For<ErrorReport>()` — the idempotent delta at boot, **no new
 > registration surface for the additive fields**; the two new docs ride a
-> **new** `EscalationDocTypes` parallel surface), the ADR 0001-B thin-token
+> **new** `EscalationDocTypes` parallel surface), the ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B thin-token
 > rule (the admin surface is `[Authorize(Roles = GlobalAdmin)]`), the ADR
 > 0006-C3 single-write-lane rule (each token generate / revoke and each inbound
 > acceptance commits its doc + exactly one `AccessAudit` row together), and
-> the ADR 0006-D dependency-direction rule (**`Kumunita.Core` references no
+> the ADR [0006](../adr/0006-module-boundary-contracts.md)-D dependency-direction rule (**`Kumunita.Core` references no
 > ASP.NET HTTP types** — the forwarder + the inbound endpoint are
 > **Web-layer**). All of these still bind **unchanged**. ESC adds **two new
 > docs** (`EscalationToken`, `EscalationOutboundConfig` — ESC·3 / ESC·4),
@@ -104,7 +117,7 @@
 > `IAuthorizationService` surface (ESC·12), and **no** persistence of the
 > receiving-side token plaintext (ESC·3). It is **additive**. **No EF
 > migration** (the additive fields are a string / nullable string /
-> `DateTimeOffset?` on an existing doc — ADR 0004 §B.1 idempotent delta at
+> `DateTimeOffset?` on an existing doc — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta at
 > boot).
 >
 > **The `ErrorReport` field set ceiling is re-pinned** (the ESC 19-member set
@@ -140,7 +153,7 @@
 > **unauthenticated operator-override fallback** when the DB config is absent
 > or disabled (ESC·4). `AccessVia` gains **exactly one** additive value
 > (`Escalation`) and the 12 frozen values are untouched (ESC·10). The
-> `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+> `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
 > `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip is **U09's**
 > (ESC·13). There is **no new bounded context** (ESC·1).
 
@@ -274,20 +287,20 @@ token-authenticated* channel).
 
 - **ESC·1 — ESC is a capability on the M31 / M32 surface, not a new context.**
   The two new docs (`EscalationToken`, `EscalationOutboundConfig`) live in
-  the `Kumunita.Core.ErrorReports` context (the ADR 0154 / 0155 surface),
+  the `Kumunita.Core.ErrorReports` context (the ADR [0154](../adr/0154-production-error-handling.md) / 0155 surface),
   registered on a **new** `EscalationDocTypes` surface (the M31
   `ErrorReportDocTypes` / the Usage `UsageDocTypes` parallel-surface
   precedent). ESC **reuses** the M32 `ErrorReport` doc + `IErrorReportService`
   and **extends** them additively; it adds **no new bounded context**.
 - **ESC·2 — The `ErrorReport` doc field set is extended additively to a
-  19-member ESC ceiling.** M32's 15 (ADR 0155 D1) are unchanged; ESC adds
+  19-member ESC ceiling.** M32's 15 (ADR [0155](../adr/0155-issue-submission-escalation.md) D1) are unchanged; ESC adds
   **exactly four**: `FromInstance` (string?, the accepting token's `Label`),
   `EscalationReceivedAt` (DateTimeOffset?, the receive instant),
   `EscalationSourceId` (string?, the origin's report id — the inbound
   idempotency key), `EscalationTokenId` (string?, which token accepted it) —
   each null for locally-filed rows. The `Origin` closed set extends from
   `{"error-page","general"}` to `{"error-page","general","escalated"}` (a
-  string field — ADR 0004 §B.1 idempotent delta, **no migration**).
+  string field — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta, **no migration**).
 - **ESC·3 — Receiving-side tokens are the `EscalationToken` doc: multiple,
   labeled, individually revocable, hashed at rest.** Only the **SHA-256 hash**
   is stored — the **plaintext is shown exactly once** at generation, never
@@ -317,7 +330,7 @@ token-authenticated* channel).
   **validation** (hash compare) + the **received-row write** are Core
   (`IEscalationTokenService.ValidateAsync` + `IErrorReportService.
   AcceptInboundAsync`); the **HTTP** (outbound POST + inbound request
-  parsing) is Web (M32·5 / ADR 0006-D — Core stays HTTP-free).
+  parsing) is Web (M32·5 / ADR [0006](../adr/0006-module-boundary-contracts.md)-D — Core stays HTTP-free).
 - **ESC·7 — A successful inbound is idempotent on (token, origin-report-id).**
   A re-delivery of the **same** origin report under the **same** token returns
   the **existing** row (200, idempotent), not a duplicate. The key is
@@ -336,8 +349,8 @@ token-authenticated* channel).
   validates** (immediate). `LastUsedAt` is stamped on each successful inbound
   (a read-then-write on the token row, no audit row).
 - **ESC·10 — `AccessVia` gains exactly one additive value: `Escalation`.**
-  The M1 `Admin` / ADR 013 `Group` / ADR 0028 `Guardian` / ADR 0036
-  `Community` / ADR 0041 `Resident` / M31 `Anonymous` append precedent — the
+  The M1 `Admin` / ADR 013 `Group` / ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) `Guardian` / ADR [0036](../adr/0036-community-visible-audience-default.md)
+  `Community` / ADR [0041](../adr/0041-page-audience-scope-dropdown.md) `Resident` / M31 `Anonymous` append precedent — the
   **12 frozen values are untouched**. The inbound audit row is the **only**
   row that carries `Via = Escalation` (the M2M standing — the receiving admin
   is not the actor, the origin platform is).
@@ -345,7 +358,7 @@ token-authenticated* channel).
   four languages.** Every new user-visible string is a `KnownTranslationKeys`
   entry present, **non-empty, in all four** languages (en/de/fr/da), pinned by
   `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests`. The
-  `en` values are the source text (ADR 0015 D1 `kw-l` provider-floor
+  `en` values are the source text (ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor
   discipline); the `de` / `fr` / `da` values are U07's to author (the M30·6
   four-language pin).
 - **ESC·12 — The admin token/config surface is GlobalAdmin-gated; no new
@@ -357,9 +370,9 @@ token-authenticated* channel).
 - **ESC·13 — The six-member close flip is U09's responsibility.** The
   `Milestones.cs` **lane row** (added as `StatusDone`, **after** the M32 row,
   without disturbing the M33 / M34 order or the single-in-progress pin — M34
-  stays `StatusNext`) / README / `STATUS.md` / `ARCHITECTURE.md` /
+  stays `StatusNext`) / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` (a new entry, newest-first, naming ESC
-  + ADR 0159) lands in U09. The M27 "shipped with no entry until caught in
+  + ADR [0159](../adr/0159-escalation-authorization.md)) lands in U09. The M27 "shipped with no entry until caught in
   review" lesson (AGENTS.md) is held.
 
 ## FACES (pinned, 10)
@@ -598,7 +611,7 @@ value (the ESC·2 19-member ceiling)
 The M32 **15 fields are unchanged** (ESC·2 — no re-shape). ESC adds
 **exactly four** additive fields; each is null for locally-filed rows. The
 `Origin` **closed set** extends from `{"error-page","general"}` to
-`{"error-page","general","escalated"}` (a string field — ADR 0004 §B.1
+`{"error-page","general","escalated"}` (a string field — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
 idempotent delta, **no migration**). The re-pinned **19-member ESC ceiling** is
 the M32 15 + the ESC 4 below.
 
@@ -625,7 +638,7 @@ public sealed class ErrorReport
 additive class)
 
 Namespace `Kumunita.Core.ErrorReports`. The `GenerateAsync` + `RevokeAsync`
-lanes are **single-write-lane** (the ADR 0006 C3 shape — the M32
+lanes are **single-write-lane** (the ADR [0006](../adr/0006-module-boundary-contracts.md) C3 shape — the M32
 `MarkResolvedAsync` precedent: one write session storing the doc + exactly one
 `AccessAudit` row). `ValidateAsync` is a constant-time hash compare that
 stamps `LastUsedAt` on a match (a read-then-write, **no** audit row — the
@@ -678,7 +691,7 @@ public sealed class EscalationTokenService : IEscalationTokenService
 method)
 
 The M31 3 + the M32 1 methods are **unchanged** (ESC·1). `AcceptInboundAsync`
-is the M32 `MarkResolvedAsync` **idempotent-write-lane** shape (the ADR 0006
+is the M32 `MarkResolvedAsync` **idempotent-write-lane** shape (the ADR [0006](../adr/0006-module-boundary-contracts.md)
 C3 single-write-lane): validate the token → idempotent lookup → store the
 received row + **one** `AccessAudit` row → stamp the token's `LastUsedAt` —
 in **one** write session.
@@ -740,7 +753,7 @@ A **new** parallel surface (the M31 `ErrorReportDocTypes` / the Usage
 `UsageDocTypes` parallel-surface precedent). It registers the **two new
 docs**; the M32 `ErrorReportDocTypes` surface is **untouched** (ESC·1 — the
 four additive `ErrorReport` fields **ride** the existing
-`.Schema.For<ErrorReport>()` — ADR 0004 §B.1 idempotent delta at boot, no new
+`.Schema.For<ErrorReport>()` — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 idempotent delta at boot, no new
 surface for the additive fields).
 
 ```csharp
@@ -791,7 +804,7 @@ sets are the **floor**, **untouched**; ESC **adds** this new `escalation.*`
 namespace). Every key is present, **non-empty, in all four** languages
 (en/de/fr/da), pinned by `KwLRegistryConsistencyTests` +
 `KnownTranslationKeys_ParityTests` (the M31·7 / M32·9 precedent). The `en`
-values are the source text (ADR 0015 D1 `kw-l` provider-floor discipline); the
+values are the source text (ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline); the
 `de` / `fr` / `da` values are U07's to author (the M30·6 four-language pin).
 `escalation.list.status.escalated` is the new status chip (the M32
 `errorreport.list.status.*` chip precedent).
@@ -973,3 +986,201 @@ record, do not silently re-shape):
   4-members (unchanged; `ConfiguredSource` is the single additive member,
   ESC·4);
 - the **`KUMUNITA_ESCALATION_ENDPOINT`** env-var fallback (preserved, ESC·4).
+
+
+---
+
+## ADR [0041](../adr/0041-page-audience-scope-dropdown.md) — moved content (D11 trim, 2026-11-02)
+
+## Rejected alternatives
+
+- **Leave the form as-is, just add an "All residents" option to the
+  Community `<select>`.** Rejected — the Community `<select>` is
+  semantically "the target community of the `Community` flag", not
+  "the scope of the page". Adding an "All residents" option to it
+  would be a *lie* (it would set `Community = true` + `ComponentId =
+  null`, which is the *inert* shape — the branch 4 short-circuits on
+  a null `ComponentId`). A top-level `Scope` dropdown is the honest
+  shape.
+
+- **Use `AudienceMode` for the new flag.** Rejected — `AudienceMode`
+  governs how the *grant list* combines (Any / All). The
+  `AllResidents` flag is a *distinct grant*, not a mode of the grant
+  list (the ADR [0036](../adr/0036-community-visible-audience-default.md) precedent). Making it an `AudienceMode` value
+  would collide with the C1 invariant (empty-list semantics) and with
+  ADR [0006](../adr/0006-module-boundary-contracts.md)'s "the grant list is the explicit set" contract.
+
+- **Retire the audience editor entirely.** Rejected — the "Individual
+  access" scope still needs it (a board memo for three specific people
+  is a legitimate page scope). The editor is retained, but only
+  revealed when the author explicitly picks "Individual access".
+
+- **Make "All residents" a *default* on the stored `Audience` (i.e.
+  flip the flag `true` for every new page's audience).** Rejected —
+  the flag is a *first-class grant* the author opts into, not a
+  bootstrap default. A page that was `Audience { Community = true }`
+  + `ComponentId = "x"` should *stay* community-scoped, not become
+  all-residents-visible. The default is a *form* default (the Scope
+  dropdown's initial selection), not a *stored-shape* default.
+
+
+## Migration
+
+The `Audience.AllResidents` flag is a new property on an existing
+document type (Marten's versioned schema). It is **additive**: existing
+documents round-trip with the flag `false` (the .NET default), so no
+data migration is required. The `PageComposeViewModel.CommunityId`
+field is removed from the *view model* (the form-bound shape), but the
+`Page.ComponentId` document field is **retained** (the stored shape
+still needs it for the community scope). The `_PageForm.cshtml`
+visibility card is restructured (the Scope dropdown + the
+conditional editor); the pre-ADR-0041 form shape (a Community
+`<select>` + a CommunityVisible checkbox) is gone.
+
+
+---
+
+## ADR [0036](../adr/0036-community-visible-audience-default.md) — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+- **Core (DB-backed, `AuthorizationServiceTests`)** — the `A0036_*`
+  family pins the branch end-to-end against the live `Decide()` path:
+  - `A0036_CommunityFlagAndMember_Allows_ViaCommunity` — flag on, member
+    of the component → **Allow**, `via Community` (not `Audience` — the
+    empty grant list would have denied; the branch short-circuits first).
+  - `A0036_CommunityFlagButNotMember_Denies` — flag on, **not** a member
+    → **Deny** (grant list empty → no fallback).
+  - `A0036_CommunityFlagButNullComponent_Inert` — flag on, `ComponentId`
+    null → **Deny** (the branch is inert without a component).
+  - `A0036_CommunityFlagFalse_EmptyGrants_OwnerOnly` — the pre-ADR-0036
+    shape (flag off, empty grants): a member who isn't the owner is
+    denied, the owner is allowed via `Owner` (the old behavior, pinned).
+  - `A0036_CommunityFlagPlusExplicitGrant_BothVisible` — flag on **and**
+    an explicit user grant: the community member sees it via `Community`,
+    the granted non-member sees it via `Audience` (the two grants
+    compose).
+- **Web (pure, `AudienceEditorModelCommunityTests`)** — the form-bound
+  `CommunityVisible` ↔ document `Community` round-trip, both directions:
+  - `BuildAudience_CommunityVisible_RoundTripsVerbatim` — checked /
+    unchecked both carry verbatim onto `Audience.Community`, with
+    `Mode` + `Grants` untouched.
+  - `BuildAudience_CommunityVisible_WithGrants_BothPreserved` — the flag
+    and the grant list are independent; both survive.
+  - `FromAudience_Community_RoundTripsVerbatim` — the edit-lane read
+    direction seeds `CommunityVisible` from `Audience.Community`; the
+    full build → from → build round-trip is stable (guards against a
+    regression that silently flips a community-visible post to
+    owner-only on the next edit save).
+
+
+---
+
+## ADR [0015](../adr/0015-ui-view-localization-mechanics.md) — moved content (D11 trim, 2026-11-02)
+
+## Amendments
+
+### 2026-10-04 — context-reuse: accepted design choice (P2-4)
+
+**The 13 context-reuse keys.** A full drift scan of every `<kw-l>` against the
+registry `en` floor found 37 keys whose view fallback text differs from the
+registry value. 13 of these are **intentional context-reuse**: a single key
+carries per-entity or per-voice wording that is more accurate than the generic
+registry floor. Splitting each key into one-per-entity would multiply the
+closed set without adding information (the provider floor renders the generic
+form on a fresh `en` instance, which is correct for the *platform* copy; the
+view's per-entity fallback is the *user-visible* truth on a translated
+instance). The 13 keys are:
+
+| # | Key | Reuse pattern |
+|---|-----|---------------|
+| 1 | `events.community_hint` | "this event" (en) → "this board / goal / project" (×3 views) |
+| 2 | `posts.audience_all_members` | "Everyone in this community" (en) → "Everyone" (×7 non-post views) |
+| 3 | `posts.draft_note` | "under its audience" (en) → "to this group's members" (group view) |
+| 4 | `posts.language_hint` | "this post" (en) → "this event / board / goal / project" (×7 views) |
+| 5 | `posts.publish` | "Publish" (en) → "Open" (draft-list view) |
+| 6 | `posts.reply_language_note` | "replying" (en) → "commenting" (announcement view) |
+| 7 | `posts.title_hint` | "body-only post" (en) → "body-only entry" (group/event view) |
+| 8 | `projects.board.audience_default` | "this board" (en) → "this goal / project" (×2 views) |
+| 9 | `settings.dateformat_default_tail` | "you reset" (resident voice) → "a resident resets" (admin voice) |
+| 10 | `tag.input.hint` | "this post" (en) → "this event" (event view) / no tail (profile view) |
+| 11 | `grant.empty_groups` | curly vs. straight quotes in "under …" |
+| 12 | `grant.hint` | curly vs. straight quotes in "Select all" |
+| 13 | `profile.audience_off_note` | curly vs. straight quotes in "switch on …" |
+
+**Decision.** Context-reuse is an accepted pattern: the registry `en` value
+is the **generic platform form** (the floor a fresh `en` instance renders),
+and the view fallback is the **per-entity or per-voice form** that is more
+accurate for that specific context. The provider floor (D1) still resolves
+every registered key to its `en` text, so the generic form is always
+available; the view's fallback is an **opt-in refinement** for the one site
+where the generic wording would be misleading. No key is dead, no key is
+unregistered, and `KwLRegistryConsistencyTests` passes cleanly for all 13 —
+this amendment documents the design choice so a future audit does not flag
+them as drift.
+
+### 2026-09-12 — full-sweep + provider floor (the upgrade path)
+
+**Full sweep.** The registry is no longer a pilot surface: it now covers the
+*entire* platform UI (251 keys — every key is emitted by a `<kw-l>` in a view,
+and every registered key is emitted, so the M·12 completeness universe equals
+the view surface exactly). The wrapped surface spans the shared layout,
+Home, Posts, Groups (create/edit), Directory/Detail, Community/Manage,
+Moderation (queue + resolve), Account (verify / resend / denied), Admin
+(audit log + break-glass), Locale (settings + public picker), static pages,
+and the announcements lane (index / new / edit / detail + the two shared
+announcement partials). Deliberate exclusions, all recorded so they are not
+read as drift:
+
+- **The setup flow** (`AdminSetup/Setup`) — first-boot, single-admin,
+  pre-community; ADR [0005](../adr/0005-multilingual-support.md)'s seam never claimed it.
+- **The `about` product surface** (`StaticPages/About`) — *superseded for
+  this surface by ADR [0042](../adr/0042-bundled-initial-language-pack.md) (2026-09-18), D3/D5*: its 17 `about.*` keys are
+  now registered and the view is wrapped in `<kw-l>` through the existing
+  mechanism; the exclusions below still hold for it.
+- **The FAQ placeholder** accordion — not platform UI yet (the FAQ content
+  is still `TODO(faq)`) — this exclusion stands.
+- **HTML attributes** (`placeholder`, `aria-label`, `title`) — the TagHelper
+  emits element *content*; attributes are out of its reach by design and are
+  left hardcoded.
+- **JS `confirm()` strings** — same reason; the dialog text is hardcoded.
+- **C#-built markup** (e.g. the grant-picker "select all" rows in
+  `Html.Raw`, and strings embedding inline `<code>` API identifiers or
+  inlined data values between words) — the `<kw-l>` element cannot wrap a
+  fragment inside a C# string, and registering a key whose rendered value
+  would drift from the actual output would make the registry a lie.
+- **`[Display(Name)]` model labels** — editor-internal, not platform copy.
+
+**Provider floor (the real upgrade mechanism).** The original design's
+"reseed to pick up new keys" premise turned out to be false in practice: the
+seeder runs **only** on a pristine DB (the `DbBootstrap.IsPristineAsync`
+gate), so a running instance whose code added keys would have kept rendering
+**raw keys** as the floor — which is exactly the regression this lane's
+first user-visible bug was. The floor was therefore tightened in code:
+`TranslationProvider.GetAsync` / `GetManyAsync` now resolve any
+registered-but-unseeded key to its `en` source text from
+`KnownTranslationKeys.EnValues`, with the raw key as the last resort for
+unregistered keys. Consequences:
+
+- **Code is the floor.** A registered key renders its English on *every*
+  instance — first-boot (seeder's rows present) or existing (floor from code)
+  — so upgrading the code is the entire upgrade path. **No reseed step
+  exists and none is needed.**
+- The seeder remains first-boot-only; its `en` rows are now a *stored copy*
+  of the registry, not the source of the floor.
+- The registry honesty invariant is now load-bearing: a key registered in
+  code but emitted by no view is dead weight, and a view emitting a key
+  missing from the registry renders a raw key. The final sweep holds the
+  invariant at 251 emitted = 251 registered, zero dead.
+
+
+---
+
+## ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- Federation replaces local Identity with an OpenIddict IdP (the `identity` schema may
+  move to the IdP and be dropped here).
+- An Identity framework version changes store contracts enough to re-cost the Marten
+  store option.

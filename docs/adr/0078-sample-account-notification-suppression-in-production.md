@@ -1,27 +1,23 @@
-# ADR 0078 — Sample-account notification suppression in production
-
-Status: Accepted
-Date: 2026-09-25
-Amends: **0076** (the M6 notification surface — the
-`NotificationService.EmitAsync` writer gains a single environment-aware
-gate before its profile-lookup step; no signature change, no new document,
-no new surface, no new seam on any frozen interface), **0055** (the
-sample-data seeder's code-owned account e-mail addresses become the
-closed set the gate compares against — a new `SampleAccountEmails`
-readonly property on `SampleDataSeeder`, additive on the seeder's
-existing constants), and **0056** (the sample-data opt-in / deploy
-posture — this ADR settles the *outbound channel* consequence of that
-posture that 0056 left implicit: in the Development environment the
-sample accounts are full notification citizens; in a Production / Staging
-demo instance they are not).
+---
+id: adr-0078
+title: "Sample-account notification suppression in production"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: [adr-0076]
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
-M6 (ADR 0076) and the admin-lane kinds (ADR 0077) made **every**
+M6 (ADR [0076](0076-notifications-inbox-and-recipient-email.md)) and the admin-lane kinds (ADR [0077](0077-admin-account-signup-verify-notification.md)) made **every**
 resident a full notification citizen: a reply, a group post, an RSVP, a
 report, a to-do — each produces an inbox row and, per the recipient's
 preference, a durable email. That is exactly right for a real
-neighborhood. But ADR 0055 / 0056 introduced a second, distinct kind of
+neighborhood. But ADR [0055](0055-development-sample-data-lane.md) / 0056 introduced a second, distinct kind of
 resident — the **sample neighborhood** — which is an explicit opt-in
 (`SampleData__Enabled`) that, in the Development loop, is backed by
 **Mailpit** (a local SMTP sink that discards mail after showing it). In
@@ -29,7 +25,7 @@ that environment, the sample accounts being notified is harmless and
 even useful: a developer can watch the durable-outbox pipeline work
 end-to-end against the seeded mock neighborhood.
 
-The problem is the **deployed demo** posture (ADR 0056): a Production
+The problem is the **deployed demo** posture (ADR [0056](0056-sample-data-opt-in-and-deploy-posture.md)): a Production
 instance with `SampleData__Enabled=true` is a *public* instance whose
 sample accounts are real, sign-in-able rows (random high-entropy
 passwords, a credentials summary e-mailed to the seed admin). In that
@@ -139,14 +135,3 @@ data" value is preserved.
   against the live scratch-Postgres fixture and construct the service
   directly with an explicit `Options.Create(...)`, so the pin is
   independent of the host's binding.
-
-## Follow-ons
-
-- **Suppressing the M4 event-reminder e-mail for sample attendees** is
-  *not* covered by this gate: the §6.4 reminder is staged directly by
-  `EventReminderService` with its own `remind:{eventId}:{userId}` key
-  (ADR 0054) and does not route through `EmitAsync`. On a deployed demo
-  instance with sample RSVPs, those reminder e-mails still go out. That
-  is a narrow, acceptable consequence (the reminders are the one M4
-  lane that predates M6 and never adopted the M6 seam); if it becomes
-  noise it is a follow-on lane, its own ADR.

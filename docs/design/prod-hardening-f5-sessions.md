@@ -1,4 +1,19 @@
+---
+id: design-prod-hardening-f5-sessions
+title: "F5 — session kill-all + invalidation (AUTH-04)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+updated: 2026-11-02
+---
+
 # F5 — AUTH-04: session kill-all + invalidation — Part-0 design pin
+
+> **Abstract:** the **F5 session kill-all** design pin (Part-0, design-only) — **session kill-all + invalidation**: a resident who changes their password (or "signs out everywhere") is actually signed out of their other live sessions (the security-stamp invalidation is neutered today) + a kill-all surface. Server-side state + per-request resolution (no cookie claim). Closes 2026-10-22 AUTH-04. **Who is it for:** a developer executing F5 U2–U4; an agent that needs the kill-all / invalidation shape. **When to read the rest:** before touching the kill-all service, the security-stamp invalidation, or the F5 tests.
+
 
 > **Fix:** F5 (report row **AUTH-04**) — kind **`code`**, **dep F3 (complete)**.
 > **Status:** this is the **Part-0 design pin** (F5.U1). It is **design-only**:
@@ -11,7 +26,7 @@
 > is *supposed* to trigger is neutered in this codebase (see §1), and there is
 > **no kill-all surface** at all.
 
-> **Repo doctrine applied (from `AGENTS.md`):** *"Thin token, fat authorization:
+> **Repo doctrine applied (from [`AGENTS.md`](../../AGENTS.md)):** *"Thin token, fat authorization:
 > 'may this actor see that resource?' is resolved by the `Authorization` service
 > per request, not encoded in an identity claim."* F5's invalidation mechanism
 > must honor that: **server-side state + per-request resolution**, not a cookie
@@ -35,7 +50,7 @@
   `ValidationInterval` of 30 minutes. Every 30 min … the validator fires and
   re-reads the user from the store by the `NameIdentifier` claim … The custom
   `KumunitaClaimsPrincipalFactory` … mints the identity with a **name-type of
-  null** (not `NameIdentifier`, by design — ADR 0006-B no-relational-data
+  null** (not `NameIdentifier`, by design — ADR [0006](../adr/0006-module-boundary-contracts.md)-B no-relational-data
   invariant), so `userManager.FindByIdAsync(...)` **returns null** on every
   validation pass, and the validator then calls
   `context.RejectPrincipal()` + `SignInManager.SignOutAsync()` … That is the
@@ -65,7 +80,7 @@
 > to compare. So the two standard levers the plan names — "revert the interval
 > so `UpdateSecurityStampAsync` fires" and "a per-user security-stamp bump" —
 > are **both inert in this codebase today** unless we either (a) re-mint a
-> standard `NameIdentifier` + a `SecurityStamp` claim (an **ADR 0006-B conflict**),
+> standard `NameIdentifier` + a `SecurityStamp` claim (an **ADR [0006](../adr/0006-module-boundary-contracts.md)-B conflict**),
 > or (b) switch to the repo's *actual* invalidation pattern (per-request
 > server-side resolution — §2, Option B). This is the design decision this pin
 > resolves.
@@ -157,7 +172,7 @@ the `## F3.U4` handoff section):
 
 - **The controller** — `src/Kumunita.Web/Controllers/SecuritySettingsController.cs`:
   `[Authorize]` at `/settings/security` (the `MessagingSettingsController`
-  settings-tab shape, `LocaleController` / `KioskController` idiom, ADR 0080).
+  settings-tab shape, `LocaleController` / `KioskController` idiom, ADR [0080](../adr/0080-settings-surface-split.md)).
   The resolve-user seam is `ResolveUserAsync()` (`:85-94`):
   `var subject = KumunitaPrincipal.SubjectId(User); … return await userManager.FindByIdAsync(subject);`.
   The enrollment actions are `Mfa()` `GET /settings/security/mfa` (`:150-190`) and
@@ -206,7 +221,7 @@ owner to pick before it lands code** (§8 drift note).
    kill-all is rejected at completion.
 
 **Why it is NOT recommended (grounded evidence):**
-- **ADR 0006-B conflict.** Adding a `SecurityStamp` claim to the admissible claim
+- **ADR [0006](../adr/0006-module-boundary-contracts.md)-B conflict.** Adding a `SecurityStamp` claim to the admissible claim
   set breaks the "exactly `ClaimTypes.All` (subject, externalId, verified, role)"
   invariant that `ClaimShaping` (`:6-20`) and the invariant-set-B tests assert.
   `ClaimShaping.cs:57`'s null name-type is a **deliberate** choice (the comment at
@@ -226,7 +241,7 @@ owner to pick before it lands code** (§8 drift note).
   remediation exists to prevent (`Program.cs:465-477`).
 
 **Verdict: not recommended.** It is *recorded* here so the owner can choose it;
-if chosen, it is a **new ADR** (an ADR 0006-B amendment), not a silent change
+if chosen, it is a **new ADR** (an ADR [0006](../adr/0006-module-boundary-contracts.md)-B amendment), not a silent change
 (§7 non-goal).
 
 ### Option B — keep the 14-day interval; kill-all via a server-side revocation stamp + per-request gate (repo-consistent) — **RECOMMENDED**
@@ -270,7 +285,7 @@ if chosen, it is a **new ADR** (an ADR 0006-B amendment), not a silent change
   not a re-shape of the F3 leg flow (§7 non-goal).
 
 **Verdict: recommended.** It is consistent with the repo's existing
-invalidation pattern (§1c), needs **no ADR 0006-B amendment** (the revocation mark
+invalidation pattern (§1c), needs **no ADR [0006](../adr/0006-module-boundary-contracts.md)-B amendment** (the revocation mark
 is a DB column, not a new claim type), and is the **only** option that cleanly
 covers the F3 pending-cookie window with one consistent gate.
 
@@ -375,14 +390,14 @@ covers the F3 pending-cookie window with one consistent gate.
   Option B leg-2 gate (a narrow additive check on the F3 `LoginMfa` path) and
   reuses the leg flow's pending-cookie semantics. It does **not** touch the F3
   `SecuritySettingsController` MFA actions.
-- **F5 does NOT open ADR 0006-B** under the recommendation (Option B). It opens a
+- **F5 does NOT open ADR [0006](../adr/0006-module-boundary-contracts.md)-B** under the recommendation (Option B). It opens a
   **new ADR** only if the owner picks Option A (the `SecurityStamp`-claim /
   name-type change) — recorded, not assumed.
-- **F5 adds no new bounded context** (ADR 0006 preserved), **no new Marten doc
+- **F5 adds no new bounded context** (ADR [0006](../adr/0006-module-boundary-contracts.md) preserved), **no new Marten doc
   that changes the C3 single-write-lane** (the kill-all write is in
   `Kumunita.Core/Identity/IdentityService.cs`, the existing single-write seam),
   and **no new `<PackageReference>`**.
-- **F5 does NOT touch the F3-landed files or the F4 `OPS.md` blocks** (per the
+- **F5 does NOT touch the F3-landed files or the F4 [`OPS.md`](../OPS.md) blocks** (per the
   unit's rule). The only F3-landed file F5 may *add to* is `AccountController.cs`
   (the leg-2 gate), and only as a narrow additive check the owner approves (§8).
 

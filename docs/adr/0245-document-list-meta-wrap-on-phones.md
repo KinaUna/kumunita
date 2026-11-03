@@ -1,10 +1,23 @@
-# ADR 0245 — The document list meta row keeps each item whole on phones
+---
+id: adr-0245
+title: "The document list meta row keeps each item whole on phones"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0245](0245-document-list-meta-wrap-on-phones.md) — The document list meta row keeps each item whole on phones
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-Since ADR 0239 the document list row reads `uploader · size · date` in `.airy-ann-meta`, a non-wrapping flex line. At 390px the three
+Since ADR [0239](0239-document-uploader-attribution-and-delete-lane.md) the document list row reads `uploader · size · date` in `.airy-ann-meta`, a non-wrapping flex line. At 390px the three
 spans shrank and broke inside themselves: "Alex / Admin", "30 / B" and the date over two lines, in a 46px-tall block. The detail page
 meta (a stacked list) was checked and is fine.
 

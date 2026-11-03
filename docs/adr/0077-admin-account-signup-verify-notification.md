@@ -1,4 +1,17 @@
-# ADR 0077 — Admin account notifications: notify every GlobalAdmin when a resident signs up or verifies (a new notify gate + two admin-lane kinds on the frozen M6 emitter)
+---
+id: adr-0077
+title: "Admin account notifications: notify every GlobalAdmin when a resident signs up or verifies (a new notify gate + two admin-lane kinds on the frozen M6 emitter)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m20-notification-quiet-times-design.md]
+supersedes: [adr-0076]
+superseded_by: [adr-0165]
+updated: 2026-11-02
+---
+
+# ADR [0077](0077-admin-account-signup-verify-notification.md) — Admin account notifications: notify every GlobalAdmin when a resident signs up or verifies (a new notify gate + two admin-lane kinds on the frozen M6 emitter)
 
 Status: Accepted
 Date: 2026-09-24
@@ -38,7 +51,7 @@ events." This ADR adds exactly those two things and nothing more.
 
 **What the request is:** "add an admin option: send email/notification when a
 user signs up / verifies an account." Read literally: a **GlobalAdmin
-toggle** (the instance gate, the ADR 0019/0020/0050 `LocaleSettings` shape)
+toggle** (the instance gate, the ADR [0019](0019-timezone-platform-default-and-resident-override.md)/0020/0050 `LocaleSettings` shape)
 that, when on, fans out a **notification** (the M6 inbox row + best-effort
 email) to **every GlobalAdmin** at **two moments** — signup and verification.
 
@@ -48,7 +61,7 @@ email) to **every GlobalAdmin** at **two moments** — signup and verification.
 A new `bool` field on the `LocaleSettings` singleton (the same document the
 timezone / date-format / editor / signup-gate lanes read and write),
 **defaulting to `true`** — the M6 "null / empty = all enabled" lean-default
-and the ADR 0050 `IsSignupOpen` floor shape: a fresh instance ships with the
+and the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) `IsSignupOpen` floor shape: a fresh instance ships with the
 admin notification *on* (the operator who self-hosts a community wants to know
 when someone joins, until they say otherwise). The read seam
 (`IIdentityService.IsNotifyAdminsOnSignupAsync`) carries the **`true` floor**
@@ -56,7 +69,7 @@ when someone joins, until they say otherwise). The read seam
 `false` silences it), exactly like `IsSignupOpenAsync`. The write seam
 (`IIdentityService.SetNotifyAdminsOnSignupAsync`) is a read-modify-write of
 the singleton + **exactly one** `AccessAudit` row (via: Admin, action
-`"signup.set-notify"`, target `"signup"`), the ADR 0019/0020 single-target
+`"signup.set-notify"`, target `"signup"`), the ADR [0019](0019-timezone-platform-default-and-resident-override.md)/0020 single-target
 shape — a read, no audit row. *Forbids:* a per-admin toggle (this is an
 *instance* setting — the recipient set is "every GlobalAdmin," not a chosen
 subset), a new document, a migration, or a `false` floor.
@@ -119,7 +132,7 @@ POST action `SaveNotify(bool notifyAdmins)` + a GET seed
 (`vm.NotifyAdmins`) + a second form in `AdminSignup/Index.cshtml` mirroring
 the gate form (its own `[ValidateAntiForgeryToken]` POST, one `<select>` on/off,
 its own submit button reusing the existing `admin.signup_save` label). One
-toggle = one audited write lane (the ADR 0019/0020 shape) — the existing
+toggle = one audited write lane (the ADR [0019](0019-timezone-platform-default-and-resident-override.md)/0020 shape) — the existing
 `Save(bool isOpen)` action and its tests are **untouched**. *Forbids:* folding
 the notify toggle into the gate `Save` action (one action should carry one
 audited decision), or a new admin page.
@@ -137,7 +150,7 @@ a build failure. *Forbids:* a key in fewer than four languages.
 ## Consequences
 
 - **The delta is small and additive:** one bool field on `LocaleSettings`
-  (ADR 0004 §B.1, no migration), two constants on `NotificationKinds` (now
+  (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1, no migration), two constants on `NotificationKinds` (now
   eleven), two seams on `IIdentityService` + `IdentityService`
   (read + write gate, the emitter), one optional constructor parameter, one
   new admin POST action + one form, twelve keys × four languages, and one new
@@ -150,7 +163,7 @@ a build failure. *Forbids:* a key in fewer than four languages.
   is the *only* new wiring, and it is a no-op in a test harness).
 - **The reuse pin:** the M1 durable-email trio delivers the admin emails (the
   same `OutboxEmail` row, the same durable handler, the same dead-letter +
-  `/health` degraded gate); ADR 0061's per-recipient language resolution
+  `/health` degraded gate); ADR [0061](0061-email-and-notification-language.md)'s per-recipient language resolution
   governs them verbatim; the closed `KnownTranslationKeys` registry holds the
   subject/body templates (all four languages, the parity test enforces
   equality).

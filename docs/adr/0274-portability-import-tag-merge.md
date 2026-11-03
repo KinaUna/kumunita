@@ -1,11 +1,24 @@
-# ADR 0274 — Portability import (KeepExisting): merge tags by slug + default-language name
+---
+id: adr-0274
+title: "Portability import (KeepExisting): merge tags by slug + default-language name"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0274](0274-portability-import-tag-merge.md) — Portability import (KeepExisting): merge tags by slug + default-language name
 
 Status: Accepted
 Date: 2026-10-30
-Extends the **ADR 0193 portability import modes** lane (the `KeepExisting`
+Extends the **ADR [0193](0193-portability-import-modes.md) portability import modes** lane (the `KeepExisting`
 merge semantic — "keep existing, add only what is new") and the **TG lane**
-(ADR 0044 — the `Tag` / `TagTranslation` documents, the `Slug` business key,
-the write-lane create-or-reuse identity guard C-TG·4) and the **ADR 0005**
+(ADR [0044](0044-tags.md) — the `Tag` / `TagTranslation` documents, the `Slug` business key,
+the write-lane create-or-reuse identity guard C-TG·4) and the **ADR [0005](0005-multilingual-support.md)**
 display-name preference order (the default-language `TagTranslation` row,
 falling back to the tag's base `Name`). This ADR closes the duplicate-tag
 failure a `KeepExisting` import produced over a live instance: tags that two
@@ -15,7 +28,7 @@ twice.
 
 ## Context
 
-ADR 0193's `KeepExisting` (merge) import skips an archived row when the target
+ADR [0193](0193-portability-import-modes.md)'s `KeepExisting` (merge) import skips an archived row when the target
 already holds it, keyed on the type's **natural identity** — the union of the
 surrogate id and the member set of **every unique index** on the type's table
 (derived from the Marten mapping). That guard is correct for the doc types it
@@ -24,7 +37,7 @@ was built for — `TranslationResource` `(Key, LanguageCode)`,
 `(ParentId, LanguageCode)` rows — because each carries a **unique business-key
 index** the skip can read.
 
-A `Tag` is the exception. The `Slug` is its business key (ADR 0044 D3, the
+A `Tag` is the exception. The `Slug` is its business key (ADR [0044](0044-tags.md) D3, the
 C-TG·4 pin) but it is **not** a unique index: `TagDocTypes` registers **no**
 index on `Tag`, on the grounds that the write lane's create-or-reuse
 (`TagService.AttachTo*Async`, "a second author attaching the same Slug reuses
@@ -46,9 +59,9 @@ default language."* Two constraints:
 - **The merge key is the default-language name** — a tag is "the same" when it
   is the same slug **and** the same display name in the instance's default
   language. A different default-language name (even the same slug) is a
-  **different** tag (the ADR 0044 D3 design — two names, two tags).
+  **different** tag (the ADR [0044](0044-tags.md) D3 design — two names, two tags).
 
-The constraint that keeps the merge safe is the one ADR 0193 already enforces:
+The constraint that keeps the merge safe is the one ADR [0193](0193-portability-import-modes.md) already enforces:
 **the existing row is kept intact, never overwritten; only new rows are added.**
 This ADR re-applies that same keep-first discipline to the `Tag` /
 `TagTranslation` pair, using a merge key the natural-identity skip cannot
@@ -69,7 +82,7 @@ the per-type loop, the service:
    **`Slug` (normalized the way the write lane derives it: `Trim` +
    `ToLowerInvariant`) AND the default-language display name** (case-insensitive).
    The display name is the tag's `TagTranslation` row for the default language,
-   falling back to the tag's base `Name` (the ADR 0005 D5 preference order —
+   falling back to the tag's base `Name` (the ADR [0005](0005-multilingual-support.md) D5 preference order —
    the `/tags` page's displayed name). A tag that matches no existing tag on
    both is **not** in the map (it is stored as its own new tag — D2).
 2. **Re-points the archive's content references** (data-driven, from the
@@ -86,7 +99,7 @@ the per-type loop, the service:
    intact (the natural-identity skip keeps them); a language the existing tag
    does not yet have is **added** (the row is not skipped — it is the
    "translations fold in" half). One row per `(existing tag, language)` — the
-   ADR 0044 D1 shape, now satisfied by the existing tag, not a duplicate.
+   ADR [0044](0044-tags.md) D1 shape, now satisfied by the existing tag, not a duplicate.
 
 The apply loop then, for each `Tag` row whose id is in the merge map, **skips
 the store** (the existing tag is kept intact, never overwritten); the merged
@@ -99,7 +112,7 @@ pure add-on to the `KeepExisting` apply path.
 **D2 — The keep-vs-add boundary is the default-language name.** A tag the
 archive carries that the target already holds — same slug **but a different
 default-language display name** — is a **different** tag and is stored as its
-own new tag (no false merge). This is the ADR 0044 D3 design carried to the
+own new tag (no false merge). This is the ADR [0044](0044-tags.md) D3 design carried to the
 import: two names, two tags. The merge map is the only place the "same tag"
 decision is made; everything else (the skip, the remap, the store-if-absent)
 follows from it.
@@ -125,12 +138,12 @@ to merge into). The `defaultLanguageCode` parameter is passed but ignored in
   drive the content re-pointing; the `Tag` / `TagTranslation` pair is the only
   special-cased type, and only because it is the only type whose identity guard
   is the write lane rather than a unique index — the same reason it is the only
-  type the ADR 0193 natural-identity skip cannot see).
+  type the ADR [0193](0193-portability-import-modes.md) natural-identity skip cannot see).
 - **Live-instance repair:** an instance that already accumulated duplicate tags
   from a pre-fix `KeepExisting` import still has them — the merge is forward
   only (a re-import merges new tags into existing ones; it does not
   retroactively de-duplicate rows the target already holds, which the
   keep-first discipline forbids). The operator's path to a clean `/tags` page
   is a `CleanSlate` import (the default — it wipes then applies the archive's
-  tags as the single set) or the operator's pre-import backup (the ADR 0108 D1
+  tags as the single set) or the operator's pre-import backup (the ADR [0108](0108-portability-import-export.md) D1
   rollback path).

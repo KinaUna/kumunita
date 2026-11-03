@@ -1,4 +1,20 @@
+---
+id: design-m16-inventory
+title: "M16 — Inventory (check-out / check-in)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0117-inventory.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M16 — Inventory (check-out / check-in + usage history) — design
+
+> **Abstract:** the **inventory** design — a neighborhood's shared/private things (equipment, clothes, books) become **trackable**: a check-out / check-in transition (who it's with) + an append-only usage history. One new bounded context (`Kumunita.Core.Inventory`) + two docs + one adapter on the frozen authorization service. **Who is it for:** a developer touching `InventoryItem` / `InventoryCheckout`; an agent that needs the check-out/check-in seam. **When to read the rest:** before touching the inventory context, the usage-history append, or the check-out/check-in transition.
+
 
 > **Milestone M16.** The neighborhood's **shared, community-owned, or
 > private things** (equipment, sports-team clothes, books, …) become
@@ -22,7 +38,7 @@
 >
 > **Status.** **LOCKED.** The decisions D1–D8, the invariants
 > C-M16·1–7, the FACES F1–F5 + the named trade, the §kw-l key list, and
-> the §gate test names are locked in **ADR 0117 (Accepted, 2026-09-29)**.
+> the §gate test names are locked in **ADR [0117](../adr/0117-inventory.md) (Accepted, 2026-09-29)**.
 > The `[PROPOSED]` set in the register
 > `docs/plans-milestones/plan-m16-inventory.md` is the locked set this
 > doc restates **verbatim** (the veto window closed before U00 ran — the
@@ -57,7 +73,7 @@ frozen seams**:
 1. **The frozen `IAuthorizationService`** — `CanAsync(Read)` (detail) /
    `CanSeeAsync(Read)` (list) with the `IDocumentSession` overloads (C3 —
    the audit row commits **in the same transaction** as the domain
-   write), over an `IAuditableResource` (ADR 0006 §A). The frozen surface
+   write), over an `IAuditableResource` (ADR [0006](../adr/0006-module-boundary-contracts.md) §A). The frozen surface
    is 4-method + the group lane; the frozen `AccessAction` set is
    `Read` / `Moderate`; the frozen `AccessVia` set is Owner / Admin
    (+ the existing values). **M16 adds none of these — it adds an
@@ -76,24 +92,24 @@ frozen seams**:
 3. **The `*DocTypes` parallel-surface shape** (`src/Kumunita.Core/MessagingDocTypes.cs`)
    — `opts.Schema.For<T>()` + named indexes; `ApplyAllConfiguredChangesTo
    DatabaseAsync()` delta-detects and applies the new tables
-   **idempotently** at boot (ADR 0004 §B.1) — **zero migrations for
+   **idempotently** at boot (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1) — **zero migrations for
    existing surfaces**. The M9 `convo_uidx_pair` (`UniqueIndex("convo_uidx_pair", c => c.ParticipantA, c => c.ParticipantB)`)
    is the **F1 idempotency witness** the `InventoryDocTypes` open-checkout
    unique partial index copies (the witness of at-most-one-open-checkout).
-4. **The M5 standing split** (C-M5·6 / ADR 0086) — the write lanes'
+4. **The M5 standing split** (C-M5·6 / ADR [0086](../adr/0086-goals-projects-lane.md)) — the write lanes'
    **creator ∪ GlobalAdmin** standing probe (the `ProjectService`
    standing-probe shape — compose the frozen "can see it" +
    `IUserInfoService`'s GlobalAdmin probe **server-side**) and the **broad
    standing** precedent (the `ClaimTodoAsync` "any member who can see it"
-   shape, ADR 0106) — D5's two standing classes.
+   shape, ADR [0106](../adr/0106-todo-self-assign-lane-and-board-default-audience.md)) — D5's two standing classes.
 5. **The M5 `projects.*` `kw-l` block in `KnownTranslationKeys`** (the
-   closed-key registry, ADR 0015) — the `inv.*` block it joins (the
+   closed-key registry, ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) — the `inv.*` block it joins (the
    `KnownTranslationKeys_ParityTests` + `KwLRegistryConsistencyTests`
    pins extend automatically — §kw-l).
-6. **The ADR 0024 soft-delete flag** (`IsDeleted`) — the item's delete
+6. **The ADR [0024](../adr/0024-author-soft-delete-lane.md) soft-delete flag** (`IsDeleted`) — the item's delete
    lane's shape (a flag flip, never a row delete — the checkout records
    are the append-only history, C-M16·3).
-7. **The ADR 0018 authored-in `LanguageCode` tag** — the item's
+7. **The ADR [0018](../adr/0018-ugc-authored-in-language-tag.md) authored-in `LanguageCode` tag** — the item's
    display-tag shape (single-language in M16 — the translation lane is
    §deferred).
 
@@ -109,8 +125,8 @@ media, **no** recurrence (§deferred).
 
 M16 builds entirely on **frozen, verified seams** (the list above). This
 is a **milestone** (a roadmap letter, not a named lane): the close unit
-(U06) flips `Milestones.cs` / the README Roadmap / `docs/STATUS.md` /
-`docs/ARCHITECTURE.md` + `MilestonesTests.cs` (the AGENTS.md doc↔code
+(U06) flips `Milestones.cs` / the README Roadmap / [`docs/STATUS.md`](../STATUS.md) /
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `MilestonesTests.cs` (the AGENTS.md doc↔code
 parity contract — D7). This design doc (authored U00, **LOCKED**) is the
 **primary tier**; the register
 `docs/plans-milestones/plan-m16-inventory.md` is the secondary tier; the
@@ -135,13 +151,13 @@ section + the nav entry (U05), the **twenty `inv.*` `kw-l` keys ×
 en/de/fr/da** (U04, §kw-l), and the **three acceptance gate tests**
 (U06, §gate) + the **D7 docs parity flip** (U06).
 
-**Out (each a named follow-on lane, ADR 0117 Consequences — own ADRs;
+**Out (each a named follow-on lane, ADR [0117](../adr/0117-inventory.md) Consequences — own ADRs;
 the deferred-lane list is locked in §deferred):** the "nudge the owner
 on checkout" notification lane (D8 — the M6 `INotificationService`
 emitter idiom); the per-item translation lane (the M5 `TodoTranslation`
 shape — the item's `LanguageCode` tag is present, the translation
-records are not); the media / attachments-on-items lane (the ADR 0025 /
-ADR 0034 shape); the recurring / reserved check-out lane (a pre-booked
+records are not); the media / attachments-on-items lane (the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) /
+ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) shape); the recurring / reserved check-out lane (a pre-booked
 slot, a hold); a third "Usage" document or context (C-M16·3 — the history
 **is** the checkout records).
 
@@ -180,7 +196,7 @@ split is the invariant that keeps the two from leaking into each other.
   `ComponentId` (a feed filter, never a gate — C-M3·2), `AuthorId` (the
   standing owner — D5), `Audience` (the exact `Post` `Audience`,
   `null` = public — D2/D3), `CurrentHolderId` nullable (`null` = in the
-  pool — D4), `IsDeleted` (ADR 0024), `LanguageCode` (ADR 0018),
+  pool — D4), `IsDeleted` (ADR [0024](../adr/0024-author-soft-delete-lane.md)), `LanguageCode` (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)),
   `Created`, `Modified`), `InventoryCheckout.cs` (the append-only usage
   record: `Id`, `ItemId`, `BorrowerId`, `CheckedOutAt`, `CheckedInAt`
   nullable — open when null, `Note` optional),
@@ -219,9 +235,9 @@ split is the invariant that keeps the two from leaking into each other.
   `StatusNext` → `StatusDone`; M17 `StatusPlanned` → `StatusNext`),
   `MilestonesTests.cs` (re-pinned to
   `M17_Is_The_Single_InProgress_Milestone` + the shipped list gains M16
-  + M18 stays planned), the `README.md` Roadmap (M16 → done, M17 → in
-  progress) + the M16 **Status** line, `docs/STATUS.md`, and
-  `docs/ARCHITECTURE.md` (the value-chain table gains the **M16 row** —
+  + M18 stays planned), the [`README.md`](../../README.md) Roadmap (M16 → done, M17 → in
+  progress) + the M16 **Status** line, [`docs/STATUS.md`](../STATUS.md), and
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) (the value-chain table gains the **M16 row** —
   the table currently ends at the M15 row).
 
 **Unchanged (the frozen surface — the §drift-guard frozen list is the
@@ -273,7 +289,7 @@ and every existing controller / view / view-model.
 
   Registered in `Program.cs` (`InventoryDocTypes.Configure(opts)` after
   `MessagingDocTypes.Configure(opts)`). Delta-detected + applied idempotently
-  at boot — **zero migrations for existing surfaces** (ADR 0004 §B.1).
+  at boot — **zero migrations for existing surfaces** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 
 - **`InventoryItemToAuditableResource`** (D2, U01) — the **exact** M5
   `ProjectToAuditableResource` 6-member projection:
@@ -322,7 +338,7 @@ and every existing controller / view / view-model.
   actor; one `AccessAudit` row `TargetKind = "inventory"`, `Via
   Owner/Admin`), `EditItemAsync` (the standing probe: **creator ∪
   GlobalAdmin** — D5), `DeleteItemAsync` (the standing probe: **creator
-  ∪ GlobalAdmin**; the ADR 0024 soft-delete flag — the item's checkout
+  ∪ GlobalAdmin**; the ADR [0024](../adr/0024-author-soft-delete-lane.md) soft-delete flag — the item's checkout
   history survives the flag), `CheckOutAsync` (the standing probe:
   **any member who can see it** — community/shared; **owner ∪
   GlobalAdmin** — private; the **atomic** transition — F1: the
@@ -357,7 +373,7 @@ moderator scope**, and **no** `IAuthorizationService` method (D2 /
 C-M16·4). The read decision is **always** the item's `Audience` through
 the frozen service (C-M16·1 — `OwnerKind` never an access gate); the
 action decision is **always** the D5 standing probe (C-M16·5 — the
-visibility/standing split). The **migration path** is the ADR 0004
+visibility/standing split). The **migration path** is the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md)
 §B.1 delta detection: `ApplyAllConfiguredChangesToDatabaseAsync()`
 applies the two new tables + the indexes idempotently at boot — **zero
 migrations for existing surfaces** (D1). **Every** read and write
@@ -522,10 +538,10 @@ carried to M16.
 one adapter + one service seam + one controller + four views + one nav
 entry + twenty registry keys. **One idempotent delta** at boot:
 `InventoryDocTypes` is delta-detected and applied by
-`ApplyAllConfiguredChangesToDatabaseAsync()` (ADR 0004 §B.1) — the two
+`ApplyAllConfiguredChangesToDatabaseAsync()` (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1) — the two
 new tables + the three indexes, **zero migrations for existing
 surfaces** (D1). The twenty `inv.*` keys are seeded by the existing
-100%-completeness seeder floor (the ADR 0052 warm-boot backfill, the
+100%-completeness seeder floor (the ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md) warm-boot backfill, the
 `projects.*` precedent).
 
 **Rollback (the documented path):**
@@ -537,7 +553,7 @@ surfaces** (D1). The twenty `inv.*` keys are seeded by the existing
    `ActorId`) names who and when. Correcting it is a **new** check-in /
    check-out by a standing actor — the audit trail is the rollback's
    evidence, not its obstacle.
-2. **A mistaken item** (created / edited in error) — the ADR 0024
+2. **A mistaken item** (created / edited in error) — the ADR [0024](../adr/0024-author-soft-delete-lane.md)
    soft-delete flag (the `IsDeleted` flip) removes it from the list
    without touching the append-only history (C-M16·3); restoring it is
    the flag flipped back.
@@ -615,12 +631,12 @@ used by whom" the row names — a fact, not a claim).
 - **Not** — a **notification** on checkout (§deferred, D8, own ADR — the
   M6 `INotificationService` emitter idiom); a **translation** of the
   item's name/description (§deferred, own ADR — the M5 `TodoTranslation`
-  shape); **media** on items (§deferred, own ADR — the ADR 0025 / 0034
+  shape); **media** on items (§deferred, own ADR — the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / 0034
   shape); **recurring / reserved** check-outs (§deferred, own ADR — a
   pre-booked slot, a hold); a **third "Usage" document or context**
   (C-M16·3 forbids — the history **is** the checkout records).
 
-## Decisions (D1–D8, locked — ADR 0117)
+## Decisions (D1–D8, locked — ADR [0117](../adr/0117-inventory.md))
 
 > **Locked verbatim.** These are the register's [PROPOSED] set, locked
 > with **no veto recorded** (the open-veto window closed before U00 ran
@@ -691,7 +707,7 @@ used by whom" the row names — a fact, not a claim).
   check-out/check-in (the M5 `ClaimTodoAsync` broad standing precedent).
   The Web `[Authorize]` attribute is a **convenience pre-gate only**,
   never the source of truth. No new `AccessVia` value beyond the
-  existing set (the TG ADR 0044 "no new AccessVia beyond Owner/Admin"
+  existing set (the TG ADR [0044](../adr/0044-tags.md) "no new AccessVia beyond Owner/Admin"
   precedent).
   *Forbids:* a new `AccessVia` value; the Web `[Authorize]` as the
   source of truth; a standing that lets a non-visible actor check out an
@@ -712,8 +728,8 @@ used by whom" the row names — a fact, not a claim).
   `MilestonesTests.cs` re-pinned to
   `M17_Is_The_Single_InProgress_Milestone` + the shipped list gains M16
   + M18 stays planned; the README **Roadmap** (M16 → done, M17 → in
-  progress) + the M16 **Status** line; `docs/STATUS.md`; and
-  `docs/ARCHITECTURE.md`'s value-chain table gains the **M16 row** (the
+  progress) + the M16 **Status** line; [`docs/STATUS.md`](../STATUS.md); and
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)'s value-chain table gains the **M16 row** (the
   table currently ends at the M15 row). All four surfaces ship **in the
   same unit** (the M15/U10 docs-parity precedent).
   *Forbids:* reordering M17/M18; editing a shipped milestone's text;
@@ -773,8 +789,8 @@ used by whom" the row names — a fact, not a claim).
   four surfaces — `Milestones.cs` (M16→done, M17→next),
   `MilestonesTests.cs` (re-pinned to
   `M17_Is_The_Single_InProgress_Milestone` + shipped list + M18
-  planned), the README Roadmap/Status, and `docs/STATUS.md` + the
-  `docs/ARCHITECTURE.md` value-chain M16 row — **in the same unit**
+  planned), the README Roadmap/Status, and [`docs/STATUS.md`](../STATUS.md) + the
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) value-chain M16 row — **in the same unit**
   (D7).
 
 ## §kw-l — the key list (the `inv.*` keys × en/de/fr/da)
@@ -816,7 +832,7 @@ used by whom" the row names — a fact, not a claim).
 Each × **4 languages** (`en` / `de` / `fr` / `da`), the closed-key
 registry shape (the `KnownTranslationKeys_ParityTests` +
 `KwLRegistryConsistencyTests` pins enforce the 4-language set + non-empty
-values; the ADR 0052 warm-boot backfill seeds them idempotently — the
+values; the ADR [0052](../adr/0052-warm-boot-ui-string-baseline-backfill.md) warm-boot backfill seeds them idempotently — the
 `projects.*` precedent).
 
 ## §gate — the three acceptance tests (U06)
@@ -859,7 +875,7 @@ confirmation (C-M16·4 — `IAuthorizationService` / `AccessAction` /
 four-language parity (the U04 pins already record this — a single
 consolidated assertion if not already covered); the D7 four-surface docs
 parity flip (C-M16·7 — `Milestones.cs` / `MilestonesTests.cs` / README
-Roadmap+Status / `docs/STATUS.md` + `docs/ARCHITECTURE.md` value-chain
+Roadmap+Status / [`docs/STATUS.md`](../STATUS.md) + [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) value-chain
 M16 row, **in the same unit**).
 
 ## §deferred — the deferred-lane list (each a named follow-on, own ADR)
@@ -867,8 +883,8 @@ M16 row, **in the same unit**).
 | Deferred lane | The one-line "own ADR" note |
 |---|---|
 | **The "nudge the owner on checkout" notification lane** (D8) | The M6 `INotificationService` emitter idiom + a Wolverine handler — a **new trust boundary** (an outbound nudge on a state transition) that M16 deliberately does not take. The README's "optionally" is the **usage history** (F3), not a notification. Own ADR as a new outbound surface. |
-| **The per-item translation lane** (the M5 `TodoTranslation` shape) | The item's `LanguageCode` tag (ADR 0018) is present for display; a full translation record (one row per item × language, with its own author standing matrix) is a **different inventory** — an own lane, own ADR. M16's item is **single-language** by design (the README row does not name translations). |
-| **The media / attachments-on-items lane** (the ADR 0025 / ADR 0034 shape) | An image / a file on an item is a **media lane** over the ADR 0011 storage substrate — a new surface with its own standing matrix. M16's item is **text + ownership** (the README row names the *thing* and its *use*, not its *picture*). Own ADR. |
+| **The per-item translation lane** (the M5 `TodoTranslation` shape) | The item's `LanguageCode` tag (ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)) is present for display; a full translation record (one row per item × language, with its own author standing matrix) is a **different inventory** — an own lane, own ADR. M16's item is **single-language** by design (the README row does not name translations). |
+| **The media / attachments-on-items lane** (the ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md) / ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md) shape) | An image / a file on an item is a **media lane** over the ADR [0011](../adr/0011-media-and-file-storage.md) storage substrate — a new surface with its own standing matrix. M16's item is **text + ownership** (the README row names the *thing* and its *use*, not its *picture*). Own ADR. |
 | **The recurring / reserved check-out lane** (a pre-booked slot, a hold) | A **reservation** is a second state (booked-but-not-checked-out) the F1 transition does not model — a new document, a new transition, a new standing matrix (who may book vs. who may check out). Own ADR as a new surface on top of the F1 shape. |
 | **A third "Usage" document or context** (C-M16·3 forbids) | The usage history **is** the `InventoryCheckout` records (D4 / F3) — a separate "Usage" doc/context is the anti-pattern the D1 *Forbids:* names. No ADR is needed for what is forbidden. |
 
@@ -914,10 +930,10 @@ the named trade, the §kw-l key list, and the §gate test names match the
 register verbatim; the source was checked against the live
 `ProjectToAuditableResource` (the 6-member projection — the adapter
 shape), the `MessagingDocTypes` surface (the `*DocTypes` + the
-`convo_uidx_pair` unique-index shape), the ADR 0116 shape (the ADR
+`convo_uidx_pair` unique-index shape), the ADR [0116](../adr/0116-translation-bulk.md) shape (the ADR
 Status/Context/Decision/Consequences + the deferred-lane + affected-files
-sections), and the ADR 0117-free confirmation against
-`docs/adr/README.md` (the index ends at 0116 — 0117 is free) — no
+sections), and the ADR [0117](../adr/0117-inventory.md)-free confirmation against
+[`docs/adr/README.md`](../adr/README.md) (the index ends at 0116 — 0117 is free) — no
 source-driven refinement was needed.)
 
 **The drift-guard rule** (the unit-series rule): a unit that finds the
@@ -932,3 +948,62 @@ test **appends** to the §gate list and records the drift here. A change
 to any of the D1–D8 decisions, the C-M16·1–7 invariants, the §kw-l
 list, or the §gate names **after U00** is a **drift event** (this log is
 the witness).
+
+---
+
+## ADR [0117](../adr/0117-inventory.md) — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Inventory/InventoryItem.cs` — new (the item
+  document; U01).
+- `src/Kumunita.Core/Inventory/InventoryCheckout.cs` — new (the
+  append-only usage record; U01).
+- `src/Kumunita.Core/Inventory/InventoryItemToAuditableResource.cs` —
+  new (the adapter — the exact M5 `ProjectToAuditableResource` 6-member
+  projection, `TargetKind = "inventory"`; U01).
+- `src/Kumunita.Core/Inventory/IInventoryService.cs` +
+  `src/Kumunita.Core/Inventory/InventoryService.cs` — new (the read
+  lanes `ListItemsAsync` / `GetItemAsync` / `GetHistoryAsync` — U02; the
+  write lanes `CreateItemAsync` / `EditItemAsync` / `DeleteItemAsync` /
+  `CheckOutAsync` / `CheckInAsync` + the D5 standing probes + the F1
+  atomic transition — U03).
+- `src/Kumunita.Core/Inventory/InventoryRequests.cs` — new (the
+  request DTOs — the sealed-record shape; U02).
+- `src/Kumunita.Core/InventoryDocTypes.cs` — new (the surface — the
+  `InventoryItem` `(ComponentId, Created)` + `(OwnerKind, Created)`
+  indexes; the `InventoryCheckout` `(ItemId, CheckedOutAt)` index + the
+  **unique partial index** on `(ItemId)` where `CheckedInAt IS NULL` —
+  the F1 witness; U01).
+- `src/Kumunita.Core/DependencyInjection.cs` — the
+  `AddTransient<IInventoryService>(…)` registration (the M5 / M9 shape —
+  **no** `INotificationService`, D8; U02).
+- `src/Kumunita.Web/Program.cs` — `InventoryDocTypes.Configure(opts);` added
+  to the `*DocTypes.Configure(opts)` block (after
+  `MessagingDocTypes.Configure(opts)`; U01).
+- `src/Kumunita.Web/Models/InventoryViewModels.cs` — new (the view
+  models; U04).
+- `src/Kumunita.Web/Controllers/InventoryController.cs` — new (the
+  list / detail / create — U04; the edit / delete / check-out /
+  check-in — U05).
+- `src/Kumunita.Web/Views/Inventory/List.cshtml` /
+  `Views/Inventory/Detail.cshtml` / `Views/Inventory/Create.cshtml`
+  (U04) + `Views/Inventory/Edit.cshtml` (U05) — new.
+- `src/Kumunita.Web/Views/Shared/` (the sidebar/nav partial) — the
+  "Inventory" nav entry (U05).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the
+  twenty `inv.*` keys × en/de/fr/da (the `projects.*` block shape — the
+  parity pins extend; U04).
+- `tests/Kumunita.Core.Tests/` — the U01 (the surface + the adapter) +
+  U02 (the read-lane) + U03 (the write-lane + the standing-probe) pins
+  (names verbatim in the design doc §Feedback loops) +
+  `tests/Kumunita.Web.Tests/` — the U04 (3) + U05 (4) pins + the U06
+  three acceptance gate tests (the design doc §gate:
+  `M16_Acceptance_ClosedLoop_CheckOutCheckInHistory` /
+  `M16_Acceptance_HandoffAuthorizationBoundary_PrivateAndShared` /
+  `M16_Acceptance_PartVsWholeAuditCompleteness`) + the D7 four-surface
+  docs-parity pins.
+- `src/Kumunita.Web/Milestones.cs` + [`README.md`](../../README.md) + [`docs/STATUS.md`](../STATUS.md) +
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
+  — the D7 four-surface flip (the U06 close, **in the same unit** —
+  C-M16·7).

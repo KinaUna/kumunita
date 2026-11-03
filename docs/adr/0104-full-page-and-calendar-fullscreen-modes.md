@@ -1,14 +1,22 @@
-# ADR 0104 — Full-page expand mode (board + calendar) and calendar full-screen
-
-Status: Accepted
-Date: 2026-09-26
+---
+id: adr-0104
+title: "Full-page expand mode (board + calendar) and calendar full-screen"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m35-kiosk-mode-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
-The Kanban board (M5, ADR 0067 et seq.) ships a **browser full-screen** mode:
+The Kanban board (M5, ADR [0067](0067-m5-projects-todos-and-kanban.md) et seq.) ships a **browser full-screen** mode:
 the board element becomes the Fullscreen API target, the browser hides the
 rest of the page, and the `:fullscreen` rules in `site.css` give it the
-full-bleed look (the ADR 0070 board-polish lane wired it,
+full-bleed look (the ADR [0070](0070-board-edit-lane-and-board-polish.md) board-polish lane wired it,
 `client/lib/projects-board.ts`). But a resident often wants to work in the
 board *without* leaving the tab — the browser full-screen hides the address
 bar and the rest of the app, which is more than they want. They want a second
@@ -16,7 +24,7 @@ mode: the board expanded to fill **100% of the page's width and height**, the
 page chrome (navbar / footer / pinned announcement / flash) pushed out of the
 way, but staying in the normal viewport.
 
-The events calendar (ADR 0063 / ADR 0064 / ADR 0081) had *neither* mode — its
+The events calendar (ADR [0063](0063-events-calendar-view.md) / ADR [0064](0064-events-calendar-dwm-views.md) / ADR [0081](0081-events-calendar-week-default-and-quick-create.md)) had *neither* mode — its
 Month chip grid and Day/Week time-ruler grid render at their natural size
 inside the normal page layout.
 
@@ -31,7 +39,7 @@ So two display modes are wanted across the app:
 ### The full-page expand mode (shared)
 
 - **One shared client module — `client/lib/expand-page.ts`** (tsc-built,
-  ADR 0031 pin: no deps, no globals, no `any`). It self-guards on the absence
+  ADR [0031](0031-wysiwyg-editor-and-toolbar.md) pin: no deps, no globals, no `any`). It self-guards on the absence
   of either button, so it is loaded globally in `_Layout.cshtml` (next to the
   other always-on modules). It toggles the `body.kmb-page-expanded` class on
   `.page-expand-toggle` click, removes it on `.page-expand-close` click, and
@@ -105,24 +113,3 @@ So two display modes are wanted across the app:
   already pin the four new keys into all four dictionaries — they pass.
 - `Milestones.cs` / the README Roadmap / `MilestonesTests.cs` **untouched**
   (a display-mode polish, not a milestone).
-
-## Affected files
-
-- `src/Kumunita.Web/client/lib/expand-page.ts` (new)
-- `src/Kumunita.Web/client/lib/calendar-fullscreen.ts` (new)
-- `src/Kumunita.Web/wwwroot/js/lib/expand-page.js` (tsc output)
-- `src/Kumunita.Web/wwwroot/js/lib/calendar-fullscreen.js` (tsc output)
-- `src/Kumunita.Web/wwwroot/css/site.css` (expand-mode rules + calendar
-  `:fullscreen` rules)
-- `src/Kumunita.Web/Views/Projects/BoardDetail.cshtml` (expand toggle + close)
-- `src/Kumunita.Web/Views/Event/Calendar.cshtml` (expand toggle + close,
-  full-screen toggle + close in both branches, `calendar-fullscreen.js` load)
-- `src/Kumunita.Web/Views/Shared/_Layout.cshtml` (global `expand-page.js`)
-- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (4 new `common.*`
-  keys × 4 languages)
-- `docs/adr/README.md` (index)
-
-Additive on 0067 / 0070 (the board full-screen idiom it mirrors) + 0063 / 0064
-/ 0081 (the calendar surface) + 0031 (the tsc-only client pin) + 0015 (the
-`kw-l` registry). Amends nothing. No changes to `Kumunita.Core`'s service
-seams or schema; no new routes.

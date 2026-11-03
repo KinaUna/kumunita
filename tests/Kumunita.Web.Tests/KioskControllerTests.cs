@@ -2,9 +2,9 @@ using System.Collections.Concurrent;
 using System.Security.Claims;
 using Kumunita.Core.Events;
 using Kumunita.Core.Kiosk;
-using Kumunita.Core.Projects;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
+using Kumunita.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -38,7 +38,7 @@ namespace Kumunita.Web.Tests;
 /// re-author them).
 /// <para>
 /// Harness: the project's standing <b>direct-construction</b> idiom (NSubstitute
-/// <see cref="IKioskService"/> / <see cref="IProjectService"/> /
+/// <see cref="IKioskService"/> / <see cref="IKioskItemCatalog"/> (ADR 0285) /
 /// <see cref="IEventService"/> / <see cref="IDocumentStore"/> seams +
 /// <see cref="DefaultHttpContext"/> — the <see cref="AdminStorageMetricsHistoryTests"/>
 /// M33 shape). The frozen read-seam Postgres behaviour is pinned by the 6 M35
@@ -55,145 +55,146 @@ public class KioskControllerTests
     private const string Member  = Kumunita.Core.Identity.Roles.Member;
     private const string GlobalAdmin = Kumunita.Core.Identity.Roles.GlobalAdmin;
 
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
     // ── Pin 7 ─────────────────────────────────────────────────────────────
     // M35·3 / M35·6 (FACES M35-2): a SIGNED-IN viewer visits /kiosk → the
-    // chrome-hidden layout + the first slide render. The playlist's Board
-    // slide resolves to the surface's OWN route (/projects/boards/{id}) via
-    // the frozen board-detail read seam; the stage renders the iframe (the
-    // M35·6 reuse — the kiosk frames the surface, it does not re-author it).
+    // chrome-hidden layout + the first slide render. The entry resolves (ADR
+    // 0285: through the catalog, i.e. the item's own read seam) to the item's
+    // OWN route; the stage renders the iframe (the M35·6 reuse). The slide
+    // carries the entry's duration / scroll / comments (ADR 0285).
 
     [Fact]
     public async Task M35_3_SignedIn_Sees_ChromeHidden_FirstSlide()
     {
-        var (controller, kiosk, projects, _, _) = Build(role: Member);
+        var (controller, kiosk, catalog, _, _) = Build(role: Member);
 
-        // A configured playlist (one Board slide) the signed-in viewer can see:
+        var entry = new KioskEntry
+        {
+            Type = KioskItemType.Board, ItemId = "board-1", DurationSeconds = 25,
+            Scroll = KioskScrollBehavior.Auto,
+        };
         kiosk.GetPlaylistAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
         {
             Id = Subject,
-            Views = [new KioskView { Kind = KioskViewKind.Board, BoardId = "board-1" }],
-            ViewIntervalSeconds = 40,
+            Entries = [entry],
+            DefaultDurationSeconds = 40,
             RefreshIntervalSeconds = 12,
+            ScrollSpeed = KioskScrollSpeed.Slow,
         });
-        // The frozen M5 board-detail read seam resolves the board for the viewer:
-        projects.GetBoardAsync("board-1", Subject, Arg.Any<CancellationToken>())
-            .Returns(new BoardDetailResult
-            {
-                Board = new KanbanBoard { Id = "board-1", Title = "Board A" },
-            });
+        catalog.ResolveAsync(entry, Subject, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new KioskResolvedItem(true, "Board A", "/projects/boards/board-1", "B|lane"));
 
-        var action = await controller.Index(TestContext.Current.CancellationToken);
+        var action = await controller.Index(Ct);
         var model = Assert.IsType<KioskDisplayViewModel>(Assert.IsType<ViewResult>(action).Model);
 
-        // The first slide resolves to the surface's own route (the iframe src, M35·6):
         Assert.True(model.HasSlides);
-        Assert.NotNull(model.FirstSlide);
-        Assert.False(model.FirstSlide!.Denied);
-        Assert.Equal("/projects/boards/board-1", model.FirstSlide.Href);
-        // The two intervals project through (M35·4 display-only):
-        Assert.Equal(40, model.ViewIntervalSeconds);
+        var first = model.FirstSlide!;
+        Assert.False(first.Denied);
+        // D7: the slide href carries ?kiosk=1 — the authoritative kiosk signal
+        // the layout turns into the kmb-kiosk body class (survives no-referrer).
+        Assert.Equal("/projects/boards/board-1?kiosk=1", first.Href);
+        Assert.Equal("Board A", first.Title);
+        Assert.Equal(25, first.DurationSeconds);
+        Assert.Equal(KioskScrollBehavior.Auto, first.Scroll);
+        Assert.Equal(KioskFingerprint.Of("B|lane"), first.Fingerprint);
+        Assert.Equal(40, model.DefaultDurationSeconds);
         Assert.Equal(12, model.RefreshIntervalSeconds);
+        Assert.Equal(KioskScrollSpeed.Slow, model.ScrollSpeed);
         await kiosk.Received(1).GetPlaylistAsync(Subject, Arg.Any<CancellationToken>());
-        await projects.Received(1).GetBoardAsync("board-1", Subject, Arg.Any<CancellationToken>());
 
-        // The chrome-hidden layout renders (the ADR 0104 body.kmb-page-expanded
-        // idiom — the top-level chrome is hidden, the stage + iframe fill the
-        // viewport — the M35·6 pin): the string-pin idiom.
         var html = ViewSource("Kiosk", "Index.cshtml");
         Assert.Contains("#kiosk-stage", html);              // the stage the TS reads
-        Assert.Contains("kmb-kiosk-iframe", html);          // the iframe (the surface's own route)
+        Assert.Contains("kmb-kiosk-iframe", html);          // the iframe (the item's own route)
         Assert.Contains(".navbar,", html);                  // the chrome-hide selector set
         Assert.Contains("key=\"kiosk.title\"", html);       // the display heading
     }
 
-    // ── Pin 8 ─────────────────────────────────────────────────────────────
-    // M35·3 / M35-6 (FACES M35-6): an ANONYMOUS visitor to /kiosk is
-    // redirected to sign-in — the gate is the class-level [Authorize] (no role
-    // restriction: any authenticated resident). Asserted via the attribute
-    // (the house "no TestServer" idiom — the M33 M33_7_NonGlobalAdmin_Denied
-    // shape: the redirect is the attribute's effect, not an action-level
-    // re-check).
 
     [Fact]
     public void M35_3_Anonymous_RedirectedToSignIn()
     {
-        // The gate (M35-6): [Authorize] on the controller type — an anonymous
-        // request is rejected by the auth middleware → the sign-in redirect.
         var attr = typeof(KioskController).GetCustomAttribute<AuthorizeAttribute>();
         Assert.NotNull(attr);
         Assert.True(
             string.IsNullOrEmpty(attr!.Roles),
             "GET /kiosk is signed-in (any authenticated resident) — the [Authorize] gate has NO role restriction (M35·3 / M35-6).");
 
-        // The /kiosk route is the Index action (the display surface):
         var httpGet = typeof(KioskController).GetMethod(nameof(KioskController.Index))!
             .GetCustomAttribute<HttpGetAttribute>();
         Assert.NotNull(httpGet);
         Assert.Contains("/kiosk", httpGet!.Template ?? string.Empty);
     }
 
-    // ── Pin 9 ─────────────────────────────────────────────────────────────
-    // M35·5 / M35-5 (FACES M35-5): GET /kiosk/slide?slide=N over a slide the
-    // viewer CANNOT see → the kiosk.slide_denied shape (no content, no 404 —
-    // the frozen seam's deny signal is caught, the denied shape returned).
 
     [Fact]
     public async Task M35_5_SlideDenied_SignsInViewer_SeesDeniedShape()
     {
-        var (controller, kiosk, projects, _, _) = Build(role: Member);
+        var (controller, kiosk, catalog, _, _) = Build(role: Member);
 
+        var entry = new KioskEntry { Type = KioskItemType.Announcement, ItemId = "ann-x" };
         kiosk.GetPlaylistAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
         {
             Id = Subject,
-            Views = [new KioskView { Kind = KioskViewKind.Board, BoardId = "board-x" }],
+            Entries = [entry],
         });
-        // The viewer may NOT read this board — the frozen seam's deny signal
-        // (a faulted Task the controller's catch converts to the denied shape):
-        projects.GetBoardAsync("board-x", Subject, Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<BoardDetailResult>(new UnauthorizedAccessException()));
+        catalog.ResolveAsync(entry, Subject, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(KioskResolvedItem.Hidden);
 
-        var action = await controller.Slide(slide: 0, t: 1, ct: TestContext.Current.CancellationToken);
+        var action = await controller.Slide(slide: 0, t: 1, ct: Ct);
         var vm = Assert.IsType<KioskSlideRefreshViewModel>(Assert.IsType<JsonResult>(action).Value);
 
-        // The denied shape (M35-5 FACE): no content (Href null), the
-        // kiosk.slide_denied key named, and **not** a 404 (a JSON 200 with the
-        // denied flag):
         Assert.True(vm.Denied);
         Assert.Null(vm.Href);
         Assert.Equal("kiosk.slide_denied", vm.DeniedKey);
+        Assert.Equal(KioskFingerprint.Of("denied"), vm.Fingerprint);
         Assert.Equal(0, vm.Index);
     }
 
-    // ── Pin 10 ────────────────────────────────────────────────────────────
-    // M35·2 (ADR 0164 amendment — per-resident): the settings surface is
-    // [Authorize]d (any signed-in user edits their OWN playlist) with **no
-    // role restriction** — the GlobalAdmin gate from the original M35-7 pin is
-    // gone (the playlist is no longer a shared GlobalAdmin singleton). The
-    // sign-in gate is the class-level [Authorize] (pinned in the M35-6
-    // M35_3_Anonymous test); the settings methods carry **no** method-level
-    // [Authorize(Roles = ...)] gate (a Member may save their own kiosk).
+    // ADR 0285 D1 — a calendar entry: the catalog gives the route (with the
+    // component filter); the controller fingerprints the events in the
+    // viewer's window, read for that component.
+
+    [Fact]
+    public async Task ADR0285_CalendarSlide_ReadsTheComponentsWindow()
+    {
+        var (controller, kiosk, catalog, events, _) = Build(role: Member);
+
+        var entry = new KioskEntry { Type = KioskItemType.Calendar, ItemId = "comp-1", CalendarView = "day" };
+        kiosk.GetPlaylistAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
+        {
+            Id = Subject,
+            Entries = [entry],
+        });
+        catalog.ResolveAsync(entry, Subject, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new KioskResolvedItem(true, "Main street", "/events/calendar?view=day&componentId=comp-1", null));
+        events.ListInRangeAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), "comp-1", Subject, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<Event>>([]));
+
+        var action = await controller.Slide(slide: 0, t: 1, ct: Ct);
+        var vm = Assert.IsType<KioskSlideRefreshViewModel>(Assert.IsType<JsonResult>(action).Value);
+
+        Assert.False(vm.Denied);
+        // D7: the base href already has a query, so ?kiosk=1 rides as &kiosk=1.
+        Assert.Equal("/events/calendar?view=day&componentId=comp-1&kiosk=1", vm.Href);
+        await events.Received(1).ListInRangeAsync(
+            Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), "comp-1", Subject, Arg.Any<CancellationToken>());
+    }
+
 
     [Fact]
     public void M35_7_Settings_Authorized_NoRoleGate()
     {
-        // The sign-in gate (ADR 0164 amendment): the class-level [Authorize]
-        // (any signed-in resident edits their own playlist) carries NO role
-        // set — the M35_3_Anonymous test pins its presence; here we pin that
-        // the settings surface adds no method-level role restriction (the
-        // original M35-7 GlobalAdmin gate is removed).
         var getMethod = typeof(KioskController).GetMethod(nameof(KioskController.SettingsGet))!;
         Assert.True(
             getMethod.GetCustomAttribute<AuthorizeAttribute>() is null,
             "GET /settings/kiosk is any signed-in user (per-resident, ADR 0164 amendment) — no method-level [Authorize(Roles = ...)] gate; the class-level [Authorize] (no roles) is the sign-in gate.");
 
-        // The same: the POST lane has no method-level role gate either —
-        // any signed-in user saves their own playlist.
         var postMethod = typeof(KioskController).GetMethod(nameof(KioskController.SettingsPost))!;
         Assert.True(
             postMethod.GetCustomAttribute<AuthorizeAttribute>() is null,
             "POST /settings/kiosk is any signed-in user (per-resident, ADR 0164 amendment) — no method-level [Authorize(Roles = ...)] gate; the class-level [Authorize] (no roles) is the sign-in gate.");
 
-        // And the class gate itself (the sign-in requirement) has NO roles:
         var classAttr = typeof(KioskController).GetCustomAttribute<AuthorizeAttribute>();
         Assert.NotNull(classAttr);
         Assert.True(
@@ -201,82 +202,161 @@ public class KioskControllerTests
             "The KioskController [Authorize] gate is role-free — a Member may configure their own kiosk (ADR 0164 amendment).");
     }
 
-    // ── Pin 11 ────────────────────────────────────────────────────────────
-    // M35·5 / M35-1 (ADR 0164 amendment — per-resident): a signed-in resident
-    // POSTs /settings/kiosk → the
-    // controller parses the form, opens the caller's session, and delegates to
-    // SavePlaylistAsync (the service owns the ONE kiosk.save audit row + the
-    // upsert — the M35·5 pin, pinned in the Core KioskServiceTests) and
-    // redirects on success (the M3 same-transaction save-lane shape).
+    // ADR 0285 — the editor shows each stored entry with its item's current
+    // title (resolved for the viewer); a gone / hidden item is flagged.
+
+    [Fact]
+    public async Task ADR0285_SettingsGet_ResolvesEntryTitles()
+    {
+        var (controller, kiosk, catalog, _, _) = Build(role: Member);
+
+        var visible = new KioskEntry { Type = KioskItemType.Page, ItemId = "page-1" };
+        var gone = new KioskEntry { Type = KioskItemType.CommunityPost, ItemId = "post-gone" };
+        kiosk.GetPlaylistAsync(Subject, Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
+        {
+            Id = Subject,
+            Entries = [visible, gone],
+            DefaultDurationSeconds = 20,
+            ScrollSpeed = KioskScrollSpeed.Fast,
+        });
+        catalog.ResolveAsync(visible, Subject, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new KioskResolvedItem(true, "Bin days", "/pages/bins", "v"));
+        catalog.ResolveAsync(gone, Subject, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(KioskResolvedItem.Hidden);
+
+        var action = await controller.SettingsGet(Ct);
+        var vm = Assert.IsType<KioskSettingsViewModel>(Assert.IsType<ViewResult>(action).Model);
+
+        Assert.Equal(2, vm.Entries.Count);
+        Assert.Equal("Bin days", vm.Entries[0].ItemTitle);
+        Assert.True(vm.Entries[0].ItemVisible);
+        Assert.Null(vm.Entries[1].ItemTitle);
+        Assert.False(vm.Entries[1].ItemVisible);
+        Assert.Equal(20, vm.DefaultDurationSeconds);
+        Assert.Equal(KioskScrollSpeed.Fast, vm.ScrollSpeed);
+    }
+
 
     [Fact]
     public async Task M35_5_GlobalAdmin_SavePlaylist_OneAuditRow_Persists()
     {
         var (controller, kiosk, _, _, store) = Build(role: GlobalAdmin);
 
-        // The caller's session (the M3 same-transaction lane — the controller
-        // opens it, the service commits into it):
         var session = Substitute.For<IDocumentSession>();
         store.LightweightSession().Returns(session);
-        // The service save (the one kiosk.save audit row + upsert — the Core
-        // pin) returns the saved row:
-        kiosk.SavePlaylistAsync(
-                Arg.Any<IReadOnlyList<KioskView>>(), 60, 30,
-                Arg.Any<KioskDisplayMode>(),
+        KioskPlaylistDraft? saved = null;
+        kiosk.SavePlaylistAsync(Arg.Do<KioskPlaylistDraft>(d => saved = d),
                 Arg.Any<string>(), Arg.Any<IDocumentSession>(), Arg.Any<CancellationToken>())
-            .Returns(new KioskPlaylist
-            {
-                Id = Subject,
-                Views = [new KioskView { Kind = KioskViewKind.Board, BoardId = "board-1" }],
-                ViewIntervalSeconds = 60,
-                RefreshIntervalSeconds = 30,
-            });
+            .Returns(new KioskPlaylist { Id = Subject });
 
-        // The form (a single Board slide + the two intervals):
+        // ADR 0285 — rows arrive in index order (gaps are fine); a row with no
+        // type is left out; the group id rides only on group-routed types; the
+        // checkbox + hidden-false pair reads as checked.
         controller.HttpContext.Request.Form = new FormCollection(new Dictionary<string, StringValues>
         {
-            ["ViewIntervalSeconds"]    = new StringValues("60"),
-            ["RefreshIntervalSeconds"] = new StringValues("30"),
-            ["DisplayMode"]            = new StringValues("FullScreen"),
-            ["Views[0].Kind"]          = new StringValues("Board"),
-            ["Views[0].BoardId"]       = new StringValues("board-1"),
+            ["DefaultDurationSeconds"]    = new StringValues("60"),
+            ["RefreshIntervalSeconds"]    = new StringValues("30"),
+            ["DisplayMode"]               = new StringValues("FullScreen"),
+            ["ScrollSpeed"]               = new StringValues("Fast"),
+            ["Entries[3].Type"]           = new StringValues("GroupPost"),
+            ["Entries[3].ItemId"]         = new StringValues("post-1"),
+            ["Entries[3].GroupId"]        = new StringValues("group-1"),
+            ["Entries[3].DurationSeconds"] = new StringValues("45"),
+            ["Entries[3].Scroll"]         = new StringValues("Auto"),
+            ["Entries[3].ShowComments"]   = new StringValues(["false", "true"]),
+            ["Entries[3].Label"]          = new StringValues("Choir news"),
+            ["Entries[1].Type"]           = new StringValues("Calendar"),
+            ["Entries[1].ItemId"]         = new StringValues(""),
+            ["Entries[1].GroupId"]        = new StringValues("ignored"),
+            ["Entries[1].CalendarView"]   = new StringValues("month"),
+            ["Entries[1].ShowComments"]   = new StringValues("false"),
+            ["Entries[2].Type"]           = new StringValues(""),
+            ["Entries[2].ItemId"]         = new StringValues("left-out"),
         });
 
-        var action = await controller.SettingsPost(TestContext.Current.CancellationToken);
+        var action = await controller.SettingsPost(Ct);
 
-        // The success path (not the sub-floor redirect-back): the redirect +
-        // the saved confirmation. The redirect MUST be the action-name overload
-        // resolving SettingsGet's /settings/kiosk attribute route — NOT a string
-        // URL passed to RedirectToAction(string), which ASP.NET Core treats as an
-        // *action name* and renders to /Kiosk/%2Fsettings%2Fkiosk (a 404). Pinning
-        // the action name is what keeps that regression caught.
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(KioskController.SettingsGet), redirect.ActionName);
         Assert.NotNull(controller.TempData["info"]);
 
-        // The controller delegated the single write to the service with the
-        // parsed form (one Board view + the two intervals + the parsed
-        // DisplayMode + the caller's session) — the service commits the one
-        // kiosk.save audit row + the upsert (M35·5, pinned in KioskServiceTests).
-        // The DisplayMode is pinned to FullScreen (the form value) to verify
-        // the amendment's display-mode parse (M35·4 display-only):
         await kiosk.Received(1).SavePlaylistAsync(
-            Arg.Any<IReadOnlyList<KioskView>>(), 60, 30,
-            KioskDisplayMode.FullScreen,
-            Arg.Any<string>(), Arg.Any<IDocumentSession>(), Arg.Any<CancellationToken>());
+            Arg.Any<KioskPlaylistDraft>(), Subject, Arg.Any<IDocumentSession>(), Arg.Any<CancellationToken>());
+        Assert.NotNull(saved);
+        Assert.Equal(60, saved!.DefaultDurationSeconds);
+        Assert.Equal(30, saved.RefreshIntervalSeconds);
+        Assert.Equal(KioskDisplayMode.FullScreen, saved.DisplayMode);
+        Assert.Equal(KioskScrollSpeed.Fast, saved.ScrollSpeed);
+        Assert.Equal(2, saved.Entries.Count);
+
+        var calendar = saved.Entries[0];
+        Assert.Equal(KioskItemType.Calendar, calendar.Type);
+        Assert.Null(calendar.ItemId);
+        Assert.Null(calendar.GroupId);
+        Assert.Equal("month", calendar.CalendarView);
+        Assert.Equal(60, calendar.DurationSeconds);   // no duration → the default
+        Assert.False(calendar.ShowComments);
+
+        var post = saved.Entries[1];
+        Assert.Equal(KioskItemType.GroupPost, post.Type);
+        Assert.Equal("post-1", post.ItemId);
+        Assert.Equal("group-1", post.GroupId);
+        Assert.Equal(45, post.DurationSeconds);
+        Assert.Equal(KioskScrollBehavior.Auto, post.Scroll);
+        Assert.True(post.ShowComments);
+        Assert.Equal("Choir news", post.Label);
     }
 
-    // ── Pin 12 ────────────────────────────────────────────────────────────
-    // M35·6 (the additive-only pin): the EXISTING board / calendar / todos
-    // surfaces render UNCHANGED — each still declares its OWN @model and
-    // carries NO kiosk coupling (the kiosk frames them via iframe, it does not
-    // re-author them — the M35·6 / M35·9 "reused, not re-shape" pin).
+    [Theory]
+    [InlineData("Todo", "", "30", "Pick an item")]                  // no item picked
+    [InlineData("GroupPost", "post-1", "30", "Pick an item")]       // no group
+    [InlineData("Todo", "todo-1", "3", "between 5 and 3600")]       // under 5 s
+    [InlineData("Todo", "todo-1", "abc", "between 5 and 3600")]     // not a number
+    public async Task ADR0285_SavePlaylist_RefusesAnInvalidEntry(string type, string itemId, string duration, string message)
+    {
+        var (controller, kiosk, _, _, store) = Build(role: Member);
+        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+
+        controller.HttpContext.Request.Form = new FormCollection(new Dictionary<string, StringValues>
+        {
+            ["DefaultDurationSeconds"]     = new StringValues("30"),
+            ["RefreshIntervalSeconds"]     = new StringValues("10"),
+            ["Entries[0].Type"]            = new StringValues(type),
+            ["Entries[0].ItemId"]          = new StringValues(itemId),
+            ["Entries[0].DurationSeconds"] = new StringValues(duration),
+        });
+
+        var action = await controller.SettingsPost(Ct);
+
+        Assert.IsType<RedirectToActionResult>(action);
+        Assert.Contains(message, controller.TempData["error"] as string ?? string.Empty);
+        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, default!, default);
+    }
+
+    [Theory]
+    [InlineData("4", "10")]   // default duration under 5
+    [InlineData("30", "1")]   // refresh under 2
+    public async Task ADR0285_SavePlaylist_RefusesInvalidDisplaySettings(string defaultDuration, string refresh)
+    {
+        var (controller, kiosk, _, _, _) = Build(role: Member);
+
+        controller.HttpContext.Request.Form = new FormCollection(new Dictionary<string, StringValues>
+        {
+            ["DefaultDurationSeconds"] = new StringValues(defaultDuration),
+            ["RefreshIntervalSeconds"] = new StringValues(refresh),
+        });
+
+        var action = await controller.SettingsPost(Ct);
+
+        Assert.IsType<RedirectToActionResult>(action);
+        Assert.NotNull(controller.TempData["error"]);
+        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, default!, default);
+    }
+
 
     [Fact]
     public void M35_6_ExistingSurfaces_RenderUnchanged()
     {
-        // Each of the three framed surfaces keeps its own model + has no
-        // kiosk coupling (the string-pin idiom — the M35·6 additive-only pin):
         var surfaces = new[]
         {
             (Folder: "Projects", View: "BoardDetail.cshtml", Model: "BoardDetailViewModel"),
@@ -291,73 +371,163 @@ public class KioskControllerTests
         }
     }
 
-    // ── Harness ──────────────────────────────────────────────────────────────
+    // ── ADR 0285 D4 / D5 — playback attributes and the comments toggle ─────
 
-    /// <summary>Build a <see cref="KioskController"/> over a
-    /// <see cref="DefaultHttpContext"/> whose principal carries
-    /// <paramref name="role"/> (the <see cref="AdminStorageMetricsHistoryTests"/>
-    /// M33 <c>Build</c> shape) + NSubstituted <see cref="IKioskService"/> /
-    /// <see cref="IProjectService"/> / <see cref="IEventService"/> /
-    /// <see cref="IDocumentStore"/> seams the test stubs. <paramref name="role"/>
-    /// is <c>null</c> for the anonymous (no-principal) case. No Postgres (the
-    /// Core seam behaviour is pinned in <c>Kiosk/KioskServiceTests.cs</c>).</summary>
-    private static (KioskController controller, IKioskService kiosk, IProjectService projects,
+    [Theory]
+    // D7: every slide href carries ?kiosk=1 (the authoritative kiosk signal,
+    // which _Layout turns into the kmb-kiosk body class — it survives the
+    // global Referrer-Policy: no-referrer that a referrer-based test would
+    // have failed under). D5: where the entry shows comments on a discussion
+    // surface, &kioskComments=1 rides after it.
+    [InlineData(KioskItemType.Announcement, true, "/announcements/a-1", "/announcements/a-1?kiosk=1&kioskComments=1")]
+    [InlineData(KioskItemType.Announcement, false, "/announcements/a-1", "/announcements/a-1?kiosk=1")]
+    [InlineData(KioskItemType.Page, true, "/pages/bins", "/pages/bins?kiosk=1")]          // no discussion on a page
+    [InlineData(KioskItemType.Todo, true, "/projects/todos/t-1", "/projects/todos/t-1?kiosk=1&kioskComments=1")]
+    public async Task ADR0285_ShowComments_AddsTheQueryFlag_OnlyWhereThereIsADiscussion(
+        KioskItemType type, bool showComments, string resolvedHref, string expectedHref)
+    {
+        var (controller, kiosk, catalog, _, _) = Build(role: Member);
+        var entry = new KioskEntry { Type = type, ItemId = "x", ShowComments = showComments };
+        kiosk.GetPlaylistAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
+        {
+            Id = Subject,
+            Entries = [entry],
+        });
+        catalog.ResolveAsync(entry, Subject, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new KioskResolvedItem(true, "Item", resolvedHref, "v"));
+
+        var action = await controller.Slide(slide: 0, t: 1, ct: Ct);
+        var vm = Assert.IsType<KioskSlideRefreshViewModel>(Assert.IsType<JsonResult>(action).Value);
+
+        Assert.Equal(expectedHref, vm.Href);
+    }
+
+    [Fact]
+    public void ADR0285_PlaybackAndCommentsWiring_IsInPlace()
+    {
+        // The stage + slide meta carry what kiosk.ts plays.
+        var index = ViewSource("Kiosk", "Index.cshtml");
+        Assert.Contains("data-default-duration=", index);
+        Assert.Contains("data-scroll-speed=", index);
+        Assert.Contains("data-duration=", index);
+        Assert.Contains("data-scroll=", index);
+
+        // The layout turns ?kioskComments=1 into the body class …
+        var layout = ViewSource("Shared", "_Layout.cshtml");
+        Assert.Contains("kmb-kiosk-comments", layout);
+        Assert.Contains("kioskComments", layout);
+
+        // D7 — the authoritative kiosk signal: the kiosk appends ?kiosk=1 to
+        // EVERY slide href (KioskController always does), and _Layout turns it
+        // into the kmb-kiosk body class. This is what actually activates the
+        // kiosk CSS in the browser — it survives the global
+        // Referrer-Policy: no-referrer (F7) that suppresses the Referer header
+        // a referrer-based test relied on (the bug that left kiosk controls
+        // visible). Pinned on both ends: the controller emits it on every slide,
+        // and the layout reads it from the query string.
+        var controllerSrc = File.ReadAllText(Path.Combine(RepoRoot, "src", "Kumunita.Web", "Controllers", "KioskController.cs"));
+        Assert.Contains("KioskQueryKey = \"kiosk\"", controllerSrc);
+        Assert.Contains("AppendQuery(baseHref, KioskQueryKey, \"1\")", controllerSrc);
+        Assert.Contains("Query[\"kiosk\"]", layout);
+        Assert.Contains("kmb-kiosk", layout);
+
+        // … site.css hides the discussion sections without it …
+        var css = File.ReadAllText(Path.Combine(RepoRoot, "src", "Kumunita.Web", "wwwroot", "css", "site.css"));
+        Assert.Contains("body.kmb-kiosk:not(.kmb-kiosk-comments) .kmb-discussion", css);
+        // The control-only shell-hide rules (the "Add a to-do" composer card,
+        // the RSVP card, the "Translations:" chip row).
+        Assert.Contains("body.kmb-kiosk .kmb-detail-card:has(> .card-body > form)", css);
+        Assert.Contains("body.kmb-kiosk .kmb-detail-card:has(form.kmb-rsvp)", css);
+        Assert.Contains("body.kmb-kiosk .d-flex:has(> [data-translation-chip])", css);
+        // The calendar cluster-hide rules (the Full page / Full screen
+        // toggle row, the view-toggle + New event + iCal feed row, the
+        // Prev/Today/Next/Filter nav row, the Events/Calendar tab strip).
+        Assert.Contains("body.kmb-kiosk .lede-row .d-flex", css);
+        Assert.Contains("body.kmb-kiosk .head-row > .d-flex", css);
+        Assert.Contains("body.kmb-kiosk .d-flex.mb-3", css);
+        Assert.Contains("body.kmb-kiosk .kmb-tab-under-navbar", css);
+
+        // … and every detail page with a discussion marks it.
+        foreach (var (folder, view) in new[]
+        {
+            ("Posts", "Detail.cshtml"), ("Groups", "PostDetail.cshtml"), ("Announcement", "Detail.cshtml"),
+            ("Projects", "TodoDetail.cshtml"), ("Event", "Detail.cshtml"), ("Groups", "EventDetail.cshtml"),
+        })
+        {
+            Assert.Contains("kmb-discussion", ViewSource(folder, view));
+        }
+    }
+
+    // ── ADR 0285 — the playlist editor's item picker ──────────────────────
+
+    [Fact]
+    public async Task ADR0285_Items_UnknownType_Is400()
+    {
+        var (controller, _, _, _, _) = Build(role: Member);
+
+        var action = await controller.Items("Inventory", null, Ct);
+        var numeric = await controller.Items("3", null, Ct);
+
+        Assert.IsType<BadRequestResult>(action);
+        Assert.IsType<BadRequestResult>(numeric);
+    }
+
+    [Fact]
+    public async Task ADR0285_Items_Calendar_All_First_Then_Components()
+    {
+        var (controller, _, catalog, _, _) = Build(role: Member);
+        catalog.SearchAsync(KioskItemType.Calendar, null, Subject, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<KioskItemOption>>([new KioskItemOption("c-1", "Main street", null, null)]));
+
+        var action = await controller.Items("calendar", null, Ct);
+
+        var items = ItemsOf(action);
+        Assert.Equal(2, items.Count);
+        Assert.Equal("", items[0].GetProperty("id").GetString());
+        Assert.Equal("All communities", items[0].GetProperty("title").GetString());
+        Assert.Equal("c-1", items[1].GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task ADR0285_Items_Board_PassesQueryAndActor()
+    {
+        var (controller, _, catalog, _, _) = Build(role: Member);
+        catalog.SearchAsync(KioskItemType.Board, "garden", Subject, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<KioskItemOption>>([new KioskItemOption("b-1", "Garden board", null, null)]));
+
+        var action = await controller.Items("Board", "garden", Ct);
+
+        var item = Assert.Single(ItemsOf(action));
+        Assert.Equal("b-1", item.GetProperty("id").GetString());
+        Assert.Equal("Garden board", item.GetProperty("title").GetString());
+    }
+
+    private static List<System.Text.Json.JsonElement> ItemsOf(IActionResult action)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(Assert.IsType<JsonResult>(action).Value);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        return doc.RootElement.GetProperty("items").EnumerateArray().Select(e => e.Clone()).ToList();
+    }
+
+
+    private static (KioskController controller, IKioskService kiosk, IKioskItemCatalog catalog,
         IEventService events, IDocumentStore store) Build(string? role)
     {
         var kiosk    = Substitute.For<IKioskService>();
-        var projects = Substitute.For<IProjectService>();
+        var catalog  = Substitute.For<IKioskItemCatalog>();
         var events   = Substitute.For<IEventService>();
         var store    = Substitute.For<IDocumentStore>();
 
-        var controller = new KioskController(kiosk, projects, events, null, store);
+        var controller = new KioskController(kiosk, events, null, store, catalog);
 
-        // The direct-construction harness must expose the MVC services
-        // Controller.ViewData / Controller.TempData / Controller.View resolve
-        // from HttpContext.RequestServices (a real deployment carries them via
-        // AddControllers()). The KioskController touches BOTH: the GET actions
-        // write ViewData["FullBleed"] / ["Title"] (the Index action, line ~108)
-        // and the POST lane writes TempData["info"] on success (line ~313). The
-        // M33 AdminStorageMetricsHistoryTests precedent never hit either — it
-        // only drove a GET action that returned View(vm) without writing
-        // ViewData / TempData. Both Controller.View (the View(vm) result the GET
-        // actions build) AND Controller.TempData resolve
-        // ITempDataDictionaryFactory + IModelMetadataProvider from DI
-        // (AddControllers normally wires them), so register the real MVC
-        // service set here. The success path's
-        // RedirectToAction("/settings/kiosk") merely CONSTRUCTS a
-        // RedirectToActionResult (Url is only touched when the result is
-        // executed, which this test never does), so no Url helper is needed:
         var services = new ServiceCollection();
-        // AddHttpContextAccessor + AddControllers wire the full MVC service
-        // set (ITempDataDictionaryFactory, IModelMetadataProvider,
-        // ValidationProblemDetailsService, IHttpContextAccessor, etc.) that
-        // Controller.ViewData / Controller.TempData / Controller.View resolve
-        // from HttpContext.RequestServices (a real deployment always carries
-        // these). The M33 AdminStorageMetricsHistoryTests precedent never hit
-        // this — it only drove a GET action that returned View(vm) without
-        // writing ViewData / TempData. Register the 4 KioskController
-        // dependencies + the in-memory ITempDataProvider before
-        // AddControllers (the real TransientsDataDictionaryFactory resolves
-        // ITempDataProvider from DI):
         services.AddHttpContextAccessor();
         services.AddSingleton<ITempDataProvider, InMemoryTempDataProvider>();
-        // The concrete TempDataDictionaryFactory (Microsoft.AspNetCore.Mvc.
-        // ViewFeatures) resolves ITempDataProvider from DI (registered above).
-        // Controller.View / Controller.TempData both resolve
-        // ITempDataDictionaryFactory from RequestServices:
         services.AddTransient<ITempDataDictionaryFactory, TempDataDictionaryFactory>();
         services.AddSingleton(Substitute.For<IModelMetadataProvider>());
-        // The success-path RedirectToAction("/settings/kiosk") resolves
-        // IUrlHelperFactory from RequestServices (ControllerBase.get_Url).
-        // .NET 10's IUrlHelper (Microsoft.AspNetCore.Mvc.IUrlHelper) methods
-        // return System.String (the older UrlValue type is gone), so a plain
-        // stub implementation is the cleanest — the compiler enumerates the
-        // exact required members (Action(UrlActionContext) / Content /
-        // IsLocalUrl / RouteUrl(UrlRouteContext) / Link / the ActionContext
-        // property):
         services.AddSingleton<IUrlHelperFactory, StubUrlHelperFactory>();
         services.AddSingleton(kiosk);
-        services.AddSingleton(projects);
+        services.AddSingleton(catalog);
         services.AddSingleton(events);
         services.AddSingleton(store);
         var provider = services.BuildServiceProvider();
@@ -382,13 +552,9 @@ public class KioskControllerTests
         };
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
-        return (controller, kiosk, projects, events, store);
+        return (controller, kiosk, catalog, events, store);
     }
 
-    /// <summary>Read <c>Views/{folder}/{view}</c> as a string (the house
-    /// "string pin, no TestServer" idiom — the <see cref="PwaManifestTests"/>
-    /// <c>RepoRoot</c> shape), stripping Razor comments (author documentation,
-    /// not markup) so the pin matches the rendered markup, not a comment.</summary>
     private static string ViewSource(string folder, string view)
     {
         var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", folder, view);

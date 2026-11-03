@@ -1,11 +1,19 @@
-# ADR 0126 — Attachment inline preview: the safe-renderable subset renders in the browser
-
-Status: Accepted
-Date: 2026-10-02
+---
+id: adr-0126
+title: "Attachment inline preview: the safe-renderable subset renders in the browser"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/attachment-inline-preview-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
-ADR 0034 shipped the file-attachment lane and pinned, as **C-ATT·2**, that
+ADR [0034](0034-file-attachments-posts-replies-announcements.md) shipped the file-attachment lane and pinned, as **C-ATT·2**, that
 "attachments are downloads, not renders": the serve route
 (`AttachmentController.ServeFile`) sets `Content-Disposition: attachment` +
 `X-Content-Type-Options: nosniff` + the **stored** `Content-Type`, and a body
@@ -22,7 +30,7 @@ image types. **SVG is excluded.** `text/html`, `image/svg+xml`, and
 `application/javascript` are **not** on the list — the types that carry a
 browser-executable script surface cannot enter the store through this lane.
 
-Since ADR 0034, a small UI affordance landed separately (untracked here,
+Since ADR [0034](0034-file-attachments-posts-replies-announcements.md), a small UI affordance landed separately (untracked here,
 already in the tree): `MarkdownRenderer` emits
 `target="_blank" rel="noopener"` on attachment links, so a reader clicking an
 attachment opens it in a new tab and keeps their place on the page. But while
@@ -45,7 +53,7 @@ this ADR):
   upload iff its declared `Content-Type` is allowlisted. The
   script-bearing types (`text/html`, `image/svg+xml`, `application/javascript`)
   are rejected at the boundary (415), so they **never reach the store**.
-- **The stored `Content-Type` is served verbatim** (ADR 0034 D1 / C-ATT·8):
+- **The stored `Content-Type` is served verbatim** (ADR [0034](0034-file-attachments-posts-replies-announcements.md) D1 / C-ATT·8):
   `ServeFile` returns `File(stream, stored.ContentType)` — the value validated
   at upload, never a client-influenced query parameter.
 
@@ -137,20 +145,20 @@ body still renders the link, the preview happens in a separate browsing
 context. *Forbids:* an inline `<iframe>` of the attachment inside the post /
 announcement / page body, or an `<img>` for a non-image attachment.
 
-**D5 — The document lane (ADR 0122/0125) and the image lane are untouched.**
+**D5 — The document lane (ADR [0122](0122-document-management.md)/0125) and the image lane are untouched.**
 The **document** lane's `DocumentController` download stays
 `Content-Disposition: attachment` (its D6 "a download, never an inline render"
 pin is a *stricter*, deliberate choice for authority-published official
 documents — previewing them is a separate future decision, its own ADR). The
-**image** lane (ADR 0025) keeps its inline `<img>` render and its raster-only
+**image** lane (ADR [0025](0025-rich-content-markdown-and-content-images.md)) keeps its inline `<img>` render and its raster-only
 `AllowedContentTypes` (C-ATT·9). This ADR changes **only** the *attachment*
 lane's serve disposition. *Forbids:* extending the inline branch to
 `/documents/{id}/download` or to `/content-image/{id}`.
 
 **D6 — Zero new authorization surface, zero schema, zero new store method,
-zero new route.** The lane *rides* the frozen ADR 0034 serve route (the
+zero new route.** The lane *rides* the frozen ADR [0034](0034-file-attachments-posts-replies-announcements.md) serve route (the
 5-step ordering, the `Read` decision, the audit contract C-ATT·7/10, the
-404-not-403 posture) and the frozen ADR 0011 `IMediaStore`. It adds exactly:
+404-not-403 posture) and the frozen ADR [0011](0011-media-and-file-storage.md) `IMediaStore`. It adds exactly:
 **one** `MediaOptions` member set (D3), **one** disposition branch in
 `ServeFile` (D2), and the already-shipped renderer affordance (D4). No new
 `AccessAction` / `AccessVia` / `Decide()` branch / adapter, no new `MediaObject`
@@ -163,7 +171,7 @@ field, no new `IMediaStore` method, no migration.
 - **The browser-displayable attachments now preview.** A reader clicking a
   PDF, image, or text/CSV attachment opens it in a new tab that **renders**
   (the browser's native viewer) instead of forcing a download — the
-  "in-browser preview is a future lane" deferral in ADR 0034 is now closed for
+  "in-browser preview is a future lane" deferral in ADR [0034](0034-file-attachments-posts-replies-announcements.md) is now closed for
   this subset. The non-previewable types (Office, zip) still download.
 - **The safety model is auditable and layered** (D1): the dangerous types are
   excluded by the upload gate (not by an inline check), the served type is the
@@ -172,7 +180,7 @@ field, no new `IMediaStore` method, no migration.
   spoof any of the first three layers.
 - **Zero new surface** (D6): it reuses the store, the catalog, the serve
   route, the `Read` decision, and the audit lane. The claim set and the
-  document/schema shape are byte-identical after ADR 0126.
+  document/schema shape are byte-identical after ADR [0126](0126-attachment-inline-preview.md).
 - **The body still renders a link, never an `<img>`/`<iframe>`** (D4): the
   C-ATT·2 "download reference is an `<a>`" pin and the `IsSafeUrl` /
   `IsSafeImageSrc` split are preserved; the preview is a *new tab*, not an
@@ -180,7 +188,7 @@ field, no new `IMediaStore` method, no migration.
 
 **Neutral / cost:**
 
-- **The named trade — a disposition branch for zero new surface:** ADR 0126
+- **The named trade — a disposition branch for zero new surface:** ADR [0126](0126-attachment-inline-preview.md)
   buys *inline preview of the safe-renderable subset, in a new tab, with the
   safety model already three-quarters in the tree*, with **one `MediaOptions`
   member set + one `ServeFile` branch + the (shipped) renderer affordance**,
@@ -196,70 +204,3 @@ field, no new `IMediaStore` method, no migration.
 - **The PDF-JS guarantee is browser-side** (D1.4): safe in every modern
   browser's built-in viewer; the "open the downloaded PDF in a JS-executing
   desktop reader" path is outside the guarantee and is documented as such.
-
-## Follow-on lanes (each its own ADR)
-
-- **Document-lane inline preview** — ADR 0122/0125's D6 "download, never an
-  inline render" pin for authority-published documents is deliberate;
-  previewing a *previewable* official document (e.g. a PDF) is a separate
-  decision, its own ADR.
-- **Office / audio / video preview or streaming** — outside the previewable
-  set by construction (D3); any of them is a new type added to the allowlist
-  and, if it is to render, *explicitly* to the previewable set, in the lane
-  that earns it.
-- **In-page `<iframe>` preview (a lightbox on the content page)** — D4 forbids
-  it in this lane; a resident-facing "open preview on this page" affordance is
-  a future UI lane (it would need the iframe-isolation + the same `nosniff` /
-  declared-type discipline, and its own ADR).
-- **Lifting the ADR 0034 drift-paused Web serve tests** — the end-to-end
-  disposition pin belongs in `AttachmentServingTests`; lifting them (a
-  substitutable `PostService` seam or a Testcontainers-backed Web harness) is
-  the ADR 0034 "Revisit when" new-infra decision, not part of this lane.
-
-## Supersedes
-
-- **None.** ADR 0126 **amends ADR 0034** (D2 / C-ATT·2): the pin
-  "attachments are downloads, not renders" becomes "attachments are downloads,
-  **except the closed safe-renderable subset (D2/D3) which is served inline and
-  previewed in a new tab (D4)** — the explicit 'in-browser preview is a future
-  lane' deferral, now resolved for that subset." It does **not** supersede an
-  earlier ADR. It *rides* ADR 0034 (the serve route, the 5-step ordering, the
-  `Read` decision, the audit contract, the 404 posture — all unchanged), ADR
-  0011 (the `IMediaStore` content-addressed volume + `MediaObject` catalog,
-  unchanged), ADR 0006 (the frozen `Read` path + Core stays HTTP-free), ADR
-  0035 (the group-post membership decision the serve route resolves), and
-  ADR 0004 §B.1 (additive-surface discipline — the previewable set is a
-  `MediaOptions` member, not a schema field). The ADR 0034 `AttachmentIds`
-  fields, the `Find*ByAttachmentIdAsync` seams, the `IMediaStore` /
-  `MediaObject` seams, and the document + image lanes are **unchanged**. This
-  is stated explicitly so a later reader knows ADR 0126 is a **disposition
-  branch over ADR 0034, not a new storage or authorization surface** — no
-  earlier ADR's decisions are re-scoped by this one. **Implemented and
-  tested**: `MediaOptions.IsPreviewable` / `ResolvedPreviewableTypes` /
-  `PreviewableContentTypes` (D3) + the `AttachmentController.ServeFile`
-  disposition branch (D2) are in the tree; the F4 `IsPreviewable` pins land in
-  `tests/Kumunita.Core.Tests/Media/MediaOptionsPreviewableTests.cs` (8 pins,
-  passing). The end-to-end disposition-per-type serve pin (F1) remains in the
-  ADR 0034 drift-paused `AttachmentServingTests` harness (see Follow-on lanes).
-
-## Affected files
-
-- `src/Kumunita.Core/Media/MediaOptions.cs` — **additive**:
-  `PreviewableContentTypes` (optional config) + `ResolvedPreviewableTypes` +
-  `IsPreviewable(string?)`, mirroring the existing `IsAttachmentAllowed` /
-  `IsDocumentAllowed` idiom (the attachment + image + document members
-  unchanged).
-- `src/Kumunita.Web/Controllers/AttachmentController.cs` — `ServeFile` gains
-  the one disposition branch (D2): `inline` iff `IsPreviewable(stored.ContentType)`
-  else `attachment`; `nosniff` + the stored `Content-Type` unchanged.
-- `src/Kumunita.Web/Security/MarkdownRenderer.cs` — the
-  `IsAttachmentLink` helper + the `target="_blank" rel="noopener"` emission on
-  attachment links (D4) — **already in the tree** (shipped separately);
-  recorded here as the preview affordance the inline branch enables.
-- `tests/Kumunita.Core.Tests/…` — a pure `MediaOptions.IsPreviewable` pin
-  (the seven previewable types true; Office / zip / `text/html` / SVG false),
-  the `MediaOptions` allowlist-pin convention.
-- `tests/Kumunita.Web.Tests/AttachmentServingTests.cs` (or a new
-  `AttachmentPreviewTests`) — the disposition-per-type end-to-end pin, in the
-  ADR 0034 drift-paused harness (lifted with it) or the Web harness when it
-  lands.

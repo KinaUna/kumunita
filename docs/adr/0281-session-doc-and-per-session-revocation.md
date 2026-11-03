@@ -1,24 +1,15 @@
-# ADR 0281 — Per-session model + per-session revocation (the `sessions` named lane): a `SessionDoc` in a new `Kumunita.Core.Sessions` bounded context, a `SessionService` 5-method surface, the `kumunita.sid` cookie item, the `SessionRevocationMiddleware`, and the `SecuritySettingsController` extension — on top of F5's whole-account stamp rotation (the two mechanisms coexist and are independent)
-
-Status: Accepted
-Date: 2026-11-01
-Amends: 0006 (the `C3` "audit always on" / `C4` "strong consistency" / `C5`
-"moderator default-OFF" pins are **applied at the owner boundary** — the lane
-is per-account, not per-audience — and the **`C3` same-transaction deviation**
-documented in §Decision.4 is the one recorded relaxation, satisfied within each
-service method + at the request level). Amends: 0004 §B.1 (the `SessionDoc` is
-Marten-native, registered on the new `SessionDocTypes` parallel surface —
-delta-detected, idempotent, **no seeding**, the ADR 0004 §B.1 rule). Amends:
-0278 (none — a parallel context, `Kumunita.Core.Sessions`, with no dependency
-on the `GroupMessaging` / `Messaging` contexts; the session data is per-account,
-not per-resource). Additive on: 0001-B (the resident's choice is absolute — a
-resident may revoke **any** of their own sessions, the platform does not auto-
-retain sessions), 0171 (the F5 / prod-hardening `session.kill_all` +
-`RevocationStampMiddleware` whole-account kill is **kept as-is** — the F5
-`SecurityStamp` column and the `RevocationStampMiddleware` are preserved; this
-ADR **adds** a per-session record and a per-session enforcement path), and the
-F5 `IIdentityService.KillAllSessionsAsync(string subjectId)` seam (unchanged —
-the sessions lane is a **caller** of the kill-all path, not a modifier of it).
+---
+id: adr-0281
+title: "Per-session model + per-session revocation (the `sessions` named lane): a `SessionDoc` in a new `Kumunita.Core.Sessions` bounded context, a `SessionService` 5-method surface, the `kumunita.sid` cookie item, the `SessionRevocationMiddleware`, and the `SecuritySettingsController` extension — on top of F5's whole-account stamp rotation (the two mechanisms coexist and are independent)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/sessions-per-session-revocation.md]
+supersedes: [adr-0006]
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
@@ -53,7 +44,7 @@ independent).
 This is the **first session-data milestone**: F5 was stamp-rotation-based (no
 per-session record). Because this is a new bounded context + a new document +
 a new service, the lane opened with a two-part design doc
-(`docs/design/sessions-per-session-revocation.md`) that pinned every seam,
+([`docs/design/sessions-per-session-revocation.md`](../design/sessions-per-session-revocation.md)) that pinned every seam,
 invariant, and test name before any implementing unit ran — the guard against
 *Distributed fragmentation* (session-validity logic re-implemented in the
 controller, the middleware, *and* the service) and *Accidental integration*
@@ -68,15 +59,15 @@ comment, not in the invariant list).
 domain document** — `SessionDoc` (7 fields: `Id` (a conventional `string`, a
 GUID — the session id), `UserId`, `UserAgent`, `Ip`, `CreatedAt`, `LastActive`,
 `RevokedAt?` — the last is the only nullable field, the active/revoked
-discriminator). It is **Marten-native** (ADR 0004 §B.1 — conventional
+discriminator). It is **Marten-native** (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 — conventional
 `string Id`, no `Identity(...)` override, matching `PostDocTypes` /
 `CoreDocTypes` / every other document in the repo), registered on the **new
 parallel surface** `SessionDocTypes.Configure(StoreOptions)` (one line —
 `opts.Schema.For<SessionDoc>();` — **no** business-key index; the
 `(UserId, RevokedAt)` index is a named `SL·D` deferral, not in this lane).
 There is **no seeding** (sessions are created on sign-in, never seeded —
-ADR 0004 §B.1). `SessionService` is the **only** caller of the `SessionDoc`
-store (the ADR 0006-D "the authorization path is unique" analog — here the
+ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1). `SessionService` is the **only** caller of the `SessionDoc`
+store (the ADR [0006](0006-module-boundary-contracts.md)-D "the authorization path is unique" analog — here the
 *session* path is unique).
 
 ### 2. The `SessionService` 5-method surface (the single composition point)
@@ -156,7 +147,7 @@ stamp rotation + the `session.kill_all` audit row) and
 within the same request** (the two modules do not share a transaction). The
 `C3` pin is satisfied *within* each service method (the `AccessAudit` row +
 the domain write are one `SaveChangesAsync`) and at the *request* level for the
-two-mechanism case. This is the **one** recorded relaxation of ADR 0006 `C3`
+two-mechanism case. This is the **one** recorded relaxation of ADR [0006](0006-module-boundary-contracts.md) `C3`
 in this lane; a unit that finds a way to make the two commits share a
 transaction (e.g. a shared `IDocumentSession`) is a drift event in the
 **positive** direction (the `C3` pin is strengthened, not weakened) and must
@@ -178,22 +169,22 @@ independently of any per-session `RevokedAt` write.
 - The resident can **see** their active sessions (`/settings/security/sessions`)
   and **revoke one** at a time (or all-but-current via the extended kill-all) —
   the resident's *"which device is that?"* question is now answerable.
-- `SessionDoc` is the **only** new document (ADR 0004 §B.1); `SessionService`
-  is the **only** caller of the `SessionDoc` store (ADR 0006-D); the F5 stamp
+- `SessionDoc` is the **only** new document (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1); `SessionService`
+  is the **only** caller of the `SessionDoc` store (ADR [0006](0006-module-boundary-contracts.md)-D); the F5 stamp
   rotation is unchanged (the `SecurityStamp` column + the
   `RevocationStampMiddleware` are preserved).
 - **Zero** new `AccessAction` / `AccessVia` / `Decide()` branch — the per-
   session revoke is a new `Action` string (`session.revoke` /
   `session.revoke_all_but_current`), not a new `AccessAction` enum member (the
-  ADR 0006-B "audit always on" convention — a new row shape, not a new
+  ADR [0006](0006-module-boundary-contracts.md)-B "audit always on" convention — a new row shape, not a new
   authorization surface). No new `IAuthorizationService` call (the C-S1·3 pin
   is a single `userId == currentSubject` check at the owner boundary).
 - **Zero migrations** — the `SessionDoc` is delta-detected / idempotent on the
-  new `SessionDocTypes` surface (ADR 0004 §B.1). No seeding (sessions are
+  new `SessionDocTypes` surface (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1). No seeding (sessions are
   created on sign-in).
 - The `Milestones.cs` / README Roadmap / `MilestonesTests.cs` triple is
-  **byte-identical** (a **named lane**, not a milestone — the ADR 0013 `GP` /
-  ADR 0171 `FDW` precedent; the M4/M5/M6 roadmap stays Events/Projects/
+  **byte-identical** (a **named lane**, not a milestone — the ADR [0013](0013-group-posts-membership-lane.md) `GP` /
+  ADR [0171](0171-least-privilege-db-role.md) `FDW` precedent; the M4/M5/M6 roadmap stays Events/Projects/
   Portability).
 - **Tests:** 13 — the 12 pinned `SessionServiceTests` (`tests/Kumunita.Core.
   Tests/SessionServiceTests.cs`) + 1 kill-all extension Web test
@@ -201,73 +192,5 @@ independently of any per-session `RevokedAt` write.
   green, 0 failed** (the `### Run result (sessions acceptance gate —
   2026-11-01)` section of the design doc — the three-test closed-loop /
   handoff / part-vs-whole gate, evidenced at the seam-test layer; the F5 e2e
-  is **recorded, not assumed done** — the `STATUS.md` prod-hardening owner-ops
+  is **recorded, not assumed done** — the [`STATUS.md`](../STATUS.md) prod-hardening owner-ops
   item "live E2E + F5 sign-out verifications" owns it).
-
-## Not covered (the 5 `SL·D` deferrals, verbatim)
-
-Each is a **named deferral** with a one-line `SL·D` follow-up candidate:
-
-- **Per-session `DeviceLabel`** — a resident-set label (rename "Chrome on
-  work laptop" to "My laptop"). A future `SL·D` lane adds the field + the
-  rename surface. *`SL·D` candidate: add `DeviceLabel?` to `SessionDoc` + a
-  `PATCH /sessions/{id}/label` action.*
-- **Per-session `Kiosk` flag** — a kiosk-mode session property. The kiosk is a
-  separate surface, not a session property. *`SL·D` candidate: the kiosk
-  surface declares its own session scope, not a `SessionDoc` field.*
-- **Admin "sign out all residents"** — a new `GlobalAdmin` action (kill every
-  resident's sessions platform-wide). Not a per-resident surface. *`SL·D`
-  candidate: a `GlobalAdmin` `POST /admin/sessions/kill-all` action over
-  `SessionService.*` with an `Admin` audit row (ADR 0006-E named lane).*
-- **Per-group / per-event session scoping** — sessions are per-account, not
-  per-resource. *`SL·D` candidate: a `SessionScope` document keyed to a
-  resource id, only if a M4/M5 surface genuinely needs it.*
-- **A session `Trust` / `Remember me` distinction** — the existing cookie
-  already carries a `Persistent` flag; no new surface in this lane. *`SL·D`
-  candidate: surface `Persistent` in the list if a resident asks.*
-
-## Deviations of record (the two documented deviations)
-
-1. **The U3 `SchemaBootstrap.cs` entry-read slip (a plan-documentation slip,
-   not a drift pause).** The plan's U3 "Entry reads" / "Deliverables" list
-   named `Kumunita.Core/Bootstrap/SchemaBootstrap.cs` as a place to add
-   `SessionDocTypes.Configure(opts);` "next to the existing
-   `CoreDocTypes.Configure` + `PostDocTypes.Configure` calls" there. That is
-   **factually wrong about this codebase**: `SchemaBootstrap.cs` contains
-   **no** `*DocTypes.Configure` calls at all — it only calls
-   `ApplyAllConfiguredChangesToDatabaseAsync()`, which picks up whatever
-   surfaces are already registered on the DI store's `StoreOptions` from
-   `Program.cs`. This codebase has **exactly one `StoreOptions`**, built once
-   in `Program.cs`; `SessionDocTypes.Configure` lives there (as it does for
-   every other context — `CoreDocTypes` / `PostDocTypes` / `MediaDocTypes` /
-   `PersonalNotesDocTypes` / etc.). U3 added the **single `Program.cs`
-   registration** (one line, after the existing `PostDocTypes.Configure`
-   line) and did **not** edit `SchemaBootstrap.cs` — following the codebase's
-   own documented, repeated precedent. This is recorded here so the ADR is the
-   source of the boot-wiring truth, not the plan's mis-stated file list.
-2. **The C3 same-transaction request-level deviation (see §Decision.4).**
-   The kill-all extension's two commits land in separate transactions within
-   the same request (the F5 Identity/EF path and the sessions Marten path do
-   not share a transaction); the `C3` pin is satisfied within each service
-   method + at the request level. The design doc §2.3 documents this deviation
-   and freezes it in §2.6 (U2's frozen-counts blockquote).
-
-## Close flip (U12, 2026-11-01)
-
-- `WhatsNew.cs` head = **`0.84.0`** / `2026-11-01` / ADR 0281 (the required
-  sixth close-flip member, the M27 lesson; the `WhatsNewTests` head-pin
-  bumped from `0.83.0` / ADR 0280 to `0.84.0` / ADR 0281).
-- `ARCHITECTURE.md` §2 — the `Sessions/` line flipped to **`sessions` ✓ live**
-  with the gate summary (13/13 green).
-- `README.md` — the **`Sessions`** named-lane row added (mirroring the
-  **Prod-hardening** named-lane row — "a named lane, not a milestone");
-  `Milestones.cs` / `MilestonesTests.cs` **byte-identical**.
-- `STATUS.md` — the sessions-lane note (mirroring the prod-hardening named-
-  lane paragraph shape).
-- The design doc's first 15 lines now carry the `> **Abstract:**` blockquote
-  (the `improve-check.ps1` gate (g) — the 10-second "is this the right read"
-  gate — resolved; the doc is ~740 lines and over the 400-line ceiling).
-- `KnownTranslationKeys.cs` re-baselined **14885 → 14905** in
-  `improve-check.ps1` gate (a) by U9 (the 5 `settings.sessions.*` keys ×
-  en/de/fr/da = 20 entries); the ADR annotation for that re-baseline is this
-  ADR (ADR 0281), recorded in U9's handoff note.

@@ -1,3 +1,25 @@
+---
+id: philosophy-example-meeting
+title: "Attending a Meeting"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the same three-shape example (differentiation / linkage /
+> what breaks) told with a meeting — agenda, attendees, pre-read as the
+> parts; facilitation as the linkage; a decision that survives the room as
+> the emergent property. **Who is it for:** readers who spend their week in
+> meetings. **When to read the rest:** when the plain-language examples
+> didn't land and you'd rather think in agendas, facilitation, and action
+> items.
+>
+
 # Attending a Meeting
 
 > Reach for this one if you spend your week in meetings.

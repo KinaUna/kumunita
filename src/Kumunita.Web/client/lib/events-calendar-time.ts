@@ -33,6 +33,17 @@
  *     registry-localized text the view ships as `data-overlap-hint` on the
  *     root, with the hardcoded English string below as the floor fallback.
  *
+ * (d) Overlap columns (side-by-side layout): previously the ring in (c) was
+ *     the only overlap signal and the blocks themselves shared one full-width
+ *     slot, so of N overlapping events only the last (topmost) was actually
+ *     visible/clickable. Now, per day-column, the column's instances are
+ *     greedily packed into lanes (sorted by clipped start; an instance takes
+ *     the first lane whose previous instance ends at or before its start,
+ *     else a new lane), and each instance's `left`/`width` are set to its
+ *     slice of the stack (the 0.25rem side gutters the .event-block rule
+ *     used are kept; the slices minus a hairline gap). A lone event keeps
+ *     the full width; two concurrent events split 50/50, etc.
+ *
  * Self-wires at load on the `#events-calendar` root **only when
  * `data-view != "month"`** (the view ships `data-view="@Model.View"`); the
  * Month path is untouched and keeps `events-calendar.js`. No nav code
@@ -121,7 +132,11 @@
     // key falls in [localDay(startUtc), localDay(endUtc − 1ms)] (the −1ms
     // keeps endUtc exclusive). The Map preserves DOM (chronological) order,
     // so the first appended instance is the chronologically first column —
-    // it keeps the rendered time label; the repeats are title-only.
+    // it keeps the rendered time label; the repeats are title-only. Each
+    // column's instances are collected with their clipped [start, end) so
+    // the (d) lane pass can slice the column's width among concurrent ones.
+    interface DayInstance { el: HTMLElement; cStart: number; cEnd: number; }
+    const instancesByDay = new Map<string, DayInstance[]>();
     for (let i = 0; i < blocks.length; i++) {
       const start = starts[i];
       const end = ends[i];
@@ -153,7 +168,68 @@
           instance.style.height = Math.max(heightPct, 1.5).toFixed(4) + '%';
           first = false;
           stack.appendChild(instance);
+          let list = instancesByDay.get(key);
+          if (!list) { list = []; instancesByDay.set(key, list); }
+          list.push({ el: instance, cStart: clippedStart, cEnd: clippedEnd });
         }
+      }
+    }
+
+    // (d) Overlap columns — per day-column, pack the instances into lanes
+    // (a lane's events are pairwise non-overlapping, so each slice of the
+    // column's width is free for that lane's member) and write each
+    // instance's left/width. Greedy by clipped start, first-fitting-lane
+    // scan (O(k²) per column, k ≪ 30). A lone event → full width
+    // (calc(100% − 0.5rem), the .event-block rule's gutters minus padding);
+    // n concurrent → n equal slices with a 0.25rem gap between them.
+    for (const list of instancesByDay.values()) {
+      const sorted = [...list].sort((a, b) => a.cStart - b.cStart || a.cEnd - b.cEnd);
+      const laneEnds: number[] = []; // laneEnds[i] = the latest cEnd placed in lane i
+      const lanes: number[] = [];   // lanes[i] = the lane index of sorted[i]
+      for (const inst of sorted) {
+        let lane = -1;
+        for (let i = 0; i < laneEnds.length; i++) {
+          if (laneEnds[i] <= inst.cStart) { lane = i; break; }
+        }
+        if (lane === -1) { lane = laneEnds.length; laneEnds.push(0); }
+        laneEnds[lane] = inst.cEnd;
+        lanes.push(lane);
+      }
+      const n = laneEnds.length;
+      if (n === 0) continue;
+      // A hairline gap between slices so two same-colored blocks don't
+      // bleed into each other (the .event-block padding still frames the
+      // content). Only applied when there is more than one lane.
+      const gapRem = n > 1 ? 0.25 : 0;
+      const totalGapRem = gapRem * (n - 1);
+      const gutterRem = 0.5; // the .event-block rule's 0.25rem gutters, both sides
+      // Width math, in plain rem + % so the browser's calc() never has to
+      // multiply a constant by an expression containing % (a combination
+      // some engines reject). The available width inside the stack is
+      // `100% - (gutter + totalGap)rem`; each of the n lanes is
+      // `that / n`. A lane's left edge is the 0.25rem gutter plus its index
+      // × (slice + gap).
+      const widthCalc = `calc((100% - ${(gutterRem + totalGapRem).toFixed(3)}rem) / ${n})`;
+      for (let i = 0; i < sorted.length; i++) {
+        const li = lanes[i];
+        if (li === 0) {
+          sorted[i].el.style.left = `${(gutterRem / 2).toFixed(3)}rem`;
+        } else {
+          // left = gutter/2 + li * (slice + gap), where
+          //   slice = (100% − (gutter + totalGap)rem) / n
+          // Expanding and regrouping so every multiplication has an integer
+          // constant on the left (CSS calc() forbids `% * number`):
+          //   left = gutter/2 + li * (100% − (gutter+totalGap)rem) / n
+          //                  + li * gap
+          //        = gutter/2 + (li/n) * 100% − (li/n)(gutter+totalGap)rem
+          //                  + li * gap
+          const sliceRemPart = (gutterRem + totalGapRem) / n;
+          const subtractRem = sliceRemPart * li - gapRem * li; // (li/n)(g+tg) − li*gap
+          sorted[i].el.style.left =
+            `calc(${(gutterRem / 2).toFixed(3)}rem + ${li} * 100% / ${n} - ${subtractRem.toFixed(3)}rem)`;
+        }
+        sorted[i].el.style.width = widthCalc;
+        sorted[i].el.style.right = 'auto';
       }
     }
   }

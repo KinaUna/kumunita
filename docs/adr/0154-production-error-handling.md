@@ -1,4 +1,17 @@
-# ADR 0154 — Production error handling (a report-an-issue affordance on the 500 error page + a GlobalAdmin triage surface)
+---
+id: adr-0154
+title: "Production error handling (a report-an-issue affordance on the 500 error page + a GlobalAdmin triage surface)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0154](0154-production-error-handling.md) — Production error handling (a report-an-issue affordance on the 500 error page + a GlobalAdmin triage surface)
 
 Status: Accepted
 Date: 2026-10-09
@@ -38,15 +51,15 @@ and a resident may file a *general issue* not tied to an error page). M31 does
   `TriagedAt?` / `TriagedBy?`. **No field outside this set may appear in the
   doc.** The `ErrorReport` is a **platform-error signal, not a
   content-moderation report** — the existing `Posts/Report` doc (the M3b
-  content-moderation report, ADR 0023) is **untouched** (M31·10 — separate
+  content-moderation report, ADR [0023](0023-reply-report-target-lane.md)) is **untouched** (M31·10 — separate
   docs in separate contexts, distinct `TargetKind` strings: `"error-report"`
   vs `"post"` / `"reply"`).
 - **The `TriageStatus` value set is closed in M31** (D2). The
   `TriageStatus` field accepts **exactly** `{"new", "triaged"}` in M31. M32
-  **adds** `"resolved"` additively per ADR 0004 §B.1 (a string field — no
+  **adds** `"resolved"` additively per ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 (a string field — no
   migration needed), it does not re-shape the existing two.
 - **The doc is Marten-native, registered in a new parallel surface** (D3). The
-  `ErrorReportDocTypes.Configure(opts)` surface (ADR 0004 §B.1, the
+  `ErrorReportDocTypes.Configure(opts)` surface (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1, the
   `UsageDocTypes` / `PostDocTypes` parallel-surface precedent) pins one
   `.Schema.For<ErrorReport>()` + the `(TriageStatus, Created)` index for the
   admin list ordering. **No EF migration** — the delta is applied
@@ -64,14 +77,14 @@ and a resident may file a *general issue* not tied to an error page). M31 does
   / `IAuthorizationService` surface** (M31·9).
 - **The `Via` tag for the submission row is a new additive value when
   anonymous** (D5). The `CreateAsync` audit row's `Via` tag is the design doc
-  §2.1 pin: `AccessVia.Resident` (ADR 0041) for a non-blank `SubjectId`;
+  §2.1 pin: `AccessVia.Resident` (ADR [0041](0041-page-audience-scope-dropdown.md)) for a non-blank `SubjectId`;
   **`AccessVia.Anonymous`** for a blank `SubjectId`. `Anonymous` is a **new
   additive** `AccessVia` enum value (the 12th), appended after `Resident` in
-  `Decision.cs` with a doc comment citing ADR 0154 + the ADR 013/028/036/041
+  `Decision.cs` with a doc comment citing ADR [0154](0154-production-error-handling.md) + the ADR 013/028/036/041
   append precedent — the eleven frozen values are **never re-shaped**. This is
   the repo's established response to "a new standing with no existing tag"
-  (the M1 `Admin`, ADR 0013 `Group`, ADR 0028 `Guardian`, ADR 0036
-  `Community`, ADR 0041 `Resident` all followed it). It is **not** a new
+  (the M1 `Admin`, ADR [0013](0013-group-posts-membership-lane.md) `Group`, ADR [0028](0028-guardian-controls-account-scope-supervision.md) `Guardian`, ADR [0036](0036-community-visible-audience-default.md)
+  `Community`, ADR [0041](0041-page-audience-scope-dropdown.md) `Resident` all followed it). It is **not** a new
   authorization surface (the `AccessVia` enum is the *record* of "by what
   right," not a *gate*).
 - **The 500 error page gains a non-blocking report form** (D6). The
@@ -87,7 +100,7 @@ and a resident may file a *general issue* not tied to an error page). M31 does
   confirmation (the `errorreport.thanks` `kw-l` key).
 - **The `/admin/error-reports` GlobalAdmin surface** (D7). A new
   `ErrorReportAdminController` (`[Authorize(Roles = GlobalAdmin)]` — the
-  standard admin gate, the thin-token rule ADR 0001-B, the
+  standard admin gate, the thin-token rule ADR [0001](0001-core-stack-and-identity-model.md)-B, the
   `AdminOnboardingController` shape): `GET /admin/error-reports` (the
   `ListAsync` read, newest-first, **no per-row `IAuthorizationService` call,
   no audit on reads** — a read, not an access decision; a non-`GlobalAdmin`
@@ -101,7 +114,7 @@ and a resident may file a *general issue* not tied to an error page). M31 does
   `KnownTranslationKeys_ParityTests` (M31·7). The closed set is **20 keys**
   (the design doc §2.3 table — the error-page form consumes keys 1–8, the
   admin list view consumes keys 9–20); the `en` values are the source text
-  (the ADR 0015 D1 `kw-l` provider-floor discipline); the `de` / `fr` / `da`
+  (the ADR [0015](0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline); the `de` / `fr` / `da`
   values are U05's to author (the M30·6 four-language pin).
 
 ## Consequences
@@ -117,11 +130,11 @@ and a resident may file a *general issue* not tied to an error page). M31 does
 - **One new bounded context, one new doc, one new service, one new
   registration surface** — `Kumunita.Core.ErrorReports` (the `ErrorReport`
   doc + the `IErrorReportService` + the `ErrorReportDocTypes`); additive per
-  ADR 0006 / ADR 0004 §B.1. The `Posts/Report` doc (ADR 0023) is **untouched**
+  ADR [0006](0006-module-boundary-contracts.md) / ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1. The `Posts/Report` doc (ADR [0023](0023-reply-report-target-lane.md)) is **untouched**
   (M31·10 — M31 adds a *new* doc in a *new* context, not a new field on an
   existing one).
 - **The `TriageStatus` value set is closed to `{"new", "triaged"}` in M31** —
-  M32 **adds** `"resolved"` additively (ADR 0004 §B.1), it does not re-shape
+  M32 **adds** `"resolved"` additively (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1), it does not re-shape
   the existing two.
 - **The `AccessVia` enum gains one additive value** — `Anonymous` (the 12th),
   for the anonymous submission row's `Via` tag; the eleven frozen values are
@@ -130,7 +143,7 @@ and a resident may file a *general issue* not tied to an error page). M31 does
   (M31·9).
 - **`ContactEmail` is stored + read by the admin only** — M31 never sends mail
   from it (the escalation forwarding lane, and the mail send, are M32's).
-- **`No EF migration`** (a new Marten doc type is additive per ADR 0004 §B.1;
+- **`No EF migration`** (a new Marten doc type is additive per ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1;
   the delta is applied idempotently at boot). **Two new routes**:
   `/Home/Error/Report` (the report submission, public) +
   `/admin/error-reports` (the GlobalAdmin triage surface + the

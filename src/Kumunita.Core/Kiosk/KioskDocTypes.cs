@@ -18,7 +18,7 @@ namespace Kumunita.Core;
 /// SiteContentDocTypes / SurfaceLabelsDocTypes / EscalationDocTypes
 /// precedent: without the call the doc is invisible to the schema).
 /// <para>
-/// The <see cref="KioskView"/> entry is a **value object** nested in the
+/// The <see cref="KioskEntry"/> (ADR 0285) is a **value object** nested in the
 /// <see cref="KioskPlaylist"/> (not a standalone doc — M35·9: the kiosk adds
 /// **no** new doc type beyond <see cref="KioskPlaylist"/>; the M5
 /// <c>Projects</c> + M4 <c>Events</c> contexts are **untouched**).

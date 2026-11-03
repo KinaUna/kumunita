@@ -1,4 +1,17 @@
-# ADR 0106 — To-do self-assign lane ("Assign to me") and new-board "Everyone" default
+---
+id: adr-0106
+title: "To-do self-assign lane (\"Assign to me\") and new-board \"Everyone\" default"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m16-inventory-design.md]
+supersedes: [adr-0073]
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0106](0106-todo-self-assign-lane-and-board-default-audience.md) — To-do self-assign lane ("Assign to me") and new-board "Everyone" default
 
 Status: Accepted
 Date: 2026-09-13
@@ -38,7 +51,7 @@ promises.**
    current user should also be on the list of people that can be assigned
    to."* The standing matrix (C-M5·6) is creator ∪ assignee ∪ GlobalAdmin —
    a *stranger* who can merely *see* an unassigned to-do has no sanctioned
-   way to take it onto themselves except the claim lane (ADR 0073), which
+   way to take it onto themselves except the claim lane (ADR [0073](0073-todo-group-community-claim-lane.md)), which
    requires group/community membership standing, not just visibility. And the
    "Assign to…" people list deliberately **excluded** the actor themself (the
    grant-picker convention: "addressed to me" is meaningless), so self-assign
@@ -58,7 +71,7 @@ promises.**
 `CommunityVisible = true` (the ADR 0036 community-visible flag), `Mode =
 "Any"`, and an empty `Grants` list — matching the Posts precedent
 (`PostsController` seeds `CommunityVisible = true`). With a `null`/empty
-`ComponentId`, the ADR 0036 branch is the whole decision: **any signed-in
+`ComponentId`, the ADR [0036](0036-community-visible-audience-default.md) branch is the whole decision: **any signed-in
 resident sees the board** (the resident-only standing), and the "granular"
 audience panel (`_GrantPickers`) hides while the flag is on. The rendered
 checkbox (already `?? true`) and the submitted value now agree, and a fresh
@@ -83,12 +96,12 @@ correction in one controller action.
   GlobalAdmin) is unchanged — **no take-over, no standing change** for
   non-self writes.
 
-This is the ADR 0073 claim **generalized**: the claim required group /
+This is the ADR [0073](0073-todo-group-community-claim-lane.md) claim **generalized**: the claim required group /
 community *membership* standing (a probe); the self-assign lane is broader
 but strictly safer — "if you can see it and it's unassigned, you may take it
 onto yourself" is the natural neighborhood rule, and it reuses the *existing*
 frozen `CanAsync` Read decision (no new `AccessVia`, no new `Decide()`
-branch, ADR 0006). The `todo.assign` audit row and the self-assign
+branch, ADR [0006](0006-module-boundary-contracts.md)). The `todo.assign` audit row and the self-assign
 **no-notification** case (actor == assignee skips the recipient) already
 exist; both are unchanged.
 
@@ -141,7 +154,7 @@ read decision (C-M5·3); the expander reveals nothing the actor may not see.
   seed, no service/schema change.
 - A **resident who can see an unassigned to-do can take it onto themselves**
   from any of the three dropdowns, even without group/community standing or
-  authorship — the claim (ADR 0073) subsumed. **Already-assigned** to-dos and
+  authorship — the claim (ADR [0073](0073-todo-group-community-claim-lane.md)) subsumed. **Already-assigned** to-dos and
   **non-self** assignments still require standing (no take-over).
 - The **"Assign to…" people list now includes the actor** (a separate
   `Assign_Users` seed), while the audience/subtask pickers keep excluding
@@ -153,5 +166,5 @@ read decision (C-M5·3); the expander reveals nothing the actor may not see.
   one service method, a view-data seed, and a view.
 - **Translation**: three new keys — `projects.todo.assign_to_me`,
   `projects.todo.details`, `projects.todo.community` — added to **all four**
-  dictionaries (en/de/fr/da) in `KnownTranslationKeys`, so the ADR 0042 /
+  dictionaries (en/de/fr/da) in `KnownTranslationKeys`, so the ADR [0042](0042-bundled-initial-language-pack.md) /
   0044 parity + warm-add tests keep passing.

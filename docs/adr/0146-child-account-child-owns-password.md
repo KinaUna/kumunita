@@ -1,21 +1,19 @@
-# ADR 0146 — Child accounts: the child owns the password (the guardian never sets it; the child sets it at the confirmation link)
-
-Status: Accepted
-Date: 2026-10-06
-Builds on: 0028 (the GU standing — the `GuardianLink` document, the
-`AccessVia.Guardian` value, and — critically — the design doc's own stated
-intent that "the parent does not need the child's credentials to supervise;
-supervision rides the link, not the password" and "a parent does not re-key a
-child's password"); 0001 (the M1 identity handoff — `RegisterAsync` +
-`VerifyWithTokenAsync`, the single designed email seam this lane extends);
-0006 (the §A frozen `IIdentityService` surface gains two *additive* methods;
-the §E compatible-ADD precedent); 0138 (the `ChangePasswordAsync` credential
-write + the `IsChangePasswordLockedForAsync` guard this lane's credential
-write reuses the shape of)
+---
+id: adr-0146
+title: "Child accounts: the child owns the password (the guardian never sets it; the child sets it at the confirmation link)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/prod-hardening-f2-token-hash.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
 
 ## Context
 
-ADR 0028 froze the GU surface and its design doc stated the intended
+ADR [0028](0028-guardian-controls-account-scope-supervision.md) froze the GU surface and its design doc stated the intended
 credential posture explicitly: the guardian supervises through the
 `GuardianLink`, *not* through the child's password, and the design's
 "world seams" section records "no 're-key the password into a phone' step"
@@ -34,7 +32,7 @@ This left two problems the documented intent did not want:
    A child whose parent chose their password has no independent credential —
    the account's "ownership" of that password is the parent's, which inverts
    the very "eventually-independent" posture the GU lane is built toward
-   (ADR 0028 §D·5, the come-of-age transition).
+   (ADR [0028](0028-guardian-controls-account-scope-supervision.md) §D·5, the come-of-age transition).
 
 2. **The child never got to choose.** The account was created, the
    verification email sent, the child clicked the link, and signed in to an
@@ -54,7 +52,7 @@ the guardian to the child.
 
 ### A. The formation seam: `IIdentityService.RegisterChildAccountAsync`
 
-One **additive** method on the frozen `IIdentityService` surface (ADR 0006
+One **additive** method on the frozen `IIdentityService` surface (ADR [0006](0006-module-boundary-contracts.md)
 §A/§E, the `DeleteChildAccountAsync` / `RegisterAsync` ADD shape):
 
 ```csharp
@@ -67,7 +65,7 @@ Task<ThinPrincipal> RegisterChildAccountAsync(string displayName, string email);
   `password: null` means the account is created **without a credential**
   (the `UserManager.AddPasswordAsync` call is skipped). The account, the
   `Profile` (unverified, self-only visibility), the single-use
-  `KindVerify` token, and the ADR 0077 `account.signup` GlobalAdmin
+  `KindVerify` token, and the ADR [0077](0077-admin-account-signup-verify-notification.md) `account.signup` GlobalAdmin
   notification are all staged exactly as the self-serve lane stages them —
   **nothing about the formation is different except the absence of the
   credential.** The two lanes are one code path with one optional argument
@@ -100,7 +98,7 @@ Task<Profile> VerifyAndSetPasswordAsync(string tokenValue, string password);
   `CompleteSeedAdminSetupAsync` shape: a credential write that also flips
   `Verified`). The credential write result is checked and thrown on
   failure (a password that fails the `UserManager` policy is a user
-  error the Web surfaces, not a 500). The ADR 0077 `account.verified`
+  error the Web surfaces, not a 500). The ADR [0077](0077-admin-account-signup-verify-notification.md) `account.verified`
   notification is emitted as the other verify lanes emit it.
 - **The credential is the child's.** `via: Owner` (the resident
   activating their own account — the `VerifyWithTokenAsync` /
@@ -164,39 +162,20 @@ moved).
   still collects a password, still calls `RegisterAsync`, and the
   confirm-only verify link still works exactly as M1 shipped. A resident
   who signed up themselves does not suddenly have to re-set a password.
-- **The `ChangePasswordAsync` lane and its ADR 0138 lock are untouched** —
+- **The `ChangePasswordAsync` lane and its ADR [0138](0138-sample-data-change-password-lock.md) lock are untouched** —
   the child, once activated, changes their own password through the same
   self-serve lane as anyone else (and is subject to the same sample-data
   lock). This ADR adds a way to *set* the password at creation; it does
   not re-route the *change* lane.
 - **The GU standing and every other supervisory action are untouched** —
   suspend/unsuspend, community + group curation, invitation approval, the
-  event gate (ADR 0144), deletion (ADR 0143) all still ride the
+  event gate (ADR [0144](0144-guardian-event-rsvp-gate.md)), deletion (ADR [0143](0143-guardian-delete-child.md)) all still ride the
   `GuardianLink`. The lane's whole honesty (G·1 — the guardian never reads
   the child's content) is unchanged; this ADR only moves the *credential*,
   which the design doc always intended to be the child's.
 - **No new `AccessVia` value, no new `GuardianLink` state, no schema
   change.** The two new seams are additive on `IIdentityService`; the
   token, the profile, the audit rows are the existing documents.
-
-## Invariants (pinned)
-
-- **C-0146·1 — The child account is created password-less.**
-  `RegisterChildAccountAsync` leaves the account's `PasswordHash` empty;
-  a `CheckPasswordAsync` against any candidate fails until the child sets
-  it. (Pinned by
-  `ChildAccountPasswordTests.RegisterChildAccount_CreatesAnUnverifiedAccountWithNoPassword`.)
-- **C-0146·2 — The child's credential is set by the child, at the link.**
-  `VerifyAndSetPasswordAsync` sets the password the child supplied, flips
-  `Verified`, and consumes the token in one commit; the child's password
-  then signs them in (a re-fetched `CheckPasswordAsync` succeeds) and the
-  token is single-use (a second presentation is refused). (Pinned by
-  `ChildAccountPasswordTests.VerifyAndSetPassword_SetsTheChildsOwnCredential_AndSignsIn`.)
-- **C-0146·3 — The self-serve lane is unchanged.** A resident who signed
-  up with a password gets the confirm-only verify link; the
-  `AddChildForm` pin is now three fields (no `Password`). (Pinned by
-  `GuardianViewModelsTests.AddChildForm_Is_Form_Model_With_Three_Fields`
-  and the unchanged `AccountController.Signup` behavior.)
 
 ## Consequences
 

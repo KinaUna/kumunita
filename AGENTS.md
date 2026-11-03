@@ -1,468 +1,91 @@
+---
+id: agents
+title: "AGENTS.md"
+tier: living
+kind: entry
+status: current
+audiences: [agent, developer]
+related: [README.md, docs/DOCS-CONVENTIONS.md]
+updated: 2026-11-02
+---
+
+> **Abstract:** the agent entry — the must-knows for working in this repo
+> (start here, shape of the code, the one thing to internalize, conventions,
+> the don't-pause rule, doc-sync), each a short paragraph + a link out.
+> **Who is it for:** an AI agent or developer in this repo.
+> **When to read the rest:** at session start, before the first code or doc change.
+>
+
 # AGENTS.md — Kumunita
 
 Kumunita is a **self-hosted community platform for one neighborhood**. Each
 deployment serves a single community (its own container + Postgres) — there is
 no multi-tenant data model.
 
+> **This file is loaded into every agent session, so its length is a
+> per-session cost.** As of `D06` of the `IMPROVE-DOCS` lane it carries only
+> the must-knows; the working doctrine (Razor, testing + CI, live-server
+> debugging, sandbox quirks) now lives in [`docs/dev/`](docs/dev/README.md),
+> and the shared doc rules in [`docs/DOCS-CONVENTIONS.md`](docs/DOCS-CONVENTIONS.md).
+
 ## Start here
 
-- `README.md` — what the platform is, its current status (M3 + group posts
-  shipped; **multilingual is next** — pulled forward from M6 so the platform can
-  be exercised in more than one language before the circle widens; then M4
-  events/RSVPs, M5 projects), principles, tech stack, and the **Running** instructions.
-- `docs/ARCHITECTURE.md` — the detailed map: stack, data model, the three
-  bounded contexts (Identity / UserInfo / Authorization), the module-boundary
-  contracts, and the CQRS-lite & side-effects (Wolverine) convention.
-- `docs/adr/` — decision records. **ADR 0004** (persistence & schema evolution)
-  and **ADR 0006** (module boundary contracts) constrain how data is stored and
-  how contexts talk to each other — read them before touching persistence,
-  schema, or cross-context calls.
-- `docs/design/` — the per-milestone design docs (M1 identity/access, M2
-  directory/profiles/groups, M3/m3b posts + moderation). The M1–M3 scope is the
+- [`README.md`](README.md) — what the platform is, current status, principles, tech stack,
+  and the Running instructions.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the detailed map: stack, data model, the bounded
+  contexts, the module-boundary contracts, the CQRS-lite & Wolverine
+  convention.
+- `docs/adr/` — decision records. **ADR [0004](docs/adr/0004-data-persistence-and-schema-evolution.md)** (persistence & schema evolution) and **ADR [0006](docs/adr/0006-module-boundary-contracts.md)** (module boundary contracts) constrain how data is stored and how contexts talk — read them before touching persistence, schema, or cross-context calls.
+- `docs/design/` — the per-milestone design docs; the M1–M3 scope is the
   shipped surface.
-- `docs/SECURITY.md` — the privacy model, threat model, and access-control
-  rules. This repo is privacy-first; treat the author's audience choice as the
+- [`docs/SECURITY.md`](docs/SECURITY.md) — the privacy model, threat model, and access-control
+  rules. This repo is privacy-first; the author's audience choice is the
   authoritative constraint.
+- [`docs/DOCS-CONVENTIONS.md`](docs/DOCS-CONVENTIONS.md) — the shared doc rules (front-matter, abstract,
+  ADR cap, linking) — read before your first doc change.
+- `docs/dev/` — the working doctrine: [razor-verification](docs/dev/razor-verification.md), [testing-and-ci](docs/dev/testing-and-ci.md), [live-server-debugging](docs/dev/live-server-debugging.md), [agent-environment-quirks](docs/dev/agent-environment-quirks.md).
 
 ## The shape of the code
 
-- **`Kumunita.Core`** — domain + services. Bounded contexts live in
-  `Identity/`, `UserInfo/`, `Authorization/`, `Posts/`, `Moderation/`,
-  `Localization/`, `Bootstrap/`. The M3b "platform announcements" lane
-  (`Announcements/`, registered in `PostDocTypes` alongside `CoreDocTypes`) is a
-  feature module within that surface, not a top-level bounded context.
-  `DependencyInjection.cs` registers each feature.
+- **`Kumunita.Core`** — domain + services. Bounded contexts: `Identity/`,
+  `UserInfo/`, `Authorization/`, `Posts/`, `Moderation/`, `Localization/`,
+  `Bootstrap/` — `DependencyInjection.cs` registers each. The `Announcements`
+  module (`PostDocTypes`) is a feature module, not a top-level context.
 - **`Kumunita.Web`** — Razor Pages / MVC (server-rendered), `Program.cs`
-  bootstrap, `Milestones.cs` (home-page roadmap — keep in sync with `README.md`),
-  `Models/` + `Security/` (view-models and claim shaping, both server-rendered).
-- **Persistence** (ADR 0004 §B): **Marten** owns the domain documents and
+  bootstrap, `Milestones.cs` (home-page roadmap — the canonical list), `Models/`
+  + `Security/` (view-models and claim shaping).
+- **Persistence** (ADR [0004](docs/adr/0004-data-persistence-and-schema-evolution.md) §B): **Marten** owns the domain documents and
   versioned schema (the `CoreDocTypes` / `PostDocTypes` registration
-  surfaces). **EF Core is used only for ASP.NET Identity tables** — do not put
-  domain data in EF.
+  surfaces). **EF Core is used only for ASP.NET Identity tables** — do not
+  put domain data in EF.
 
 ## The one thing to internalize before writing code here
 
-This repo uses **Marten and Wolverine** on **.NET 10**. The idiomatic patterns
-in training data are frequently **older major versions** of both libraries. Before
-writing Marten schema/migration code or Wolverine handler code, check the actual
-APIs in the current dependency versions in the `.csproj` files — do not copy a
-"common" Marten or Wolverine pattern from memory. The ADRs above encode this
-project's *specific* choices (CQRS-lite, documents + projections, no event sourcing,
-a single durable email handler rather than a saga) — follow them.
+This repo uses **Marten and Wolverine** on **.NET 10**. The idiomatic patterns in training data are frequently **older major versions** of both. Before writing Marten schema/migration code or Wolverine handler code, check the actual APIs in the current `.csproj` versions — do not copy a "common" pattern from memory. The ADRs encode this project's *specific* choices (CQRS-lite, documents + projections, no event sourcing, a single durable email handler rather than a saga) — follow them.
 
 ## Conventions to preserve
 
 - Server-rendered Razor Pages / MVC over Blazor or SPA patterns.
 - Audit-by-default: access to audience-restricted content is always logged.
-- Thin token, fat authorization: "may this actor see that resource?" is resolved
-  by the `Authorization` service per request, not encoded in an identity claim.
-- Keep `Milestones.cs` and the README **Roadmap** section together — `Milestones.cs`
-  has a comment that says this is the contract.
+- Thin token, fat authorization: "may this actor see that resource?" is
+  resolved by the `Authorization` service per request, not in an identity claim.
+- Keep `Milestones.cs` and the roadmap docs together — `Milestones.cs` is the
+  **canonical list** (it renders the home page); [`docs/product/roadmap.md`](docs/product/roadmap.md) +
+  [`docs/STATUS.md`](docs/STATUS.md) point at it rather than restating it.
 
 ## Don't pause mid-task to check in
 
-If you're partway through a multi-step task and a tool batch returns
-successfully with no error, keep going — don't stop to announce what you're
-about to do next and wait for a "continue." That pause-and-confirm habit
-(reported specifically with some models: github/orgs/community#184524) is
-not a safety feature here; it just stalls iterative work like looping over
-records, running several build/test rounds, or applying a change across
-multiple files. Stop only when the task is actually done, or when you hit a
-real blocker (an error, a missing file, an ambiguous requirement, or
-something destructive/irreversible you genuinely need confirmation for) —
-in those cases say what happened and what you need. **A failed tool call or
-a terminal command error is a recoverable step, not a stopping point**: read
-the error, adjust, and continue the same task. If the *same* command has
-failed twice, change approach (different command form, different tool)
-rather than retrying it a third time. In VS Code, note the workspace's
-`.vscode/settings.json` also raises `chat.agent.maxRequests`
-from its default of 25, since that cap alone can force a stop mid-task even
-when you intend to keep going.
+If you're partway through a multi-step task and a tool batch returns successfully with no error, keep going — don't stop to announce the next step and wait for a "continue." That pause-and-confirm habit (github/orgs/community#184524) is not a safety feature; it just stalls iterative work. Stop only on a real blocker (an error, a missing file, an ambiguous requirement, or something destructive you genuinely need confirmation for) — say what happened and what you need. **A failed tool call is a recoverable step, not a stopping point**: read the error, adjust, continue. If the *same* command failed twice, change approach.
 
-**The flip side — long-running things in flight.** When a known-long
-test suite, build, or server startup is running in the background
-(`Kumunita.Core.Tests` ~20 s, `Kumunita.Web.Tests` ~1 min, a
-`docker compose up` ~8 s), say so *proactively* in the same turn: name
-the expected duration and that you'll report on completion. The user
-has repeatedly had to poll "Is it done?" / "Are the tests done?" 2–6
-times per session while the agent stayed silent — that churn is the
-cost of not stating the expectation up front. This does not conflict
-with the rule above (which is about *stopping to confirm before acting*);
-it's about *communicating status while waiting*.
+**The flip side — long-running things in flight.** When a known-long test suite, build, or `docker compose up` is running in the background (~20 s / ~1 min / ~8 s), say so *proactively* in the same turn — name the duration and that you'll report on completion.
 
 ## Keeping the docs in sync with the code
 
-This repo is deliberate about doc ↔ code parity, so keep these pairs together
-when you change behavior:
+This repo is deliberate about doc ↔ code parity. Keep these pairs together when you change behavior:
 
-- The **README Roadmap** and `src/Kumunita.Web/Milestones.cs` — the home page
-  renders `Milestones.cs`, and its doc-comment names the README as the source
-  of truth. Bump a milestone to "done" in one when it ships and the other
-  follows. **Tests pin the exact order + the single-in-progress milestone
-  (`tests/Kumunita.Web.Tests/MilestonesTests.cs`)** — keep that file in step
-  with any roadmap reorder.
-- **`src/Kumunita.Web/WhatsNew.cs`** (the "What's new" registry, ADR 0110,
-  pinned by `tests/Kumunita.Web.Tests/WhatsNewTests.cs`) — the platform's
-  version history. When a milestone **or a named lane ships**, add its version
-  (newest-first; or extend the newest row) here — this is a **required sixth
-  member** of the close flip above. The milestone-flip contract
-  (`Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
-  `MilestonesTests.cs`) does **not** name it, which is why it is easy to miss
-  (M27 shipped 2026-10-07 with no entry until caught in review — added as
-  0.40.0). "Shipped" = the close unit ran, not "in progress."
-- When a **new capability lands out of the M-letter order**, it gets a *named
-  lane* with a short ID — **not** a renumber. Precedent: the media/avatars
-  lane (ADR 0011, "M4-adjacent") and **group posts** (`GP`, ADR 0013, "no
-  milestone letter; roadmap M4/M5/M6 stay Events/Projects/Portability"). The
-  same rule now applies to **multilingual** (`ML`, ADR 0005, pulled forward to
-  *next* in 2026-09-12 so the platform can be exercised in more than one
-  language before the circle widens) — M4/M5/M6 are untouched.
-- The **bounded-context / persistence layout** described in `docs/ARCHITECTURE.md`
-  and ADR 0004/0006 — if you add a new context, doc-type surface, or change how
-  contexts are registered in `DependencyInjection.cs`, reflect it in the relevant
-  ADR rather than leaving the design doc stale.
-- A **new capability that settles a design question** gets an ADR under `docs/adr/`
-  (numbered after the current highest), not just a prose note in the README.
-- The plans folder is **`docs/plans-milestones/`** (with an "s"), holding `in-progress/`
-  and `done/<lane>/`. Older handoff notes sometimes say `docs/plan-milestones` —
-  that's a stale path, treat it as the same folder.
-
-## Razor verification doctrine
-
-When a user reports a rendering bug, **the rendered HTML is the evidence, not
-the source file** — and the user's report outranks your source reading.
-
-- **Never conclude "stale build / stale process / stale deployment"** unless you
-  have confirmed the served bytes differ from what the current source would
-  produce. If you're about to tell the user "this is stale, refresh it", you
-  own that claim and it has been wrong before.
-- **Verify against the served page**, not the `.cshtml`: fetch the real HTML
-  (`curl` with a session cookie, or the integrated browser) and
-  inspect the actual markup. "The view file looks right" is not verification.
-- Known Razor traps in this codebase (each of these has actually bit us):
-  - **Un-awaited `async Task<string>` helpers** interpolated into a string render
-    the type name (`System.Runtime.CompilerServices.AsyncTaskMethodBuilder...`).
-    When a banner/label looks wrong, grep every call site of the async
-    helper for a missing `await` (this hit `SeedLanguageName` in 9 places).
-  - **Razor HTML-encodes expressions inside attribute values** — building a
-    `style`/`data-*` attribute with `@(cond ? " style=\"display:none\"" : null)`
-    produces broken HTML (`style= display:none`). Concatenate or use `Html.Raw`
-    for such attributes; never interpolate quoted attribute strings via `@(...)`.
-  - **A TagHelper tag inside a quoted attribute value renders as raw HTML text**
-    — `<kw-l>` cannot live inside `title="..."`. Put the localized label in a
-    proper inline element (`<span>`/`<button>`) instead.
-  - **Boolean TagHelper flags bind differently as bare vs. quoted**
-    (`<kw-dt TimeOnly>` vs `TimeOnly="true"`) in .NET 10's Razor source
-    generator. When a flag "doesn't take effect", check the generated
-    descriptor or the rendered output — don't trust the markup at face value.
-  - **`@checked(...)` is not a Razor expression** — it renders as a bogus
-    literal attribute (`value="true" true=""`) with **no** `checked`
-    attribute, so the box is never checked on load and (worse) an unchecked
-    box posts nothing, silently binding `false` on save. The proven pattern
-    is the conditional-attribute expression:
-    `@(Model.X ? "checked" : null)`. `Views/AdminSite/Index.cshtml` shipped
-    with `@checked(...)` on all nine toggles (bug reported 2026-10-22; every
-    other checkbox in the repo uses the conditional form) — fix markup with
-    `@(Model.X ? "checked" : null)`, never `@checked(...)`.
-  - **`@($"...")` in an attribute is a C# interpolated string, not Razor** — the
-    only interpolation holes are `{var}`; a bare `@var` inside is a **literal**
-    character. So `action="@($"/notes/@row.Id/delete")"` renders the literal URL
-    `/notes/@row.Id/delete`, while the working form is
-    `action="@($"/notes/{row.Id}/delete")"`. Plain `href="/notes/@row.Id/edit"`
-    (no `@$`) is a real Razor expression and is fine. This bit the Notes +
-    Bookmarks per-row/folder write controls in 9 places (bug reported
-    2026-10-22; commit `b481499a` introduced it by converting the delete
-    `<a href>` links into POST forms and dropping the `{…}` braces). Grep the
-    whole codebase with `grep -rnoE '@\(\$"[^"]*@[A-Za-z_]' src/Kumunita.Web/Views/`
-    — any hit is this bug.
-  - **A bare `@expr` inside a `<script>` block IS HTML-encoded in .NET 10** —
-    a `<script type="application/json" id="x">@myJson</script>` block does
-    **not** carry raw JSON: the `"` becomes `&quot;`, so the client's
-    `JSON.parse(el.textContent)` fails ("Expected property name at position
-    1"). Emit the value via `@Html.Raw(json)` (outputs as-is); if a value can
-    contain a literal `</script>`, neutralize it first:
-    `@Html.Raw(json.Replace("</", "<\\/"))` (`<\/` is a valid JSON escape that
-    cannot close the script). **Fixed 2026-10-27:** the `_Layout.cshtml`
-    `#kumunita-strings` block (the P0-6 client strings bundle) used to wrap
-    its JSON in `HttpUtility.HtmlEncode` — under this rule that
-    **double-encoded** it (served bytes showed `&amp;quot;`), so every
-    client module (`rich-editor.ts`, `tag-suggest.ts`, `kiosk.ts`,
-    `note-modal.ts`, `onboarding-modal.ts`, `notifications-bell.ts`,
-    `image-editor.ts`) was silently falling back to the English floor
-    strings. It now uses the correct `@Html.Raw(...)` form. The ADR 0195
-    `#card-edit-prefills` block uses the same form.
-- A URL or link that shows a **literal `@Model.X`** (404s, `/groups/@Model.GroupId/posts`)
-is the same class of bug — an uninterpolated Razor attribute value, not a
-  routing problem. Fix the markup; don't debug the route.
-
-**Getting a live server.** `dotnet run` requires a `ConnectionStrings:Kumunita`
-value the agent does not have; the docker-compose stack carries all credentials
-and seeds sample data on first boot. To render a page end-to-end:
-
-```bash
-docker compose build app && docker compose up -d app   # rebuild + recreate (volumes persist)
-```
-
-The app needs ~8 s to finish booting (Marten schema + Wolverine leadership).
-App URL: `http://localhost:5080`. Sample-data GlobalAdmin: `admin@examplium.com`
-/ `Admin123!` (the `SampleDataSeeder` constants in `Kumunita.Core/Bootstrap/`).
-Sign in in the integrated browser (or `curl` with a session cookie
-+ anti-forgery token), then navigate to the target page. The browser snapshot
-is the evidence.
-
-## Running the tests (test-runner quirk)
-
-Both test projects use **xunit.v3** (`Microsoft.Testing.Platform`), surfaced to VS
-Test Explorer via `Microsoft.Testing.Extensions.VSTestBridge`. On this machine the
-discovery path reliably goes wrong: VS Test Explorer (the `run_tests` tool) shows
-"Discovered: N Tests found … No tests found to run", and `dotnet test` fails with
-`Zero tests ran / Exit code: 5` — even though the same discovery run found all the
-tests moments earlier. This is a runner/discovery bug, **not** a real test failure;
-don't keep retrying those paths or "fix" the tests.
-
-The reliable path is to build, then run each test assembly in-process through
-xunit.v3's own runner (this is what actually reports pass/fail here):
-
-```bash
-dotnet build Kumunita.slnx -c Debug
-dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll
-dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
-```
-
-`Kumunita.Web.Tests` runs in well under a second; `Kumunita.Core.Tests` takes ~20 s
-because it starts `postgres:18` via Testcontainers (and leaves Docker containers
-behind if the process is killed — clean up with `docker container prune`).
-
-## CI known-failure cheatsheet
-
-The e2e + test GitHub Actions jobs have a small set of known, repeatable
-failure modes that are *environmental*, not code bugs. When a CI run
-fails with any of the following, apply the named fix instead of guessing
-from the log:
-
-- **`dotnet/setup-dotnet` "repository not found"** — the action lives
-  under the `actions` org, not the `dotnet` org. Use
-  `actions/setup-dotnet@v4` with `version: '10.0.400'` +
-  `roll-forward: latestfeature` (matching `global.json`).
-- **`browserType.launch: Executable doesn't exist at .../chromium_headless_shell-...`** —
-  the e2e job is missing the browser. Add
-  `playwright install --with-deps chromium` as a step before
-  `npm --prefix e2e run test`.
-- **Local Playwright: `libnss3` / `libnspr4` / `libasound2t64` not found** —
-  the agent terminal cannot `sudo`. Hand the user this exact command in
-  their own shell and stop:
-  ```bash
-  sudo apt-get install -y libnss3 libnspr4 libasound2t64
-  ```
-  Do not retry `playwright install` or try `--force` variants — the
-  missing system libraries are the cause, and only the user can install
-  them.
-- **`Node.js 20 is deprecated` / `Unexpected input(s)` warnings** — pin
-  `actions/checkout@v4`, `actions/setup-node@v4`,
-  `actions/setup-dotnet@v4` and target `node20` (or the current LTS)
-  explicitly. The runner's default Node is EOL; CI warns unless you pin.
-
-## CI gates and anti-regression pins (don't rediscover them)
-
-A few CI gates fail for *designed* reasons and the agent tends to
-misread them as code regressions. The two that recur in this repo:
-
-- **`improve-check.ps1` — the IMPROVE-lane close gate.** It is a
-  god-file / doc-size *grandfathering* guard: it pins specific files to
-  a known line count (currently `KnownTranslationKeys.cs`, frozen at
-  the IMPROVE close) and fails the run if the file has grown past the
-  baseline without a matching ADR amendment. It **self-skips locally**
-  when `pwsh` is not on PATH (it needs PowerShell 7, which CI has), so
-  a local `dotnet exec` of the test suite won't catch it — only CI
-  will. When it fails in CI:
-  1. Read the gate output — it names the exact file + line count it's
-     pinning and the expected-vs-actual.
-  2. If the growth is legitimate (a new translation key added by a real
-     change), **re-baseline the count** in `improve-check.ps1` *and*
-     annotate the ADR that drove the growth (one line: "count re-based
-     to N on <date> by ADR 0xxx"). Both in the same commit.
-  3. Do *not* delete the gate, do *not* force-skip it, do *not* trim
-     the pinned file to fit the baseline — the pin is the point.
-- **`PwaManifestTests.Site_Css_Media_Block_Boundary_...` — the `@media`
-  block-count pin.** It counts the `@media` blocks in `site.css` and
-  compares to a frozen number (historically "six", now "twelve" as of
-  the M10 drift-guard). Adding a new `@media (…)` block to `site.css`
-  will trip it. When a new block is genuinely needed:
-  1. Update the pin in `PwaManifestTests` to the new count.
-  2. Annotate the ADR that introduced the block with the new total
-     (same commit).
-  3. If you're *investigating* a pin failure, the test failure message
-     tells you the expected vs. actual count — trust that over grepping
-     `site.css` by eye.
-
-These two gates are **by design** — they exist so a future lane can't
-silently bloat `KnownTranslationKeys.cs` or `site.css` without a
-documented reason. The fix is always "re-baseline + annotate", never
-"loosen the gate".
-
-## Postgres diagnostic conventions (live server)
-
-When debugging against the live docker-compose Postgres, three specific
-errors recur because the conventions are non-obvious:
-
-- **`ERROR: relation "mt.IdentityToken" does not exist`** (or similar) —
-  the table name is wrong. The Marten convention in this repo is
-  **`mt_doc_` + lowercase class name** (e.g. `mt_doc_identitytoken`,
-  `mt_doc_bookmark`, `mt_doc_personalnote`). The class name is
-  lowercased and the `mt_doc_` prefix is required. Querying
-  `mt.IdentityToken` (Pascal case, no `mt_doc_` prefix) is the failure
-  mode.
-- **`ERROR: relation "..." does not exist`** on the *correct* table
-  name — you're connected to the **`postgres`** database, not
-  **`kumunita`**. The docker-compose stack creates the `kumunita` DB
-  (see `dev-db-init/` + `docker-compose.yml`); the `postgres` database
-  is the default and has none of the app's schemas. The `postgres=#`
-  prompt in the psql banner is the tell — re-run with
-  `psql -h localhost -U kumunita -d kumunita`.
-- **`function digest(unknown, unknown) does not exist`** — Postgres's
-  built-in `digest()` is in the `pgcrypto` extension, which is *not*
-  enabled on the app DB. For hashing a password to verify against
-  `identity."AspNetUsers".PasswordHash`, use `crypt()` from `pgcrypto`
-  (if available) or just `SELECT "PasswordHash"` and compare in the app
-  — don't try to re-derive the hash in SQL.
-
-Also: the **`/admin/setup`** flow returns a uniform **`404 NotFound`**
-on submit by design (the controller deliberately collapses several
-distinct causes into one response so an anonymous caller can't
-distinguish "already set up" from "wrong token"). **A 404 on submit of
-a valid token + password is success, not failure** — the setup lane is
-permanently closed after a successful POST. Do not chase this as a bug;
-the report "I set the password and got a 404" is the expected outcome.
-
-## Git state gotcha
-
-"Nothing to commit" after staging usually means the commit **already landed**
-(the GUI or an earlier turn committed on your behalf). Verify with
-`git --no-pager log -1` before troubleshooting the working tree.
-
-## Using the browser (trusted-folder quirk)
-
-The integrated browser (Playwright) can only open files in **trusted**
-folders. The Linux system temp folder (`/tmp/...`) is not trusted: any
-`file://` URL pointing there returns a **403 "Forbidden. File does not
-reside within a trusted folder."** error — and overwriting an already-trusted
-file in that folder *invalidates* its trust (a previously shared page stops
-loading). This wastes a lot of time: the harness looks broken (JS leaks, page
-errors, typing "does nothing") when the real cause is the untrusted path.
-
-The reliable setup (already in the repo):
-
-- **`.tmp/`** — a gitignored scratch folder at the repo root (see
-  `.gitignore`). Files under the repo root **are** trusted, so a browser
-  harness placed here loads and runs fine.
-- **`.tmp/build-harness.js`** — regenerates `.tmp/harness.html` by inlining
-  the **real** compiled JS (`wwwroot/js/lib/rich-editor.js` +
-  `dom-to-markdown.js`, with `import`/`export` stripped and any `</script>`
-  in JS doc-comments escaped to `<\/script>` so it doesn't close the inline
-  `<script>` early). Run it with `node .tmp/build-harness.js` after every
-  `npm --prefix src/Kumunita.Web run build`.
-- The harness mirrors the real toolbar/pane/textarea markup (from
-  `Views/Announcement/Edit.cshtml`) so `bindRichEditor` self-wires exactly as
-  in the app.
-
-Rules:
-
-1. **Never put browser harness files in the system temp folder (`/tmp`).**
-   Use `.tmp/` (in-repo, gitignored).
-2. **Re-run `node .tmp/build-harness.js` after each TS recompile** so the
-   harness picks up the latest `wwwroot/js` output — a stale harness will
-   test the wrong code.
-3. **Drive with real `page.keyboard.type`** once the page is trusted — the
-   in-repo harness gives a working, faithful proxy for contenteditable
-   behavior (the old untrusted setup could not).
-
-## Running terminal commands safely (WSL2 / Linux agents)
-
-If you run terminal commands on this machine, the shell is **bash** (inside a
-WSL2 sandbox). Bash doesn't have PowerShell's here-string / continuation-prompt
-traps, but it has its own class of agent-session hazard worth knowing about.
-
-### `$variables` don't survive between separate terminal commands
-
-Copilot's terminal tool doesn't reliably reuse the same shell process for every
-command it runs — it sometimes starts a fresh terminal/process for a later
-command (a known, currently-unfixed Copilot bug: microsoft/vscode#286106,
-#265881, #265863). When that happens, a variable you set in one command
-(`MYVAR=...`) simply doesn't exist in the next one. Bash doesn't error on an
-undefined variable — it expands to an empty string. That's exactly what "the
-`$` variables got stripped by the terminal wrapper" looks like from the
-outside: the value is gone, no error was raised, and the command that used it
-just produced nothing.
-
-Treat every terminal command you run as if it might start in a brand-new
-process with no memory of any earlier command:
-
-- **Don't split a task across multiple terminal calls that depend on a shell
-  variable set in an earlier call.** If step 2 needs a value step 1 computed,
-  do both steps in the *same* command (chain with `&&` or `;`), or better,
-  put the whole sequence in one script file (e.g. `.tmp/run.sh`) and run it
-  once with `bash .tmp/run.sh`.
-- If a value genuinely must survive across separate agent-issued commands,
-  don't hold it in a shell variable — write it to a file and read it back
-  (`echo "$val" > /tmp/kumunita-var` / `val=$(cat /tmp/kumunita-var)`), or
-  pass the literal value again on the next command instead of referencing a
-  variable name.
-- When in doubt, prefer one self-contained script file over a sequence of
-  small interdependent snippets — it sidesteps this bug entirely, since the
-  whole script runs top to bottom in a single process regardless of how many
-  terminals Copilot decides to open.
-
-### Quoting and multi-line content
-
-- **Quote variables**: `"$var"` instead of `$var`, so paths with spaces don't
-  split into multiple arguments.
-- **Don't paste multi-line command blocks into the terminal across separate
-  tool calls without chaining.** If a sequence needs to be atomic, chain it
-  with `&&` on a single line, or write a `.sh` file with the file-editing
-  tool and run it with `bash script.sh` — a broken script then fails fast
-  with a syntax error instead of leaving the interactive shell in a confused
-  continuation state.
-- If a `>` continuation prompt shows up in terminal output (bash's
-  line-continuation marker, meaning an unterminated quote or backslash),
-  stop and cancel rather than trying to "finish" the statement, and don't
-  retry the same multi-line form.
-
-### When the sync terminal channel wedges (no output at all)
-
-A separate, Copilot-agent-specific failure mode (not a bash/WSL2 one): a
-`mode=sync` terminal call can return **"Command produced no output"** — even
-for a trivial `echo` — because the agent's *output-capture* layer wedges.
-This is the known Copilot agent terminal bug cited above (microsoft/vscode#
-286106 / #265881 / #265863); it is not caused by anything in the repo and no
-`.vscode/settings.json` key disables it. Treat it as a **channel** failure,
-not a command failure, and do not keep retrying the same sync call. The
-reliable workarounds, best first:
-
-- **Prefer `mode=async` + `get_terminal_output`** for anything non-trivial
-  (builds, test runs, servers). This has been observed to work even while the
-  sync channel is dead: the `Kumunita.Core.Tests` suite (1440 tests) completed
-  and reported its full `TEST EXECUTION SUMMARY` through the async channel in
-  exactly that situation.
-- **Redirect to a file as a belt-and-suspenders** so the result survives on
-  disk regardless of inline capture: `… 2>&1 > .tmp/result.log`, then read it
-  with the file tools.
-- **Keep each command self-contained** (single process, no cross-call
-  `$vars` — the doctrine above) so a wedged call has a small blast radius.
-
-Secondary causes worth ruling out if a command still hangs: `git`/`gh` commands
-that page output (`git log`, `git diff`, `gh pr view`) can block waiting for a
-keypress — prefer `git --no-pager <cmd>`, or set `core.pager` to `cat` for
-repos this applies to. Commands that are long-running by design
-(`dotnet watch`, `npm start`, dev servers) should be started as background
-tasks, not awaited as if they will exit on their own.
-
-## Terminal commands
-- Never end your turn while a terminal command you depend on is still running.
-  "I'll be notified when it finishes" is not an acceptable stopping point.
-- Run builds, tests and migrations in the foreground. Use a background terminal
-  only for processes that never exit, like `dotnet watch`, dev servers or containers.
-- If a command times out or you start it in the background, wait for it with the
-  await-terminal tool, or keep checking get_terminal_output until it exits.
-  Then continue the task from the result.
-- For a long-running server, wait until its output shows it's ready
-  (e.g. "Now listening on"), then carry on.
+- The **roadmap** and `src/Kumunita.Web/Milestones.cs` — `Milestones.cs` is the **source of truth** (the home page renders it; `MilestonesTests.cs` pins the exact order + shipped statuses). [`docs/product/roadmap.md`](docs/product/roadmap.md) + [`docs/STATUS.md`](docs/STATUS.md) point at it rather than restate the list.
+- **`src/Kumunita.Web/WhatsNew.cs`** (the "What's new" registry, ADR [0110](docs/adr/0110-platform-versioning-and-whats-new.md), pinned by `tests/Kumunita.Web.Tests/WhatsNewTests.cs`) — the platform's version history. When a milestone **or a named lane ships**, add its version (newest-first; or extend the newest row). "Shipped" = the close unit ran, not "in progress."
+- When a **new capability lands out of the M-letter order**, it gets a *named lane* with a short ID — **not** a renumber. Precedent: media (ADR [0011](docs/adr/0011-media-and-file-storage.md)), group posts (`GP`, ADR [0013](docs/adr/0013-group-posts-membership-lane.md)), multilingual (`ML`, ADR [0005](docs/adr/0005-multilingual-support.md)).
+- The **bounded-context / persistence layout** in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) + ADR [0004](docs/adr/0004-data-persistence-and-schema-evolution.md)/[0006](docs/adr/0006-module-boundary-contracts.md) — new contexts / doc-type surfaces / `DependencyInjection.cs` changes reflect in the relevant ADR, not the design doc.
+- A **new capability that settles a design question** gets an ADR under `docs/adr/` (numbered after the current highest), not just a prose note in the README.
+- Lane history lives in **`docs/archive/lanes/<lane>/`** (moved by `D02`). The doc rules are in [`docs/DOCS-CONVENTIONS.md`](docs/DOCS-CONVENTIONS.md); the working doctrine this file used to restate is in [`docs/dev/`](docs/dev/README.md) — link, don't restate.

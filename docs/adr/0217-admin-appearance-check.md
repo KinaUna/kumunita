@@ -1,9 +1,22 @@
-# ADR 0217 — Admin Appearance form: end-to-end check and duplicate flash
+---
+id: adr-0217
+title: "Admin Appearance form: end-to-end check and duplicate flash"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0217](0217-admin-appearance-check.md) — Admin Appearance form: end-to-end check and duplicate flash
 
 Status: Accepted
 
 ## Context
-The admin Appearance form (`/admin/site`, ADR 0175) had not been exercised end to end. Checked live as the
+The admin Appearance form (`/admin/site`, ADR [0175](0175-palettes-and-feed-card.md)) had not been exercised end to end. Checked live as the
 sample admin: change the default palette, save, read what a cookie-free visitor and a member see, restore.
 
 ## Verified
@@ -13,7 +26,7 @@ sample admin: change the default palette, save, read what a cookie-free visitor 
   clears the override and follows the new default (checkmark moves correctly).
 - A POST without the anti-forgery token is 400; an anonymous POST is redirected.
 - Dark mode: select, label, heading and the saved-message box read correctly.
-- A tampered value (`DefaultPalette=bogus`) stores Forest. This is deliberate (ADR 0175 D3, pinned by
+- A tampered value (`DefaultPalette=bogus`) stores Forest. This is deliberate (ADR [0175](0175-palettes-and-feed-card.md) D3, pinned by
   `SavePalette_UnknownValue_StoresForest`), so it is left as is.
 
 ## Finding and fix

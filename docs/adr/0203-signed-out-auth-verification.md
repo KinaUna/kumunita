@@ -1,9 +1,22 @@
-# ADR 0203 — Signed-out auth verification
+---
+id: adr-0203
+title: "Signed-out auth verification"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0203](0203-signed-out-auth-verification.md) — Signed-out auth verification
 
 Status: Accepted
 
 ## Context
-Login and Signup (ADR 0198) had not been checked signed out. Verified by
+Login and Signup (ADR [0198](0198-account-pages.md)) had not been checked signed out. Verified by
 fetching the signed-out HTML (credentials omitted) into the pane: Login in
 Forest dark/light and Ember light/dark, phone width, and the error, validation,
 suspended-account and MFA-branch elements (injected from the view's own markup).

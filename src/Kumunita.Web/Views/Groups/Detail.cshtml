@@ -121,13 +121,13 @@
             <li class="nav-item" role="presentation">
                 <a class="nav-link @(activeTab == "feed" ? "active" : string.Empty)"
                    href="@TabHref("feed")">
-                    <kw-l key="groups.tab.feed">Feed</kw-l>
+                    <svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="#kmb-i-community"/></svg><kw-l key="groups.tab.feed">Feed</kw-l>
                 </a>
             </li>
             <li class="nav-item" role="presentation">
                 <a class="nav-link @(activeTab == "members" ? "active" : string.Empty)"
                    href="@TabHref("members")">
-                    <kw-l key="groups.tab.members">Members</kw-l>
+                    <svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="#kmb-i-groups"/></svg><kw-l key="groups.tab.members">Members</kw-l>
                 </a>
             </li>
             @if (canManage)
@@ -135,7 +135,7 @@
                 <li class="nav-item" role="presentation">
                     <a class="nav-link @(activeTab == "settings" ? "active" : string.Empty)"
                        href="@TabHref("settings")">
-                        <kw-l key="groups.tab.settings">Settings</kw-l>
+                        <svg class="kmb-nav-icon kmb-icon" width="16" height="16" aria-hidden="true"><use href="#kmb-i-settings"/></svg><kw-l key="groups.tab.settings">Settings</kw-l>
                     </a>
                 </li>
             }

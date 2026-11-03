@@ -1,9 +1,22 @@
-# ADR 0236 — site.css component dark patches collapse into light-dark() (step 2 of the light-dark cleanup)
+---
+id: adr-0236
+title: "site.css component dark patches collapse into light-dark() (step 2 of the light-dark cleanup)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0236](0236-site-css-component-patches-light-dark.md) — site.css component dark patches collapse into light-dark() (step 2 of the light-dark cleanup)
 
 Status: Accepted
 
 ## Context
-ADR 0235 moved the 64 colour tokens of `site.css` into `light-dark()`. The component patch groups (about 230 lines) were still
+ADR [0235](0235-site-css-light-dark-tokens.md) moved the 64 colour tokens of `site.css` into `light-dark()`. The component patch groups (about 230 lines) were still
 written twice, once under `@media (prefers-color-scheme: dark) { html:not([data-kmb-theme='light']) … }` and once under
 `html[data-kmb-theme='dark'] …`, with `!important` at (0,4,1) specificity to beat Bootstrap and, as a side effect, `palettes.css`.
 
@@ -38,7 +51,7 @@ Two Playwright oracles over OS scheme x palette (forest, ember, none) x theme at
 
 ## Not covered
 Real pages in the running app (the container serves the old stylesheet until rebuilt); auto mode with OS light was only exercised
-by the oracle. Browsers without `light-dark()` are out of scope, as for ADR 0228 and 0235.
+by the oracle. Browsers without `light-dark()` are out of scope, as for ADR [0228](0228-housekeeping-light-dark-detail-rename-doc-types.md) and 0235.
 
 ## Follow-ups
 - Look at the two warm feature icons in a browser after the next build.

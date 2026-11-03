@@ -1,13 +1,19 @@
-# ADR 0004 — Data persistence & schema evolution
-
-Status: Accepted
-Date: 2026-08-26
-Amends: 0001 (Decision A — "Marten in place of EF Core"; Consequences — "no EF migration
-tooling")
+---
+id: adr-0004
+title: "Data persistence & schema evolution"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/esc-escalation-authorization-design.md]
+supersedes: [adr-0001]
+superseded_by: [adr-0011, adr-0037, adr-0105, adr-0108]
+updated: 2026-11-02
+---
 
 ## Context
 
-ADR 0001 chose Marten over EF Core, but ASP.NET Core Identity's default persistence *is*
+ADR [0001](0001-core-stack-and-identity-model.md) chose Marten over EF Core, but ASP.NET Core Identity's default persistence *is*
 EF Core (`IdentityDbContext`). Two data-layer decisions therefore need an explicit home:
 
 1. **Schema evolution.** The original plan leaned on Marten auto-upgrade (schema derived
@@ -85,7 +91,7 @@ default. Concretely (Marten 9, verified against the live catalog 2026-09-16):
 | "not a draft" | `!p.IsDraft` | `data->'IsDraft' IS DISTINCT FROM 'true'::jsonb` | `true` ⇒ row kept |
 
 The two C# forms are semantically identical once deserialized, and produce
-**opposite** results on pre-existing rows. This bit us once: ADR 0037's draft
+**opposite** results on pre-existing rows. This bit us once: ADR [0037](0037-draft-mode-author-only.md)'s draft
 lane added `IsDraft` to `Post` and `Announcement` in the same commit;
 `PostService` filtered `!p.IsDraft` (survived), `AnnouncementService` filtered
 `a.IsDraft == false` (silently hid **every** pre-existing announcement from
@@ -94,7 +100,7 @@ every viewer, incl. a GlobalAdmin — no error, no 500, just an empty list).
 **Rule:** when an additive document field is added to a **query** predicate,
 use the negation form (`!flag`, not `flag == false`; `flag == true` is safe
 either way — a missing key already fails that comparison). Review gate: the
-ADR 0006 module-boundary review of the service seam is the place a reviewer
+ADR [0006](0006-module-boundary-contracts.md) module-boundary review of the service seam is the place a reviewer
 catches the form, since the query lives in `Kumunita.Core`.
 
 **Alternative — one-shot backfill:** if the semantic genuinely needs
@@ -143,12 +149,5 @@ Positive
 Negative / accepted risks
 - Two ORMs (Marten + EF Core) in the dependency tree — **scoped**: EF is Identity-only.
 - Two migration systems — **scoped**: each confined to its own schema and tracking table.
-- ADR 0001's "Marten in place of EF Core" is amended to: Marten for the domain; EF
+- ADR [0001](0001-core-stack-and-identity-model.md)'s "Marten in place of EF Core" is amended to: Marten for the domain; EF
   strictly for the Identity tables.
-
-## Revisit when
-
-- Federation replaces local Identity with an OpenIddict IdP (the `identity` schema may
-  move to the IdP and be dropped here).
-- An Identity framework version changes store contracts enough to re-cost the Marten
-  store option.

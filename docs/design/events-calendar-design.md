@@ -1,4 +1,21 @@
+---
+id: design-events-calendar
+title: "Events calendar (`EV-CAL`) — month-anchored overview"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0063-events-calendar-view.md
+  - docs/adr/0054-events-rsvp-reminders.md
+  - docs/adr/0019-timezone-platform-default-and-resident-override.md
+updated: 2026-11-02
+---
+
 # Events calendar (`EV-CAL`) — a month-anchored overview of visible events — design
+
+> **Abstract:** the **events calendar (`EV-CAL`)** design — a **month-anchored overview of visible events**: the calendar's month view over the frozen M4 events surface, with the exact seam signatures, the 13 pinned test names, and the three-test acceptance gate. A named lane on the already-shipped M4 events. **Who is it for:** a developer touching the month-view calendar seam; an agent that needs the calendar view-model + controller shape. **When to read the rest:** before touching the month view, the calendar controller, or the EV-CAL tests.
+
 
 > **Two parts.** Part 1 (U00) is "What this lane is / the existing surface /
 > the design decisions / the invariants"; Part 2 (U01, §5 below) is "The seams
@@ -8,7 +25,7 @@
 > shape.
 >
 > **Status.** **In progress** (lane opened 2026-09-23). Decisions **D1–D7**
-> are **locked — [DECIDED — ADR 0063]** (U01 authored ADR 0063, Accepted, and
+> are **locked — [DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]** (U01 authored ADR [0063](../adr/0063-events-calendar-view.md), Accepted, and
 > flipped every marker to this). The ADR is the sign-off gate; this doc is
 > the primary reference tier for implementation. The lane plan is
 > `plans-milestones/in-progress/events-calendar/plan-events-calendar.md`
@@ -16,7 +33,7 @@
 > `events-calendar-handoff-notes.md` alongside it.
 >
 > This is a **named lane** (`EV-CAL`) on the already-shipped **M4** events
-> surface (ADR 0054) — not a milestone letter: **M5 stays Projects; M6 stays
+> surface (ADR [0054](../adr/0054-events-rsvp-reminders.md)) — not a milestone letter: **M5 stays Projects; M6 stays
 > Portability** (the `GP` / `TG` / `PG` named-lane precedent).
 
 ## 1. What this lane is
@@ -51,8 +68,8 @@ display-only.** It adds:
   `IUserInfoService` / `IIdentityService`);
 - **one Web route** — `GET /events/calendar` on the existing `EventController`;
 - **one view + one view model** (+ **2 additive `EventRow` fields**, defaulted);
-- **one `client/lib` TS file** (tsc-only, zero dependencies — the ADR 0031 pin);
-- **~8 `kw-l` keys × 4 languages** (en/de/fr/da — the ADR 0015 registry shape).
+- **one `client/lib` TS file** (tsc-only, zero dependencies — the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) pin);
+- **~8 `kw-l` keys × 4 languages** (en/de/fr/da — the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) registry shape).
 
 And it adds **nothing else**: no documents, no schema, no seeding, no write
 lane, no audit row kind, no §6.4 job, no editor work, no dependency. The
@@ -68,12 +85,12 @@ calls no seam, and is never an access decision.
 
 Read directly, not assumed:
 
-1. **The `Event` document** (`Kumunita.Core.Events`, ADR 0054) —
+1. **The `Event` document** (`Kumunita.Core.Events`, ADR [0054](../adr/0054-events-rsvp-reminders.md)) —
    `Start` / `End` as `DateTimeOffset` **UTC instants**; `IsDraft`
-   (ADR 0037, `true` floor — feed excludes drafts unconditionally for
-   non-authors); `IsDeleted` (ADR 0024 — feed excludes deleted
+   (ADR [0037](../adr/0037-draft-mode-author-only.md), `true` floor — feed excludes drafts unconditionally for
+   non-authors); `IsDeleted` (ADR [0024](../adr/0024-author-soft-delete-lane.md) — feed excludes deleted
    unconditionally); `ComponentId?` (a feed filter, *never* a gate —
-   C-M3·2); `Audience` (the exact post `Audience`, ADR 0001-B / 0036 —
+   C-M3·2); `Audience` (the exact post `Audience`, ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B / 0036 —
    `null` = public, the frozen `Decide()` branch). Every field is frozen
    by this lane (D1) — the calendar reads `Start` / `End` to place chips
    and to compute overlap, and nothing else is new.
@@ -100,15 +117,15 @@ Read directly, not assumed:
    additive, defaulted fields (`StartUtc`, `EndUtc`) join without
    touching that call site (D2 / U03).
 5. **`EventController`** (`Kumunita.Web/Controllers`) — `[Authorize]`,
-   the thin-controller read shape (ADR 0006-D): the feed action builds
+   the thin-controller read shape (ADR [0006](../adr/0006-module-boundary-contracts.md)-D): the feed action builds
    `EventRow`s, resolves author/component display names (display
    lookups, never decisions), and ships `EventIndexViewModel`.
    `EffectiveTimezoneResolver` is already in the controller's
-   constructor composition (the ADR 0019 per-request resolution —
+   constructor composition (the ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) per-request resolution —
    actor `Profile.TimeZone` → instance default → `UTC` floor, cached
    once per request) — the calendar's anchor→UTC window math reuses it,
    no new injection surface needed.
-6. **`kw-dt` TagHelper** (ADR 0019 / 0020) — every event timestamp on
+6. **`kw-dt` TagHelper** (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) / 0020) — every event timestamp on
    the calendar renders through the *one* existing TagHelper (the view
    renders chip times; the TS module never formats a wall-clock time).
 7. **The `kw-l` registry** (`Kumunita.Core/Localization/KnownTranslationKeys.cs`)
@@ -116,7 +133,7 @@ Read directly, not assumed:
    de/fr/da mirrors) is the host for the ~8 new `events.calendar.*` keys;
    the `tags.*` block is the precedent for a lane's key cluster; the en
    text is the fallback in every view (`<kw-l key=…>English</kw-l>`).
-8. **`client/lib`** — plain-TS, tsc-only, zero dependencies (the ADR 0031
+8. **`client/lib`** — plain-TS, tsc-only, zero dependencies (the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)
    pin; `name-filter.ts` is the self-contained-module shape to mirror);
    `wwwroot/js` is the output; scripts are included with the
    `asp-append-version` pattern.
@@ -126,11 +143,11 @@ Read directly, not assumed:
 
 ## 3. The design decisions
 
-Each decision below is **locked — [DECIDED — ADR 0063]** (U01 authored ADR
+Each decision below is **locked — [DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]** (U01 authored ADR
 0063, Accepted, and flipped every marker to this). U02–U08 code against this
 locked text.
 
-### 3.1 Zero document changes (D1) **[DECIDED — ADR 0063]**
+### 3.1 Zero document changes (D1) **[DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]**
 
 No field is added to `Event`, `EventRsvp`, or `EventTranslation`;
 `EventDocTypes` is untouched; no `FeatureSchemaBase` migration; the boot
@@ -141,7 +158,7 @@ in the whole lane is: one seam (`ListInRangeAsync`) + its implementation,
 one `Calendar` action, one view, one TS file, one CSS rule, and the key
 block (the C-EV·6 pin).
 
-### 3.2 The one seam: `ListInRangeAsync` (D2) **[DECIDED — ADR 0063]**
+### 3.2 The one seam: `ListInRangeAsync` (D2) **[DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]**
 
 `IEventService.ListInRangeAsync(DateTimeOffset windowStartUtc,
 DateTimeOffset windowEndUtc, string? componentId, string actorId,
@@ -163,11 +180,11 @@ seam itself is unbounded in `ct` semantics; the *bound* is a caller
 policy the Web enforces: `windowEndUtc = windowStartUtc + 30d`). No other
 method in `IEventService` or `EventService` changes.
 
-### 3.3 The route + anchor + window (D3) **[DECIDED — ADR 0063]**
+### 3.3 The route + anchor + window (D3) **[DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]**
 
 `GET /events/calendar` with query `?from=YYYY-MM-DD` — the month anchor
 **in the viewer's effective timezone** (the
-`EffectiveTimezoneResolver`'s zone, ADR 0019), default = the zone's
+`EffectiveTimezoneResolver`'s zone, ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)), default = the zone's
 "today" — and `?componentId=…` (the feed's filter reused verbatim, a
 filter never a gate — C-M3·2). Window =
 `[anchorLocalStartUtc, anchorLocalStartUtc + 30d)` where
@@ -178,7 +195,7 @@ as plain GET links by the server (C-EV·7 — no client nav code).
 Unparseable/missing `from` falls back to the zone's today (a display
 fallback, not an error).
 
-### 3.4 Overlap is client-side display-only (D4) **[DECIDED — ADR 0063]**
+### 3.4 Overlap is client-side display-only (D4) **[DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]**
 
 Two events overlap iff their `[startUtc, endUtc)` half-open intervals
 intersect. Computed in the TS module **over the already-authorized row
@@ -195,7 +212,7 @@ seam or access decision). It writes **no** row, calls
 (the C-EV·4 pin — the overlap is computed on the client over data the
 server already decided to show; the server neither sees nor cares).
 
-### 3.5 The view shape (D5) **[DECIDED — ADR 0063]**
+### 3.5 The view shape (D5) **[DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]**
 
 `Views/Event/Calendar.cshtml` over `EventCalendarViewModel`: a **7-column
 day grid** of the 30 window-days (Bootstrap shape, mirroring
@@ -208,7 +225,7 @@ label, the prev/next/today nav links, the `componentId` filter form
 (reused from the feed), the "List" cross-link (C-EV·8), and an empty
 state when the window has no visible events.
 
-### 3.6 The `kw-l` keys (D6) **[DECIDED — ADR 0063]**
+### 3.6 The `kw-l` keys (D6) **[DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]**
 
 ~8 new keys under `events.calendar.*` in **all four** seeded languages
 (en/de/fr/da) in `KnownTranslationKeys.cs`: `events.calendar.title`,
@@ -218,7 +235,7 @@ en floor text is authoritative, the de/fr/da texts are U07's
 translations). The `events.*` block is the host; the `tags.*` block is
 the precedent.
 
-### 3.7 Out of scope (future lanes) (D7) **[DECIDED — ADR 0063]**
+### 3.7 Out of scope (future lanes) (D7) **[DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]**
 
 No year view; no event creation from the calendar; no RSVP from the
 calendar (the detail page owns it); no drag-to-reschedule; no iCal export
@@ -233,7 +250,7 @@ these landing later is a new named lane, not an extension of this one.
 The invariants C-EV·1 … C-EV·8 (§4) are the enforcement surface of
 D1–D7 — each cites its decision and the frozen precedent it rides. They
 are **pinned** (not proposals): they are true of the design as stated,
-and the ADR 0063 will carry them verbatim.
+and the ADR [0063](../adr/0063-events-calendar-view.md) will carry them verbatim.
 
 ## 4. Invariants (pinned for `EV-CAL`)
 
@@ -257,7 +274,7 @@ and the ADR 0063 will carry them verbatim.
   service keeps it from accreting).
 - **C-EV·5** — the `from` anchor is a **date in the viewer's effective
   zone**; the anchor→UTC window math uses the
-  `EffectiveTimezoneResolver`'s zone (ADR 0019); the zone id shipped to
+  `EffectiveTimezoneResolver`'s zone (ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)); the zone id shipped to
   the TS module is a **display** input only (the browser formats via
   `Intl`) — **never** an authorization input.
 - **C-EV·6** — zero document / schema / seeding changes (the D1 pin);
@@ -381,7 +398,7 @@ public sealed record EventCalendarViewModel(
 **The `Calendar` action's window math** (U04, in `EventController`): parse
 `from` as a date **in the viewer's effective zone** (default: the zone's
 today) → convert the anchor's **local midnight** to a UTC instant (the
-`EffectiveTimezoneResolver`'s zone, ADR 0019) →
+`EffectiveTimezoneResolver`'s zone, ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md)) →
 `windowEndUtc = windowStartUtc.AddDays(30)`. `PrevAnchor` / `NextAnchor` are
 the anchor shifted **±1 month**, formatted `yyyy-MM-dd` (pre-rendered
 plain-GET-link targets — C-EV·7). `MonthLabel` is the anchor date's month
@@ -441,7 +458,7 @@ The following are **frozen pins** for `EV-CAL`; a unit that finds one out of
 date pauses and records `## U<m> — Drift pause` in the handoff note
 (unit-series rule 7) rather than improvising:
 
-- **D1–D7** (§3.1–§3.7) — locked [DECIDED — ADR 0063]; the ADR 0063 Decision
+- **D1–D7** (§3.1–§3.7) — locked [DECIDED — ADR [0063](../adr/0063-events-calendar-view.md)]; the ADR [0063](../adr/0063-events-calendar-view.md) Decision
   section is the source of truth.
 - **The seam signature** (§5.1) — `ListInRangeAsync(DateTimeOffset
   windowStartUtc, DateTimeOffset windowEndUtc, string? componentId, string
@@ -497,3 +514,101 @@ proof (C-EV·6). **All three gate tests PASS.**
   (`Assert.Empty` for the author). No other drift pause is open; §5.6's
   frozen pins were matched by every unit U02–U08 (each recorded **No
   drift** in the handoff note).
+
+---
+
+## ADR [0054](../adr/0054-events-rsvp-reminders.md) — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+- **Core (`Kumunita.Core.Tests`, DB-backed)** — `EventServiceTests`
+  (T01–T18, §3.7): the feed + audience branch family (`M4_*`, the
+  `A0036_*` family shape), the draft pin, the standing matrix, the
+  publish/delete lanes, the RSVP pins, the audit-row + adapter shapes.
+  `EventReminderServiceTests` (T19–T23): the Wolverine-free harness shape
+  of `AuditPurgeServiceTests` — window filter, `Going` filter, author
+  inclusion, idempotency-key shape, no-audit-row.
+- **Web (`Kumunita.Web.Tests`)** — `EventControllerTests` (NSubstitute
+  `IEventService`, no live Postgres — the `AnnouncementControllerTests`
+  shape): the route map, the 404-vs-403 split, the feed filter, the
+  composer/edit audience round-trip, the RSVP form.
+- **`MilestonesTests.cs`** — the `Ids` ordered list is **unchanged**
+  (`… PG, M4, M5, M6`); the `Shipped` set gains `"PG"`; the
+  single-in-progress pin is **renamed** `PG_Is_The_Single_InProgress_Milestone`
+  → `M4_Is_The_Single_InProgress_Milestone` (asserting `M4`) in the same
+  commit as the `Milestones.cs` + README status flips.
+
+
+---
+
+## ADR [0037](../adr/0037-draft-mode-author-only.md) — moved content (D11 trim, 2026-11-02)
+
+## Tests
+
+Behavior is pinned at the **core** seam (the sealed, un-substitutable
+`PostService` / `AnnouncementService` run against a real `postgres:18`
+via Testcontainers), in `tests/Kumunita.Core.Tests/PostDraftModeTests.cs`:
+
+- Feed exclusion for everyone — community feed, group feed, announcement
+  list, and pinned list all omit a draft from the author, a member, and a
+  `GlobalAdmin` alike, while a live item still surfaces to its audience.
+- **`Draft_TargetedCommunity_NotLeakedToGlobalAdmin`** — the precedence
+  pin: a community-targeted draft is absent even for the admin, asserting
+  the `&&`/`||` shape of `ListVisibleAsync`.
+- Detail author-only — `GetPostAsync`, `GetGroupPostAsync`, and
+  `AnnouncementService.GetAsync` return the draft to the author and
+  `null` to a non-author (incl. a `null` actor), with **no `AccessAudit`
+  row** written (the ADR [0014](../adr/0014-post-edit-lane-author-only.md)/0016/0024 no-audit-row convention).
+- Publish author-only / idempotent / throws — `PublishPostAsync` (both
+  community and group lanes) and `AnnouncementService.PublishAsync` flip
+  the flag for the author, deny a `GlobalAdmin` non-author
+  (`UnauthorizedAccessException`), throw on a missing id
+  (`KeyNotFoundException`), are idempotent on a live item (no re-stamp of
+  `Modified`), and preserve `Pinned` on the announcement.
+- `ListMyDraftsAsync` (both surfaces) returns **only** the actor's live
+  drafts — not another actor's, not a deleted draft.
+
+The Web thin-layer mapping is pinned in
+`tests/Kumunita.Web.Tests/AnnouncementControllerTests.cs` (the
+announcement lane is the interface-backed surface, substitutable via
+`IAnnouncementService`): `Publish` maps draft+author → publish + redirect
+to `Detail`, a non-author (even `GlobalAdmin`) → `ForbidResult` with no
+write, `UnauthorizedAccessException` → `ForbidResult`,
+`KeyNotFoundException` → `NotFoundResult`, anonymous → `UnauthorizedResult`;
+`Detail` flags `IsAuthor && IsDraft` for the author and `NotFound` for a
+non-author; `New` (POST) wires the `SaveAsDraft` checkbox onto the
+`Announcement.IsDraft` create field (checked → draft, unchecked → live).
+
+**Why there are no route-level Web tests for the post / group-post /
+My-Drafts lanes:** `PostService` is a `public sealed class` that returns
+`Marten.Linq.IMartenQueryable<T>` from `Query<T>()` — it cannot be faked
+under NSubstitute, so the announcement lane (interface-backed) is the
+substitutable Web surface. The post and group-post *behavior* (the exact
+draft gates, publish seam, and list filtering this ADR pins) is exhaustively
+covered at the core lane above; the Web post/group routes are thin
+`Result`-mapping wrappers over those already-pinned seams, and the
+`/my/drafts` index is a read-only projection of `ListMyDraftsAsync`. Pinning
+the core lane is therefore the behavior pin; the thin Web mapping is
+asserted on the interface-backed surface as the representative case.
+
+
+---
+
+## ADR [0019](../adr/0019-timezone-platform-default-and-resident-override.md) — moved content (D11 trim, 2026-11-02)
+
+## Related
+
+- **ADR [0005](../adr/0005-multilingual-support.md)** — multilingual support (the "platform default + user override"
+  shape this ADR mirrors; §C UGC "never translated" is *unchanged* by this
+  ADR — this is a *display* change, not a *translation*).
+- **ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1** — additive schema-evolution pattern both new fields
+  follow (no re-seed, no breaking change).
+- **ADR [0002](../adr/0002-deployment-topology.md)** — deployment topology (single-deployment, single-neighborhood;
+  the "host's OS is the deployment's choice" risk in the Consequences is
+  scoped by this ADR's single-deployment assumption).
+- **ADR [0015](../adr/0015-ui-view-localization-mechanics.md)** — UI view-localization mechanics (the `kw-l` TagHelper this
+  ADR's `kw-dt` TagHelper mirrors; the same "per-request value rendered across
+  many views" problem, the same solution).
+- **ADR [0018](../adr/0018-ugc-authored-in-language-tag.md)** — UGC authored-in language tag (a different axis: that ADR
+  stores *what language* a piece of UGC is in; this ADR stores *what time zone*
+  to render timestamps in — the two are orthogonal and compose cleanly).

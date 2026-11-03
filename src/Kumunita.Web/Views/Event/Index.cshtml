@@ -159,8 +159,8 @@
            authorization re-runs per request (C-M3·2 — past is a selector, never
            an access input). Placed below the feed list. *@
         <div class="btn-group btn-group-sm mt-4 events-feed-toggle" role="group" aria-label="@ariaTimeRange">
-            <a class="btn btn-outline-secondary @(!Model.Past ? "active" : null)" href="@FeedToggleHref(false)" aria-pressed="@(!Model.Past ? "true" : "false")"><kw-l key="events.upcoming">Upcoming</kw-l></a>
-            <a class="btn btn-outline-secondary @(Model.Past ? "active" : null)" href="@FeedToggleHref(true)" aria-pressed="@(Model.Past ? "true" : "false")"><kw-l key="events.past">Past</kw-l></a>
+            <a class="btn btn-outline-secondary @(!Model.Past ? "active" : null)" href="@FeedToggleHref(false)" aria-pressed="@(!Model.Past ? "true" : "false")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-upcoming"/></svg><kw-l key="events.upcoming">Upcoming</kw-l></a>
+            <a class="btn btn-outline-secondary @(Model.Past ? "active" : null)" href="@FeedToggleHref(true)" aria-pressed="@(Model.Past ? "true" : "false")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-past"/></svg><kw-l key="events.past">Past</kw-l></a>
         </div>
 
         @if (Model.Components.Count > 0)

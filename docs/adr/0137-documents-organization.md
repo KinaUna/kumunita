@@ -1,4 +1,17 @@
-# ADR 0137 — Documents organization: `TagIds` + `FolderId` on `Document` (tags reuse the TG tag vocabulary, folders a Page-style `DocumentFolder` ParentId forest — a display/organizational facet, never a gate)
+---
+id: adr-0137
+title: "Documents organization: `TagIds` + `FolderId` on `Document` (tags reuse the TG tag vocabulary, folders a Page-style `DocumentFolder` ParentId forest — a display/organizational facet, never a gate)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0137](0137-documents-organization.md) — Documents organization: `TagIds` + `FolderId` on `Document` (tags reuse the TG tag vocabulary, folders a Page-style `DocumentFolder` ParentId forest — a display/organizational facet, never a gate)
 
 Status: Accepted
 Date: 2026-10-05
@@ -52,7 +65,7 @@ A fourth attach lane mirroring `AttachToPostAsync` / `AttachToPageAsync`:
 A new doc type in the same `DocumentDocTypes` registration:
 `Id`, `ParentId?` (null = root), `Name`, `OwnerId` (the actor that
 created it), `Created`, `Modified` — the `Page` forest convention
-(ADR 0007 / 0039): flat doc, parent id, no path column. `Document`
+(ADR [0007](0007-group-management-lane-owner-or-globaladmin.md) / 0039): flat doc, parent id, no path column. `Document`
 gains `FolderId?` (null = unfiled) — a **display/organizational facet,
 never a gate**: the document's access control (0122's frozen
 read/authorize seams) is untouched; the folder only groups display and
@@ -111,7 +124,7 @@ so it carries no `Audience` / `ContentPath` / per-document gate.
   `Detail.cshtml` shows tag badge chips + a folder chip;
   `Index.cshtml` has a "New folder" inline form.
 - **Localization**: one closed `documents.*` kw-l set (13 keys) ×
-  en/de/fr/da — the ML-UI closed-keylist convention (ADR 0015).
+  en/de/fr/da — the ML-UI closed-keylist convention (ADR [0015](0015-ui-view-localization-mechanics.md)).
 
 ## Consequences
 

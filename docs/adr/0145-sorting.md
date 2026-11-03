@@ -1,4 +1,17 @@
-# ADR 0145 — Sorting: the one canonical sort contract (M26)
+---
+id: adr-0145
+title: "Sorting: the one canonical sort contract (M26)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m26-sorting-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0145](0145-sorting.md) — Sorting: the one canonical sort contract (M26)
 
 Status: Accepted
 Date: 2026-10-06
@@ -10,7 +23,7 @@ the closed `sort.*` set is additive on it)
 
 ## Context
 
-M7 (ADR 0090) shipped **pagination** and **filtering** over the paged Core
+M7 (ADR [0090](0090-pagination-and-filtering.md)) shipped **pagination** and **filtering** over the paged Core
 seams. **M3** shipped the actual **ordering** — and it has been **hardcoded
 in Core** ever since: every paged list seam does a fixed
 `OrderBy`/`OrderByDescending` over the *already-authorized* candidate set
@@ -23,7 +36,7 @@ hardcoded one, on every one of the 18 paged list/search surfaces. **M26
 makes that order user-selectable** — the M7 sibling that pagination and
 filtering shipped without.
 
-This ADR records the decision; `docs/design/m26-sorting-design.md` (parts
+This ADR records the decision; [`docs/design/m26-sorting-design.md`](../design/m26-sorting-design.md) (parts
 1–2) freezes the invariants **C-SORT·1–8**, the FACES **F1–F12**, the 18
 locked allowlists (corrections C-1…C-3), the **exact C#** of every seam this
 ADR points at, and the pinned test names — the design doc is the authority on
@@ -34,7 +47,7 @@ shape; this ADR is the authority on *why these shapes, and why nothing else*.
 - **The contract is a pure Core value object, not an HTTP type (D-SORT·1,
   C-SORT·3).** `record SortSpec(string Key, bool Descending)` + the pure
   `SortKeys.Parse(key, dir, allowedKeys, defaultKey, defaultDir)` in a new
-  `Kumunita.Core.Query` namespace (ADR 0006-D, the M25 `C-UP·3`
+  `Kumunita.Core.Query` namespace (ADR [0006](0006-module-boundary-contracts.md)-D, the M25 `C-UP·3`
   precedent) — **no HTTP, no DI registration** (a value object + a static
   parser; `AddKumunitaCore` gains **zero** new registrations, C-SORT·7). The
   `?sort=`/`?dir=` query-param parsing and the view mapping are **Web-only**
@@ -60,7 +73,7 @@ shape; this ADR is the authority on *why these shapes, and why nothing else*.
 - **Sort is a display facet, never a gate (D-SORT·4, C-SORT·4).**
   Re-ordering **never** changes *which* rows are authorized — the
   `CanSeeAsync` call, the `AccessAudit` row, and the `HiddenCount` shape are
-  all **untouched** (the ADR 0064 `?view=` display-selector precedent + the
+  all **untouched** (the ADR [0064](0064-events-calendar-dwm-views.md) `?view=` display-selector precedent + the
   M7 C-M7·2 "display-only" pin). A signed-in and an anonymous viewer on a
   visible surface get the **same** sort behavior (F10); a sorted read emits
   **zero** new `AccessAudit` rows vs. an unsorted read (F11).
@@ -91,7 +104,7 @@ shape; this ADR is the authority on *why these shapes, and why nothing else*.
 
 - **No new document / context / schema (D-SORT·7, C-SORT·7).** `SortSpec` is
   a **value object** — no Marten doc, no `DocTypes` surface, no
-  `SchemaBootstrap` change (ADR 0004 §B / ADR 0006-D discipline); **zero**
+  `SchemaBootstrap` change (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B / ADR [0006](0006-module-boundary-contracts.md)-D discipline); **zero**
   new `AccessAction`, **zero** new bounded context, **zero** new index.
 
 ### The 8 invariants (C-SORT·1–8, frozen)
@@ -103,7 +116,7 @@ shape; this ADR is the authority on *why these shapes, and why nothing else*.
 - **C-SORT·2 — default-preserving.** An absent/`null` `SortSpec` reproduces
   the surface's **current hardcoded order exactly** — no unsorted read's
   output changes.
-- **C-SORT·3 — `Core` stays HTTP-free (ADR 0006-D).** `SortSpec` +
+- **C-SORT·3 — `Core` stays HTTP-free (ADR [0006](0006-module-boundary-contracts.md)-D).** `SortSpec` +
   `SortKeys.Parse` are **pure** Core; the `?sort=`/`?dir=` parsing and the
   view mapping are **Web-only**.
 - **C-SORT·4 — sort is a display facet, never a gate.** Re-ordering never

@@ -1,4 +1,17 @@
-# ADR 0214 — Login and MFA challenge fixes
+---
+id: adr-0214
+title: "Login and MFA challenge fixes"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0214](0214-login-mfa-fixes.md) — Login and MFA challenge fixes
 
 Status: Accepted
 

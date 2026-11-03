@@ -1,3 +1,24 @@
+---
+id: philosophy-template-design-doc
+title: "Design Doc — template"
+tier: living
+kind: philosophy
+status: current
+audiences: [developer, agent]
+related:
+  - docs/philosophy/anti-patterns.md
+  - docs/ops/restore.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the design-doc template — a fill-in for any change in this
+> repo, with the "Seams & contracts" section mandatory and a FACES check at
+> the end. **Who is it for:** the person proposing a non-trivial change.
+> **When to read the rest:** before writing the design doc; the three tests
+> ([`START-HERE.md`](../START-HERE.md#the-three-tests)) are the entry and
+> exit gate.
+>
+
 # Design Doc — [Title]
 
 > The "Seams & contracts" section is mandatory. Run the three tests
@@ -40,7 +61,7 @@ that hasn't priced it.
 
 ## Rollout & rollback
 Deployment path, migration, and a clean rollback / restore. (See
-[`../../docs/OPS.md`](../../docs/OPS.md).)
+[`../../OPS.md`](../../OPS.md).)
 
 ## Risks
 Where is the integration most likely to break? Where could privacy or trust

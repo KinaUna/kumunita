@@ -843,6 +843,98 @@ body.kmb-kiosk .kanban-divided-menu {
 body.kmb-kiosk .head-row > .d-flex {
   display: none !important;
 }
+/* ── Calendar surface (the M35 / ADR 0285 kiosk lane) — the explicit
+   cluster-hide rules. The generic button / .btn / form / select / input
+   / .nav rules above already hide the individual controls; these rules
+   additionally hide the CONTROL CLUSTERS (their wrappers) so no orphaned
+   button-band / gap is left on the wall display. The kiosk KEEPS the
+   "Calendar" title (h1) + the date-range lede (the doctrine "keep title
+   + subtitle + content") — so these target the button clusters inside
+   the header, not the header itself:
+   • .lede-row .d-flex — the Full page / Full screen toggle pair (the
+     .d-flex cluster next to the lede's <p>, which stays).
+   • .head-row > .d-flex — the right cluster: the Day/Week/Month view
+     toggle (.events-view-toggle) + the New event button
+     (.events-new-event-btn) + the Calendar feed (iCal) link. (The
+     to-do-surface rule above already carries this selector; it is
+     re-listed here so the calendar's own hide is self-contained and
+     does not depend on the to-do rule surviving a refactor.)
+   • .d-flex.mb-3 — the Prev / Today / Next nav links + the Filter form
+     (the .ms-auto d-flex that holds the Community select). The only
+     .d-flex.mb-3 row on the calendar page, so nothing else is hit.
+   • .kmb-tab-under-navbar — the Events / Calendar tab strip (a nav
+     control, calendar-specific class).
+   The grid (#events-calendar) + its event blocks / chips stay. */
+body.kmb-kiosk .lede-row .d-flex,
+body.kmb-kiosk .head-row > .d-flex,
+body.kmb-kiosk .d-flex.mb-3,
+body.kmb-kiosk .kmb-tab-under-navbar {
+  display: none !important;
+}
+/* ── Calendar height: the whole grid must fit the frame with no internal
+   scroll (the M35 "fit the whole month/day to the frame" amendment).
+   The block above (lines ~747–800) already sets overflow:hidden + the
+   flex-fill chain + the grid-row compression. The one rule that can
+   still leave a scrollbar is the .events-time-body's fixed
+   height: calc(24 * 3rem) (line 3252) — when the frame is shorter than
+   72rem the body overflows. Re-pin it to auto so the flex chain hands
+   the height down and the % positioning of event blocks + the
+   background hour-lines scale proportionally (no JS change needed —
+   the same doctrine as the verified block above). */
+body.kmb-kiosk #events-calendar .events-time-body {
+  height: auto !important;
+}
+/* ADR 0285 D5 — the interactive-only shells on the detail surfaces. The
+   generic hide rules above already strip the inner buttons / forms / chips,
+   but three cards are composed ONLY of controls (a heading + hint + form),
+   so once the form is hidden an orphaned heading band is left on the wall
+   display. Hide the WHOLE card when it is nothing but a control:
+   • a card whose only meaningful content is an inner <form> (the "Add a
+     to-do to this event" composer — heading + hint + the POST form); and
+   • the RSVP card, which carries the .kmb-rsvp form (the Going/Maybe/No
+     buttons + the owner-only responses list).
+   The "Translations:" chip row is a separate concern (the language-swap
+   selector for the variant bodies): hide just the row that carries the
+   data-translation-chip buttons, never the card. Every selector targets a
+   control-only shell — never the surrounding content — so the event's
+   title, body, date, byline and any other kiosk-meaningful content stay.
+   The selector is deliberately the direct-child `> .card-body > form` shape
+   (the "Add a to-do to this event" composer), NOT `:has(form)` — a content
+   card carries the ⋮ action dropdown whose menu holds forms (Delete,
+   translation remove), so a broad :has(form) would hide the whole title +
+   body card. */
+body.kmb-kiosk .kmb-detail-card:has(> .card-body > form) {
+  display: none !important;
+}
+/* The RSVP card: the Going/Maybe/No form + the owner-only responses list.
+   Its form sits one level deeper (card-body > h2 + form.kmb-rsvp), so it is
+   carried as its own rule. (The kmb-discussion rule above already hides it
+   when the entry opts comments ON — this covers the comments-OFF case.) */
+body.kmb-kiosk .kmb-detail-card:has(form.kmb-rsvp) {
+  display: none !important;
+}
+body.kmb-kiosk .d-flex:has(> [data-translation-chip]) {
+  display: none !important;
+}
+/* ADR 0285 D5 — comment threads, replies and event RSVP lists (the
+   .kmb-discussion sections of the detail pages) are hidden on a kiosk slide
+   unless the playlist entry shows them (the kiosk passes ?kioskComments=1 and
+   _Layout adds .kmb-kiosk-comments). Comment composers are always hidden on
+   a slide: a wall display does not take input. */
+body.kmb-kiosk:not(.kmb-kiosk-comments) .kmb-discussion,
+body.kmb-kiosk .kmb-detail-composer,
+body.kmb-kiosk .kmb-composer-title {
+  display: none !important;
+}
+/* ADR 0285 D4 — a slide may be scrolled by the kiosk (auto-scroll); a wall
+   display shows no scrollbar while it does. */
+html:has(> body.kmb-kiosk) {
+  scrollbar-width: none;
+}
+html:has(> body.kmb-kiosk)::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
 
 .lead {
   font-weight: 400;
@@ -1420,6 +1512,12 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
 .dropdown-item .kmb-nav-icon {
   margin-right: 0.4rem;
   vertical-align: -0.15em;
+}
+/* ADR 0283 — the same icon + label shape inside button-group switches
+   (Upcoming/Past, Day/Week/Month, the Translations mode toggle). */
+.btn .kmb-nav-icon {
+  margin-right: 0.35rem;
+  vertical-align: -0.125em;
 }
 
 /* ADR 0279 — the hand-drawn icon family. Every nav / account-menu icon is a
@@ -3950,3 +4048,64 @@ body.kmb-page-expanded #events-calendar:fullscreen .page-expand-close {
 .kmb-notices:has(.kmb-notices-more:not([hidden])) .kmb-notice .d-flex > .btn-close { margin-inline-start: 3.25rem; }
 body.kmb-embed .kmb-notices,
 body.kmb-kiosk .kmb-notices { display: none; }
+
+/* ── Board list view (ADR 0285 D6) — /projects/boards/{id}?view=list ──────
+   The board's lanes as headed sections, each card one row: title (a link to
+   the to-do), then status chip, assignee and due date. Surface tokens, so
+   both palettes and both modes follow. */
+.kmb-board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.kmb-board-list-lane {
+  background: var(--kmb-surface);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 0.75rem 1rem;
+}
+.kmb-board-list-lane-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.kmb-board-list-count {
+  display: inline-block;
+  min-width: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: var(--kmb-radius-pill);
+  background: var(--kmb-surface-2);
+  color: var(--kmb-ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+.kmb-board-list-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--kmb-border-soft);
+}
+.kmb-board-list-row:first-child { border-top: 0; }
+.kmb-board-list-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--kmb-ink);
+  text-decoration: none;
+  font-weight: 500;
+}
+.kmb-board-list-title:hover { color: var(--kmb-accent); text-decoration: underline; }
+.kmb-board-list-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  color: var(--kmb-muted);
+  font-size: 0.875rem;
+}

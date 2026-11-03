@@ -1,14 +1,27 @@
-# ADR 0254 — The Page form is localized
+---
+id: adr-0254
+title: "The Page form is localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0254](0254-page-form-localized.md) — The Page form is localized
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
 `Pages/_PageForm` (shared by New and Edit) was verified live after the rebuild: the Public switch, the scope dropdown and the Individual-access
-editor behave correctly and the page has no overflow at 390px (the Publishing card from ADR 0244 works). Its text, however, was almost
+editor behave correctly and the page has no overflow at 390px (the Publishing card from ADR [0244](0244-section-cards-todo-page-kiosk-forms.md) works). Its text, however, was almost
 entirely hard-coded English: the heading and the two `<title>`s, the validation fallback, the labels and hints for Title, Parent page,
 Language and Tags, the Publishing card (Public switch, scope label, options and hint, Mount point, audience heading and the Any/All mode
-descriptions) and the Create / Save buttons. Two hints were developer text, not user text ("ADR 0018 — …", "ADR 0039 §3.8 — …").
+descriptions) and the Create / Save buttons. Two hints were developer text, not user text ("ADR [0018](0018-ugc-authored-in-language-tag.md) — …", "ADR [0039](0039-pages-hierarchy-audience-translations.md) §3.8 — …").
 
 ## Decision
 - Everything above moves to `<kw-l>` (or `Translation.GetAsync` for the "Top level" option texts, which sit inside an `<option>`) with the

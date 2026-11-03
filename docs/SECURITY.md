@@ -1,304 +1,66 @@
-# Kumunita — Security & Privacy
+---
+id: security-model
+title: "Security & privacy model"
+tier: reference
+kind: security
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer, agent]
+related:
+  - docs/security/why-first.md
+  - docs/security/trust-boundaries.md
+  - docs/security/data-classes.md
+  - docs/security/adversaries.md
+  - docs/security/control-map.md
+  - docs/security/decisions-open-items.md
+  - docs/SECURITY-AUDIT.md
+  - SECURITY.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the *what, whom, and why* of Kumunita's security and privacy —
+> the single source for what we protect, from whom, and why, split into six
+> concern files. **Who is it for:** everyone — residents read the
+> [why](security/why-first.md) and [data classes](security/data-classes.md);
+> admins and developers read the [adversaries](security/adversaries.md) and
+> [control map](security/control-map.md); operators read the
+> [decisions](security/decisions-open-items.md). **When to read the rest:**
+> when a change touches a data class, a privilege surface, or a third-party
+> boundary — the matching concern file, then the [control map].
 
 Security and privacy are the **highest-priority requirements** of this product, not
 features to add. This document is the single source for *what we protect, from whom,
-and why*. It complements `ARCHITECTURE.md` (how the mechanisms work), `OPS.md`
-§10 (the operational hardening checklist), and `SECURITY-AUDIT.md` (the audit
-program — the cadence, owners, and run-anywhere checklists that verify the controls
-here actually hold, and where each run is recorded). Rationale for
-identity/authorization decisions lives in `adr/0001` and `adr/0003`.
+and why*. It complements [`ARCHITECTURE.md`](ARCHITECTURE.md) (how the mechanisms work),
+[`hardening-checklist`](ops/hardening-checklist.md) (the operational hardening
+checklist), and [`SECURITY-AUDIT.md`](SECURITY-AUDIT.md) (the audit program — the
+cadence, owners, and run-anywhere checklists that verify the controls here actually
+hold, and where each run is recorded). Rationale for identity/authorization
+decisions lives in [ADR 0001](adr/0001-core-stack-and-identity-model.md) and [ADR 0003](adr/0003-roles-and-moderator-scoping.md).
 
-Status: pre-M0, design-level. Update this document when a control changes, a threat is
-accepted, or an open item below is decided — and record non-obvious decisions as ADRs.
+Status: pre-M0, design-level. Update this document when a control changes, a threat
+is accepted, or an open item below is decided — and record non-obvious decisions as
+ADRs.
 
-## 1. Why this is the top priority
+The model is split into one file per concern (this is the hub; each concern is
+self-contained and links to the others):
 
-- A Kumunita instance holds **real, named neighbors** and their private conversations.
-  A leak isn't a dataset — it's the person down the street.
-- Scale is tiny (dozens to hundreds of users), so **sophisticated attack economics
-  don't apply; the realistic threats are simple ones** (stuffing, scraping, a bad
-  actor with an account, an operator mistake). Simple threats need simple, correct
-  controls — not a security framework.
-- One deployment per neighborhood (ADR 0002) means **isolation is total but also
-  total-loss**: there is no shared-infrastructure blast radius, and no shared defense
-  in depth either. Each instance stands on its own.
+| Concern | Read it when | File |
+|---------|--------------|------|
+| **Why security & privacy is the top priority** — the two operating rules and the five design rules (deny-by-default, least standing, audit-by-default, fail-closed, minimize) | you need the *why* behind a rule, or are deciding whether a change fits the posture | [`why-first.md`](security/why-first.md) |
+| **Trust boundaries** (B1–B6) — where data crosses into someone else's control | you are adding or touching a third-party integration | [`trust-boundaries.md`](security/trust-boundaries.md) |
+| **Data classes** (PII, private content, audit, secrets, media/attachments) — what we store and what its loss means | you are deciding what may be stored, served, or logged | [`data-classes.md`](security/data-classes.md) |
+| **Assumed adversaries** (A1–A7) — ranked by realism at this scale | you are asking "what can a bad actor do now?" | [`adversaries.md`](security/adversaries.md) |
+| **Control map** — every control, the adversary it answers, the code seam, the ADR | you are adding a feature and must cover the threat, or verifying a control holds | [`control-map.md`](security/control-map.md) |
+| **Decisions & open items** — the decided controls + the items still undecided | you are changing a security surface, or deciding an open item | [`decisions-open-items.md`](security/decisions-open-items.md) |
 
-**Deployment assumption (confirmed):** each neighborhood gets its **own VPS and its own
-domain** (a dedicated instance per ADR 0002, not co-hosted neighborhoods on one box).
-Per-instance rate limiting is therefore effective, and one community's traffic or abuse
-cannot exhaust or implicate another's. If this ever changes (shared hosting), revisit
-§6 (rate limiting) and the CAPTCHA decision (OPS.md §10).
+The related surfaces:
 
-**Two operating rules shape everything below:**
-
-- **Privacy by design, not by promise.** Access rules are enforced in code on every
-  request (ARCHITECTURE.md §4.4); the audit trail exists to *prove* the design held,
-  not to substitute for it. A control that depends on someone remembering to check is
-  not a control.
-- **Security is non-negotiable scope.** A security or privacy issue found at any
-  milestone stops feature work until it is resolved or explicitly accepted in writing
-  (here, or in an ADR). Schedule pressure is not an acceptable reason to defer one.
-
-**Design rules, in priority order:**
-
-1. **Deny by default.** No audience = invisible to everyone (the empty-audience-denies
-   invariant, ARCHITECTURE.md §4.4).
-2. **Least standing.** Moderator access to restricted content is off by default and
-   unlocked only by a report or an explicit admin toggle (ADR 0003).
-3. **Audit by default.** Restricted-content access is always logged; admin and
-   moderation actions are always logged (ARCHITECTURE.md §5).
-4. **Fail closed.** Authorization errors, missing grants, and concurrency failures
-   resolve to denial / rollback — never to a guess.
-5. **Minimize.** No event-sourced data lake, no third-party analytics, no telemetry.
-   What we don't store, we can't leak.
-
-## 2. Trust boundaries
-
-Data crosses these boundaries; each one is a point where protection is delegated to
-someone else.
-
-| # | Boundary                       | Who controls it                    | Protection / notes                                                                 |
-|---|--------------------------------|------------------------------------|------------------------------------------------------------------------------------|
-| B1 | Browser ↔ app (TLS)           | Coolify / Let's Encrypt            | HTTPS-only + HSTS (OPS.md §10); cookies `Secure`/`HttpOnly`/`SameSite=Lax`         |
-| B2 | Public internet → VPS         | VPS host (operator)                | Only 80/443 + SSH (key-only) exposed; Postgres never public (OPS.md §10)            |
-| B3 | App ↔ Postgres                | operator                           | Dedicated non-superuser DB account after first run; internal network only           |
-| B4 | App ↔ SMTP provider           | **provider (third party)**         | SPF/DKIM/DMARC (OPS.md §7); provider can read email bodies — see §3 class (a)      |
-| B5 | Backups → offsite storage     | **object store (third party)**     | Encrypted at rest by the store; **also encrypt backups at the source**; access scoped to a key we rotate (OPS.md §4) |
-| B6 | Secrets: env / secrets manager| operator + Coolify                 | One-time seed token pattern; secrets never in image, logs, or this repo (OPS.md §10) |
-
-**Operator = trusted-but-not-invulnerable.** The host operator can read everything on
-a VPS. The break-glass design (ADR 0003, ARCHITECTURE.md §4.5) assumes the operator
-may be the *only* honest party left, and constrains what an app-admin can do to the
-operator's authority.
-
-## 3. Data classes
-
-How each class is stored and what its loss means.
-
-| Class | Contents | Stored where | Sensitivity if leaked |
-|-------|----------|--------------|------------------------|
-| **(a) PII** | names, emails, phones (opt-in), profiles, households | `mt` (Profile…), `identity` | High — identifies real neighbors; phone/email is contact-targetable |
-| **(b) Private content** | audience-restricted posts, replies, RSVPs, project members | `mt` | High — private conversations; disclosure breaks community trust permanently |
-| **(c) Audit & moderation** | `AccessAudit`, `Report`, `AdminOverride` | `mt` | **High, asymmetric** — reveals *who accessed what*, incl. *denied* items (see §3.1) |
-| **(d) Secrets** | DB/SMTP credentials, seed token, backup keys | env / secrets manager / object store | Critical — full instance compromise |
-| **(e) Media & uploaded bytes** | raster avatars (jpeg/png/webp/gif) — identifying images of residents — and the `MediaObject` catalog (hash id, original filename, size, first-storer) | bytes: dedicated volume (OPS.md §4/§5, second restore surface); catalog: `mt` (ADR 0011) | High — a face is identity material; served **only** through an auth + audit-gated app endpoint (never a static path), raster-only (SVG excluded as a script vector) |
-| **(e) Attachment files (ADR 0034, lane `ATT`)** | user-attached files (PDF / Office docs / text / csv / zip / raster) on posts, replies, announcements — arbitrary resident content — cataloged by the **same** `MediaObject` doc on the **same** volume as (e) above | same volume + same `mt` catalog as (e); the owning doc carries `AttachmentIds` (additive, zero migrations, ADR 0004 §B.1) | High — same as (e): served **only** through the auth + audit-gated `GET /attachment/{id}` endpoint (never a static path), a **separate** file allowlist (SVG excluded, `Media__AttachmentAllowedContentTypes`), `Content-Disposition: attachment` + `nosniff` (a download, not an inline render — C-ATT·2/8), every miss a 404 (orphan-safe — C-ATT·7) |
-
-### 3.1 The audit log is a disclosure surface (accepted by design)
-
-`AccessAudit` records **denials with `targetId`**, and list views record `hiddenCount`.
-A GlobalAdmin reading the log can therefore enumerate *which* restricted items exist and
-*who was kept out of them*. That is a deliberate property — it is what makes the audit
-log an accountability mechanism ("prove what happened", OPS.md §9) — but it means:
-
-- The **audit log itself must be treated as class (c)**: GlobalAdmin-only, retained per
-  the tiered policy (ARCHITECTURE.md §5), pseudonymized on account deletion.
-- Do not "fix" it by dropping `targetId` or denials — that removes the accountability
-  the community is promised.
-
-**"Minor" is not a stored data class.** A child's status as a supervised account is
-carried by the `GuardianLink` row (ADR 0028), not by a stored age or birthdate — so the
-guardian lane adds a *control* without adding a sensitive PII field. This keeps rule 5
-(minimize: "what we don't store, we can't leak") intact even as the feature lands.
-
-## 4. Assumed adversaries
-
-Ranked by realism at this scale. Each maps to the controls that answer it.
-
-| # | Adversary | Can do | Mitigated by |
-|---|-----------|--------|--------------|
-| A1 | **Curious outsider** (no account) | scrape public pages, probe endpoints, attempt signup | nothing sensitive is public; opt-in contact details; rate limiting (OPS.md §10) |
-| A2 | **Credential-stuffing / signup bots** | brute login, flood register & report endpoints | rate limiting on the eight covered lanes (§6, OPS.md §10), Identity lockout (OPS.md §10); CAPTCHA deferred by decision (OPS.md §10) — a **bot-challenge seam** (F9, AUTH-15) is in place: a `KUMUNITA__SIGNUP__BOT_CHECK` flag, **off by default** (the owner's site key is an owner-ops step). The deferral stands until the owner turns the flag on |
-| A3 | **Compromised or malicious resident** (has an account) | try to read beyond their audience, abuse delegation, spam reports | deny-by-default audiences (ADR 0001-B); action-scoped delegation (ARCHITECTURE.md §4.4); report-filing rate-limited; security-stamp invalidation on privilege change (OPS.md §10); audit trail for after-the-fact |
-| A4 | **Malicious / hostile GlobalAdmin** | read everything, suppress others, extend their power | two-admin standing practice; no in-app `AdminOverride` creation; operator-only break-glass; `BreakGlass`-tagged audit (ADR 0003, ARCHITECTURE.md §4.5) |
-| A5 | **Third parties & operator path** (SMTP provider, object store, VPS host, operator mistake) | leak data at B4/B5, misconfigure | encryption at rest + at source, scoped keys, SPF/DKIM/DMARC, least-privilege DB user, backups-verified (OPS.md §4, §7, §10) |
-| A6 | **Supply chain** (base image, NuGet/npm) | malicious or stale dependency | pinned image + package versions; rebuild on base updates (OPS.md §10); two-project solution with no heavy runtime deps (ADR 0001) |
-| A7 | **The hostile or over-reaching guardian** (a parent supervising a child's account) | over a minor who may not contest it out-of-platform, use the supervision lane to silence the child (suspend without cause), or try to grow the lane beyond account-level control into reading the child's private content | standing comes from *creating* the account, no self-serve claim over a stranger (ADR 0028 G·4); the lane is **account-scope only** — the content path has no guardian branch, so the exposure is never the child's private life (ADR 0028 G·1); the **safety valve**: a GlobalAdmin dissolves any link or un-suspends any account, audited `Via: Admin` (ADR 0028 G·5) |
-
-**Not assumed (documented, not designed for):** nation-state actors; VPS-level physical
-access; a compromised Coolify platform. If the deployment context changes, add them.
-
-## 5. Control map — every threat must be covered
-
-Quick self-check when adding a feature: does it introduce a new data class or a new
-privilege surface? If so, add a row here and in the relevant checklist.
-
-| Control | Answers | Owner / detail |
-|---------|---------|----------------|
-| Deny-by-default audiences + empty-audience-denies | A1, A3 | ARCHITECTURE.md §4.3–4.4 |
-| Thin token, fat authorization (no privilege in cookie) | A3 | ADR 0001-B, ARCHITECTURE.md §4.1 |
-| Security-stamp rotation on privilege change | A3 (revoked grants) | OPS.md §10 |
-| Optimistic concurrency + atomic audit commit | A3 (lost-update abuse) | ARCHITECTURE.md §5 |
-| Rate limiting (the eight fixed-window policies: `login` / `signup` / `resend` / `report` / `setup` / `message` / `write` / `upload`), per-IP | A2 | §6 (mechanism decided); OPS.md §10 (endpoints + XFF); the `upload` leg is F8 (the 2026-10-25 fix pass) |
-| Identity account lockout, per-account (defaults) | A2 | OPS.md §10 — pairs with rate limiting; see division of labor there |
-| **2FA (TOTP): required for GlobalAdmin**, recommended for Moderator | A3, A4 | §6 (decided); OPS.md §10; break-glass step OPS.md §9 |
-| Content-Security-Policy `script-src 'self'` (strict, no inline script) + origin pinning (shipped) | A3 (XSS) | §6 (decided); OPS.md §10 (shipped in `Program.cs`) |
-| PBKDF2 password hashing (Identity default; iteration count documented) | A2, A3 | §6 (decided 2026-08-27; ADR 0172 records the posture) |
-| CAPTCHA (deferred, documented decision) | A2 | OPS.md §10 |
-| Report-gated, audited moderator access | A4 (and protects A3's privacy from mods) | ADR 0003 |
-| Two-admin rule + operator-only break-glass | A4 | ADR 0003, ARCHITECTURE.md §4.5, OPS.md §9 |
-| One-time seed token, removed from env after first boot | A5 | OPS.md §2 |
-| Non-superuser DB, internal-only | A1, A5 | OPS.md §10 |
-| Encrypted offsite backups + verified restores | A5, disaster | OPS.md §4–5 |
-| Pinned image + packages | A6 | OPS.md §10 |
-| Guardian standing is creation-based, account-scope (no content read), and community-reversible | A7 | ADR 0028 G·4/G·1/G·5; the content path has no `Via: Guardian` branch; GlobalAdmin dissolve/un-suspend audited `Via: Admin` |
-| SPF / DKIM / DMARC, stable From: | phishing-as-us (A3 impersonation) | OPS.md §7 |
-| Audit log (always-on, tiered retention) | accountability for A3, A4 | ARCHITECTURE.md §5 |
-| Media served only through an auth + audit endpoint (never static; one frozen `CanAsync(Read)` call commits the Allow **and** Deny rows) | A1 (scraping), A3 | ADR 0011 (C-MED·1/2/3); design doc §2.3 |
-| Upload type/size allowlist at the edge — raster only (SVG = excluded script vector), 10 MiB cap, self-only write lane | A3 (payload-as-XSS, self-impersonation of others) | ADR 0011 (C-MED·5/8); `Media__*` keys (OPS.md) |
-| **Attachment lane (ADR 0034):** served only through `GET /attachment/{id}` (never static); the owning post / reply (parent post) / announcement's **single** `Read` decision; **every miss a 404** (store-miss, orphan, Deny) — existence never leaks; **one `Deny` row** on a UGC (post/reply) Deny, **zero rows** on every other 404 (announcement ⇒ zero rows); `Content-Disposition: attachment` + `nosniff` + stored `Content-Type` (a download, not an inline render); a **separate** file allowlist (SVG excluded); the `AttachmentIds` id is derived **server-side** from the body (never client-sent); a removed link ⇒ inert bytes (orphan-safe, never hard-deleted) | A1 (scraping), A3 (payload-as-XSS, self-impersonation) | ADR 0034 (C-ATT·1–10); design doc `file-attachments-design.md`; `Media__AttachmentAllowedContentTypes` (OPS.md) |
-| Upload virus scan (F16): the `IVirusScanner` seam + a quarantine flag on the `MediaObject` doc + a serve-lane gate, **fail-open by default** (`VirusScan__Host` / `VirusScan__Port` unset ⇒ the seam is absent), `InfectedUpload_NotServed` | A3 (malicious payload) | F16; OPS.md §10 (the ClamAV daemon is an owner-ops step) |
-| Global security-header floor (F7): every response carries `X-Content-Type-Options: nosniff` + `Referrer-Policy`, set in the same `app.Use(…)` block as the CSP (the 2026-10-25 fix pass added them; pinned by `F7F8_HardeningGateTests`) | A3 (MIME sniffing, referrer leakage) | F7; OPS.md §10 |
-
-## 6. Decisions & open items
-
-### Decisions
-
-**Supply-chain pinning (SEC L5, decided 2026-10-31; protects A6):** what is
-pinned and what is intentionally left floating.
-
-- **Pinned (by commit / digest, not just tag):**
-  - **CI actions** (`.github/workflows/ci.yml`): `actions/checkout@fbc6f39…b6c09`
-    (`# v5`), `actions/setup-dotnet@26b0ec1…c95bf1` (`# v5`),
-    `actions/setup-node@a0853c2…a1444` (`# v5`). SHA = the tag's resolved commit
-    (GitHub API, 2026-10-31).
-  - **Container base images** (`Dockerfile`): `mcr.microsoft.com/dotnet/sdk:10.0`
-    and `mcr.microsoft.com/dotnet/aspnet:10.0` are SHA-pinned to their
-    multi-arch index digests (MCR registry, 2026-10-31).
-  - **NuGet + npm packages:** already version-pinned via `PackageReference`
-    / `package-lock.json`; `dotnet list package --vulnerable` + `npm audit` are
-    clean (U3 baseline).
-- **Intentionally not pinned ("to pin" list):**
-  - `node:22` (Dockerfile stage 1, the TS build) — Docker Hub blocks anonymous
-    digest resolution, so it stays a floating tag. **To pin:** resolve via a
-    token-authenticated pull or `docker pull node:22 && docker inspect` and add
-    the digest.
-  - `postgres:18`, `axllent/mailpit:latest` (dev `docker-compose.yml`) — dev-only,
-    not the deploy path, so left floating. **To pin:** same approach if a dev box
-    needs reproducible builds.
-  - **Workflow `permissions:`** is now scoped to `contents: read` (least
-    privilege — the workflow only reads the checked-out source).
-- **Non-root container runtime:** the app's *running process* is `app` (UID 1654,
-  the user the MCR aspnet base ships), achieved via `docker/entrypoint.sh`:
-  the entrypoint starts as the image's default USER (root) just long enough to
-  `chown -R app:app /app /data` (re-claiming any root-owned files in the mounted
-  volumes), then drops to `app` via `setpriv --reuid app --regid app
-  --clear-groups` and `exec`s `dotnet Kumunita.Web.dll`. The dotnet process
-  is therefore non-root (PID 1, UID 1654) — the U25 invariant — but the
-  entrypoint's root phase repairs the ownership of *any* stale pre-U25 volume
-  files at every boot (the U25-era `RUN chown` only fixed the image layer, not
-  a mounted named volume first populated when the app ran as root). `curl`/`wget`
-  are kept (external health probe, no built-in substitute — see the U25 handoff
-  note). The MCR base ships `setpriv` (util-linux) but not `gosu`/`su-exec`;
-  `setpriv` is the setuid-free, PAM-free, env-preserving privilege drop.
-
-**Rate limiting (mechanism, decided 2026-08-27; protects A2):**
-
-- **Mechanism:** ASP.NET Core's built-in rate-limiting middleware
-  (`AddRateLimiter`), with **per-endpoint policies** and **in-memory partitioning by
-  client IP** (plus user identity where the actor is authenticated). At one instance
-  per neighborhood with dozens of users, a process-local counter is the correct weight
-  — no Postgres-backed or distributed rate limiter, no queue.
-- **Covered endpoints (shipped):** `login` (5/15 min), `signup` (5/1 hr), `resend` (5/1 hr), `report-filing` (10/1 hr — an authorization-escalation surface), `setup` (5/15 min), `message` (20/15 min), `write` (30/15 min), and `upload` (10/15 min — F8, the 2026-10-25 fix pass, attached to the four upload POSTs: `/attachment`, `/content-image`, `/documents`, `/profile/avatar`). OPS.md §10 is the canonical runbook list; the `upload` leg is pinned by `F7F8_HardeningGateTests`.
-- **Real client IP is a hard requirement.** Behind the reverse proxy the app sees the
-  proxy's address unless the proxy forwards `X-Forwarded-For` *and* the app honors it
-  (trust the proxy, e.g. `ForwardedHeaders` / `UseForwardedHeaders` configured for the
-  proxy only). **Without this, per-IP partitioning collapses into one shared bucket** —
-  every user shares one limit and a single client can exhaust it for everyone. This is
-  verified in the M0/M1 smoke test, not assumed.
-- **Revisit trigger:** shared hosting of multiple neighborhoods on one VPS/IP (see
-  deployment assumption, §1) — per-instance limits stop protecting the others, and the
-  CAPTCHA decision (OPS.md §10) is revisited in that case.
-
-**Proxy trust (SEC H3, decided 2026-10-31; protects A2 — the real-client-IP
-requirement above):** the trusted-proxy list is **configuration-driven, never
-trust-all.** `ForwardedHeadersSetup` (U9) reads `ReverseProxy:KnownNetworks`
-(CIDR ranges) and `ReverseProxy:KnownProxies` (IPs) from the app's config;
-when both are unset or empty it falls back to a safe default — loopback
-(`127.0.0.0/8`, `::1/128`) and the RFC1918 ranges (`10.0.0.0/8`,
-`172.16.0.0/12`, `192.168.0.0/16`), which covers the Docker network — and
-**never** to "trust everyone." An out-of-range peer's `X-Forwarded-For` /
-`X-Forwarded-Proto` headers are ignored, so a spoofed client cannot inject a
-false source IP or scheme. An unparseable CIDR or IP value throws
-`InvalidOperationException` at `builder.Services` time (the boot fails, the
-door does not open). In production, set `ReverseProxy:KnownNetworks` to the
-CIDR of the edge proxy's source address (e.g. `172.18.0.0/16`) so the
-`X-Forwarded-For` header is honored and the `login` rate-limit partitioning
-sees real client IPs. The cookie `Secure` attribute is set explicitly via
-`CookieSecurePolicy.Always` outside Development (U10), so the session cookie
-is never issued over plain HTTP even on a non-TLS hop.
-
-**2FA (decided 2026-08-27; protects A3, A4):** TOTP via ASP.NET Identity's built-in
-support, plus recovery codes.
-
-- **GlobalAdmin: required.** An admin account is total instance compromise (roles,
-  standing moderator visibility, audit log); 2FA is the control, not optional.
-  Enforced server-side by `AdminTwoFactorMiddleware` (registered in `Program.cs`
-  after `UseAuthentication`, before `UseAuthorization`): an authenticated
-  GlobalAdmin without enrolled 2FA (and not a sample-data account) is limited
-  to the enrolment, logout and static routes; every other route is redirected
-  to enrolment. The login redirect in `AccountController` is a convenience only
-  — the middleware is the gate.
-- **Moderator: recommended, not required** — standing is component-scoped and their
-  restricted reads are already audited.
-- **Member: none** — overkill at this scale; their content is protected by
-  deny-by-default audiences.
-- **Break-glass interaction:** the OPS.md §9 break-glass procedure requires the
-  elevated account to have 2FA enabled (or enables it as part of elevation) — an
-  account that just became an admin must meet the admin bar before it keeps the
-  standing.
-- **Recovery codes are mandatory:** they are the self-serve path if a TOTP device is
-  lost; the two-admin rule (ADR 0003) is the fallback if the codes are gone too.
-
-**Content-Security-Policy (decided 2026-08-27; XSS hardening, protects A3):**
-
-- **Policy:** `default-src 'self'` (all assets are first-party — `tsc`-built JS, no
-  CDN), `style-src 'self' 'unsafe-inline'` (inline styles in Razor are fine), no
-  `script-src` extension.
-- **The constraint is on the code, not the header.** The header itself is a
-  one-line server-side change — loosening is nearly free (add a scoped `script-src`
-  entry with SRI, or switch to nonces via `UseCsp`), but *tightening after the fact*
-  means hunting down every inline handler the browser now refuses. So the discipline
-  is pinned now, at zero lines of front-end code:
-  - Razor views: **no inline `on*` attributes, no inline `<script>`** — use the
-    `client/*.ts` modules with `addEventListener` (the documented pattern, ARCHITECTURE.md §7).
-  - Any future third-party script gets a *scoped* `script-src` addition **plus
-    Subresource Integrity**, decided per case — never by loosening `default-src`.
-
-**Password storage (decided 2026-08-27; protects A2/A3):** ASP.NET Identity hashes
-passwords with PBKDF2 (HMAC-SHA256); the iteration count is configurable via
-`IdentityOptions` and we document the default rather than silently depending on it.
-No custom password scheme — Identity's format, reset flow, and lockout are the ones
-we test and operate (OPS.md §10).
-
-**Translation of user-generated content (decided 2026-08-27; protects A3 privacy):**
-off by default. UGC is always rendered as authored — nothing is translated silently,
-and platform texts (UI, terms, about, help) are translated *in-instance* from data
-and never leave the box. If a machine-translation feature is ever enabled: the
-provider is a third-party boundary like B4 — **audience-restricted content is never
-sent to it** — translation is per-item, user-initiated, and always labeled
-"machine translation", and this decision is re-recorded here before shipping
-(ADR 0005 C). The **authored-in language tag** on `Post` / `PostReply` /
-`Announcement` (ADR 0018) is **not** a translation step — it is a BCP-47
-metadata field (for future search and reader-added language versions), carries
-no content to a third party, and changes none of this posture.
-
-### Open items (decide before shipping the surface they protect)
-
-SEC lane (2026-10-31, `6dafb783`) **closed:** the proxy-trust / forwarded-headers
-item (H3 — see the "Proxy trust" decision above: config-driven, never trust-all,
-`Secure` cookie policy, HSTS `max-age=31536000` + `Permissions-Policy`) and the
-GlobalAdmin 2FA item (H2 — see the "2FA" decision above: `AdminTwoFactorMiddleware`
-is the server-side gate, the login redirect a convenience). The SEC remediation
-register and its per-finding test rows are in `SECURITY-AUDIT.md` §8.
-
-| Item | Protects | Decision needed |
-|------|----------|-----------------|
-| Log hygiene: sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged — **still open (SEC L8c, parked 2026-10-31, no owner decision; the open-ended scope is why it parked)** | A3 (log integrity) | M1 — undecided |
-| Named invariant tests (empty-audience-denies, delegation action-scope) referenced from ARCHITECTURE.md §4.4 | A3 | M1 |
-| **Sign-up gate (ADR 0050) + the invitation mechanism it closes to.** The gate is landed: a GlobalAdmin flips the instance open / invitation-only (`/admin/signup`; `LocaleSettings.IsSignupOpen`, `false` floor as amended 2026-10-05 — a fresh instance ships **invitation-only** so the admin can set up the platform first), and when closed the `/account/signup` write lane and the nav/login sign-up affordances are authoritative — new self-service accounts are refused (existing residents unaffected). That is the control that answers A2 better than rate-limiting alone. **Still open:** the *invitation mechanism* a closed instance closes the door *to* — an invited resident self-serves their password from an admin-sent link rather than registering (token lifecycle, expiry, admin UX). Decide it before the community is open to residents beyond the development team. | A2 (signup bots) | Gate: landed (ADR 0050); invitation mechanism: before wider rollout |
-
-Decisions taken here should link back into OPS.md §10 (checklist) and, where they
-
-Decisions taken here should link back into OPS.md §10 (checklist) and, where they
-change a design decision, into an ADR.
+- **The audit program** — how often the controls are verified, by whom, and where
+  each run is recorded: [`SECURITY-AUDIT.md`](SECURITY-AUDIT.md) (the hub) →
+  `security/audit-*.md` (rules + cadence, checklists C / D / P / R, annual &
+  trigger audits, the audit log).
+- **The vulnerability disclosure policy** — how to report a security issue and how
+  reports are handled: [`SECURITY.md`](../SECURITY.md) at the repo root (GitHub's
+  recognized location), with the machine-readable companion served at
+  `GET /.well-known/security.txt`.
+- **The operational hardening checklist** — the operator's "what must be true"
+  slice: [`ops/hardening-checklist.md`](ops/hardening-checklist.md).

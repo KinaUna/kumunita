@@ -1,11 +1,24 @@
-# ADR 0124 — M8 expansion — Search: six extended surfaces + tag-name match
+---
+id: adr-0124
+title: "M8 expansion — Search: six extended surfaces + tag-name match"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0124](0124-search-expansion.md) — M8 expansion — Search: six extended surfaces + tag-name match
 
 Status: Accepted
 Date: 2026-09-26
 
 ## Context
 
-ADR 0091 (M8) shipped a single `/search` surface over the **four** resident
+ADR [0091](0091-search.md) (M8) shipped a single `/search` surface over the **four** resident
 content surfaces (posts, events, pages, announcements). Its D2 explicitly
 scoped the surface to those four and named the rest "out: projects, todo
 items, boards, goals, the directory, tags, groups as entities" — with the
@@ -19,7 +32,7 @@ resident content surfaces that a search box should cover.
 
 Three design forks were resolved by the platform owner:
 
-1. **Bookmarks** (ADR 0118) are **excluded**: a bookmark carries no title
+1. **Bookmarks** (ADR [0118](0118-bookmarks.md)) are **excluded**: a bookmark carries no title
    or metadata of its own (it references a post/event/page) — searching
    "bookmarks" would be searching the referenced document, which the
    original four surfaces already cover.
@@ -36,7 +49,7 @@ Three design forks were resolved by the platform owner:
 
 ## Decision
 
-- **Six new surfaces (E1).** In addition to the original four (ADR 0091
+- **Six new surfaces (E1).** In addition to the original four (ADR [0091](0091-search.md)
   D2), `surface=all` and the paged single-surface view now cover:
   `projects`, `boards`, `todos`, `inventory`, `documents`, `people`.
   Each surface's candidate predicate is the **same canonical read
@@ -77,7 +90,7 @@ Three design forks were resolved by the platform owner:
   `CanSeeAsync` pass (C-M8·1/2).
 
 - **People surface: pure catalog read, no authorization pass (E3).**
-  The directory (ADR 0003, M2) is a pure catalog read: "every
+  The directory (ADR [0003](0003-roles-and-moderator-scoping.md), M2) is a pure catalog read: "every
   non-blocked resident, for any signed-in viewer" — the
   `DirectoryService` docs are explicit that `CanSeeAsync` is **not** run
   on the list (there is no hidden-count to count). The `Profile.
@@ -111,10 +124,10 @@ Three design forks were resolved by the platform owner:
   `Board`, `TodoItem`, `InventoryItem`, and `Document` documents already
   exist with the fields this ADR reads. The `TagIds` field exists on
   `Post`, `Event`, `Page`, `TodoItem`, and `Profile` (the five
-  tag-aware surfaces). ADR 0004 §B is untouched.
+  tag-aware surfaces). ADR [0004](0004-data-persistence-and-schema-evolution.md) §B is untouched.
 
 - **Zero new authorization surface (E7).** The six new surfaces compose
-  the **same three frozen seams** as ADR 0091 D8: `IDocumentStore`,
+  the **same three frozen seams** as ADR [0091](0091-search.md) D8: `IDocumentStore`,
   `IAuthorizationService`, `IUserInfoService`. No new `AccessAction`, no
   new `AccessVia`, no new adapter, no new `Decide()` branch (C-M8·1).
   The people surface does **not** run `CanSeeAsync` (E3) — it is a
@@ -145,7 +158,7 @@ Three design forks were resolved by the platform owner:
   the same `/search` page). The directory route (`/directory/{id}`) is
   the detail link.
 - **Anonymous still searches** the original four surfaces (posts,
-  events, pages, announcements) — unchanged from ADR 0091. The six new
+  events, pages, announcements) — unchanged from ADR [0091](0091-search.md). The six new
   surfaces are signed-in-only (their canonical feeds are gated).
 - **The audit log** now records `search:projects`, `search:boards`,
   `search:todos`, `search:inventory`, `search:documents`, and
@@ -154,8 +167,8 @@ Three design forks were resolved by the platform owner:
 - **Bookmarks are excluded** by design (no searchable content of their
   own) — a future ADR can add them if the bookmark document grows a
   title/metadata field.
-- **The deferred lanes from ADR 0091 are unchanged:** language-scoped
-  search (ADR 0018) and full-text search (a future ADR with the
+- **The deferred lanes from ADR [0091](0091-search.md) are unchanged:** language-scoped
+  search (ADR [0018](0018-ugc-authored-in-language-tag.md)) and full-text search (a future ADR with the
   `tsvector` migration) both land without re-designing this one,
   because the seam is still one interface (D8 extended) and the engine
   is still one predicate per surface (D6 extended).

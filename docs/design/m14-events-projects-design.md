@@ -1,4 +1,21 @@
+---
+id: design-m14-events-projects
+title: "M14 — Integration of Events and Projects"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0115-integration-of-events-and-projects.md
+  - docs/adr/0112-ical-calendar-export.md
+  - docs/adr/0086-goals-projects-lane.md
+updated: 2026-11-02
+---
+
 # M14 — Integration of Events and Projects — design
+
+> **Abstract:** how the **Events (M4) and Projects (M5) surfaces interlock** — a to-do can be associated with an event (one additive `EventId?`, a reverse read seam, a dedicated write lane, both-direction display links), and the to-dos' optional dates become a **standard `VTODO` iCal surface** (a pure `TodoIcsWriter` + two routes). **Who is it for:** a developer touching the to-do ↔ event seam or the to-do ICS writer; an agent that needs the exact additive shape before changing either surface. **When to read the rest:** before touching `TodoItem`, the `ListTodosForEventAsync` / `SetTodoEventAsync` seams, or the to-do ICS routes.
+
 
 > **Milestone M14.** The **two coordination surfaces interlock**: the Events
 > (M4) and Projects (M5) surfaces — which a neighborhood uses as one thing —
@@ -14,9 +31,9 @@
 > dangling-safe** (the `ProjectLink`/`BlockerChip` idiom, C-M14·2). The
 > composition is **Web-layer** (D2) — **no** `Kumunita.Core.Events` →
 > `Kumunita.Core.Projects` dependency. **The calendar interlock (D4):** the
-> to-dos' existing optional dates (`DueAt` / `StartAt`, ADR 0079) become a
+> to-dos' existing optional dates (`DueAt` / `StartAt`, ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md)) become a
 > **standard iCal `VTODO` surface** — a **BCL-only pure `TodoIcsWriter`**
-> (the `IcsWriter` discipline, ADR 0112) + two `[Authorize]` routes
+> (the `IcsWriter` discipline, ADR [0112](../adr/0112-ical-calendar-export.md)) + two `[Authorize]` routes
 > (`GET /projects/todos.ics` the caller's visible dated to-dos, always 200;
 > `GET /projects/todos/{id}.ics` one `VTODO`, the 404-not-403 split) + two
 > quiet `kw-l` affordances.
@@ -26,11 +43,11 @@
 > `Milestones.cs`, the source of truth); **no new authorization surface**
 > (C-M14·4 — no new `AccessAction` / `AccessVia` / `Decide()` branch); the
 > `EventId` link is **a filter/association, never a gate** (C-M14·1); the
-> `VTODO` file **never carries a decision** (C-M14·5 — the ADR 0028 posture
+> `VTODO` file **never carries a decision** (C-M14·5 — the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) posture
 > applied to the file form, the C-M12·2 pin carried to the to-do surface);
 > and **additive-only, frozen seams untouched** (C-M14·7).
 >
-> **Status.** **LOCKED.** The decisions D1–D8 are locked in **ADR 0115
+> **Status.** **LOCKED.** The decisions D1–D8 are locked in **ADR [0115](../adr/0115-integration-of-events-and-projects.md)
 > (Accepted, 2026-09-29)**. The `[PROPOSED]` set in the register
 > `plan-m14-events-projects.md` was **locked as written — no veto was
 > recorded**; where the source contradicted the prose, the refinements are
@@ -47,11 +64,11 @@
 
 ## Context
 
-M4 shipped events (ADR 0054; the in-app calendar EV-CAL / EV-DWM / EV-NW /
-EV-PAST, ADR 0063 / 0064 / 0081 / 0109; M12 iCal export, ADR 0112). M5
-shipped projects (ADR 0067: to-dos + Kanban boards; the PL goals & projects
-lane ADR 0086 added the `ProjectId` association; ADR 0079 added the
-optional to-do dates `StartAt` / `DueAt`; ADR 0087 the blocker chip).
+M4 shipped events (ADR [0054](../adr/0054-events-rsvp-reminders.md); the in-app calendar EV-CAL / EV-DWM / EV-NW /
+EV-PAST, ADR [0063](../adr/0063-events-calendar-view.md) / 0064 / 0081 / 0109; M12 iCal export, ADR [0112](../adr/0112-ical-calendar-export.md)). M5
+shipped projects (ADR [0067](../adr/0067-m5-projects-todos-and-kanban.md): to-dos + Kanban boards; the PL goals & projects
+lane ADR [0086](../adr/0086-goals-projects-lane.md) added the `ProjectId` association; ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md) added the
+optional to-do dates `StartAt` / `DueAt`; ADR [0087](../adr/0087-todo-dependency-blocked-by-lane.md) the blocker chip).
 ARCHITECTURE.md's value-chain row names M14 exactly: **"M14 integration of
 Events and Projects | coordination — the two coordination surfaces
 interlock."** And the README principles are explicit that the interlock
@@ -62,7 +79,7 @@ Today the two surfaces **never point at each other** (grep-confirmed at
 U00 against the live tree): there is **no `EventId` on `TodoItem`**, **no
 to-dos-in-a-calendar surface**, and **no cross-surface display link**
 anywhere. A resident who plans an event cannot link the prep to-dos to it,
-and the to-dos — which already carry optional dates (ADR 0079) — do not
+and the to-dos — which already carry optional dates (ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md)) — do not
 appear in **any** calendar even though the events do (M12, `IcsWriter`).
 
 What M14 builds on, all frozen and verified against source at U00:
@@ -72,7 +89,7 @@ What M14 builds on, all frozen and verified against source at U00:
    `CanAsync(Read)` decision, the 404-vs-403 split) and
    `ListUpcomingAsync(componentId, actorId, page, ct)` +
    `ListMineAsync(actorId, ct)` (the actor's own events — authored ∪
-   RSVPed — the ADR 0065 posture). D2 composes the to-do → event display
+   RSVPed — the ADR [0065](../adr/0065-events-feed-your-upcoming-events.md) posture). D2 composes the to-do → event display
    link over `GetAsync`; D3 reuses `GetAsync` as the `set-event` lane's
    `eventId` visibility check; the U04 event picker reads `ListMineAsync`.
    **The frozen surface is untouched** (C-M14·7).
@@ -94,10 +111,10 @@ What M14 builds on, all frozen and verified against source at U00:
    new `EventId?` copies (D1).
 4. **The dangling-safe display idiom**
    (`Kumunita.Core/Projects/ProjectRequests.cs`):
-   `TodoDetailResult.Blocker` + `BlockerChip` (ADR 0087) — an unreadable /
+   `TodoDetailResult.Blocker` + `BlockerChip` (ADR [0087](../adr/0087-todo-dependency-blocked-by-lane.md)) — an unreadable /
    absent / soft-deleted target degrades to a `Generic` chip with `null`
    title / link (no leak); and the Web-side `TodoDetailViewModel`
-   `ProjectId?` / `ProjectTitle?` pair (ADR 0086 D9) — both `null` when the
+   `ProjectId?` / `ProjectTitle?` pair (ADR [0086](../adr/0086-goals-projects-lane.md) D9) — both `null` when the
    target is soft-deleted / unreadable, the link omitted entirely (C-M14·2
    is this idiom carried to the event link).
 5. **The `ProjectDocTypes` registration surface**
@@ -108,9 +125,9 @@ What M14 builds on, all frozen and verified against source at U00:
    `ComputedIndex` exposes no `Name`, so single-field indexes use the
    auto-derived-name form). The new `(EventId)` index joins in the same
    form (D1, C-M14·7 — additive, delta-detected, zero migration for
-   existing rows, ADR 0004 §B.1).
+   existing rows, ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 6. **The `IcsWriter` BCL-only closed-subset emitter**
-   (`Kumunita.Core/Events/IcsWriter.cs`, ADR 0112): the CRLF / 75-octet
+   (`Kumunita.Core/Events/IcsWriter.cs`, ADR [0112](../adr/0112-ical-calendar-export.md)): the CRLF / 75-octet
    fold / full escaping / stable-`UID` / valid-empty-calendar / caller-
    passed-`nowUtc` / **never-emitted list** discipline the
    `TodoIcsWriter` copies verbatim (D4).
@@ -120,7 +137,7 @@ What M14 builds on, all frozen and verified against source at U00:
    no-store` + `X-Content-Type-Options: nosniff` (the ADR 0034/0108 idiom),
    the 404-not-403 split on the per-item lane, always-200 on the feed lane.
    The `VTODO` routes copy this shape (D4, §routes).
-8. **The `kw-l` closed-key registry** (ADR 0015) + the
+8. **The `kw-l` closed-key registry** (ADR [0015](../adr/0015-ui-view-localization-mechanics.md)) + the
    `KnownTranslationKeys_ParityTests` en/de/fr/da parity pins — the new
    affordance keys join it (D3 / D4, §kw-l).
 
@@ -157,7 +174,7 @@ What M14 builds on, all frozen and verified against source at U00:
   (§deferred lanes), and the gate (§gate).
 - **D8** — **docs parity at the flip** (the U07 close unit, the C-M11·8
   precedent): `Milestones.cs` (M14 → `StatusDone`, M15 → `StatusNext`),
-  README Roadmap, `docs/STATUS.md`, `docs/ARCHITECTURE.md` (the M14 value-
+  README Roadmap, [`docs/STATUS.md`](../STATUS.md), [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) (the M14 value-
   chain row → done), `MilestonesTests.cs` re-pin (M15 becomes the single
   in-progress milestone) — all in **one** unit.
 
@@ -181,7 +198,7 @@ C-M14·3); the display links only ever show content the actor may already
 see (C-M14·2); the `VTODO` file carries only the to-do's title + body +
 optional dates (C-M14·5); and the new strings are localized in all four
 languages (§kw-l). The team pays a small, bounded cost: one additive field
-+ one index (zero migration — ADR 0004 §B.1 delta-detect), one reverse
++ one index (zero migration — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 delta-detect), one reverse
 read seam + one write lane (both copy existing house shapes verbatim), and
 one pure emitter that copies `IcsWriter`'s discipline. **No new bounded
 context, no new authorization surface, no recurrence concept, no new
@@ -218,7 +235,7 @@ pins, which is the point).
   `src/Kumunita.Web/Localization/KnownTranslationKeys.cs` + the four
   locale files (§kw-l).
 - **Touched in the U07 close only (D8):** `src/Kumunita.Web/Milestones.cs`
-  (M14 → `StatusDone`, M15 → `StatusNext`) + `README.md` Roadmap +
+  (M14 → `StatusDone`, M15 → `StatusNext`) + [`README.md`](../../README.md) Roadmap +
   `docs/STATUS.md` + `docs/ARCHITECTURE.md` + `tests/Kumunita.Web.Tests/
   MilestonesTests.cs` (re-pin to M15).
 - **Untouched (pinned):** the **frozen** `IEventService` / `EventService`
@@ -291,7 +308,7 @@ contract is named + closed here:
 
    Sets `TodoItem.EventId` to `eventId` (`null` = **clear the link** — the
    `SetTodoProjectAsync` `null`-clears rule). **Standing: creator ∪
-   assignee ∪ GlobalAdmin over the to-do** (C-M5·6 — the ADR 0014/0016/
+   assignee ∪ GlobalAdmin over the to-do** (C-M5·6 — the ADR [0014](../adr/0014-post-edit-lane-author-only.md)/0016/
    0017 matrix, re-checked **server-side**; C-M14·3; the Web `[Authorize]`
    is a convenience pre-gate only, never the source of truth). The to-do
    must exist and be `!IsDeleted` (`KeyNotFoundException` — 404). A
@@ -307,14 +324,14 @@ contract is named + closed here:
    the controller, the same place the M6 notification card composes
    `ListBoardsForTodoAsync`):
    - **to-do → event** (`GET /projects/todos/{id}`): `TodoDetailViewModel`
-     gains `EventId?` / `EventTitle?` / `EventLinkPath?` (the ADR 0086 D9
+     gains `EventId?` / `EventTitle?` / `EventLinkPath?` (the ADR [0086](../adr/0086-goals-projects-lane.md) D9
      `ProjectId?` / `ProjectTitle?` shape, all three `null` by default).
      The controller resolves the event through the **frozen**
      `IEventService.GetAsync(todo.EventId, actorId, ct)` and treats
      `KeyNotFoundException` / `UnauthorizedAccessException` /
      `event.IsDeleted` as **leave the chip fields `null`** — omit
      entirely, never a 404/403 for the to-do, no title / id leaked
-     (C-M14·2 — the `BlockerChip.Generic` / ADR 0086 D9 dangling-safe
+     (C-M14·2 — the `BlockerChip.Generic` / ADR [0086](../adr/0086-goals-projects-lane.md) D9 dangling-safe
      idiom).
    - **event → to-dos** (`GET /events/{id}`): `EventDetailViewModel` gains
      `IReadOnlyList<LinkedTodoRow>? LinkedTodos = null`; the controller
@@ -362,7 +379,7 @@ contract is named + closed here:
    never re-derived and never leaked (C-M14·5).
 6. **The route contracts** (§routes): two `[Authorize]` actions on
    `ProjectsController` (the class-level `[Authorize]` already applies),
-   served with the ADR 0034/0108 idiom (the M12 `EventController.EventIcs`
+   served with the ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md)/0108 idiom (the M12 `EventController.EventIcs`
    / `CalendarFeed` shape, verbatim):
    - **`GET /projects/todos.ics`** — `ListTodosAsync(null, null, actorId,
      0, ct)` (the caller's visible to-do set, the feed-lane shape) →
@@ -384,8 +401,8 @@ contract is named + closed here:
    Both routes: `text/calendar; charset=utf-8` + `Content-Disposition:
    attachment` + `Cache-Control: no-store` + `X-Content-Type-Options:
    nosniff`. **No subscription token** — the feed rides the cookie,
-   re-authorized every fetch (the M6 link-lane posture, ADR 0085/0095,
-   carried to the to-do surface — the ADR 0112 D2 shape).
+   re-authorized every fetch (the M6 link-lane posture, ADR [0085](../adr/0085-notification-item-link-and-reply-highlight.md)/0095,
+   carried to the to-do surface — the ADR [0112](../adr/0112-ical-calendar-export.md) D2 shape).
 7. **The access-model contract:** **zero change** (C-M14·4). M14 adds
    **no** `AccessAction`, **no** `AccessVia`, **no**
    `IAuthorizationService.Decide()` branch, **no** `Audience` change,
@@ -396,7 +413,7 @@ contract is named + closed here:
    `set-event` standing **reuses** C-M5·6 (creator ∪ assignee ∪ GlobalAdmin
    — the `SetTodoProjectAsync` matrix) — it does not invent a new one. The
    read lanes already commit their own `AccessAudit` rows (the frozen
-   ADR 0006/C3 lanes); the `set-event` lane adds exactly one
+   ADR [0006](../adr/0006-module-boundary-contracts.md)/C3 lanes); the `set-event` lane adds exactly one
    (`todo.set_event`); M14 adds no other audit verb.
 
 ## Feedback loops
@@ -429,14 +446,14 @@ show the chip (the target's title / id are not in the to-do's HTML), and
 an event's "linked to-dos" section shows only to-dos that actor may read
 (the seam is the gate — C-M14·1). The **`VTODO` file carries no decision**
 (C-M14·5) — no author / assignee identity (`ORGANIZER` / `ATTENDEE`
-never), no audience / grant / membership material, no `X-…` — the ADR 0028
-"no standing to carry a secret" posture and the ADR 0112 C-M12·2 pin,
+never), no audience / grant / membership material, no `X-…` — the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)
+"no standing to carry a secret" posture and the ADR [0112](../adr/0112-ical-calendar-export.md) C-M12·2 pin,
 carried to the to-do surface. **Privacy**: the association is set under
 the to-do's **existing** standing (C-M14·3) and the read lanes reuse the
 **existing** `Read` decisions (C-M14·4) — M14 grants no new access to any
 content; it only surfaces *links between content the caller already
 holds*. **Reliability**: the schema change is additive + delta-detected
-(ADR 0004 §B.1 — zero migration for existing rows, idempotent at boot);
+(ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — zero migration for existing rows, idempotent at boot);
 the emitter is pure + deterministic (no clock, no IO, no store); the
 `Cache-Control: no-store` pin keeps the per-caller file out of any proxy
 or the PWA service worker (the M10 C-M10·2 cache-boundary posture — the
@@ -459,7 +476,7 @@ already read (C-M14·1/2); the `VTODO` feed is **exactly** the caller's
 visible dated to-dos (C-M14·5) — no amplification, no cross-caller bleed,
 no RSVP-list / assignee-list exposure (the never-emitted list, C-M14·5).
 The whole pays: one additive field + index (zero migration), two additive
-seams (frozen surface extended, the ADR 0086/0087 frozen-surface rule
+seams (frozen surface extended, the ADR [0086](../adr/0086-goals-projects-lane.md)/0087 frozen-surface rule
 honoured), one pure emitter, two routes — and a little **legibility** on
 the to-do detail (the named FACES trade).
 
@@ -490,7 +507,7 @@ unlinked / dangling target omits its chip — the interlock never leaks
 
 ## Rollout & rollback
 
-**Additive-only, delta-detected** (C-M14·7 — ADR 0004 §B.1): the `EventId?`
+**Additive-only, delta-detected** (C-M14·7 — ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1): the `EventId?`
 field + the `(EventId)` index land on `ProjectDocTypes`'s existing `TodoItem`
 block; `ApplyAllConfiguredChangesToDatabaseAsync()` delta-detects the new
 column + index and applies them **idempotently at boot** — **zero
@@ -502,7 +519,7 @@ column, the house's additive-never-removed posture), the two seams
 revert, the chip / section / picker / routes / `kw-l` keys revert (an
 unused `kw-l` key renders nothing — the registry rows are inert), and the
 emitter + its tests revert. **No data is orphaned**: a `TodoItem.EventId`
-value on a reverted build is simply never read (the ADR 0024 dangling-
+value on a reverted build is simply never read (the ADR [0024](../adr/0024-author-soft-delete-lane.md) dangling-
 association posture — the association dangles, nothing breaks). See OPS.md.
 
 ## Risks
@@ -518,7 +535,7 @@ association posture — the association dangles, nothing breaks). See OPS.md.
   at all. Either way, a `Kumunita.Core.Events` → `Kumunita.Core.Projects`
   reference is **never** introduced (D2 — the composition point for
   event → to-dos is the `EventController`, which already references both
-  services; the ADR 0004 §B.1 "a bounded context per concern" rule holds).
+  services; the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 "a bounded context per concern" rule holds).
 - **The `.ics` literal in an `{id}` route template** (the M12 U02 known
   gotcha, the register names it): `GET /projects/todos.ics` and
   `GET /projects/todos/{id}` both match the literal `/projects/todos.ics`
@@ -528,7 +545,7 @@ association posture — the association dangles, nothing breaks). See OPS.md.
   route above the parameterized `"/projects/todos/{id}"`, so
   `GET /projects/todos.ics` resolves to the feed, not to a detail with
   `id = "todos.ics"`. The U06 handoff records the exact resolution and the
-  §routes pin is the source of truth (the ADR 0112 / M12 §routes
+  §routes pin is the source of truth (the ADR [0112](../adr/0112-ical-calendar-export.md) / M12 §routes
   precedent).
 - **A `DESCRIPTION` that is Markdown with `![img](/content-image/{id})` /
   `[file](/attachment/{id})` links** — the same M12 chosen-behavior risk:
@@ -544,7 +561,7 @@ association posture — the association dangles, nothing breaks). See OPS.md.
   absent** (FACES check, trade) — the U03 / U04 / U06 views join the
   existing `ProjectLink` / `BlockerChip` block, they do not restructure it.
 - **The `DTSTAMP` is "now," not the to-do's `Modified`** — the same
-  deliberate ADR 0112 D1 choice: `DTSTAMP` is the RFC's refresh marker
+  deliberate ADR [0112](../adr/0112-ical-calendar-export.md) D1 choice: `DTSTAMP` is the RFC's refresh marker
   (the calendar app's update-vs-add signal uses `UID`, not `DTSTAMP`);
   the caller passes it, the emitter never reads a clock, so the UID-
   stability pin is about `UID`, not `DTSTAMP`.
@@ -689,8 +706,8 @@ precedent: association is a dedicated lane, not the main form).
 > **The closed property set.** The emitter emits **exactly** this, in
 > this order, and nothing else (C-M14·6). A property outside this set is a
 > **drift event** (record it in §drift-guard, resolve in favor of this
-> pin). This is the WY·3 subset pin (ADR 0031) and the C-M12·4 pin
-> (ADR 0112) applied to the `VTODO` surface.
+> pin). This is the WY·3 subset pin (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) and the C-M12·4 pin
+> (ADR [0112](../adr/0112-ical-calendar-export.md)) applied to the `VTODO` surface.
 
 **The `VCALENDAR` envelope** (every file, one) — the `IcsWriter`
 envelope verbatim:
@@ -706,7 +723,7 @@ END:VCALENDAR
 ```
 
 **The `PRODID` value, verbatim (locked):**
-`-//Kumunita//community calendar//EN` (the ADR 0112 D4 pin — one
+`-//Kumunita//community calendar//EN` (the ADR [0112](../adr/0112-ical-calendar-export.md) D4 pin — one
 PRODID for the instance, `VEVENT` and `VTODO` files alike).
 
 **One `VTODO` per dated to-do** (`DueAt != null || StartAt != null`;
@@ -732,20 +749,20 @@ END:VTODO
   C-M14·6).
 - **`DTSTAMP`** = the caller-passed `nowUtc` (the RFC's "date-time of
   creation" = the refresh marker, **not** `TodoItem.Modified` — the
-  ADR 0112 D1 shape).
+  ADR [0112](../adr/0112-ical-calendar-export.md) D1 shape).
 - **`DUE`** = `todo.DueAt` (stored UTC, `yyyyMMddTHHmmssZ`; **only when
-  set** — the ADR 0079 optional-date shape).
+  set** — the ADR [0079](../adr/0079-todo-optional-start-and-due-dates.md) optional-date shape).
 - **`DTSTART`** = `todo.StartAt` (stored UTC, `yyyyMMddTHHmmssZ`;
   **only when set**).
 - **`SUMMARY`** = `todo.Title` (escaped).
 - **`DESCRIPTION`** = `todo.Body` — the **Markdown source**, not rendered
-  HTML (only when non-empty — the ADR 0112 D4 chosen-behavior pin).
+  HTML (only when non-empty — the ADR [0112](../adr/0112-ical-calendar-export.md) D4 chosen-behavior pin).
 - **`STATUS:CANCELLED`** = only when `todo.IsDeleted == true` (the RFC
   update path — an emitter **capability**, never reached through the
-  frozen read seams, the ADR 0112 `IcsWriter` drift-guard entry-1 shape).
+  frozen read seams, the ADR [0112](../adr/0112-ical-calendar-export.md) `IcsWriter` drift-guard entry-1 shape).
 
-**Never emitted (the C-M14·5 / C-M14·6 "never" list — the ADR 0028
-posture + the ADR 0112 D1 "never" list carried to the to-do surface):**
+**Never emitted (the C-M14·5 / C-M14·6 "never" list — the ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md)
+posture + the ADR [0112](../adr/0112-ical-calendar-export.md) D1 "never" list carried to the to-do surface):**
 `ORGANIZER` (no author identity in a file that travels), `CREATED-BY`,
 `ATTENDEE` (no assignee identity), `RRULE` / `RECURRENCE-ID` (C-M14·6 /
 D6 — no recurrence in M14), `TodoItem.Audience` / grant / membership
@@ -761,11 +778,11 @@ specific property (the `X-…` set — none of it).
 folded at a ≤ 75-octet boundary that does not break a multi-byte UTF-8
 sequence, with a single leading space on each continuation line; escaping
 — backslash `\` → `\\` (first), semicolon → `\;`, comma → `\,`, CR/LF →
-`\n` (the ADR 0112 / `IcsWriter` format pin verbatim).
+`\n` (the ADR [0112](../adr/0112-ical-calendar-export.md) / `IcsWriter` format pin verbatim).
 
 ## §routes — the two VTODO routes (D4; U06 copies verbatim)
 
-**Locked verbatim** (the ADR 0112 §routes shape, the `EventController`
+**Locked verbatim** (the ADR [0112](../adr/0112-ical-calendar-export.md) §routes shape, the `EventController`
 serve idiom):
 
 ```csharp
@@ -784,7 +801,7 @@ undated to-do yields a `VTODO` with only `UID` / `DTSTAMP` / `SUMMARY`
 **Serve (locked):** `Content-Type: text/calendar; charset=utf-8` +
 `Content-Disposition: attachment; filename="kumunita-todo-{id}.ics"` +
 `Cache-Control: no-store` + `X-Content-Type-Options: nosniff` (the
-ADR 0034/0108 idiom, the M12 `EventIcs` action verbatim).
+ADR [0034](../adr/0034-file-attachments-posts-replies-announcements.md)/0108 idiom, the M12 `EventIcs` action verbatim).
 
 **Lane 2 — `GET /projects/todos.ics`:** `[Authorize]`;
 `IProjectService.ListTodosAsync(null, null, actorId, 0, ct)` (the
@@ -798,9 +815,9 @@ RFC-legal no-crash path, C-M14·5/6); the serve shape
 **Always `200`** (the seam filters rather than throws for an individual
 denial — no 404/403 on this lane). **Anonymous ⇒ the standard sign-in
 challenge** (the class-level `[Authorize]` default — F3; no anonymous
-iCal surface, the ADR 0112 D2 pin). **No subscription token** — the feed
+iCal surface, the ADR [0112](../adr/0112-ical-calendar-export.md) D2 pin). **No subscription token** — the feed
 rides the cookie, re-authorized every fetch (the M6 link-lane posture,
-ADR 0085/0095; the ADR 0112 D2 shape).
+ADR [0085](../adr/0085-notification-item-link-and-reply-highlight.md)/0095; the ADR [0112](../adr/0112-ical-calendar-export.md) D2 shape).
 
 **The route-resolution pin (the M12 known gotcha, carried):** ASP.NET
 Core ranks the **literal** `"/projects/todos.ics"` route above the
@@ -817,14 +834,14 @@ resolves to the feed, not to a detail with `id = "todos.ics"` (the
 | `todo.set_event.label` | "Link to event" | the picker form label (U04) |
 | `todo.set_event.pick` | "Choose an event" | the `<select>` placeholder / clear option (U04) |
 | `events.linked_todos` | "Linked to-dos" | the event detail section (U03) |
-| `projects.todos.ics.download` | "Add to calendar" | the to-do detail `<a>` (U06 — the ADR 0112 `events.ics.download` shape) |
-| `projects.todos.ics.feed` | "Calendar feed (iCal)" | the to-do index `<a>` (U06 — the ADR 0112 `events.ics.feed` shape) |
+| `projects.todos.ics.download` | "Add to calendar" | the to-do detail `<a>` (U06 — the ADR [0112](../adr/0112-ical-calendar-export.md) `events.ics.download` shape) |
+| `projects.todos.ics.feed` | "Calendar feed (iCal)" | the to-do index `<a>` (U06 — the ADR [0112](../adr/0112-ical-calendar-export.md) `events.ics.feed` shape) |
 
 All six keys join the closed `kw-l` registry in **all four** languages
 (the `KnownTranslationKeys_ParityTests` enforces the 4-language set +
-non-empty values; the ADR 0015/0052 warm-boot backfill seeds them
+non-empty values; the ADR [0015](../adr/0015-ui-view-localization-mechanics.md)/0052 warm-boot backfill seeds them
 idempotently). **No new JS** (plain `<a>` links + one native `<form>` /
-`<select>` — the ADR 0031 tsc-only discipline holds).
+`<select>` — the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) tsc-only discipline holds).
 
 ## §invariants — C-M14·1 … C-M14·7 (locked verbatim)
 
@@ -848,7 +865,7 @@ idempotently). **No new JS** (plain `<a>` links + one native `<form>` /
   through the frozen `IAuthorizationService` over the **existing**
   `TodoItemToAuditableResource` / `EventToAuditableResource` adapters.
 - **C-M14·5 · (D4) The `VTODO` file never carries a decision.**
-  (C-M12·2 / ADR 0028 applied to the file form.) No `ORGANIZER` /
+  (C-M12·2 / ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) applied to the file form.) No `ORGANIZER` /
   `CREATED-BY` / `ATTENDEE` (author / assignee identity), no `Audience` /
   grant / membership internals; the authorization was applied to the set
   *before* the emitter runs.
@@ -951,7 +968,7 @@ refinement, not a decision change):**
    but the house's association-lane precedent (`SetTodoProjectAsync`,
    verified at U00) resolves the target's visibility through the
    **authorization service** (the "a read is not a decision" posture,
-   ADR 0054) — so the lane's **only** cross-context touch is the standing
+   ADR [0054](../adr/0054-events-rsvp-reminders.md)) — so the lane's **only** cross-context touch is the standing
    check, and `ProjectService` needs **no** `IEventService` reference at
    all. (If U02 finds the `SetTodoProjectAsync` implementation in fact
    calls a sibling service's `GetAsync`, it may follow that implementation
@@ -980,15 +997,15 @@ refinement, not a decision change):**
    `TodoRow` is too heavy — it carries display fields a chip section does
    not render).
 
-## §deferred lanes (ADR 0115 Consequences — each named, each "own ADR" /
+## §deferred lanes (ADR [0115](../adr/0115-integration-of-events-and-projects.md) Consequences — each named, each "own ADR" /
 own milestone)
 
 - **Recurring events / `RRULE` — M18** (D6; the source of truth is
   `Milestones.cs` — M18 = "Recurring events — repeating events over the
-  M4 events surface"; ADR 0112's "M14 is the natural home" + the
+  M4 events surface"; ADR [0112](../adr/0112-ical-calendar-export.md)'s "M14 is the natural home" + the
   `IcsWriter.cs` doc-comment "M14's home" refs are **stale forward-refs**
   — written before the roadmap settled M18 — and are superseded by this
-  ADR + ADR 0115's Consequences).
+  ADR + ADR [0115](../adr/0115-integration-of-events-and-projects.md)'s Consequences).
 - **`RRULE` on the `VTODO` surface** (a to-do's recurrence rides M18's
   recurrence concept, if that ever extends past events — own ADR).
 - **ICS import** (round-tripping a calendar file *into* Kumunita — ADR
@@ -1015,3 +1032,78 @@ own milestone)
    **omits** the chip / the row — never a 404/403 for the source surface,
    and the target's title / id are **not leaked** (C-M14·2).
 
+
+---
+
+## ADR [0115](../adr/0115-integration-of-events-and-projects.md) — moved content (D11 trim, 2026-11-02)
+
+## Affected files
+
+- `src/Kumunita.Core/Projects/TodoItem.cs` — the one additive `EventId?`
+  field (D1).
+- `src/Kumunita.Core/ProjectDocTypes.cs` — the one additive `(EventId)` index
+  (D1).
+- `src/Kumunita.Core/Projects/IProjectService.cs` +
+  `src/Kumunita.Core/Projects/ProjectService.cs` — the two additive seams
+  (`ListTodosForEventAsync` D2, `SetTodoEventAsync` D3) + their
+  implementations.
+- `src/Kumunita.Core/Events/TodoIcsWriter.cs` — new (the pure `VTODO`
+  emitter; the only new Core type; D4).
+- `src/Kumunita.Web/Models/ProjectTodoViewModels.cs` —
+  `TodoDetailViewModel` additive event-link fields + the
+  `TodoEventPicker` picker model (D2/D3).
+- `src/Kumunita.Web/Models/EventEditorModel.cs` —
+  `EventDetailViewModel` additive `LinkedTodos` + the `LinkedTodoRow`
+  record (D2).
+- `src/Kumunita.Web/Controllers/ProjectsController.cs` — the to-do
+  detail's event-link resolve (D2); the `POST /projects/todos/{id}/set-
+  event` action + picker seed (D3); the two `.ics` actions (D4).
+- `src/Kumunita.Web/Controllers/EventController.cs` — the event detail's
+  `LinkedTodos` population (D2).
+- `src/Kumunita.Web/Views/Projects/Todo/Detail.cshtml` — the "linked
+  event" chip (D2) + the event picker `<form>` (D3) + the "Add to
+  calendar" `<a>` (D4).
+- `src/Kumunita.Web/Views/Projects/Todo/Index.cshtml` — the "Calendar
+  feed (iCal)" `<a>` (D4).
+- `src/Kumunita.Web/Views/Events/Detail.cshtml` — the "linked to-dos"
+  section (D2).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the four
+  locale files — the six `kw-l` keys in en/de/fr/da (D4 affordances).
+- `src/Kumunita.Web/Milestones.cs` + [`README.md`](../../README.md) + [`docs/STATUS.md`](../STATUS.md) +
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) + `tests/Kumunita.Web.Tests/MilestonesTests.cs` —
+  the M14 → `StatusDone` / M15 → `StatusNext` flip (D8), in one unit.
+- **New tests** (the D7 pins): `tests/Kumunita.Core.Tests/` — the
+  `ListTodosForEventAsync` pins (U01, 4), the `SetTodoEventAsync` pins
+  (U02, 3), the `TodoIcsWriter` pure pins (U05, 4), and the three
+  acceptance tests + the cross-surface read-shape pins (U07); the Web
+  parity pins (U03 / U04 / U06).
+
+
+---
+
+## ADR [0065](../adr/0065-events-feed-your-upcoming-events.md) — moved content (D11 trim, 2026-11-02)
+
+## Pins
+
+| # | Pin |
+|---|-----|
+| C-MINE·1 | **Non-leaky union** — `ListMineAsync` returns the actor's `EventRsvp` rows (any `RsvpStatus`) ∪ their authored events; a non-author can only hold an RSVP row on an event they may already read (the write lanes gate standing first), so the read needs no per-row access decision. |
+| C-MINE·2 | **Upcoming + live, drafts included** — `Start > now` (strictly future) and `!IsDeleted`; a draft authored event is in the list (the actor's own row, ADR [0037](../adr/0037-draft-mode-author-only.md) author-only). The feed's unconditional draft exclusion does not apply here. |
+| C-MINE·3 | **`MineCap = 50`, `Start` ascending, no paging** — the result-count backstop + the feed-ordering index; the section does not page. |
+| C-MINE·4 | **No `AccessAudit` row, no `IAuthorizationService` call** — the `GetMyRsvpAsync` posture: the write lanes committed their decisions; this read re-decides nothing. An empty actor is a `403` before store access. |
+| C-MINE·5 | **The section renders only when non-empty, above the feed** — an empty `MyEvents` (default) leaves the page byte-identical to the pre-lane page; the section reuses the feed's `airy-ann-*` markup and the two `events.mine.*` keys (× 4 languages, registry parity). |
+
+
+## Test coverage
+
+- **Core** (`EventServiceTests`, Testcontainers): `ListMineAsync` returns the
+  union (a `Maybe` RSVP, a `No` RSVP, an authored event, and a draft authored
+  event all appear, ordered `Start` ascending); a stranger's RSVP on the
+  actor's events does not change the list; past + soft-deleted events are
+  excluded; an actor with no rows gets an empty list; an empty / null actor
+  throws `UnauthorizedAccessException` and **no `AccessAudit` row** lands.
+- **Web** (`EventControllerTests`, NSubstitute): `Index` calls
+  `ListMineAsync(actorId)` and surfaces `MyEvents` with the same author /
+  component display-name read shape as the feed rows; the empty case leaves
+  the feed unchanged and `MyEvents` empty; a `ListMineAsync` denial maps to a
+  clean `ForbidResult` (the 403 split).

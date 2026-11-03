@@ -1,3 +1,17 @@
+---
+id: design-m13-logging-analytics
+title: "M13 — Logging and analytics"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0114-logging-and-usage-analytics.md
+  - docs/adr/0108-portability-import-export.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M13 — Logging and analytics — design
 
 > **Abstract:** *What it settles:* the **operator's feedback loop**, in two
@@ -12,7 +26,7 @@
 > rendered anywhere, no third-party telemetry of any kind (C-M13·1,
 > SECURITY.md §5), and the `AccessAudit` lane (M1) — that answers "who was
 > allowed/denied, when," not "how the platform is used over time." LOCKED in
-> ADR 0114.
+> ADR [0114](../adr/0114-logging-and-usage-analytics.md).
 
 > **Milestone M13.** The **operator's feedback loop**, operator-local in two
 > halves. **(1) The logging half:** the host's logs land in **dated files**
@@ -27,7 +41,7 @@
 > (C-M13·3) and **no third-party telemetry of any kind** (C-M13·1,
 > SECURITY.md §5).
 >
-> **Status.** **LOCKED.** The decisions D1–D8 are locked in **ADR 0114
+> **Status.** **LOCKED.** The decisions D1–D8 are locked in **ADR [0114](../adr/0114-logging-and-usage-analytics.md)
 > (Accepted, 2026-09-28)**. The `[PROPOSED]` set in the register
 > `plan-m13-logging-analytics.md` was locked **without veto** — no user
 > override was recorded before U00 ran; the register's own D-item text is
@@ -90,7 +104,7 @@ verified against the source at U00:
    `[Authorize(Roles = Roles.GlobalAdmin)]` attribute shape, the
    `AdminSubjectId` helper (`user.FindFirst
    (Kumunita.Core.Identity.ClaimTypes.Subject)?.Value`, line 107), and the
-   ADR 0062 section-split precedent (a section-specific controller + its
+   ADR [0062](../adr/0062-admin-surface-split.md) section-split precedent (a section-specific controller + its
    own view, not a new action on the god-controller) that D4 follows.
 5. **The `kw-l` closed-key registry**
    (`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`) — the
@@ -106,7 +120,7 @@ verified against the source at U00:
 7. **The `*DocTypes.Configure(opts)` registration surface**
    (`Program.cs`'s Marten block, `CoreDocTypes` / `PostDocTypes` / …) and
    `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` — the one-line
-   `UsageDocTypes.Configure(opts);` additions U02 makes (ADR 0004 §B.1).
+   `UsageDocTypes.Configure(opts);` additions U02 makes (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1).
 8. **The `PostDocTypes` "string Id" convention**
    (`src/Kumunita.Core/PostDocTypes.cs`) — `UsageEvent` uses the
    conventional `string Id`, so no non-default convention or
@@ -134,13 +148,13 @@ the retention tick — `UsagePurgeService` (Core, static) +
 `UsagePurgeHandler` (Web, `IWorker`-shape static handler) +
 `UsagePurgeTick` (D5, §retention); the **pinned test names** (D7, §pinned
 tests — 19 pins); and the **U07 docs flip** (D8) — `Milestones.cs` /
-`README.md` / `docs/STATUS.md` / `docs/ARCHITECTURE.md` /
+[`README.md`](../../README.md) / [`docs/STATUS.md`](../STATUS.md) / [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) /
 `MilestonesTests.cs` re-pin (M14 becomes the single in-progress), all in
 one unit.
 
-**Out (each a named follow-on lane, ADR 0114 Consequences — see §deferred
+**Out (each a named follow-on lane, ADR [0114](../adr/0114-logging-and-usage-analytics.md) Consequences — see §deferred
 lanes):** charts (a `client/lib` TS module); per-account activity views
-(the C-M13·3 boundary says no, and stays no, unless ADR 0114 is
+(the C-M13·3 boundary says no, and stays no, unless ADR [0114](../adr/0114-logging-and-usage-analytics.md) is
 revisited); per-request detail views (the raw `UsageEvent` table is the
 operator's psql surface, not a rendered one); custom retention per surface
 (a single window is enough for M13); per-instance retention config (the
@@ -198,7 +212,7 @@ not by discipline).
   labels — the one new row shape on export is a *write* shaped on the
   existing POCO, not a schema change), `CoreDocTypes` … `MessagingDocTypes`
   (the `Usage` docs get their **own** `UsageDocTypes` surface, the
-  ADR 0004 §B.1 "a parallel surface per bounded context" rule).
+  ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 "a parallel surface per bounded context" rule).
 
 ## Seams & contracts (mandatory)
 
@@ -227,7 +241,7 @@ the one GlobalAdmin-gated controller; the rows are not an auditable
 resource).
 
 **The admin surface (D4).** One `[Authorize(Roles = Roles.GlobalAdmin)]`
-controller (the ADR 0062 section-split precedent — a section-specific
+controller (the ADR [0062](../adr/0062-admin-surface-split.md) section-split precedent — a section-specific
 controller, not a new action on the god-controller): `GET
 /admin/analytics?window=7|30|90` (default 30) → `AnalyticsViewModel` →
 `Views/AdminAnalytics/Index.cshtml`; `GET /admin/analytics/export?window=
@@ -236,7 +250,7 @@ controller, not a new action on the god-controller): `GET
 `ActorId == the current user's ClaimTypes.Subject`, `Via =
 AccessVia.Admin`, `Outcome = AccessOutcome.Allow` — the ADR 0108
 "portability.export" precedent verbatim). The gate is **the role** (F3 —
-the ADR 0105 "the gate is the role" posture, the `AdminController` shape);
+the ADR [0105](../adr/0105-messaging.md) "the gate is the role" posture, the `AdminController` shape);
 there is no per-row gate on the surface because the surface renders no
 rows, only aggregates (C-M13·3).
 
@@ -325,7 +339,7 @@ writes the `UsageEvent` row; that *is* the record).
 - **Legibility / cost:** one new document + one new context + one new
   `*DocTypes` surface — each mirroring a shipped precedent, each pinned by
   the test list; the Postgres footprint is one row per recognized request,
-  bounded to 365 days by D5's constant (the ADR 0114 Consequences
+  bounded to 365 days by D5's constant (the ADR [0114](../adr/0114-logging-and-usage-analytics.md) Consequences
   calculation).
 
 ## Local-optimization check
@@ -372,7 +386,7 @@ limitation; loosening it is a deliberate ADR revisit, §deferred lanes).
 
 ## Rollout & rollback
 
-The deploy is a redeploy of the usual image (`OPS.md`): boot runs
+The deploy is a redeploy of the usual image ([`OPS.md`](../OPS.md)): boot runs
 `SchemaBootstrap.ApplyAsync` (the `UsageEvent` doc is created on the
 `UsageDocTypes` surface, idempotent — the `PostDocTypes` precedent), the
 `AddFileSink` call runs its one `Retain` boot pass (deleting
@@ -1052,7 +1066,7 @@ anmodninger` / `Tilmeldte` / `Anonyme` / `Distinkte konti` / `Overflade`
 / `Antal` / `Eksportér CSV`
 
 (10 keys × 4 languages = 40 entries; the `KnownTranslationKeys_ParityTests`
-enforces the 4-language set + non-empty values, the ADR 0015/0052
+enforces the 4-language set + non-empty values, the ADR [0015](../adr/0015-ui-view-localization-mechanics.md)/0052
 warm-boot backfill seeds them idempotently.)
 
 ## §retention — the `UsagePurgeService` + `UsagePurgeHandler` + `UsagePurgeTick` (D5; U05 copies verbatim)
@@ -1183,7 +1197,7 @@ The new `Kumunita.Core.Logging` surface (the "a bounded context per
 concern" house rule applied to the logging layer). **BCL-only** — no
 NuGet logging package (the D6-locked shape; the NuGet
 `Microsoft.Extensions.Logging.File` alternative was considered and
-**rejected** in ADR 0114's Context, the "no new dependency" discipline
+**rejected** in ADR [0114](../adr/0114-logging-and-usage-analytics.md)'s Context, the "no new dependency" discipline
 holds for the sink as it does for the `IcsWriter` — the
 `System.IO.Compression` M11 precedent).
 
@@ -1665,7 +1679,7 @@ at run time, so the gate was **run in full**, not authored-and-deferred
 
 **Per-unit drift status (one line per `## U<m>` handoff section):**
 
-- **U00** — no drift pauses; ADR 0114 confirmed free + `Program.cs`
+- **U00** — no drift pauses; ADR [0114](../adr/0114-logging-and-usage-analytics.md) confirmed free + `Program.cs`
   middleware position source-confirmed. **Resolved.**
 - **U01** — 4 source-driven confirmations (the `LoggingBuilder` →
   `ILoggingBuilder`, `ILogger.BeginScope` 1-arg, `builder.Logging`
@@ -1754,7 +1768,7 @@ closed by U05 against this doc's doc-comments).
   `AccessAction` / `AccessVia` / `Decide()` branch / `IAuditableResource`
   — the `UsageEvent` row is **not** an auditable resource (it is an
   operator read over an operator-owned table); the one new `AccessAudit`
-  row is on the **export** (the `analytics.export` action, the ADR 0108
+  row is on the **export** (the `analytics.export` action, the ADR [0108](../adr/0108-portability-import-export.md)
   "portability.export" precedent); the `IAuthorizationService` frozen
   surface is unchanged (the `IUserInfoService` public-method count is
   unchanged). Pinned by the design doc §Seams + the U05 handoff (the
@@ -1778,7 +1792,7 @@ closed by U05 against this doc's doc-comments).
   `AccessAudit` table gains one `analytics.export` row (C-M13·6).
 - **F3 · The stranger sees nothing.** A resident without `GlobalAdmin`
   gets the sign-in challenge on `/admin/analytics` — no usage number, not
-  even a 404-vs-403 distinction (the ADR 0105 "the gate is the role"
+  even a 404-vs-403 distinction (the ADR [0105](../adr/0105-messaging.md) "the gate is the role"
   posture, the `AdminController` shape).
 - **F4 · The capture is honest.** A `GET /posts/{id}` by a signed-in
   resident stores exactly one `UsageEvent` row with
@@ -1792,11 +1806,11 @@ closed by U05 against this doc's doc-comments).
 ## §deferred lanes — the Consequences hand-off (each a named follow-on, own ADR)
 
 - **Charts** (a `client/lib` TS module over the existing `HasMore`-free
-  table) — a `tsc`-only module, the ADR 0031 discipline; the admin page
+  table) — a `tsc`-only module, the ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) discipline; the admin page
   is a table + a count for M13. **Own lane**, own ADR.
 - **Per-account activity views** (a rendering of the `ActorId` column) —
-  the C-M13·3 boundary says no, and **stays no**, unless ADR 0114 is
-  **revisited** (a deliberate privacy decision, the ADR 0112
+  the C-M13·3 boundary says no, and **stays no**, unless ADR [0114](../adr/0114-logging-and-usage-analytics.md) is
+  **revisited** (a deliberate privacy decision, the ADR [0112](../adr/0112-ical-calendar-export.md)
   "RSVP state in the calendar file" precedent — a privacy decision is
   its own ADR, not a config change). **Own lane**, own ADR.
 - **Per-request detail views** (the raw `UsageEvent` table rendered as a
@@ -1825,7 +1839,7 @@ closed by U05 against this doc's doc-comments).
   residents" count needs a new column or a different source. **Own
   lane**, own ADR.
 - **The `tsvector` full-text search upgrade** — M8's own deferred lane
-  (ADR 0091 D4: "zero schema change, no `tsvector` (that is a future
+  (ADR [0091](../adr/0091-search.md) D4: "zero schema change, no `tsvector` (that is a future
   lane with its own ADR)"); M13's aggregation is a `COUNT(*)` over a
   window, not a text query — the `tsvector` lane is unaffected by M13.
   **Own lane** (M8's, already named).
@@ -1867,11 +1881,11 @@ source-driven refinements — the register's D-item text is the locked
 text):
 
 1. **The ADR number 0114 is confirmed free.** The `docs/adr/` folder
-   contains `0001` through `0113` (113 ADR files + `README.md`), and
-   `docs/adr/README.md`'s index ends at the `0113` row (line 119).
+   contains `0001` through `0113` (113 ADR files + [`README.md`](../../README.md)), and
+   [`docs/adr/README.md`](../adr/README.md)'s index ends at the `0113` row (line 119).
    `0114` is the next free number — verified at U00 against the live
    tree (the register's "confirm it is free against
-   `docs/adr/README.md` before writing" instruction is satisfied).
+   [`docs/adr/README.md`](../adr/README.md) before writing" instruction is satisfied).
 2. **The `Program.cs` middleware position is confirmed against the live
    tree.** `Program.cs` line 516 `app.UseRouting()`, line 525
    `app.UseAuthentication()`, line 534

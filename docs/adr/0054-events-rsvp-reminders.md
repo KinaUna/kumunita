@@ -1,279 +1,141 @@
-# ADR 0054 — M4: Events, RSVPs & reminders (a new `Kumunita.Core.Events` context reusing the frozen authorization / audience / renderer / editor / email / §6.4-job seams)
-
-Status: Accepted
-Date: 2026-09-20
-Amends: **0001-B** (the `Audience` doc — *reused*, not extended),
-**0006** (the frozen `IAuthorizationService` / `IAuditableResource` surface
-— the new `EventToAuditableResource` adapter plugs into it, no signature
-change), **0036** (the `Audience.Community` branch — the composer seeds it
-`true` by default, verbatim the post convention), **0025** (the
-`MarkdownRenderer` + content-image idiom — the event `Body` is rendered by
-the *one* renderer), **0031** (the `bindRichEditor` — the event composer is
-the *one* editor), **0037** (the `IsDraft` flag + `/my/drafts` lane —
-carried onto `Event.IsDraft`), **0024** (the `IsDeleted` author
-soft-delete flag — carried onto `Event.IsDeleted`), **0018** (the authored-in
-language tag — carried onto `Event.LanguageCode`), **0044** (the `TagIds`
-idiom — carried onto `Event.TagIds`), **0034** (the attachment idiom —
-carried onto `Event.AttachmentIds`), **0019 / 0020** (the `kw-dt` TagHelper
-— every event timestamp renders through it), and **0014 / 0016 / 0017**
-(the author-only / author-of-record ∪ GlobalAdmin standing precedent — the
-event standing matrix reuses it).
+---
+id: adr-0054
+title: "M4: Events, RSVPs & reminders (a new `Kumunita.Core.Events` context reusing the frozen authorization / audience / renderer / editor / email / §6.4-job seams)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/events-calendar-design.md]
+supersedes: [adr-0001]
+superseded_by: [adr-0059, adr-0063, adr-0065, adr-0165]
+updated: 2026-11-02
+---
 
 ## Context
 
-The roadmap arrows so far: **awareness** (M2 directory / groups),
-**signal** (M3 posts / announcements / group posts / moderation),
-**knowledge** (the `PG` pages lane). M4 is the **coordination** arrow — a
-decision becomes an owned, scheduled, **reminded** action: a resident can
-see that a cleanup day is happening, RSVP "going", and get a reminder email
-the day before. It is the platform's first **content-with-time** surface.
+The roadmap arrows so far: **awareness** (M2 directory / groups), **signal**
+(M3 posts / announcements / group posts / moderation), **knowledge** (the
+`PG` pages lane). M4 is the **coordination** arrow — a decision becomes an
+owned, scheduled, **reminded** action: a resident can see that a cleanup day
+is happening, RSVP "going", and get a reminder email the day before. It is the
+platform's first **content-with-time** surface.
 
-**Roadmap order (recorded here, per the sign-off gate):** the **`PG`
-(pages) lane is SHIPPED** — its register (U00–U07) is green, `LocalizedPage`
-is fully retired (zero references in `src/`), and
-`docs/plans-milestones/done/pages/pages-handoff-notes.md` records "the PG lane
-is complete … No next unit in this lane." M4 is therefore opened **not** as
-a pull-forward over in-flight work but as the **next** lane: this same
-commit closes `PG` (`StatusNext` → `StatusDone`) and opens `M4`
-(`StatusPlanned` → `StatusNext`) in `Milestones.cs` + the README Roadmap +
-`MilestonesTests.cs` (the single-in-progress pin is renamed from `PG` to
-`M4`). **M5 stays Projects; M6 stays Portability** — no roadmap letter
-moves.
+**Roadmap order (recorded here, per the sign-off gate):** the **`PG` (pages)
+lane is SHIPPED** — its register (U00–U07) is green, `LocalizedPage` is fully
+retired. M4 is opened as the **next** lane: this same commit closes `PG`
+(`StatusNext` → `StatusDone`) and opens `M4` (`StatusPlanned` → `StatusNext`)
+in `Milestones.cs` + the README Roadmap + `MilestonesTests.cs`. **M5 stays
+Projects; M6 stays Portability** — no roadmap letter moves.
 
-**The field-naming decision (recorded here):** `docs/ARCHITECTURE.md` §5
-sketches the event document as `{ id, title, description, componentId?,
-authorId, start, end, location?, capacity?, audience, rsvpRequired }`.
-This ADR settles the canonical names as **`Body`** (rich Markdown content,
-mirroring `Announcement.Body` and the RC/RE surface) and
+**The field-naming decision (recorded here):** the [data
+model](../architecture/data-model.md) sketches the event document as
+`{ … description …, rsvpRequired }`. This ADR settles the canonical names as
+**`Body`** (rich Markdown content, mirroring `Announcement.Body`) and
 **`ReminderEnabled`** (a bool, `true` floor — a per-event opt-*out* of the
-reminder, the reminder being the default). The §5 sketch is the
-pre-decision shape; **the M4 close unit (U12) syncs the ARCHITECTURE.md §5
-`Events` block to these names** (per the AGENTS.md doc↔code parity rule),
-so no unit in U01–U11 has to touch that file.
+reminder, the reminder being the default). **The M4 close unit (U12) syncs
+the [data model](../architecture/data-model.md) `Events` block to these names**
+(per the AGENTS.md doc↔code parity rule).
 
 **The one constraint:** the milestone is **additive and reusing.** The
-`Audience` doc, the `IAuthorizationService.CanAsync(Read)` decision path,
-the `MarkdownRenderer` + `bindRichEditor`, the content-image / attachment
-idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
-`OutboxEmailHandler` trio (M1 step 7), and the self-rescheduling
-`TimeoutMessage` §6.4-job shape (the `AuditPurgeHandler` precedent) are all
-**frozen seams** — M4 adds **an adapter, not a branch**.
+`Audience` doc, the `IAuthorizationService.CanAsync(Read)` decision path, the
+`MarkdownRenderer` + `bindRichEditor`, the content-image / attachment idiom,
+the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` + `OutboxEmailHandler`
+trio (M1 step 7), and the self-rescheduling `TimeoutMessage`
+[CQRS-lite §6.4 job](../architecture/cqrs-lite-wolverine.md) shape are all
+**frozen seams** — M4 adds **an adapter, not a branch**. The full moved detail
+(the two documents' field sets, the standing matrix, the Web surface, the
+`EventReminders` §6.4 job, the 25 pinned test names, the three-test gate, the
+drift-guard) lives in the [handoff
+note](../design/adr-handoffs.md#adr-0054--m4--events-rsvps--reminders-moved-
+detail).
 
 ## Decision
 
-- **A new bounded context `Kumunita.Core.Events`** with two documents:
-  - **`Event`** — `Id`; `Title`; **`Body`** (Markdown — the one
-    `MarkdownRenderer`, ADR 0025); `ComponentId?` (a feed filter, *never* a
-    gate — C-M3·2); `AuthorId`; **`Start` / `End`** (`DateTimeOffset` UTC
-    instants — the time); `Location?`; `Capacity?` (int — display metadata,
-    **not** a gate); **`Audience`** (the **exact** post `Audience`, ADR
-    0001-B / 0036 — `null` = public, the frozen `Decide()` branch 5);
-    **`ReminderEnabled`** (bool, `true` floor — the §6.4 job's opt-out);
-    `IsDraft` (bool, `true` default — ADR 0037); `IsDeleted` (bool, `false`
-    default — ADR 0024); `LanguageCode` (ADR 0018 authored-in tag);
-    `TagIds` (ADR 0044); `ImageIds` (ADR 0025); `AttachmentIds` (ADR 0034);
-    `Created` / `Modified?`. Every field reuses an existing idiom; `Start` /
-    `End` / `Location` / `Capacity` / `ReminderEnabled` are the only new
-    concepts, and none of them is an access mechanism.
-  - **`EventRsvp`** — `Id`; `EventId`; `UserId`;
-    **`Status`** (enum `Going | Maybe | No`); `At`. Registered with a
-    **unique `(EventId, UserId)` index** — the
-    ARCHITECTURE.md §5 **last-write-wins concurrency exception**: a
-    conflicting RSVP write is a no-op or self-converging; the resident's
-    latest status is simply the truth (upsert semantics). **No
-    `AccessAudit` row on an RSVP** — a routine resident action, not an
-    access decision (the profile-edit posture).
-  - **`EventDocTypes`** — a new document surface (the `PostDocTypes` pattern
-    verbatim): `Event` (conventional `Id`) + a `(ComponentId, Start)`
-    index (the feed ordering shape) + `EventRsvp` (the unique
-    `(EventId, UserId)` index). **Zero migrations for existing surfaces** —
-    the two docs are new, the surface is additive (ADR 0004 §B.1).
+- **A new bounded context `Kumunita.Core.Events`** with two documents —
+  **`Event`** (`Id`; `Title`; **`Body`** Markdown; `ComponentId?`; `AuthorId`;
+  **`Start` / `End`**; `Location?`; `Capacity?`; **`Audience`**;
+  **`ReminderEnabled`**; `IsDraft`; `IsDeleted`; `LanguageCode`; `TagIds`;
+  `ImageIds`; `AttachmentIds`; `Created` / `Modified?`) and **`EventRsvp`**
+  (`Id`; `EventId`; `UserId`; **`Status`** enum `Going | Maybe | No`; `At`,
+  with a **unique `(EventId, UserId)` index** — last-write-wins; **no
+  `AccessAudit` row on an RSVP**) — registered on a new surface
+  **`EventDocTypes`**. **Zero migrations for existing surfaces** (ADR [0004](0004-data-persistence-and-schema-evolution.md)
+  §B.1). *See the handoff note for the full field sets + index shapes.*
 - **The audience is the post `Audience`, reused verbatim.** **No new
   `Audience` field, no new `AudienceMode`, no new `AccessVia` value.** The
-  frozen `Decide()` algorithm already covers every standing an event needs
-  (`Owner` / `Audience` / `Community` / `Delegation` / …). The composer
-  seeds it **community-visible by default** (ADR 0036) via the
-  `AudienceEditorModel` form surface verbatim — the same partial the post /
-  announcement / group-post / page composers already use.
-- **The decision path is the frozen `IAuthorizationService`** through a new
-  **`EventToAuditableResource`** adapter — the `PostToAuditableResource`
-  shape verbatim: `Id = Event.Id`; `Name = Event.Title ?? Body[..60]` (the
-  57 + "..." truncation idiom); `OwnerId = Event.AuthorId`;
-  `Audience = Event.Audience` (null allowed); `ComponentId =
-  Event.ComponentId`; **`TargetKind = "event"`** (the **exact** string —
-  the `AccessAudit` aggregate-row discriminator). A single instance per
-  `Event` is safe to pass into either overload (`CanAsync` detail,
-  `CanSeeAsync` feed). **No new `AccessAction`** (the existing `Read` is
-  enough), **no new authorization branch**, **no new `AccessVia`** — the
-  adapter is the **only** new authorization surface in this milestone.
-- **The standing matrix** (enforced server-side in the `EventService` — the
-  `AnnouncementService.CreateAsync` C3 pattern; the Web `[Authorize]` is a
-  convenience pre-gate only):
-
-  | Action | Standing | `AccessVia` |
-  |---|---|---|
-  | **Create** | any signed-in resident (becomes the author) | `Owner` |
-  | **Edit** (body / time / audience / …) | the `AuthorId` ∪ GlobalAdmin | `Owner` / `Admin` |
-  | **Publish** a draft | the `AuthorId` only (ADR 0037 pin) | `Owner` |
-  | **Soft-delete** | the `AuthorId` ∪ GlobalAdmin (ADR 0024) | `Owner` / `Admin` |
-  | **RSVP** | any resident who may read the event | *(no row — the RSVP is not an access decision)* |
-
-  `CheckCreateStanding` / `CheckEditStanding` throw
-  `UnauthorizedAccessException` (403) / `KeyNotFoundException` (404)
-  exactly like `AnnouncementService`. Every audited write lane stores its
-  `AccessAudit` row in the caller's session (C3), `TargetKind = "event"`,
-  `Action` `event.create` / `event.update` / `event.publish` /
-  `event.delete` — **no `event.rsvp` action**.
+  frozen `Decide()` algorithm already covers every standing an event needs.
+  The composer seeds it **community-visible by default** (ADR [0036](0036-community-visible-audience-default.md)) via the
+  `AudienceEditorModel` form surface verbatim.
+- **The decision path is the frozen `IAuthorizationService` through a new
+  `EventToAuditableResource` adapter** (the `PostToAuditableResource` shape
+  verbatim: `Id = Event.Id`; `Name = Event.Title ?? Body[..60]`;
+  `OwnerId = Event.AuthorId`; `Audience = Event.Audience`; `ComponentId =
+  Event.ComponentId`; **`TargetKind = "event"`**). **No new `AccessAction`**
+  (the existing `Read` is enough), **no new authorization branch**, **no new
+  `AccessVia`** — the adapter is the **only** new authorization surface.
+- **The standing matrix** (enforced server-side in the `EventService`):
+  Create any signed-in resident / `Owner`; Edit `AuthorId` ∪ GlobalAdmin /
+  `Owner` / `Admin`; Publish the `AuthorId` only / `Owner`; Soft-delete
+  `AuthorId` ∪ GlobalAdmin / `Owner` / `Admin`; RSVP any resident who may read
+  / *no row*. `CheckCreateStanding` / `CheckEditStanding` throw
+  `UnauthorizedAccessException` (403) / `KeyNotFoundException` (404) exactly
+  like `AnnouncementService`; audited lanes store `TargetKind = "event"`,
+  `Action` `event.create` / `event.update` / `event.publish` / `event.delete`
+  — **no `event.rsvp` action**. *See the handoff note for the full table.*
 - **The draft / tag / media / language / delete lanes are reused, not
-  reinvented:** the `IsDraft` flag + `/my/drafts` lane (ADR 0037); the
-  `TagIds` (ADR 0044); the `ImageIds` + `AttachmentIds` (ADR 0025 / 0034 —
-  the server-side body parse populates them; the client never sends them);
-  the `LanguageCode` (ADR 0018); the `IsDeleted` flag + read-lane filter
-  (ADR 0024). **The translation lane (ADR 0022/0026/0029) is NOT extended to
-  events in M4's own scope** — an `Event` is authored-in-language in M4; the
-  user-added event-translation lane ships as a separate named lane under ADR
-  0059 (the ADR 0022/0029/0048 lane carried to the events surface), so it is
-  additive to this ADR, not part of it.
-- **The Web surface** — `EventController` (`Kumunita.Web.Controllers`):
-  `GET /events` (the feed — upcoming events, `componentId` filter optional,
-  `CanSeeAsync(Read)`-filtered so a private event's *existence* does not
-  leak); `GET /events/{id}` (the detail view — title + rendered body via
-  the *one* `MarkdownRenderer`, every timestamp via the *one* `kw-dt`
-  TagHelper, the RSVP form Going/Maybe/No, the RSVP list **owner-only** —
-  a non-author sees only their own RSVP; 404 on absent, 403 on denied, the
-  announcement 404-vs-403 split); `GET/POST /events/new` (compose — title,
-  body in the **one** `bindRichEditor`, component picker, the
-  `AudienceEditorModel` verbatim, the language picker, `Start`/`End`,
-  `Location`, `Capacity`, the `ReminderEnabled` checkbox — WYSIWYG with the
-  RC image + ATT attachment lanes); `GET/POST /events/{id}/edit` (the edit
-  lane — audience round-trips verbatim via `FromAudience`/`BuildAudience`);
-  `POST /events/{id}/publish` / `delete` (the standing-gated actions);
-  `POST /events/{id}/rsvp` (the last-write-wins lane, no audit row). The
-  **nav entry** is one line (the `Community` nav pattern), and a draft
-  event is included in the author's `/my/drafts` list. The
-  `Post` / `Announcement` / `Page` surfaces stay **untouched**.
+  reinvented:** the `IsDraft` flag + `/my/drafts` lane (ADR [0037](0037-draft-mode-author-only.md)); the
+  `TagIds` (ADR [0044](0044-tags.md)); the `ImageIds` + `AttachmentIds` (ADR [0025](0025-rich-content-markdown-and-content-images.md) / 0034); the
+  `LanguageCode` (ADR [0018](0018-ugc-authored-in-language-tag.md)); the `IsDeleted` flag + read-lane filter (ADR [0024](0024-author-soft-delete-lane.md)).
+  **The translation lane is NOT extended to events in M4's own scope** — the
+  user-added event-translation lane ships as a separate named lane under
+  **ADR [0059](0059-event-translations.md)**.
+- **The Web surface** — `EventController`: `GET /events` (the feed,
+  `CanSeeAsync(Read)`-filtered so a private event's *existence* does not leak);
+  `GET /events/{id}` (the detail view, the RSVP form, the RSVP list
+  **owner-only**); `GET/POST /events/new` (compose); `GET/POST /events/{id}/
+  edit`; `POST /events/{id}/publish` / `delete`; `POST /events/{id}/rsvp`
+  (no audit row). The `Post` / `Announcement` / `Page` surfaces stay
+  **untouched**. *See the handoff note for the full route list.*
 - **The `EventReminders` §6.4 job** (the second of the three jobs named in
-  ARCHITECTURE.md §6.4 — `AuditPurge` shipped in M1, `VerifyDigest` stays
-  deferred) follows the `AuditPurgeHandler` precedent **verbatim**:
-  - **`EventReminderService`** (a Wolverine-free static class in
-    `Kumunita.Core.Events`, the `AuditPurgeService` precedent):
-    `SendRemindersAsync(store, options, now, mailer, localization, ct)` —
-    (a) load events with
-    `ReminderEnabled = true` and not deleted whose `Start` is within the
-    **24-hour window** (`now < Start ≤ now + 24h` — the "remind the day
-    before" semantics; a past `Start` is not reminded); (b) recipients =
-    the `EventRsvp` rows with `Status = Going` **plus the author, always**
-    (even if they did not RSVP; `Maybe` / `No` are not reminded); (c) for
-    each recipient, stage one `OutboxEmail` via the **frozen**
-    `IMailerStage.StageAsync` with idempotency key
-    **`remind:{eventId}:{userId}`** (the §6.2 per-email key scheme — the
-    existing-row check is the no-double-send guard across ticks); (d) **no
-    `AccessAudit` row** (a side effect, not an access decision — the
-    verification-email posture). The reminder's "when" renders in each
-    **recipient's** own time zone + date-time format (ADR 0019 / 0020, the
-    `kw-dt` resolution order: the recipient's `Profile.TimeZone` /
-    `Profile.DateFormat` override → the platform default → the `UTC` /
-    `DateFormat.FloorFormat` floor) — **not** a hard-coded UTC stamp; the
-    `localization` seam supplies the two platform defaults.
-  - **`EventReminderHandler`** (`Kumunita.Web/SideEffects`): a thin
-    adapter — call the Wolverine-free service with a live `IDocumentStore`
-    + `IOptions<EventReminderOptions>` + the frozen `IMailerStage` + the
-    `ILocalizationService` platform-default read, then **re-yield a fresh
-    `EventReminderTick`** (the self-rescheduling idiom).
-  - **`EventReminderTick`** — `record EventReminderTick() :
-    Wolverine.TimeoutMessage(TimeSpan.FromDays(1))` (the `AuditPurgeTick`
-    precedent verbatim — the delay is baked into the message type, so every
-    re-publish carries the same schedule; no per-callsite `DelayedFor`).
-  - **`EventReminderOptions`** — the `AuditPurgeOptions` shape
-    (`WindowHours = 24` floor). **Wiring:** `Program.cs` registers the
-    tick next to the `AuditPurgeTick` (durable scheduling —
-    `IntegrateWithWolverine()`).
-  - **Best-effort, re-runnable** (ARCHITECTURE.md §6.2 — "Event reminder /
-    Best-effort / Re-runnable scheduled job; dead-letter if SMTP truly
-    down"): a failed SMTP send dead-letters in `EmailDeadLetter`; the
-    `IMailerStage` + `OutboxEmail` + `OutboxEmailHandler` trio is
-    **untouched** (no new method, no new email channel, no new SMTP
-    config) — the job only *stages* rows.
-- **The 25 pinned seam test names** (the design doc §3.7 is the master
-  list, locked here) — 20 in `EventServiceTests` (T01–T18: the feed
-  family, the `null`-audience-public branch, the `Community` + grants
-  branches, the draft pin, the standing matrix, the publish author-only
-  pin, the soft-delete filter, the RSVP last-write-wins + unique-index +
-  owner-only-list + no-audit-row pins, the audit-row shape, the adapter
-  shape; T24–T25: the GlobalAdmin-override end-to-end edit + delete
-  part-vs-whole seam, the audit row tagged `Via = Admin`) + 5 in
-  `EventReminderServiceTests` (T19–T23: the window filter,
-  the `Going`-RSVP filter, the author-inclusion rule, the
-  idempotency-key shape, the no-audit-row pin).
-- **The three-test acceptance gate** (the design doc §3.8, recorded by the
-  gate unit): **closed loop** (an author creates a published event → it
-  appears in the feed with the `TargetKind = "event"` aggregate row; the
-  author RSVPs → their RSVP is visible in the owner-only list), **handoff**
-  (a user added to the audience's grants after creation sees the event on
-  the next request — strong consistency; the `Delegation` branch is the
-  handoff-onto-a-delegate case), **part-vs-whole** (the 25 names are the
-  whole; all pass together in the same run as the inherited M1–M3 / PG
-  anchors).
-- **The drift-guard** (the design doc §3.9): the `Event` field set
-  (including the `Body` / `ReminderEnabled` naming decision), the
-  `EventRsvp` shape, the `EventToAuditableResource` adapter, the
-  `IEventService` public method set (the edit/delete write lanes carry the
-  principal's `actorRoles` per §3.4, the `AnnouncementService` /
-  `PageService` precedent — the GlobalAdmin override is enforced
-  server-side, not deferred to the Web boundary), the 25 test names, the
-  three-test
-  gate, and the §6.4 job shape are **frozen** — a re-shape of any of them
-  is a new ADR, a rename of a test name is a drift event, and a new
-  Wolverine idiom is a new unit, not a silently-omitted one.
+  [CQRS-lite & side effects](../architecture/cqrs-lite-wolverine.md) §6.4)
+follows the `AuditPurgeHandler` precedent **verbatim**: **`EventReminderService
+`** (a Wolverine-free static class) loads events with
+  `ReminderEnabled = true` whose `Start` is within the **24-hour window**,
+  reminds the `Going` RSVPs **plus the author always**, stages one
+  `OutboxEmail` each via the **frozen** `IMailerStage.StageAsync` with key
+  **`remind:{eventId}:{userId}`**, and writes **no `AccessAudit` row**.
+  **`EventReminderHandler`** is a thin adapter that re-yields a fresh
+  `EventReminderTick` (a `TimeoutMessage(TimeSpan.FromDays(1))`). The
+  reminder's "when" renders in each **recipient's** own time zone + date-time
+  format (ADR [0019](0019-timezone-platform-default-and-resident-override.md) / 0020). *See the handoff note for the full job shape.*
+- **Pinned and gated.** The **25 pinned seam test names** (the design doc
+  §3.7 is the master list, locked here) + the **three-test acceptance gate**
+  (closed loop, handoff, part-vs-whole) + the **drift-guard** (the design doc
+  §3.9 — the `Event` field set, the `EventRsvp` shape, the adapter, the
+  `IEventService` public method set, the 25 test names, the gate, and the
+  §6.4 job shape are **frozen**). *See the handoff note for the full test-
+  name list, the gate, and the drift-guard.*
 
 ## Consequences
 
-- **One authorization path, one audience, one renderer, one editor, one
-  email trio, one timezone/format resolver** — the milestone *reuses*
-  instead of *duplicating*: the `Event` gets private/community/public
-  visibility, the correct `AccessVia` audit tag, and delegation for free
-  (the `Decide()` algorithm is unchanged; only the
-  `EventToAuditableResource` adapter is new). The reminder's "when"
-  renders through the **same** ADR 0019 / 0020 resolution order the `kw-dt`
-  TagHelper uses — the recipient's `Profile.TimeZone` / `Profile.DateFormat`
-  override → the platform default → the `UTC` / `FloorFormat` floor — so the
-  resident's reminder reads in their own time and format, exactly as the
-  page does.
-- **The reminder email is a side effect on a working event, not the other
-  way round** — the §6.4 job lands after the read + write lanes are green
-  (the register's sequencing invariant), and it touches no seam: the
-  frozen `IMailerStage` trio already owns dispatch, retry, and dead-letter.
-- **The RSVP is deliberately light** — one row per user, last-write-wins,
-  no audit row: a neighborhood RSVP is a routine action, and the
-  milestone gains nothing from treating it like an access decision.
-- **`Post` / `Announcement` / `Page` stay untouched** — M4 is additive on
-  top of the shipped lanes; the new surface is a new context + a new doc
-  surface, so nothing existing is re-shaped.
-- **The ARCHITECTURE.md §5 `Events` block is out of date by design
-  right now** (`description` / `rsvpRequired` vs. the settled
-  `Body` / `ReminderEnabled`) — the close unit (U12) syncs it, per the
-  AGENTS.md doc↔code parity rule.
+- **One authorization path, one audience, one renderer, one editor, one email
+  trio, one timezone/format resolver** — the milestone *reuses* instead of
+  *duplicating*: the `Event` gets private/community/public visibility, the
+  correct `AccessVia` audit tag, and delegation for free (the `Decide()`
+  algorithm is unchanged; only the `EventToAuditableResource` adapter is new).
+  The reminder's "when" renders through the **same** ADR [0019](0019-timezone-platform-default-and-resident-override.md) / 0020
+  resolution order the `kw-dt` TagHelper uses.
+- **The reminder email is a side effect on a working event, not the other way
+  round** — the §6.4 job lands after the read + write lanes are green, and it
+  touches no seam: the frozen `IMailerStage` trio already owns dispatch,
+  retry, and dead-letter.
+- **The RSVP is deliberately light** — one row per user, last-write-wins, no
+  audit row: a neighborhood RSVP is a routine action.
+- **`Post` / `Announcement` / `Page` stay untouched** — M4 is additive on top
+  of the shipped lanes.
+- **The [data model](../architecture/data-model.md) `Events` block is out of
+  date by design right now** — the close unit (U12) syncs it.
 - **Out of scope (deliberate non-decisions):** iCal export (M6),
-  notifications-as-a-lane (M6), group events (a follow-on lane, own ADR),
-  per-resident reminder settings (a follow-on lane), and the `VerifyDigest`
-  §6.4 job (stays deferred). (The event-translation lane left out of M4's
-  own scope shipped under **ADR 0059**.)
-
-## Tests
-
-- **Core (`Kumunita.Core.Tests`, DB-backed)** — `EventServiceTests`
-  (T01–T18, §3.7): the feed + audience branch family (`M4_*`, the
-  `A0036_*` family shape), the draft pin, the standing matrix, the
-  publish/delete lanes, the RSVP pins, the audit-row + adapter shapes.
-  `EventReminderServiceTests` (T19–T23): the Wolverine-free harness shape
-  of `AuditPurgeServiceTests` — window filter, `Going` filter, author
-  inclusion, idempotency-key shape, no-audit-row.
-- **Web (`Kumunita.Web.Tests`)** — `EventControllerTests` (NSubstitute
-  `IEventService`, no live Postgres — the `AnnouncementControllerTests`
-  shape): the route map, the 404-vs-403 split, the feed filter, the
-  composer/edit audience round-trip, the RSVP form.
-- **`MilestonesTests.cs`** — the `Ids` ordered list is **unchanged**
-  (`… PG, M4, M5, M6`); the `Shipped` set gains `"PG"`; the
-  single-in-progress pin is **renamed** `PG_Is_The_Single_InProgress_Milestone`
-  → `M4_Is_The_Single_InProgress_Milestone` (asserting `M4`) in the same
-  commit as the `Milestones.cs` + README status flips.
+  notifications-as-a-lane (M6), group events (a follow-on lane), per-resident
+  reminder settings (a follow-on lane), and the `VerifyDigest` §6.4 job (stays
+  deferred). The event-translation lane shipped under **ADR [0059](0059-event-translations.md)**.

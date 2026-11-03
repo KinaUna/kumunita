@@ -1,4 +1,17 @@
-# ADR 0131 — SMTP transport: MailKit in place of the BCL SmtpClient
+---
+id: adr-0131
+title: "SMTP transport: MailKit in place of the BCL SmtpClient"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/m22/m22-u00.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0131](0131-smtp-transport-mailkit-swap.md) — SMTP transport: MailKit in place of the BCL SmtpClient
 
 Status: Accepted
 Date: 2026-10-02
@@ -13,7 +26,7 @@ on the BCL `System.Net.Mail.SmtpClient`.
 
 The BCL `SmtpClient` had a documented limitation — the .NET API reference for
 `SmtpClient.EnableSsl` is explicit that the implicit-TLS / SMTPS model (port
-465) is **not** supported. This was recorded in `COOLIFY.md` §5.1B as a
+465) is **not** supported. This was recorded in [`deploy/coolify/step-5/51-smtp.md`](../deploy/coolify/step-5/51-smtp.md) as a
 "relay-swap or implementation-change" note.
 
 On the 2026-10-02 VPS deployment (Proton Mail SMTP submission,
@@ -40,7 +53,7 @@ credentials:
 
 So: same credentials, same host, same port, same TLS shape, same vantage point —
 everything works except the BCL `SmtpClient` on .NET 10. The BCL was the
-variable. The codebase had already anticipated this escape hatch (`COOLIFY.md`
+variable. The codebase had already anticipated this escape hatch ([`COOLIFY.md`](../COOLIFY.md)
 §5.1B: "it needs a relay swap or a `SmtpSender` implementation change").
 
 ## Decision
@@ -67,7 +80,7 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
   `MailKit.ProtocolException`). The cooldown list (6 attempts / ~24 h, the
   §6.2 shape) and the `Fault<OutboxEmail>` dead-letter path are untouched.
 - `Kumunita.Core.csproj` — adds `MailKit` 4.18.1 (pulls `MimeKit`).
-- `COOLIFY.md` §5.1 / §5.1B — the "465 is not supported" note is superseded;
+- [`deploy/coolify/step-5/51-smtp.md`](../deploy/coolify/step-5/51-smtp.md) (the real-relay shape) — the "465 is not supported" note is superseded;
   `SMTP__Secure=Ssl` is now a first-class value
   (`SecureSocketOptions.SslOnConnect`).
 
@@ -115,7 +128,7 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
     path. The 8 queued `OutboxEmail` rows (the `Fail:` lines in the boot log)
     drain on the next handler tick under the existing retry policy.
   - **465 / implicit TLS (SMTPS) is now a first-class shape** — the
-    `COOLIFY.md` §5.1B "relay swap or implementation change" escape hatch is
+    [`deploy/coolify/step-5/51-smtp.md`](../deploy/coolify/step-5/51-smtp.md) "relay swap or implementation change" escape hatch is
     retired; `SMTP__Secure=Ssl` + `SMTP__Port=465` is a legitimate
     configuration for a 465-only relay.
   - The `SmtpProbe` (the /health diagnostic) and the real send now share the
@@ -153,7 +166,7 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
   - No new `kw-l` key, no view change, no route change.
   - `Milestones.cs` / the README Roadmap / `MilestonesTests.cs` are
     **untouched** (a transport-swap on an already-shipped seam, not a
-    milestone — the ADR 0086/0088/0089/0093 "named lane on the shipped
+    milestone — the ADR [0086](0086-goals-projects-lane.md)/0088/0089/0093 "named lane on the shipped
     surface" precedent).
 
 ## References
@@ -164,15 +177,15 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
   `mailDetail: null`), and the app's `SmtpFailedRecipientException` on
   `OutboxEmail#08df20a5` (and 7 sibling rows) — all reproduced on the same
   container, same credentials, same network path.
-- `COOLIFY.md` §5.1 / §5.1B (the pre-swap "465 is not supported" note, now
+- [`deploy/coolify/step-5/51-smtp.md`](../deploy/coolify/step-5/51-smtp.md) (the pre-swap "465 is not supported" note, now
   superseded).
 - `src/Kumunita.Core/Identity/SmtpProbe.cs` (the hand-rolled sockets
   handshake the /health diagnostic uses — unchanged, now a faithful proxy for
   the real send).
 - `src/Kumunita.Web/Program.cs` (the Wolverine retry policy, updated for
   MailKit's exception types).
-- `docs/adr/0004-data-persistence-and-schema-evolution.md` (the durable outbox
+- [`docs/adr/0004-data-persistence-and-schema-evolution.md`](0004-data-persistence-and-schema-evolution.md) (the durable outbox
   + dead-letter shape this ADR leaves untouched).
 - The .NET API reference for `System.Net.Mail.SmtpClient.EnableSsl` (the
   original "implicit TLS is not supported" statement that motivated the
-  escape-hatch note in `COOLIFY.md` §5.1B).
+  escape-hatch note in [`deploy/coolify/step-5/51-smtp.md`](../deploy/coolify/step-5/51-smtp.md)).

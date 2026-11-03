@@ -1,4 +1,21 @@
+---
+id: design-inline-editor
+title: "Inline editor (`IE`)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0032-inline-editor-rendered-default-view.md
+  - docs/adr/0031-wysiwyg-editor-and-toolbar.md
+  - docs/adr/0025-rich-content-markdown-and-content-images.md
+updated: 2026-11-02
+---
+
 # Inline editor (`IE`) — the rendered view is the default editor; the Markdown source is hidden behind a toggle
+
+> **Abstract:** the **inline editor (`IE`)** design — the **rendered view is the default editor**; the Markdown source is hidden behind a toggle. Invariant IE·1, FACES IE1–IE5, the exact toggle contract, the CSS pin, the Razor button pin, and the pinned tests. Built on RE (ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) + RC (ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)). **Who is it for:** a developer touching the inline editor or the source toggle; an agent that needs the frozen-base invariant. **When to read the rest:** before touching the inline editor, the source toggle, or the IE tests.
+
 
 > **Three-tier contract.** This file is the **primary** tier of the IE lane:
 > it pins the invariant (IE·1), the FACES (IE1–IE5), the exact toggle
@@ -12,7 +29,7 @@
 > register wins for *which files exist* and *what each unit does*.
 >
 > **The frozen base.** This lane is built **on top of** the rich editor
-> lane (`RE`, ADR 0031) and the rich-content lane (`RC`, ADR 0025). RC's
+> lane (`RE`, ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)) and the rich-content lane (`RC`, ADR [0025](../adr/0025-rich-content-markdown-and-content-images.md)). RC's
 > **R·1–R·7** and RE's **RE·1–RE·3** all still bind **unchanged**
 > (re-anchored in §Frozen base below). IE adds **no** re-shape of
 > `MarkdownRenderer`, `ContentImageIds`, `IMediaStore`, the `ImageIds`
@@ -215,7 +232,7 @@ re-order the existing keys):
 ["rc.editor.showPreview"] = "Preview", // the toggle button's label while the source is visible
 ```
 
-The dead `rc.editor.preview` key (RE, ADR 0031 — never emitted through
+The dead `rc.editor.preview` key (RE, ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md) — never emitted through
 `<kw-l>` in any view) is **removed**: IE's `rc.editor.showPreview` is the
 canonical "show preview" label. (2026-09-15.)
 
@@ -294,7 +311,7 @@ section in the handoff note (unit-series rule 6), **not** a silent edit.
 ## Named deferrals (a future IE-2 lane, not a renumber)
 
 Each is a **future lane**, named, not a deferral to be quietly dropped
-(the ADR 0011 / 0025 / 0031 precedent):
+(the ADR [0011](../adr/0011-media-and-file-storage.md) / 0025 / 0031 precedent):
 
 - **localStorage persistence** — remember the resident's view preference
   (source vs. pane) across sessions. A `localStorage` read on init +
@@ -309,10 +326,10 @@ Each is a **future lane**, named, not a deferral to be quietly dropped
   screens (a floating action button, a bottom-sheet, or a
   sticky-positioned toggle). A responsive CSS + JS concern.
 - **True `contenteditable` / third-party editor** (ProseMirror/Quill/
-  Tiptap) — **hard non-negotiable** out (D1, ADR 0031): it breaks
+  Tiptap) — **hard non-negotiable** out (D1, ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md)): it breaks
   `tsc`-only + the no-HTML-round-trip stance + RC's `ImageIds` source
   parse. **Not a deferral**; a separate-architecture decision that would
-  supersede ADR 0031.
+  supersede ADR [0031](../adr/0031-wysiwyg-editor-and-toolbar.md).
 
 ## Frozen base (re-anchored unchanged)
 

@@ -1,3 +1,28 @@
+---
+id: philosophy-in-product
+title: "Integration in the Community & the Platform"
+tier: living
+kind: philosophy
+status: current
+audiences: [platform-maintainer, community-admin]
+related:
+  - docs/philosophy/the-platform-as-integrator.md
+  - docs/philosophy/the-human-system.md
+  - docs/philosophy/anti-patterns.md
+  - docs/ops/backups.md
+  - docs/ops/restore.md
+  - docs/adr/0003-roles-and-moderator-scoping.md
+updated: 2026-11-02
+---
+
+> **Abstract:** how we run the platform *and* the community as one
+> system — the loops and their owners (fast, medium, slow), moderation as
+> the most important loop, the local-optimization watch, cross-role
+> integration, and releases as integration events. **Who is it for:** the
+> people who run this deployment. **When to read the rest:** when deciding
+> how to operate the platform, or when a loop isn't closing.
+>
+
 # Integration in the Community & the Platform
 
 > The conceptual foundation for everything in this doc is
@@ -58,7 +83,7 @@ model of the platform — especially of the access model. Where their mental
 models diverge, seams break silently: a moderator assumes a group "obviously"
 includes the board, a resident assumes their post is private to neighbors.
 Design reviews, a shared written model of the access rules, and clear
-moderator scoping (ADR 0003) are our integration harnesses. A feature that
+moderator scoping (ADR [0003](../adr/0003-roles-and-moderator-scoping.md)) are our integration harnesses. A feature that
 works technically but confuses the residents failed at a seam we didn't see.
 
 ## Releases are integration events

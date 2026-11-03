@@ -1,3 +1,24 @@
+---
+id: philosophy-example-household
+title: "Running a Household"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the same three-shape example (differentiation / linkage /
+> what breaks) told with a household — cooking, cleaning, finances, repairs and
+> childcare as the parts, the shared calendar and check-ins as the linkage,
+> treating it as "housework" as the failure. **Who is it for:** readers who
+> run a home, with or without others. **When to read the rest:** when the
+> plain-language examples didn't land and you'd rather think in a household.
+>
+
 # Running a Household
 
 > Reach for this one if you run a home, with or without others.

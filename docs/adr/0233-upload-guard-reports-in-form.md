@@ -1,9 +1,22 @@
-# ADR 0233 — A rejected document upload re-renders the form with an error
+---
+id: adr-0233
+title: "A rejected document upload re-renders the form with an error"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0233](0233-upload-guard-reports-in-form.md) — A rejected document upload re-renders the form with an error
 
 Status: Accepted
 
 ## Context
-ADR 0232 found that a browser form post which fails an upload guard returned a bare status (`StatusCodeResult` for 413/415,
+ADR [0232](0232-verification-gaps-faq-mfa-upload.md) found that a browser form post which fails an upload guard returned a bare status (`StatusCodeResult` for 413/415,
 `BadRequestObjectResult` for 400) with an empty body, so the person saw a blank white page and lost what they had typed.
 While checking the form live, a second bug showed up: a plain `GET /documents/new` rendered "The Mode field is required."
 on a fresh form.

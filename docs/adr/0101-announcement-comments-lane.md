@@ -1,4 +1,17 @@
-# ADR 0101 — Signed-in resident comments on announcements
+---
+id: adr-0101
+title: "Signed-in resident comments on announcements"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m11-portability-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0101](0101-announcement-comments-lane.md) — Signed-in resident comments on announcements
 
 Status: Accepted
 Date: 2026-09-26
@@ -7,8 +20,8 @@ Extends the **shipped M3b announcements surface** (the
 **comment precedent set**: the **C-M3·1** "comment-inherits the parent's
 visibility" rule (a comment carries **no** `Audience` of its own — its
 visibility inherits the parent's, so there is no second authorization evaluation
-and no read-time audit row), the **ADR 0018** authored-in language tag, the
-**ADR 0024** author-soft-delete shape, and the **ADR 0016**
+and no read-time audit row), the **ADR [0018](0018-ugc-authored-in-language-tag.md)** authored-in language tag, the
+**ADR [0024](0024-author-soft-delete-lane.md)** author-soft-delete shape, and the **ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md)**
 reply-delete author-only rule. This ADR adds a new read+write capability to the
 announcement detail surface: **signed-in** residents can **comment** on an
 announcement, and an **admin toggle** can close the surface to everyone.
@@ -20,7 +33,7 @@ not an audience-restricted record. `AnnouncementService` resolves who may read
 an announcement through `ResolveReadVisibilityAsync` (Public = everyone;
 Community = any signed-in resident; a community-targeted announcement = that
 community's residents/moderators, plus GlobalAdmin). It does **not** go through
-`IAuthorizationService.CanAsync` (unlike the ADR 0100 to-do lane) — the
+`IAuthorizationService.CanAsync` (unlike the ADR [0100](0100-todo-comments-lane.md) to-do lane) — the
 announcement's own scope split is the sole read decision, and that flat split is
 what the comment lane inherits.
 
@@ -33,7 +46,7 @@ The request:
   as the announcement they belong to (a community-targeted one is visible to
   that community's residents).
 
-Three deliberate differences from the ADR 0100 to-do lane, each a narrowing
+Three deliberate differences from the ADR [0100](0100-todo-comments-lane.md) to-do lane, each a narrowing
 rather than a new mechanism:
 
 - **Signed-in-only, not "can-see" — and *stronger* for public announcements.**
@@ -43,7 +56,7 @@ rather than a new mechanism:
   community-targeted announcement the two rules coincide (only its residents
   can see it, and they are signed in); for a public one the signed-in rule is
   strictly tighter than the visibility rule.
-- **Top-level only — no replies.** ADR 0100 carried the C-M5·7 sole-hierarchy
+- **Top-level only — no replies.** ADR [0100](0100-todo-comments-lane.md) carried the C-M5·7 sole-hierarchy
   shape (comment + reply). Here a comment is always top-level
   (`ParentId == null`) — there is no `ParentId` field at all. A single flat
   list under the announcement is the shipped scope; the request was
@@ -59,7 +72,7 @@ This is a **named lane on the already-shipped M3b surface** (like ADR
 ## Decision
 
 A new document type `Announcements.AnnouncementComment` (registered on the
-`PostDocTypes` surface — the additive-schema shape, ADR 0004 §B.1) carries:
+`PostDocTypes` surface — the additive-schema shape, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1) carries:
 
 ```csharp
 public sealed class AnnouncementComment
@@ -74,7 +87,7 @@ public sealed class AnnouncementComment
 }
 ```
 
-**No `ParentId`** (top-level only — the deliberate scope cut vs ADR 0100),
+**No `ParentId`** (top-level only — the deliberate scope cut vs ADR [0100](0100-todo-comments-lane.md)),
 **no `Audience`** field (C-M3·1), **no `Modified`** (a comment is immutable
 until its author soft-deletes it), and **no attachments** (the ask was
 add-comment-only; the announcement itself already carries the rich content
@@ -82,10 +95,10 @@ surface).
 
 **An admin toggle** lives on `LocaleSettings`:
 `public bool AnnouncementCommentsEnabled { get; set; } = true;` (the codebase
-`true`-floor convention, ADR 0004 §B.1 additive — mirrors `IsSignupOpen` /
+`true`-floor convention, ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive — mirrors `IsSignupOpen` /
 `NotifyAdminsOnSignup`). A `null` settings row reads as **on** (the floor).
 
-Five new seams on `IAnnouncementService` (the frozen seam, ADR 0006), each
+Five new seams on `IAnnouncementService` (the frozen seam, ADR [0006](0006-module-boundary-contracts.md)), each
 following the announcement service's own convention (the service opens its own
 session, applies the flat visibility split, writes the C3 audit row in the same
 session, and `SaveChangesAsync`s once):
@@ -118,7 +131,7 @@ session, and `SaveChangesAsync`s once):
    - **404** (`KeyNotFoundException`): the announcement is missing, a **draft**,
      or **not visible** to the actor under the flat split.
    - On success: materializes `LanguageCode` from the instance default when
-     unchosen (ADR 0018), stores the row, commits an
+     unchosen (ADR [0018](0018-ugc-authored-in-language-tag.md)), stores the row, commits an
      `announcementcomment.create` / `TargetKind = "announcement"` /
      `Via = Owner` `AccessAudit` row atomically (C3), and returns the comment.
 5. **`DeleteAnnouncementCommentAsync(announcementId, commentId, actorId,
@@ -139,7 +152,7 @@ only under that announcement — there is no comment feed).
 - `Detail` sets `CanComment` (signed in **and** toggle on), loads the comments
   (each row resolves the author's display name via `UserInfoService`, null-safe
   to the raw subject id, flags `IsAuthor`) and seeds the composer's language
-  picker from the enabled catalog (ADR 0018). When `CanComment` is false the
+  picker from the enabled catalog (ADR [0018](0018-ugc-authored-in-language-tag.md)). When `CanComment` is false the
   detail page renders neither the list nor the composer.
 - `AddComment` (`POST /announcements/{id}/comments`) posts `body`, optional
   `languageCode` — the C3 split (404 / 403) with the `ForbidResult` /
@@ -172,7 +185,7 @@ pattern (the `AdminController` constructor is test-pinned). A dashboard card on
 `_off` / `_save`) added to **all four** locale dictionaries (en/de/fr/da) —
 the `KnownTranslationKeys_ParityTests` invariant holds.
 
-**Tests.** New `AnnouncementServiceTests` ADR 0101 pins:
+**Tests.** New `AnnouncementServiceTests` ADR [0101](0101-announcement-comments-lane.md) pins:
 - `AreAnnouncementCommentsEnabled_DefaultOn` — a `null` settings row reads as
   **on** (the `true` floor).
 - `SetAnnouncementCommentsEnabled_StoresFlagAndAuditRow` — setting the flag
@@ -201,9 +214,9 @@ the `KnownTranslationKeys_ParityTests` invariant holds.
 
 - Signed-in residents can now comment on an announcement, and an admin can
   close the surface instance-wide — reusing the C-M3·1 visibility inheritance,
-  the ADR 0018 authored-in tag, and the ADR 0024 / ADR 0016 soft-delete shapes
+  the ADR [0018](0018-ugc-authored-in-language-tag.md) authored-in tag, and the ADR [0024](0024-author-soft-delete-lane.md) / ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) soft-delete shapes
   rather than inventing a new mechanism.
-- The visibility model is deliberately **tighter** than the ADR 0100 to-do
+- The visibility model is deliberately **tighter** than the ADR [0100](0100-todo-comments-lane.md) to-do
   lane: comments are **signed-in-only** (even on a public announcement) and,
   for a community-targeted announcement, visible to exactly that community's
   residents. A comment can never be visible where the announcement is not, and
@@ -220,4 +233,4 @@ the `KnownTranslationKeys_ParityTests` invariant holds.
   index on the `PostDocTypes` surface; a new `LocaleSettings` field); no existing
   table, index, or seam changes. The `Milestones.cs` / README Roadmap /
   `MilestonesTests.cs` triple is untouched (a named lane on the shipped M3b
-  surface, not a milestone — the ADR 0086–0100 precedent).
+  surface, not a milestone — the ADR [0086](0086-goals-projects-lane.md)–0100 precedent).

@@ -1,3 +1,16 @@
+---
+id: design-m31-production-error-handling
+title: "M31 — Production error handling"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0154-production-error-handling.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # M31 — Production error handling (design doc)
 
 > **Abstract:** This design settles how a resident reports a platform error
@@ -43,15 +56,15 @@
 > record, the `ErrorReportDocTypes` registration shape, the `AccessAudit`
 > `Via` pin for the submission row, the closed `errorreport.*` `kw-l` key
 > set, the 16 pinned test names, the acceptance gate, the drift guard) +
-> **ADR 0154**.
+> **ADR [0154](../adr/0154-production-error-handling.md)**.
 >
-> **The frozen base.** M31 is built **on top of** the ADR 0004 §B.1
+> **The frozen base.** M31 is built **on top of** the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
 > Marten-native / parallel-surface pattern (the `ErrorReportDocTypes`
 > registration shape, the `PostDocTypes` / `EventDocTypes` / `NotificationDocTypes` /
-> `UsageDocTypes` precedent), the ADR 0001-B thin-token rule (the admin
-> surface is `[Authorize(Roles = GlobalAdmin)]`), the ADR 0006 C3
+> `UsageDocTypes` precedent), the ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B thin-token rule (the admin
+> surface is `[Authorize(Roles = GlobalAdmin)]`), the ADR [0006](../adr/0006-module-boundary-contracts.md) C3
 > single-write-lane shape (one write session storing the `ErrorReport` doc +
-> exactly one `AccessAudit` doc in the same session), the ADR 0015 D1
+> exactly one `AccessAudit` doc in the same session), the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1
 > `kw-l` provider-floor discipline (the `en` value is the source text), the
 > `Usage/UsageEvent` row-per-event doc shape (the POCO + the conventional
 > string `Id` — the shape `ErrorReport` mirrors, not the field source), and
@@ -64,12 +77,12 @@
 > **one new GlobalAdmin surface** (`/admin/error-reports` +
 > `POST /admin/error-reports/{id}/triage`), and the **closed
 > `errorreport.*` `kw-l` key set** × en/de/fr/da — but it adds **no**
-> re-shape of the existing `Posts/Report` doc (ADR 0023, M31·10), **no** new
+> re-shape of the existing `Posts/Report` doc (ADR [0023](../adr/0023-reply-report-target-lane.md), M31·10), **no** new
 > `AccessAction` / `Decide()` branch / `IAuthorizationService` method
 > (M31·9), **no** `resolved` triage status and **no** escalation forwarding
 > lane (the M32 boundary), and **no** login gate on the error page's report
 > form (M31·2). It is **additive**. **No EF migration** (a new Marten doc
-> type is additive per ADR 0004 §B.1; the delta is applied idempotently at
+> type is additive per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1; the delta is applied idempotently at
 > boot).
 >
 > **The `ErrorReport` field set is the ceiling** (the 11-member set pinned by
@@ -78,7 +91,7 @@
 > in M31** to `{"new", "triaged"}` — M32 **adds** `"resolved"` additively, it
 > does not re-shape the existing two. **The existing `Posts/Report` doc is
 > untouched** (M31 adds a *new* doc in a *new* context, not a new field on an
-> existing one, the ADR 0006 module-boundary contract). **The closed
+> existing one, the ADR [0006](../adr/0006-module-boundary-contracts.md) module-boundary contract). **The closed
 > `errorreport.*` `kw-l` key set is the floor** (Part 2 §2.3 pins the exact
 > set).
 >
@@ -153,7 +166,7 @@ note.
   `MarkTriagedAsync` audited write-lanes + the `ListAsync` read — the ADR
   0006 C3 single-write-lane shape, one `AccessAudit` row per effective
   write);
-- the `ErrorReportDocTypes` (the ADR 0004 §B.1 additive doc type, the
+- the `ErrorReportDocTypes` (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 additive doc type, the
   `UsageDocTypes` parallel surface — one `.Schema.For<ErrorReport>()` call,
   the `(TriageStatus, Created)` index for the admin list ordering;
   **no EF migration**);
@@ -191,14 +204,14 @@ note.
 - **The local resolution lane** — the admin marks a report `resolved` with a
   resolution note (the `resolved` status is M32's; M31's `TriageStatus`
   value set is **closed** to `{"new", "triaged"}`, and M32 **adds**
-  `"resolved"` additively per ADR 0004 §B.1 — it does not re-shape the
+  `"resolved"` additively per ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1 — it does not re-shape the
   existing two).
 - **The escalation forwarding lane** — forwarding a report to a configurable
   endpoint (an env-var URL); M31 never sends mail from `ContactEmail` either
   (the field is stored + read by the admin only).
 - **The per-report detail view with a resolution note** — M31's admin
   surface is the list + the mark-as-triaged action; a detail page is M32's.
-- **The `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+- **The `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip** until the
   milestone *ships* (U07 owns it — the `WhatsNew.cs` `0.47.0` entry is
   appended by U07, not by an earlier unit).
@@ -208,7 +221,7 @@ note.
 - **M31·1 — The `ErrorReport` is a platform-error signal, not a
   content-moderation report.** The doc lives in a **new bounded context**
   (`Kumunita.Core.ErrorReports`), separate from `Kumunita.Core.Posts`. The
-  existing `Posts/Report` doc (the M3b content-moderation report, ADR 0023)
+  existing `Posts/Report` doc (the M3b content-moderation report, ADR [0023](../adr/0023-reply-report-target-lane.md))
   is **untouched** — M31 does not add fields to it, does not reuse it, does
   not change its registration. The two report concepts are **separate docs
   in separate contexts** and never mix.
@@ -223,13 +236,13 @@ note.
 - **M31·3 — The `ErrorReport` doc is Marten-native, registered in a new
   parallel surface.** The doc is a POCO with a conventional string `Id` (the
   `Posts/Report` / `Usage/UsageEvent` row-per-event shape), registered in a
-  new `ErrorReportDocTypes.Configure(opts)` surface (the ADR 0004 §B.1
+  new `ErrorReportDocTypes.Configure(opts)` surface (the ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1
   parallel-surface pattern, the `PostDocTypes` / `EventDocTypes` / `NotificationDocTypes`
   precedent). **No EF migration.** The delta is applied idempotently at boot
   (the `SchemaBootstrap` + the dev-loop `Program.cs` path both pick it up).
 - **M31·4 — The admin list is a GlobalAdmin-gated read.** The
   `/admin/error-reports` surface is `[Authorize(Roles = GlobalAdmin)]` (the
-  standard admin gate, the thin-token rule ADR 0001-B). The list is a
+  standard admin gate, the thin-token rule ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B). The list is a
   **read-only** listing — **no per-row `IAuthorizationService` call**, no
   `AccessAudit` row on reads (a read, not an access decision). A
   non-`GlobalAdmin` (including a signed-in resident) gets a 403.
@@ -262,10 +275,10 @@ note.
   list in Part 2 §2.3) is authored by U05 and consumed by U04's error page
   + U05's admin views.
 - **M31·8 — The six-member close flip is U07's responsibility.** The
-  `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+  `Milestones.cs` / README / [`STATUS.md`](../STATUS.md) / [`ARCHITECTURE.md`](../ARCHITECTURE.md) /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip lands in U07.
   The `WhatsNew.cs` registry gains one new entry (newest-first, the `0.47.0`
-  row) naming M31 + ADR 0154 — the M27 "shipped with no entry until caught in
+  row) naming M31 + ADR [0154](../adr/0154-production-error-handling.md) — the M27 "shipped with no entry until caught in
   review" lesson (AGENTS.md) is held.
 - **M31·9 — No new authorization surface.** No new `AccessAction`, no new
   `Decide()` branch, no new `IAuthorizationService` surface. The `Via` tag
@@ -277,7 +290,7 @@ note.
   the app where an anonymous visitor sees a product surface). The admin
   surface is `[Authorize(Roles = GlobalAdmin)]` (the standard admin gate, the
   `AdminOnboardingController` / `AdminSurfaceLabelsController` shape). The
-  thin-token rule (ADR 0001-B) is held.
+  thin-token rule (ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B) is held.
 - **M31·10 — The existing `Posts/Report` doc is untouched.** M31 does not add
   fields to `Posts/Report`, does not change its `Status` vocabulary, does not
   alter its `PostDocTypes` registration, does not touch the M3b moderation
@@ -326,7 +339,7 @@ the `ErrorReport` field set (the 11-member ceiling), the `ErrorReportDraft`
 record, the `ErrorReportDocTypes` registration shape, the `AccessAudit`
 `Via` pin for the submission row, the closed `errorreport.*` `kw-l` key set,
 the 16 pinned test names, the acceptance gate, the drift guard — plus
-**ADR 0154**.*
+**ADR [0154](../adr/0154-production-error-handling.md)**.*
 
 ---
 
@@ -415,24 +428,24 @@ public interface IErrorReportService
 decision this §2.1 owns, M31·5 / M31·9):**
 
 - **Non-blank `SubjectId` (a signed-in resident):** `Via = AccessVia.Resident`
-  (ADR 0041 — the all-residents standing; the actor is signed in, a non-empty
+  (ADR [0041](../adr/0041-page-audience-scope-dropdown.md) — the all-residents standing; the actor is signed in, a non-empty
   `SubjectId`). This is the FACES M31-2 shape.
 - **Blank `SubjectId` (an anonymous visitor):** `Via = AccessVia.Anonymous`
   — a **new additive** `AccessVia` enum value, appended **after**
   `Resident` in `src/Kumunita.Core/Authorization/Decision.cs`, with a doc
-  comment citing ADR 0154 + the ADR 013/028/036/041 append precedent. The
+  comment citing ADR [0154](../adr/0154-production-error-handling.md) + the ADR 013/028/036/041 append precedent. The
   eleven frozen `AccessVia` values (Owner, Audience, Delegation, Moderator,
   Report, BreakGlass, Admin, Group, Guardian, Community, Resident) are
   **never re-shaped**; `Anonymous` is the 12th.
 
 **Why a new value (not an existing one):** none of the eleven frozen values
 fits the "unsigned visitor filing a platform-error signal" standing — `Resident`
-explicitly requires a *signed-in* actor (ADR 0041), `Admin`/`Guardian`/`Group`/
+explicitly requires a *signed-in* actor (ADR [0041](../adr/0041-page-audience-scope-dropdown.md)), `Admin`/`Guardian`/`Group`/
 `Community`/`Moderator`/`Owner`/`Delegation`/`Audience`/`BreakGlass`/`Report`
 each encode a standing the anonymous submitter does not hold. The repo
 precedent for exactly this situation (a new standing with no existing tag) is
-an additive `AccessVia` append — the M1 `Admin` (ADR 0006), ADR 0013 `Group`,
-ADR 0028 `Guardian`, ADR 0036 `Community`, ADR 0041 `Resident` all followed it.
+an additive `AccessVia` append — the M1 `Admin` (ADR [0006](../adr/0006-module-boundary-contracts.md)), ADR [0013](../adr/0013-group-posts-membership-lane.md) `Group`,
+ADR [0028](../adr/0028-guardian-controls-account-scope-supervision.md) `Guardian`, ADR [0036](../adr/0036-community-visible-audience-default.md) `Community`, ADR [0041](../adr/0041-page-audience-scope-dropdown.md) `Resident` all followed it.
 This is **permitted** by the register (M31·9 allows a new `AccessVia` value
 *only* when §2.1 pins it — and this §2.1 does) and is **not** a new
 authorization surface (no `AccessAction`, no `Decide()` branch, no
@@ -467,7 +480,7 @@ is identical in shape with `Action = "errorreport.triage"`, `ActorId =`
 
 ### 2.2 new M31-owned Core types (exact C#)
 
-**The `ErrorReport` doc — the 11-member ceiling (M31·3, ADR 0154 D1).**
+**The `ErrorReport` doc — the 11-member ceiling (M31·3, ADR [0154](../adr/0154-production-error-handling.md) D1).**
 No field outside this set may appear in the doc; no field in the set may be
 dropped. This is the **field ceiling** the U03 drift pin
 (`M31_3_ErrorReport_Doc_FieldSet_Ceiling`) asserts.
@@ -635,7 +648,7 @@ public sealed class ErrorReportService : IErrorReportService
 }
 ```
 
-**The `ErrorReportDocTypes` registration surface** (ADR 0004 §B.1, the
+**The `ErrorReportDocTypes` registration surface** (ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) §B.1, the
 `UsageDocTypes` / `PostDocTypes` parallel-surface shape — the `UsageDocTypes`
 is the closest analog, a row-per-event surface). One `.Schema.For<ErrorReport>()`
 call + the `(TriageStatus, Created)` index for the admin list ordering (the
@@ -680,7 +693,7 @@ automatically (the `*DocTypes` surfaces are all registered there, the
 
 The **20 keys** (verbatim from the register's Assumptions; the exact set is
 **frozen** by the §2.6 drift guard). Each with its **en** value — the source
-text, the ADR 0015 D1 `kw-l` provider-floor discipline. The `de` / `fr` / `da`
+text, the ADR [0015](../adr/0015-ui-view-localization-mechanics.md) D1 `kw-l` provider-floor discipline. The `de` / `fr` / `da`
 values are **U05's** to author (the M30·6 four-language pin; the
 `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` closure
 asserts every key is present, non-empty, in all four languages, M31·7).
@@ -801,14 +814,14 @@ The following are **frozen pins**; any mismatch found by a later unit is a
 - **The M32 boundary** — no `resolved` triage status, no escalation
   forwarding lane, no general issue-submission lane, no per-report detail
   view with a resolution note (Part 1 §Scope Out). The `Posts/Report` doc
-  (ADR 0023) is **untouched** (M31·10).
+  (ADR [0023](../adr/0023-reply-report-target-lane.md)) is **untouched** (M31·10).
 
 ---
 
-*Part 2 (U02) end. The ADR 0154 (`docs/adr/0154-production-error-handling.md`,
+*Part 2 (U02) end. The ADR [0154](../adr/0154-production-error-handling.md) ([`docs/adr/0154-production-error-handling.md`](../adr/0154-production-error-handling.md),
 `Status: Draft`) is the companion document — it names the Decision /
 Consequences that this design doc pins in detail. The ADR index
-(`docs/adr/README.md`) gains the 0154 row (`Status: Draft`).*
+([`docs/adr/README.md`](../adr/README.md)) gains the 0154 row (`Status: Draft`).*
 
 ---
 
@@ -860,3 +873,28 @@ Consequences that this design doc pins in detail. The ADR index
 hold). The full `Kumunita.Core.Tests` `ErrorReportServiceTests` class ran
 **8/8 green** (live Postgres via Testcontainers). **The M31 acceptance gate
 passes: 16/16, no drift pause, no still-open drift.**
+
+
+---
+
+## ADR [0023](../adr/0023-reply-report-target-lane.md) — moved content (D11 trim, 2026-11-02)
+
+## Revisit when
+
+- A **reply-edit** surface is wanted that lets a resident edit their
+  own reply after a report is filed (ADR [0016](../adr/0016-group-post-and-reply-edit-lane-author-only.md) already lets the
+  author edit the body pre-report; post-report editing is a new
+  decision).
+- A **reply-removal** lane (distinct from the M3b post-hide /
+  post-remove) is wanted — today the F3/F4 lanes operate on the
+  post; a reply-own hide/remove is a new seam + a new `PostStatus`
+  value (or a new `PostReply` field) on the `PostReply` POCO.
+- **Announcement replies** (if/when announcements grow a reply
+  surface) are requested — today the report lane is post-scoped, and
+  an announcement reply would need its own discriminator + the same
+  two-negative filing-tag pin.
+- A **second target kind** (e.g. a translation row, a group
+  description edit) is reportable — the `Report` POCO would need a
+  `TargetKind` discriminator beyond post/reply, and the
+  `Action` / `TargetKind` audit-row convention established here
+  would extend to the new kind.

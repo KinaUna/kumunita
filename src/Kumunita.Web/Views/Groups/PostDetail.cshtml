@@ -445,17 +445,17 @@
 
         </div>
 
-        <h2 class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 class="h5 mt-4 mb-2 kmb-section-title kmb-discussion" style="font-weight:600;">
             <kw-l key="posts.replies_heading">Replies</kw-l> <span class="text-muted">(@Model.Replies.Count)</span>
         </h2>
 
         @if (Model.Replies.Count == 0)
         {
-            <p class="text-muted"><kw-l key="groups.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l></p>
+            <p class="text-muted kmb-discussion"><kw-l key="groups.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l></p>
         }
         else
         {
-            <ul class="kmb-detail-comments list-unstyled p-0 mb-4">
+            <ul class="kmb-detail-comments kmb-discussion list-unstyled p-0 mb-4">
                 @foreach (var r in Model.Replies)
                 {
                     string replyAvatarInitial = !string.IsNullOrWhiteSpace(r.AuthorDisplayName)
@@ -681,7 +681,7 @@
             group-lane decision; there is no per-reply audience. The route
             re-runs the parent's group-lane decision before the write (C4).
         *@
-        <h2 class="h5 mt-4 mb-2 kmb-section-title" style="font-weight:600;">
+        <h2 class="h5 mt-4 mb-2 kmb-section-title kmb-composer-title" style="font-weight:600;">
             @if (Model.IsAuthor)
             {
                 <kw-l key="posts.reply_heading_author">Reply (you are the author of this post)</kw-l>

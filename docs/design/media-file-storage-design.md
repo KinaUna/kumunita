@@ -1,10 +1,26 @@
+---
+id: design-media-file-storage
+title: "File & media storage (content-addressed)"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0011-media-and-file-storage.md
+  - docs/adr/0004-data-persistence-and-schema-evolution.md
+updated: 2026-11-02
+---
+
 # Design Doc — File & media storage (content-addressed local-volume store + profile-avatar reference lane)
+
+> **Abstract:** the **file & media storage** design — a **content-addressed local-volume store** (`IMediaFileStore` + `MediaObject` catalog on `mt`) + the **profile-avatar reference lane** that exercises it end-to-end. Two restore surfaces (the catalog rides the `pg_dump`; the payload rides the volume snapshot). **Who is it for:** a developer touching the `IMediaFileStore` / `IMediaStore` seams; an agent that needs the serving-lane contract. **When to read the rest:** before touching the media store, the `MediaObject` catalog, or the avatar reference lane.
+
 
 > **Part 1 of 2 (authored by the plan author).** Part 1 pins **scope** (the
 > content-addressed media store + the **profile-avatar reference lane** that
 > exercises it end-to-end; group logos / post attachments / badge icons are
 > *follow-on lanes*, out of scope), the **invariants** (`C-MED·1..8` + which
-> ADR 0004 / 0006 / SECURITY.md §3 / OPS clause this feature must not break),
+> ADR [0004](../adr/0004-data-persistence-and-schema-evolution.md) / 0006 / SECURITY.md §3 / OPS clause this feature must not break),
 > and the **serving-lane contract**. Part 2 pins the **exact C#** U1–U10
 > implement against (`MediaObject`, `MediaOptions`, `IMediaFileStore`,
 > `LocalVolumeFileStore`, `IMediaStore`, `LocalVolumeMediaStore`,
@@ -12,7 +28,7 @@
 > the two `ProfileController` avatar actions), the **pinned seam-test names**
 > (U3 / U5 / U9), the **acceptance gate** (build + tests via the `dotnet exec`
 > path AGENTS.md prescribes), and the **drift-guard** — mirroring M3b Part 2
-> (`docs/design/m3b-moderation.md` § `## Seams & contracts (Part 2)`). This doc
+> ([`docs/design/m3b-moderation.md`](m3b-moderation.md) § `## Seams & contracts (Part 2)`). This doc
 > is the **primary** reference tier: a later unit codes against it, never
 > re-derives it — the doc wins on any mismatch (drift-guard).
 
@@ -51,8 +67,8 @@ nameable: the byte payload is one filesystem surface outside Postgres, so
    lane), the **owner-scoped upload** action, and the **audited serving**
    endpoint on `ProfileController`. The serving endpoint is *the contract*
    follow-on lanes copy (C-MED·1/2/3).
-3. **The governance artifacts** (authored in the close unit, U10): **ADR 0011**
-   + `docs/adr/README.md` row, and the doc sync (ARCHITECTURE / SECURITY /
+3. **The governance artifacts** (authored in the close unit, U10): **ADR [0011](../adr/0011-media-and-file-storage.md)**
+   + [`docs/adr/README.md`](../adr/README.md) row, and the doc sync (ARCHITECTURE / SECURITY /
    OPS / README).
 
 **Out-of-scope (follow-on lanes that *reuse* `IMediaStore` + the serving-lane
@@ -68,16 +84,16 @@ contract, each gated on its *owning* resource's audience):**
   increment; the `ContentKind`-by-allowlist seam (`MediaOptions.AllowedContentTypes`)
   is deliberately the extension point.
 - **Multi-tenant / cross-community media** — no such data model exists (single
-  community per instance per ADR 0002).
+  community per instance per ADR [0002](../adr/0002-deployment-topology.md)).
 
 ## Invariants
 
-- **C-MED·1 — single decision path (ADR 0006-D).** Serving media calls **only**
+- **C-MED·1 — single decision path (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).** Serving media calls **only**
   the frozen `IAuthorizationService.CanAsync(..., AccessAction.Read, resource)`,
   the same path `DirectoryService.PreviewAsAsync` + `ProfileController.Preview`
   already use. **No** new authorization module, and **no** new `AccessAction` /
   `AccessVia` id (U10's ADR must not add one either).
-- **C-MED·2 — audit-by-default (SECURITY.md §3 / ADR 0006-C).** Every media
+- **C-MED·2 — audit-by-default (SECURITY.md §3 / ADR [0006](../adr/0006-module-boundary-contracts.md)-C).** Every media
   **serving** request commits an `AccessAudit` row (Allow *and* Deny) — it
   goes through `CanAsync`, so the audit is the path's existing behavior. There
   is no unaudited serve and no Deny that skips the audit row.
@@ -94,7 +110,7 @@ contract, each gated on its *owning* resource's audience):**
   Type + size are enforced at the **upload boundary** (Web) against
   `MediaOptions`; the serving endpoint serves the *stored* (already-validated)
   `ContentType`.
-- **C-MED·6 — Core stays HTTP-free (ADR 0006-D).** `Kumunita.Core` references
+- **C-MED·6 — Core stays HTTP-free (ADR [0006](../adr/0006-module-boundary-contracts.md)-D).** `Kumunita.Core` references
   no ASP.NET/HTTP types. The store seam takes `byte[]` + `filename` +
   `contentType` + `actorId`, **not** `IFormFile` / `Stream` (the Web layer
   reads the upload into bytes and passes them in). Testable without a live
@@ -143,7 +159,7 @@ contract, each gated on its *owning* resource's audience):**
 
 > **Pinned for U1–U9. A unit matches these verbatim; on any mismatch the doc
 > wins — fix the code in the same commit + append a note to
-> `docs/plans-milestones/done/media-file-storage-handoff-notes.md`.**
+> [`docs/archive/lanes/media/media-file-storage-handoff-notes.md`](../archive/lanes/media/media-file-storage-handoff-notes.md).**
 
 ### §2.1 Seam surface (added / reused)
 
@@ -495,7 +511,7 @@ Notes: `ClaimTypes` here is the repo's custom claim names (same as `Edit()`);
 `403`) is the repo's fail-closed idiom (matches `PreviewAsAsync` returning
 `null` → the caller's 404). **This** action is C-MED·1/2/3 in code.
 
-> **Rendered-slot rule (added 2026-10-26 — ADR 0011 Amendment, 2026-10-26).**
+> **Rendered-slot rule (added 2026-10-26 — ADR [0011](../adr/0011-media-and-file-storage.md) Amendment, 2026-10-26).**
 > The action above is the *serving* contract — unchanged, and still the
 > fail-closed 404 for a direct URL with no profile / blocked profile / no
 > avatar set (FACES M3–M5). **How views render** an avatar slot is now a
@@ -542,7 +558,7 @@ Notes: `ClaimTypes` here is the repo's custom claim names (same as `Edit()`);
 `_mediaOpts` = `IOptions<MediaOptions>` (added to the ctor). The self-only
 scoping (U7a) is structural: the form's `subject` is the current user, never a
 path param — a foreign-subject upload is simply unreachable (and the `[Authorize]`
-+ self-only shape keeps ADR 0003 intact, same as `ProfileController.Edit()`).
++ self-only shape keeps ADR [0003](../adr/0003-roles-and-moderator-scoping.md) intact, same as `ProfileController.Edit()`).
 
 ### §2.5 Pinned seam-test names
 
@@ -612,7 +628,7 @@ about is a discovery issue, not a result).
 5. Never serves media from a public/static folder or mounts the volume as a
    static path (C-MED·3); never writes a volume file that bypasses the
    `IMediaStore` seam (C-MED·6).
-6. ADR 0011 (U10) must not contradict this doc — if it does, **A1011 is corrected**,
+6. ADR [0011](../adr/0011-media-and-file-storage.md) (U10) must not contradict this doc — if it does, **A1011 is corrected**,
    not this doc.
 7. Follow-on lanes (group logos / post attachments / badge icons) are a
    **separate feature** with its own design doc + units; this feature does not
@@ -621,7 +637,7 @@ about is a discovery issue, not a result).
 ---
 
 *This doc is the **primary** reference tier. U1–U9 code against it. Each unit's
-entry-read list (in `docs/plans-milestones/done/plan-media-file-storage.md`)
+entry-read list (in [`docs/archive/lanes/media/plan-media-file-storage.md`](../archive/lanes/media/plan-media-file-storage.md))
 cites the § it implements. The doc is written once (by the plan author) and
 only ever touched per the §2.7 drift-guard — never by a unit deciding a shape
 twice.*
@@ -647,7 +663,7 @@ lane) · U5 lane tests (set / clear / missing) · U6 `POST /profile/avatar`
 · U7 `GET /profile/avatar/{subjectId}` (FACES M1–M6, one frozen
 `CanAsync(Read)` → both outcomes audited, `nosniff`) · U8 avatar form +
 `<img src="/profile/avatar/{subject}">` + monogram fallback · U9 serving +
-upload test suites. **U10** — this record + ADR 0011 + the governance
+upload test suites. **U10** — this record + ADR [0011](../adr/0011-media-and-file-storage.md) + the governance
 reconciliations below. No unit rewrote another's seam; the only deviations
 from this doc were the reconciled ones the units recorded in the handoff:
 U4's `KeyNotFoundException` doc-wins, U6's `[ValidateAntiForgeryToken]`, U7's
@@ -655,16 +671,16 @@ U4's `KeyNotFoundException` doc-wins, U6's `[ValidateAntiForgeryToken]`, U7's
 `IHttpContextAccessor` `@inject` for the subject id, U9's local
 `TestFormFile : IFormFile` (the .NET 10 `FormFile` setter NRE).
 
-**Governance reconciled in close (ADR 0011 + docs):** ADR 0011
-(`docs/adr/0011-media-and-file-storage.md`, accepted 2026-09-11); `SECURITY.md`
-data class **(e)** + the two C-MED control rows (`SECURITY.md` §3/§5);
-`OPS.md` `Media__*` config rows + the **second restore surface** (the media
-volume) in §4 backups and §5 restore; `ARCHITECTURE.md` §2/§3/§5 (Media module
-row, feature-module list, `MediaObject` POC, "one database + one volume");
-`README.md` status + features + ADR range (0001–0011). Per §2.7 rule 6 the
+**Governance reconciled in close (ADR [0011](../adr/0011-media-and-file-storage.md) + docs):** ADR [0011](../adr/0011-media-and-file-storage.md)
+([`docs/adr/0011-media-and-file-storage.md`](../adr/0011-media-and-file-storage.md), accepted 2026-09-11); [`SECURITY.md`](../../SECURITY.md)
+data class **(e)** + the two C-MED control rows ([`SECURITY.md`](../../SECURITY.md) §3/§5);
+[`OPS.md`](../OPS.md) `Media__*` config rows + the **second restore surface** (the media
+volume) in §4 backups and §5 restore; [solution layout](../architecture/solution-layout.md) (Media module
+row), the [modular monolith](../ARCHITECTURE.md) feature-module list, [data model — MediaObject](../architecture/data-model.md) ("one database + one volume");
+[`README.md`](../../README.md) status + features + ADR range (0001–0011). Per §2.7 rule 6 the
 ADR conformed to this doc — no drift guard fired against it.
 
-**Amendment note (2026-10-26 — see ADR 0011 Amendment, 2026-10-26).** The
+**Amendment note (2026-10-26 — see ADR [0011](../adr/0011-media-and-file-storage.md) Amendment, 2026-10-26).** The
 U8 "avatar form + `<img src="/profile/avatar/{subject}">` + monogram
 fallback" deliverable has been refined: the *rendering* of an avatar slot is
 now driven by a server-side presence check (the `<kw-avatar>` TagHelper +
@@ -697,6 +713,6 @@ pin now covers both the serving lane (§2.3) and the rendering lane
    OPS `Media__MaxBytes` guidance and the SEC (e) class sensitivity line both
    need revisiting in the same unit.
 
-**Sole handoff artifact:** `docs/plans-milestones/done/
+**Sole handoff artifact:** `docs/archive/lanes/
 media-file-storage-handoff-notes.md` `## Summary` — read it first when starting
 any follow-on lane's U1.

@@ -1,12 +1,20 @@
-# ADR 0018 — UGC authored-in language tag (posts, replies, announcements)
-
-Status: Accepted
-Date: 2026-09-14
+---
+id: adr-0018
+title: "UGC authored-in language tag (posts, replies, announcements)"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/guardian-controls-design.md]
+supersedes: []
+superseded_by: [adr-0027, adr-0086]
+updated: 2026-11-02
+---
 
 ## Context
 
 Announcements and community/group posts are user-generated content that is,
-per ADR 0005 §C, **always rendered as authored — never translated**. Machine
+per ADR [0005](0005-multilingual-support.md) §C, **always rendered as authored — never translated**. Machine
 translation of UGC is a *deferred* feature (a separate trust boundary, off by
 default). But residents in a multilingual neighborhood write in more than one
 language, and the platform is about to gain **search** (deferred, README →
@@ -16,15 +24,15 @@ reader can tell which language a row is in, so a reader who wants a version in
 their own language can *add* one (a separate, later feature), and so a future
 search can scope to a language.
 
-ADR 0005 is about **platform** text (UI strings, static pages) and is explicit
+ADR [0005](0005-multilingual-support.md) is about **platform** text (UI strings, static pages) and is explicit
 that it does *not* touch UGC. This ADR adds a small **metadata tag** to the
 three UGC document shapes; it does **not** add any translation, display, or
-machine-translation behavior. ADR 0005 §C is therefore **unchanged** — the tag
+machine-translation behavior. ADR [0005](0005-multilingual-support.md) §C is therefore **unchanged** — the tag
 is data, not a translation step.
 
-This is the natural follow-on to ADR 0013 (group posts), which already carried
+This is the natural follow-on to ADR [0013](0013-group-posts-membership-lane.md) (group posts), which already carried
 a `GroupId` on the same `Post` document: a new, optional, additive field on an
-existing document. It follows the **ADR 0004 §B.1 additive** pattern — a new
+existing document. It follows the **ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive** pattern — a new
 POCO field is delta-detected and idempotent, and no re-seed is required.
 
 ## Decision
@@ -50,8 +58,8 @@ POCO field is delta-detected and idempotent, and no re-seed is required.
   means "use the instance default."
 - **Set at authoring time. Immutability splits by lane:**
   - **Posts: create-time tag, corrected on the author-only edit lanes
-    (amended 2026-09-13, per owner request).** The ADR 0014 (community post
-    edit) and ADR 0016 (group-post edit) seams now accept a
+    (amended 2026-09-13, per owner request).** The ADR [0014](0014-post-edit-lane-author-only.md) (community post
+    edit) and ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) (group-post edit) seams now accept a
     `languageCode` argument and re-resolve it through the same
     `PostService.ResolveLanguageCodeAsync` helper — a non-empty submission is
     written verbatim (the author can correct the language the post was
@@ -59,13 +67,13 @@ POCO field is delta-detected and idempotent, and no re-seed is required.
     (never blanking a stored tag). The Web edit lanes
     (`PostsController.Edit`, `GroupsController.EditGroupPost`) seed the
     picker from the enabled catalog pre-selected to the post's stored tag,
-    exactly like the announcement edit lane (ADR 0017).
-  - **Replies: create-time only.** The ADR 0016 reply-edit seam
+    exactly like the announcement edit lane (ADR [0017](0017-announcement-edit-lane-author-or-globaladmin.md)).
+  - **Replies: create-time only.** The ADR [0016](0016-group-post-and-reply-edit-lane-author-only.md) reply-edit seam
     (`UpdateReplyAsync`) stays body-only — the reply's tag is **not**
     editable there, consistent with the lane's existing "body only" rule
     (like the reply's `PostId` / `AuthorId`).
   - **Announcements: editable on the edit lane.** The announcement edit
-    surface (ADR 0017) is *not* ADR-frozen to a narrower field set, so the tag
+    surface (ADR [0017](0017-announcement-edit-lane-author-or-globaladmin.md)) is *not* ADR-frozen to a narrower field set, so the tag
     is editable there. `AnnouncementService.UpdateAsync` re-resolves the value
     through the same default-resolution helper (so a no-op re-save that leaves
     the picker at the instance default does not blank a previously-stored
@@ -75,10 +83,10 @@ POCO field is delta-detected and idempotent, and no re-seed is required.
   two post edit surfaces (`Posts/Edit`, `Groups/Edit` — amended 2026-09-13),
   and the two reply forms (`Posts/Detail`, `Groups/PostDetail`) each get a
   `Language` `<select>` posting the author's choice. The options are the
-  instance's **enabled** `LanguageCatalog` (ADR 0005 B), ordered by
+  instance's **enabled** `LanguageCatalog` (ADR [0005](0005-multilingual-support.md) B), ordered by
   `SortOrder`. The picker is pre-selected to the stored row's tag on the
   edit lanes; on the create lanes and the reply/comment forms the
-  pre-selection is the actor's **current effective language** (ADR 0049 —
+  pre-selection is the actor's **current effective language** (ADR [0049](0049-default-language-variant-selection.md) —
   the `kumunita.locale` cookie → first enabled `Accept-Language` match →
   instance default → `en` floor, the same chain the `<kw-l>` TagHelper
   resolves UI strings through) — "write in the language you're reading in"
@@ -99,10 +107,10 @@ Positive
   (b) a future **language-scoped search** — neither of which is in scope here,
   but neither requires a migration when it lands (the field is already there
   and already populated).
-- Follows the established ADR 0004 §B.1 additive pattern: no re-seed, no
+- Follows the established ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive pattern: no re-seed, no
   breaking change; existing rows backfill to the instance default on their
   next write and read as the instance default until then.
-- Keeps ADR 0005 §C's trust posture intact: **nothing is translated, nothing
+- Keeps ADR [0005](0005-multilingual-support.md) §C's trust posture intact: **nothing is translated, nothing
   is displayed differently** — this is purely a metadata tag. The platform's
   "UGC is never machine-translated" invariant (the README → Deferred trust
   boundary) is untouched.
@@ -120,14 +128,3 @@ Negative / accepted risks
   the same `en` floor. (The `GetDefaultLanguageCodeAsync` seam is the single
   read path the Web uses; the Core services read `LocaleSettings` directly
   because they run inside a write session and already hold one.)
-
-## Related
-
-- **ADR 0005** — multilingual support (platform text; §C UGC "never
-  translated" is *unchanged* by this ADR).
-- **ADR 0004 §B.1** — additive schema-evolution pattern this field follows.
-- **ADR 0013** — group posts (the `Post` document this tag rides on).
-- **ADR 0014 / 0016** — post edit lanes this tag is **editable** on
-  (amended 2026-09-13) and the reply edit lane it stays **frozen** on
-  (body-only, create-time tag).
-- **ADR 0017** — announcement edit lane this tag is **editable** on.

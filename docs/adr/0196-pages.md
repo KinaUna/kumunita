@@ -1,8 +1,21 @@
-# ADR 0196 — Pages
+---
+id: adr-0196
+title: "Pages"
+tier: reference
+kind: adr
+status: proposed
+audiences: [developer, agent, platform-maintainer]
+related: [docs/adr/0183-announcements.md, docs/adr/0184-announcement-detail.md, docs/adr/0192-documents.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0196](0196-pages.md) — Pages
 
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-27
-Relates to: ADR 0192 (documents), ADR 0184 (detail pages), ADR 0183 (chips)
+Relates to: ADR [0192](0192-documents.md) (documents), ADR [0184](0184-announcement-detail.md) (detail pages), ADR [0183](0183-announcements.md) (chips)
 
 ## Decision
 
@@ -18,4 +31,4 @@ Relates to: ADR 0192 (documents), ADR 0184 (detail pages), ADR 0183 (chips)
 ## Open
 
 - Light mode not verified for the tree; check both palettes, expand/collapse and phone width.
-- Page form (New/Edit) relies on the form look (ADR 0182).
+- Page form (New/Edit) relies on the form look (ADR [0182](0182-form-look.md)).

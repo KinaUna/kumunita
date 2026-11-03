@@ -1,4 +1,17 @@
-# ADR 0138 — Sample-data change-password lock: a `GlobalAdmin` option (shown only on a `SampleData__Enabled` instance) that locks the demo (sample) accounts out of changing their own password — except the sample `GlobalAdmin` — plus the resident self-serve change-password surface it guards
+---
+id: adr-0138
+title: "Sample-data change-password lock: a `GlobalAdmin` option (shown only on a `SampleData__Enabled` instance) that locks the demo (sample) accounts out of changing their own password — except the sample `GlobalAdmin` — plus the resident self-serve change-password surface it guards"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/archive/lanes/improve/improve-audit.md]
+supersedes: [adr-0006]
+superseded_by: [adr-0194, adr-0280]
+updated: 2026-11-02
+---
+
+# ADR [0138](0138-sample-data-change-password-lock.md) — Sample-data change-password lock: a `GlobalAdmin` option (shown only on a `SampleData__Enabled` instance) that locks the demo (sample) accounts out of changing their own password — except the sample `GlobalAdmin` — plus the resident self-serve change-password surface it guards
 
 Status: Accepted
 Date: 2026-10-04
@@ -7,7 +20,7 @@ config flag is the *existence gate* this surface is unreachable without, so the
 admin option is "unreachable by construction" on a real deployment exactly as the
 seeder is); 0078 (the closed `SampleAccountEmails` set — the *single source of
 truth* this lane's "is this a sample account?" conjunct compares against, so the
-lock and the notification-suppression gate cannot drift); 0050 (the ADR 0050
+lock and the notification-suppression gate cannot drift); 0050 (the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md)
 sign-up gate — the *exact template* this lane mirrors: one admin-settled
 instance value on the `LocaleSettings` singleton, one audited write lane, the
 gate authoritative on both the hidden form and the write path)
@@ -27,7 +40,7 @@ ChangePasswordAsync` seam existed but had no Web caller), and so no way to
 change a sample password. Now that a change-password surface is landing (the
 residents' "Change password" form), a new seam opens: a visitor testing the demo
 could change a sample account's password and break the shared credential for the
-everyone else who uses it. ADR 0138 closes that seam with a **GlobalAdmin option,
+everyone else who uses it. ADR [0138](0138-sample-data-change-password-lock.md) closes that seam with a **GlobalAdmin option,
 shown only when the sample data is enabled**: flip it on and the demo accounts
 (every `SampleAccountEmails` member) are locked out of changing their own
 password — **except the sample `GlobalAdmin`**, whose own credential the admin
@@ -38,23 +51,23 @@ README Roadmap / `MilestonesTests.cs` triple is **untouched**.
 The one thing the whole lane respects:
 
 - **The lock is a pure read decision, and the write guard is the single place
-  the rule bites** (the ADR 0050 gate posture): the
+  the rule bites** (the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) gate posture): the
   `IsChangePasswordLockedForAsync(subjectId)` read combines the four conjuncts in
   **one place**, so the resident `GET /account/password` notice and the
   `ChangePasswordAsync` self-serve guard **agree by construction**; the
   `UnauthorizedAccessException` (the one refusal) is thrown in the **Core**
   `ChangePasswordAsync` before any write (no audit row for the blocked attempt
   — the fail-closed pin), and the Web surfaces it. `IActionResult` / HTTP
-  never cross the seam (ADR 0006-D).
+  never cross the seam (ADR [0006](0006-module-boundary-contracts.md)-D).
 - **The closed set is reused, not re-derived**: the "is this a sample account?"
-  conjunct reads the *same* `SampleDataSeeder.SampleAccountEmails` the ADR 0078
+  conjunct reads the *same* `SampleDataSeeder.SampleAccountEmails` the ADR [0078](0078-sample-account-notification-suppression-in-production.md)
   notification-suppression gate compares against — one source of truth, so the
-  lock and the suppression cannot drift (the ADR 0129 embedded document is the
+  lock and the suppression cannot drift (the ADR [0129](0129-sample-data-embedded-json-document.md) embedded document is the
   single origin of both).
 
 ## Context
 
-A deployed demo site (`Production` + `SampleData__Enabled=true`, ADR 0056) is
+A deployed demo site (`Production` + `SampleData__Enabled=true`, ADR [0056](0056-sample-data-opt-in-and-deploy-posture.md)) is
 *public*: the seed admin keeps its `SeedAdmin__` setup-token lane, the other demo
 accounts get random high-entropy passwords, and a credentials summary is emailed
 to the seed admin. But the accounts themselves are **shared** — "Anna", "Ben",
@@ -72,7 +85,7 @@ Two facts about the current surface shape the decision:
   were the one-time `SeedAdmin__` setup lane, and nothing else). So there was
   nothing to lock; the lane had to add the resident surface *and* the lock
   together (the user confirmed the full scope).
-- **The sample set is code-owned and closed** (ADR 0078 / 0129):
+- **The sample set is code-owned and closed** (ADR [0078](0078-sample-account-notification-suppression-in-production.md) / 0129):
   `SampleDataSeeder.SampleAccountEmails` is the single source of truth
   "this account is a sample account" already relies on (the production
   notification-suppression gate). The lock keys on the *same* set — no second,
@@ -87,11 +100,11 @@ Two facts about the current surface shape the decision:
 
 1. `IsSampleDataEnabledAsync()` — the instance carries the
    `SampleData__Enabled` flag (a pure config read; a real deployment never
-   carries it, so the lock is *unreachable by construction*, ADR 0056);
+   carries it, so the lock is *unreachable by construction*, ADR [0056](0056-sample-data-opt-in-and-deploy-posture.md));
 2. `IsSamplePasswordChangeLockedAsync()` — the admin opted in (the
    `LocaleSettings.SamplePasswordChangeLocked` gate, the `false` floor);
 3. the subject is a **sample account** — its `Profile.Email` is a member of the
-   closed `SampleAccountEmails` set (the ADR 0078 single source of truth); and
+   closed `SampleAccountEmails` set (the ADR [0078](0078-sample-account-notification-suppression-in-production.md) single source of truth); and
 4. the subject is **not** a `GlobalAdmin` (the sample admin is exempt).
 
 Conjuncts 3 and 4 short-circuit, so **every real (non-sample) account and the
@@ -115,7 +128,7 @@ Core guard).
 
 ### The admin option (shown only when sample data is enabled)
 
-A new `GlobalAdmin`-gated `/admin/sample` surface (the ADR 0050
+A new `GlobalAdmin`-gated `/admin/sample` surface (the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md)
 `AdminSignupController` template, its own controller so the `AdminController`
 test-pinned constructor is untouched):
 
@@ -125,7 +138,7 @@ test-pinned constructor is untouched):
   floor).
 - `POST /admin/sample` → **404** when the flag is unset (the gate is
   authoritative on the write path too — a crafted POST to a real instance is
-  refused, the ADR 0050 gate shape); otherwise
+  refused, the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) gate shape); otherwise
   `SetSamplePasswordChangeLockedAsync(locked, actor)` — the single audited
   write lane (exactly one `AccessAudit` row, `Via: Admin`, action
   `sample.set-password-lock`, `TargetKind`/`TargetId` "sample"), then a
@@ -145,7 +158,7 @@ param):
 
 - **GET** — the change-password form (current / new / confirm); when
   `IsChangePasswordLockedForAsync` returns `true`, the static
-  `ChangePasswordLocked` notice instead (the ADR 0050 `SignupClosed` shape).
+  `ChangePasswordLocked` notice instead (the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) `SignupClosed` shape).
 - **POST** — the guard is authoritative (a locked account is denied with the
   notice, no write); otherwise the **current** password is verified against the
   account (`CheckPasswordAsync` — the self-serve lane proves it is really this
@@ -158,17 +171,17 @@ param):
 "Change password" is a **settings tab** (a `nav.change_password` kw-l key in
 the shared `_SettingsTabs.cshtml` sub-nav, reached from the account menu's
 single "Settings" entry) — moved out of the account dropdown 2026-10-04, the
-ADR 0028 "Children" / ADR 0080 idiom; a locked sample account sees the notice
+ADR [0028](0028-guardian-controls-account-scope-supervision.md) "Children" / ADR [0080](0080-settings-surface-split.md) idiom; a locked sample account sees the notice
 when it opens the page (the link stays, the write is refused).
 
 ### Persistence
 
 `LocaleSettings.SamplePasswordChangeLocked` — an **additive** `bool` on the
-existing `LocaleSettings` singleton (the same doc the ADR 0050 `IsSignupOpen` /
-ADR 0077 `NotifyAdminsOnSignup` / ADR 0019 / ADR 0020 lanes read and write),
+existing `LocaleSettings` singleton (the same doc the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md) `IsSignupOpen` /
+ADR [0077](0077-admin-account-signup-verify-notification.md) `NotifyAdminsOnSignup` / ADR [0019](0019-timezone-platform-default-and-resident-override.md) / ADR [0020](0020-date-format-platform-default-and-resident-override.md) lanes read and write),
 default `false` (locked-out off). No new document, no migration — a missing
 row reads as **not locked** (the `false` floor), so existing instances are
-unaffected (ADR 0004 §B.1 additive-field shape).
+unaffected (ADR [0004](0004-data-persistence-and-schema-evolution.md) §B.1 additive-field shape).
 
 ### Localization
 
@@ -189,9 +202,9 @@ in **all four** languages (en/de/fr/da) — the `KwLRegistryConsistencyTests`
   the lock is a pure demo-instance concern, gated on the `SampleData__Enabled`
   flag so it is unreachable by construction on a real deployment.
 - The decision is **one** pure read in Core, so the resident form, the locked
-  notice, and the `ChangePasswordAsync` guard cannot disagree (the ADR 0050
+  notice, and the `ChangePasswordAsync` guard cannot disagree (the ADR [0050](0050-admin-managed-signup-gate-open-or-invitation-only.md)
   gate-is-authoritative posture); the closed sample set is the **same** source
-  of truth ADR 0078 uses, so the lock and the suppression gate cannot drift.
+  of truth ADR [0078](0078-sample-account-notification-suppression-in-production.md) uses, so the lock and the suppression gate cannot drift.
 - Every flip is audited (`sample.set-password-lock`), every self-serve change
   is audited (`password.change`, `Via: Owner`) — the audit-by-default
   invariant holds end to end.
@@ -210,7 +223,7 @@ in **all four** languages (en/de/fr/da) — the `KwLRegistryConsistencyTests`
   happens to use a sample-set email would be treated as a sample account. This
   is acceptable (the sample-set emails are deliberately-fictional
   `examplium.com` addresses, distinct from the real `kumunita.com` domain, ADR
-  0056), and the same closed set ADR 0078 already relies on.
+  0056), and the same closed set ADR [0078](0078-sample-account-notification-suppression-in-production.md) already relies on.
 
 ## Alternative considered
 
@@ -218,7 +231,7 @@ in **all four** languages (en/de/fr/da) — the `KwLRegistryConsistencyTests`
   would lock *every* non-admin account on a demo instance (including a real
   resident who signed up on it), and would need no closed set. The user's
   requirement is specifically the *sample* accounts (the shared seed
-  credentials), and reusing the ADR 0078 closed set is the single source of
+  credentials), and reusing the ADR [0078](0078-sample-account-notification-suppression-in-production.md) closed set is the single source of
   truth that already answers "is this a sample account" — so the closed-set
   membership is the honest, drift-proof conjunct.
 - **No resident surface; admin-only reset with an implicit lock** — rejected:

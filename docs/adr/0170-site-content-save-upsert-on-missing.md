@@ -1,9 +1,22 @@
-# ADR 0170 — Site content singleton save: upsert-on-missing
+---
+id: adr-0170
+title: "Site content singleton save: upsert-on-missing"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m35-kiosk-mode-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0170](0170-site-content-save-upsert-on-missing.md) — Site content singleton save: upsert-on-missing
 
 Status: Accepted
 Date: 2026-10-22
-Amends **ADR 0150** (D3 — the `SiteContent` write lane) and, by extension,
-the **M35·2** divergence note in **ADR 0164** (the Kiosk
+Amends **ADR [0150](0150-site-content-customization.md)** (D3 — the `SiteContent` write lane) and, by extension,
+the **M35·2** divergence note in **ADR [0164](0164-kiosk-mode.md)** (the Kiosk
 `SavePlaylistAsync` "upsert vs. no-op" register). This ADR retires the
 `SiteContentService.SaveAsync` no-op-on-missing-row template in favor of an
 upsert, so a save is **never a silent no-op** — the singleton row is created
@@ -14,7 +27,7 @@ nullable read) remain.
 
 ## Context
 
-`SiteContentService.SaveAsync` (ADR 0150 D3) shipped as a **no-op on a
+`SiteContentService.SaveAsync` (ADR [0150](0150-site-content-customization.md) D3) shipped as a **no-op on a
 missing row**:
 
 ```csharp
@@ -25,15 +38,15 @@ if (stored is null)
 }
 ```
 
-The rationale (in the original code comment and in ADR 0150 D3) was: the
+The rationale (in the original code comment and in ADR [0150](0150-site-content-customization.md) D3) was: the
 `FirstBootSeeder` runs on the very first boot (the `IsPristineAsync` gate,
-ADR 0005 / ADR 0015) and creates the singleton row with the shipped defaults
+ADR [0005](0005-multilingual-support.md) / ADR [0015](0015-ui-view-localization-mechanics.md)) and creates the singleton row with the shipped defaults
 before any admin could ever save, so a save "on a missing row" could not
 actually happen in production.
 
-The Kiosk lane (ADR 0164, M35·2) had the **same structural template** and
+The Kiosk lane (ADR [0164](0164-kiosk-mode.md), M35·2) had the **same structural template** and
 **deliberately chose the opposite shape** — an upsert. The M35 design doc
-`docs/design/m35-kiosk-mode-design.md` §2.2 pinned the three
+[`docs/design/m35-kiosk-mode-design.md`](../design/m35-kiosk-mode-design.md) §2.2 pinned the three
 `SiteContentService` → `KioskService` divergences (upsert vs. no-op;
 caller's session vs. own session; nullable read vs. never-null read), and
 the "upsert vs. no-op" item was the one that named the `SiteContentService`
@@ -53,7 +66,7 @@ by moving Kiosk to the no-op shape. The reasoning:
    `Task.CompletedTask` with no error, no `AccessAudit` row, and no
    visible change.
 2. **The upsert is what the write actually needs to do.** The write
-   contract (ADR 0150 D3, invariant C3/C4) is: "one session, doc + exactly
+   contract (ADR [0150](0150-site-content-customization.md) D3, invariant C3/C4) is: "one session, doc + exactly
    one `AccessAudit` row commit together; strong consistency — the new
    value is live on the very next `GetAsync`." A no-op on a missing row
    is incompatible with that contract (the value is **not** live on the
@@ -68,7 +81,7 @@ by moving Kiosk to the no-op shape. The reasoning:
    missing, never-overwrites (the `SeedLanguageCatalogAsync` /
    `SeedDefaultPagesAsync` shape). A first-save on a missing row creates
    the row with the caller's field set (the `SiteContent` POCO defaults
-   for any field the caller did not set, the ADR 0150 D4 shape — the
+   for any field the caller did not set, the ADR [0150](0150-site-content-customization.md) D4 shape — the
    byte-identical `kw-l` defaults); the seeder's later no-op on a warm
    boot is unchanged (it checks `LoadAsync` and skips if the row exists).
    There is no conflict between the two writers: they are idempotent in
@@ -91,16 +104,16 @@ var stored = await session
 
 The rest of the lane (apply the field set, `session.Store(stored)`, the
 single `AccessAudit` row, `SaveChangesAsync`) is **unchanged**. The
-`SiteContent` POCO field defaults (the ADR 0150 D4 "byte-identical to the
+`SiteContent` POCO field defaults (the ADR [0150](0150-site-content-customization.md) D4 "byte-identical to the
 shipped `kw-l` text" shape) are the fallback for any field the caller
 does not set — the same fallback the `GetAsync` in-code fallback returns
-(ADR 0150 D2, SITE·1).
+(ADR [0150](0150-site-content-customization.md) D2, SITE·1).
 
 **Strong consistency is now actually honored on the missing-row path**
 (invariant C4): the very next `GetAsync` returns the saved value (not
 the in-code fallback), and exactly one `AccessAudit` row is written
 (action `site.save`, `TargetKind` `"site"`, `Via = Admin`, `TargetId`
-`"singleton"` — the ADR 0150 D3 shape).
+`"singleton"` — the ADR [0150](0150-site-content-customization.md) D3 shape).
 
 **No new route, no new seam, no new bounded context, no new `AccessAction`
 / `AccessVia` / `Decide()` branch, no EF migration, no `kw-l` key
@@ -118,7 +131,7 @@ The `KioskService` doc-comment "Three intentional departures from the
 `SiteContentService` template" becomes "**Two** intentional departures"
 (caller's session vs. own session; nullable read vs. never-null read).
 The "Upsert vs. no-op" item is retired and replaced with an explicit
-**"Upsert parity (ADR 0170)"** note: both `SavePlaylistAsync` and
+**"Upsert parity (ADR [0170](0170-site-content-save-upsert-on-missing.md))"** note: both `SavePlaylistAsync` and
 `SiteContentService.SaveAsync` upsert — a missing row is created. A save
 is never a silent no-op in either service.
 
@@ -127,28 +140,28 @@ missing row is created (the register's M35·2 pin — the one intentional
 departure from the `SiteContentService.SaveAsync` no-op-on-missing
 template; …)" is amended to: "**Upsert**: a missing row is created (the
 register's M35·2 pin — a resident can configure their playlist on a fresh
-instance without a seeder; ADR 0170 moved the
+instance without a seeder; ADR [0170](0170-site-content-save-upsert-on-missing.md) moved the
 `SiteContentService.SaveAsync` template to the same upsert shape, so the
 two services are on parity — a save is never a silent no-op)."
 
-The M35 design doc `docs/design/m35-kiosk-mode-design.md` §2.2 "Upsert
+The M35 design doc [`docs/design/m35-kiosk-mode-design.md`](../design/m35-kiosk-mode-design.md) §2.2 "Upsert
 vs. no-op" divergence note is amended with the same
-"ADR 0170 closed this divergence" note. (The design doc is a historical
+"ADR [0170](0170-site-content-save-upsert-on-missing.md) closed this divergence" note. (The design doc is a historical
 record; the amendment is appended, not rewritten.)
 
-### D3 — the ADR 0150 D3 "never load-or-creates" sentence is retired
+### D3 — the ADR [0150](0150-site-content-customization.md) D3 "never load-or-creates" sentence is retired
 
-ADR 0150 D3's "The lane **upserts** the singleton — it never creates a
+ADR [0150](0150-site-content-customization.md) D3's "The lane **upserts** the singleton — it never creates a
 second row (D6)" is preserved (still true — the upsert is still an
 upsert, not a second row). The **`ISiteContentService.SaveAsync` doc
 comment**'s "(a missing row is a **no-op** — the lane does not load-or-
-create; …)" is amended to "(a missing row is **created** — the ADR 0170
-upsert-on-missing amendment, the ADR 0164 `KioskService` 'upsert vs.
+create; …)" is amended to "(a missing row is **created** — the ADR [0170](0170-site-content-save-upsert-on-missing.md)
+upsert-on-missing amendment, the ADR [0164](0164-kiosk-mode.md) `KioskService` 'upsert vs.
 no-op' shape: a save is live and idempotent even before the seeder ran,
 never a silent no-op)".
 
-ADR 0150's own file gains an `## Amendments` section (the ADR 0005 /
-0015 / 0050 convention) with a 2026-10-22 entry pointing at ADR 0170.
+ADR [0150](0150-site-content-customization.md)'s own file gains an `## Amendments` section (the ADR [0005](0005-multilingual-support.md) /
+0015 / 0050 convention) with a 2026-10-22 entry pointing at ADR [0170](0170-site-content-save-upsert-on-missing.md).
 
 ### D4 — the Core test pins the new behavior
 
@@ -170,19 +183,19 @@ path is pinned by the new test).
 ### D5 — the sibling `SurfaceLabelsService` (M29·6) is **not** amended in
 this pass
 
-`SurfaceLabelsService.SaveAsync` (ADR 0152, M29) has the **same**
+`SurfaceLabelsService.SaveAsync` (ADR [0152](0152-admin-surface-labels.md), M29) has the **same**
 no-op-on-missing-row template (the "M29·6 never load-or-creates" pin,
 `SurfaceLabelsService.cs:164`). The same reasoning applies to it. This
 ADR deliberately does **not** amend it — the user's request was scoped to
-the `/admin/site` surface (ADR 0150), and the M29 lane is a separate
+the `/admin/site` surface (ADR [0150](0150-site-content-customization.md)), and the M29 lane is a separate
 bounded context with its own ADR, its own test suite, and its own
 `SeedRowAsync`-style harness. If the same latent-bug class is confirmed
 on the M29 surface (a save on a missing row would silently no-op), the
-M29 lane should get its own ADR 01xx amending ADR 0152 in the same shape
+M29 lane should get its own ADR 01xx amending ADR [0152](0152-admin-surface-labels.md) in the same shape
 as this one — a one-line `?? new SurfaceLabels { Id = "singleton" }`
 coalesce + the same doc / test updates. The M29 design doc
-`docs/design/m29-admin-surface-labels-design.md` §2.1 already names the
-"ADR 0150 … no-op on missing row — the SITE·6 'never load-or-creates'
+[`docs/design/m29-admin-surface-labels-design.md`](../design/m29-admin-surface-labels-design.md) §2.1 already names the
+"ADR [0150](0150-site-content-customization.md) … no-op on missing row — the SITE·6 'never load-or-creates'
 pin" as the shape it mirrors, so the M29 amendment would need to update
 that reference too.
 
@@ -216,13 +229,13 @@ that reference too.
   service's behavior — the service's behavior is pinned in Core).
 - **The sibling `SurfaceLabelsService` (M29·6) is unchanged** (D5). If
   the same latent-bug class is confirmed there, a separate ADR amending
-  ADR 0152 in the same shape is the follow-up.
+  ADR [0152](0152-admin-surface-labels.md) in the same shape is the follow-up.
 - **`Milestones.cs` / README Roadmap / `MilestonesTests.cs` are
   byte-identical** (a named-lane amendment, not a milestone flip — the
-  ADR 0013 `GP` / ADR 0011 `M4-adjacent` precedent). **No `WhatsNew.cs`
+  ADR [0013](0013-group-posts-membership-lane.md) `GP` / ADR [0011](0011-media-and-file-storage.md) `M4-adjacent` precedent). **No `WhatsNew.cs`
   entry** (an internal hardening of an existing lane, not a new
-  capability the platform ships — the ADR 0110 "milestone **or a named
+  capability the platform ships — the ADR [0110](0110-platform-versioning-and-whats-new.md) "milestone **or a named
   lane ships**" rule does not apply to a bug-fix amendment of an
   already-shipped lane). **No ADR index row added** (the amendment is
-  recorded on ADR 0150's `## Amendments` section, the ADR 0005 / 0015 /
+  recorded on ADR [0150](0150-site-content-customization.md)'s `## Amendments` section, the ADR [0005](0005-multilingual-support.md) / 0015 /
   0050 convention — not a new ADR with its own index row).

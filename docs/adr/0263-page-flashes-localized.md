@@ -1,10 +1,23 @@
-# ADR 0263 — Page controller flashes are localized
+---
+id: adr-0263
+title: "Page controller flashes are localized"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: []
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0263](0263-page-flashes-localized.md) — Page controller flashes are localized
 
 Status: Accepted
 Date: 2026-10-29
 
 ## Context
-Next in the flash order after Posts (ADR 0262): the Page controller had 14 literal English `TempData` messages plus two sign-in `ModelState` errors.
+Next in the flash order after Posts (ADR [0262](0262-posts-flashes-localized.md)): the Page controller had 14 literal English `TempData` messages plus two sign-in `ModelState` errors.
 
 ## Decision
 - The 14 flashes and the two sign-in model errors go through `this.FlashAsync(key, english)`; translation messages reuse `flash.translation_*`.

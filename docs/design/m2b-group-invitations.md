@@ -1,4 +1,20 @@
+---
+id: design-m2b-group-invitations
+title: "M2b — Owner-invited group membership"
+tier: reference
+kind: design
+status: current
+audiences: [developer, agent]
+related:
+  - docs/adr/0006-module-boundary-contracts.md
+  - docs/adr/0003-roles-and-moderator-scoping.md
+updated: 2026-11-02
+---
+
 # Design Doc — M2b: owner-invited group membership (invite → accept/decline)
+
+> **Abstract:** the **M2b owner-invited group membership** design — an **invite → accept/decline** flow on the M2 groups surface: the group owner sends an invitation, the invitee accepts/declines; the immediate add/remove surface is kept side-by-side. Single-part unit doc pinning invariants C-M2b·1..3, FACES F16–F20, and the seam shapes. **Who is it for:** a developer touching the `GroupInvitation` lane; an agent that needs the accept/decline shape. **When to read the rest:** before touching the invitation doc, the accept/decline lane, or the F16–F20 faces.
+
 
 > **Single-part unit doc** (the m3b two-part split is unnecessary at m2b's
 > size). Part A pins **scope**, **invariants** (`C-M2b·1..3` + carried M2/M3
@@ -24,12 +40,12 @@ record of *why*.
 
 M2b adds the invitation lane on top of that, per the
 user-approved decisions in the plan
-(`docs/plans-milestones/done/plan-m2b-owner-invited-group-membership-(invite-acceptdecline).md`):
+(`docs/archive/lanes/plan-m2b-owner-invited-group-membership-(invite-acceptdecline).md`):
 
 - **Direction:** the **owner invites**, the **invitee resolves** (accept /
   decline). No join-request flow — that would open the reader to
   owner∪member-less state and break the owner∪member privacy model.
-  *(Superseded by **ADR 0094** / the `group-join-request-lane` design doc:
+  *(Superseded by **ADR [0094](../adr/0094-group-join-request-lane.md)** / the `group-join-request-lane` design doc:
   a self-initiated join-request lane now exists, but **public groups only** —
   the private-group owner∪member model it protected is untouched, and the
   m2b invitation lane is kept side-by-side, not replaced.)*
@@ -52,7 +68,7 @@ user-approved decisions in the plan
 2. The `CoreDocTypes` registration, `UniqueIndex(GroupId, UserId)` (the
    one-row-per-(group, user) business-key convention of
    `GroupMembership`).
-3. Seven new named seams on `IUserInfoService` (ADR 0006-E compatible
+3. Seven new named seams on `IUserInfoService` (ADR [0006](../adr/0006-module-boundary-contracts.md)-E compatible
    lane — no signature change to any pinned M1/M2 method): four writes
    (`InviteGroupMemberAsync`, `AcceptGroupInvitationAsync`,
    `DeclineGroupInvitationAsync`, `CancelGroupInvitationAsync`) + three
@@ -83,12 +99,12 @@ user-approved decisions in the plan
 - Any re-opening of the immediate add/remove surface (U10/F7) — it stays
   exactly as M2 shipped it.
 - Group self-join, invitation-by-invitee, and delegation on invitations
-  (ADR 0003 default-OFF is carried; a delegate may not stand in for the
+  (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) default-OFF is carried; a delegate may not stand in for the
   invitee in the self-lane — C-M2b·2).
 
 ## Invariants (pinned for m2b)
 
-m2b is a *caller* of the ADR 0006 invariants (not an owner). M2b owns
+m2b is a *caller* of the ADR [0006](../adr/0006-module-boundary-contracts.md) invariants (not an owner). M2b owns
 **three** new invariants (`C-M2b·1..3`) — the three behavioral rules m2b is
 the first unit to need on the groups surface — plus the **carried** M2 pins
 that m2b's reads / writes must keep holding.
@@ -98,17 +114,17 @@ that m2b's reads / writes must keep holding.
 | **C-M2b·1** (m2b-owned) | **SoD lane (C-M2·3 extension).** Create (`InviteGroupMemberAsync`) / cancel (`CancelGroupInvitationAsync`) an invitation ⇒ **owner ∪ GlobalAdmin only**. Web gate = U10's `TryResolveWriteSurface` (owner ∪ member reachability) **plus** the owner-or-GlobalAdmin standing check (a plain member reaches the surface — the U10/F7 add/remove pin — but its invite/cancel POSTs 404 at the controller's `TryResolveInviteSurface`). Audited `Via` is derived **exactly like add/remove**: `invitedBy / cancelledBy == Group.OwnerId ⇒ Owner`, else `Admin` (the seam's single SoD source — the Web layer carries no form-bound owner id). | The invite/cancel actions (F16/F18) are the first m2b write lanes that the owner∪GlobalAdmin gate constrains. `UserInfoServiceGroupInvitationsM2bTests.Invite_Via_*` pin the audit `Via` derivation; the Web gate is a controller concern (no Web seam test). |
 | **C-M2b·2** (m2b-owned) | **Self-lane.** Accept (`AcceptGroupInvitationAsync`) / decline (`DeclineGroupInvitationAsync`) ⇒ the **invitee only** — the actor must equal the row's `UserId`, **verified in Core** (not only by the Web gate). Web gate = "in my pending list, else 404" (read lane #2). A foreign caller throws `InvalidOperationException`; the Web maps it to an error, never a 500. | The accept/decline actions (F17) are the first m2b write lanes with a *self*-SoD (not owner/SoD). `UserInfoServiceGroupInvitationsM2bTests.AcceptBy_A_Foreign_Account_Throws_CM2b_2` + `Accept_Unknown_Group_Or_Pair_Throws` pin the Core wall. |
 | **C-M2b·3** (m2b-owned) | **State machine (C-M2·3 extension).** One row per (group, user) (the `UniqueIndex` business key); `Pending → {Accepted, Declined, Cancelled}`; `Pending → Cancelled`; **re-invite resets to `Pending`**; an invalid transition (double-resolution, or resolve-after-resolution) ⇒ `InvalidOperationException`. The two resolve stamps (`ResolvedAt`/`ResolvedBy`) clear on a reset. | The `Resolved_Row_Does_Not_Accept_Decline_Or_Cancel_Again_CM2b_3` + `ReInvite_After_Decline_Resets_To_Pending_CM2b_3` + `Inviting_The_Same_Pair_Twice_Keeps_One_Row_CM2b_3` tests pin each wall; the Web maps the `InvalidOperationException` to `TempData["error"]` (F17/F18's error rows). |
-| **C3** (carried — ADR 0006 + M1) | Every m2b mutation writes its `AccessAudit` row in the **same transaction** (invariant C3): the `group.invite` / `group.invite.accept` / `group.invite.decline` / `group.invite.cancel` rows, `TargetKind "group"`, `Outcome Allow`. Allow-and-Deny are both recorded (Deny never occurs in m2b's writes by construction — the SoD gates are pre-write, not post-write). | `UserInfoServiceGroupInvitationsM2bTests.Every_M2b_Write_Appends_Its_AuditRow_C3` pins the four action ids on the `group` target-kind. |
+| **C3** (carried — ADR [0006](../adr/0006-module-boundary-contracts.md) + M1) | Every m2b mutation writes its `AccessAudit` row in the **same transaction** (invariant C3): the `group.invite` / `group.invite.accept` / `group.invite.decline` / `group.invite.cancel` rows, `TargetKind "group"`, `Outcome Allow`. Allow-and-Deny are both recorded (Deny never occurs in m2b's writes by construction — the SoD gates are pre-write, not post-write). | `UserInfoServiceGroupInvitationsM2bTests.Every_M2b_Write_Appends_Its_AuditRow_C3` pins the four action ids on the `group` target-kind. |
 | **C4** (carried — M1) | **Accept ⇒ live membership** on the very next `GetGroupIdsAsync` / `GetGroupsForUserAsync` call. An **invite** itself never touches membership (C4's lane is accept-only). | `Invite_Then_Accept_Membership_LiveOnNextCall_C4` pins both the negative (invite does not add membership) and the positive (accept does, live-on-next-call). |
 | **C-M2·2** (carried — M2) | The **three new reads** (`GetGroupAsync`, `GetPendingInvitationsForUserAsync`, `GetPendingInvitationsForGroupAsync`) append **no** `AccessAudit` row — they are candidate projections, not access decisions (C-M2·2 + C1). | `The_Three_M2b_Read_Lanes_Append_No_AuditRow_CM2_2` pins the no-audit shape on all three lanes. |
-| **ADR 0006-E** (carried — ADR 0006) | All seam additions are **new named methods** on `IUserInfoService` — no signature change to any pinned M1/M2 method. | The `IUserInfoService` "M2b additions" block is the single addition; no existing method is touched. |
+| **ADR [0006](../adr/0006-module-boundary-contracts.md)-E** (carried — ADR [0006](../adr/0006-module-boundary-contracts.md)) | All seam additions are **new named methods** on `IUserInfoService` — no signature change to any pinned M1/M2 method. | The `IUserInfoService` "M2b additions" block is the single addition; no existing method is touched. |
 
 **ADRs m2b must keep holding** (pinned in the invariant rows above, and not
-to be re-derived by later units): ADR 0001-B (audience-grants stored
-verbatim — not exercised in m2b), ADR 0006-A/B/C (the read/write/audit split
+to be re-derived by later units): ADR [0001](../adr/0001-core-stack-and-identity-model.md)-B (audience-grants stored
+verbatim — not exercised in m2b), ADR [0006](../adr/0006-module-boundary-contracts.md)-A/B/C (the read/write/audit split
 — exercised through the `IUserInfoService` lane only, never the
-`IDocumentSession` overloads), ADR 0006-D (Web shapes HTTP, Core decides),
-ADR 0003 (SoD default-OFF, the C-M2b·1/·2/·3 pins are its m2b face).
+`IDocumentSession` overloads), ADR [0006](../adr/0006-module-boundary-contracts.md)-D (Web shapes HTTP, Core decides),
+ADR [0003](../adr/0003-roles-and-moderator-scoping.md) (SoD default-OFF, the C-M2b·1/·2/·3 pins are its m2b face).
 
 ## FACES (m2b-added user-visible outcomes → invariant pins)
 
@@ -134,7 +150,7 @@ acceptance gate without re-deriving them (the M2 §2.7 drift-guard).
 > Every C# fragment below is **exact**: parameter lists, return types, and
 > namespaces are the contract the tests anchor to. The `IUserInfoService`
 > "M2b additions" block is the *only* change to the frozen M1/M2 lane
-> (ADR 0006-E). No existing method's signature is touched.
+> (ADR [0006](../adr/0006-module-boundary-contracts.md)-E). No existing method's signature is touched.
 
 ### New Core types (`Kumunita.Core.UserInfo`)
 
@@ -242,7 +258,7 @@ loads the group's pending invitations via
 `GetPendingInvitationsForGroupAsync(group.Id)` and projects them to
 `PendingInvitationViewModel` (the invitee's display name via
 `GetProfileAsync`) — the F16 pending list. Neither the controller nor the
-view has a channel to an owner-id form-bound field (ADR 0003 SoD by
+view has a channel to an owner-id form-bound field (ADR [0003](../adr/0003-roles-and-moderator-scoping.md) SoD by
 structural identity, carried from U10/F7).
 
 ## Seam-test names (landed, `Kumunita.Core.Tests`)

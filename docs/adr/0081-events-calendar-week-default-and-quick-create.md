@@ -1,22 +1,35 @@
-# ADR 0081 — Events calendar: week as the default view + quick-create from empty space + month single-line grid
+---
+id: adr-0081
+title: "Events calendar: week as the default view + quick-create from empty space + month single-line grid"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m10-pwa-responsive-design.md]
+supersedes: []
+superseded_by: []
+updated: 2026-11-02
+---
+
+# ADR [0081](0081-events-calendar-week-default-and-quick-create.md) — Events calendar: week as the default view + quick-create from empty space + month single-line grid
 
 Status: Accepted
 Date: 2026-09-12
 
 ## Context
 
-The events calendar (ADR 0063 `EV-CAL`, then ADR 0064 `EV-DWM` for the
+The events calendar (ADR [0063](0063-events-calendar-view.md) `EV-CAL`, then ADR [0064](0064-events-calendar-dwm-views.md) `EV-DWM` for the
 day/week/month views) is the resident's at-a-glance surface at
-`GET /events/calendar`. Three things shipped in ADR 0064 left a gap in the
+`GET /events/calendar`. Three things shipped in ADR [0064](0064-events-calendar-dwm-views.md) left a gap in the
 day-to-day flow of *adding* an event from the calendar:
 
-1. **The default view is month.** ADR 0064 C-DWM·8 pins `?view=month` as the
+1. **The default view is month.** ADR [0064](0064-events-calendar-dwm-views.md) C-DWM·8 pins `?view=month` as the
    default (no `?view` ⇒ month) for backward compatibility with EV-CAL. But a
    resident opening the calendar most often wants the *immediate* week — the
    day/week grid is the denser, more actionable view; month is the
    overview. Defaulting to month forces one extra click to get the week.
 2. **There is no "New event" affordance on the calendar.** The "New event"
-   button (`events.new_event`, the M4 ADR 0054 precedent) lives on the
+   button (`events.new_event`, the M4 ADR [0054](0054-events-rsvp-reminders.md) precedent) lives on the
    `/events` *feed* (Index.cshtml), not on the calendar. A resident looking at
    a calendar has to leave it to create.
 3. **Month grid cells carry spacing.** `.events-calendar-day` cells are
@@ -30,7 +43,7 @@ month grid to single-line separators with no inter-cell margin.
 
 ## Decision
 
-- **Week is the default view (amends ADR 0064 C-DWM·8).** The
+- **Week is the default view (amends ADR [0064](0064-events-calendar-dwm-views.md) C-DWM·8).** The
   `Calendar(...)` `?view=` resolution now falls back to **`week`** when
   `?view` is absent or out-of-set, and `EventCalendarViewModel.View` defaults
   to `"week"`. The three named views (day/week/month) are unchanged and
@@ -40,7 +53,7 @@ month grid to single-line separators with no inter-cell margin.
 - **A "New event" button on the calendar header.** `Calendar.cshtml`'s
   header gains a primary "New event" button (`events.new_event`,
   already-registered in all four languages) that opens the quick-create modal
-  (a Bootstrap modal via `data-bs-toggle` / `data-bs-target`, the ADR 0071
+  (a Bootstrap modal via `data-bs-toggle` / `data-bs-target`, the ADR [0071](0071-lane-edit-arrow-autosubmit-and-menu-dividers.md)
   modal convention).
 - **Click an empty slot ⇒ a quick-create modal seeded to that slot.** A new
   plain-TS module `client/lib/events-calendar-new.ts` (the
@@ -61,9 +74,9 @@ month grid to single-line separators with no inter-cell margin.
   with a blank body, seeds `Body` from `Title` — a title-only quick-create is
   a well-formed shape, while the full composer's "a body is required" rule
   (and its re-render path) is untouched for non-quick-create posts. The modal
-  also posts `SaveAsDraft=true` (the ADR 0037 draft floor) and the
+  also posts `SaveAsDraft=true` (the ADR [0037](0037-draft-mode-author-only.md) draft floor) and the
   community-visible default audience (`Mode=Any`, empty grants,
-  `CommunityVisible=true` — the ADR 0001-B / 0036 default). `QuickCreate`
+  `CommunityVisible=true` — the ADR [0001](0001-core-stack-and-identity-model.md)-B / 0036 default). `QuickCreate`
   is never a gate or an access input — a shape signal only.
 - **Month grid: single-line separators, no gap.** `.events-calendar-grid`
   drops `gap` for a bordered `grid` container; `.events-calendar-day` loses
@@ -73,7 +86,7 @@ month grid to single-line separators with no inter-cell margin.
 
 ## Consequences
 
-- **Amends ADR 0064 C-DWM·8** — the default view is `week`, not `month`. The
+- **Amends ADR [0064](0064-events-calendar-dwm-views.md) C-DWM·8** — the default view is `week`, not `month`. The
   month view is still reachable via `?view=month`; nothing about the month
   *grid math* changes (only its status as the default). The invalid/absent
   `?view=` fallback is `week`.
@@ -82,9 +95,9 @@ month grid to single-line separators with no inter-cell margin.
   window-agnostic and is reused unchanged). `EventEditorModel.QuickCreate` is
   a Web-layer shape signal — no `CreateEventRequest` field, no document, no
   audit action added.
-- **Zero new translation keys.** `events.new_event` (the M4 ADR 0054 label,
+- **Zero new translation keys.** `events.new_event` (the M4 ADR [0054](0054-events-rsvp-reminders.md) label,
   already in en/de/fr/da) is reused for the button; `common.optional`
-  (ADR 0072) for the Location placeholder. No registry change.
+  (ADR [0072](0072-kanban-placeholder-attributes-localized.md)) for the Location placeholder. No registry change.
 - **One new `client/lib` module** (`events-calendar-new.ts`, `tsc`-only,
   self-wiring, no dependency) + the two `site.css` rules + the modal markup +
   the header button. The Bootstrap modal is loaded globally (the layout's

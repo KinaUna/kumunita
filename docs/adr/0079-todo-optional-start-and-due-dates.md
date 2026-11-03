@@ -1,15 +1,28 @@
-# ADR 0079 — To-do optional start and due dates
+---
+id: adr-0079
+title: "To-do optional start and due dates"
+tier: reference
+kind: adr
+status: accepted
+audiences: [developer, agent, platform-maintainer]
+related: [docs/design/m14-events-projects-design.md]
+supersedes: [adr-0067]
+superseded_by: [adr-0086]
+updated: 2026-11-02
+---
+
+# ADR [0079](0079-todo-optional-start-and-due-dates.md) — To-do optional start and due dates
 
 Status: Accepted (amended 2026-09-28 — see **Amendment** below)
 Date: 2026-09-25
 
 > **Amendment (2026-09-28, same-day).
 > form-side binding changed from `DateTimeOffset?` to wall-clock `DateTime?`
-> (per ADR 0019). The controller converts wall-clock → UTC at the Web
+> (per ADR [0019](0019-timezone-platform-default-and-resident-override.md)). The controller converts wall-clock → UTC at the Web
 > boundary before the write, and stored UTC → wall-clock when seeding the
 > edit form. The **storage** type is unchanged (`DateTimeOffset?`, UTC
 > instant) — the conversion is entirely at the Web boundary, mirroring the
-> ADR 0054 Event `Start`/`End` treatment. The `<kw-dt>` TagHelper display
+> ADR [0054](0054-events-rsvp-reminders.md) Event `Start`/`End` treatment. The `<kw-dt>` TagHelper display
 > path is unchanged (already correct).**
 
 Amends: **0067** (the M5 to-do surface — the `TodoItem` document gains two
@@ -20,18 +33,18 @@ the Event requires both, the to-do leaves both blank by default).
 
 ## Context
 
-A to-do (M5, ADR 0067) already carries the neighborhood's shared work: a
+A to-do (M5, ADR [0067](0067-m5-projects-todos-and-kanban.md)) already carries the neighborhood's shared work: a
 title, an optional body, a free-text status, an optional assignee (the §2.5
 standing branch), an optional parent (a subtask), an optional board
 placement, and an audience. What it does **not** carry is any sense of *when*
 the work is expected to happen — a to-do that says "repaint the front gate"
 has no deadline and no start.
 
-The M4 Event (ADR 0054) settled the repo's date/time idiom, and this feature
+The M4 Event (ADR [0054](0054-events-rsvp-reminders.md)) settled the repo's date/time idiom, and this feature
 reuses it verbatim:
 
 - **`DateTimeOffset`**, stored UTC, rendered by the one `<kw-dt>` TagHelper
-  in the viewer's effective timezone (ADR 0019) — so a date a resident sets
+  in the viewer's effective timezone (ADR [0019](0019-timezone-platform-default-and-resident-override.md)) — so a date a resident sets
   "on the 5th" is *shown* in every viewer's own timezone without any per-row
   storage of a zone.
 - ~~**`type="datetime-local"`** form inputs, bound model-side to a nullable
@@ -40,11 +53,11 @@ reuses it verbatim:
   **Superseded by the Amendment above** — the form model is now wall-clock
   `DateTime?`; the controller handles the zone conversion. The `yyyy-MM-ddTHH:mm`
   round-trip shape is unchanged; the zone source moved from "local instant"
-  to "the actor's effective zone (ADR 0019)".
+  to "the actor's effective zone (ADR [0019](0019-timezone-platform-default-and-resident-override.md))".
 
 The one deliberate departure from the Event is **optionality**. An Event is
 defined by its start and end — an event with no times is a contradiction, so
-ADR 0054 makes both `Start` / `End` required. A to-do is not so defined: a
+ADR [0054](0054-events-rsvp-reminders.md) makes both `Start` / `End` required. A to-do is not so defined: a
 large share of a neighborhood's to-dos are open-ended ("fix the broken
 wheelbarrow") and have no date at all. Forcing both dates on every to-do
 would tax the common case for the benefit of the exceptional one. So both
@@ -63,7 +76,7 @@ two nullable `DateTimeOffset?` fields:
 - **`StartAt`** — the optional start instant.
 - **`DueAt`** — the optional due instant (the at-a-glance deadline).
 
-Both default to `null` (no date). This is the ADR 0054 Event `Start` / `End`
+Both default to `null` (no date). This is the ADR [0054](0054-events-rsvp-reminders.md) Event `Start` / `End`
 shape **minus the requirement** — the storage type, the UTC storage, the
 `datetime-local` binding, and the `<kw-dt>` effective-timezone render are all
 reused; only the "required" is dropped, becoming "optional, null = no date".
@@ -88,7 +101,7 @@ seam is not mis-read as the standard partial rule.
 
 ### The coherence rule
 
-When **both** dates are set, `DueAt` must not precede `StartAt` (the ADR 0054
+When **both** dates are set, `DueAt` must not precede `StartAt` (the ADR [0054](0054-events-rsvp-reminders.md)
 Event "the end time must be after the start" shape, *on-or-after* rather than
 strictly-after). The Web-boundary `TodoEditorModel.IsValid` enforces this and
 the controller surfaces it as the localized form error **"The due date must
@@ -110,7 +123,7 @@ for `End < Start`.
 ### No migration
 
 `StartAt` / `DueAt` are nullable field additions on an existing document.
-Per ADR 0004 §B (Marten delta-detection), adding a nullable column to a
+Per ADR [0004](0004-data-persistence-and-schema-evolution.md) §B (Marten delta-detection), adding a nullable column to a
 document is a no-op against the existing schema — the `ProjectDocTypes`
 registration is unchanged and no explicit migration is required.
 
@@ -134,4 +147,4 @@ dates is edited by exactly the same set of actors as one without.
   pins the deviation explicitly.
 - **No new document, no new seam, no standing change** — the change is
   additive on `TodoItem` + the two request DTOs + the Web models / controller
-  / views, all reusing the ADR 0054 date idiom.
+  / views, all reusing the ADR [0054](0054-events-rsvp-reminders.md) date idiom.
