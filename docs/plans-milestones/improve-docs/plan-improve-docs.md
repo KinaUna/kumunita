@@ -140,7 +140,7 @@ a half-applied rule.
 - `D10` — ✅ (commit `1a1bb409`, 2026-11-02)
 - `D11` — ✅ (commit `757413e3`, 2026-11-02)
 - `D12` — ✅ (commit `dc1dc91a`, 2026-11-02)
-- `D13` — ✅ (2026-11-02)
+- `D13` — ✅ (commit `badb2442`, 2026-11-02)
 - `D14` — not started
 
 ### `D00` — Baseline, conventions, harness
