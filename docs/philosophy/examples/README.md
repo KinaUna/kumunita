@@ -1,3 +1,25 @@
+---
+id: philosophy-examples
+title: "Examples — One Door Per Reader"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer]
+related:
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
+> **Abstract:** a shelf of the same three-shape example (parts / linkage /
+> what breaks), one per doc, matched to different backgrounds — a garden, a
+> road trip, a sports team, a meeting, a calendar, digesting food, learning a
+> language, running a household. **Who is it for:** readers who didn't click
+> on the three examples in [`everyday-life.md`](../everyday-life.md) and
+> want to pick the one that already lives in their head. **When to read the
+> rest:** when the plain-language version didn't land — pick the example
+> that does.
+>
+
 # Examples — One Door Per Reader
 
 [`everyday-life.md`](../everyday-life.md) makes the case with three

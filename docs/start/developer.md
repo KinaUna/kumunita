@@ -38,6 +38,7 @@ You write code in this repo. The docs below are the ones that matter for
 | [`docs/adr/`](../adr/README.md) | The ADR index — the deciding document for any non-obvious rule. |
 | [`docs/design/`](../design/m3b-moderation.md) | The current truth per subsystem (every doc `tier: reference` / `kind: design` + an Abstract, `D10`) — the **six subsystem hubs** are the doors in: [events](../design/events-subsystem.md) · [rich content](../design/rich-content-subsystem.md) · [notifications](../design/notifications-subsystem.md) · [storage metrics](../design/storage-metrics-subsystem.md) · [analytics](../design/analytics-subsystem.md) · [prod-hardening](../design/prod-hardening.md). |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The philosophy in one hour — the "why" behind the conventions. |
+| [`docs/philosophy/templates/design-doc.md`](../philosophy/templates/design-doc.md) | The design-doc template — the "Seams & contracts" section is mandatory; the three tests and the FACES check are the entry and exit gates. |
 
 The per-audience entry pages live under [`start/`](../README.md#per-audience-entry-pages)
 — this page is one of them.

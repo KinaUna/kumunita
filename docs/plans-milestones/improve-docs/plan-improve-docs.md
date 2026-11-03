@@ -140,7 +140,8 @@ a half-applied rule.
 - `D10` — ✅ (commit `1a1bb409`, 2026-11-02)
 - `D11` — ✅ (commit `757413e3`, 2026-11-02)
 - `D12` — ✅ (commit `dc1dc91a`, 2026-11-02)
-- `D13`–`D14` — not started
+- `D13` — ✅ (2026-11-02)
+- `D14` — not started
 
 ### `D00` — Baseline, conventions, harness
 - Write [`docs/DOCS-CONVENTIONS.md`](../../DOCS-CONVENTIONS.md) (schema above, tiers, abstract rule,
@@ -530,6 +531,56 @@ a half-applied rule.
   `examples/` are reachable, fix `templates/design-doc.md`'s broken link.
 - Check `adopting-fig.md` / `in-code.md` reflect the new doc conventions
   (the docs *are* an integration seam the philosophy talks about).
+- **Shipped 2026-11-02:** all **25** `docs/philosophy/**` docs (12 top-level
+  + the 8 `examples/` + the 3 `templates/` + the `examples/` hub) now carry
+  front-matter (`tier: living` / `kind: philosophy` — the schema's last
+  unused `kind` value, `D00`'s schema already named it) + a
+  [`DOCS-CONVENTIONS.md`](../../DOCS-CONVENTIONS.md)-conformant `> **Abstract:**`
+  block where the file is over 60 lines — **19** in total (the 12 top-level
+  docs, all already >60; plus the 7 that crossed the threshold after the
+  front-matter block was added: `examples/README`, `examples/a-sports-team`,
+  `examples/attending-a-meeting`, `examples/calendar`,
+  `examples/digesting-food`, `examples/learning-a-language`,
+  `templates/design-doc`). Stamped by [`tools/docs/stamp-philosophy-fm.py`](../../../tools/docs/stamp-philosophy-fm.py)
+  (one-shot, idempotent — refuses to re-stamp a doc that already has
+  front-matter; verifies front-matter, abstracts, relative `.md` link targets,
+  and `id` uniqueness across the folder). The entry pages now link directly
+  into the two sub-folders so each is reachable in one hop from `docs/start/`
+  (the `D13` "reachable from an entry page" criterion):
+  [`start/developer.md`](../../start/developer.md) + [`start/agent.md`](../../start/agent.md)
+  gained a [`templates/design-doc.md`](../../philosophy/templates/design-doc.md)
+  row; [`start/platform-maintainer.md`](../../start/platform-maintainer.md)
+  gained [`templates/postmortem.md`](../../philosophy/templates/postmortem.md)
+  + [`templates/retrospective.md`](../../philosophy/templates/retrospective.md);
+  [`start/resident.md`](../../start/resident.md) +
+  [`start/community-admin.md`](../../start/community-admin.md) gained a
+  [`examples/`](../../philosophy/examples/README.md) row.
+  `templates/design-doc.md`'s Rollout-&-rollback link now reads
+  [`../../OPS.md`](../../OPS.md) (the display text matched the href after
+  `D12`'s fix; the link had been `../../docs/OPS.md` — the wrong repo-relative
+  path — before `D12`'s `linkify.ps1` pass corrected the href to
+  `../../OPS.md`; the text now matches it). `adopting-fig.md` and
+  `in-code.md` were checked against the new doc conventions and neither
+  contradicts them — `adopting-fig.md` is about *adopting the philosophy
+  elsewhere* (the FIG source, the sync cadence, the domain-guide split),
+  not about this repo's doc conventions, and `in-code.md` already names the
+  ADRs for the seams it cites (`ADR 0001` the stack, `ADR 0003` the access
+  model) and its "Definition of Done (integration clauses)" section is the
+  philosophy-side companion to the `D06` `docs/dev/testing-and-ci.md`
+  doctrine — no change was made to either. Verification:
+  `docs-report.ps1` — broken links **0** (unchanged), front-matter
+  **1059 → 1084** (+25: the 25 philosophy docs), abstracts
+  **736 → 755** (+19: the 19 philosophy docs that are or became >60
+  lines); the 5 files still without front-matter are
+  [`README.md`](../../../README.md), [`AGENTS.md`](../../../AGENTS.md),
+  `docs/adr/README.md`, `docs/guides/CONVENTIONS.md`, `docs/STATUS.md` —
+  none in `docs/philosophy/` (out of `D13` scope). `dotnet build` **0
+  errors**; `Kumunita.Core.Tests` **1682 passed / 0 failed / 2 pre-existing
+  skips** (exit 0; ~4 min on this box due to Testcontainers);
+  `Kumunita.Web.Tests` **1249 total / 1 failed** — `ImproveCheck_Gate_Passes`
+  RED on gate `g` (the 16 `docs/design/*.md` over 400 lines w/o Abstract,
+  pre-existing beyond the U07 baseline — the `D14` "retire the baselines"
+  close work, not `D13`).
 
 ### `D14` — Gates and close
 - `tools/docs/docs-check.ps1` gates, with **baselines retired, not grandfathered**:

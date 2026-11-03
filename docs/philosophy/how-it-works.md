@@ -1,3 +1,25 @@
+---
+id: philosophy-how-it-works
+title: "How Kumunita Works — for the Neighborhood"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin]
+related:
+  - docs/philosophy/everyday-life.md
+  - docs/SECURITY.md
+  - docs/product/features.md
+updated: 2026-11-02
+---
+
+> **Abstract:** what Kumunita does, how privacy and moderation
+> actually behave, and how to give feedback that helps — no technical
+> background needed; the entry point for anyone in the neighborhood who
+> isn't a contributor. **Who is it for:** residents and the people who
+> moderate. **When to read the rest:** before asking for a change, or when
+> explaining the platform to someone.
+>
+
 # How Kumunita Works — for the Neighborhood
 
 > No technical background needed. If you can use a website, you can read this,

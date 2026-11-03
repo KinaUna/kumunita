@@ -1,3 +1,25 @@
+---
+id: philosophy-platform-as-integrator
+title: "The Platform as an Integration Engine"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer]
+related:
+  - docs/philosophy/README.md
+  - docs/philosophy/in-product.md
+  - docs/product/features.md
+updated: 2026-11-02
+---
+
+> **Abstract:** why Kumunita exists, in our terms — the value chain
+> (signals → shared awareness → understanding → decisions → coordination →
+> outcomes), each arrow an integration step, and the two consequences for
+> how we build. **Who is it for:** everyone asking "why is this worth
+> building." **When to read the rest:** before scoping a feature, or when
+> arguing for the whole over a part.
+>
+
 # The Platform as an Integration Engine
 
 Kumunita is a linkage machine. Its features are parts; its value is the

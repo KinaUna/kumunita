@@ -1,3 +1,25 @@
+---
+id: philosophy-domains
+title: "Domains of Integration — the Lens"
+tier: living
+kind: philosophy
+status: current
+audiences: [developer, platform-maintainer, community-admin]
+related:
+  - docs/philosophy/START-HERE.md
+  - docs/philosophy/further-reading.md
+  - docs/philosophy/anti-patterns.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the diagnostic lens — the nine domains the mind
+> already integrates (re-mapped onto the systems we build), the six native to
+> software, and the six that belong to the product reaching into a life.
+> **Who is it for:** the people designing or reviewing changes here.
+> **When to read the rest:** when a design feels wrong but nothing is
+> "broken" — name the domain it is failing at.
+>
+
 # Domains of Integration — the Lens
 
 > **The line to remember:** the parts are cheap; the linkage is what's rare.

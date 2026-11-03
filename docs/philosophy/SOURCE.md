@@ -1,3 +1,25 @@
+---
+id: philosophy-source
+title: "Provenance — FIG source & adoption"
+tier: living
+kind: philosophy
+status: current
+audiences: [developer, agent]
+related:
+  - docs/philosophy/adopting-fig.md
+  - docs/philosophy/README.md
+  - https://github.com/KinaUna/fractal_integration
+updated: 2026-11-02
+---
+
+> **Abstract:** the provenance record for this folder — the upstream
+> Fractal Integration Guidelines (FIG) repo, the exact commit and date
+> synced from, the re-sync cadence, and the deliberate local deviations.
+> **Who is it for:** the people who maintain the philosophy docs (and any
+> agent asked to re-sync them). **When to read the rest:** before re-syncing
+> from the source, or when asked why a doc here differs from upstream.
+>
+
 # Provenance — FIG source & adoption
 
 This folder is Kumunita's local adoption of the **Fractal Integration Guidelines (FIG)**.

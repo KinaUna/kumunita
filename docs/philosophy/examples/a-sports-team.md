@@ -1,3 +1,24 @@
+---
+id: philosophy-example-sports-team
+title: "A Sports Team"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the same three-shape example (differentiation / linkage /
+> what breaks) told with a sports team — positions as the parts, strategy and
+> communication as the linkage, chemistry as the emergent property. **Who is
+> it for:** readers who think in teams and play. **When to read the rest:**
+> when the plain-language examples didn't land and you'd rather think in
+> terms of positions, drills, and a game plan.
+>
+
 # A Sports Team
 
 > Reach for this one if you think in terms of teams and play.

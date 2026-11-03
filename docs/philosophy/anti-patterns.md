@@ -1,3 +1,27 @@
+---
+id: philosophy-anti-patterns
+title: "Anti-patterns"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer, agent]
+related:
+  - docs/philosophy/README.md
+  - docs/philosophy/in-code.md
+  - docs/philosophy/in-product.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the eight domain-general integration failures (part
+> sprawl, the god part, distributed fragmentation, parts-work-seams-don't,
+> signals-without-loops, accidental integration, silent coupling,
+> reflection-without-actuation), each with its Kumunita symptom and fix —
+> name the failure by the general name so the diagnosis stays portable.
+> **Who is it for:** anyone diagnosing why something is failing. **When to
+> read the rest:** the next time something goes wrong, and in every review
+> and retro.
+>
+
 # Anti-patterns
 
 The eight failures below are **domain-general** — any differentiated system can

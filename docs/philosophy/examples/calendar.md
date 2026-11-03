@@ -1,3 +1,25 @@
+---
+id: philosophy-example-calendar
+title: "A Calendar"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the same three-shape example (differentiation / linkage /
+> what breaks) told with a calendar — the different kinds of time as the
+> parts; sequencing, buffers, recurrence, and shared visibility as the
+> linkage; time you can trust as the emergent property. **Who is it for:**
+> readers who think in schedules and time. **When to read the rest:** when
+> the plain-language examples didn't land and you'd rather think in blocks,
+> buffers, and protected time.
+>
+
 # A Calendar
 
 > Reach for this one if you think in schedules and time.

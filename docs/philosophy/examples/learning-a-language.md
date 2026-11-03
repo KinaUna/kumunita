@@ -1,3 +1,25 @@
+---
+id: philosophy-example-language
+title: "Learning a Language"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the same three-shape example (differentiation / linkage /
+> what breaks) told with language learning — vocabulary, grammar, listening,
+> speaking, pronunciation as the parts; practice under real conditions with
+> feedback as the linkage; fluency as the emergent property. **Who is it
+> for:** readers who've ever studied a skill from scratch. **When to read
+> the rest:** when the plain-language examples didn't land and you'd rather
+> think in sub-skills, drills, and conversations.
+>
+
 # Learning a Language
 
 > Reach for this one if you've ever studied a skill from scratch.

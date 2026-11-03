@@ -1,3 +1,26 @@
+---
+id: philosophy-adopting-fig
+title: "Adopting FIG in Your Own Project"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, developer]
+related:
+  - docs/philosophy/SOURCE.md
+  - docs/philosophy/anti-patterns.md
+  - https://github.com/KinaUna/fractal_integration
+updated: 2026-11-02
+---
+
+> **Abstract:** how to bring these guidelines into your own project —
+> repo, wiki, team handbook, or an AI-agent prompt — without losing the link
+> back to the FIG source: keep the core, differentiate around it, record the
+> sync, note deviations, re-sync on a cadence. **Who is it for:** someone
+> adopting the guidelines elsewhere (or an agent doing it for them).
+> **When to read the rest:** when the guidelines stop being something you
+> read and start being something you copy.
+>
+
 # Adopting FIG in Your Own Project
 
 > This doc is for when these guidelines stop being something you read and

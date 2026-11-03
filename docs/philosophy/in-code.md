@@ -1,3 +1,29 @@
+---
+id: philosophy-in-code
+title: "Integration in Code"
+tier: living
+kind: philosophy
+status: current
+audiences: [developer, agent]
+related:
+  - docs/philosophy/anti-patterns.md
+  - docs/philosophy/START-HERE.md
+  - docs/adr/0001-core-stack-and-identity-model.md
+  - docs/adr/0003-roles-and-moderator-scoping.md
+  - docs/dev/testing-and-ci.md
+  - docs/dev/razor-verification.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the six principles turned into practice on this
+> stack (a modular monolith: ASP.NET Core 10, Marten, Wolverine) —
+> boundaries as contracts, seams as where we test, short feedback loops,
+> coupling discipline, judging the whole, and the integration clauses of
+> the Definition of Done. **Who is it for:** anyone who writes code here.
+> **When to read the rest:** before a design or review, and before calling
+> a change done.
+>
+
 # Integration in Code
 
 How the six principles become practice on Kumunita's stack: a modular

@@ -1,3 +1,25 @@
+---
+id: philosophy-example-digestion
+title: "Digesting Food"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the same three-shape example (differentiation / linkage /
+> what breaks) told with digestion — the organs as the parts; the sequencing
+> and signaling as the linkage; usable nutrients as the emergent property.
+> Simplified on purpose — a shape to think with, not a physiology lesson.
+> **Who is it for:** readers for whom biology or health makes sense.
+> **When to read the rest:** when the plain-language examples didn't land
+> and you'd rather think in stages, signals, and handoffs.
+>
+
 # Digesting Food
 
 > Reach for this one if biology or health makes sense to you. Simplified

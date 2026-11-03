@@ -1,3 +1,26 @@
+---
+id: philosophy-human-system
+title: "The Human as the Outermost System"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer]
+related:
+  - docs/philosophy/START-HERE.md
+  - docs/philosophy/in-product.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the outermost scale — the person is the system that
+> contains all the others: well-being as integration, burnout as an
+> integration failure, boundaries as designed seams, and what that means for
+> how we build and how the platform treats its residents. **Who is it
+> for:** everyone, but especially the people who decide trade-offs.
+> **When to read the rest:** before any trade-off that costs a part
+> (throughput, hours, engagement) at the expense of a whole (a person, a
+> team, the neighborhood).
+>
+
 # The Human as the Outermost System
 
 Everything we build lives inside a human life. The code lives inside a

@@ -1,3 +1,24 @@
+---
+id: philosophy-everyday-life
+title: "Everyday Life — Integration in Plain Language"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin]
+related:
+  - docs/philosophy/START-HERE.md
+  - docs/philosophy/examples/README.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the same philosophy as the rest of the folder, told
+> with things you can touch — cooking, a relay race, a shared event — no
+> jargon, no diagrams, read start to finish in ten minutes. **Who is it
+> for:** readers who don't live in the codebase. **When to read the rest:**
+> as the first philosophy read if jargon isn't your language; if none of
+> its examples fit, [`examples/`](examples/README.md) has more.
+>
+
 # Everyday Life — Integration in Plain Language
 
 > For readers who don't live in the codebase. The same idea as the rest of

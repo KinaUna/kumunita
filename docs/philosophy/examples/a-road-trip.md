@@ -1,3 +1,16 @@
+---
+id: philosophy-example-road-trip
+title: "A Road Trip"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
 # A Road Trip
 
 > Reach for this one if you think in journeys and logistics.

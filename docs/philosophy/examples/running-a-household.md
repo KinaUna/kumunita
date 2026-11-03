@@ -1,3 +1,16 @@
+---
+id: philosophy-example-household
+title: "Running a Household"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
 # Running a Household
 
 > Reach for this one if you run a home, with or without others.

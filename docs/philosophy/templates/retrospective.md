@@ -1,3 +1,16 @@
+---
+id: philosophy-template-retro
+title: "Retro — template"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer]
+related:
+  - docs/philosophy/anti-patterns.md
+  - docs/philosophy/START-HERE.md
+updated: 2026-11-02
+---
+
 # Retro — [cycle]
 
 ## Loop check (start here)

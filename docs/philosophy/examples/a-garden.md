@@ -1,3 +1,16 @@
+---
+id: philosophy-example-garden
+title: "A Garden"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident]
+related:
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/everyday-life.md
+updated: 2026-11-02
+---
+
 # A Garden
 
 > Reach for this one if you'd rather think about plants than people.

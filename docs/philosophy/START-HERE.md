@@ -1,3 +1,29 @@
+---
+id: philosophy-start-here
+title: "START HERE — the philosophy in one hour"
+tier: living
+kind: philosophy
+status: current
+audiences: [resident, community-admin, platform-maintainer, developer, agent]
+related:
+  - docs/philosophy/README.md
+  - docs/philosophy/everyday-life.md
+  - docs/philosophy/domains-of-integration.md
+  - docs/philosophy/anti-patterns.md
+  - docs/philosophy/examples/README.md
+  - docs/philosophy/adopting-fig.md
+updated: 2026-11-02
+---
+
+> **Abstract:** the whole philosophy in one hour — the one argument
+> (parts are cheap, the linkage is rare), the six principles, the three
+> tests (closed-loop, handoff, part-vs-whole), the FACES check, and a
+> deliberate 60-minute reading order through every doc in the folder.
+> **Who is it for:** anyone who has not read the philosophy yet — it is the
+> onboarding. **When to read the rest:** as the first philosophy read, or
+> when a doc in the folder stops making sense.
+>
+
 # START HERE — Kumunita's Philosophy, in one hour
 
 > **The line to remember:** the parts are cheap; the linkage is what's rare.
