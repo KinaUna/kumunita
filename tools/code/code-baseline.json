@@ -16,7 +16,7 @@
   "files": [
     {
       "id": "src/Kumunita.Core/Announcements/AnnouncementService.cs",
-      "max": 793
+      "max": 701
     },
     {
       "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs",
