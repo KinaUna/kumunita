@@ -7,7 +7,7 @@ status: current
 audiences: [resident, community-admin, platform-maintainer, developer, agent]
 related:
   - docs/DOCS-CONVENTIONS.md
-  - docs/plans-milestones/improve-docs/plan-improve-docs.md
+  - docs/archive/lanes/improve-docs/plan-improve-docs.md
 updated: 2026-11-02
 ---
 
@@ -74,16 +74,19 @@ are updated in the same commit.
 
 ## Lane register
 
-The unit-by-unit work driving the restructure is tracked in the lane
-register, [`plans-milestones/improve-docs/plan-improve-docs.md`](plans-milestones/improve-docs/plan-improve-docs.md).
-Each unit `D00`–`D14` is one small, self-documenting commit (or a short
-series for the mechanical batches). `D00` (conventions + harness), `D01`
+The unit-by-unit work that drove the restructure is the `IMPROVE-DOCS` lane
+register, [`archive/lanes/improve-docs/plan-improve-docs.md`](archive/lanes/improve-docs/plan-improve-docs.md)
+(shipped 2026-11-02; all 15 units `D00`–`D14` complete). Each unit
+`D00`–`D14` was one small, self-documenting commit (or a short
+series for the mechanical batches): `D00` (conventions + harness), `D01`
 (this map + the entry pages), `D02` (the archive move), `D03` (the archive
 tier), `D04` (the ops split), `D05` (the Coolify split), `D06` (slimming
 [`AGENTS.md`](../AGENTS.md) into [`dev/`](dev/README.md)), `D07` (slimming [`README.md`](../README.md) into
 [`product/`](product/roadmap.md)), `D08` (splitting the security docs into
 [`security/`](security/why-first.md) + the audit program + the VDP at the repo
 root), `D09` (splitting [`ARCHITECTURE.md`](ARCHITECTURE.md) into
-[`architecture/`](architecture/identity-access.md) + the hub), and `D10`
-(landing the [`design/`](design/m3b-moderation.md) front-matter + abstracts +
-the six subsystem hubs) are done.
+[`architecture/`](architecture/identity-access.md) + the hub), `D10` (landing the
+[`design/`](design/m3b-moderation.md) front-matter + abstracts + the six subsystem
+hubs), `D11` (the ADR cap + `adr-handoffs.md`), `D12` (the 5 960-link
+linkify pass), `D13` (the philosophy fit-check), and `D14` (the close gate
+in CI + the cold-read verification).

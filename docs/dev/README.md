@@ -8,7 +8,7 @@ audiences: [developer, agent]
 related:
   - AGENTS.md
   - docs/README.md
-  - docs/plans-milestones/improve-docs/plan-improve-docs.md
+  - docs/archive/lanes/improve-docs/plan-improve-docs.md
 lane: improve-docs
 updated: 2026-11-02
 ---
@@ -42,4 +42,4 @@ one fact, one place (the [linking rule](../DOCS-CONVENTIONS.md)).
 The entry pages that point into this folder are
 [`start/developer.md`](../start/developer.md) and
 [`start/agent.md`](../start/agent.md); the lane register driving `D06` is
-[`plans-milestones/improve-docs/plan-improve-docs.md`](../plans-milestones/improve-docs/plan-improve-docs.md).
+[`archive/lanes/improve-docs/plan-improve-docs.md`](../archive/lanes/improve-docs/plan-improve-docs.md) (shipped; frozen at the lane's close).

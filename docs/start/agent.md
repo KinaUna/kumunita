@@ -10,7 +10,7 @@ related:
   - docs/README.md
   - docs/dev/README.md
   - docs/DOCS-CONVENTIONS.md
-  - docs/plans-milestones/improve-docs/plan-improve-docs.md
+  - docs/archive/lanes/improve-docs/plan-improve-docs.md
   - docs/philosophy/START-HERE.md
 updated: 2026-11-02
 ---
@@ -32,7 +32,7 @@ matter for *you* — the things to read before you touch code or docs.
 | [`docs/dev/`](../dev/README.md) | The working doctrine — the Razor verification traps, the test-runner quirk + CI cheatsheet + gates, the live-server debugging conventions, and the sandbox / browser / terminal quirks. Read it before verifying a bug, running tests, reading CI, or debugging the live server. |
 | [`docs/DOCS-CONVENTIONS.md`](../DOCS-CONVENTIONS.md) | The shared rules every doc in this repo follows — the front-matter schema, the abstract rule, the ADR cap, the linking rule, the "one fact, one place" rule. Read before your first doc change. |
 | [`docs/README.md`](../README.md) | The docs map — where things live, the tier model, the entry pages. |
-| [`docs/plans-milestones/improve-docs/plan-improve-docs.md`](../plans-milestones/improve-docs/plan-improve-docs.md) | The lane register for the current doc restructure — the `D`-units, the evidence, the target shape. The unit spec for your current task. |
+| [`docs/archive/lanes/improve-docs/plan-improve-docs.md`](../archive/lanes/improve-docs/plan-improve-docs.md) | The lane register for the (shipped) doc restructure — the `D00`–`D14` units, the evidence, the target shape. Frozen at the lane's close; the unit spec for the *current* task is the `AGENTS.md` + `docs/dev/` doctrine. |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The philosophy in one hour — the "why" behind the conventions, the integration argument that the seams are the point. |
 | [`docs/philosophy/templates/design-doc.md`](../philosophy/templates/design-doc.md) | The design-doc template — the "Seams & contracts" section is mandatory; use it when proposing a non-trivial change. |
 | [`docs/adr/`](../adr/README.md) | The ADR index — the deciding document for any non-obvious rule. The code cites ADR numbers ~9 600 times; the number is the stable key. |

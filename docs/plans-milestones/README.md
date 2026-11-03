@@ -28,14 +28,19 @@ to live here are in
 
 ## Layout
 
-- **`improve-docs/`** (and any other in-flight lane) — the lane register
+- **A lane folder per in-flight lane** — the lane register
   (`plan-*.md`) + the unit plans for the *current* work. Each lane folder is
-  named for the lane (the `m3b` / `group-posts` / `improve-docs` shapes are
-  the common layouts — the M-lettered milestones use `mNN/`, the named lanes
+  named for the lane (the `m3b` / `group-posts` shapes are the common
+  layouts — the M-lettered milestones use `mNN/`, the named lanes
   use `<lane-slug>/`).
 - An **`in-progress/`** folder (re-created as needed) — unit plans for a
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
+
+There is **no in-flight lane at this moment** — the `IMPROVE-DOCS` lane
+(the last shipped) moved to
+[`archive/lanes/improve-docs/`](../archive/lanes/improve-docs/) at its close
+(2026-11-02), so the only entry in this folder is this `README.md`.
 
 ## The three-tier contract (per lane)
 

@@ -25,6 +25,7 @@ folder (no per-file rows are needed).
 
 | Old path (former `plans-milestones/done/`) | New path |
 |---|---|
+| docs/plans-milestones/improve-docs/… | [docs/archive/lanes/improve-docs/…](lanes/improve-docs/) |
 | docs/plans-milestones/done/esc/… | [docs/archive/lanes/esc/…](lanes/esc/) |
 | docs/plans-milestones/done/ev-dwm/… | [docs/archive/lanes/ev-dwm/…](lanes/ev-dwm/) |
 | docs/plans-milestones/done/events-calendar/… | [docs/archive/lanes/events-calendar/…](lanes/events-calendar/) |
@@ -100,9 +101,9 @@ Notes:
 - The improve lane's audit harness lives at 	ools/docs/ (moved out of the
   lane folder by D00); the lane's register, audit ledger and handoff note
   followed the folder to `docs/archive/lanes/improve/`.
-- `docs/plans-milestones/improve-docs/` (this lane's register) did **not**
-  move — it is the in-progress lane and stays put.
-- `docs/plans-milestones/improve-docs/baseline-report.txt` is the D00 baseline
+- `docs/plans-milestones/improve-docs/` (the IMPROVE-DOCS lane register) **moved**
+  to `docs/archive/lanes/improve-docs/` at the lane's close (2026-11-02).
+- `docs/archive/lanes/improve-docs/baseline-report.txt` is the D00 baseline
   snapshot of the pre-move tree; its `plans-milestones/done/…` rows are the
   correct historical record and are intentionally left untouched (a frozen
   residual, not a broken link).

@@ -54,7 +54,7 @@ $excludeDirs = @('.git', 'node_modules', '.serena', '.tmp', 'test-results',
   'wwwroot', 'bin', 'obj')
 # --- excluded files (repo-root-relative) --------------------------------------
 $selfPath = 'tools/docs/rewrite-paths.ps1'
-$frozen = @('docs/plans-milestones/improve-docs/baseline-report.txt',
+$frozen = @('docs/archive/lanes/improve-docs/baseline-report.txt',
   'docs/archive/REDIRECTS.md')
 
 $files = @()

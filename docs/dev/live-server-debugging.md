@@ -8,7 +8,7 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - AGENTS.md
   - docs/dev/README.md
-  - docs/plans-milestones/improve-docs/plan-improve-docs.md
+  - docs/archive/lanes/improve-docs/plan-improve-docs.md
 lane: improve-docs
 updated: 2026-11-02
 ---

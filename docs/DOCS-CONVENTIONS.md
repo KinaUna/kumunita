@@ -6,7 +6,7 @@ kind: guide
 status: current
 audiences: [developer, agent, platform-maintainer]
 related:
-  - docs/plans-milestones/improve-docs/plan-improve-docs.md
+  - docs/archive/lanes/improve-docs/plan-improve-docs.md
 updated: 2026-11-02
 ---
 
@@ -14,7 +14,7 @@ updated: 2026-11-02
 > front-matter schema, the abstract rule, the ADR cap, the linking rule,
 > the "one fact, one place" rule, and the tier model. Read this before
 > adding or moving a doc; it is referenced by every unit of the
-> `IMPROVE-DOCS` lane ([plan-improve-docs.md](plans-milestones/improve-docs/plan-improve-docs.md)).
+> `IMPROVE-DOCS` lane ([plan-improve-docs.md](archive/lanes/improve-docs/plan-improve-docs.md)).
 > **Who is it for:** anyone touching `docs/`, [`README.md`](../README.md) or [`AGENTS.md`](../AGENTS.md).
 > **When to read the rest:** before your first doc change in a session, or
 > when a later unit's exit criterion names one of these rules.
@@ -123,6 +123,6 @@ at a lane close).
 ## Pointer
 
 The lane register for the work this conventions doc is written against is
-[`plan-improve-docs.md`](plans-milestones/improve-docs/plan-improve-docs.md).
+[`plan-improve-docs.md`](archive/lanes/improve-docs/plan-improve-docs.md).
 The previous IMPROVE lane (the code-layer audit) is
 [`plan-improve.md`](archive/lanes/improve/plan-improve.md).
