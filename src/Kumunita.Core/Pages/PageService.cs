@@ -2,6 +2,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Tags;
+using Kumunita.Core.Translations;
 using Marten;
 using Marten.Services;
 
@@ -71,6 +72,15 @@ public sealed class PageService : IPageService
     // so the existing test call sites keep compiling unchanged.
     private readonly Mentions.IMentionService? _mentions;
 
+    // C06 (ADR 0288) — the one shared translation-variant write lane. The pages
+    // surface's add/update/remove translation methods are thin forwarders into
+    // this (the descriptor names the pages quirks: GlobalAdmin / Translator /
+    // (User-page) author standing via CheckTranslateStanding +
+    // ResolveTranslationStandingVia, verbatim title on both Create and
+    // ApplyUpdate). The session is the caller's (the PostService shape, passed
+    // in as a parameter).
+    private readonly TranslationLane<Page, PageTranslation> _translationLane;
+
     public PageService(IDocumentStore store, ITagService? tags = null,
         INotificationEmitter? notifications = null,
         Mentions.IMentionService? mentions = null)
@@ -79,6 +89,42 @@ public sealed class PageService : IPageService
         _tags = tags;
         _notifications = notifications;
         _mentions = mentions;
+        _translationLane = new TranslationLane<Page, PageTranslation>(new TranslationDescriptor<Page, PageTranslation>
+        {
+            TargetKind = "page",
+            ActionPrefix = "page.translation",
+            Noun = "Page",
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Page page, object? _, string actorId, IReadOnlySet<string> actorRoles) =>
+            {
+                // The gate + the Via tag, exactly the original's two-step
+                // shape: CheckTranslateStanding throws on a denied actor
+                // (UnauthorizedAccessException) and ResolveTranslationStandingVia
+                // records the narrowest right that applied (Owner for a blog
+                // author, Admin for GlobalAdmin / Translator).
+                CheckTranslateStanding(actorId, actorRoles, page);
+                return ResolveTranslationStandingVia(page, actorId, actorRoles);
+            },
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Page>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<PageTranslation>()
+                .Where(t => t.PageId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new PageTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                PageId = id,
+                LanguageCode = lang,
+                Title = title,
+                Body = body,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (PageTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            {
+                row.Title = title;
+                row.Body = body;
+            }
+        });
     }
 
     // ─── Read lanes (ADR 0039 §3.3 / §3.4 / §3.5) ─────────────────────────
@@ -1119,58 +1165,8 @@ public sealed class PageService : IPageService
         string pageId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(pageId))
-            throw new ArgumentException("A page id is required.", nameof(pageId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
-        if (page is null)
-            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to translate.");
-
-        // Standing re-check (server-side, ADR 0040): GlobalAdmin / Translator
-        // on either kind — a community Moderator has no translation standing.
-        // CheckTranslateStanding is the U02 pure helper — it throws
-        // UnauthorizedAccessException if the actor has no qualifying standing.
-        CheckTranslateStanding(actorId, actorRoles, page);
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new PageTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            PageId = pageId,
-            LanguageCode = languageCode,
-            Title = title,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
-
-        var audit = new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "page.translation.add",
-            TargetKind = "page",
-            TargetId = pageId,
-            Via = via,
-            Outcome = AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
+        return await _translationLane.AddAsync(session, pageId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     // ─── ADR 0048 — edit + delete lane for page translations ───────────────
@@ -1195,53 +1191,8 @@ public sealed class PageService : IPageService
         string pageId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(pageId))
-            throw new ArgumentException("A page id is required.", nameof(pageId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
-        if (page is null)
-            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to update.");
-
-        var row = await session.Query<PageTranslation>()
-            .Where(t => t.PageId == pageId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Page '{pageId}' has no translation in '{languageCode}'; nothing to update.");
-
-        CheckTranslateStanding(actorId, actorRoles, page);
-
-        row.Title = title;
-        row.Body = body;
-
-        var now = DateTimeOffset.UtcNow;
-        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
-        var audit = new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "page.translation.update",
-            TargetKind = "page",
-            TargetId = pageId,
-            Via = via,
-            Outcome = AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
+        return await _translationLane.UpdateAsync(session, pageId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1257,47 +1208,8 @@ public sealed class PageService : IPageService
         string pageId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(pageId))
-            throw new ArgumentException("A page id is required.", nameof(pageId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
-        if (page is null)
-            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to remove.");
-
-        var row = await session.Query<PageTranslation>()
-            .Where(t => t.PageId == pageId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Page '{pageId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        CheckTranslateStanding(actorId, actorRoles, page);
-
-        var now = DateTimeOffset.UtcNow;
-        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
-        var audit = new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "page.translation.remove",
-            TargetKind = "page",
-            TargetId = pageId,
-            Via = via,
-            Outcome = AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
+        await _translationLane.RemoveAsync(session, pageId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     // ─── ADR 0058 — reset to the seeded baseline text ────────────────────
