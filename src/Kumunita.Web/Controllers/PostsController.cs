@@ -586,7 +586,7 @@ public sealed class PostsController(
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
             .ToList();
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        var canTranslate = PostService.CanAddTranslation(
+        var canTranslate = PostTranslationPolicy.CanAddTranslation(
             result.Post.GroupId.Length > 0, result.Post.ComponentId, result.Post.AuthorId, actor, actorRoles);
 
         // ADR 0044 (TG lane) — the post's tags, resolved to display names in
@@ -633,7 +633,7 @@ public sealed class PostsController(
             var replyAuthorProfile = await userInfo.GetProfileAsync(reply.AuthorId);
             // ADR 0022 — the reply's standing is its parent's (community lane,
             // same component scope); the reply's own author is the Owner branch.
-            var canTranslateReply = PostService.CanAddTranslation(
+            var canTranslateReply = PostTranslationPolicy.CanAddTranslation(
                 result.Post.GroupId.Length > 0, result.Post.ComponentId, reply.AuthorId, actor, actorRoles);
             replyItems.Add(new ReplyItem(
                 reply.Id,

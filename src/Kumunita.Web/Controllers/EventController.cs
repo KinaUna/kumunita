@@ -916,7 +916,7 @@ public sealed class EventController : Controller
         // §3.4 standing affordances (the buttons' rule, in step with the service).
         var canEdit = false;
         var canDelete = false;
-        try { EventService.CheckEditStanding(actorId, roles, ev); canEdit = true; }
+        try { EventStandingPolicy.CheckEdit(actorId, roles, ev); canEdit = true; }
         catch (KeyNotFoundException) { canEdit = false; }
         catch (UnauthorizedAccessException) { canEdit = false; }
         // The §3.4 standing matrix's edit + delete rows are identical (author ∪
@@ -984,7 +984,7 @@ public sealed class EventController : Controller
         var languages = enabledLanguages
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
             .ToList();
-        var canTranslate = EventService.CanAddTranslation(ev.AuthorId, actorId, roles);
+        var canTranslate = EventStandingPolicy.CanAddTranslation(ev.AuthorId, actorId, roles);
 
         // ADR 0115 D2 (M14 interlock) — the **linked to-dos** section (the
         // reverse read seam's page, mapped to <see cref="LinkedTodoRow"/>
@@ -1574,7 +1574,7 @@ public sealed class EventController : Controller
 
         try
         {
-            EventService.CheckEditStanding(actorId, roles, ev);
+            EventStandingPolicy.CheckEdit(actorId, roles, ev);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1659,7 +1659,7 @@ public sealed class EventController : Controller
 
         try
         {
-            EventService.CheckEditStanding(actorId, roles, ev);
+            EventStandingPolicy.CheckEdit(actorId, roles, ev);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1808,7 +1808,7 @@ public sealed class EventController : Controller
 
         try
         {
-            EventService.CheckEditStanding(actorId, roles, ev);
+            EventStandingPolicy.CheckEdit(actorId, roles, ev);
         }
         catch (UnauthorizedAccessException)
         {

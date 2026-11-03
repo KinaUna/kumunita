@@ -1032,120 +1032,51 @@ public sealed class ProjectService : IProjectService
     // is an <see cref="UnauthorizedAccessException"/> (the Web layer's 403).
 
     /// <summary>
-    /// The **to-do** mutation standing (design doc §2.5, C-M5·6): the actor is
-    /// allowed iff **creator** (<see cref="TodoItem.AuthorId"/> == actor, the
-    /// <c>Owner</c> branch) ∪ **assignee** (<see cref="TodoItem.AssigneeId"/> ==
-    /// actor — assignment grants standing, the ADR 0067 collaborator branch) ∪
-    /// **GlobalAdmin** (<paramref name="actorRoles"/> carries the role — the
-    /// ADR 0017 override branch). A null to-do is a
-    /// <see cref="KeyNotFoundException"/> (the Web layer's 404); a denied actor
-    /// is an <see cref="UnauthorizedAccessException"/> (the Web layer's 403).
+    /// The **to-do** mutation standing (design doc §2.5, C-M5·6) — a thin
+    /// forwarder to <see cref="TodoStandingPolicy.CheckTodo"/> (C04):
+    /// creator (<c>Owner</c>) ∪ assignee (ADR 0067) ∪ GlobalAdmin (ADR 0017).
+    /// A null to-do is a <see cref="KeyNotFoundException"/> (the Web 404); a
+    /// denied actor is an <see cref="UnauthorizedAccessException"/> (the Web
+    /// 403). The rule and throws live on the policy — byte-identical.
     /// </summary>
     public static void CheckTodoStanding(string actorId, IReadOnlySet<string> actorRoles, TodoItem? todo)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (todo is null)
-            throw new KeyNotFoundException("A to-do is required for the standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to mutate a to-do.");
-
-        if (string.Equals(todo.AuthorId, actorId, StringComparison.Ordinal))
-            return;                                        // creator (Owner branch)
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;                                        // GlobalAdmin (ADR 0017 override)
-        if (!string.IsNullOrEmpty(todo.AssigneeId)
-            && string.Equals(todo.AssigneeId, actorId, StringComparison.Ordinal))
-            return;                                        // assignee (ADR 0067 collaborator)
-
-        throw new UnauthorizedAccessException(
-            "Only the creator, the assignee, or a GlobalAdmin may mutate this to-do.");
-    }
+        => TodoStandingPolicy.CheckTodo(actorId, actorRoles, todo);
 
     /// <summary>
-    /// The **board / lane** mutation standing (design doc §2.5, C-M5·6): the
-    /// actor is allowed iff **creator** (<see cref="KanbanBoard.AuthorId"/> ==
-    /// actor, the <c>Owner</c> branch) ∪ **GlobalAdmin** (<paramref
-    /// name="actorRoles"/> carries the role — the ADR 0017 override branch).
-    /// The **assignee branch does not apply** to a board or a lane (a lane is
-    /// not its own standing surface — C-M5·6). A null board is a
-    /// <see cref="KeyNotFoundException"/> (the Web layer's 404); a denied actor
-    /// is an <see cref="UnauthorizedAccessException"/> (the Web layer's 403).
+    /// The **board / lane** mutation standing (design doc §2.5, C-M5·6) — a
+    /// thin forwarder to <see cref="BoardStandingPolicy.CheckBoard"/> (C04):
+    /// creator (<c>Owner</c>) ∪ GlobalAdmin (ADR 0017); the assignee branch
+    /// does not apply to a board or a lane. A null board is a
+    /// <see cref="KeyNotFoundException"/> (the Web 404); a denied actor is an
+    /// <see cref="UnauthorizedAccessException"/> (the Web 403). The rule and
+    /// throws live on the policy — byte-identical.
     /// </summary>
     public static void CheckBoardStanding(string actorId, IReadOnlySet<string> actorRoles, KanbanBoard? board)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (board is null)
-            throw new KeyNotFoundException("A board is required for the standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to mutate a board.");
-
-        if (string.Equals(board.AuthorId, actorId, StringComparison.Ordinal))
-            return;                                        // creator (Owner branch)
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;                                        // GlobalAdmin (ADR 0017 override)
-
-        throw new UnauthorizedAccessException(
-            "Only the creator or a GlobalAdmin may mutate this board.");
-    }
+        => BoardStandingPolicy.CheckBoard(actorId, actorRoles, board);
 
     /// <summary>
-    /// The **goal** mutation standing (ADR 0086 / design doc §9.3, C-PL·2):
-    /// the actor is allowed iff **creator**
-    /// (<see cref="ProjectGoal.AuthorId"/> == actor, the <c>Owner</c> branch)
-    /// ∪ **GlobalAdmin** (<paramref name="actorRoles"/> carries the role —
-    /// the ADR 0017 override branch). The **assignee branch does not apply**
-    /// to a goal (a goal is not assignable the way a to-do is — the ADR 0070
-    /// board-edit precedent — C-PL·2). A null goal is a
-    /// <see cref="KeyNotFoundException"/> (the Web layer's 404); a denied
-    /// actor is an <see cref="UnauthorizedAccessException"/> (the Web layer's
-    /// 403).
+    /// The **goal** mutation standing (ADR 0086 / design doc §9.3, C-PL·2) —
+    /// a thin forwarder to <see cref="GoalStandingPolicy.CheckGoal"/>
+    /// (C04): creator (<c>Owner</c>) ∪ GlobalAdmin (ADR 0017); the assignee
+    /// branch does not apply to a goal. A null goal is a
+    /// <see cref="KeyNotFoundException"/> (the Web 404); a denied actor is an
+    /// <see cref="UnauthorizedAccessException"/> (the Web 403). The rule and
+    /// throws live on the policy — byte-identical.
     /// </summary>
     public static void CheckGoalStanding(string actorId, IReadOnlySet<string> actorRoles, ProjectGoal? goal)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (goal is null)
-            throw new KeyNotFoundException("A goal is required for the standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to mutate a goal.");
-
-        if (string.Equals(goal.AuthorId, actorId, StringComparison.Ordinal))
-            return;                                        // creator (Owner branch)
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;                                        // GlobalAdmin (ADR 0017 override)
-
-        throw new UnauthorizedAccessException(
-            "Only the creator or a GlobalAdmin may mutate this goal.");
-    }
+        => GoalStandingPolicy.CheckGoal(actorId, actorRoles, goal);
 
     /// <summary>
-    /// The **project** mutation standing (ADR 0086 / design doc §9.3, C-PL·2):
-    /// the actor is allowed iff **creator**
-    /// (<see cref="Project.AuthorId"/> == actor, the <c>Owner</c> branch)
-    /// ∪ **GlobalAdmin** (<paramref name="actorRoles"/> carries the role —
-    /// the ADR 0017 override branch). The **assignee branch does not apply**
-    /// to a project (a project is not assignable the way a to-do is — the
-    /// ADR 0070 board-edit precedent — C-PL·2; the
-    /// <see cref="CheckGoalStanding"/> shape). A null project is a
-    /// <see cref="KeyNotFoundException"/> (the Web layer's 404); a denied
-    /// actor is an <see cref="UnauthorizedAccessException"/> (the Web layer's
-    /// 403).
+    /// The **project** mutation standing (ADR 0086 / design doc §9.3, C-PL·2)
+    /// — a thin forwarder to <see cref="ProjectStandingPolicy.CheckProject"/>
+    /// (C04): creator (<c>Owner</c>) ∪ GlobalAdmin (ADR 0017); the assignee
+    /// branch does not apply to a project. A null project is a
+    /// <see cref="KeyNotFoundException"/> (the Web 404); a denied actor is an
+    /// <see cref="UnauthorizedAccessException"/> (the Web 403). The rule and
+    /// throws live on the policy — byte-identical.
     /// </summary>
     public static void CheckProjectStanding(string actorId, IReadOnlySet<string> actorRoles, Project? project)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (project is null)
-            throw new KeyNotFoundException("A project is required for the standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to mutate a project.");
-
-        if (string.Equals(project.AuthorId, actorId, StringComparison.Ordinal))
-            return;                                        // creator (Owner branch)
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;                                        // GlobalAdmin (ADR 0017 override)
-
-        throw new UnauthorizedAccessException(
-            "Only the creator or a GlobalAdmin may mutate this project.");
-    }
+        => ProjectStandingPolicy.CheckProject(actorId, actorRoles, project);
 
     /// <summary>
     /// Structural equality over two <see cref="Audience"/> values (ADR 0098 —
@@ -1701,6 +1632,13 @@ public sealed class ProjectService : IProjectService
     /// assigned, or an actor with no such standing, is <see
     /// cref="UnauthorizedAccessException"/> (the Web layer's 403).
     /// </summary>
+    // TODO ❓ SEC — routes through IAuthorizationService per the IMPROVE-SEC lane (E11).
+    // This is the *claim-to-do* standing — an access decision that belongs on the
+    // frozen IAuthorizationService, and a session-touching resolver (it probes the
+    // actor's group / community membership via IUserInfoService). C04 deliberately
+    // left it in place: it is NOT one of the pure standing matrices (it touches a
+    // session), and the decision to route it through IAuthorizationService is the
+    // SEC lane's, not C04's. Do not relocate here.
     private async Task<AccessVia> ClaimStandingAsync(TodoItem todo, string actorId, CancellationToken ct)
     {
         if (!string.IsNullOrEmpty(todo.AssigneeId))

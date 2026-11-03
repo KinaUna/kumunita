@@ -1582,7 +1582,7 @@ public sealed class GroupsController(
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
             .ToList();
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        var canTranslate = PostService.CanAddTranslation(
+        var canTranslate = PostTranslationPolicy.CanAddTranslation(
             isGroupLane: true, result.Post.ComponentId, result.Post.AuthorId, actor, actorRoles);
 
         var replyIds = result.Replies.Select(r => r.Id).ToList();
@@ -1597,7 +1597,7 @@ public sealed class GroupsController(
             var replyAuthorProfile = await userInfo.GetProfileAsync(reply.AuthorId);
             // ADR 0022 (group lane) — the reply's standing is its parent's:
             // author ∪ GlobalAdmin (no component-moderator branch, ADR 0007).
-            var canTranslateReply = PostService.CanAddTranslation(
+            var canTranslateReply = PostTranslationPolicy.CanAddTranslation(
                 isGroupLane: true, result.Post.ComponentId, reply.AuthorId, actor, actorRoles);
             replyItems.Add(new ReplyItem(
                 reply.Id,

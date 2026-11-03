@@ -2177,51 +2177,31 @@ public sealed class PostService
     /// to render the "add a translation" affordance (a <b>display</b> pin, not a
     /// gate — the real deny is the <see cref="AddPostTranslationAsync"/> /
     /// <see cref="AddReplyTranslationAsync"/> standing check, which re-runs the
-    /// same rule server-side). Keeping this in Core — not duplicated in the two
-    /// detail controllers — is the ADR 0006-D "the service owns the decision,
-    /// not the Web" shape; it delegates to the same
-    /// <see cref="ResolveTranslationStanding"/> the write lanes use, so the
-    /// display and the gate can never drift apart. ADR 0048: the edit /
-    /// remove lanes (the same standing matrix, re-derived from the parent)
+    /// same rule server-side). C04: the rule moved to
+    /// <see cref="PostTranslationPolicy.CanAddTranslation"/> — a thin forwarder
+    /// here keeps the call surface unchanged; the Web no longer reaches the
+    /// concrete service for the decision. ADR 0048: the edit / remove lanes
     /// reuse this exact display pin, so the "add a …" / "edit …" / "remove …"
-    /// affordances render under the same standing — the display and the
-    /// three gates can never drift apart.
+    /// affordances render under the same standing.
     /// </summary>
     public static bool CanAddTranslation(
         bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveTranslationStanding(isGroupLane, componentId, rowAuthorId, actorId, actorRoles) is not null;
+        => PostTranslationPolicy.CanAddTranslation(isGroupLane, componentId, rowAuthorId, actorId, actorRoles);
 
     /// <summary>
     /// The ADR 0022 translation standing resolver (shared by
     /// <see cref="AddPostTranslationAsync"/> /
-    /// <see cref="AddReplyTranslationAsync"/> /
-    /// <see cref="CanAddTranslation"/>). Returns the <see cref="AccessVia"/>
-    /// the actor qualifies under, or <c>null</c> to deny. Precedence (most
-    /// specific standing first, so the audit row records the narrowest right
-    /// that applied): the row's **author** (
-    /// <see cref="AccessVia.Owner"/>); a **GlobalAdmin**
-    /// (<see cref="AccessVia.Admin"/>); and, on the **community** lane only
-    /// (a <see cref="Kumunita.Core.Identity.Roles.ModeratorComponent"/> claim
-    /// scoped to the post's component) — a **Moderator**
-    /// (<see cref="AccessVia.Moderator"/>). The group lane has no
+    /// <see cref="AddReplyTranslationAsync"/> write lanes and
+    /// <see cref="CanAddTranslation"/>). C04: the rule moved to
+    /// <see cref="PostTranslationPolicy.ResolveTranslationStanding"/> — a thin
+    /// forwarder here keeps the write lanes' single source of truth
+    /// (<c>AccessVia.Owner</c> / <c>AccessVia.Admin</c> /
+    /// <c>AccessVia.Moderator</c>); the group lane has no
     /// component-moderator standing (ADR 0007).
     /// </summary>
     private static AccessVia? ResolveTranslationStanding(
         bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (string.Equals(rowAuthorId, actorId, StringComparison.Ordinal))
-            return AccessVia.Owner;
-
-        if (actorRoles.Contains(Identity.Roles.GlobalAdmin))
-            return AccessVia.Admin;
-
-        if (!isGroupLane
-            && !string.IsNullOrEmpty(componentId)
-            && actorRoles.Contains(Identity.Roles.ModeratorComponent(componentId)))
-            return AccessVia.Moderator;
-
-        return null;
-    }
+        => PostTranslationPolicy.ResolveTranslationStanding(isGroupLane, componentId, rowAuthorId, actorId, actorRoles);
 
     /// <summary>
     /// <b>Reverse-lookup</b> read seam (RC U03, R·5): the first post (by

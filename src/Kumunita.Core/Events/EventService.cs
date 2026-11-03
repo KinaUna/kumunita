@@ -473,107 +473,62 @@ public sealed class EventService : IEventService
 
     // ─── Standing-matrix gate helpers (ADR 0054 §3.4 — pure, no store) ───
     //
-    // The C3 server-side re-check pattern (the PageService.CheckCreateStanding /
-    // CheckEditStanding shape; the AnnouncementService.CreateAsync C3 pattern): a
-    // Web [Authorize(Roles=…)] is a convenience pre-gate, not the source of truth.
-    // Each helper is a **pure** role-claim check (no DB access), so it is directly
-    // testable and callable from any of U04's write lanes. A null event is a
-    // KeyNotFoundException (the Web layer's 404); a denied actor is an
-    // UnauthorizedAccessException (the Web layer's 403). The existing role claim
-    // (Roles.GlobalAdmin) is consulted — **no** new AccessAction, no new AccessVia,
-    // no branch in the frozen IAuthorizationService (ADR 0006 §A; ADR 0054 §3.4).
+    // C04: these pure decisions moved to the <see cref="EventStandingPolicy"/>
+    // static (the D6-allowed cross-module target). The service keeps a thin
+    // forwarder so the Core write lanes and the <c>EventController</c> keep the
+    // exact same call surface; the rule, the throws, and the <c>AccessVia</c>
+    // derivation are the policy's, byte-identical. The Web no longer calls the
+    // concrete service for a decision (the E9 / E12 anti-pattern this unit
+    // exists to kill).
 
     /// <summary>
-    /// The **create** standing (ADR 0054 §3.4): <b>any signed-in resident</b> may
-    /// create an event (they become the author — the <c>Owner</c> branch). The
-    /// "signed-in" constraint is the <c>actorId</c> being non-empty (the Web
-    /// <c>[Authorize]</c> enforces the sign-in; this re-checks it at the Core
-    /// layer — a null/empty actor is a denial, the Web layer's 403). A non-null
-    /// <paramref name="event"/> is required (the U04 write lane passes the
-    /// <c>CreateEventRequest</c>-derived document; a null is a data bug — the
-    /// KeyNotFoundException the Web maps to a 404).
+    /// The **create** standing (ADR 0054 §3.4) — a thin forwarder to
+    /// <see cref="EventStandingPolicy.CheckCreate"/> (C04). Throws
+    /// <see cref="KeyNotFoundException"/> (null event, the Web 404) and
+    /// <see cref="UnauthorizedAccessException"/> (null/empty actor, the Web 403).
     /// </summary>
     public static void CheckCreateStanding(string actorId, IReadOnlySet<string> actorRoles, Event? @event)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (@event is null)
-            throw new KeyNotFoundException("An event is required for the create standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to create an event.");
-    }
+        => EventStandingPolicy.CheckCreate(actorId, actorRoles, @event);
 
     /// <summary>
     /// The **edit** standing (ADR 0054 §3.4, the ADR 0014 / 0016 / 0017
-    /// precedent): the event's <see cref="Event.AuthorId"/> (the
-    /// <c>Owner</c> branch) <b>or</b> a <see cref="Roles.GlobalAdmin"/>
-    /// (<c>Admin</c> override). Evaluated against the <em>stored</em> event
-    /// (loaded before the gate, so its <c>AuthorId</c> is available — the
-    /// <see cref="Announcements.AnnouncementService"/> edit-gate shape). A null
-    /// event is a <see cref="KeyNotFoundException"/> (the Web layer's 404); a
-    /// denied actor is an <see cref="UnauthorizedAccessException"/> (the Web
-    /// layer's 403). A <see cref="Roles.GlobalAdmin"/> is allowed to edit any
-    /// event (the ADR 0017 override shape — contrast ADR 0037's publish lane,
-    /// where a GlobalAdmin is <em>denied</em>).
+    /// precedent) — a thin forwarder to
+    /// <see cref="EventStandingPolicy.CheckEdit"/> (C04). Author (<c>Owner</c>)
+    /// ∪ GlobalAdmin (<c>Admin</c> override). Throws
+    /// <see cref="KeyNotFoundException"/> (null event, the Web 404) and
+    /// <see cref="UnauthorizedAccessException"/> (a denied actor, the Web 403).
     /// </summary>
     public static void CheckEditStanding(string actorId, IReadOnlySet<string> actorRoles, Event? @event)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (@event is null)
-            throw new KeyNotFoundException("An event is required for the edit standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to edit an event.");
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;
-        if (string.Equals(@event.AuthorId, actorId, StringComparison.Ordinal))
-            return;
-
-        throw new UnauthorizedAccessException(
-            "Only the author or a GlobalAdmin may edit an event.");
-    }
+        => EventStandingPolicy.CheckEdit(actorId, actorRoles, @event);
 
     /// <summary>
-    /// The **translation** display pin (ADR 0059, the
-    /// <see cref="Posts.PostService.CanAddTranslation"/> shape): <c>true</c> when
-    /// <paramref name="actorId"/> may add / edit / remove a translation of the
-    /// event authored by <paramref name="eventAuthorId"/>. A <b>display</b> pin,
-    /// not a gate — the real deny is the
+    /// The **translation** display pin (ADR 0059) — a thin forwarder to
+    /// <see cref="EventStandingPolicy.CanAddTranslation"/> (C04): <c>true</c>
+    /// when <paramref name="actorId"/> may add / edit / remove a translation of
+    /// the event authored by <paramref name="eventAuthorId"/>. A <b>display</b>
+    /// pin, not a gate — the real deny is the
     /// <see cref="AddEventTranslationAsync"/> / <see cref="UpdateEventTranslationAsync"/>
-    /// / <see cref="RemoveEventTranslationAsync"/> standing check, which re-runs the
-    /// same rule server-side. Delegates to the same
-    /// <see cref="ResolveTranslationStanding"/> the write lanes use, so the display
-    /// and the three gates can never drift apart.
+    /// / <see cref="RemoveEventTranslationAsync"/> standing check, which re-runs
+    /// the same rule server-side (the
+    /// <see cref="EventStandingPolicy"/> resolver — display and gates can never
+    /// drift apart).
     /// </summary>
     public static bool CanAddTranslation(string eventAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveTranslationStanding(eventAuthorId, actorId, actorRoles) is not null;
+        => EventStandingPolicy.CanAddTranslation(eventAuthorId, actorId, actorRoles);
 
     /// <summary>
     /// The ADR 0059 translation standing resolver (shared by
     /// <see cref="AddEventTranslationAsync"/> / <see cref="UpdateEventTranslationAsync"/>
     /// / <see cref="RemoveEventTranslationAsync"/> /
-    /// <see cref="CanAddTranslation"/>). Returns the <see cref="AccessVia"/> the
-    /// actor qualifies under, or <c>null</c> to deny. Precedence (most specific
-    /// standing first, so the audit row records the narrowest right that applied):
-    /// the event's **author** (<see cref="AccessVia.Owner"/>); a
-    /// <see cref="Roles.Translator"/> (ADR 0021, <see cref="AccessVia.Admin"/>);
-    /// or a <see cref="Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>).
-    /// Events have **no** component-moderator standing (ADR 0054 §5 — the M4
-    /// community lane has no component-moderator branch, ADR 0007's group-lane
-    /// precedent).
+    /// <see cref="CanAddTranslation"/>) — a thin forwarder to the
+    /// <see cref="EventStandingPolicy"/> resolver (C04). Returns the
+    /// <see cref="AccessVia"/> the actor qualifies under, or <c>null</c> to deny
+    /// (author → <see cref="AccessVia.Owner"/>; a <see cref="Roles.Translator"/>
+    /// (ADR 0021) or a <see cref="Roles.GlobalAdmin"/> →
+    /// <see cref="AccessVia.Admin"/>).
     /// </summary>
     private static AccessVia? ResolveTranslationStanding(string eventAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (string.Equals(eventAuthorId, actorId, StringComparison.Ordinal))
-            return AccessVia.Owner;
-
-        if (actorRoles.Contains(Roles.Translator))
-            return AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return AccessVia.Admin;
-
-        return null;
-    }
+        => EventStandingPolicy.ResolveTranslationStanding(eventAuthorId, actorId, actorRoles);
 
     // ─── Write lanes (U04) — standing re-checked server-side (§3.4, C3) ───
     //
