@@ -202,6 +202,7 @@ public sealed class VerifyConfirmStepTests(PostgresFixture fixture) : IClassFixt
                 new IdentityErrorDescriber(),
                 NullLogger<RoleManager<IdentityRole>>.Instance),
             userInfo: userInfo,
+            profileSettings: Substitute.For<IProfileSettingsService>(),
             identity: identity,
             options: Options.Create(new IdentityOptions()));
 

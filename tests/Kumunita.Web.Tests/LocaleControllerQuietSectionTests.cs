@@ -122,10 +122,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
             Substitute.For<ITranslationProvider>(),
             Substitute.For<IMailerStage>());
 
-        var controller = new LocaleController(
-            localization, userInfo, store,
-            translationProvider: null,
-            notifications: notifications);
+        var controller = new LocaleController(localization, userInfo, Substitute.For<IProfileSettingsService>(), store, translationProvider: null, notifications: notifications);
 
         var httpContext = new DefaultHttpContext();
         if (signedIn)

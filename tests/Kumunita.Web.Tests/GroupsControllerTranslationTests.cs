@@ -55,17 +55,18 @@ public class GroupsControllerTranslationTests
     public async Task UpdateTranslation_Owner_HappyPath_Redirects()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetGroupsForUserAsync("subj-owner").Returns(new List<Group>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetGroupsForUserAsync("subj-owner").Returns(new List<Group>
         {
             new() { Id = GroupId, Name = "G", OwnerId = "subj-owner" },
         });
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-owner");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-owner");
 
         var result = await controller.UpdateTranslation(GroupId, "fr", "Nouveau", "Desc");
 
         Assert.IsType<RedirectToActionResult>(result);
-        await userInfo.Received(1).UpdateGroupTranslationAsync(
+        await groupService.Received(1).UpdateGroupTranslationAsync(
             GroupId, "fr", "Nouveau", "Desc", "subj-owner",
             Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Member)), Arg.Any<IDocumentSession>());
     }
@@ -74,14 +75,15 @@ public class GroupsControllerTranslationTests
     public async Task UpdateTranslation_MissingGroup_NotFound_NoWrite()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetGroupsForUserAsync("subj-member").Returns(new List<Group>());
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetGroupsForUserAsync("subj-member").Returns(new List<Group>());
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-member");
 
         var result = await controller.UpdateTranslation("grp-missing", "fr", "X", "Desc");
 
         Assert.IsType<NotFoundResult>(result);
-        await userInfo.DidNotReceive().UpdateGroupTranslationAsync(
+        await groupService.DidNotReceive().UpdateGroupTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
             Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
     }
@@ -90,12 +92,13 @@ public class GroupsControllerTranslationTests
     public async Task UpdateTranslation_Anonymous_NotFound_NoWrite()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        var controller = Build(userInfo, IsAuthenticated: false);
+        var groupService = Substitute.For<IGroupService>();
+        var controller = Build(userInfo, groupService, IsAuthenticated: false);
 
         var result = await controller.UpdateTranslation(GroupId, "fr", "X", "Desc");
 
         Assert.IsType<ForbidResult>(result);
-        await userInfo.DidNotReceive().UpdateGroupTranslationAsync(
+        await groupService.DidNotReceive().UpdateGroupTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
             Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
     }
@@ -104,16 +107,17 @@ public class GroupsControllerTranslationTests
     public async Task UpdateTranslation_Denied_NotFound()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetGroupsForUserAsync("subj-member").Returns(new List<Group>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetGroupsForUserAsync("subj-member").Returns(new List<Group>
         {
             new() { Id = GroupId, Name = "G", OwnerId = "subj-owner" },
         });
-        userInfo.UpdateGroupTranslationAsync(
+        groupService.UpdateGroupTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
             Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
             .Returns(Task.FromException<GroupTranslation>(new UnauthorizedAccessException("Denied.")));
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-member");
 
         var result = await controller.UpdateTranslation(GroupId, "fr", "X", "Desc");
 
@@ -124,16 +128,17 @@ public class GroupsControllerTranslationTests
     public async Task UpdateTranslation_MissingRow_NotFound()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetGroupsForUserAsync("subj-owner").Returns(new List<Group>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetGroupsForUserAsync("subj-owner").Returns(new List<Group>
         {
             new() { Id = GroupId, Name = "G", OwnerId = "subj-owner" },
         });
-        userInfo.UpdateGroupTranslationAsync(
+        groupService.UpdateGroupTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
             Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
             .Returns(Task.FromException<GroupTranslation>(new KeyNotFoundException("No row.")));
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-owner");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-owner");
 
         var result = await controller.UpdateTranslation(GroupId, "fr", "X", "Desc");
 
@@ -144,17 +149,18 @@ public class GroupsControllerTranslationTests
     public async Task RemoveTranslation_Owner_HappyPath_Redirects()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetGroupsForUserAsync("subj-owner").Returns(new List<Group>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetGroupsForUserAsync("subj-owner").Returns(new List<Group>
         {
             new() { Id = GroupId, Name = "G", OwnerId = "subj-owner" },
         });
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-owner");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-owner");
 
         var result = await controller.RemoveTranslation(GroupId, "fr");
 
         Assert.IsType<RedirectToActionResult>(result);
-        await userInfo.Received(1).RemoveGroupTranslationAsync(
+        await groupService.Received(1).RemoveGroupTranslationAsync(
             GroupId, "fr", "subj-owner",
             Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Member)), Arg.Any<IDocumentSession>());
     }
@@ -163,14 +169,15 @@ public class GroupsControllerTranslationTests
     public async Task RemoveTranslation_MissingGroup_NotFound_NoWrite()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetGroupsForUserAsync("subj-member").Returns(new List<Group>());
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetGroupsForUserAsync("subj-member").Returns(new List<Group>());
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-member");
 
         var result = await controller.RemoveTranslation("grp-missing", "fr");
 
         Assert.IsType<NotFoundResult>(result);
-        await userInfo.DidNotReceive().RemoveGroupTranslationAsync(
+        await groupService.DidNotReceive().RemoveGroupTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
             Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
     }
@@ -179,16 +186,17 @@ public class GroupsControllerTranslationTests
     public async Task RemoveTranslation_Denied_NotFound()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetGroupsForUserAsync("subj-member").Returns(new List<Group>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetGroupsForUserAsync("subj-member").Returns(new List<Group>
         {
             new() { Id = GroupId, Name = "G", OwnerId = "subj-owner" },
         });
-        userInfo.RemoveGroupTranslationAsync(
+        groupService.RemoveGroupTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
             Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
             .Returns(Task.FromException(new UnauthorizedAccessException("Denied.")));
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-member");
 
         var result = await controller.RemoveTranslation(GroupId, "fr");
 
@@ -199,6 +207,7 @@ public class GroupsControllerTranslationTests
 
     private static GroupsController Build(
         IUserInfoService? userInfo = null,
+        IGroupService? groupService = null,
         string[]? roles = null,
         bool IsAuthenticated = false,
         string? subjectId = null)
@@ -223,7 +232,7 @@ public class GroupsControllerTranslationTests
         // group-event actions, so the seam is not invoked.
         var events = Substitute.For<Kumunita.Core.Events.IEventService>();
 
-        var controller = new GroupsController(userInfoImpl, posts, localization, store, events);
+        var controller = new GroupsController(userInfoImpl, groupService ?? Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), posts, localization, store, events);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 

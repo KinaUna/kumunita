@@ -224,11 +224,7 @@ public class ProfileAvatarServingTests
         IMediaStore media,
         string? principalSubjectId)
     {
-        var controller = new ProfileController(
-            userInfo,
-            new DirectoryService(userInfo, authz),
-            media,
-            Options.Create(new MediaOptions()));
+        var controller = new ProfileController(userInfo, Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), new DirectoryService(userInfo, Substitute.For<IProfileSettingsService>(), authz), media, Options.Create(new MediaOptions()));
 
         var httpContext = new DefaultHttpContext();
         if (principalSubjectId is not null)

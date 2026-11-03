@@ -13,7 +13,7 @@ namespace Kumunita.Core.Moderation;
 /// <see cref="Kumunita.Core.Posts.PostService"/>. A pure caller of the
 /// two frozen M1/M2 modules — <see cref="IUserInfoService"/> read seams
 /// (including the flag-flip seam
-/// <see cref="IUserInfoService.SetComponentModeratorAccessAsync"/>,
+/// <see cref="IProfileSettingsService.SetComponentModeratorAccessAsync"/>,
 /// used by U5's F6 lane) and <see cref="IAuthorizationService"/> (the
 /// single decision path) — plus its own <see cref="IDocumentStore"/>
 /// for the write lanes.
@@ -44,7 +44,9 @@ namespace Kumunita.Core.Moderation;
 /// </summary>
 public sealed class ModerationService
 {
-    private readonly IUserInfoService _userInfo;
+    // C07 (ADR 0286) — SetComponentModeratorAccessAsync moved to
+    // IProfileSettingsService; this service now holds only the sibling.
+    private readonly IProfileSettingsService _profileSettings;
     private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
 
@@ -54,12 +56,12 @@ public sealed class ModerationService
     private readonly INotificationEmitter? _notifications;
 
     public ModerationService(
-        IUserInfoService userInfo,
+        IProfileSettingsService profileSettings,
         IAuthorizationService authz,
         IDocumentStore store,
         INotificationEmitter? notifications = null)
     {
-        _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));
         _store    = store    ?? throw new ArgumentNullException(nameof(store));
         _notifications = notifications;
@@ -680,7 +682,7 @@ public sealed class ModerationService
     /// Unlock the report (F6; C-M3b·4, the "report-driven unlock" —
     /// the C5 activation event). GlobalAdmin-gated: the same SoD gate
     /// shape as <see cref="AssignReportAsync"/>. On success, calls
-    /// <see cref="IUserInfoService.SetComponentModeratorAccessAsync"/>
+    /// <see cref="IProfileSettingsService.SetComponentModeratorAccessAsync"/>
     /// (the M1 flag-flip seam, *unchanged*, GlobalAdmin-gated) with
     /// <c>on = true</c> — the activation that enables the
     /// <see cref="CanReadWithReportAsync"/> read branch (C-M3b·2) for
@@ -733,7 +735,7 @@ public sealed class ModerationService
             // transaction); the flag-flip seam commits separately per
             // its M1 contract.
             if (report.ComponentId is not null)
-                await _userInfo.SetComponentModeratorAccessAsync(
+                await _profileSettings.SetComponentModeratorAccessAsync(
                     report.ComponentId, true, globalAdminId)
                     .ConfigureAwait(false);
 
@@ -762,7 +764,7 @@ public sealed class ModerationService
     /// <see cref="UnlockAsync"/>). Same SoD / audit shape as
     /// <see cref="UnlockAsync"/>; <see cref="Report.Status"/> =
     /// <c>"resolved"</c> (the §2.3 item 2 literal). Also calls
-    /// <see cref="IUserInfoService.SetComponentModeratorAccessAsync"/>
+    /// <see cref="IProfileSettingsService.SetComponentModeratorAccessAsync"/>
     /// with <c>on = true</c> on success (the flag-flip — see
     /// <see cref="UnlockAsync"/>'s doc-comment for the "separate
     /// commit" note).
@@ -793,7 +795,7 @@ public sealed class ModerationService
         if (decision.Allowed)
         {
             if (report.ComponentId is not null)
-                await _userInfo.SetComponentModeratorAccessAsync(
+                await _profileSettings.SetComponentModeratorAccessAsync(
                     report.ComponentId, true, globalAdminId)
                     .ConfigureAwait(false);
 

@@ -87,7 +87,7 @@ public class GroupMessagesControllerTests
     [Fact]
     public async Task GroupMessages_Index_ToggleOff_RendersDisabled_NoListCall()
     {
-        var (controller, group, userInfo) = Build(false);
+        var (controller, group, userInfo, profileSettings) = Build(false);
 
         var action = await controller.Index(null);
         var view   = Assert.IsType<ViewResult>(action);
@@ -100,7 +100,7 @@ public class GroupMessagesControllerTests
 
         await group.DidNotReceiveWithAnyArgs()
             .ListGroupsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int?>());
-        await userInfo.DidNotReceiveWithAnyArgs()
+        await profileSettings.DidNotReceiveWithAnyArgs()
             .GetProfilesAsync(Arg.Any<bool>());
     }
 
@@ -120,7 +120,7 @@ public class GroupMessagesControllerTests
     [Fact]
     public async Task GroupMessages_Index_ToggleOn_RendersGroupList()
     {
-        var (controller, group, userInfo) = Build(true);
+        var (controller, group, userInfo, profileSettings) = Build(true);
 
         var grp = new GroupConversationRef(
             Id: GrpId, CreatorId: Actor,
@@ -133,7 +133,7 @@ public class GroupMessagesControllerTests
             .Returns(new GroupConversationList(new[] { grp }, HasMore: false));
         var rec = new Profile { SubjectId = RecIp1, DisplayName = "Anna",
                                 MessagingOptIn = true, MessagingRestricted = false, Blocked = false };
-        userInfo.GetProfilesAsync(Arg.Any<bool>())
+        profileSettings.GetProfilesAsync(Arg.Any<bool>())
             .Returns(Task.FromResult<IReadOnlyList<Profile>>(new[] { rec }));
 
         var action = await controller.Index(null);
@@ -161,7 +161,7 @@ public class GroupMessagesControllerTests
     [Fact]
     public async Task GroupMessages_Thread_NonParticipant_Returns404_NoMarkRead()
     {
-        var (controller, group, _) = Build(true);
+        var (controller, group, _, _) = Build(true);
         group.GetConversationAsync(GrpId, Actor, Arg.Any<int>(), Arg.Any<int?>())
             .Returns(Task.FromException<GroupConversationDetail>(
                 new KeyNotFoundException("The conversation was not found.")));
@@ -185,7 +185,7 @@ public class GroupMessagesControllerTests
     [Fact]
     public async Task GroupMessages_Send_BlankBody_RendersError_NoServiceCall()
     {
-        var (controller, group, _) = Build(true);
+        var (controller, group, _, _) = Build(true);
 
         var action = await controller.Send(GrpId, "   ");
         var view   = Assert.IsType<ViewResult>(action);
@@ -212,7 +212,7 @@ public class GroupMessagesControllerTests
     [Fact]
     public async Task GroupMessages_Send_PerActorDisallowed_Disabled_NoSendCall()
     {
-        var (controller, group, _) = Build(true, perActorAllowed: false);
+        var (controller, group, _, _) = Build(true, perActorAllowed: false);
 
         var action = await controller.Send(GrpId, "Hello");
         var view   = Assert.IsType<ViewResult>(action);
@@ -289,7 +289,7 @@ public class GroupMessagesControllerTests
     /// set <c>TempData["info"]</c> without a real session.
     /// </summary>
     private static (GroupMessagesController controller, IGroupMessagingService group,
-                    IUserInfoService userInfo)
+                    IUserInfoService userInfo, IProfileSettingsService profileSettings)
         Build(bool enabled, bool perActorAllowed = true)
     {
         var group = Substitute.For<IGroupMessagingService>();
@@ -302,16 +302,16 @@ public class GroupMessagesControllerTests
         messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(perActorAllowed);
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         // Default: the actor's profile (for the "You" sender label on the
         // thread). Tests that need specific profile data override this.
         userInfo.GetProfileAsync(Actor)
             .Returns(new Profile { SubjectId = Actor, DisplayName = "Ben" });
 
-        var controller = new GroupMessagesController(
-            NullLogger<GroupMessagesController>.Instance, group, messaging, userInfo);
+        var controller = new GroupMessagesController(NullLogger<GroupMessagesController>.Instance, group, messaging, userInfo, profileSettings);
         WireControllerContext(controller, Actor);
 
-        return (controller, group, userInfo);
+        return (controller, group, userInfo, profileSettings);
     }
 
     /// <summary>

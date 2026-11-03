@@ -36,6 +36,10 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private readonly ISearchService search;
     private readonly IUserInfoService userInfo;
+    // C07 (ADR 0286) — the IGroupService + IProfileSettingsService siblings
+    // (the GetGroupsForUserAsync / GetComponentsAsync owners).
+    private readonly IGroupService groupService;
+    private readonly IProfileSettingsService profileSettings;
     private readonly IProjectService? projects;
     private readonly IEventService? events;
     private readonly IPageService? pages;
@@ -46,6 +50,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
     public KioskItemCatalog(
         ISearchService search,
         IUserInfoService userInfo,
+        IGroupService groupService,
+        IProfileSettingsService profileSettings,
         IProjectService? projects = null,
         IEventService? events = null,
         IPageService? pages = null,
@@ -55,6 +61,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
     {
         this.search = search ?? throw new ArgumentNullException(nameof(search));
         this.userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        this.groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
+        this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         this.projects = projects;
         this.events = events;
         this.pages = pages;
@@ -122,7 +130,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         IReadOnlyDictionary<string, string> groupNames = new Dictionary<string, string>();
         if (ordered.Any(h => !string.IsNullOrEmpty(h.GroupId)))
         {
-            var groups = await userInfo.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
+            var groups = await groupService.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
             groupNames = groups
                 .GroupBy(g => g.Id, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
@@ -195,7 +203,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         if (string.IsNullOrWhiteSpace(entry.ItemId))
             return new KioskResolvedItem(true, null, href, null);
 
-        var component = (await userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false))
+        var component = (await profileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false))
             .FirstOrDefault(c => string.Equals(c.Id, entry.ItemId, StringComparison.Ordinal));
         // A disabled / removed component: the calendar would show nothing for
         // it, so the slide is the denied shape rather than an empty grid.
@@ -390,7 +398,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private async Task<IReadOnlyList<KioskItemOption>> ComponentsAsync(string q)
     {
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
         return components
             .Where(c => q.Length == 0 || c.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
             .OrderBy(c => c.SortOrder)

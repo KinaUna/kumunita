@@ -847,9 +847,10 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
 
         var userInfoReal = new UserInfoService(store);
         var authz = new AuthorizationService(store, userInfoReal);
+        var profileSettings = new ProfileSettingsService(store);
         var notifications = new NotificationService(
             store, userInfo, translator, mailer, null, null, null);
-        var moderation = new ModerationService(userInfoReal, authz, store, notifications);
+        var moderation = new ModerationService(profileSettings, authz, store, notifications);
 
         return (store, moderation, staged);
     }
@@ -891,7 +892,8 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
     {
         var userInfo = new UserInfoService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var moderation = new ModerationService(userInfo, authz, store);
+        var profileSettings = new ProfileSettingsService(store);
+        var moderation = new ModerationService(profileSettings, authz, store);
         return (userInfo, authz, moderation);
     }
 

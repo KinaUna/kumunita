@@ -53,14 +53,15 @@ public sealed class ProfileAvatarLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-avatar-set";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
         // Fresh seed ⇒ no avatar yet (the additive field defaults to null).
         Assert.Null((await svc.GetProfileAsync(subject))?.AvatarId);
 
-        await svc.SetProfileAvatarAsync(subject, KnownHash, subject);
+        await profileSettings.SetProfileAvatarAsync(subject, KnownHash, subject);
 
         // The write is live on the very next single-profile read (C4); the
         // fresh read through the service's own read lane is what proves the
@@ -79,24 +80,25 @@ public sealed class ProfileAvatarLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-avatar-clear";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
         // Set an avatar first (test 1 proves the set; this test proves the
         // explicit clear over a set value).
-        await svc.SetProfileAvatarAsync(subject, KnownHash, subject);
+        await profileSettings.SetProfileAvatarAsync(subject, KnownHash, subject);
         Assert.Equal(KnownHash, (await svc.GetProfileAsync(subject))!.AvatarId);
 
         // null ⇒ clear (the lane still stores + saves, so the clear persists
         // — a fresh read must still see null afterwards).
-        await svc.SetProfileAvatarAsync(subject, null, subject);
+        await profileSettings.SetProfileAvatarAsync(subject, null, subject);
 
         Assert.Null((await svc.GetProfileAsync(subject))?.AvatarId);
 
         // …and the clear is re-settable (the lane is a plain field write,
         // not a tombstone).
-        await svc.SetProfileAvatarAsync(subject, KnownHash, subject);
+        await profileSettings.SetProfileAvatarAsync(subject, KnownHash, subject);
         Assert.Equal(KnownHash, (await svc.GetProfileAsync(subject))!.AvatarId);
     }
 
@@ -106,11 +108,12 @@ public sealed class ProfileAvatarLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         // The design doc §2.2 pins KeyNotFoundException for this lane (U4's
         // doc-wins note over the group lanes' InvalidOperationException).
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.SetProfileAvatarAsync("u-avatar-missing", KnownHash, "u-avatar-any"));
+            () => profileSettings.SetProfileAvatarAsync("u-avatar-missing", KnownHash, "u-avatar-any"));
 
         // Fail closed = fail *without side effects*: no profile row was
         // created (the lane is load-throw-set-save, never load-or-create).
@@ -122,7 +125,7 @@ public sealed class ProfileAvatarLaneTests(PostgresFixture fixture)
     /// <summary>Seed a bootstrap profile through the service's own
     /// <c>UpsertProfileAsync</c> (all-null patch ⇒ the record supplies every
     /// field — the exact idiom at <c>UserInfoServiceTests</c> L62).</summary>
-    private static async Task SeedProfileAsync(IUserInfoService svc, string subject)
+    private static async Task SeedProfileAsync(IDocumentStore store, string subject)
     {
         var profile = new Profile
         {
@@ -130,7 +133,7 @@ public sealed class ProfileAvatarLaneTests(PostgresFixture fixture)
             DisplayName = "Resident " + subject,
             Verified = true,
         };
-        await svc.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+        await new ProfileSettingsService(store).UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
     }
 
     /// <summary>One scratch Postgres DB + a <c>mt</c> schema over the M1 docs

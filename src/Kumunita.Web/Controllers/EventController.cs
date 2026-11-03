@@ -73,6 +73,8 @@ public sealed class EventController : Controller
 
     private readonly IEventService events;
     private readonly IUserInfoService userInfo;
+    private readonly IProfileSettingsService profileSettings;
+    private readonly IGroupService groupService;
     private readonly ILocalizationService localization;
     private readonly IDocumentStore store;
     private readonly EffectiveTimezoneResolver timezone;
@@ -116,7 +118,7 @@ public sealed class EventController : Controller
 
     public EventController(
         IEventService events,
-        IUserInfoService userInfo,
+        IUserInfoService userInfo, IProfileSettingsService profileSettings, IGroupService groupService,
         ILocalizationService localization,
         IDocumentStore store,
         EffectiveTimezoneResolver timezone,
@@ -127,6 +129,8 @@ public sealed class EventController : Controller
     {
         this.events = events;
         this.userInfo = userInfo;
+this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
+        this.groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
         this.localization = localization;
         this.store = store;
         this.timezone = timezone;
@@ -147,7 +151,7 @@ public sealed class EventController : Controller
     // doc-comment's "mirrored, not re-invented" claim is now true.)
 
     private Task SeedGrantPickerOptionsAsync()
-        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo);
+        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
     private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
         => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
@@ -172,7 +176,7 @@ public sealed class EventController : Controller
     }
 
     private Task<IReadOnlyList<(string Id, string Name)>> SeedComponentPickerAsync()
-        => ComposerSeedOptions.SeedComponentPickerAsync(userInfo);
+        => ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
 
     /// <summary>
     /// ADR 0051 — in place, swap <paramref name="event"/>'s Title/Body to the
@@ -380,7 +384,7 @@ public sealed class EventController : Controller
         var componentIds = events
             .Concat(myEvents)
             .Select(e => e.ComponentId).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
-        var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var allComponents = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var componentById = allComponents
             .Where(c => componentIds.Contains(c.Id))
             .ToDictionary(c => c.Id, c => string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name);
@@ -663,7 +667,7 @@ public sealed class EventController : Controller
 
         // Component display names (a *read* lookup, never a gate — C-M3·2).
         var componentIds = events.Select(e => e.ComponentId).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
-        var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var allComponents = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var componentById = allComponents
             .Where(c => componentIds.Contains(c.Id))
             .ToDictionary(c => c.Id, c => string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name);
@@ -934,7 +938,7 @@ public sealed class EventController : Controller
         string? componentName = null;
         if (!string.IsNullOrEmpty(ev.ComponentId))
         {
-            var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
+            var allComponents = await profileSettings.GetComponentsAsync(enabledOnly: true);
             var match = allComponents.FirstOrDefault(c => c.Id == ev.ComponentId);
             componentName = match is not null && !string.IsNullOrWhiteSpace(match.Name) ? match.Name : null;
         }

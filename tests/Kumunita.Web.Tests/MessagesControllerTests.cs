@@ -95,7 +95,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Index_ToggleOff_RendersDisabled_NoListCall()
     {
-        var (controller, messaging, userInfo) = BuildMessaging(false);
+        var (controller, messaging, userInfo, profileSettings) = BuildMessaging(false);
 
         var action = await controller.Index(null);
         var view   = Assert.IsType<ViewResult>(action);
@@ -108,7 +108,7 @@ public class MessagesControllerTests
 
         await messaging.DidNotReceiveWithAnyArgs()
             .ListConversationsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int?>());
-        await userInfo.DidNotReceiveWithAnyArgs()
+        await profileSettings.DidNotReceiveWithAnyArgs()
             .GetProfilesAsync(Arg.Any<bool>());
     }
 
@@ -129,7 +129,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Index_ToggleOn_RendersConversationList()
     {
-        var (controller, messaging, userInfo) = BuildMessaging(true);
+        var (controller, messaging, userInfo, profileSettings) = BuildMessaging(true);
 
         var convo = new ConversationRef(
             Id: ConvoId, OtherParticipantId: OtherId, OtherDisplayName: "Anna",
@@ -143,7 +143,7 @@ public class MessagesControllerTests
         // is a valid new-conversation candidate. Ben is the actor (excluded by
         // id) and would additionally be excluded by his own opt-in (the
         // floor default false).
-        userInfo.GetProfilesAsync(false).Returns(new[]
+        profileSettings.GetProfilesAsync(false).Returns(new[]
         {
             new Profile { SubjectId = Actor,   DisplayName = "Ben"  },
             new Profile { SubjectId = OtherId, DisplayName = "Anna", MessagingOptIn = true },
@@ -181,7 +181,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Index_Picker_Excludes_MessagingDisabled_Resident()
     {
-        var (controller, messaging, userInfo) = BuildMessaging(true);
+        var (controller, messaging, userInfo, profileSettings) = BuildMessaging(true);
         // No existing conversations — this test pins the picker, not the list
         // (an empty ConversationList, so the action's pager logic reads a real
         // object rather than NSubstitute's null).
@@ -195,7 +195,7 @@ public class MessagesControllerTests
         const string OptedIn     = "subj-resident-optin";
         const string OptedOut    = "subj-resident-optout";
         const string Restricted  = "subj-resident-restricted";
-        userInfo.GetProfilesAsync(false).Returns(new[]
+        profileSettings.GetProfilesAsync(false).Returns(new[]
         {
             new Profile { SubjectId = Actor,      DisplayName = "Ben"  },
             new Profile { SubjectId = OptedIn,    DisplayName = "Carol", MessagingOptIn = true },
@@ -234,7 +234,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Thread_NonParticipant_404_NoView()
     {
-        var (controller, messaging, _) = BuildMessaging(true);
+        var (controller, messaging, _, _) = BuildMessaging(true);
 
         messaging.GetConversationAsync(ConvoId, Actor, 1, Arg.Any<int?>())
             .Returns(Task.FromException<ConversationDetail>(
@@ -268,7 +268,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Thread_RendersMessages_WithUnreadMarkers()
     {
-        var (controller, messaging, _) = BuildMessaging(true);
+        var (controller, messaging, _, _) = BuildMessaging(true);
 
         var convo = new ConversationRef(
             Id: ConvoId, OtherParticipantId: OtherId, OtherDisplayName: "Anna",
@@ -323,7 +323,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Send_PostsBody_ToService()
     {
-        var (controller, messaging, _) = BuildMessaging(true);
+        var (controller, messaging, _, _) = BuildMessaging(true);
 
         var action = await controller.Send(ConvoId, "Hello there");
         var redirect = Assert.IsType<RedirectResult>(action);
@@ -346,7 +346,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Send_BlankBody_RendersError_NoServiceCall()
     {
-        var (controller, messaging, _) = BuildMessaging(true);
+        var (controller, messaging, _, _) = BuildMessaging(true);
 
         var action = await controller.Send(ConvoId, "   ");
         var view   = Assert.IsType<ViewResult>(action);
@@ -378,7 +378,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Index_PerActorDisallowed_RendersDisabled_NoListCall()
     {
-        var (controller, messaging, userInfo) = BuildMessaging(true);
+        var (controller, messaging, userInfo, profileSettings) = BuildMessaging(true);
         messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(false);
 
         var action = await controller.Index(null);
@@ -396,7 +396,7 @@ public class MessagesControllerTests
         // decided by the gate read alone).
         await messaging.DidNotReceiveWithAnyArgs()
             .ListConversationsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int?>());
-        await userInfo.DidNotReceiveWithAnyArgs()
+        await profileSettings.DidNotReceiveWithAnyArgs()
             .GetProfilesAsync(Arg.Any<bool>());
     }
 
@@ -411,7 +411,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Thread_PerActorDisallowed_404_NoThreadRead()
     {
-        var (controller, messaging, _) = BuildMessaging(true);
+        var (controller, messaging, _, _) = BuildMessaging(true);
         messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(false);
 
         var action = await controller.Thread(ConvoId, null);
@@ -431,7 +431,7 @@ public class MessagesControllerTests
     [Fact]
     public async Task Messages_Send_PerActorDisallowed_Disabled_NoSendCall()
     {
-        var (controller, messaging, _) = BuildMessaging(true);
+        var (controller, messaging, _, _) = BuildMessaging(true);
         messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(false);
 
         var action = await controller.Send(ConvoId, "Hello");
@@ -595,7 +595,7 @@ public class MessagesControllerTests
     /// <see cref="AccountControllerSignupGateTests"/> pattern) so
     /// <c>Send</c> can set <c>TempData["info"]</c> without a real session.
     /// </summary>
-    private static (MessagesController controller, IMessagingService messaging, IUserInfoService userInfo)
+    private static (MessagesController controller, IMessagingService messaging, IUserInfoService userInfo, IProfileSettingsService profileSettings)
         BuildMessaging(bool enabled)
     {
         var messaging = Substitute.For<IMessagingService>();
@@ -608,14 +608,15 @@ public class MessagesControllerTests
         messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(true);
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         // Default: the actor's profile (for the "You" sender label on the
         // thread). Tests that need specific profile data override this.
         userInfo.GetProfileAsync(Actor).Returns(new Profile { SubjectId = Actor, DisplayName = "Ben" });
 
-        var controller = new MessagesController(NullLogger<MessagesController>.Instance, messaging, userInfo);
+        var controller = new MessagesController(NullLogger<MessagesController>.Instance, messaging, userInfo, profileSettings);
         WireControllerContext(controller, Actor);
 
-        return (controller, messaging, userInfo);
+        return (controller, messaging, userInfo, profileSettings);
     }
 
     /// <summary>

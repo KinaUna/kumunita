@@ -32,7 +32,7 @@ namespace Kumunita.Core.Bootstrap;
 /// absence (an instance without first-run env is still usable — the plan pins this
 /// explicitly).</li>
 /// <li><b>Default components</b> (safety/maintenance/social/governance):
-/// <see cref="IUserInfoService.SeedComponentsAsync"/> is already idempotent and
+/// <see cref="IProfileSettingsService.SeedComponentsAsync"/> is already idempotent and
 /// idempotency-guarded (only <c>SetComponentModeratorAccessAsync</c> may flip the
 /// <c>ModeratorAccess</c> flag — invariant C5).</li>
 /// <li><b>Language catalog</b>: the source-language <c>en</c> row (enabled, sort 0)
@@ -164,7 +164,7 @@ public static class FirstBootSeeder
         IDocumentStore mt,
         UserManager<User> userManager,
         RoleManager<IdentityRole> roleManager,
-        IUserInfoService userInfo,
+        IProfileSettingsService profileSettings,
         IMailerStage mailer,
         CommunityOptions community,
         SeedAdminOptions? seedAdmin,
@@ -192,7 +192,8 @@ public static class FirstBootSeeder
         }
 
         // 3. Default components (idempotent upsert — existing rows' flags are honored).
-        await userInfo.SeedComponentsAsync();
+        // C07 (ADR 0286) — SeedComponentsAsync moved to IProfileSettingsService.
+        await profileSettings.SeedComponentsAsync();
 
         // 4. Language catalog (ADR 0005: source-language row + instance default).
         await SeedLanguageCatalogAsync(mt, logger, ct);

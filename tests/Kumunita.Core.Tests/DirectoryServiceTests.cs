@@ -30,8 +30,9 @@ public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new DirectoryService(userInfo, authz);
+        var svc = new DirectoryService(userInfo, new ProfileSettingsService(store), authz);
 
         var verifiedOther = "u-dir-verified-other";
         var unverifiedViewer = "u-dir-unverified-viewer";
@@ -69,8 +70,8 @@ public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         // seam (UpsertProfileAsync appends no Audit row — M1's bootstrap surface — so
         // the audit count below starts well-defined at 0 for any DirectoryService
         // decision rows).
-        await userInfo.UpsertProfileAsync(verifiedProfile, new ProfileUpdate(null, null, null, null, null));
-        await userInfo.UpsertProfileAsync(unverifiedProfile, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(verifiedProfile, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(unverifiedProfile, new ProfileUpdate(null, null, null, null, null));
 
         // The suspended resident: BlockAsync is the real admin lane (it needs
         // UserManager; pulling Identity infra into this test would obscure the pin).

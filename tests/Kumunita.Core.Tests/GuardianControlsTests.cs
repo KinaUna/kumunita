@@ -44,13 +44,16 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, svc);
 
         const string guardian = "u-g1-guardian";
         const string child = "u-g1-child";
 
         // The guardian holds an ACTIVE link over the child (so they CAN curate).
-        var link = await svc.CreateGuardianLinkAsync(child, guardian);
+        var link = await guardianService.CreateGuardianLinkAsync(child, guardian);
         Assert.Equal(GuardianLinkStatus.Active, link.Status);
 
         // A post the child authored, audience-restricted to the child alone (a
@@ -85,22 +88,25 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string guardian = "u-g2-guardian";
         const string child = "u-g2-child";
 
         await SeedChildProfileAsync(store, child);
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // Before: the child's profile is un-suspended.
         Assert.False((await svc.GetProfileAsync(child))!.Blocked);
 
         // Suspend — the flag is live on the very next read (C4).
-        await svc.SuspendChildAsync(child, guardian);
+        await guardianService.SuspendChildAsync(child, guardian);
         Assert.True((await svc.GetProfileAsync(child))!.Blocked);
 
         // Un-suspend — standing restored on the next read.
-        await svc.UnsuspendChildAsync(child, guardian);
+        await guardianService.UnsuspendChildAsync(child, guardian);
         Assert.False((await svc.GetProfileAsync(child))!.Blocked);
 
         // The two GU audit verbs, both Via: Guardian (the guardian's own standing).
@@ -122,22 +128,25 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string owner = "u-g2o-owner";
         const string guardian = "u-g2o-guardian";
         const string child = "u-g2o-child";
 
         var group = await svc.CreateGroupAsync(owner, "CameOfAge", null);
-        await svc.InviteGroupMemberAsync(group.Id, child, invitedBy: owner);
-        var link = await svc.CreateGuardianLinkAsync(child, guardian);
+        await groupService.InviteGroupMemberAsync(group.Id, child, invitedBy: owner);
+        var link = await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // Supervised: the child's self-accept is refused (the GU gate is live).
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.AcceptGroupInvitationAsync(group.Id, child));
+            groupService.AcceptGroupInvitationAsync(group.Id, child));
 
         // Dissolve (the independence lane) — the child's self-lane is OPEN AGAIN on the
         // very next attempt (C4). The membership then lands via the self-accept.
-        await svc.DissolveGuardianLinkAsync(link.Id, guardian, viaAdmin: false);
+        await guardianService.DissolveGuardianLinkAsync(link.Id, guardian, viaAdmin: false);
         await using (var session = store.QuerySession())
         {
             var stored = await session.LoadAsync<GuardianLink>(link.Id, TestContext.Current.CancellationToken);
@@ -145,7 +154,7 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
         }
 
         // No active link now → the self-accept succeeds; membership is live on the next read.
-        await svc.AcceptGroupInvitationAsync(group.Id, child);
+        await groupService.AcceptGroupInvitationAsync(group.Id, child);
         Assert.Contains(group.Id, await svc.GetGroupIdsAsync(child));
     }
 
@@ -159,25 +168,28 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string guardian = "u-g3-guardian";
         const string supervisedChild = "u-g3-child";
         const string foreignTarget = "u-g3-foreign";  // NOT supervised by this guardian
 
         await SeedChildProfileAsync(store, foreignTarget);
-        await svc.CreateGuardianLinkAsync(supervisedChild, guardian); // active link is over supervisedChild only
+        await guardianService.CreateGuardianLinkAsync(supervisedChild, guardian); // active link is over supervisedChild only
         var group = await svc.CreateGroupAsync("u-g3-owner", "G3", null);
-        await svc.SeedComponentsAsync();
+        await profileSettings.SeedComponentsAsync();
         var component = (await LoadFirstComponentAsync(store)).Id;
 
         // The GU-specific lanes are refused for a non-child (no active link over foreignTarget):
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SuspendChildAsync(foreignTarget, guardian));
+            guardianService.SuspendChildAsync(foreignTarget, guardian));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.UnsuspendChildAsync(foreignTarget, guardian));
+            guardianService.UnsuspendChildAsync(foreignTarget, guardian));
         // Approve's standing gate fires before the (group, child) row check:
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.ApproveGroupInvitationAsync(group.Id, foreignTarget, guardian));
+            guardianService.ApproveGroupInvitationAsync(group.Id, foreignTarget, guardian));
         // Community curation: the guardian branch yields no standing over a foreign
         // target, so the existing community gate (GlobalAdmin ∪ moderator) refuses —
         // a guardian holds neither.
@@ -195,12 +207,15 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, svc);
 
         const string guardian = "u-g3r-guardian";
         const string child = "u-g3r-child";
 
-        await svc.CreateGuardianLinkAsync(child, guardian); // the guardian standing is live
+        await guardianService.CreateGuardianLinkAsync(child, guardian); // the guardian standing is live
 
         // The guardian's OWN post: the owner branch (Allowed) — recorded as Owner, NOT Guardian.
         var ownPost = new TestPost
@@ -240,11 +255,14 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string guardian = "u-g4-guardian";
         const string child = "u-g4-child";
 
-        var link = await svc.CreateGuardianLinkAsync(child, guardian);
+        var link = await guardianService.CreateGuardianLinkAsync(child, guardian);
         Assert.Equal(GuardianLinkStatus.Active, link.Status);
         Assert.Equal(guardian, link.GuardianId);
         Assert.Equal(child, link.ChildId);
@@ -258,7 +276,7 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
         // Idempotent no-op on a duplicate pair: the SAME row is returned, and NO second
         // audit row is appended (a no-op is a no-op — the contract, not an error).
         var countBefore = await CountAuditAsync(store, "guardian.create", link.Id);
-        var again = await svc.CreateGuardianLinkAsync(child, guardian);
+        var again = await guardianService.CreateGuardianLinkAsync(child, guardian);
         Assert.Equal(link.Id, again.Id);
         Assert.Equal(GuardianLinkStatus.Active, again.Status);
         Assert.Equal(countBefore, await CountAuditAsync(store, "guardian.create", link.Id));
@@ -280,21 +298,24 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string guardian = "u-g5-guardian";
         const string admin = "u-g5-admin";   // a GlobalAdmin — NOT the GuardianId
         const string child = "u-g5-child";
 
         await SeedChildProfileAsync(store, child);
-        var link = await svc.CreateGuardianLinkAsync(child, guardian);
+        var link = await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // The child is suspended (the guardian's GU lane) — Blocked is the suspension.
-        await svc.SuspendChildAsync(child, guardian);
+        await guardianService.SuspendChildAsync(child, guardian);
         Assert.True((await svc.GetProfileAsync(child))!.Blocked);
 
         // Act 1 — the GlobalAdmin dissolves the ACTIVE link (not the GuardianId; viaAdmin
         // skips the GuardianId check): the link closes, audited Via: Admin.
-        await svc.DissolveGuardianLinkAsync(link.Id, admin, viaAdmin: true);
+        await guardianService.DissolveGuardianLinkAsync(link.Id, admin, viaAdmin: true);
         await using (var session = store.QuerySession())
         {
             var stored = await session.LoadAsync<GuardianLink>(link.Id, TestContext.Current.CancellationToken);
@@ -322,6 +343,9 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string owner = "u-inv-owner";
         const string guardian = "u-inv-guardian";
@@ -329,21 +353,21 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
         const string independentChild = "u-inv-independent"; // no link
 
         var gSupervised = await svc.CreateGroupAsync(owner, "Supervised", null);
-        await svc.InviteGroupMemberAsync(gSupervised.Id, supervisedChild, invitedBy: owner);
-        await svc.CreateGuardianLinkAsync(supervisedChild, guardian);
+        await groupService.InviteGroupMemberAsync(gSupervised.Id, supervisedChild, invitedBy: owner);
+        await guardianService.CreateGuardianLinkAsync(supervisedChild, guardian);
 
         // Supervised: the self-accept is refused (the GU gate).
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.AcceptGroupInvitationAsync(gSupervised.Id, supervisedChild));
+            groupService.AcceptGroupInvitationAsync(gSupervised.Id, supervisedChild));
 
         // But the self-decline stays open (a child may always say no).
-        await svc.DeclineGroupInvitationAsync(gSupervised.Id, supervisedChild);
+        await groupService.DeclineGroupInvitationAsync(gSupervised.Id, supervisedChild);
         Assert.DoesNotContain(gSupervised.Id, await svc.GetGroupIdsAsync(supervisedChild));
 
         // Conditional on the active link: a child with NO link self-accepts normally.
         var gIndependent = await svc.CreateGroupAsync(owner, "Independent", null);
-        await svc.InviteGroupMemberAsync(gIndependent.Id, independentChild, invitedBy: owner);
-        await svc.AcceptGroupInvitationAsync(gIndependent.Id, independentChild);
+        await groupService.InviteGroupMemberAsync(gIndependent.Id, independentChild, invitedBy: owner);
+        await groupService.AcceptGroupInvitationAsync(gIndependent.Id, independentChild);
         Assert.Contains(gIndependent.Id, await svc.GetGroupIdsAsync(independentChild));
     }
 
@@ -357,16 +381,19 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string owner = "u-ia-owner";
         const string guardian = "u-ia-guardian";
         const string child = "u-ia-child";
 
         var group = await svc.CreateGroupAsync(owner, "Approved", null);
-        await svc.InviteGroupMemberAsync(group.Id, child, invitedBy: owner);
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await groupService.InviteGroupMemberAsync(group.Id, child, invitedBy: owner);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
-        var row = await svc.ApproveGroupInvitationAsync(group.Id, child, guardian);
+        var row = await guardianService.ApproveGroupInvitationAsync(group.Id, child, guardian);
         Assert.Equal(InvitationStatus.Accepted, row.Status);
         Assert.Equal(guardian, row.ResolvedBy);
 
@@ -391,6 +418,9 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string owner = "u-mm-owner";
         const string guardian = "u-mm-guardian";
@@ -398,7 +428,7 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
 
         var group = await svc.CreateGroupAsync(owner, "Curated", null);
         var component = (await LoadFirstComponentAsync(store)).Id; // requires the seeded 4 components
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // ── Group add / remove (the guardian as addedBy/removedBy) ──────────────
         await svc.AddGroupMemberAsync(group.Id, child, guardian);
@@ -439,26 +469,29 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, svc);
-        var directory = new DirectoryService(svc, authz);
+        var directory = new DirectoryService(svc, new ProfileSettingsService(store), authz);
 
         const string guardian = "u-sb-guardian";
         const string child = "u-sb-child";
         const string viewer = "u-sb-viewer"; // a signed-in viewer (ListAsync is sign-in-gated)
 
         await SeedChildProfileAsync(store, child);
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // Before the suspension: the child is in the directory (a non-blocked resident).
         Assert.Contains(child, (await directory.ListAsync(viewer)).Visible.Select(p => p.SubjectId));
 
         // Suspend — the SAME flag the directory already reads (enforcement parity):
-        await svc.SuspendChildAsync(child, guardian);
+        await guardianService.SuspendChildAsync(child, guardian);
         Assert.True((await svc.GetProfileAsync(child))!.Blocked);
         Assert.DoesNotContain(child, (await directory.ListAsync(viewer)).Visible.Select(p => p.SubjectId));
 
         // Un-suspend — the child is back in the directory on the next read.
-        await svc.UnsuspendChildAsync(child, guardian);
+        await guardianService.UnsuspendChildAsync(child, guardian);
         Assert.False((await svc.GetProfileAsync(child))!.Blocked);
         Assert.Contains(child, (await directory.ListAsync(viewer)).Visible.Select(p => p.SubjectId));
 
@@ -530,7 +563,7 @@ public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<Post
         var existing = await session.Query<Component>().FirstOrDefaultAsync(TestContext.Current.CancellationToken);
         if (existing is not null)
             return existing;
-        return (await new UserInfoService(store).SeedComponentsAsync())[0];
+        return (await new ProfileSettingsService(store).SeedComponentsAsync())[0];
     }
 
     private async Task<IDocumentStore> BootStoreAsync()

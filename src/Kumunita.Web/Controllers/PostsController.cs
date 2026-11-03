@@ -78,7 +78,7 @@ namespace Kumunita.Web.Controllers;
 public sealed class PostsController(
     PostService posts,
     ModerationService moderation,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, ICommunityMembershipService community, IProfileSettingsService profileSettings, IGroupService groupService,
     ILocalizationService localization,
     IDocumentStore store,
     // ADR 0044 (TG lane) — the tag read seam. The Detail action renders the
@@ -140,7 +140,7 @@ public sealed class PostsController(
         // set, never a visible set (C-M3·2) and never an <c>AccessAudit</c>
         // subject (C-M3·2; the Core-layer seam test
         // GetComponentsAsync_CandidateFilterEmitsNoAuditRow pins this).
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var component = components.FirstOrDefault(c => c.Id == componentId);
         if (component is null)
             // §2.3 row 2: missing/disabled component — the pre-feed
@@ -200,7 +200,7 @@ public sealed class PostsController(
         // the same rule the dedicated page's gate accepts; a component
         // moderator may view the rows via the page but the feed only
         // advertises it to the standing that acts on it).
-        var canTranslate = userInfo.CanTranslateCommunity(
+        var canTranslate = community.CanTranslateCommunity(
             actor, KumunitaPrincipal.RoleSet(User));
 
         // ADR 0051 — extend ADR 0049's default-visible-variant rule (already in
@@ -358,7 +358,7 @@ public sealed class PostsController(
             ? SortKeys.Parse(sort, dir, PostFeedAllowedKeys, "created", defaultDir: true)
             : null;
 
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         // The viewer's posting reach is the same rule the composer's POST gate uses
         // (AccessibleComponentsAsync mirrors PostService.CreatePostAsync's gate). On
         // the all-sections feed, "Write a post" is offered only when the viewer can
@@ -495,7 +495,7 @@ public sealed class PostsController(
     {
         if (translationProvider is null)
             return fallbackName;
-        var translations = await userInfo.GetCommunityTranslationsAsync(componentId);
+        var translations = await community.GetCommunityTranslationsAsync(componentId);
         var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
         return match is not null && !string.IsNullOrWhiteSpace(match.Name) ? match.Name : fallbackName;
     }
@@ -665,7 +665,7 @@ public sealed class PostsController(
         string? communityName = null;
         if (result.Post.ComponentId.Length > 0)
         {
-            communityName = (await userInfo.GetComponentsAsync(enabledOnly: true))
+            communityName = (await profileSettings.GetComponentsAsync(enabledOnly: true))
                 .FirstOrDefault(c => c.Id == result.Post.ComponentId)?.Name;
             if (communityName is not null && translationProvider is not null)
             {
@@ -738,7 +738,7 @@ public sealed class PostsController(
     private async Task<IReadOnlyList<Component>> AccessibleComponentsAsync(
         System.Security.Claims.ClaimsPrincipal user)
     {
-        var all = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var all = await profileSettings.GetComponentsAsync(enabledOnly: true);
 
         if (KumunitaPrincipal.IsGlobalAdmin(user))
             return all; // GlobalAdmin bypasses the membership check
@@ -771,7 +771,7 @@ public sealed class PostsController(
     // that used to live here are thin delegates to that helper.)
 
     private Task SeedGrantPickerOptionsAsync()
-        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo);
+        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
     private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
         => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
@@ -1234,7 +1234,7 @@ public sealed class PostsController(
         if (string.IsNullOrEmpty(componentId))
             return [];
 
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var component = components.FirstOrDefault(c => c.Id == componentId);
         if (component is null)
             return [];

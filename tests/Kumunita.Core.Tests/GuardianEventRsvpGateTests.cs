@@ -101,7 +101,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     public async Task SupervisedChild_TwoActiveGuardians_EachGetsOneRequestNotification()
     {
         var boot = await BootAsync();
-        await boot.UserInfo.CreateGuardianLinkAsync(ChildId, SecondGuardianId);
+        await boot.GuardianService.CreateGuardianLinkAsync(ChildId, SecondGuardianId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
@@ -145,7 +145,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     public async Task SupervisedChild_NotifiesPosture_RsvpLands_GuardianNotified()
     {
         var boot = await BootAsync();
-        await boot.UserInfo.SetChildEventRsvpModeAsync(
+        await boot.GuardianService.SetChildEventRsvpModeAsync(
             ChildId, EventRsvpMode.GuardianNotifies, GuardianId);
 
         // The self-lane is allowed (auto-approve)...
@@ -168,7 +168,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     public async Task SupervisedChild_ChildDecidesPosture_RsvpLands_NoGuardianNotification()
     {
         var boot = await BootAsync();
-        await boot.UserInfo.SetChildEventRsvpModeAsync(
+        await boot.GuardianService.SetChildEventRsvpModeAsync(
             ChildId, EventRsvpMode.ChildDecides, GuardianId);
 
         var rsvp = await boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken);
@@ -244,7 +244,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     public async Task GuardianVeto_ChildRsvpDeleted_AuditRow()
     {
         var boot = await BootAsync();
-        await boot.UserInfo.SetChildEventRsvpModeAsync(
+        await boot.GuardianService.SetChildEventRsvpModeAsync(
             ChildId, EventRsvpMode.GuardianNotifies, GuardianId);
         await boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken);
         var rsvps = await RsvpsFor(boot.Store, ChildId);
@@ -318,7 +318,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     {
         var boot = await BootAsync();
 
-        await boot.UserInfo.SetChildEventRsvpModeAsync(
+        await boot.GuardianService.SetChildEventRsvpModeAsync(
             ChildId, EventRsvpMode.GuardianNotifies, GuardianId);
 
         await using (var s = boot.Store.QuerySession())
@@ -340,7 +340,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         var boot = await BootAsync();
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => boot.UserInfo.SetChildEventRsvpModeAsync(
+            () => boot.GuardianService.SetChildEventRsvpModeAsync(
                 ChildId, EventRsvpMode.ChildDecides, StrangerId));
     }
 
@@ -350,6 +350,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     {
         public required IDocumentStore Store { get; init; }
         public required UserInfoService UserInfo { get; init; }
+        public required GuardianService GuardianService { get; init; }
         public required EventService Events { get; init; }
     }
 
@@ -414,7 +415,8 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
 
         // The GU formation — the (guardian, child) active link.
         var userInfoForLink = new UserInfoService(store);
-        await userInfoForLink.CreateGuardianLinkAsync(ChildId, GuardianId);
+        var linkService = new GuardianService(store);
+        await linkService.CreateGuardianLinkAsync(ChildId, GuardianId);
 
         // The GU lane's NotificationService wiring (real service over a
         // recording mailer + a Substitute ITranslationProvider; the
@@ -437,10 +439,11 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         var sp = sc.BuildServiceProvider();
 
         var userInfo = new UserInfoService(store, sp);
+        var guardianService = new GuardianService(store, sp);
         var events = new EventService(
             store, new AuthorizationService(store, userInfo), userInfo, ns);
 
-        return new Boot { Store = store, UserInfo = userInfo, Events = events };
+        return new Boot { Store = store, UserInfo = userInfo, Events = events, GuardianService = guardianService };
     }
 
     private static async Task<IReadOnlyList<GuardianEventRequest>> RequestsFor(

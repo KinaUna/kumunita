@@ -26,7 +26,7 @@ namespace Kumunita.Web;
 public sealed class KumunitaClaimsPrincipalFactory(
     UserManager<User> userManager,
     RoleManager<IdentityRole> roleManager,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IProfileSettingsService profileSettings,
     Kumunita.Core.Identity.IIdentityService identity,   // NEW (M19, D5)
     IOptions<IdentityOptions> options)
     : UserClaimsPrincipalFactory<User, IdentityRole>(userManager, roleManager, options)
@@ -101,7 +101,7 @@ public sealed class KumunitaClaimsPrincipalFactory(
 
         if (userRoleNames.Contains(Roles.Moderator))
         {
-            var assignments = await userInfo.GetAssignmentsAsync(user.Id ?? string.Empty);
+            var assignments = await profileSettings.GetAssignmentsAsync(user.Id ?? string.Empty);
             foreach (var a in assignments)
                 roles.Add(Roles.ModeratorComponent(a.ComponentId));
         }

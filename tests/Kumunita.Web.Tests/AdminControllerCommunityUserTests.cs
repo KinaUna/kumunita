@@ -192,12 +192,7 @@ public class AdminControllerCommunityUserTests
                 .UseNpgsql("Host=localhost;Database=_test_never_opened;Username=_;******")
                 .Options);
 
-        var controller = new AdminController(
-            identities: db,
-            store:      Substitute.For<IDocumentStore>(),
-            identity:   identity,
-            userInfo:   userInfo,
-            pages:      Substitute.For<IPageService>());
+        var controller = new AdminController(identities: db, store:      Substitute.For<IDocumentStore>(), identity:   identity, userInfo:   userInfo, Substitute.For<ICommunityMembershipService>(), Substitute.For<IProfileSettingsService>(), pages:      Substitute.For<IPageService>());
 
         var claims = new List<Claim>
         {

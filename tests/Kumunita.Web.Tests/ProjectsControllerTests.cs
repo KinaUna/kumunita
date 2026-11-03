@@ -2248,20 +2248,21 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         string[]? roles = null)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         // The display-name / picker-read lanes default to empty candidate sets
         // (a valid shape): a missing profile row falls back to the raw id, and
         // the component picker is empty.
         userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
         // The goal composer (U06) seeds the shared _GrantPickers option lists
         // via SeedGrantPickerOptionsAsync — these two reads are null-safe
         // defaults (empty candidate sets — a valid shape) so the new/create
         // goal lanes don't NRE on the .Where/.Select projection.
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
-        var controller = new ProjectsController(
-            projects, userInfo, DefaultLocalization(), store ?? Substitute.For<IDocumentStore>());
+        var controller = new ProjectsController(projects, userInfo, Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store ?? Substitute.For<IDocumentStore>());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

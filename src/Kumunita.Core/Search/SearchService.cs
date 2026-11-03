@@ -89,16 +89,19 @@ public sealed class SearchService : ISearchService
     private readonly IDocumentStore _store;
     private readonly IAuthorizationService _authz;
     private readonly IUserInfoService _userInfo;
+    // C07 (ADR 0286) — the IProfileSettingsService sibling (the moved method's owner).
+    private readonly IProfileSettingsService _profileSettings;
 
     /// <summary>
     /// Create the search service over the three frozen seams (the ADR 0006-D
     /// frozen-composition shape — no fourth dependency, no new seam).
     /// </summary>
-    public SearchService(IDocumentStore store, IAuthorizationService authz, IUserInfoService userInfo)
+    public SearchService(IDocumentStore store, IAuthorizationService authz, IUserInfoService userInfo, IProfileSettingsService profileSettings)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
     }
 
     // ── surface=all (D1 / D8) ──────────────────────────────────────────────
@@ -660,7 +663,7 @@ public sealed class SearchService : ISearchService
     {
         if (string.IsNullOrWhiteSpace(actorId)) return [];
 
-        var candidates = (await _userInfo.GetProfilesAsync(false).ConfigureAwait(false))
+        var candidates = (await _profileSettings.GetProfilesAsync(false).ConfigureAwait(false))
             .Where(p => !p.Blocked)
             .ToList();
 

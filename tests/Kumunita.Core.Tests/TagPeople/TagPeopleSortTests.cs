@@ -450,6 +450,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         });
 
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
         var translations = new TranslationProvider(store);
         var svc = new TagService(store, authz, translations);
@@ -475,8 +476,9 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
             null, null, TestContext.Current.CancellationToken);
 
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new ProfileFindService(userInfo, authz, store);
+        var svc = new ProfileFindService(profileSettings, authz, store);
         return (store, svc);
     }
 
@@ -522,8 +524,9 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         string viewer, string? tag = null, string? bio = null)
     {
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var profile = new Profile { SubjectId = subjectId, DisplayName = displayName, Verified = true, Bio = bio };
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null,
                 new Audience(AudienceMode.Any,

@@ -71,7 +71,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-public";
         await Plant(store, new Announcement
@@ -113,7 +113,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-both";
         await Plant(store, new Announcement
@@ -152,7 +152,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-sort";
         // Plant in an order deliberately different from the expected sort
@@ -182,7 +182,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         var visible = await svc.ListVisibleAsync("u-resident", new HashSet<string> { Roles.Member });
 
@@ -206,7 +206,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-noaudit";
         await Plant(store, new Announcement
@@ -242,7 +242,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string actor = "u-admin-public";
         await using var session = newSession(store);
@@ -277,7 +277,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string actor = "u-moderator-public";
         await using var session = newSession(store);
@@ -311,7 +311,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string actor = "u-member-public";
         await using var session = newSession(store);
@@ -341,7 +341,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string actor = "u-admin-community";
         await using var session = newSession(store);
@@ -370,7 +370,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string actor = "u-moderator-community";
         await using var session = newSession(store);
@@ -400,7 +400,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string actor = "u-member-community";
         await using var session = newSession(store);
@@ -429,7 +429,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         const string actor = "u-no-roles";
 
         await using var session = newSession(store);
@@ -467,7 +467,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-delete";
         await Plant(store, new Announcement
@@ -498,7 +498,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await using var session = newSession(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -520,7 +520,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string originalAuthor = "u-author-original";
         var created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero);
@@ -566,7 +566,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-public-denied";
         await Plant(store, new Announcement
@@ -606,7 +606,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-community";
         await Plant(store, new Announcement
@@ -642,7 +642,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-flat";
         await Plant(store, new Announcement
@@ -679,7 +679,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-flat-admin";
         await Plant(store, new Announcement
@@ -716,7 +716,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await using var session = newSession(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -739,7 +739,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-noop";
         await Plant(store, new Announcement
@@ -779,7 +779,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-pinned-visit";
         var c = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
@@ -822,7 +822,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-pinned-auth";
         var c = new DateTimeOffset(2026, 2, 2, 0, 0, 0, TimeSpan.Zero);
@@ -870,7 +870,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         // Plant two non-pinned (Pinned = false) announcements: the pinned
         // lane must return null even though other announcements exist.
@@ -907,7 +907,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-unpin";
         var c = new DateTimeOffset(2026, 2, 4, 0, 0, 0, TimeSpan.Zero);
@@ -942,7 +942,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         const string author = "u-author-scope";
         var c = new DateTimeOffset(2026, 2, 5, 0, 0, 0, TimeSpan.Zero);
@@ -993,7 +993,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new ComponentMembership
@@ -1036,7 +1036,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
@@ -1067,7 +1067,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new ComponentMembership
@@ -1106,7 +1106,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
 
@@ -1135,7 +1135,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
 
@@ -1162,7 +1162,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
 
@@ -1189,7 +1189,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
@@ -1220,7 +1220,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await using var session = newSession(store);
         await Assert.ThrowsAsync<ArgumentException>(() =>
@@ -1248,7 +1248,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
 
@@ -1279,7 +1279,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Announcement
@@ -1316,7 +1316,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
@@ -1407,7 +1407,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -1450,7 +1450,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Announcement
@@ -1484,7 +1484,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
@@ -1518,7 +1518,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -1550,7 +1550,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await using var session = newSession(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -1573,7 +1573,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -1622,7 +1622,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Announcement
@@ -1660,7 +1660,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
@@ -1698,7 +1698,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -1737,7 +1737,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -1763,7 +1763,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -1805,7 +1805,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Announcement
@@ -1847,7 +1847,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -1883,7 +1883,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -1910,7 +1910,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task AreAnnouncementCommentsEnabled_DefaultOn()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         Assert.True(await svc.AreAnnouncementCommentsEnabledAsync());
     }
@@ -1925,7 +1925,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task SetAnnouncementCommentsEnabled_Closed_StoresFlagAndAuditRow()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await svc.SetAnnouncementCommentsEnabledAsync(false, "u-admin");
 
@@ -1948,7 +1948,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task SetAnnouncementCommentsEnabled_NoActorRefused()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => svc.SetAnnouncementCommentsEnabledAsync(false, ""));
@@ -1963,7 +1963,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task CreateAnnouncementComment_ToggleOff_Refused_NotPersisted()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new LocaleSettings
         {
@@ -1996,7 +1996,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task CreateAnnouncementComment_AnonymousRefused()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2018,7 +2018,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task CreateAnnouncementComment_MissingAnnouncementRefused()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await using var session = newSession(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -2034,7 +2034,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task CreateAnnouncementComment_DraftRefused()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2059,7 +2059,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task CreateAnnouncementComment_NotVisibleRefused()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
         await Plant(store, new Announcement
@@ -2086,7 +2086,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task CreateAnnouncementComment_Public_StoresRowAndAuditRow()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2125,7 +2125,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task CreateAnnouncementComment_BlankBodyRefused()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2153,7 +2153,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task GetAnnouncementComments_AnonymousRefused()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2174,7 +2174,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task GetAnnouncementComments_DraftRefused()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2196,7 +2196,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task GetAnnouncementComments_InCreatedOrder()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2227,7 +2227,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task DeleteAnnouncementComment_NonAuthorRefused_NotTouched()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2261,7 +2261,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task DeleteAnnouncementComment_Author_SoftDeletesAndKeepsRow()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         await Plant(store, new Announcement
         {
@@ -2369,7 +2369,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task M36_Announcement_Published_MentionResolved_StoresOneRow_AndStagesEmail()
     {
         var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
-        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.ProfileSettings, boot.Notifications, boot.Mentions);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
         const string author = "u-m36-ann-author";
 
@@ -2390,7 +2390,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task M36_Announcement_Draft_Mention_StoresNoRow()
     {
         var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
-        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.ProfileSettings, boot.Notifications, boot.Mentions);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
         const string author = "u-m36-ann-draft-author";
 
@@ -2405,7 +2405,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task M36_Announcement_Published_MentionUnknown_StoresNoRow()
     {
         var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
-        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.ProfileSettings, boot.Notifications, boot.Mentions);
         const string author = "u-m36-ann-inert-author";
 
         var ann = new Announcement { Scope = AnnouncementScope.Public, Title = "T", Body = "@Ghost help", IsDraft = true };

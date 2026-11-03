@@ -77,7 +77,7 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 public sealed class ProfileController(
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
     DirectoryService directory,
     IMediaStore media,
     IOptions<MediaOptions> mediaOpts,
@@ -241,7 +241,7 @@ public sealed class ProfileController(
     /// </summary>
     private async Task SeedGrantPickerOptionsAsync()
     {
-        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: true);
+        var profiles = await profileSettings.GetProfilesAsync(verifiedOnly: true);
         var selfId = SubjectId(User);
         var userOptions = profiles
             .Where(p => !p.Blocked)
@@ -257,7 +257,7 @@ public sealed class ProfileController(
 
         // ADR 0010: the grant/access lists are public groups only (a private
         // group is an organizing unit, never granted as an audience).
-        var groups = await userInfo.GetPublicGroupsAsync();
+        var groups = await groupService.GetPublicGroupsAsync();
         var groupOptions = groups
             .Select(g => new GrantOption
             {
@@ -333,7 +333,7 @@ public sealed class ProfileController(
         // The bio is written verbatim (D3); the tags are resolved by slug via
         // the create-or-get loop (C-M23·6). No separate profile-write audit
         // row (the M2 UpsertProfileAsync shape, U02).
-        await userInfo.UpsertProfileAsync(profile, patch, subject);
+        await profileSettings.UpsertProfileAsync(profile, patch, subject);
 
         // M23 (U04) — the saved flash resolves through the house
         // EffectiveLanguageCode.ResolveAsync + ITranslationProvider.GetAsync
@@ -491,7 +491,7 @@ public sealed class ProfileController(
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         var mediaObject = await media.PutAsync(ms.ToArray(), file.FileName, file.ContentType, subject);
-        await userInfo.SetProfileAvatarAsync(subject, mediaObject.Id, subject); // C-MED·8 single lane
+        await profileSettings.SetProfileAvatarAsync(subject, mediaObject.Id, subject); // C-MED·8 single lane
 
         return RedirectToAction("Edit");
     }

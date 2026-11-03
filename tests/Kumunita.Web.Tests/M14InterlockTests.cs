@@ -476,10 +476,12 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         string subjectId)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
         userInfo.GetGroupIdsAsync(Arg.Any<string>()).Returns(new HashSet<string>(StringComparer.Ordinal));
         userInfo.GetCommunityIdsAsync(Arg.Any<string>()).Returns(Array.Empty<string>());
 
@@ -490,8 +492,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
         localization.GetDefaultLanguageCodeAsync().Returns("en");
 
-        var controller = new ProjectsController(
-            projects, userInfo, localization, store, events: events);
+        var controller = new ProjectsController(projects, userInfo, Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), localization, store, events: events);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim> { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId) };
@@ -516,19 +517,19 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         string subjectId)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
         var localization = Substitute.For<ILocalizationService>();
         localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>());
         localization.GetDefaultLanguageCodeAsync().Returns("en");
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
 
-        var controller = new EventController(
-            events, userInfo, localization, Substitute.For<IDocumentStore>(), timezone,
-            projects: projects);
+        var controller = new EventController(events, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, Substitute.For<IDocumentStore>(), timezone, projects: projects);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim> { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId) };

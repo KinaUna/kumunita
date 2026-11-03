@@ -27,7 +27,7 @@ namespace Kumunita.Web.Tests;
 ///       The mode write is never reached.</item>
 /// <item><b>Happy path.</b> A guardian with an active link POSTs the mode:
 ///       the action calls
-///       <see cref="IUserInfoService.SetChildEventRsvpModeAsync"/> with the
+///       <see cref="IGuardianService.SetChildEventRsvpModeAsync"/> with the
 ///       (childId, mode, guardianId) tuple, the mode is live on the very next
 ///       <see cref="IUserInfoService.GetProfileAsync"/> read (C4 strong
 ///       consistency), a <c>guardian.event_rsvp_mode</c> audit row with
@@ -49,7 +49,7 @@ namespace Kumunita.Web.Tests;
 /// <see cref="GuardianMessagingRestrictionTests"/> (the real Marten store,
 /// the real <see cref="UserInfoService"/>, the real
 /// <c>ActiveLinkAsync</c> standing gate) — the mode write is the
-/// <see cref="IUserInfoService.SetChildEventRsvpModeAsync"/> seam, and the
+/// <see cref="IGuardianService.SetChildEventRsvpModeAsync"/> seam, and the
 /// <c>guardian.event_rsvp_mode</c> audit row is only produced by the real
 /// store.
 /// </summary>
@@ -182,7 +182,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         var events = EventsService(store);
 
         // The GuardianNotifies posture: the child RSVPs freely...
-        await (new UserInfoService(store)).SetChildEventRsvpModeAsync(
+        await (new GuardianService(store)).SetChildEventRsvpModeAsync(
             Child, EventRsvpMode.GuardianNotifies, Guardian);
         await events.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
@@ -281,9 +281,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
 
         var userInfo = new UserInfoService(store);
         var identity = Substitute.For<IIdentityService>();   // unused in these tests
-        var controller = new GuardianController(
-            userInfo, identity, store,
-            withEvents ? EventsService(store) : null);
+        var controller = new GuardianController(userInfo, Substitute.For<IGroupService>(), new GuardianService(store), Substitute.For<IProfileSettingsService>(), identity, store, withEvents ? EventsService(store) : null);
 
         // The ClaimsPrincipal — the actor's subject id via the Kumunita.Sub
         // claim (KumunitaPrincipal.SubjectId reads this).

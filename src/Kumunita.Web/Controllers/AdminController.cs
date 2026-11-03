@@ -40,7 +40,7 @@ public sealed class AdminController(
     AppDbContext identities,
     IDocumentStore store,
     IIdentityService identity,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, ICommunityMembershipService community, IProfileSettingsService profileSettings,
     IPageService pages,
     // ADR 0161 — the language-catalog seam for the /admin/platform
     // platform-pages translation surface (the enabled-language candidate
@@ -179,7 +179,7 @@ public sealed class AdminController(
         // CommunityController.Manage shape): non-blocked profiles, not the
         // actor themself — per community, minus its explicit members.
         var adminSubject = AdminSubjectId(User);
-        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: false);
+        var profiles = await profileSettings.GetProfilesAsync(verifiedOnly: false);
         var candidatePool = profiles
             .Where(p => !p.Blocked && p.SubjectId != adminSubject)
             .ToList();
@@ -433,7 +433,7 @@ public sealed class AdminController(
                 .Select(r => r.Name!)
                 .ToList();
             var componentIds = roleNames.Contains(Kumunita.Core.Identity.Roles.Moderator)
-                ? (await userInfo.GetAssignmentsAsync(subject)).Select(a => a.ComponentId).ToList()
+                ? (await profileSettings.GetAssignmentsAsync(subject)).Select(a => a.ComponentId).ToList()
                 : new List<string>();
             var communityIds = (await userInfo.GetCommunityIdsAsync(subject)).ToList();
             var profile = await userInfo.GetProfileAsync(subject);
@@ -450,7 +450,7 @@ public sealed class AdminController(
             });
         }
 
-        var allComponents = await userInfo.GetComponentsAsync(enabledOnly: false);
+        var allComponents = await profileSettings.GetComponentsAsync(enabledOnly: false);
         var componentOptions = allComponents
             .Where(c => c.Enabled)
             .Select(c => new AdminIndexViewModel.ComponentOption
@@ -499,7 +499,7 @@ public sealed class AdminController(
         var admin = AdminSubjectId(User) ?? string.Empty;
         try
         {
-            var created = await userInfo.CreateCommunityAsync(model.Name, model.Description, admin);
+            var created = await community.CreateCommunityAsync(model.Name, model.Description, admin);
             // ADR 0012 — the form's "mandatory" checkbox: the Core CreateAsync
             // defaults Mandatory=false, so flip the flag on through the same
             // GlobalAdmin-only audited lane (the admin's standing, never the
@@ -548,7 +548,7 @@ public sealed class AdminController(
             // patch (null = keep-as-is). The Core also accepts icon / flag toggles,
             // but they're not exposed here (the moderator-access flag has its own
             // surface; the icon picker is a separate future piece of UI).
-            await userInfo.UpdateCommunityAsync(
+            await community.UpdateCommunityAsync(
                 componentId: model.ComponentId,
                 name: model.Name,
                 description: model.Description,
@@ -580,7 +580,7 @@ public sealed class AdminController(
         var admin = AdminSubjectId(User) ?? string.Empty;
         try
         {
-            await userInfo.SetCommunityEnabledAsync(componentId, enabled, admin);
+            await community.SetCommunityEnabledAsync(componentId, enabled, admin);
             TempData["info"] = enabled
                 ? "Community re-enabled. It is visible on the feed and in the moderator scope list."
                 : "Community disabled. It is hidden from the /community feed and the moderator scope list; its posts and assignments remain intact.";
@@ -855,12 +855,12 @@ public sealed class AdminController(
 
         // All component ids (enabled + disabled — the current rows are keyed
         // on them regardless of Enabled state).
-        var allComponents = (await userInfo.GetComponentsAsync(enabledOnly: false)).Select(c => c.Id).ToHashSet();
+        var allComponents = (await profileSettings.GetComponentsAsync(enabledOnly: false)).Select(c => c.Id).ToHashSet();
 
         // ADR 0012 — the enabled mandatory ids (the union read in
         // GetCommunityIdsAsync always carries them — see the scope note
         // below the diff).
-        var mandatoryComponentIds = (await userInfo.GetComponentsAsync(enabledOnly: true))
+        var mandatoryComponentIds = (await profileSettings.GetComponentsAsync(enabledOnly: true))
             .Where(c => c.Mandatory)
             .Select(c => c.Id)
             .ToHashSet();

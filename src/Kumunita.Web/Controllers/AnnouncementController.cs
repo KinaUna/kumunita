@@ -70,7 +70,7 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 public sealed class AnnouncementController(
     IAnnouncementService announcements,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IProfileSettingsService profileSettings,
     ILocalizationService localization,
     IDocumentStore store,
     // ADR 0051 (extending ADR 0049 to the /announcements list surface) — the
@@ -122,7 +122,7 @@ public sealed class AnnouncementController(
     private async Task SeedComposeOptionsAsync(AnnouncementComposeViewModel model, IReadOnlySet<string> roles)
     {
         model.AllowedScopes = RoleAllowedScopes(roles);
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
         model.TargetCommunities = components
             .Where(c => roles.Contains(Roles.GlobalAdmin) || roles.Contains(Roles.ModeratorComponent(c.Id)))
             .ToList();
@@ -205,7 +205,7 @@ public sealed class AnnouncementController(
             authorNames[id] = name;
         }
 
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var componentNames = components.ToDictionary(c => c.Id, c => c.Name);
 
         // ADR 0051 — extend ADR 0049's default-visible-variant rule (already in
@@ -334,7 +334,7 @@ public sealed class AnnouncementController(
         string? communityName = null;
         if (a.CommunityId is not null)
         {
-            var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+            var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
             communityName = components.FirstOrDefault(c => c.Id == a.CommunityId)?.Name;
         }
 

@@ -51,7 +51,7 @@ public class SettingsSectionSplitTests
             .Returns(Task.FromResult<LocaleSettings?>(defaultSettings));
         store.QuerySession().Returns(readSession);
 
-        var controller = new LocaleController(localization, userInfo, store);
+        var controller = new LocaleController(localization, userInfo, Substitute.For<IProfileSettingsService>(), store);
         var httpContext = new DefaultHttpContext();
         if (signedIn)
         {

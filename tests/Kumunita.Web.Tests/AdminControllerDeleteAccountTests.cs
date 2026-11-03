@@ -175,12 +175,7 @@ public class AdminControllerDeleteAccountTests
                 .UseNpgsql("Host=localhost;Database=_test_never_opened;Username=_;******")
                 .Options);
 
-        var controller = new AdminController(
-            identities: db,
-            store:      Substitute.For<IDocumentStore>(),
-            identity:   identity,
-            userInfo:   Substitute.For<IUserInfoService>(),
-            pages:      Substitute.For<IPageService>());
+        var controller = new AdminController(identities: db, store:      Substitute.For<IDocumentStore>(), identity:   identity, userInfo:   Substitute.For<IUserInfoService>(), Substitute.For<ICommunityMembershipService>(), Substitute.For<IProfileSettingsService>(), pages:      Substitute.For<IPageService>());
 
         var ctx = new DefaultHttpContext();
         ctx.RequestServices = new ServiceCollection().BuildServiceProvider();

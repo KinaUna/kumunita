@@ -49,7 +49,7 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 public sealed class OnboardingController(
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IProfileSettingsService profileSettings,
     // The per-request localization read seams — used to render the
     // finish/skip flash in the resident's effective language (the
     // LocaleController.FlashAsync / ProfileController.FlashAsync idiom).
@@ -149,7 +149,7 @@ public sealed class OnboardingController(
         var subjectId = SubjectId(User) ?? string.Empty;
         try
         {
-            await userInfo.CompleteOnboardingAsync(subjectId, subjectId);
+            await profileSettings.CompleteOnboardingAsync(subjectId, subjectId);
         }
         catch (System.Collections.Generic.KeyNotFoundException)
         {

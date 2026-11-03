@@ -533,17 +533,20 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
         var pages = Substitute.For<IPageService>();
         pages.GetTreeAsync().Returns(new List<Page>());
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>
         {
             new Component { Id = "comp-default", Name = "Safety", Enabled = true },
         });
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
         var controller = new PageController(
-            pages, Substitute.For<IAuthorizationService>(), DefaultLocalization(), userInfo, store);
+            pages, Substitute.For<IAuthorizationService>(), DefaultLocalization(), userInfo,
+            Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), store);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
@@ -1859,6 +1862,8 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
         var authz = Substitute.For<IAuthorizationService>();
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         var controller = Build(pages, authz, userInfo, store,
             IsAuthenticated: true, subjectId: actor,
             notifications: new Kumunita.Core.Notifications.NotificationService(
@@ -1925,11 +1930,13 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
     {
         var authzImpl = authz ?? Substitute.For<IAuthorizationService>();
         var userInfoImpl = userInfo ?? Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         if (userInfo is null)
         {
-            userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
-            userInfoImpl.GetProfilesAsync(true).Returns(new List<Profile>());
-            userInfoImpl.GetPublicGroupsAsync().Returns(new List<Group>());
+            profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+            profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+            groupService.GetPublicGroupsAsync().Returns(new List<Group>());
         }
 
         var storeImpl = store ?? Substitute.For<IDocumentStore>();
@@ -1944,7 +1951,7 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var localization = DefaultLocalization();
 
-        var controller = new PageController(pages, authzImpl, localization, userInfoImpl, storeImpl,
+        var controller = new PageController(pages, authzImpl, localization, userInfoImpl, groupService, profileSettings, storeImpl,
             notifications: notifications);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };

@@ -50,6 +50,8 @@ public sealed class AnnouncementService : IAnnouncementService
 
     private readonly IDocumentStore _store;
     private readonly IUserInfoService _userInfo;
+    // C07 (ADR 0286) — the IProfileSettingsService sibling (the moved method's owner).
+    private readonly IProfileSettingsService _profileSettings;
     // ADR 0084 — the M6 notification emitter seam (optional nullable default
     // so existing test call sites that construct AnnouncementService
     // positionally (store, userInfo) keep compiling unchanged — the same
@@ -73,11 +75,13 @@ public sealed class AnnouncementService : IAnnouncementService
     private readonly TranslationLane<Announcement, AnnouncementTranslation> _translationLane;
 
     public AnnouncementService(IDocumentStore store, IUserInfoService userInfo,
+        IProfileSettingsService profileSettings,
         INotificationEmitter? notifications = null,
         Kumunita.Core.Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _notifications = notifications;
         _mentions = mentions;
         _translationLane = new TranslationLane<Announcement, AnnouncementTranslation>(new TranslationDescriptor<Announcement, AnnouncementTranslation>
@@ -359,7 +363,7 @@ public sealed class AnnouncementService : IAnnouncementService
             }
             else
             {
-                var all = await _userInfo.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
+                var all = await _profileSettings.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
                 const string targetId = "announcements";           // the flat/public sentinel (ADR 0084)
                 foreach (var p in all)
                 {
@@ -608,7 +612,7 @@ public sealed class AnnouncementService : IAnnouncementService
             }
             else
             {
-                var all = await _userInfo.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
+                var all = await _profileSettings.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
                 const string targetId = "announcements";
                 foreach (var p in all)
                 {
@@ -970,7 +974,7 @@ public sealed class AnnouncementService : IAnnouncementService
             throw new UnauthorizedAccessException(
                 $"Only a GlobalAdmin or a moderator of community '{target}' may target that community.");
 
-        var components = await _userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+        var components = await _profileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
         if (components is null || !components.Any(c => c.Id == target))
             throw new ArgumentException(
                 $"Unknown community '{target}' for the announcement target.",

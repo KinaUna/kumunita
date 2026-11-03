@@ -1058,7 +1058,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
     {
         var userInfo = new UserInfoService(store);
         var authz = new AuthorizationService(store, userInfo);
-        return new Search.SearchService(store, authz, userInfo);
+        return new Search.SearchService(store, authz, userInfo, new ProfileSettingsService(store));
     }
 
     /// <summary>Plant a group membership row (the M7 / ProjectServiceTests shape).</summary>

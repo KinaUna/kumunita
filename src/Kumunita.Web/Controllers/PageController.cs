@@ -63,7 +63,7 @@ public sealed class PageController(
     IPageService pages,
     Authorization.IAuthorizationService authz,
     ILocalizationService localization,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
     IDocumentStore store,
     // ADR 0049 — the per-request translation read seam, used to auto-select
     // which of a page's pre-rendered language variants (the ADR 0039
@@ -406,7 +406,7 @@ public sealed class PageController(
         var authorProfile = string.IsNullOrEmpty(page.AuthorId) ? null : await userInfo.GetProfileAsync(page.AuthorId).ConfigureAwait(false);
         string? communityName = null;
         if (page.ComponentId is { } component)
-            communityName = (await userInfo.GetComponentsAsync(true).ConfigureAwait(false))
+            communityName = (await profileSettings.GetComponentsAsync(true).ConfigureAwait(false))
                 .FirstOrDefault(c => c.Id == component)?.Name;
 
         // ADR 0029 — the "add a translation" affordance flag (the display pin):
@@ -1407,18 +1407,18 @@ public sealed class PageController(
             .Select(p => (p.Id, PagePaths.Href(byId, p)))
             .ToList();
 
-        var components = await userInfo.GetComponentsAsync(true).ConfigureAwait(false);
+        var components = await profileSettings.GetComponentsAsync(true).ConfigureAwait(false);
         model.Components = components.Select(c => (c.Id, c.Name)).ToList();
 
         // The audience editor's user / group picker options (the _GrantPickers
         // partial reads these from ViewData) — the reusable M2 grant-pick shape.
         var selfId = string.IsNullOrWhiteSpace(actorId) ? null : actorId;
-        var profiles = (await userInfo.GetProfilesAsync(true).ConfigureAwait(false)).ToList();
+        var profiles = (await profileSettings.GetProfilesAsync(true).ConfigureAwait(false)).ToList();
         var users = profiles
             .Where(p => !p.Blocked && p.SubjectId != selfId)
             .Select(p => new GrantOption { Id = p.SubjectId, Label = p.DisplayName, Kind = "User" })
             .ToList();
-        var groups = (await userInfo.GetPublicGroupsAsync().ConfigureAwait(false))
+        var groups = (await groupService.GetPublicGroupsAsync().ConfigureAwait(false))
             .Select(g => new GrantOption { Id = g.Id, Label = g.Name, Kind = "Group" })
             .ToList();
         ViewData["Audience_Users"] = users;

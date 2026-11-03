@@ -47,7 +47,7 @@ public sealed class MessagingSettingsControllerTests
     [Fact]
     public async Task Index_Renders_Model_WithInstanceEnabledAndOptIn()
     {
-        var (controller, messaging, userInfo) = Build(true, optIn: true, restricted: false);
+        var (controller, messaging, userInfo, profileSettings) = Build(true, optIn: true, restricted: false);
 
         var action = await controller.Index();
         var view   = Assert.IsType<ViewResult>(action);
@@ -63,7 +63,7 @@ public sealed class MessagingSettingsControllerTests
     [Fact]
     public async Task Index_MissingProfile_FloorsToOptInOff_NotRestricted()
     {
-        var (controller, messaging, userInfo) = Build(true, optIn: null, restricted: null);
+        var (controller, messaging, userInfo, profileSettings) = Build(true, optIn: null, restricted: null);
 
         var action = await controller.Index();
         var view   = Assert.IsType<ViewResult>(action);
@@ -79,25 +79,25 @@ public sealed class MessagingSettingsControllerTests
     [Fact]
     public async Task Save_OptInTrue_CallsSetMessagingOptInAsync()
     {
-        var (controller, messaging, userInfo) = Build(true, optIn: false, restricted: false);
+        var (controller, messaging, userInfo, profileSettings) = Build(true, optIn: false, restricted: false);
 
         var action = await controller.Save(optIn: true);
         var redirect = Assert.IsType<RedirectToActionResult>(action);
 
         Assert.Equal(nameof(MessagingSettingsController.Index), redirect.ActionName);
-        await userInfo.Received(1).SetMessagingOptInAsync(Actor, true, Actor);
+        await profileSettings.Received(1).SetMessagingOptInAsync(Actor, true, Actor);
     }
 
     [Fact]
     public async Task Save_OptInFalse_CallsSetMessagingOptInAsync()
     {
-        var (controller, messaging, userInfo) = Build(true, optIn: true, restricted: false);
+        var (controller, messaging, userInfo, profileSettings) = Build(true, optIn: true, restricted: false);
 
         var action = await controller.Save(optIn: false);
         var redirect = Assert.IsType<RedirectToActionResult>(action);
 
         Assert.Equal(nameof(MessagingSettingsController.Index), redirect.ActionName);
-        await userInfo.Received(1).SetMessagingOptInAsync(Actor, false, Actor);
+        await profileSettings.Received(1).SetMessagingOptInAsync(Actor, false, Actor);
     }
 
     // ── POST refuses when the guardian's ceiling is on ───────────────────
@@ -105,26 +105,27 @@ public sealed class MessagingSettingsControllerTests
     [Fact]
     public async Task Save_Restricted_Refuses_NoWrite()
     {
-        var (controller, messaging, userInfo) = Build(true, optIn: false, restricted: true);
+        var (controller, messaging, userInfo, profileSettings) = Build(true, optIn: false, restricted: true);
 
         var action = await controller.Save(optIn: true);
         var redirect = Assert.IsType<RedirectToActionResult>(action);
 
         Assert.Equal(nameof(MessagingSettingsController.Index), redirect.ActionName);
         // The ceiling was enforced at the Web boundary: the write was refused.
-        await userInfo.DidNotReceiveWithAnyArgs()
+        await profileSettings.DidNotReceiveWithAnyArgs()
             .SetMessagingOptInAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<string>());
     }
 
     // ── harness ───────────────────────────────────────────────────────────
 
-    private static (MessagingSettingsController controller, IMessagingService messaging, IUserInfoService userInfo)
+    private static (MessagingSettingsController controller, IMessagingService messaging, IUserInfoService userInfo, IProfileSettingsService profileSettings)
         Build(bool instanceEnabled, bool? optIn, bool? restricted)
     {
         var messaging = Substitute.For<IMessagingService>();
         messaging.IsMessagingEnabledAsync().Returns(instanceEnabled);
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         if (optIn is not null || restricted is not null)
         {
             userInfo.GetProfileAsync(Actor).Returns(new Profile
@@ -140,11 +141,10 @@ public sealed class MessagingSettingsControllerTests
             userInfo.GetProfileAsync(Actor).Returns((Profile?)null);
         }
 
-        var controller = new MessagingSettingsController(
-            NullLogger<MessagingSettingsController>.Instance, messaging, userInfo);
+        var controller = new MessagingSettingsController(NullLogger<MessagingSettingsController>.Instance, messaging, userInfo, profileSettings);
         WireControllerContext(controller, Actor);
 
-        return (controller, messaging, userInfo);
+        return (controller, messaging, userInfo, profileSettings);
     }
 
     private static void WireControllerContext(Controller controller, string subjectId)

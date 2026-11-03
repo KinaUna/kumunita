@@ -186,6 +186,7 @@ public sealed class VerifySignInStampTests(PostgresFixture fixture) : IClassFixt
                 new IdentityErrorDescriber(),
                 NullLogger<RoleManager<IdentityRole>>.Instance),
             userInfo: userInfo,
+            profileSettings: Substitute.For<IProfileSettingsService>(),
             identity: identity,
             options: Options.Create(new IdentityOptions()));
 

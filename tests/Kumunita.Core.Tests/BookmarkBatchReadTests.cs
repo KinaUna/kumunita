@@ -60,6 +60,7 @@ public class BookmarkBatchReadTests(PostgresFixture fixture) : IClassFixture<Pos
             null, null, TestContext.Current.CancellationToken);
         var resolver = new Kumunita.Core.Targets.ContentTargetResolver(
             Substitute.For<Kumunita.Core.UserInfo.IUserInfoService>(),
+            Substitute.For<Kumunita.Core.UserInfo.IGroupService>(),
             Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>(),
             store,
             Substitute.For<Kumunita.Core.Announcements.IAnnouncementService>(),

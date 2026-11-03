@@ -54,8 +54,9 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new DirectoryService(userInfo, authz);
+        var svc = new DirectoryService(userInfo, new ProfileSettingsService(store), authz);
 
         const string viewer = "u-u6-t1-viewer";
 
@@ -101,10 +102,10 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
             ContactVisibility = new Audience(AudienceMode.All, Array.Empty<AudienceGrant>()), // row 4: C1
         };
 
-        await userInfo.UpsertProfileAsync(rowNull, new ProfileUpdate(null, null, null, null, null));
-        await userInfo.UpsertProfileAsync(rowAnyEmpty, new ProfileUpdate(null, null, null, null, null));
-        await userInfo.UpsertProfileAsync(rowAnyGrant, new ProfileUpdate(null, null, null, null, null));
-        await userInfo.UpsertProfileAsync(rowAllEmpty, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(rowNull, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(rowAnyEmpty, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(rowAnyGrant, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(rowAllEmpty, new ProfileUpdate(null, null, null, null, null));
 
         // Row 1 — `null` ContactVisibility: the §2.4 "null ⇒ not opted in" short-circuit —
         // basic info still renders (Profile is non-null), contact NOT evaluated, so NO
@@ -153,8 +154,9 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new DirectoryService(userInfo, authz);
+        var svc = new DirectoryService(userInfo, new ProfileSettingsService(store), authz);
 
         const string verifiedOther = "u-u6-t2-verified-other";
         const string unverifiedViewer = "u-u6-t2-unverified-viewer";
@@ -164,7 +166,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         // so the test proves the result is driven by the show-everyone rule, *not*
         // by audience evaluation: under the old two-gate design, audience evaluation
         // would have excluded this one from the unverified viewer's list.
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             new Profile
             {
                 SubjectId = verifiedOther,
@@ -175,7 +177,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
             },
             new ProfileUpdate(null, null, null, null, null));
 
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             new Profile
             {
                 SubjectId = unverifiedViewer,
@@ -240,6 +242,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
 
         const string owner = "u-u6-t3-owner";
@@ -256,7 +259,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         // identity, so `MatchGroups` would not allow them either: the Allow that
         // follows in (a) can only come from the owner branch, which is what we are
         // proving the Owner-branch-on-`Profile` invariant to be).
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             new Profile
             {
                 SubjectId = owner,
@@ -338,12 +341,13 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
 
         const string owner = "u-u6-t4-owner";
         const string other = "u-u6-t4-other";
 
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             new Profile
             {
                 SubjectId = owner,
@@ -455,8 +459,9 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new DirectoryService(userInfo, authz);
+        var svc = new DirectoryService(userInfo, new ProfileSettingsService(store), authz);
 
         const string owner = "u-u6-t5-owner";
         const string member = "u-u6-t5-member";
@@ -466,7 +471,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         // Basic info (name + verified) renders for everyone, per the show-everyone
         // rule, regardless of this audience.
         var group = await userInfo.CreateGroupAsync(owner, "U6 T5 group", null);
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             new Profile
             {
                 SubjectId = owner,
@@ -480,7 +485,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         // The member's own profile (a minimal row so the directory can list them;
         // the show-everyone rule means their own presence isn't a baseline — it's
         // just one of N non-blocked residents).
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             new Profile
             {
                 SubjectId = member,
@@ -572,8 +577,9 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new DirectoryService(userInfo, authz);
+        var svc = new DirectoryService(userInfo, new ProfileSettingsService(store), authz);
 
         const string otherViewer = "u6-self-other-viewer";
 
@@ -601,8 +607,8 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
                 [new AudienceGrant(GrantKind.User, "u6-self-other-resident")]),
         };
 
-        await userInfo.UpsertProfileAsync(optedOut, new ProfileUpdate(null, null, null, null, null));
-        await userInfo.UpsertProfileAsync(ownerExcluding, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(optedOut, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(ownerExcluding, new ProfileUpdate(null, null, null, null, null));
 
         // Shape 1 — `null` audience: the outside viewer keeps the §2.4 row-1
         // short-circuit (hidden, no audit row); the owner sees the full block with

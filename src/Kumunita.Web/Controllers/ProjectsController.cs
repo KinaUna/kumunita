@@ -69,6 +69,8 @@ public sealed class ProjectsController : Controller
 {
     private readonly IProjectService projects;
     private readonly IUserInfoService userInfo;
+    private readonly IGroupService groupService;
+    private readonly IProfileSettingsService profileSettings;
     private readonly ILocalizationService localization;
     private readonly IDocumentStore store;
 
@@ -105,7 +107,7 @@ public sealed class ProjectsController : Controller
 
     public ProjectsController(
         IProjectService projects,
-        IUserInfoService userInfo,
+        IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
         ILocalizationService localization,
         IDocumentStore store,
         ITranslationProvider? translationProvider = null,
@@ -115,6 +117,8 @@ public sealed class ProjectsController : Controller
     {
         this.projects = projects;
         this.userInfo = userInfo;
+this.groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
+this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         this.localization = localization;
         this.store = store;
         this.translationProvider = translationProvider;
@@ -150,7 +154,7 @@ public sealed class ProjectsController : Controller
     // themselves). The other three composers leave the default
     // <c>includeAssignUsers: false</c> and do not set the key.
     private Task SeedGrantPickerOptionsAsync()
-        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, includeAssignUsers: true);
+        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the
@@ -175,7 +179,7 @@ public sealed class ProjectsController : Controller
         => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
 
     private Task<IReadOnlyList<(string Id, string Name)>> SeedComponentPickerAsync()
-        => ComposerSeedOptions.SeedComponentPickerAsync(userInfo);
+        => ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
 
     /// <summary>
     /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a
@@ -307,7 +311,7 @@ public sealed class ProjectsController : Controller
     /// </summary>
     private async Task<IReadOnlyDictionary<string, string>> ResolveComponentNamesAsync()
     {
-        var all = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var all = await profileSettings.GetComponentsAsync(enabledOnly: true);
         return all
             .Where(c => !string.IsNullOrEmpty(c.Id))
             .ToDictionary(
@@ -414,7 +418,7 @@ public sealed class ProjectsController : Controller
         if (groupIds.Count == 0)
             return new Dictionary<string, string>(StringComparer.Ordinal);
 
-        var groups = await userInfo.GetPublicGroupsAsync();
+        var groups = await groupService.GetPublicGroupsAsync();
         return groups
             .Where(g => groupIds.Contains(g.Id))
             .ToDictionary(
@@ -432,7 +436,7 @@ public sealed class ProjectsController : Controller
     /// </summary>
     private async Task<IReadOnlyDictionary<string, string>> ResolveGroupNamesAsync()
     {
-        var groups = await userInfo.GetPublicGroupsAsync();
+        var groups = await groupService.GetPublicGroupsAsync();
         return groups
             .Where(g => !string.IsNullOrEmpty(g.Id))
             .ToDictionary(
@@ -678,7 +682,7 @@ public sealed class ProjectsController : Controller
         // The row dropdown's "Assign to…" modal (the board card menu's ADR 0074
         // shape) needs the instance's enabled components as the community
         // choices — the same seeded list BoardDetail's card modal reads.
-        var communityOptions = (await userInfo.GetComponentsAsync(enabledOnly: true))
+        var communityOptions = (await profileSettings.GetComponentsAsync(enabledOnly: true))
             .Select(c => new GrantOption
             {
                 Id = c.Id,
@@ -2559,7 +2563,7 @@ public sealed class ProjectsController : Controller
         // choices; all three are display options, never a gate (the
         // standing decision is the service's on write).
         await SeedGrantPickerOptionsAsync();
-        var communityOptions = (await userInfo.GetComponentsAsync(enabledOnly: true))
+        var communityOptions = (await profileSettings.GetComponentsAsync(enabledOnly: true))
             .Select(c => new GrantOption
             {
                 Id = c.Id,

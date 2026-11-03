@@ -65,11 +65,11 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
     {
         var boot = await BootAsync();
 
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
 
         // The invitation row is Pending (the child's self-lane refuse gate
         // still applies — the membership has NOT landed).
-        var invitation = await boot.UserInfo.GetPendingInvitationsForUserAsync(ChildId);
+        var invitation = await boot.GroupService.GetPendingInvitationsForUserAsync(ChildId);
         Assert.Single(invitation);
 
         // The membership has NOT landed (the child is not yet a member).
@@ -95,8 +95,8 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
     {
         var boot = await BootAsync();
 
-        await boot.UserInfo.CreateGuardianLinkAsync(ChildId, SecondGuardianId);
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
+        await boot.GuardianService.CreateGuardianLinkAsync(ChildId, SecondGuardianId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
 
         var g1 = await NotificationsFor(boot.Store, GuardianId, NotificationKinds.GuardianGroupInvite);
         var g2 = await NotificationsFor(boot.Store, SecondGuardianId, NotificationKinds.GuardianGroupInvite);
@@ -112,7 +112,7 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
     {
         var boot = await BootAsync();
 
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, StrangerId, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, StrangerId, OwnerId);
 
         var rows = await NotificationsFor(boot.Store, StrangerId, NotificationKinds.GroupInvite);
         Assert.Single(rows);
@@ -129,14 +129,14 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
     public async Task GuardianApprovesGroupInvitation_MembershipLands_ResolvedByGuardian()
     {
         var boot = await BootAsync();
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
 
-        await boot.UserInfo.ApproveGroupInvitationAsync(GroupId, ChildId, GuardianId);
+        await boot.GuardianService.ApproveGroupInvitationAsync(GroupId, ChildId, GuardianId);
 
         Assert.Contains(GroupId, await boot.UserInfo.GetGroupIdsAsync(ChildId));
 
         // The row is no longer pending (the self-lane read is empty).
-        Assert.Empty(await boot.UserInfo.GetPendingInvitationsForUserAsync(ChildId));
+        Assert.Empty(await boot.GroupService.GetPendingInvitationsForUserAsync(ChildId));
 
         // The group.invite.approve audit row (Via: Guardian) committed.
         var audits = await AuditsFor(boot.Store, "group.invite.approve");
@@ -151,14 +151,14 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
     public async Task GuardianRejectsGroupInvitation_RowDeclined_NoMembership()
     {
         var boot = await BootAsync();
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
 
-        await boot.UserInfo.RejectGroupInvitationAsync(GroupId, ChildId, GuardianId);
+        await boot.GuardianService.RejectGroupInvitationAsync(GroupId, ChildId, GuardianId);
 
         // No membership landed.
         Assert.DoesNotContain(GroupId, await boot.UserInfo.GetGroupIdsAsync(ChildId));
         // The row is resolved (no longer pending).
-        Assert.Empty(await boot.UserInfo.GetPendingInvitationsForUserAsync(ChildId));
+        Assert.Empty(await boot.GroupService.GetPendingInvitationsForUserAsync(ChildId));
 
         var audits = await AuditsFor(boot.Store, "group.invite.reject");
         Assert.Single(audits);
@@ -169,20 +169,20 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
     public async Task RejectGroupInvitationByNonGuardian_Refused()
     {
         var boot = await BootAsync();
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => boot.UserInfo.RejectGroupInvitationAsync(GroupId, ChildId, StrangerId));
+            () => boot.GuardianService.RejectGroupInvitationAsync(GroupId, ChildId, StrangerId));
     }
 
     [Fact]
     public async Task ChildSelfAccept_Refused_WhileSupervised()
     {
         var boot = await BootAsync();
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, ChildId, OwnerId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.UserInfo.AcceptGroupInvitationAsync(GroupId, ChildId));
+            () => boot.GroupService.AcceptGroupInvitationAsync(GroupId, ChildId));
     }
 
     // ── AddCommunityMemberAsync — supervised child: pending request ────────
@@ -201,7 +201,7 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         Assert.DoesNotContain(ComponentId, await boot.UserInfo.GetCommunityIdsAsync(ChildId));
 
         // A PENDING request row exists (the guardian's curation list).
-        var pending = await boot.UserInfo
+        var pending = await boot.GuardianService
             .GetPendingCommunityMembershipRequestsForChildAsync(ChildId);
         Assert.Single(pending);
         Assert.Equal(AdminId, pending[0].RequestedBy);
@@ -230,7 +230,7 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         await boot.UserInfo.SetCommunityMembershipAsync(ComponentId, ChildId, AdminId);
 
         Assert.DoesNotContain(ComponentId, await boot.UserInfo.GetCommunityIdsAsync(ChildId));
-        Assert.Single(await boot.UserInfo
+        Assert.Single(await boot.GuardianService
             .GetPendingCommunityMembershipRequestsForChildAsync(ChildId));
         Assert.Single(await AuditsFor(boot.Store, "community.membership.request"));
         Assert.Single(await NotificationsFor(boot.Store, GuardianId,
@@ -247,7 +247,7 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         // The ADR 0012 admin lane: the membership lands immediately.
         Assert.Contains(ComponentId, await boot.UserInfo.GetCommunityIdsAsync(StrangerId));
         // No pending request row for an unsupervised resident.
-        Assert.Empty(await boot.UserInfo
+        Assert.Empty(await boot.GuardianService
             .GetPendingCommunityMembershipRequestsForChildAsync(StrangerId));
         Assert.Single(await AuditsFor(boot.Store, "community.add-member"));
     }
@@ -261,13 +261,13 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         var roles = new HashSet<string> { Identity.Roles.GlobalAdmin };
         await boot.UserInfo.AddCommunityMemberAsync(ComponentId, ChildId, AdminId, roles);
 
-        await boot.UserInfo.ApproveCommunityMembershipRequestAsync(ComponentId, ChildId, GuardianId);
+        await boot.GuardianService.ApproveCommunityMembershipRequestAsync(ComponentId, ChildId, GuardianId);
 
         // C4 — the membership is live on the very next read.
         Assert.Contains(ComponentId, await boot.UserInfo.GetCommunityIdsAsync(ChildId));
 
         // The request row is resolved (no longer pending).
-        Assert.Empty(await boot.UserInfo
+        Assert.Empty(await boot.GuardianService
             .GetPendingCommunityMembershipRequestsForChildAsync(ChildId));
 
         var audits = await AuditsFor(boot.Store, "community.membership.approve");
@@ -284,7 +284,7 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         await boot.UserInfo.AddCommunityMemberAsync(ComponentId, ChildId, AdminId, roles);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => boot.UserInfo.ApproveCommunityMembershipRequestAsync(ComponentId, ChildId, StrangerId));
+            () => boot.GuardianService.ApproveCommunityMembershipRequestAsync(ComponentId, ChildId, StrangerId));
     }
 
     // ── DeclineCommunityMembershipRequestAsync — the decline write ─────────
@@ -296,10 +296,10 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         var roles = new HashSet<string> { Identity.Roles.GlobalAdmin };
         await boot.UserInfo.AddCommunityMemberAsync(ComponentId, ChildId, AdminId, roles);
 
-        await boot.UserInfo.DeclineCommunityMembershipRequestAsync(ComponentId, ChildId, GuardianId);
+        await boot.GuardianService.DeclineCommunityMembershipRequestAsync(ComponentId, ChildId, GuardianId);
 
         Assert.DoesNotContain(ComponentId, await boot.UserInfo.GetCommunityIdsAsync(ChildId));
-        Assert.Empty(await boot.UserInfo
+        Assert.Empty(await boot.GuardianService
             .GetPendingCommunityMembershipRequestsForChildAsync(ChildId));
 
         var audits = await AuditsFor(boot.Store, "community.membership.decline");
@@ -315,7 +315,7 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         await boot.UserInfo.AddCommunityMemberAsync(ComponentId, ChildId, AdminId, roles);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => boot.UserInfo.DeclineCommunityMembershipRequestAsync(ComponentId, ChildId, StrangerId));
+            () => boot.GuardianService.DeclineCommunityMembershipRequestAsync(ComponentId, ChildId, StrangerId));
     }
 
     // ── Re-request (the m2b C-M2b·3 reset shape) ───────────────────────────
@@ -326,12 +326,12 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         var boot = await BootAsync();
         var roles = new HashSet<string> { Identity.Roles.GlobalAdmin };
         await boot.UserInfo.AddCommunityMemberAsync(ComponentId, ChildId, AdminId, roles);
-        await boot.UserInfo.DeclineCommunityMembershipRequestAsync(ComponentId, ChildId, GuardianId);
+        await boot.GuardianService.DeclineCommunityMembershipRequestAsync(ComponentId, ChildId, GuardianId);
 
         // Re-add → the row resets to Pending (no second row — the unique
         // (ComponentId, UserId) index).
         await boot.UserInfo.AddCommunityMemberAsync(ComponentId, ChildId, AdminId, roles);
-        var pending = await boot.UserInfo
+        var pending = await boot.GuardianService
             .GetPendingCommunityMembershipRequestsForChildAsync(ChildId);
         var row = Assert.Single(pending);
         Assert.Equal(CommunityMembershipRequestStatus.Pending, row.Status);
@@ -344,6 +344,8 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
     {
         public required IDocumentStore Store { get; init; }
         public required UserInfoService UserInfo { get; init; }
+        public required GroupService GroupService { get; init; }
+        public required GuardianService GuardianService { get; init; }
     }
 
     private async Task<Boot> BootAsync()
@@ -419,7 +421,8 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
 
         // The GU formation — the (guardian, child) active link.
         var userInfoForLink = new UserInfoService(store);
-        await userInfoForLink.CreateGuardianLinkAsync(ChildId, GuardianId);
+        var linkService = new GuardianService(store);
+        await linkService.CreateGuardianLinkAsync(ChildId, GuardianId);
 
         var translator = Substitute.For<ITranslationProvider>();
         translator.GetAsync(Arg.Any<string>(), Arg.Any<string?>())
@@ -435,12 +438,14 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
         var ns = new NotificationService(store, userInfoForNs, translator, mailer, null, null);
 
         var sc = new ServiceCollection();
-        sc.AddSingleton(ns);
+        sc.AddSingleton<Kumunita.Core.Notifications.INotificationEmitter>(ns);
         var sp = sc.BuildServiceProvider();
 
         var userInfo = new UserInfoService(store, sp);
+        var groupService = new GroupService(store, sp);
+        var guardianService = new GuardianService(store, sp);
 
-        return new Boot { Store = store, UserInfo = userInfo };
+        return new Boot { Store = store, UserInfo = userInfo, GroupService = groupService, GuardianService = guardianService };
     }
 
     private static async Task<IReadOnlyList<Notification>> NotificationsFor(

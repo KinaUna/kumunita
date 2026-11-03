@@ -51,7 +51,8 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
     public async Task F5_NonGuardian_Set_Is_Denied()
     {
         var store = await BootStoreAsync();
-        var svc = new UserInfoService(store);   // services null ⇒ no admin standing
+        var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);   // services null ⇒ no admin standing
 
         const string stranger = "u-m28-ng-stranger";
         const string child = "u-m28-ng-child";
@@ -59,14 +60,14 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
         // The (stranger, child) pair has NO active link; stranger is not a
         // GlobalAdmin (services null). The gate denies before any write.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SetChildTimeLimitAsync(stranger, child,
+            guardianService.SetChildTimeLimitAsync(stranger, child,
                 new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Blocked, Hours = [22, 23] }));
         // The read seam denies on the same gate.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.GetChildTimeLimitAsync(stranger, child));
+            guardianService.GetChildTimeLimitAsync(stranger, child));
 
         // Nothing was written (the gate fires before the row touch).
-        Assert.Null(await svc.GetActiveTimeLimitAsync(child));
+        Assert.Null(await guardianService.GetActiveTimeLimitAsync(child));
     }
 
     // ── F5 / C-M28·4 — a guardian with an active link writes; one audit row ──
@@ -80,17 +81,18 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
 
         const string guardian = "u-m28-gs-guardian";
         const string child = "u-m28-gs-child";
 
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
-        await svc.SetChildTimeLimitAsync(guardian, child,
+        await guardianService.SetChildTimeLimitAsync(guardian, child,
             new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Blocked, Hours = [22, 23] });
 
         // The row is live on the very next read (C-M28·4).
-        var read = await svc.GetActiveTimeLimitAsync(child);
+        var read = await guardianService.GetActiveTimeLimitAsync(child);
         Assert.NotNull(read);
         Assert.True(read!.Enabled);
         Assert.Equal(TimeLimitMode.Blocked, read.Mode);
@@ -133,8 +135,9 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
         var sp = new ServiceCollection().AddSingleton(identity).BuildServiceProvider();
 
         var svc = new UserInfoService(store, sp);
+        var guardianService = new GuardianService(store, sp);
 
-        await svc.SetChildTimeLimitAsync(admin, child,
+        await guardianService.SetChildTimeLimitAsync(admin, child,
             new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Allowed, Hours = [8, 17] });
 
         var row = await LastAuditAsync(store, "guardian.time-limit.set", child);
@@ -143,7 +146,7 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
         Assert.Equal(child, row.TargetId);
 
         // Strong consistency (C-M28·4): the admin's write is live on the read.
-        var read = await svc.GetActiveTimeLimitAsync(child);
+        var read = await guardianService.GetActiveTimeLimitAsync(child);
         Assert.Equal(TimeLimitMode.Allowed, read!.Mode);
     }
 
@@ -157,22 +160,23 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
 
         const string guardian = "u-m28-sc-guardian";
         const string child = "u-m28-sc-child";
 
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // Before: no schedule (the floor).
-        Assert.Null(await svc.GetActiveTimeLimitAsync(child));
+        Assert.Null(await guardianService.GetActiveTimeLimitAsync(child));
 
         // Set a distinct, recognizable schedule.
-        await svc.SetChildTimeLimitAsync(guardian, child,
+        await guardianService.SetChildTimeLimitAsync(guardian, child,
             new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Blocked, Hours = [0, 1, 2], DaysOfWeek = [1, 2] });
 
         // The ENFORCEMENT read (no guardian gate) sees the exact value — live
         // on the very next call (C-M28·4).
-        var read = await svc.GetActiveTimeLimitAsync(child);
+        var read = await guardianService.GetActiveTimeLimitAsync(child);
         Assert.NotNull(read);
         Assert.True(read!.Enabled);
         Assert.Equal([0, 1, 2], read.Hours);
@@ -180,9 +184,9 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
 
         // A second save overwrites the same singleton-per-child row (upsert) —
         // still one row, the new value.
-        await svc.SetChildTimeLimitAsync(guardian, child,
+        await guardianService.SetChildTimeLimitAsync(guardian, child,
             new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Allowed, Hours = [9, 10] });
-        var read2 = await svc.GetActiveTimeLimitAsync(child);
+        var read2 = await guardianService.GetActiveTimeLimitAsync(child);
         Assert.Equal(TimeLimitMode.Allowed, read2!.Mode);
         Assert.Equal([9, 10], read2.Hours);
     }
@@ -197,20 +201,21 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
     public async Task C_M28_7_Child_Cannot_Set_Own_TimeLimit()
     {
         var store = await BootStoreAsync();
-        var svc = new UserInfoService(store);   // services null ⇒ no admin standing
+        var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);   // services null ⇒ no admin standing
 
         const string child = "u-m28-self-child";
 
         // The child acting on THEMSELVES (guardianId == childId) is denied.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SetChildTimeLimitAsync(child, child,
+            guardianService.SetChildTimeLimitAsync(child, child,
                 new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Blocked, Hours = [22] }));
         // …and the read seam denies the self-read too.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.GetChildTimeLimitAsync(child, child));
+            guardianService.GetChildTimeLimitAsync(child, child));
 
         // Nothing written (the gate fires before the row touch).
-        Assert.Null(await svc.GetActiveTimeLimitAsync(child));
+        Assert.Null(await guardianService.GetActiveTimeLimitAsync(child));
     }
 
     // ── C-M28·3 / D4 — clear (null) deletes the row ──────────────────────────
@@ -225,22 +230,23 @@ public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
 
         const string guardian = "u-m28-cl-guardian";
         const string child = "u-m28-cl-child";
 
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // Set a schedule first (a row exists).
-        await svc.SetChildTimeLimitAsync(guardian, child,
+        await guardianService.SetChildTimeLimitAsync(guardian, child,
             new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Blocked, Hours = [22, 23] });
-        Assert.NotNull(await svc.GetActiveTimeLimitAsync(child));
+        Assert.NotNull(await guardianService.GetActiveTimeLimitAsync(child));
 
         // Clear (null) — the row is deleted (the floor, C-M28·3).
-        await svc.SetChildTimeLimitAsync(guardian, child, null);
+        await guardianService.SetChildTimeLimitAsync(guardian, child, null);
 
         // GetActiveTimeLimitAsync returns null = "never restricted".
-        Assert.Null(await svc.GetActiveTimeLimitAsync(child));
+        Assert.Null(await guardianService.GetActiveTimeLimitAsync(child));
 
         // The clear is still an audited write (one row for each set-and-clear).
         var count = await CountAuditAsync(store, "guardian.time-limit.set", child);

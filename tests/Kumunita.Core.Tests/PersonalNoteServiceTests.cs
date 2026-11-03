@@ -674,14 +674,15 @@ public class PersonalNoteServiceTests(PostgresFixture fixture) : IClassFixture<P
         // IIdentityService (the role set is empty for the test actors
         // — GetBySubjectAsync returns null for the synthetic subject
         // ids, so the announcement read degrades to the no-role path).
-        var announcements = new AnnouncementService(store, userInfo);
+        var announcements = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         var identity = Substitute.For<IIdentityService>();
         identity.GetBySubjectAsync(Arg.Any<string>()).Returns((ThinPrincipal?)null);
         var inventory = new InventoryService(store, authz, userInfo);
         // IMPROVE-CODE C05 — the target-resolution seam the service now
         // delegates to (the same real seams, composed into the one resolver).
         var resolver = new Kumunita.Core.Targets.ContentTargetResolver(
-            userInfo, authz, store, announcements, events, projects, inventory, identity);
+            userInfo, new GroupService(store), authz, store, announcements, events, projects, inventory,
+            identity);
         var svc = new PersonalNoteService(store, resolver);
         return (userInfo, authz, svc);
     }

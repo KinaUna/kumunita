@@ -24,9 +24,10 @@ public sealed class ProfileFirstDayOfWeekLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-fdw-default";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
         var read = await svc.GetProfileAsync(subject);
         Assert.NotNull(read);
@@ -39,12 +40,13 @@ public sealed class ProfileFirstDayOfWeekLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-fdw-set";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
         Assert.Null((await svc.GetProfileAsync(subject))!.FirstDayOfWeek);
 
-        await svc.SetProfileFirstDayOfWeekAsync(subject, 0, subject); // Sunday (the opt-in)
+        await profileSettings.SetProfileFirstDayOfWeekAsync(subject, 0, subject); // Sunday (the opt-in)
 
         var read = await svc.GetProfileAsync(subject);
         Assert.Equal(0, read!.FirstDayOfWeek);
@@ -59,18 +61,19 @@ public sealed class ProfileFirstDayOfWeekLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-fdw-change";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
-        await svc.SetProfileFirstDayOfWeekAsync(subject, 0, subject); // Sunday
+        await profileSettings.SetProfileFirstDayOfWeekAsync(subject, 0, subject); // Sunday
         Assert.Equal(0, (await svc.GetProfileAsync(subject))!.FirstDayOfWeek);
 
-        await svc.SetProfileFirstDayOfWeekAsync(subject, 1, subject); // back to Monday
+        await profileSettings.SetProfileFirstDayOfWeekAsync(subject, 1, subject); // back to Monday
         Assert.Equal(1, (await svc.GetProfileAsync(subject))!.FirstDayOfWeek);
 
         // Re-settable (the lane is a plain field write, not a tombstone).
-        await svc.SetProfileFirstDayOfWeekAsync(subject, 0, subject);
+        await profileSettings.SetProfileFirstDayOfWeekAsync(subject, 0, subject);
         Assert.Equal(0, (await svc.GetProfileAsync(subject))!.FirstDayOfWeek);
     }
 
@@ -80,9 +83,10 @@ public sealed class ProfileFirstDayOfWeekLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.SetProfileFirstDayOfWeekAsync("u-fdw-missing", 0, "u-fdw-any"));
+            () => profileSettings.SetProfileFirstDayOfWeekAsync("u-fdw-missing", 0, "u-fdw-any"));
 
         // Fail closed = no profile row created.
         Assert.Null(await svc.GetProfileAsync("u-fdw-missing"));
@@ -90,7 +94,7 @@ public sealed class ProfileFirstDayOfWeekLaneTests(PostgresFixture fixture)
 
     // ── Shared helpers ────────────────────────────────────────────────────
 
-    private static async Task SeedProfileAsync(IUserInfoService svc, string subject)
+    private static async Task SeedProfileAsync(IDocumentStore store, string subject)
     {
         var profile = new Profile
         {
@@ -98,7 +102,7 @@ public sealed class ProfileFirstDayOfWeekLaneTests(PostgresFixture fixture)
             DisplayName = "Resident " + subject,
             Verified = true,
         };
-        await svc.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+        await new ProfileSettingsService(store).UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
     }
 
     private async Task<IDocumentStore> BootStoreAsync()

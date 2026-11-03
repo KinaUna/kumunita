@@ -126,12 +126,7 @@ public class AdminControllerBlockTests
                 .UseNpgsql("Host=localhost;Database=_test_never_opened;Username=_;Password=_")
                 .Options);
 
-        var controller = new AdminController(
-            identities: db,
-            store:      Substitute.For<IDocumentStore>(),
-            identity:   identity,
-            userInfo:   Substitute.For<IUserInfoService>(),
-            // SP U03 — these lanes never touch the Platform-pages resolution;
+        var controller = new AdminController(identities: db, store:      Substitute.For<IDocumentStore>(), identity:   identity, userInfo:   Substitute.For<IUserInfoService>(), Substitute.For<ICommunityMembershipService>(), Substitute.For<IProfileSettingsService>(), // SP U03 — these lanes never touch the Platform-pages resolution;
             // a default (unconfigured) stub is fine.
             pages:      Substitute.For<IPageService>());
 

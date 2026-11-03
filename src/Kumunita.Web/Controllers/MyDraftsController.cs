@@ -47,7 +47,7 @@ namespace Kumunita.Web.Controllers;
 public sealed class MyDraftsController(
     PostService posts,
     IAnnouncementService announcements,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
     IDocumentStore store) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
@@ -81,7 +81,7 @@ public sealed class MyDraftsController(
         // the /groups feed uses). The PostListItem's ComponentId/ComponentName
         // pair doubles as the "which lane + its id" hint the view uses to
         // build the detail link.
-        var components = await userInfo.GetComponentsAsync(enabledOnly: false);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: false);
         var componentById = components.ToDictionary(c => c.Id, c => c.Name);
         var authorProfile = await userInfo.GetProfileAsync(actor);
         var authorName = authorProfile?.DisplayName is { Length: > 0 } dn ? dn : actor;
@@ -93,7 +93,7 @@ public sealed class MyDraftsController(
             string? laneLabel = null;
             if (isGroupLane)
             {
-                var group = await userInfo.GetGroupAsync(p.GroupId);
+                var group = await groupService.GetGroupAsync(p.GroupId);
                 laneLabel = group?.Name;
             }
             else if (!string.IsNullOrEmpty(p.ComponentId)

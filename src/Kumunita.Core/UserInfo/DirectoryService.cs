@@ -89,11 +89,14 @@ public sealed record PreviewRow(bool ShowContactBlock, Profile? Profile);
 public sealed class DirectoryService
 {
     private readonly IUserInfoService _userInfo;
+    // C07 (ADR 0286) — the IProfileSettingsService sibling (the moved method's owner).
+    private readonly IProfileSettingsService _profileSettings;
     private readonly IAuthorizationService _authz;
 
-    public DirectoryService(IUserInfoService userInfo, IAuthorizationService authz)
+    public DirectoryService(IUserInfoService userInfo, IProfileSettingsService profileSettings, IAuthorizationService authz)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
     }
 
@@ -122,7 +125,7 @@ public sealed class DirectoryService
         if (string.IsNullOrEmpty(viewerSubjectId))
             return new DirectoryList(Visible: Array.Empty<Profile>());
 
-        var all = await _userInfo.GetProfilesAsync(verifiedOnly: false).ConfigureAwait(false);
+        var all = await _profileSettings.GetProfilesAsync(verifiedOnly: false).ConfigureAwait(false);
         var visible = all.Where(p => !p.Blocked).ToList();
         return new DirectoryList(Visible: visible);
     }

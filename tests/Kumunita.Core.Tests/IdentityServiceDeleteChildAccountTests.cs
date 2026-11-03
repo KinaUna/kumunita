@@ -79,9 +79,10 @@ public sealed class IdentityServiceDeleteChildAccountTests(
         // Create the link, then dissolve it (the independence lane) — the
         // guardian no longer holds standing.
         var svc = new UserInfoService(boot.Store);
-        var link = await svc.CreateGuardianLinkAsync(child, guardian);
+        var guardianService = new GuardianService(boot.Store);
+        var link = await guardianService.CreateGuardianLinkAsync(child, guardian);
         Assert.Equal(GuardianLinkStatus.Active, link.Status);
-        await svc.DissolveGuardianLinkAsync(link.Id, guardian, viaAdmin: false);
+        await guardianService.DissolveGuardianLinkAsync(link.Id, guardian, viaAdmin: false);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => boot.Identity.DeleteChildAccountAsync(child, guardian));
@@ -103,7 +104,8 @@ public sealed class IdentityServiceDeleteChildAccountTests(
 
         // Seed the active link.
         var svc = new UserInfoService(boot.Store);
-        var link = await svc.CreateGuardianLinkAsync(child, guardian);
+        var guardianService = new GuardianService(boot.Store);
+        var link = await guardianService.CreateGuardianLinkAsync(child, guardian);
         Assert.Equal(GuardianLinkStatus.Active, link.Status);
 
         // Pre-plant an audit row *by* the child (a past action) + a group
@@ -114,7 +116,7 @@ public sealed class IdentityServiceDeleteChildAccountTests(
         // A second guardian (co-guardian) over the same child — their row
         // should also be dissolved (C·5 — no dangling standing).
         var coGuardian = await SeedAccountAsync(boot, "co-guardian@examplium.com", globalAdmin: false);
-        var coLink = await svc.CreateGuardianLinkAsync(child, coGuardian);
+        var coLink = await guardianService.CreateGuardianLinkAsync(child, coGuardian);
         Assert.Equal(GuardianLinkStatus.Active, coLink.Status);
 
         // The delete.
@@ -180,7 +182,8 @@ public sealed class IdentityServiceDeleteChildAccountTests(
         var child = await SeedAccountAsync(boot, "child@examplium.com", globalAdmin: false);
 
         var svc = new UserInfoService(boot.Store);
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        var guardianService = new GuardianService(boot.Store);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         await boot.Identity.DeleteChildAccountAsync(child, guardian);
 
@@ -248,6 +251,7 @@ public sealed class IdentityServiceDeleteChildAccountTests(
             NullLogger<UserManager<User>>.Instance);
 
         var userInfo = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
 
         var identity = new IdentityService(
             userManager:          userManager,

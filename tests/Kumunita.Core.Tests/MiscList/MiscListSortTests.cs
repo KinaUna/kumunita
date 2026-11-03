@@ -43,7 +43,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task Announcement_SortSpecNull_CurrentOrder()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         var now = DateTimeOffset.UtcNow;
         await Plant(store, Ann("s1-a", now.AddDays(-3)));
@@ -66,7 +66,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task Announcement_SortModifiedDesc_NullsFirst()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         var now = DateTimeOffset.UtcNow;
         await Plant(store, Ann("s2-a", now, modified: null));
@@ -89,7 +89,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task Announcement_SortTitle_Ordinal()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         var now = DateTimeOffset.UtcNow;
         await Plant(store, Ann("s3-a", now, title: "banana"));
@@ -112,7 +112,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task Announcement_InvalidKey_DefaultOrder()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         var now = DateTimeOffset.UtcNow;
         await Plant(store, Ann("s4-a", now.AddDays(-3)));
@@ -135,7 +135,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task Announcement_StableTieBreakBy_Id()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store, new UserInfoService(store));
+        var svc = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         var now = DateTimeOffset.UtcNow;
         await Plant(store, Ann("tie-b", now));

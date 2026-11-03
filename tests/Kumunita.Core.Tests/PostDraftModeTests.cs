@@ -352,7 +352,7 @@ public class PostDraftModeTests(PostgresFixture fixture) : IClassFixture<Postgre
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         const string author = "u-df-ann-author";
 
         await Plant(store, new Announcement
@@ -398,7 +398,7 @@ public class PostDraftModeTests(PostgresFixture fixture) : IClassFixture<Postgre
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         const string author = "u-df-ann-targeted-author";
         const string comp   = "c-df-ann-targeted";
 
@@ -435,7 +435,7 @@ public class PostDraftModeTests(PostgresFixture fixture) : IClassFixture<Postgre
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         const string author = "u-df-pinned-author";
 
         await Plant(store, new Announcement
@@ -462,7 +462,7 @@ public class PostDraftModeTests(PostgresFixture fixture) : IClassFixture<Postgre
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         const string author = "u-df-get-author";
         const string admin  = "u-df-get-admin";
         const string id     = "df-get-draft";
@@ -494,7 +494,7 @@ public class PostDraftModeTests(PostgresFixture fixture) : IClassFixture<Postgre
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         const string author = "u-df-annpub-author";
         const string admin  = "u-df-annpub-admin";
         const string id     = "df-annpub-draft";
@@ -543,7 +543,7 @@ public class PostDraftModeTests(PostgresFixture fixture) : IClassFixture<Postgre
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
-        var svc = new AnnouncementService(store, userInfo);
+        var svc = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         const string author = "u-df-annlist-author";
         const string other  = "u-df-annlist-other";
 

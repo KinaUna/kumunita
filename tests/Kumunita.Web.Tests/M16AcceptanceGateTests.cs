@@ -416,9 +416,8 @@ public sealed class M16AcceptanceGateTests(PostgresFixture fixture) : IClassFixt
         string[]? roles = null)
     {
         var userInfo = userInfoOverride ?? new UserInfoService(store);
-        var controller = new InventoryController(
-            new InventoryService(store, new AuthorizationService(store, userInfo), userInfo),
-            userInfo);
+        var profileSettings = new ProfileSettingsService(store);
+        var controller = new InventoryController(new InventoryService(store, new AuthorizationService(store, userInfo), userInfo), userInfo, profileSettings);
 
         controller.ControllerContext = new ControllerContext
         {

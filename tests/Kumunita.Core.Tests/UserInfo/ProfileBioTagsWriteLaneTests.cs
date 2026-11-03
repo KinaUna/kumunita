@@ -56,6 +56,7 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string subject = "u-m23-bio-verbatim";
 
         // Rich content (Markdown) — stored verbatim; the MarkdownRenderer render
@@ -63,7 +64,7 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
         const string richBio = "# A resident\n\nKeeps the **community garden**.\n\n> Solar panels on the roof.";
 
         var profile = new Profile { SubjectId = subject, Verified = true };
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null, null, null, null, richBio, null));
 
@@ -78,12 +79,13 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string subject = "u-m23-null-dontouch";
 
         var profile = new Profile { SubjectId = subject, Verified = true };
 
         // First save: set a bio + a tag.
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null, null, null, null, "biography v1", new[] { "gardening" }));
 
@@ -92,7 +94,7 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
         Assert.Single(afterFirst.TagIds);
 
         // Second save: all-null patch (Bio = null / TagIds = null ⇒ "don't touch").
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null, null, null, null));
 
@@ -107,12 +109,13 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string subject = "u-m23-tag-new";
         const string actor = "u-m23-tag-actor";
 
         var ct = TestContext.Current.CancellationToken;
         var profile = new Profile { SubjectId = subject, Verified = true };
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null, null, null, null, null, new[] { "SOLAR PANELS" }),
             actor);
@@ -154,13 +157,14 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string subject = "u-m23-tag-reuse";
 
         var ct = TestContext.Current.CancellationToken;
         var profile = new Profile { SubjectId = subject, Verified = true };
 
         // First save: create the tag (one tag.create row).
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null, null, null, null, null, new[] { "gardening" }));
 
@@ -171,7 +175,7 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
         Assert.Equal(1, createsBefore);
 
         // Second save: the same slug (now present) is reused, not re-created.
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null, null, null, null, null, new[] { "GARDENING" }));
 
@@ -191,11 +195,12 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string subject = "u-m23-bio-only-noaudit";
 
         var ct = TestContext.Current.CancellationToken;
         var profile = new Profile { SubjectId = subject, Verified = true };
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null, null, null, null, "A bio, no tags.", null));
 
@@ -211,11 +216,12 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string subject = "u-m23-fallback-creator";
 
         var ct = TestContext.Current.CancellationToken;
         var profile = new Profile { SubjectId = subject, Verified = true };
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null, null, null, null, null, new[] { "solar panels" }),
             actorBy: null);   // the only standing is the author's own profile (D3)

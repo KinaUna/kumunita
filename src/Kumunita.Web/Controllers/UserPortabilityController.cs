@@ -55,7 +55,7 @@ public sealed class UserPortabilityController(
     // authorization-surface pin is about IAuthorizationService, which U08
     // adds no branch of. Optional so the test-construction site compiles
     // without it; null → an empty option list (the fail-closed picker).
-    Kumunita.Core.UserInfo.IUserInfoService? userInfo = null) : Controller
+    Kumunita.Core.UserInfo.IGroupService? groupService = null) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -213,11 +213,11 @@ public sealed class UserPortabilityController(
         // the UserInfo read seam (a business read, not the authorization engine
         // — C-M27·7); an absent seam (the test floor) or a lookup failure yields
         // an empty option list (the fail-closed picker — no standing, no target).
-        if (userInfo is not null)
+        if (groupService is not null)
         {
             try
             {
-                var groups = await userInfo.GetGroupsForUserAsync(actor);
+                var groups = await groupService.GetGroupsForUserAsync(actor);
                 foreach (var g in groups)
                     model.Targets.Add(new TargetOption
                     {

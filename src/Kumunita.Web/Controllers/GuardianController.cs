@@ -43,7 +43,7 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("me/children")]
-public sealed class GuardianController(IUserInfoService userInfo, IIdentityService identity, IDocumentStore store, Kumunita.Core.Events.IEventService? events = null) : Controller
+public sealed class GuardianController(IUserInfoService userInfo, IGroupService groupService, IGuardianService guardian, IProfileSettingsService profileSettings, IIdentityService identity, IDocumentStore store, Kumunita.Core.Events.IEventService? events = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -84,7 +84,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         // unacted-upon assignments; the <see cref="PendingGuardianRequestItem"/>
         // shape: child display name + conferrer display name + requested-at,
         // ids/names only — G·1 held). A non-assignee gets an empty list.
-        var pendingRows = await userInfo.GetPendingGuardianRequestsForAssigneeAsync(subject);
+        var pendingRows = await guardian.GetPendingGuardianRequestsForAssigneeAsync(subject);
         var pendingRequests = new List<PendingGuardianRequestItem>(pendingRows.Count);
         foreach (var link in pendingRows)
         {
@@ -124,12 +124,12 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         var groupIds = (await userInfo.GetGroupIdsAsync(childId)).ToHashSet(StringComparer.Ordinal);
         var communityIds = (await userInfo.GetCommunityIdsAsync(childId)).ToList();
-        var pending = await userInfo.GetPendingInvitationsForUserAsync(childId);
+        var pending = await groupService.GetPendingInvitationsForUserAsync(childId);
 
         var invitations = new List<PendingInvitationItem>(pending.Count);
         foreach (var inv in pending)
         {
-            var group = await userInfo.GetGroupAsync(inv.GroupId);
+            var group = await groupService.GetGroupAsync(inv.GroupId);
             invitations.Add(new PendingInvitationItem(
                 inv.GroupId,
                 group?.Name ?? inv.GroupId,
@@ -150,9 +150,9 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         // component name is resolved against the component list (a curation
         // fact, not content — the PendingInvitationItem's GroupName
         // precedent; the GetComponentsAsync read is a single candidate read).
-        var communityRequests = await userInfo
+        var communityRequests = await guardian
             .GetPendingCommunityMembershipRequestsForChildAsync(childId);
-        var componentNames = (await userInfo.GetComponentsAsync(enabledOnly: false))
+        var componentNames = (await profileSettings.GetComponentsAsync(enabledOnly: false))
             .ToDictionary(c => c.Id, c => c.Name, StringComparer.Ordinal);
         var pendingCommunityRequests = new List<PendingCommunityRequestItem>(
             communityRequests.Count);
@@ -261,7 +261,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         // passes here — the catch is the defensive floor.
         try
         {
-            var schedule = await userInfo.GetChildTimeLimitAsync(subject, childId);
+            var schedule = await guardian.GetChildTimeLimitAsync(subject, childId);
             ViewData["TimeLimitsSection"] = new TimeLimitsSection(
                 schedule is { Enabled: true },
                 schedule is not null && schedule.Enabled
@@ -333,7 +333,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.SetChildMessagingRestrictionAsync(childId, restricted, subject);
+            await guardian.SetChildMessagingRestrictionAsync(childId, restricted, subject);
             TempData["info"] = restricted
                 ? await this.FlashAsync("guardian.flash_messaging_restricted", "Messaging restricted for this child account.")
                 : await this.FlashAsync("guardian.flash_messaging_allowed", "Messaging allowed for this child account.");
@@ -383,7 +383,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.SetChildEventRsvpModeAsync(childId, mode, subject);
+            await guardian.SetChildEventRsvpModeAsync(childId, mode, subject);
             TempData["info"] = mode switch
             {
                 Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves => await this.FlashAsync("guardian.flash_rsvp_mode_approves", "You must approve or deny every event attendance for this child."),
@@ -540,7 +540,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.SuspendChildAsync(childId, subject);
+            await guardian.SuspendChildAsync(childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_suspended", "Child account suspended.");
         }
         catch (UnauthorizedAccessException)
@@ -567,7 +567,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.UnsuspendChildAsync(childId, subject);
+            await guardian.UnsuspendChildAsync(childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_unsuspended", "Child account un-suspended.");
         }
         catch (UnauthorizedAccessException)
@@ -626,7 +626,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
                 // Clear = never restricted (the floor, C-M28·3): delete the
                 // row (the M20 SetQuietScheduleAsync "clear" idiom — the
                 // null-schedule = delete shape in the Core seam).
-                await userInfo.SetChildTimeLimitAsync(subject, childId, null);
+                await guardian.SetChildTimeLimitAsync(subject, childId, null);
                 TempData["info"] = await this.FlashAsync("guardian.timelimit.flash_cleared", "Time limits cleared");
             }
             else
@@ -639,7 +639,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
                     Hours     = hours ?? [],
                     DaysOfWeek = daysOfWeek ?? [],
                 };
-                await userInfo.SetChildTimeLimitAsync(subject, childId, schedule);
+                await guardian.SetChildTimeLimitAsync(subject, childId, schedule);
                 TempData["info"] = await this.FlashAsync("guardian.timelimit.flash_saved", "Time limits saved");
             }
         }
@@ -729,7 +729,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.SetChildCommunityBlockAsync(childId, communityId, blocked, subject);
+            await guardian.SetChildCommunityBlockAsync(childId, communityId, blocked, subject);
             TempData["info"] = blocked
                 ? await this.FlashAsync("guardian.flash_community_blocked", "Community {0} is now blocked and hidden for this child.", communityId)
                 : await this.FlashAsync("guardian.flash_community_restored", "Access to community {0} is restored for this child.", communityId);
@@ -763,7 +763,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.ApproveGroupInvitationAsync(groupId, childId, subject);
+            await guardian.ApproveGroupInvitationAsync(groupId, childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_invite_approved", "Approved the invitation to group {0}.", groupId);
         }
         catch (UnauthorizedAccessException)
@@ -797,7 +797,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.RejectGroupInvitationAsync(groupId, childId, subject);
+            await guardian.RejectGroupInvitationAsync(groupId, childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_invite_rejected", "Rejected the invitation to group {0}.", groupId);
         }
         catch (UnauthorizedAccessException)
@@ -832,7 +832,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.ApproveCommunityMembershipRequestAsync(communityId, childId, subject);
+            await guardian.ApproveCommunityMembershipRequestAsync(communityId, childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_community_approved", "Approved community {0} for this child.", communityId);
         }
         catch (UnauthorizedAccessException)
@@ -866,7 +866,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.DeclineCommunityMembershipRequestAsync(communityId, childId, subject);
+            await guardian.DeclineCommunityMembershipRequestAsync(communityId, childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_community_rejected", "Rejected community {0} for this child.", communityId);
         }
         catch (UnauthorizedAccessException)
@@ -917,7 +917,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            await userInfo.DissolveGuardianLinkAsync(link.Id, subject, viaAdmin: false);
+            await guardian.DissolveGuardianLinkAsync(link.Id, subject, viaAdmin: false);
             // The count-aware success message (ADR 0028 §G·6): the Detail
             // view's steering already frames this correctly per case — a
             // co-guardian sees "You are no longer this child's guardian…"
@@ -1081,7 +1081,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
             // (2) the GU formation seam — the (guardian, child) Active row, in the
             //     same request (G·4, one commit; C3).
-            await userInfo.CreateGuardianLinkAsync(child.SubjectId, subject);
+            await guardian.CreateGuardianLinkAsync(child.SubjectId, subject);
         }
         catch (DisallowedEmailDomainException ex)
         {
@@ -1192,7 +1192,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // commit's contents (C3). The conferrer's Detail page now shows a
             // "pending" badge next to the assigned guardian's name (the
             // ActiveGuardiansAsync helper now includes Pending rows).
-            await userInfo.AssignGuardianLinkAsync(childId, assignedId, subject);
+            await guardian.AssignGuardianLinkAsync(childId, assignedId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_guardian_assigned", "Guardian assigned — they will be asked to accept.");
         }
         catch (UnauthorizedAccessException)
@@ -1269,7 +1269,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // The accept seam: the row flips Pending → Active, the
             // guardian.create + guardian.accept audit rows commit (C3). The
             // assignee's standing is live on the next read (G·2/C4).
-            await userInfo.AcceptGuardianLinkAsync(childId, subject);
+            await guardian.AcceptGuardianLinkAsync(childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_now_guardian", "You are now this child’s guardian. Their account controls are available.");
         }
         catch (UnauthorizedAccessException)
@@ -1329,7 +1329,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // Index page no longer lists this request (the read seam
             // GetPendingGuardianRequestsForAssigneeAsync filters on
             // Pending).
-            await userInfo.DeclineGuardianLinkAsync(childId, subject);
+            await guardian.DeclineGuardianLinkAsync(childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_declined", "You declined the guardian request.");
         }
         catch (UnauthorizedAccessException)
@@ -1372,7 +1372,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // M28 (ADR 0151 D6) — resolve the HasTimeLimits badge:
             // the child's active schedule (the GetActiveTimeLimitAsync read,
             // C-M28·3 floor: null / Enabled==false → false).
-            var schedule = await userInfo.GetActiveTimeLimitAsync(link.ChildId);
+            var schedule = await guardian.GetActiveTimeLimitAsync(link.ChildId);
             rows.Add(new ChildAccountItem(
                 link.ChildId,
                 profile?.DisplayName ?? link.ChildId,

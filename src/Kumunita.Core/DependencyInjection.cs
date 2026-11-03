@@ -44,6 +44,10 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddKumunitaCore(this IServiceCollection services)
     {
         services.AddTransient<IUserInfoService, UserInfoService>();
+        services.AddTransient<IGroupService, GroupService>();
+        services.AddTransient<ICommunityMembershipService, CommunityMembershipService>();
+        services.AddTransient<IGuardianService, GuardianService>();
+        services.AddTransient<IProfileSettingsService, ProfileSettingsService>();
         services.AddTransient<IAuthorizationService, AuthorizationService>();
 
         // M13 (ADR 0114, plan U04): the D3 aggregation seam — the Usage
@@ -194,6 +198,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DirectoryService>(sp =>
             new DirectoryService(
                 sp.GetRequiredService<IUserInfoService>(),
+                sp.GetRequiredService<IProfileSettingsService>(),
                 sp.GetRequiredService<IAuthorizationService>()));
 
         // M36 (ADR 0165, U03): the @mentions shared module — the one new Core
@@ -216,7 +221,7 @@ public static class ServiceCollectionExtensions
         // C-M23·2/D7). An interface (unlike DirectoryService) so the Web layer
         // resolves a stable seam.
         services.AddTransient<IProfileFindService>(sp => new ProfileFindService(
-            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IProfileSettingsService>(),
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
@@ -288,6 +293,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Announcements.IAnnouncementService>(sp => new Announcements.AnnouncementService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<UserInfo.IUserInfoService>(),
+            sp.GetRequiredService<UserInfo.IProfileSettingsService>(),
             sp.GetRequiredService<Notifications.INotificationEmitter>(),
             sp.GetRequiredService<Mentions.IMentionService>()));
 
@@ -356,7 +362,7 @@ public static class ServiceCollectionExtensions
         // resolves this directly; U3/U4/U5 never needed the registration because
         // they tested with a manual-instance (the M3 PostServiceTests harness shape).
         services.AddTransient<Moderation.ModerationService>(sp => new Moderation.ModerationService(
-            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IProfileSettingsService>(),
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>(),
             // M6 (U04) — the frozen notification emitter (U03); the ctor param
@@ -531,6 +537,7 @@ public static class ServiceCollectionExtensions
         // re-implementing the kind switch.
         services.AddTransient<IContentTargetResolver>(sp => new ContentTargetResolver(
             sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IGroupService>(),
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Announcements.IAnnouncementService>(),
@@ -620,7 +627,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Search.ISearchService>(sp => new Search.SearchService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<IUserInfoService>()));
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IProfileSettingsService>()));
 
         // M11 (ADR 0108, plan U01): the Portability context's service shell
         // (bounded context Kumunita.Core.Portability — the operator plane,

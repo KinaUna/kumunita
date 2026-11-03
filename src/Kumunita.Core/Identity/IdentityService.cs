@@ -56,7 +56,13 @@ public sealed class IdentityService(
     // delete in the Marten session is unaffected). DI always supplies the live
     // <c>IMediaFileStore</c> (registered in DependencyInjection.cs), so the
     // delete lane runs the byte-delete in production.
-    Kumunita.Core.Media.IMediaFileStore? mediaStore = null) : IIdentityService
+    Kumunita.Core.Media.IMediaFileStore? mediaStore = null,
+    // C07 (ADR 0286) — the IProfileSettingsService sibling (the moved
+    // GetAssignmentsAsync owner; the access core's IUserInfoService stays for the
+    // GetProfileAsync calls). Optional (default null, the CS1736 shape) so the
+    // direct-construction test harnesses that build IdentityService positionally
+    // keep compiling unchanged; DI always supplies the live sibling.
+    IProfileSettingsService? profileSettings = null) : IIdentityService
 {
     private const string ComponentKind = "component";
     private const string AccountKind = "account";
@@ -95,7 +101,14 @@ public sealed class IdentityService(
         // values (ADR 0003) — the claim *set* stays within ClaimTypes.All.
         if (identityRoles.Contains(Roles.Moderator))
         {
-            var assignments = await userInfo.GetAssignmentsAsync(subjectId);
+            // C07 (ADR 0286) — GetAssignmentsAsync moved to IProfileSettingsService;
+            // the optional seam is null only in the direct-construction test
+            // harnesses, which never set up per-component moderator scoping
+            // (a null reader → an empty list, the same "not configured" floor as
+            // the other optional seams).
+            var assignments = profileSettings is not null
+                ? await profileSettings.GetAssignmentsAsync(subjectId)
+                : Array.Empty<ModeratorAssignment>();
             foreach (var a in assignments)
                 roles.Add(Roles.ModeratorComponent(a.ComponentId));
         }

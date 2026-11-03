@@ -69,10 +69,10 @@ public static class ComposerSeedOptions
     /// </param>
     public static async Task SeedGrantPickerOptionsAsync(
         Controller controller,
-        IUserInfoService userInfo,
+        IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
         bool includeAssignUsers = false)
     {
-        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: true);
+        var profiles = await profileSettings.GetProfilesAsync(verifiedOnly: true);
         var selfId = KumunitaPrincipal.SubjectId(controller.User);
         var userOptions = profiles
             .Where(p => !p.Blocked)
@@ -86,7 +86,7 @@ public static class ComposerSeedOptions
             .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var groups = await userInfo.GetPublicGroupsAsync();
+        var groups = await groupService.GetPublicGroupsAsync();
         var groupOptions = groups
             .Select(g => new GrantOption
             {
@@ -149,9 +149,9 @@ public static class ComposerSeedOptions
     /// a gate*; the audience is the sole access boundary on the form).
     /// </summary>
     public static async Task<IReadOnlyList<(string Id, string Name)>> SeedComponentPickerAsync(
-        IUserInfoService userInfo)
+        IProfileSettingsService profileSettings)
     {
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         return components
             .Select(c => (c.Id, Name: string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)

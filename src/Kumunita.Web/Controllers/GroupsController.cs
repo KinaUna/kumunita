@@ -39,7 +39,7 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 [Route("groups")]
 public sealed class GroupsController(
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
     PostService posts,
     ILocalizationService localization,
     IDocumentStore store,
@@ -131,7 +131,7 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(subject))
             return View(new GroupListViewModel());
 
-        var groups = await userInfo.GetGroupsForUserAsync(subject);
+        var groups = await groupService.GetGroupsForUserAsync(subject);
 
         // MemberCount is per-group: a second read per row (the U9 second-M2-ADD
         // GetGroupMembersAsync — one read lane also serves U10's Detail.Members).
@@ -143,7 +143,7 @@ public sealed class GroupsController(
         var rows = new List<GroupViewModel>(groups.Count);
         foreach (var g in groups)
         {
-            var members = await userInfo.GetGroupMembersAsync(g.Id);
+            var members = await groupService.GetGroupMembersAsync(g.Id);
             rows.Add(new GroupViewModel(g.Id, g.Name, members.Count));
         }
 
@@ -153,10 +153,10 @@ public sealed class GroupsController(
         // detail (owner ∪ member gate) until accepting, so the card must not
         // depend on it. An empty list renders no card at all.
         List<InvitationViewModel> invitations = [];
-        var pending = await userInfo.GetPendingInvitationsForUserAsync(subject);
+        var pending = await groupService.GetPendingInvitationsForUserAsync(subject);
         foreach (var inv in pending)
         {
-            var group = await userInfo.GetGroupAsync(inv.GroupId);
+            var group = await groupService.GetGroupAsync(inv.GroupId);
             var by = await userInfo.GetProfileAsync(inv.InvitedBy);
             invitations.Add(new InvitationViewModel(
                 inv.GroupId,
@@ -171,13 +171,13 @@ public sealed class GroupsController(
         // Same GroupViewModel 3-tuple projection + the same per-row member-count
         // read; the only difference is the view's affordance (a request button).
         var myGroupIds = groups.Select(g => g.Id).ToHashSet(StringComparer.Ordinal);
-        var publicGroups = await userInfo.GetPublicGroupsAsync();
+        var publicGroups = await groupService.GetPublicGroupsAsync();
         var publicRows = new List<GroupViewModel>();
         foreach (var g in publicGroups)
         {
             if (myGroupIds.Contains(g.Id))
                 continue;
-            var members = await userInfo.GetGroupMembersAsync(g.Id);
+            var members = await groupService.GetGroupMembersAsync(g.Id);
             publicRows.Add(new GroupViewModel(g.Id, g.Name, members.Count));
         }
 
@@ -186,10 +186,10 @@ public sealed class GroupsController(
         // C-M2·2 carried); the group name per row comes from the single-group
         // read — same shape as the invitations card above.
         List<JoinRequestViewModel> myJoinRequests = [];
-        var pendingRequests = await userInfo.GetPendingJoinRequestsForUserAsync(subject);
+        var pendingRequests = await groupService.GetPendingJoinRequestsForUserAsync(subject);
         foreach (var req in pendingRequests)
         {
-            var group = await userInfo.GetGroupAsync(req.GroupId);
+            var group = await groupService.GetGroupAsync(req.GroupId);
             myJoinRequests.Add(new JoinRequestViewModel(
                 req.GroupId,
                 group?.Name ?? req.GroupId));
@@ -319,7 +319,7 @@ public sealed class GroupsController(
         // Web SoD gate: the actor must be in the owner ∪ member projection for this
         // group id (U9's GetGroupsForUserAsync pin, the single "groups for user"
         // read — ADR 0006-D). A non-visible group is a 404, not a redirect.
-        var groups = await userInfo.GetGroupsForUserAsync(actor);
+        var groups = await groupService.GetGroupsForUserAsync(actor);
         var group = groups.FirstOrDefault(g => g.Id == id);
         if (group is null)
             return NotFound();
@@ -327,14 +327,14 @@ public sealed class GroupsController(
         // The member list (U9's second M2 read; the owner ∪ members set is already
         // the strong-consistency live rows — C4). One read lane serves U9's count
         // and U10's member list (design doc §2.7 — no third seam).
-        var memberRows = await userInfo.GetGroupMembersAsync(group.Id);
+        var memberRows = await groupService.GetGroupMembersAsync(group.Id);
 
         // The resident catalog read (the directory's visibility surface: every
         // non-blocked resident — the platform is invitation-only, so "who is
         // here" is not a gated read lane). One read also resolves the owner's,
         // each member's and each pending invitee's display name — the in-memory
         // lookups below replace the per-row GetProfileAsync pattern.
-        var allProfiles = (await userInfo.GetProfilesAsync(verifiedOnly: false)).ToList();
+        var allProfiles = (await profileSettings.GetProfilesAsync(verifiedOnly: false)).ToList();
         var bySubject = allProfiles
             .Where(p => !string.IsNullOrEmpty(p.SubjectId))
             .ToDictionary(p => p.SubjectId, p => p);
@@ -437,7 +437,7 @@ public sealed class GroupsController(
         // audit, C-M2·2 carried); each row's display name via the same
         // catalog read as the member rows above.
         List<PendingInvitationViewModel> pendingInvitations = [];
-        var pending = await userInfo.GetPendingInvitationsForGroupAsync(group.Id);
+        var pending = await groupService.GetPendingInvitationsForGroupAsync(group.Id);
         foreach (var inv in pending)
         {
             Profile? p;
@@ -451,7 +451,7 @@ public sealed class GroupsController(
         // catalog read as the member rows above (the PendingInvitations shape
         // carried to the join-request axis).
         List<PendingJoinRequestViewModel> pendingJoinRequests = [];
-        var pendingRequests = await userInfo.GetPendingJoinRequestsForGroupAsync(group.Id);
+        var pendingRequests = await groupService.GetPendingJoinRequestsForGroupAsync(group.Id);
         foreach (var req in pendingRequests)
         {
             Profile? p;
@@ -487,7 +487,7 @@ public sealed class GroupsController(
         // candidate list. CanTranslate is the display convenience mirroring
         // UserInfoService's AddGroupTranslationAsync standing check — the POST
         // re-checks server-side, so this is not the gate.
-        var groupTranslations = await userInfo.GetGroupTranslationsAsync(group.Id);
+        var groupTranslations = await groupService.GetGroupTranslationsAsync(group.Id);
         var translationCodes = groupTranslations.Select(t => t.LanguageCode).ToHashSet();
         var catalog = await localization.ListLanguagesAsync();
         var groupLanguages = catalog
@@ -495,7 +495,7 @@ public sealed class GroupsController(
             .OrderBy(l => l.SortOrder)
             .Select(l => new LanguageOption(l.Id, l.NativeName, translationCodes.Contains(l.Id)))
             .ToList();
-        var canTranslate = userInfo.CanTranslateGroup(
+        var canTranslate = groupService.CanTranslateGroup(
             group.OwnerId, actor, KumunitaPrincipal.RoleSet(User));
 
         return View(new GroupDetailViewModel(
@@ -604,7 +604,7 @@ public sealed class GroupsController(
         // Web SoD gate: the actor must be in the owner ∪ member projection
         // (U9's GetGroupsForUserAsync pin; the single "groups for user" read —
         // ADR 0006-D). A non-visible group is a 404, not a 200 + error text.
-        var groups = await userInfo.GetGroupsForUserAsync(actor);
+        var groups = await groupService.GetGroupsForUserAsync(actor);
         var group = groups.FirstOrDefault(g => g.Id == id);
         return group is null ? null : new ActorGroup(actor, group);
     }
@@ -823,7 +823,7 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await userInfo.AddGroupTranslationAsync(
+            await groupService.AddGroupTranslationAsync(
                 resolved.Group.Id,
                 languageCode,
                 string.IsNullOrWhiteSpace(name) ? null : name,
@@ -894,7 +894,7 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await userInfo.UpdateGroupTranslationAsync(
+            await groupService.UpdateGroupTranslationAsync(
                 resolved.Group.Id,
                 languageCode,
                 string.IsNullOrWhiteSpace(name) ? null : name,
@@ -951,7 +951,7 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await userInfo.RemoveGroupTranslationAsync(resolved.Group.Id, languageCode, actor, actorRoles, session);
+            await groupService.RemoveGroupTranslationAsync(resolved.Group.Id, languageCode, actor, actorRoles, session);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1001,7 +1001,7 @@ public sealed class GroupsController(
         // clears the description rather than storing whitespace.
         var value = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
 
-        await userInfo.UpdateGroupDescriptionAsync(
+        await groupService.UpdateGroupDescriptionAsync(
             groupId: resolved.Group.Id,
             description: value,
             updatedBy: resolved.Actor);
@@ -1044,7 +1044,7 @@ public sealed class GroupsController(
         if (resolved is null)
             return NotFound();
 
-        await userInfo.SetGroupPrivacyAsync(
+        await groupService.SetGroupPrivacyAsync(
             groupId: resolved.Group.Id,
             isPrivate: isPrivate,
             updatedBy: resolved.Actor);
@@ -1090,7 +1090,7 @@ public sealed class GroupsController(
         if (resolved is null)
             return NotFound();
 
-        await userInfo.DeleteGroupAsync(
+        await groupService.DeleteGroupAsync(
             groupId: resolved.Group.Id,
             deletedBy: resolved.Actor);
 
@@ -1158,7 +1158,7 @@ public sealed class GroupsController(
         if (resolved is null)
             return NotFound();
 
-        await userInfo.InviteGroupMemberAsync(
+        await groupService.InviteGroupMemberAsync(
             groupId: resolved.Group.Id,
             userId: subjectId!,
             invitedBy: resolved.Actor);
@@ -1194,13 +1194,13 @@ public sealed class GroupsController(
             return Unauthorized();
 
         // Self-lane gate (C-M2b·2): the row must be in MY pending list.
-        var pending = await userInfo.GetPendingInvitationsForUserAsync(actor);
+        var pending = await groupService.GetPendingInvitationsForUserAsync(actor);
         if (pending.All(inv => inv.GroupId != id))
             return NotFound();
 
         try
         {
-            await userInfo.AcceptGroupInvitationAsync(id, actor);
+            await groupService.AcceptGroupInvitationAsync(id, actor);
         }
         catch (InvalidOperationException)
         {
@@ -1229,13 +1229,13 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return Unauthorized();
 
-        var pending = await userInfo.GetPendingInvitationsForUserAsync(actor);
+        var pending = await groupService.GetPendingInvitationsForUserAsync(actor);
         if (pending.All(inv => inv.GroupId != id))
             return NotFound();
 
         try
         {
-            await userInfo.DeclineGroupInvitationAsync(id, actor);
+            await groupService.DeclineGroupInvitationAsync(id, actor);
         }
         catch (InvalidOperationException)
         {
@@ -1272,13 +1272,13 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return Unauthorized();
 
-        var pending = await userInfo.GetPendingInvitationsForUserAsync(actor);
+        var pending = await groupService.GetPendingInvitationsForUserAsync(actor);
         if (pending.All(inv => inv.GroupId != id))
             return NotFound();
 
         try
         {
-            await userInfo.AcceptGroupInvitationAsync(id, actor);
+            await groupService.AcceptGroupInvitationAsync(id, actor);
         }
         catch (InvalidOperationException)
         {
@@ -1306,13 +1306,13 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return Unauthorized();
 
-        var pending = await userInfo.GetPendingInvitationsForUserAsync(actor);
+        var pending = await groupService.GetPendingInvitationsForUserAsync(actor);
         if (pending.All(inv => inv.GroupId != id))
             return NotFound();
 
         try
         {
-            await userInfo.DeclineGroupInvitationAsync(id, actor);
+            await groupService.DeclineGroupInvitationAsync(id, actor);
         }
         catch (InvalidOperationException)
         {
@@ -1346,7 +1346,7 @@ public sealed class GroupsController(
 
         try
         {
-            await userInfo.CancelGroupInvitationAsync(
+            await groupService.CancelGroupInvitationAsync(
                 groupId: resolved.Group.Id,
                 userId: subjectId!,
                 cancelledBy: resolved.Actor);
@@ -1393,17 +1393,17 @@ public sealed class GroupsController(
         // re-check membership (it is a write lane, not a projection), so the
         // Web asserts it here — the same "what is offered is what the route
         // accepts" rule the invite lane uses.
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null || group.IsPrivate)
             return NotFound();
 
-        var myGroups = await userInfo.GetGroupsForUserAsync(actor);
+        var myGroups = await groupService.GetGroupsForUserAsync(actor);
         if (myGroups.Any(g => g.Id == id))
             return NotFound();
 
         try
         {
-            await userInfo.RequestToJoinGroupAsync(id, actor);
+            await groupService.RequestToJoinGroupAsync(id, actor);
         }
         catch (InvalidOperationException)
         {
@@ -1433,13 +1433,13 @@ public sealed class GroupsController(
             return Unauthorized();
 
         // Self-lane gate: the row must be in MY pending list.
-        var pending = await userInfo.GetPendingJoinRequestsForUserAsync(actor);
+        var pending = await groupService.GetPendingJoinRequestsForUserAsync(actor);
         if (pending.All(r => r.GroupId != id))
             return NotFound();
 
         try
         {
-            await userInfo.WithdrawJoinRequestAsync(id, actor);
+            await groupService.WithdrawJoinRequestAsync(id, actor);
         }
         catch (InvalidOperationException)
         {
@@ -1477,7 +1477,7 @@ public sealed class GroupsController(
 
         try
         {
-            await userInfo.ApproveJoinRequestAsync(
+            await groupService.ApproveJoinRequestAsync(
                 groupId: resolved.Group.Id,
                 userId: subjectId!,
                 resolvedBy: resolved.Actor);
@@ -1513,7 +1513,7 @@ public sealed class GroupsController(
 
         try
         {
-            await userInfo.DeclineJoinRequestAsync(
+            await groupService.DeclineJoinRequestAsync(
                 groupId: resolved.Group.Id,
                 userId: subjectId!,
                 resolvedBy: resolved.Actor);
@@ -1560,7 +1560,7 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return NotFound();
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -1629,7 +1629,7 @@ public sealed class GroupsController(
         if (translationProvider is not null)
         {
             string gLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
-            var gTranslations = await userInfo.GetGroupTranslationsAsync(id);
+            var gTranslations = await groupService.GetGroupTranslationsAsync(id);
             var gMatch = gTranslations.FirstOrDefault(t => String.Equals(t.LanguageCode, gLang, StringComparison.OrdinalIgnoreCase));
             if (gMatch is not null && !string.IsNullOrWhiteSpace(gMatch.Name))
                 groupName = gMatch.Name;
@@ -1672,7 +1672,7 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return Unauthorized();
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -1722,7 +1722,7 @@ public sealed class GroupsController(
             return View("New", model);
         }
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -1804,7 +1804,7 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return NotFound();
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -1862,7 +1862,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -2231,7 +2231,7 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return NotFound();
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -2279,7 +2279,7 @@ public sealed class GroupsController(
         if (translationProvider is not null)
         {
             string gLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
-            var gTranslations = await userInfo.GetGroupTranslationsAsync(id);
+            var gTranslations = await groupService.GetGroupTranslationsAsync(id);
             var gMatch = gTranslations.FirstOrDefault(t => String.Equals(t.LanguageCode, gLang, StringComparison.OrdinalIgnoreCase));
             if (gMatch is not null && !string.IsNullOrWhiteSpace(gMatch.Name))
                 groupName = gMatch.Name;
@@ -2318,7 +2318,7 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return Unauthorized();
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -2374,7 +2374,7 @@ public sealed class GroupsController(
             return View("EventNew", model);
         }
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -2456,7 +2456,7 @@ public sealed class GroupsController(
         if (string.IsNullOrEmpty(actor))
             return NotFound();
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 
@@ -2512,7 +2512,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/events/{eventId}");
         }
 
-        var group = await userInfo.GetGroupAsync(id);
+        var group = await groupService.GetGroupAsync(id);
         if (group is null)
             return NotFound();
 

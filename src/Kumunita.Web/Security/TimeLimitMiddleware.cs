@@ -108,7 +108,7 @@ public sealed class TimeLimitMiddleware
         // (3) The enforcement read (the U03 seam, child-keyed, no guardian gate,
         // no audit row). The floor (C-M28·3): null / disabled → never restricted.
         var schedule = await requestServices
-            .GetRequiredService<IUserInfoService>()
+            .GetRequiredService<IGuardianService>()
             .GetActiveTimeLimitAsync(subject);
         if (schedule is null || !schedule.Enabled)
         {

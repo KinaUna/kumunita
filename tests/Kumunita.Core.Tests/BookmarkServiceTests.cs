@@ -766,14 +766,15 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             NullLogger<IdentityService>.Instance);
 
         var authz = new AuthorizationService(store, userInfo);
-        var announcements = new AnnouncementService(store, userInfo);
+        var announcements = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         var events = new EventService(store, authz, userInfo);
         var projects = new ProjectService(store, authz, userInfo);
         var inventory = new InventoryService(store, authz, userInfo);
         // IMPROVE-CODE C05 — the target-resolution seam the service now
         // delegates to (the same real seams, composed into the one resolver).
         var resolver = new Targets.ContentTargetResolver(
-            userInfo, authz, store, announcements, events, projects, inventory, identity);
+            userInfo, new GroupService(store), authz, store, announcements, events, projects, inventory,
+            identity);
         var bm = new BookmarkService(store, resolver);
         return (userInfo, authz, bm);
     }

@@ -23,9 +23,10 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-hsu-default";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
         var read = await svc.GetProfileAsync(subject);
         Assert.NotNull(read);
@@ -38,12 +39,13 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-hsu-true";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
         Assert.False((await svc.GetProfileAsync(subject))!.HomeShowUpcoming);
 
-        await svc.SetProfileHomeShowUpcomingAsync(subject, true, subject);
+        await profileSettings.SetProfileHomeShowUpcomingAsync(subject, true, subject);
 
         var read = await svc.GetProfileAsync(subject);
         Assert.True(read!.HomeShowUpcoming);
@@ -58,18 +60,19 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-hsu-clear";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
-        await svc.SetProfileHomeShowUpcomingAsync(subject, true, subject);
+        await profileSettings.SetProfileHomeShowUpcomingAsync(subject, true, subject);
         Assert.True((await svc.GetProfileAsync(subject))!.HomeShowUpcoming);
 
-        await svc.SetProfileHomeShowUpcomingAsync(subject, false, subject);
+        await profileSettings.SetProfileHomeShowUpcomingAsync(subject, false, subject);
         Assert.False((await svc.GetProfileAsync(subject))!.HomeShowUpcoming);
 
         // Re-settable (the lane is a plain field write, not a tombstone).
-        await svc.SetProfileHomeShowUpcomingAsync(subject, true, subject);
+        await profileSettings.SetProfileHomeShowUpcomingAsync(subject, true, subject);
         Assert.True((await svc.GetProfileAsync(subject))!.HomeShowUpcoming);
     }
 
@@ -79,9 +82,10 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.SetProfileHomeShowUpcomingAsync("u-hsu-missing", true, "u-hsu-any"));
+            () => profileSettings.SetProfileHomeShowUpcomingAsync("u-hsu-missing", true, "u-hsu-any"));
 
         // Fail closed = no profile row created.
         Assert.Null(await svc.GetProfileAsync("u-hsu-missing"));
@@ -93,9 +97,10 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-huo-default";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
         var read = await svc.GetProfileAsync(subject);
         Assert.NotNull(read);
@@ -108,12 +113,13 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-huo-true";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
         Assert.False((await svc.GetProfileAsync(subject))!.HomeUpcomingMineOnly);
 
-        await svc.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
+        await profileSettings.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
 
         var read = await svc.GetProfileAsync(subject);
         Assert.True(read!.HomeUpcomingMineOnly);
@@ -129,18 +135,19 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-huo-clear";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
-        await svc.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
+        await profileSettings.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
         Assert.True((await svc.GetProfileAsync(subject))!.HomeUpcomingMineOnly);
 
-        await svc.SetProfileHomeUpcomingMineOnlyAsync(subject, false, subject);
+        await profileSettings.SetProfileHomeUpcomingMineOnlyAsync(subject, false, subject);
         Assert.False((await svc.GetProfileAsync(subject))!.HomeUpcomingMineOnly);
 
         // Re-settable (the lane is a plain field write, not a tombstone).
-        await svc.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
+        await profileSettings.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
         Assert.True((await svc.GetProfileAsync(subject))!.HomeUpcomingMineOnly);
     }
 
@@ -150,9 +157,10 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.SetProfileHomeUpcomingMineOnlyAsync("u-huo-missing", true, "u-huo-any"));
+            () => profileSettings.SetProfileHomeUpcomingMineOnlyAsync("u-huo-missing", true, "u-huo-any"));
 
         // Fail closed = no profile row created.
         Assert.Null(await svc.GetProfileAsync("u-huo-missing"));
@@ -160,7 +168,7 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
 
     // ── Shared helpers ────────────────────────────────────────────────────
 
-    private static async Task SeedProfileAsync(IUserInfoService svc, string subject)
+    private static async Task SeedProfileAsync(IDocumentStore store, string subject)
     {
         var profile = new Profile
         {
@@ -168,7 +176,7 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
             DisplayName = "Resident " + subject,
             Verified = true,
         };
-        await svc.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+        await new ProfileSettingsService(store).UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
     }
 
     private async Task<IDocumentStore> BootStoreAsync()

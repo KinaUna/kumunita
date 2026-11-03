@@ -50,6 +50,7 @@ public class GroupIsPrivateUpgradePathTests(PostgresFixture fixture) : IClassFix
         store.Dispose();
         store = await BootStoreAsync(conn);
         var rebooted = new UserInfoService(store);
+        var groupService = new GroupService(store);
         await using (var survivor = new NpgsqlConnection(conn))
         {
             await survivor.OpenAsync(ct);
@@ -63,20 +64,20 @@ public class GroupIsPrivateUpgradePathTests(PostgresFixture fixture) : IClassFix
         //    default (false ⇒ public): it is on the public picker lane,
         //    and the owner's membership resolves (the privacy flag must not
         //    have touched the authorization read).
-        var upgraded = await rebooted.GetGroupAsync(group.Id);
+        var upgraded = await groupService.GetGroupAsync(group.Id);
         Assert.NotNull(upgraded);
         Assert.Equal("Legacy building 12", upgraded!.Name);
         Assert.Equal("u-legacy-owner", upgraded.OwnerId);
         Assert.False(upgraded.IsPrivate, "a legacy doc without the key must read as public (false)");
-        Assert.Contains(group.Id, (await rebooted.GetPublicGroupsAsync()).Select(g => g.Id));
+        Assert.Contains(group.Id, (await groupService.GetPublicGroupsAsync()).Select(g => g.Id));
         Assert.Contains(group.Id, await rebooted.GetGroupIdsAsync("u-legacy-owner"));
 
         // 4. The privacy lane works on the surviving row: the owner can
         //    still make it private, and the flip is live for the picker
         //    lane and lands in the <c>data</c> JSONB (the persisted shape).
-        await rebooted.SetGroupPrivacyAsync(group.Id, true, "u-legacy-owner");
-        Assert.True((await rebooted.GetGroupAsync(group.Id))!.IsPrivate);
-        Assert.DoesNotContain(group.Id, (await rebooted.GetPublicGroupsAsync()).Select(g => g.Id));
+        await groupService.SetGroupPrivacyAsync(group.Id, true, "u-legacy-owner");
+        Assert.True((await groupService.GetGroupAsync(group.Id))!.IsPrivate);
+        Assert.DoesNotContain(group.Id, (await groupService.GetPublicGroupsAsync()).Select(g => g.Id));
         Assert.Contains(
             "IsPrivate",
             await GroupDataJsonAsync(conn, group.Id, ct));

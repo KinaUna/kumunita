@@ -52,6 +52,7 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-priv-owner";
 
@@ -59,24 +60,24 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
         // the picker read lane.
         var group = await svc.CreateGroupAsync(owner, "Building 4", "Residents of Building 4");
         Assert.False(group.IsPrivate);
-        Assert.Contains(group.Id, (await svc.GetPublicGroupsAsync()).Select(g => g.Id));
+        Assert.Contains(group.Id, (await groupService.GetPublicGroupsAsync()).Select(g => g.Id));
 
         // Flip to private — live on the very next single-group read…
-        await svc.SetGroupPrivacyAsync(group.Id, true, owner);
-        Assert.True((await svc.GetGroupAsync(group.Id))!.IsPrivate);
+        await groupService.SetGroupPrivacyAsync(group.Id, true, owner);
+        Assert.True((await groupService.GetGroupAsync(group.Id))!.IsPrivate);
 
         // …and on the owner ∪ member projection read (the /groups list lane).
-        var forUser = await svc.GetGroupsForUserAsync(owner);
+        var forUser = await groupService.GetGroupsForUserAsync(owner);
         Assert.True(forUser.Single(g => g.Id == group.Id).IsPrivate);
 
         // …and gone from the public-only read lane (the grant/access pickers).
-        Assert.DoesNotContain(group.Id, (await svc.GetPublicGroupsAsync()).Select(g => g.Id));
+        Assert.DoesNotContain(group.Id, (await groupService.GetPublicGroupsAsync()).Select(g => g.Id));
 
         // Flip back to public — live again on the picker read lane (C4, round
         // trip).
-        await svc.SetGroupPrivacyAsync(group.Id, false, owner);
-        Assert.Contains(group.Id, (await svc.GetPublicGroupsAsync()).Select(g => g.Id));
-        Assert.False((await svc.GetGroupAsync(group.Id))!.IsPrivate);
+        await groupService.SetGroupPrivacyAsync(group.Id, false, owner);
+        Assert.Contains(group.Id, (await groupService.GetPublicGroupsAsync()).Select(g => g.Id));
+        Assert.False((await groupService.GetGroupAsync(group.Id))!.IsPrivate);
     }
 
     // ── Test 2 — owner update: audit row, Via Owner, effective = owner ─────
@@ -85,11 +86,12 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-priv-audit-owner";
         var group = await svc.CreateGroupAsync(owner, "Family", "The Smith family", true);
 
-        await svc.SetGroupPrivacyAsync(group.Id, false, owner);
+        await groupService.SetGroupPrivacyAsync(group.Id, false, owner);
 
         await using var session = store.QuerySession();
         var audits = await session.Query<AccessAudit>()
@@ -117,12 +119,13 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-priv-admin-owner";
         const string admin = "u-priv-globaladmin";
         var group = await svc.CreateGroupAsync(owner, "Family", "The Smith family");
 
-        await svc.SetGroupPrivacyAsync(group.Id, true, admin);
+        await groupService.SetGroupPrivacyAsync(group.Id, true, admin);
 
         await using var session = store.QuerySession();
         var audit = await session.Query<AccessAudit>()
@@ -136,8 +139,8 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
         // The change landed for both reads (C4: the admin's write is the
         // owner's group's visible state) — and the group is now hidden from
         // the public-only lane.
-        Assert.True((await svc.GetGroupAsync(group.Id))!.IsPrivate);
-        Assert.DoesNotContain(group.Id, (await svc.GetPublicGroupsAsync()).Select(g => g.Id));
+        Assert.True((await groupService.GetGroupAsync(group.Id))!.IsPrivate);
+        Assert.DoesNotContain(group.Id, (await groupService.GetPublicGroupsAsync()).Select(g => g.Id));
     }
 
     // ── Test 4 — unknown group id throws (the lane's fail-safe shape) ──────
@@ -146,9 +149,10 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.SetGroupPrivacyAsync("u-priv-missing-group", true, "u-priv-any"));
+            () => groupService.SetGroupPrivacyAsync("u-priv-missing-group", true, "u-priv-any"));
 
         // No audit row for a write that never landed (invariant C3: the row
         // is committed *with* the change, not for the attempt).
@@ -171,6 +175,7 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-priv-list-owner";
         _ = await svc.CreateGroupAsync(owner, "Mushroom hunters", null);       // public
@@ -178,7 +183,7 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
         var privateFam = await svc.CreateGroupAsync(owner, "The family", null, true);
         _ = await svc.CreateGroupAsync(owner, "A public too", null, false);    // public (explicit)
 
-        var names = (await svc.GetPublicGroupsAsync())
+        var names = (await groupService.GetPublicGroupsAsync())
             .Select(g => g.Name)
             .OrderBy(n => n)
             .ToArray();
@@ -190,7 +195,7 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
 
         // Sanity: the private group still exists and is visible to its owner
         // via the /groups list lane — only the public-only lane hides it.
-        Assert.Contains(privateFam.Id, (await svc.GetGroupsForUserAsync(owner)).Select(g => g.Id));
+        Assert.Contains(privateFam.Id, (await groupService.GetGroupsForUserAsync(owner)).Select(g => g.Id));
     }
 
     // ── Test 6 — CreateGroupAsync honors the isPrivate default and explicit ─
@@ -203,6 +208,7 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-priv-create";
 
@@ -213,7 +219,7 @@ public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassF
         Assert.True(explicitPrivate.IsPrivate);
         // …and it is private on the very next read (persistence, not a
         // transient field).
-        Assert.True((await svc.GetGroupAsync(explicitPrivate.Id))!.IsPrivate);
+        Assert.True((await groupService.GetGroupAsync(explicitPrivate.Id))!.IsPrivate);
     }
 
     // ── Shared helper (mirror the group-description tests' BootStoreAsync) ──

@@ -85,6 +85,8 @@ public class HomeController : Controller
         IAuthorizationService? authz = null,
         ILocalizationService? localization = null,
         IUserInfoService? userInfo = null,
+        IProfileSettingsService? profileSettings = null,
+        ICommunityMembershipService? communityMembership = null,
         ITranslationProvider? translationProvider = null,
         ISiteContentService? siteContent = null,
         IErrorReportService? errorReports = null,
@@ -99,6 +101,8 @@ public class HomeController : Controller
         Authz = authz;
         Localization = localization;
         UserInfo = userInfo;
+        ProfileSettings = profileSettings;
+        CommunityMembership = communityMembership;
         TranslationProvider = translationProvider;
         SiteContentService = siteContent;
         ErrorReports = errorReports;
@@ -114,6 +118,8 @@ public class HomeController : Controller
     internal IAuthorizationService? Authz { get; }
     internal ILocalizationService? Localization { get; }
     internal IUserInfoService? UserInfo { get; }
+    internal IProfileSettingsService? ProfileSettings { get; }
+    internal ICommunityMembershipService? CommunityMembership { get; }
     internal ITranslationProvider? TranslationProvider { get; }
     internal ISiteContentService? SiteContentService { get; }
     internal IErrorReportService? ErrorReports { get; }
@@ -399,11 +405,11 @@ public class HomeController : Controller
         // invariant C1), so the frozen Decide() has no "public" branch for
         // them. An anonymous visitor (subjectId is null) therefore never
         // sees any posts — the column is structurally empty, no service call.
-        if (Posts is null || UserInfo is null || subjectId is null)
+        if (Posts is null || UserInfo is null || ProfileSettings is null || CommunityMembership is null || subjectId is null)
             return [];
         try
         {
-            var components = await UserInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+            var components = await ProfileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
             if (components.Count == 0)
                 return [];
 
@@ -416,7 +422,7 @@ public class HomeController : Controller
             {
                 foreach (var c in components)
                 {
-                    var translations = await UserInfo.GetCommunityTranslationsAsync(c.Id).ConfigureAwait(false);
+                    var translations = await CommunityMembership.GetCommunityTranslationsAsync(c.Id).ConfigureAwait(false);
                     var match = translations.FirstOrDefault(t =>
                         string.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
                     if (match is not null && !string.IsNullOrWhiteSpace(match.Name))

@@ -203,9 +203,11 @@ public class StaticPagesSP_U04Tests
         localization.GetDefaultLanguageCodeAsync().Returns("en");
 
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
@@ -215,7 +217,7 @@ public class StaticPagesSP_U04Tests
         store.QuerySession().Returns(readSession);
 
         var controller = new PageController(
-            pages, Substitute.For<IAuthorizationService>(), localization, userInfo, store);
+            pages, Substitute.For<IAuthorizationService>(), localization, userInfo, Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), store);
         var httpContext = new DefaultHttpContext();
         // ADR 0005 §C — the cookie is a display *preference*; Show must ignore
         // it for variant selection (the default active variant is the

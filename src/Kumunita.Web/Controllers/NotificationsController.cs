@@ -59,6 +59,8 @@ public sealed class NotificationsController(
     // the subscriptions routes degrade to nameless rows when a seam is absent
     // (the name is a display gap, never a decision).
     IUserInfoService? userInfo = null,
+    IProfileSettingsService? profileSettings = null,
+    IGroupService? groupService = null,
     IPageService? pages = null) : Controller
 {
     /// <summary>
@@ -307,9 +309,9 @@ public sealed class NotificationsController(
         var communityIds = userInfo is null
             ? new List<string>()
             : (await userInfo.GetCommunityIdsAsync(actorId).ConfigureAwait(false)).ToList();
-        var components = userInfo is null
+        var components = profileSettings is null
             ? new List<Kumunita.Core.UserInfo.Component>()
-            : await userInfo.GetComponentsAsync(true).ConfigureAwait(false);
+            : await profileSettings.GetComponentsAsync(true).ConfigureAwait(false);
         var communityNames = components.ToDictionary(c => c.Id, c => c.Name, StringComparer.Ordinal);
         string CommunityName(string id) => communityNames.TryGetValue(id, out var n) ? n : id;
 
@@ -330,9 +332,9 @@ public sealed class NotificationsController(
 
         // Group posts: one toggle per group the resident owns ∪ is a member of
         // (the GetGroupsForUserAsync projection, the single "my groups" read).
-        var groups = userInfo is null
+        var groups = groupService is null
             ? new List<Kumunita.Core.UserInfo.Group>()
-            : await userInfo.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
+            : await groupService.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
         foreach (var group in groups)
             list.Add(new SubscriptionRow(NotificationKinds.GroupPost, group.Id, group.Name,
                 Effective(NotificationKinds.GroupPost, group.Id)));

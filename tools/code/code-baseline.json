@@ -16,7 +16,7 @@
   "files": [
     {
       "id": "src/Kumunita.Core/Announcements/AnnouncementService.cs",
-      "max": 701
+      "max": 704
     },
     {
       "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs",
@@ -32,7 +32,7 @@
     },
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs",
-      "max": 1044
+      "max": 1047
     },
     {
       "id": "src/Kumunita.Core/Localization/LocalizationService.cs",
@@ -59,8 +59,12 @@
       "max": 736
     },
     {
-      "id": "src/Kumunita.Core/UserInfo/UserInfoService.cs",
-      "max": 2530
+      "id": "src/Kumunita.Core/UserInfo/GroupService.cs",
+      "max": 705
+    },
+    {
+      "id": "src/Kumunita.Core/UserInfo/GuardianService.cs",
+      "max": 771
     },
     {
       "id": "src/Kumunita.Web/Controllers/AdminController.cs",
@@ -72,7 +76,7 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/EventController.cs",
-      "max": 1244
+      "max": 1248
     },
     {
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs",
@@ -92,7 +96,7 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/ProjectsController.cs",
-      "max": 3186
+      "max": 3190
     }
   ],
   "methods": [
@@ -102,7 +106,7 @@
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Authorization/AuthorizationService.cs::Kumunita.Core.Authorization.AuthorizationService.Decide(IAuditableResource,string,string,IReadOnlySet\u003Cstring\u003E,IReadOnlySet\u003Cstring\u003E,bool,bool,IReadOnlySet\u003Cstring\u003E)",
+      "id": "src/Kumunita.Core/Authorization/AuthorizationService.cs::Kumunita.Core.Authorization.AuthorizationService.Decide(IAuditableResource,string,string,IReadOnlySet<string>,IReadOnlySet<string>,bool,bool,IReadOnlySet<string>)",
       "max": 51,
       "cc_max": 20
     },
@@ -122,28 +126,28 @@
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.SeedDefaultPagesAsync(IDocumentSession,IReadOnlyList\u003C(string Slug, string Title, string Body)\u003E,DateTimeOffset,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.SeedDefaultPagesAsync(IDocumentSession,IReadOnlyList<(string Slug, string Title, string Body)>,DateTimeOffset,CancellationToken)",
       "max": 89,
       "cc_max": 11
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.BackfillSampleCorpusAsync(AppDbContext,IDocumentStore,UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.BackfillSampleCorpusAsync(AppDbContext,IDocumentStore,UserManager<User>,RoleManager<IdentityRole>,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
       "max": 782,
       "cc_max": 128
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.EnsureUserAsync(UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IDocumentStore,string,string?,string,bool,string?,string?,string?,bool,ILogger,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.EnsureUserAsync(UserManager<User>,RoleManager<IdentityRole>,IDocumentStore,string,string?,string,bool,string?,string?,string?,bool,ILogger,CancellationToken)",
       "max": 69,
       "cc_max": 23
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.SeedAsync(AppDbContext,IDocumentStore,UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.SeedAsync(AppDbContext,IDocumentStore,UserManager<User>,RoleManager<IdentityRole>,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
       "max": 615,
       "cc_max": 83
     },
     {
       "id": "src/Kumunita.Core/DependencyInjection.cs::Kumunita.Core.ServiceCollectionExtensions.AddKumunitaCore(IServiceCollection)",
-      "max": 160,
+      "max": 168,
       "cc_max": 1
     },
     {
@@ -157,7 +161,7 @@
       "cc_max": 29
     },
     {
-      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.UpdateAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateEventRequest,CancellationToken)",
+      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.UpdateAsync(string,string,IReadOnlySet<string>,UpdateEventRequest,CancellationToken)",
       "max": 97,
       "cc_max": 32
     },
@@ -172,7 +176,7 @@
       "cc_max": 15
     },
     {
-      "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService.DeleteCoreAsync(string,User,string,Authorization.AccessVia,System.Func\u003CIDocumentSession, DateTimeOffset, Task\u003E?)",
+      "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService.DeleteCoreAsync(string,User,string,Authorization.AccessVia,System.Func<IDocumentSession, DateTimeOffset, Task>?)",
       "max": 166,
       "cc_max": 23
     },
@@ -182,12 +186,12 @@
       "cc_max": 13
     },
     {
-      "id": "src/Kumunita.Core/Localization/TranslationBulkImporter.cs::Kumunita.Core.Localization.TranslationBulkImporter.Parse(string,IReadOnlySet\u003Cstring\u003E)",
+      "id": "src/Kumunita.Core/Localization/TranslationBulkImporter.cs::Kumunita.Core.Localization.TranslationBulkImporter.Parse(string,IReadOnlySet<string>)",
       "max": 60,
       "cc_max": 19
     },
     {
-      "id": "src/Kumunita.Core/Localization/TranslationProvider.cs::Kumunita.Core.Localization.TranslationProvider.ResolveChainAsync(string?,IReadOnlyCollection\u003Cstring\u003E?)",
+      "id": "src/Kumunita.Core/Localization/TranslationProvider.cs::Kumunita.Core.Localization.TranslationProvider.ResolveChainAsync(string?,IReadOnlyCollection<string>?)",
       "max": 51,
       "cc_max": 19
     },
@@ -222,27 +226,27 @@
       "cc_max": 33
     },
     {
-      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.CreateAsync(Page,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.CreateAsync(Page,string,IReadOnlySet<string>,IDocumentSession)",
       "max": 117,
       "cc_max": 30
     },
     {
-      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.MoveAsync(string,string?,string?,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.MoveAsync(string,string?,string?,string,IReadOnlySet<string>,IDocumentSession)",
       "max": 60,
       "cc_max": 21
     },
     {
-      "id": "src/Kumunita.Core/Portability/ImportOwnershipGuard.cs::Kumunita.Core.Portability.ImportOwnershipGuard.Check(string,object,string,Func\u003Cstring, string?\u003E,IReadOnlySet\u003Cstring\u003E?)",
+      "id": "src/Kumunita.Core/Portability/ImportOwnershipGuard.cs::Kumunita.Core.Portability.ImportOwnershipGuard.Check(string,object,string,Func<string, string?>,IReadOnlySet<string>?)",
       "max": 52,
       "cc_max": 24
     },
     {
-      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.ApplyAsync(Marten.IDocumentStore,KumunitaArchiveData,PortabilityImportMode,string?,Dictionary\u003Cstring, string\u003E?,CancellationToken)",
+      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.ApplyAsync(Marten.IDocumentStore,KumunitaArchiveData,PortabilityImportMode,string?,Dictionary<string, string>?,CancellationToken)",
       "max": 73,
       "cc_max": 35
     },
     {
-      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.RemapReferencesInArchive(KumunitaArchiveData,string,Dictionary\u003Cstring, string\u003E,string[])",
+      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.RemapReferencesInArchive(KumunitaArchiveData,string,Dictionary<string, string>,string[])",
       "max": 67,
       "cc_max": 24
     },
@@ -262,12 +266,12 @@
       "cc_max": 28
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ResolveAsync(string,UserPortabilityImportPlan,IReadOnlyList\u003CUserPortabilityEntityResolution\u003E,Stream?,CancellationToken)",
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ResolveAsync(string,UserPortabilityImportPlan,IReadOnlyList<UserPortabilityEntityResolution>,Stream?,CancellationToken)",
       "max": 251,
       "cc_max": 70
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ScopeRowHoldsSeat(object,UserScopeEntry,string,IReadOnlySet\u003Cstring\u003E?,IReadOnlySet\u003Cstring\u003E?)",
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ScopeRowHoldsSeat(object,UserScopeEntry,string,IReadOnlySet<string>?,IReadOnlySet<string>?)",
       "max": 39,
       "cc_max": 20
     },
@@ -277,12 +281,12 @@
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreatePostAsync(PostDraft,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreatePostAsync(PostDraft,string,IReadOnlySet<string>,IDocumentSession)",
       "max": 90,
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreateReplyAsync(string,string,string,IDocumentSession,string?,IReadOnlyList\u003Cstring\u003E?)",
+      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreateReplyAsync(string,string,string,IDocumentSession,string?,IReadOnlyList<string>?)",
       "max": 65,
       "cc_max": 16
     },
@@ -292,32 +296,32 @@
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.CreateTodoCommentAsync(string,string,IReadOnlySet\u003Cstring\u003E,string,string?,string?,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.CreateTodoCommentAsync(string,string,IReadOnlySet<string>,string,string?,string?,CancellationToken)",
       "max": 68,
       "cc_max": 18
     },
     {
-      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.MoveTodoToAdjacentLaneAsync(string,string,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.MoveTodoToAdjacentLaneAsync(string,string,string,IReadOnlySet<string>,CancellationToken)",
       "max": 62,
       "cc_max": 19
     },
     {
-      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.MoveTodoToLanePositionAsync(string,string,int,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.MoveTodoToLanePositionAsync(string,string,int,string,IReadOnlySet<string>,CancellationToken)",
       "max": 77,
       "cc_max": 22
     },
     {
-      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateLaneAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateLaneRequest,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateLaneAsync(string,string,IReadOnlySet<string>,UpdateLaneRequest,CancellationToken)",
       "max": 33,
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateProjectAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateProjectRequest,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateProjectAsync(string,string,IReadOnlySet<string>,UpdateProjectRequest,CancellationToken)",
       "max": 55,
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateTodoAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateTodoRequest,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateTodoAsync(string,string,IReadOnlySet<string>,UpdateTodoRequest,CancellationToken)",
       "max": 116,
       "cc_max": 46
     },
@@ -332,17 +336,17 @@
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToDocumentAsync(string,IReadOnlyList\u003Cstring\u003E,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToDocumentAsync(string,IReadOnlyList<string>,string,IReadOnlySet<string>,IDocumentSession)",
       "max": 82,
       "cc_max": 9
     },
     {
-      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToPageAsync(string,IReadOnlyList\u003Cstring\u003E,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToPageAsync(string,IReadOnlyList<string>,string,IReadOnlySet<string>,IDocumentSession)",
       "max": 82,
       "cc_max": 11
     },
     {
-      "id": "src/Kumunita.Core/UserInfo/UserInfoService.cs::Kumunita.Core.UserInfo.UserInfoService.UpdateCommunityAsync(string,string?,string?,int?,bool?,bool?,string)",
+      "id": "src/Kumunita.Core/UserInfo/CommunityMembershipService.cs::Kumunita.Core.UserInfo.CommunityMembershipService.UpdateCommunityAsync(string,string?,string?,int?,bool?,bool?,string)",
       "max": 36,
       "cc_max": 16
     },
@@ -419,7 +423,7 @@
     {
       "id": "src/Kumunita.Web/Controllers/HomeController.cs::Kumunita.Web.Controllers.HomeController.BuildPostRowsAsync(string?,string?)",
       "max": 65,
-      "cc_max": 20
+      "cc_max": 22
     },
     {
       "id": "src/Kumunita.Web/Controllers/HomeController.cs::Kumunita.Web.Controllers.HomeController.Index()",
@@ -507,7 +511,7 @@
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.ProjectRow(TodoItem,TodoItem?,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlySet\u003Cstring\u003E,IReadOnlyCollection\u003Cstring\u003E)",
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.ProjectRow(TodoItem,TodoItem?,IReadOnlyDictionary<string, string>,IReadOnlyDictionary<string, string>,IReadOnlyDictionary<string, string>,IReadOnlySet<string>,IReadOnlyCollection<string>)",
       "max": 49,
       "cc_max": 16
     },
@@ -552,7 +556,7 @@
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Web/Localization/AccountValidationLocalizer.cs::Kumunita.Web.Localization.AccountValidationLocalizer.Rewrite(ModelError,string,string,System.Collections.Generic.IReadOnlyDictionary\u003Cstring, string\u003E,Type,string,ITranslationProvider)",
+      "id": "src/Kumunita.Web/Localization/AccountValidationLocalizer.cs::Kumunita.Web.Localization.AccountValidationLocalizer.Rewrite(ModelError,string,string,System.Collections.Generic.IReadOnlyDictionary<string, string>,Type,string,ITranslationProvider)",
       "max": 53,
       "cc_max": 16
     },
@@ -562,7 +566,7 @@
       "cc_max": 29
     },
     {
-      "id": "src/Kumunita.Web/Security/MentionRenderer.cs::Kumunita.Web.Security.MentionRenderer.Render(string?,IReadOnlyDictionary\u003Cstring, string\u003E?)",
+      "id": "src/Kumunita.Web/Security/MentionRenderer.cs::Kumunita.Web.Security.MentionRenderer.Render(string?,IReadOnlyDictionary<string, string>?)",
       "max": 54,
       "cc_max": 18
     },
@@ -592,10 +596,6 @@
     {
       "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService",
       "max": 65
-    },
-    {
-      "id": "src/Kumunita.Core/UserInfo/UserInfoService.cs::Kumunita.Core.UserInfo.UserInfoService",
-      "max": 86
     },
     {
       "id": "src/Kumunita.Web/Controllers/AdminController.cs::Kumunita.Web.Controllers.AdminController",
@@ -632,8 +632,9 @@
       "max": 58
     },
     {
-      "id": "src/Kumunita.Core/UserInfo/IUserInfoService.cs::Kumunita.Core.UserInfo.IUserInfoService",
-      "max": 86
+      "id": "src/Kumunita.Core/UserInfo/IGroupService.cs::Kumunita.Core.UserInfo.IGroupService",
+      "max": 25,
+      "adr": "0286"
     }
   ],
   "views": [
@@ -2739,7 +2740,7 @@
       "from": "UserInfo",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 1
+      "count": 5
     },
     {
       "from": "UserInfo",
@@ -2751,7 +2752,7 @@
       "from": "UserInfo",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 1
+      "count": 4
     },
     {
       "from": "UserInfo",

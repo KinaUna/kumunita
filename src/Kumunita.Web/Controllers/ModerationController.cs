@@ -119,7 +119,7 @@ namespace Kumunita.Web.Controllers;
 [Route("moderation")]
 public sealed class ModerationController(
     IDocumentStore store,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IProfileSettingsService profileSettings,
     ModerationService moderation) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
@@ -208,7 +208,7 @@ public sealed class ModerationController(
         // scope (the C-M3b·4 "no fabricated component" shape).
         if (!isGlobalAdmin && isStanding)
         {
-            var myComponents = (await userInfo
+            var myComponents = (await profileSettings
                 .GetAssignmentsAsync(actor)
                 .ConfigureAwait(false))
                 .Where(a => a.ComponentId is not null)
@@ -750,7 +750,7 @@ public sealed class ModerationController(
     private async Task<bool> IsInActorScopeAsync(IDocumentSession session, string actor, string? componentId)
     {
         if (componentId is null) return false;   // C-M3b·4 "no fabricated component"
-        var assignments = await userInfo.GetAssignmentsAsync(actor).ConfigureAwait(false);
+        var assignments = await profileSettings.GetAssignmentsAsync(actor).ConfigureAwait(false);
         if (!assignments.Any(a => a.ComponentId == componentId))
             return false;
         var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);

@@ -510,7 +510,7 @@ public class AttachmentOwnershipTests(PostgresFixture fixture) : IClassFixture<P
     private static AnnouncementService AnnouncementsSvc(IDocumentStore store)
     {
         var userInfo = new UserInfoService(store);
-        return new AnnouncementService(store, userInfo);
+        return new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
     }
 
     private static Audience Audience(GrantKind kind, string id)

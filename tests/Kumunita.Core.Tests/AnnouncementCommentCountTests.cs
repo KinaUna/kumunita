@@ -63,7 +63,7 @@ public class AnnouncementCommentCountTests(PostgresFixture fixture) : IClassFixt
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
-        return (store, new AnnouncementService(store, new UserInfoService(store)));
+        return (store, new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store)));
     }
 
     private static async Task Plant(IDocumentStore store, object document)

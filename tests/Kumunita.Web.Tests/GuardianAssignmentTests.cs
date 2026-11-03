@@ -611,7 +611,7 @@ public sealed class GuardianAssignmentTests(PostgresFixture fixture) : IClassFix
         identity.FindSubjectByEmailAsync(Arg.Any<string>())
             .Returns((string?)null);
 
-        var controller = new GuardianController(userInfo, identity, store);
+        var controller = new GuardianController(userInfo, Substitute.For<IGroupService>(), new GuardianService(store), Substitute.For<IProfileSettingsService>(), identity, store);
 
         // The ClaimsPrincipal — the actor's subject id via the Kumunita.Sub
         // claim (KumunitaPrincipal.SubjectId reads this). Use the Kumunita

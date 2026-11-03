@@ -46,6 +46,8 @@ namespace Kumunita.Core.Targets;
 public sealed class ContentTargetResolver : IContentTargetResolver
 {
     private readonly IUserInfoService _userInfo;
+    // C07 (ADR 0286) — the IGroupService sibling (GetGroupsForUserAsync's owner).
+    private readonly IGroupService _groupService;
     private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
     private readonly IAnnouncementService _announcements;
@@ -56,6 +58,7 @@ public sealed class ContentTargetResolver : IContentTargetResolver
 
     public ContentTargetResolver(
         IUserInfoService userInfo,
+        IGroupService groupService,
         IAuthorizationService authz,
         IDocumentStore store,
         IAnnouncementService announcements,
@@ -65,6 +68,7 @@ public sealed class ContentTargetResolver : IContentTargetResolver
         IIdentityService identity)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _announcements = announcements ?? throw new ArgumentNullException(nameof(announcements));
@@ -330,7 +334,7 @@ public sealed class ContentTargetResolver : IContentTargetResolver
     {
         if (targetId == ContentTargetKinds.PageGroupStaticId)
             return (true, "Groups", "/groups");
-        var groups = await _userInfo.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
+        var groups = await _groupService.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
         var g = groups.FirstOrDefault(gr => gr.Id == targetId);
         if (g is null)
             return (false, null, null);
@@ -470,7 +474,7 @@ public sealed class ContentTargetResolver : IContentTargetResolver
     {
         if (targetId == ContentTargetKinds.PageGroupStaticId)
             return ("Groups", "/groups");
-        var groups = await _userInfo.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
+        var groups = await _groupService.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
         var g = groups.FirstOrDefault(gr => gr.Id == targetId);
         if (g is null)
             return (null, null);

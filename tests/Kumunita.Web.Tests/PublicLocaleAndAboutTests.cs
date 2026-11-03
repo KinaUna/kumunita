@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Kumunita.Core;
 using Kumunita.Core.Localization;
+using Kumunita.Core.UserInfo;
 using Kumunita.Core.Pages;
 using Kumunita.Web.Controllers;
 using Marten;
@@ -230,7 +231,7 @@ public class PublicLocaleAndAboutTests
             .Returns(Task.FromResult(settings));
         store.QuerySession().Returns(readSession);
 
-        var controller = new LocaleController(localization, userInfo, store);
+        var controller = new LocaleController(localization, userInfo, Substitute.For<IProfileSettingsService>(), store);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         return controller;
     }

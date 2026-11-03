@@ -154,9 +154,10 @@ public class M7PagerWiringTests
             .Returns(new List<Event>());
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync("subj-author-001")
             .Returns((Profile?)new() { SubjectId = "subj-author-001", DisplayName = "Ada" });
-        userInfo.GetComponentsAsync(true)
+        profileSettings.GetComponentsAsync(true)
             .Returns(new List<Component> { new() { Id = componentId, Name = "Community A" } });
 
         var localization = Substitute.For<ILocalizationService>();
@@ -164,7 +165,7 @@ public class M7PagerWiringTests
         localization.GetDefaultLanguageCodeAsync().Returns("en");
 
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
-        var controller = new EventController(events, userInfo, localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(events, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, Substitute.For<IDocumentStore>(), timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         controller.ControllerContext.HttpContext.User =
             new System.Security.Claims.ClaimsPrincipal(
