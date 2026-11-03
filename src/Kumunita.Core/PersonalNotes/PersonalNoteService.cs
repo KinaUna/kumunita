@@ -7,6 +7,7 @@ using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
+using Kumunita.Core.Targets;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -76,14 +77,8 @@ public sealed class PersonalNoteService : IPersonalNoteService
          "page-events", "page-projects", "page-project",
          "page-todos", "page-boards", "page-inventory", "page-documents"];
 
-    private readonly IUserInfoService _userInfo;
-    private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
-    private readonly IEventService _events;
-    private readonly IProjectService _projects;
-    private readonly IAnnouncementService _announcements;
-    private readonly IInventoryService _inventory;
-    private readonly IIdentityService _identity;
+    private readonly IContentTargetResolver _resolver;
 
     /// <summary>
     /// Composes the frozen seams over the host-registered Marten
@@ -96,29 +91,11 @@ public sealed class PersonalNoteService : IPersonalNoteService
     /// new surface (C-M37·1).
     /// </summary>
     public PersonalNoteService(
-        IUserInfoService userInfo,
-        IAuthorizationService authz,
         IDocumentStore store,
-        IEventService events,
-        IProjectService projects,
-        IAnnouncementService announcements,
-        IInventoryService inventory,
-        IIdentityService identity)
+        IContentTargetResolver resolver)
     {
-        _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
-        _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _events = events ?? throw new ArgumentNullException(nameof(events));
-        _projects = projects ?? throw new ArgumentNullException(nameof(projects));
-        // ADR 0167 D1 (extension) — the announcement lane's two seams, the
-        // M17 BookmarkService shape (ADR 0118 D3/F2 obs-4): the frozen
-        // IAnnouncementService (the detail page's own read) + the frozen
-        // IIdentityService (the owner's real standing — the roles never
-        // cross the IPersonalNoteService seam; the same composition
-        // category as the already-composed IUserInfoService).
-        _announcements = announcements ?? throw new ArgumentNullException(nameof(announcements));
-        _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
-        _identity = identity ?? throw new ArgumentNullException(nameof(identity));
+        _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
     }
 
     // ── CreateNoteAsync (D3 write-lane check; F1 idempotent) ──────────────
@@ -144,7 +121,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         // / soft-deleted ⇒ throw (404; no row; the target's own audit row is
         // the decision's, not M37's).
         var (visible, title, link) =
-            await ResolveTargetAsync(targetKind, targetId, ownerId).ConfigureAwait(false);
+            await _resolver.ResolveAsync(targetKind, targetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         if (!visible)
             throw new KeyNotFoundException($"Target '{targetId}' is not visible to the actor.");
 
@@ -202,7 +179,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
             throw new KeyNotFoundException($"Note '{noteId}' not found for owner '{ownerId}'.");
 
         var (title, link) =
-            await ResolveForListAsync(note.TargetKind, note.TargetId, ownerId).ConfigureAwait(false);
+            await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         return ToNoteRow(note, title, link);
     }
 
@@ -234,7 +211,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         foreach (var note in notes)
         {
             var (title, link) =
-                await ResolveForListAsync(note.TargetKind, note.TargetId, ownerId).ConfigureAwait(false);
+                await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
             resolved.Add((note, title, link));
         }
 
@@ -309,7 +286,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         session.Store(note);
 
         var (title, link) =
-            await ResolveForListAsync(note.TargetKind, note.TargetId, ownerId).ConfigureAwait(false);
+            await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         return ToNoteRow(note, title, link);
     }
 
@@ -365,7 +342,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         }
 
         var (title, link) =
-            await ResolveForListAsync(note.TargetKind, note.TargetId, ownerId).ConfigureAwait(false);
+            await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         return ToNoteRow(note, title, link);
     }
 
@@ -393,7 +370,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         }
 
         var (title, link) =
-            await ResolveForListAsync(note.TargetKind, note.TargetId, ownerId).ConfigureAwait(false);
+            await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         return ToNoteRow(note, title, link);
     }
 
@@ -447,7 +424,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         // mechanism as the list read — C-M37·2). A dead / hidden target
         // degrades to (null, null); the body remains visible (D4).
         var (title, link) =
-            await ResolveForListAsync(note.TargetKind, note.TargetId, ownerId).ConfigureAwait(false);
+            await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         return ToNoteRow(note, title, link);
     }
 
@@ -626,7 +603,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         session.Store(note);
 
         var (title, link) =
-            await ResolveForListAsync(note.TargetKind, note.TargetId, ownerId).ConfigureAwait(false);
+            await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         return ToNoteRow(note, title, link);
     }
 
@@ -706,530 +683,5 @@ public sealed class PersonalNoteService : IPersonalNoteService
         return input.Trim().ToLowerInvariant();
     }
 
-    /// <summary>
-    /// The D7 degraded-resolution mechanism (design doc §2.4) — a **pure,
-    /// non-auditing doc load** that commits <b>no</b>
-    /// <see cref="Authorization.AccessAudit"/> row and makes <b>no</b>
-    /// <see cref="IAuthorizationService.CanAsync"/> call (C-M37·2 /
-    /// <c>F3_OwnerList_ZeroAuditRows_ZeroCanSeeAsyncPasses</c>, the ADR 0105
-    /// "reads never audit" + M6-inbox personal-read shape). Both return
-    /// <c>null</c> when the target is absent, soft-deleted, or a non-author
-    /// draft (the D7 degrade — C-M37·5).
-    /// <para>
-    /// This is deliberately distinct from the D3 write-lane check
-    /// (<see cref="ResolveTargetAsync"/>): the write lane re-runs the target's
-    /// own frozen <c>CanAsync(Read)</c> (the detail page's exact decision),
-    /// which commits the target's own audit row. That is correct and expected
-    /// at note *creation* (C-M37·3), but would violate the list's zero-audit
-    /// pin if reused here — so the list resolves by document shape alone
-    /// (existence + not-deleted + draft-to-own), which is exactly the
-    /// information a note row needs to render a <c>Title</c> and a <c>Link</c>.
-    /// </para>
-    /// </summary>
-    private async Task<(string? Title, string? Link)> ResolveForListAsync(
-        string targetKind, string targetId, string ownerId)
-    {
-        await using var s = _store.QuerySession();
-        switch (targetKind)
-        {
-            case "post":
-            {
-                var post = await s.LoadAsync<Post>(targetId).ConfigureAwait(false);
-                if (post is null || post.DeletedAt is not null)
-                    return (null, null);
-                // ADR 0037 — the author-only draft gate, as a pure ordinal
-                // check (no CanAsync, no audit row).
-                if (post.IsDraft && !string.Equals(post.AuthorId, ownerId, StringComparison.Ordinal))
-                    return (null, null);
-                return (post.Title, $"/posts/{targetId}");
-            }
 
-            case "grouppost":
-            {
-                var post = await s.LoadAsync<Post>(targetId).ConfigureAwait(false);
-                if (post is null || post.DeletedAt is not null)
-                    return (null, null);
-                if (post.IsDraft && !string.Equals(post.AuthorId, ownerId, StringComparison.Ordinal))
-                    return (null, null);
-                return (post.Title, $"/groups/{post.GroupId}/posts/{targetId}");
-            }
-
-            case "event":
-            {
-                var ev = await s.LoadAsync<Event>(targetId).ConfigureAwait(false);
-                if (ev is null || ev.IsDeleted)
-                    return (null, null);
-                if (ev.IsDraft && !string.Equals(ev.AuthorId, ownerId, StringComparison.Ordinal))
-                    return (null, null);
-                return (ev.Title, $"/events/{targetId}");
-            }
-
-            case "page":
-            {
-                var page = await s.LoadAsync<Page>(targetId).ConfigureAwait(false);
-                if (page is null || page.IsDeleted)
-                    return (null, null);
-                if (page.IsDraft && !string.Equals(page.AuthorId, ownerId, StringComparison.Ordinal))
-                    return (null, null);
-                var path = await BuildPagePathAsync(s, page.Id).ConfigureAwait(false);
-                return path is null ? (null, null) : (page.Title, path);
-            }
-
-            case "project":
-            {
-                var project = await s.LoadAsync<Project>(targetId).ConfigureAwait(false);
-                if (project is null || project.IsDeleted)
-                    return (null, null);
-                return (project.Title, $"/projects/{targetId}");
-            }
-
-            case "todo":
-            {
-                var todo = await s.LoadAsync<TodoItem>(targetId).ConfigureAwait(false);
-                if (todo is null || todo.IsDeleted)
-                    return (null, null);
-                return (todo.Title, $"/projects/todos/{targetId}");
-            }
-
-            case "board":
-            {
-                var board = await s.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
-                if (board is null || board.IsDeleted)
-                    return (null, null);
-                return (board.Title, $"/projects/boards/{targetId}");
-            }
-
-            case "document":
-            {
-                var doc = await s.LoadAsync<Document>(targetId).ConfigureAwait(false);
-                // ADR 0239 D4 — a soft-deleted document is dangling (the note's
-                // "document" reference is gone — the same shape the post /
-                // project / board / page / todo / announcement targets already
-                // use when their record is <c>IsDeleted</c> /
-                // <c>DeletedAt != null</c>).
-                if (doc is null || doc.DeletedAt is not null)
-                    return (null, null);
-                return (doc.Title, $"/documents/{targetId}");
-            }
-
-            case "directory":
-            {
-                var profile = await _userInfo.GetProfileAsync(targetId).ConfigureAwait(false);
-                if (profile is null || profile.Blocked)
-                    return (null, null);
-                return (profile.DisplayName, $"/directory/{targetId}");
-            }
-
-            case "announcement":
-            {
-                var a = await s.LoadAsync<Announcement>(targetId).ConfigureAwait(false);
-                if (a is null)
-                    return (null, null);
-                // ADR 0037 — the author-only draft gate (the M17 BookmarkService
-                // announcement shape, re-applied; a pure ordinal check — no
-                // CanAsync, no audit row).
-                if (a.IsDraft && !string.Equals(a.AuthorId, ownerId, StringComparison.Ordinal))
-                    return (null, null);
-                return (a.Title, $"/announcements/{targetId}");
-            }
-
-            case "inventory":
-            {
-                var item = await s.LoadAsync<InventoryItem>(targetId).ConfigureAwait(false);
-                if (item is null || item.IsDeleted)
-                    return (null, null);
-                return (item.Name, $"/inventory/{targetId}");
-            }
-
-            // ── 2026-10-25 page-level notes lane (ADR 0167 amendment) ──
-            // The static page kinds are always visible (the page itself is the
-            // surface — no item-level visibility to re-check); the dynamic
-            // page-group / page-project kinds re-run the owning surface's own
-            // frozen read (the same call the detail page uses) so a group /
-            // project the owner can no longer see degrades to the generic
-            // "no longer available" label (the D7 pin — the body remains
-            // visible, the pointer does not).
-
-            case "page-announcements":
-                return ("Announcements", "/announcements");
-
-            case "page-community":
-                return ("Community", "/community");
-
-            case "page-events":
-                return ("Events", "/events");
-
-            case "page-projects":
-                return ("Projects", "/projects");
-
-            case "page-todos":
-                return ("To-dos", "/projects/todos");
-
-            case "page-boards":
-                return ("Boards", "/projects/boards");
-
-            case "page-inventory":
-                return ("Inventory", "/inventory");
-
-            case "page-documents":
-                return ("Documents", "/documents");
-
-            case "page-group":
-            {
-                // The groups surface. Two shapes, distinguished by the
-                // target id:
-                //   - "static" — the /groups index page (always visible,
-                //     fixed title + link).
-                //   - a real group id — the /groups/{id} detail page (re-run
-                //     the owning surface's own frozen read; the group the
-                //     owner can no longer see degrades to the generic
-                //     "no longer available" label — the D7 pin, the body
-                //     remains visible, the pointer does not).
-                if (targetId == "static")
-                    return ("Groups", "/groups");
-                var groups = await _userInfo.GetGroupsForUserAsync(ownerId).ConfigureAwait(false);
-                var g = groups.FirstOrDefault(gr => gr.Id == targetId);
-                if (g is null)
-                    return (null, null);
-                return (g.Name, $"/groups/{targetId}");
-            }
-
-            case "page-project":
-            {
-                var project = await s.LoadAsync<Project>(targetId).ConfigureAwait(false);
-                if (project is null || project.IsDeleted)
-                    return (null, null);
-                return (project.Title, $"/projects/projects/{targetId}");
-            }
-
-            default:
-                return (null, null);
-        }
-    }
-
-    /// <summary>
-    /// The D3 write-lane resolution (design doc §2.3) — the owning surface's
-    /// own frozen read, re-run **the same way the target's own detail page
-    /// reads it**. <c>title</c> / <c>link</c> are both <c>null</c> when the
-    /// target is absent, soft-deleted, a non-author draft, or denied to the
-    /// actor. Re-runs the target's own frozen <c>CanAsync(Read)</c> (committing
-    /// the target's own audit row — C-M37·3); NOT used by the personal list
-    /// read (C-M37·2).
-    /// </summary>
-    private async Task<(bool Visible, string? Title, string? Link)> ResolveTargetAsync(
-        string targetKind, string targetId, string actorId)
-    {
-        switch (targetKind)
-        {
-            case "post":
-            {
-                await using var s = _store.QuerySession();
-                var post = await s.LoadAsync<Post>(targetId).ConfigureAwait(false);
-                if (post is null || post.DeletedAt is not null)
-                    return (false, null, null);
-                if (post.IsDraft && !string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
-                    return (false, null, null);
-                var decision = await _authz.CanAsync(
-                    actorId, AccessAction.Read, new PostToAuditableResource(post))
-                    .ConfigureAwait(false);
-                if (!decision.Allowed)
-                    return (false, null, null);
-                return (true, post.Title, $"/posts/{targetId}");
-            }
-
-            case "grouppost":
-            {
-                await using var s = _store.QuerySession();
-                var post = await s.LoadAsync<Post>(targetId).ConfigureAwait(false);
-                if (post is null || post.DeletedAt is not null)
-                    return (false, null, null);
-                if (string.IsNullOrEmpty(post.GroupId))
-                    return (false, null, null); // not a group post
-                if (post.IsDraft && !string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
-                    return (false, null, null);
-                var decision = await _authz.CanSeeGroupAsync(actorId, post.GroupId, targetId)
-                    .ConfigureAwait(false);
-                if (!decision.Allowed)
-                    return (false, null, null);
-                return (true, post.Title, $"/groups/{post.GroupId}/posts/{targetId}");
-            }
-
-            case "event":
-            {
-                try
-                {
-                    var ev = await _events.GetAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, ev.Title, $"/events/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "page":
-            {
-                await using var s = _store.QuerySession();
-                var page = await s.LoadAsync<Page>(targetId).ConfigureAwait(false);
-                if (page is null || page.IsDeleted)
-                    return (false, null, null);
-                if (page.IsDraft && !string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
-                    return (false, null, null);
-                var decision = await _authz.CanAsync(
-                    actorId, AccessAction.Read, new PageToAuditableResource(page))
-                    .ConfigureAwait(false);
-                if (!decision.Allowed)
-                    return (false, null, null);
-                var path = await BuildPagePathAsync(s, page.Id).ConfigureAwait(false);
-                return path is null ? (false, null, null) : (true, page.Title, path);
-            }
-
-            case "project":
-            {
-                try
-                {
-                    var project = await _projects.GetProjectAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, project.Title, $"/projects/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "todo":
-            {
-                try
-                {
-                    var detail = await _projects.GetTodoAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, detail.Todo.Title, $"/projects/todos/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "board":
-            {
-                try
-                {
-                    var detail = await _projects.GetBoardAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, detail.Board.Title, $"/projects/boards/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "document":
-            {
-                await using var s = _store.QuerySession();
-                var doc = await s.LoadAsync<Document>(targetId).ConfigureAwait(false);
-                // ADR 0239 D4 — a soft-deleted document is dangling (the
-                // note's "document" reference is gone); the decision below
-                // does not run (a missing record is indistinguishable from
-                // a denied one — the ADR 0122 D7 posture).
-                if (doc is null || doc.DeletedAt is not null)
-                    return (false, null, null);
-                var decision = await _authz.CanAsync(
-                    actorId, AccessAction.Read, new DocumentToAuditableResource(doc))
-                    .ConfigureAwait(false);
-                if (!decision.Allowed)
-                    return (false, null, null);
-                return (true, doc.Title, $"/documents/{targetId}");
-            }
-
-            case "directory":
-            {
-                var profile = await _userInfo.GetProfileAsync(targetId).ConfigureAwait(false);
-                if (profile is null || profile.Blocked)
-                    return (false, null, null);
-                var decision = await _authz.CanAsync(
-                    actorId, AccessAction.Read, new ProfileToAuditableResource(profile))
-                    .ConfigureAwait(false);
-                if (!decision.Allowed)
-                    return (false, null, null);
-                return (true, profile.DisplayName, $"/directory/{targetId}");
-            }
-
-            case "announcement":
-            {
-                // The announcement lane has no AccessAudit / CanAsync of its
-                // own — its GetAsync is the whole visibility gate (the
-                // scope-vs-role split), returning null when not visible.
-                //
-                // ADR 0167 D1 (extension, the M17 BookmarkService shape, ADR
-                // 0118 D3/F2 obs-4): the write-lane check must re-run *the
-                // same read the detail page uses*, so the owner's real
-                // standing is in play. The PersonalNotes seam hands us only
-                // an owner id (roles never cross the frozen IPersonalNoteService
-                // seam), so we resolve the owner's thin-principal role set
-                // in-Core via the frozen IIdentityService (the same category
-                // of composition as the already-composed IUserInfoService)
-                // and hand that set to the announcement read. A GlobalAdmin /
-                // community-moderator who is not a member therefore resolves a
-                // community-targeted row — matching the detail page — instead
-                // of the old lapse of an empty role set denying them.
-                var principal = await _identity.GetBySubjectAsync(actorId).ConfigureAwait(false);
-                var roles = principal is not null
-                    ? new HashSet<string>(principal.Roles, StringComparer.Ordinal)
-                    : new HashSet<string>(StringComparer.Ordinal);
-                var a = await _announcements.GetAsync(targetId, actorId, roles)
-                    .ConfigureAwait(false);
-                if (a is null)
-                    return (false, null, null);
-                return (true, a.Title, $"/announcements/{targetId}");
-            }
-
-            case "inventory":
-            {
-                // ADR 0167 extension — the M16 Inventory detail page's own
-                // read, re-run: IInventoryService.GetItemAsync (the same
-                // call the /inventory/{id} detail page uses — the C-M37·3
-                // pin: the target's own audit row commits, M37 commits none
-                // of its own). KeyNotFoundException (404 on absent /
-                // soft-deleted / denied — the C-M3·4 non-leaky shape) and
-                // UnauthorizedAccessException both degrade to Refused.
-                try
-                {
-                    var item = await _inventory.GetItemAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, item.Name, $"/inventory/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            // ── 2026-10-25 page-level notes lane (ADR 0167 amendment) ──
-            // The static page kinds (page-announcements, page-community,
-            // page-events, page-projects, page-todos, page-boards,
-            // page-inventory, page-documents) are always visible — the page
-            // itself is the surface (no item-level visibility to re-check);
-            // the write-lane check is a closed-set membership + a fixed
-            // title + a fixed link. The targetId is the fixed page id
-            // ("static" for static pages, the group/project id for the
-            // dynamic page-group / page-project kinds).
-
-            case "page-announcements":
-                return (true, "Announcements", "/announcements");
-
-            case "page-community":
-                return (true, "Community", "/community");
-
-            case "page-events":
-                return (true, "Events", "/events");
-
-            case "page-projects":
-                return (true, "Projects", "/projects");
-
-            case "page-todos":
-                return (true, "To-dos", "/projects/todos");
-
-            case "page-boards":
-                return (true, "Boards", "/projects/boards");
-
-            case "page-inventory":
-                return (true, "Inventory", "/inventory");
-
-            case "page-documents":
-                return (true, "Documents", "/documents");
-
-            case "page-group":
-            {
-                // The groups surface. Two shapes, distinguished by the
-                // target id:
-                //   - "static" — the /groups index page (one page; the note
-                //     is about the index itself). Always visible, fixed
-                //     title + link (no group to look up).
-                //   - a real group id — the /groups/{id} detail page. Re-run
-                //     the owning surface's own frozen read (the same
-                //     GetGroupsForUserAsync the /groups/{id} controller uses
-                //     — the owner ∪ member gate). A group the actor cannot
-                //     see cannot be page-noted (the M16 create-gate posture
-                //     — the D3 write-lane check re-applied).
-                if (targetId == "static")
-                    return (true, "Groups", "/groups");
-                var groups = await _userInfo.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
-                var g = groups.FirstOrDefault(gr => gr.Id == targetId);
-                if (g is null)
-                    return (false, null, null);
-                return (true, g.Name, $"/groups/{targetId}");
-            }
-
-            case "page-project":
-            {
-                // The project's own page (the /projects/projects/{id} detail) —
-                // re-run the owning surface's own frozen read (the same
-                // IProjectService.GetProjectAsync the detail page uses).
-                try
-                {
-                    var p = await _projects.GetProjectAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, p.Title, $"/projects/projects/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            default:
-                return (false, null, null);
-        }
-    }
-
-    /// <summary>
-    /// The <c>/pages/</c>-prefixed ancestor-slug chain of a page (the
-    /// <see cref="PageService.GetByPathAsync"/> shape, walked over the store
-    /// — <c>IPageService</c> exposes no by-id path lane, so the note surface
-    /// derives the same derived path from the <see cref="Page.ParentId"/>
-    /// chain directly). <c>null</c> on a broken chain.
-    /// </summary>
-    private async Task<string?> BuildPagePathAsync(Marten.IQuerySession s, string pageId)
-    {
-        var segments = new List<string>();
-        string? currentId = pageId;
-        int guard = 0;
-        while (currentId is not null && ++guard <= 64)
-        {
-            var page = await s.LoadAsync<Page>(currentId).ConfigureAwait(false);
-            if (page is null)
-                return null;
-            if (!string.IsNullOrWhiteSpace(page.Slug))
-                segments.Add(page.Slug);
-            currentId = page.ParentId;
-        }
-
-        if (segments.Count == 0)
-            return null;
-
-        segments.Reverse();
-        return "/pages/" + string.Join("/", segments);
-    }
 }

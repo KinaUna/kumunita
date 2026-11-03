@@ -2,6 +2,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
 using Kumunita.Core.Portability;
+using Kumunita.Core.Targets;
 using Kumunita.Core.UserInfo;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -519,27 +520,28 @@ public static class ServiceCollectionExtensions
         // frozen seams (C-M17·1): the frozen IAuthorizationService (the D3
         // check only) + the owning surfaces' read seams (the D5 resolution).
         // **No** INotificationService (D7 — the nudge lane is §deferred).
-        services.AddTransient<Bookmarks.IBookmarkService>(sp => new Bookmarks.BookmarkService(
+        // IMPROVE-CODE C05 — the single content-target resolution seam (ADR 0118
+        // D3/D5 + ADR 0167 D1/D7). Replaces the four private clones
+        // (BookmarkService.ResolveTargetAsync/ResolveForListAsync and the
+        // PersonalNoteService twins). The resolver composes the same frozen
+        // seams the two services previously composed (IAuthorizationService +
+        // the owning surfaces' read seams + the host-registered Marten store),
+        // so the registration shape is identical. Both services now inject
+        // IContentTargetResolver (an interface — D6-legal) instead of
+        // re-implementing the kind switch.
+        services.AddTransient<IContentTargetResolver>(sp => new ContentTargetResolver(
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Announcements.IAnnouncementService>(),
-            sp.GetRequiredService<Pages.IPageService>(),
             sp.GetRequiredService<Events.IEventService>(),
             sp.GetRequiredService<Projects.IProjectService>(),
-            // ADR 0118 amendment (2026-10-16) — the M16 Inventory detail
-            // page's own read (the /inventory/{id} surface's frozen
-            // IInventoryService.GetItemAsync); the M37 PersonalNotes
-            // "inventory" D3 shape re-applied to the M17 surface.
             sp.GetRequiredService<Inventory.IInventoryService>(),
-            // ADR 0118 D3/F2 (obs-4 amendment): the frozen IIdentityService,
-            // used in-Core only to resolve the owner's real standing when the
-            // bookmark target is an announcement — so the D3 write-lane check
-            // re-runs the *same read the detail page uses*. Roles never cross
-            // the frozen IBookmarkService seam (the 3-method signature is
-            // unchanged); this is the same category of composition as the
-            // already-composed IUserInfoService.
             sp.GetRequiredService<IIdentityService>()));
+
+        services.AddTransient<Bookmarks.IBookmarkService>(sp => new Bookmarks.BookmarkService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IContentTargetResolver>()));
 
         // M37 (ADR 0167, plan U02): the personal-notes service seam (bounded
         // context Kumunita.Core.PersonalNotes — a personal-by-id record, D2).
@@ -550,20 +552,8 @@ public static class ServiceCollectionExtensions
         // the owning surfaces' read seams (the D7 resolution). **No**
         // INotificationService (§deferred — the nudge lane is its own ADR).
         services.AddTransient<PersonalNotes.IPersonalNoteService>(sp => new PersonalNotes.PersonalNoteService(
-            sp.GetRequiredService<IUserInfoService>(),
-            sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>(),
-            sp.GetRequiredService<Events.IEventService>(),
-            sp.GetRequiredService<Projects.IProjectService>(),
-            // ADR 0167 D1 (extension) — the announcement lane (the M17
-            // BookmarkService shape, ADR 0118 D3/F2 obs-4 re-applied): the
-            // detail page's own read + the owner's real standing.
-            sp.GetRequiredService<Announcements.IAnnouncementService>(),
-            // ADR 0167 extension — the M16 Inventory detail page's own read
-            // (the /inventory/{id} surface's frozen IInventoryService
-            // .GetItemAsync); the M37 "inventory" D3 shape.
-            sp.GetRequiredService<Inventory.IInventoryService>(),
-            sp.GetRequiredService<IIdentityService>()));
+            sp.GetRequiredService<IContentTargetResolver>()));
 
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"

@@ -58,16 +58,16 @@ public class BookmarkBatchReadTests(PostgresFixture fixture) : IClassFixture<Pos
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
-        var svc = new BookmarkService(
+        var resolver = new Kumunita.Core.Targets.ContentTargetResolver(
             Substitute.For<Kumunita.Core.UserInfo.IUserInfoService>(),
             Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>(),
             store,
             Substitute.For<Kumunita.Core.Announcements.IAnnouncementService>(),
-            Substitute.For<Kumunita.Core.Pages.IPageService>(),
             Substitute.For<Kumunita.Core.Events.IEventService>(),
             Substitute.For<Kumunita.Core.Projects.IProjectService>(),
             Substitute.For<Kumunita.Core.Inventory.IInventoryService>(),
             Substitute.For<Kumunita.Core.Identity.IIdentityService>());
+        var svc = new BookmarkService(store, resolver);
         return (store, svc);
     }
 

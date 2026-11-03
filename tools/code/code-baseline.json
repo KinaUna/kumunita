@@ -43,10 +43,6 @@
       "max": 977
     },
     {
-      "id": "src/Kumunita.Core/PersonalNotes/PersonalNoteService.cs",
-      "max": 788
-    },
-    {
       "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs",
       "max": 947
     },
@@ -111,16 +107,6 @@
       "cc_max": 20
     },
     {
-      "id": "src/Kumunita.Core/Bookmarks/BookmarkService.cs::Kumunita.Core.Bookmarks.BookmarkService.ResolveForListAsync(string,string,string)",
-      "max": 80,
-      "cc_max": 28
-    },
-    {
-      "id": "src/Kumunita.Core/Bookmarks/BookmarkService.cs::Kumunita.Core.Bookmarks.BookmarkService.ResolveTargetAsync(string,string,string)",
-      "max": 142,
-      "cc_max": 20
-    },
-    {
       "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.BackfillGuideTranslationsAsync(IDocumentSession,CancellationToken)",
       "max": 85,
       "cc_max": 22
@@ -157,7 +143,7 @@
     },
     {
       "id": "src/Kumunita.Core/DependencyInjection.cs::Kumunita.Core.ServiceCollectionExtensions.AddKumunitaCore(IServiceCollection)",
-      "max": 164,
+      "max": 160,
       "cc_max": 1
     },
     {
@@ -244,16 +230,6 @@
       "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.MoveAsync(string,string?,string?,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
       "max": 60,
       "cc_max": 21
-    },
-    {
-      "id": "src/Kumunita.Core/PersonalNotes/PersonalNoteService.cs::Kumunita.Core.PersonalNotes.PersonalNoteService.ResolveForListAsync(string,string,string)",
-      "max": 131,
-      "cc_max": 40
-    },
-    {
-      "id": "src/Kumunita.Core/PersonalNotes/PersonalNoteService.cs::Kumunita.Core.PersonalNotes.PersonalNoteService.ResolveTargetAsync(string,string,string)",
-      "max": 215,
-      "cc_max": 31
     },
     {
       "id": "src/Kumunita.Core/Portability/ImportOwnershipGuard.cs::Kumunita.Core.Portability.ImportOwnershipGuard.Check(string,object,string,Func\u003Cstring, string?\u003E,IReadOnlySet\u003Cstring\u003E?)",
@@ -860,78 +836,6 @@
       "from": "Authorization",
       "to": "UserInfo",
       "symbol": "ModeratorAssignment",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Announcements",
-      "symbol": "Announcement",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Events",
-      "symbol": "Event",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Identity",
-      "symbol": "Roles",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Inventory",
-      "symbol": "InventoryItem",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Pages",
-      "symbol": "Page",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Pages",
-      "symbol": "PageToAuditableResource",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Posts",
-      "symbol": "Post",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Posts",
-      "symbol": "PostToAuditableResource",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Projects",
-      "symbol": "KanbanBoard",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Projects",
-      "symbol": "Project",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "Projects",
-      "symbol": "TodoItem",
-      "count": 1
-    },
-    {
-      "from": "Bookmarks",
-      "to": "UserInfo",
-      "symbol": "ProfileToAuditableResource",
       "count": 1
     },
     {
@@ -2003,90 +1907,6 @@
       "count": 2
     },
     {
-      "from": "PersonalNotes",
-      "to": "Announcements",
-      "symbol": "Announcement",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Documents",
-      "symbol": "Document",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Documents",
-      "symbol": "DocumentToAuditableResource",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Events",
-      "symbol": "Event",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Identity",
-      "symbol": "Roles",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Inventory",
-      "symbol": "InventoryItem",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Pages",
-      "symbol": "Page",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Pages",
-      "symbol": "PageToAuditableResource",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Posts",
-      "symbol": "Post",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Posts",
-      "symbol": "PostToAuditableResource",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Projects",
-      "symbol": "KanbanBoard",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Projects",
-      "symbol": "Project",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "Projects",
-      "symbol": "TodoItem",
-      "count": 1
-    },
-    {
-      "from": "PersonalNotes",
-      "to": "UserInfo",
-      "symbol": "ProfileToAuditableResource",
-      "count": 1
-    },
-    {
       "from": "Portability",
       "to": "Announcements",
       "symbol": "Announcement",
@@ -2810,6 +2630,90 @@
       "from": "Tags",
       "to": "Query",
       "symbol": "TagPeopleSortSupport",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Documents",
+      "symbol": "Document",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Documents",
+      "symbol": "DocumentToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Inventory",
+      "symbol": "InventoryItem",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Pages",
+      "symbol": "PageToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Posts",
+      "symbol": "PostToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "Targets",
+      "to": "UserInfo",
+      "symbol": "ProfileToAuditableResource",
       "count": 1
     },
     {
