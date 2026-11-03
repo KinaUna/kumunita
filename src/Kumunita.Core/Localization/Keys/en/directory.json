@@ -1,0 +1,16 @@
+{
+  "directory.title": "Directory",
+  "directory.lead": "Everyone in the neighborhood \u2014 every resident on the platform.",
+  "directory.empty": "No residents on this neighborhood yet.",
+  "directory.no_results": "No residents match your search.",
+  "directory.search": "Search",
+  "directory.verified_only": "Verified only",
+  "directory.clear": "Clear",
+  "directory.detail_back": "\u2190 Back to the directory",
+  "directory.detail_verified": "Verified",
+  "directory.detail_contact_address": "Address",
+  "directory.detail_contact_email": "Email",
+  "directory.detail_contact_phone": "Phone",
+  "directory.detail_no_contact": "This resident hasn\u0027t shared a contact method with you (yet). You can still see their profile page.",
+  "directory.send_message": "Send a message"
+}

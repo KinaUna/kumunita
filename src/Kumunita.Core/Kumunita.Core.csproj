@@ -92,4 +92,25 @@
     <EmbeddedResource Include="Identity\disposable-emails.txt" />
   </ItemGroup>
 
+  <!-- C02 (ADR 0289) — the curated UI-string registry, per-language per-surface
+       JSON. `KnownTranslationKeys` (the ~60-line loader) enumerates these by the
+       `Kumunita.Core.Localization.Keys.{lang}.` prefix, so no explicit LogicalName
+       is required (the `disposable-emails.txt` precedent). The `en`/`de`/`fr`/`da`
+       sub-folders are one file per surface (the key's first dot-segment). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\Keys\**\*.json" />
+  </ItemGroup>
+
+  <!-- C02 (ADR 0289) — the seeded platform content: the resident guides
+       (`{slug}.md`, read by slug; the title is the body's first `## ` heading) and
+       the four-surface set (`{slug}.md` + an ordered `index.json` carrying the
+       display title), per language, plus the nested-guide `parent-map.json` (ADR 0160).
+       `FirstBootSeeder`'s `GuidePages()`/`DeGuidePages()`/... and
+       `EnDefaultPages()`/... methods load these; the seeding logic (the
+       `IsPristineAsync` gate, the upsert, the `en`-only first-boot rule) is unchanged. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Bootstrap\GuidePages\**\*.*" />
+    <EmbeddedResource Include="Bootstrap\DefaultPages\**\*.*" />
+  </ItemGroup>
+
 </Project>

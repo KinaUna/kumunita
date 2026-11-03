@@ -1,0 +1,10 @@
+{
+  "portability.index.title": "Portabilit\u00E9",
+  "portability.export": "Exporter",
+  "portability.import": "Importer",
+  "portability.confirm.import": "Importer cette archive ? Elle remplace le contenu de l\u0027instance (le chemin de restauration \u2014 la sauvegarde pr\u00E9-import de l\u0027op\u00E9rateur est le retour arri\u00E8re).",
+  "portability.import.keep_existing": "Conserver les comptes et contenus existants",
+  "portability.import.keep_existing_hint": "Non coch\u00E9e : l\u0027import remplace les comptes et contenus de cette instance. Coch\u00E9e : les comptes et contenus existants restent inchang\u00E9s, et seul ce qui est nouveau est ajout\u00E9.",
+  "portability.status.ok": "Termin\u00E9.",
+  "portability.status.failure": "Refus\u00E9e \u2014 l\u0027archive a \u00E9t\u00E9 rejet\u00E9e avant toute \u00E9criture :"
+}

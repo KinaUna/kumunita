@@ -1,0 +1,19 @@
+{
+  "search.nav": "S\u00F8g",
+  "search.title": "S\u00F8g",
+  "search.placeholder": "S\u00F8g i indl\u00E6g, arrangementer, sider, meddelelser, projekter, br\u00E6tter, to-dos, inventar, dokumenter og personer\u2026",
+  "search.no-results": "Ingen resultater for",
+  "search.section.posts": "Indl\u00E6g",
+  "search.section.events": "Arrangementer",
+  "search.section.pages": "Sider",
+  "search.section.announcements": "Meddelelser",
+  "search.section.projects": "Projekter",
+  "search.section.boards": "Br\u00E6tter",
+  "search.section.todos": "To-dos",
+  "search.section.inventory": "Inventar",
+  "search.section.documents": "Dokumenter",
+  "search.section.people": "Personer",
+  "search.scope.community": "F\u00E6llesskab",
+  "search.scope.groups": "Grupper",
+  "search.empty.hint": "Find indl\u00E6g, arrangementer, sider, meddelelser, projekter, br\u00E6tter, to-dos, inventar, dokumenter og personer efter tekst eller tag \u2014 kun indhold, du allerede kan l\u00E6se, vises."
+}

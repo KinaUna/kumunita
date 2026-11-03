@@ -1,0 +1,20 @@
+{
+  "about.cta.heading": "Questions, feedback, or a bug?",
+  "about.cta.write_to": "Write to",
+  "about.cta.person_reads": "\u2014 a person reads it.",
+  "about.cta.issue": "Open an issue on the repository \u2014 a person reads that too.",
+  "about.cta.button": "Open a conversation",
+  "about.eyebrow": "Private by default",
+  "about.lead": "One home for everything your neighborhood does \u2014 the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.",
+  "about.cta_feed": "See the feed",
+  "about.cta_notes": "Read the pinned notes",
+  "about.features.one.title": "One feed for the street",
+  "about.features.one.body": "Posts and threads from your blocks and lanes, in one quiet place \u2014 no algorithm, no noise.",
+  "about.features.groups.title": "Groups that fit",
+  "about.features.groups.body": "Garden swap, book club, street watch \u2014 a group for whatever the neighbourhood already does.",
+  "about.features.pinned.title": "Pinned where it matters",
+  "about.features.pinned.body": "Water cuts, roadworks, the new speed bumps \u2014 notes that stay put instead of scrolling away.",
+  "about.project.eyebrow": "Open source",
+  "about.project.heading": "The code, the decisions, the design docs",
+  "about.project.lead": "If you\u0027re curious how it works \u2014 or if you\u0027re about to host it for your neighbourhood \u2014 everything is public."
+}

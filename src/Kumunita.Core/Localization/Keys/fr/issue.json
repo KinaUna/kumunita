@@ -1,0 +1,11 @@
+{
+  "issue.title": "Signaler un probl\u00E8me",
+  "issue.intro": "Quelque chose ne fonctionne pas, ou un probl\u00E8me que nous devrions conna\u00EEtre ? Dites-nous ce qui s\u0027est pass\u00E9 \u2014 m\u00EAme s\u0027il n\u0027y a pas de page d\u0027erreur devant vous.",
+  "issue.description.label": "Quel est le probl\u00E8me ?",
+  "issue.description.placeholder": "p. ex. La page du calendrier du groupe est down, ou je ne peux pas me connecter",
+  "issue.email.label": "Votre e-mail (facultatif)",
+  "issue.email.placeholder": "vous@exemple.fr",
+  "issue.submit": "Envoyer le signalement",
+  "issue.thanks": "Merci \u2014 votre signalement a \u00E9t\u00E9 enregistr\u00E9.",
+  "issue.nav": "Signaler un probl\u00E8me"
+}

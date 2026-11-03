@@ -1,0 +1,19 @@
+{
+  "search.nav": "Suche",
+  "search.title": "Suche",
+  "search.placeholder": "Beitr\u00E4ge, Events, Seiten, Ank\u00FCndigungen, Projekte, Boards, To-dos, Inventar, Dokumente und Personen durchsuchen\u2026",
+  "search.no-results": "Keine Ergebnisse f\u00FCr",
+  "search.section.posts": "Beitr\u00E4ge",
+  "search.section.events": "Events",
+  "search.section.pages": "Seiten",
+  "search.section.announcements": "Ank\u00FCndigungen",
+  "search.section.projects": "Projekte",
+  "search.section.boards": "Boards",
+  "search.section.todos": "To-dos",
+  "search.section.inventory": "Inventar",
+  "search.section.documents": "Dokumente",
+  "search.section.people": "Personen",
+  "search.scope.community": "Gemeinschaft",
+  "search.scope.groups": "Gruppen",
+  "search.empty.hint": "Finde Beitr\u00E4ge, Events, Seiten, Ank\u00FCndigungen, Projekte, Boards, To-dos, Inventar, Dokumente und Personen nach Text oder Tag \u2014 es werden nur Inhalte gezeigt, die du ohnehin lesen kannst."
+}

@@ -1,0 +1,10 @@
+{
+  "whatsnew.eyebrow": "Nouveaut\u00E9s",
+  "whatsnew.heading": "Nouveaut\u00E9s, version par version",
+  "whatsnew.lead": "Chaque publication est dat\u00E9e et list\u00E9e ici \u2014 lis ce qui est arriv\u00E9 dans chaque version mineure de la plateforme que tu utilises.",
+  "whatsnew.version": "Version",
+  "whatsnew.show_more": "Afficher plus de versions",
+  "whatsnew.show_more_remaining": "Afficher les {n} versions pr\u00E9c\u00E9dentes",
+  "whatsnew.toast_label": "Kumunita {v} est d\u00E9sormais en service.",
+  "whatsnew.toast_see": "Voir les nouveaut\u00E9s"
+}

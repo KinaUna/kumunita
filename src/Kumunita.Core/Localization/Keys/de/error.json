@@ -1,0 +1,7 @@
+{
+  "error.title": "Fehler.",
+  "error.subtitle": "Bei der Verarbeitung Ihrer Anfrage ist ein Fehler aufgetreten.",
+  "error.development_title": "Entwicklungsmodus",
+  "error.development_hint": "Das Umschalten in die Entwicklungsumgebung zeigt weitere Details zum aufgetretenen Fehler. Die Entwicklungsumgebung sollte f\u00FCr eingesetzte Anwendungen nicht aktiviert sein \u2014 sie kann sensible Informationen aus Fehlern an Endnutzer offenlegen.",
+  "error.request_id": "Anfragen-ID:"
+}

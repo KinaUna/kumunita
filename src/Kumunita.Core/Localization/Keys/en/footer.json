@@ -1,0 +1,15 @@
+{
+  "footer.tagline": "A private home for one neighborhood \u2014 the feed, the groups and the pinned notes. What happens on your street stays on your street.",
+  "footer.copyright": "\u00B7 self-hosted by your community",
+  "footer.gtk_heading": "Good to know",
+  "footer.gtk_privacy": "Private by default: each post\u0027s audience is chosen by its author, and everything is readable by you, not the world.",
+  "footer.gtk_oss": "Kumunita is open source \u2014 the code, the decisions, the docs.",
+  "footer.platform.heading": "Platform",
+  "footer.platform.about": "About",
+  "footer.platform.terms": "Terms of use",
+  "footer.platform.help": "Help",
+  "footer.platform.privacy": "Privacy",
+  "footer.platform.conduct": "Code of conduct",
+  "footer.project.heading": "The project",
+  "footer.feed": "The feed"
+}

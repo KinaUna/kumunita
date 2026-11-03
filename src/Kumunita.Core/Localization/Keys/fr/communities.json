@@ -1,0 +1,10 @@
+{
+  "communities.flash_mandatory": "Marqu\u00E9e obligatoire \u2014 tout le monde dans le quartier en est membre.",
+  "communities.flash_optional": "Marqu\u00E9e facultative.",
+  "communities.flash_gone": "Cette communaut\u00E9 n\u2019existe plus.",
+  "communities.flash_member_added": "Membre ajout\u00E9.",
+  "communities.flash_member_removed": "Membre retir\u00E9.",
+  "communities.flash_use_leave": "Pour quitter en tant que membre, utilisez le bouton \u00AB Quitter \u00BB du fil de la communaut\u00E9.",
+  "communities.flash_cannot_leave": "Vous \u00EAtes membre de {0} parce qu\u2019elle est obligatoire pour tous \u2014 vous ne pouvez pas la quitter.",
+  "communities.flash_left": "Vous avez quitt\u00E9 {0}."
+}

@@ -1,0 +1,11 @@
+{
+  "issue.title": "Problem melden",
+  "issue.intro": "Etwas funktioniert nicht, oder es gibt ein Problem, \u00FCber das wir Bescheid wissen sollten? Sagen Sie uns, was passiert ist \u2014 selbst wenn keine Fehlerseite vor Ihnen liegt.",
+  "issue.description.label": "Was ist das Problem?",
+  "issue.description.placeholder": "z. B. Die Gruppenkalender-Seite ist down, oder ich kann mich nicht anmelden",
+  "issue.email.label": "Ihre E-Mail (optional)",
+  "issue.email.placeholder": "sie@beispiel.de",
+  "issue.submit": "Problembericht senden",
+  "issue.thanks": "Danke \u2014 Ihr Problembericht wurde eingereicht.",
+  "issue.nav": "Problem melden"
+}

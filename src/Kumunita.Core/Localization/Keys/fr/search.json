@@ -1,0 +1,19 @@
+{
+  "search.nav": "Recherche",
+  "search.title": "Recherche",
+  "search.placeholder": "Rechercher dans les publications, \u00E9v\u00E9nements, pages, annonces, projets, tableaux, t\u00E2ches, inventaire, documents et personnes\u2026",
+  "search.no-results": "Aucun r\u00E9sultat pour",
+  "search.section.posts": "Publications",
+  "search.section.events": "\u00C9v\u00E9nements",
+  "search.section.pages": "Pages",
+  "search.section.announcements": "Annonces",
+  "search.section.projects": "Projets",
+  "search.section.boards": "Tableaux",
+  "search.section.todos": "T\u00E2ches",
+  "search.section.inventory": "Inventaire",
+  "search.section.documents": "Documents",
+  "search.section.people": "Personnes",
+  "search.scope.community": "Communaut\u00E9",
+  "search.scope.groups": "Groupes",
+  "search.empty.hint": "Retrouvez des publications, \u00E9v\u00E9nements, pages, annonces, projets, tableaux, t\u00E2ches, inventaire, documents et personnes par texte ou \u00E9tiquette \u2014 seules les contenus que vous pouvez d\u00E9j\u00E0 lire s\u0027affichent."
+}

@@ -1,0 +1,20 @@
+{
+  "about.cta.heading": "Une question, un retour ou un bug ?",
+  "about.cta.write_to": "\u00C9crivez \u00E0",
+  "about.cta.person_reads": "\u2014 une personne le lit.",
+  "about.cta.issue": "Ouvrez un ticket sur le d\u00E9p\u00F4t \u2014 une personne le lit aussi.",
+  "about.cta.button": "Ouvrir une conversation",
+  "about.eyebrow": "Priv\u00E9 par d\u00E9faut",
+  "about.lead": "Un chez-soi pour tout ce que ton quartier fait \u2014 le fil, les groupes et les notes qui m\u00E9ritent mieux qu\u0027un groupe de chat. Priv\u00E9, en langage clair, et \u00E0 toi.",
+  "about.cta_feed": "Voir le fil",
+  "about.cta_notes": "Lire les notes \u00E9pingl\u00E9es",
+  "about.features.one.title": "Un fil pour la rue",
+  "about.features.one.body": "Publications et fils de discussion de tes blocs et ruelles, en un seul endroit calme \u2014 pas d\u0027algorithme, pas de bruit.",
+  "about.features.groups.title": "Des groupes qui collent",
+  "about.features.groups.body": "\u00C9change de jardin, club de lecture, ronde de nuit \u2014 un groupe pour tout ce que le quartier fait d\u00E9j\u00E0.",
+  "about.features.pinned.title": "\u00C9pingl\u00E9es l\u00E0 o\u00F9 \u00E7a compte",
+  "about.features.pinned.body": "Coupures d\u0027eau, travaux de rue, les nouveaux ralentisseurs \u2014 des notes qui restent en place au lieu de d\u00E9filer.",
+  "about.project.eyebrow": "Open source",
+  "about.project.heading": "Le code, les d\u00E9cisions, la doc de design",
+  "about.project.lead": "Si tu es curieux de savoir comment \u00E7a marche \u2014 ou si tu t\u0027appr\u00EAtes \u00E0 l\u0027h\u00E9berger pour ton quartier \u2014 tout est public."
+}

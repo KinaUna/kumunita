@@ -1,0 +1,18 @@
+{
+  "onboarding.title": "Ops\u00E6t din konto",
+  "onboarding.intro": "En kort guidet tur gennem de f\u00E5 ting, der f\u00E5r Kumunita til at fungere for dig. Alt henviser til den indstilling, der allerede ejer det \u2014 du kan f\u00E6rdigg\u00F8re det p\u00E5 et minut eller komme tilbage, n\u00E5r du vil.",
+  "onboarding.step_displayname": "Dit visningsnavn",
+  "onboarding.step_avatar": "Din avatar",
+  "onboarding.step_language": "Dit gr\u00E6nsefladesprog",
+  "onboarding.step_timezone": "Din tidszone",
+  "onboarding.step_dateformat": "Dit dato- og tidsformat",
+  "onboarding.step_email": "Dit e-mail- og beskedssprog",
+  "onboarding.step_contact": "Dine kontaktoplysninger og hvem der kan se dem",
+  "onboarding.step_messaging": "Om du kan bruge direkte beskeder",
+  "onboarding.visit": "G\u00E5 til denne indstilling",
+  "onboarding.finish": "Alt er klar \u2014 afslut ops\u00E6tningen",
+  "onboarding.skip": "Spring over for nu",
+  "onboarding.flash_done": "Ops\u00E6tningen er f\u00E6rdig \u2014 velkommen til dit nabolag.",
+  "onboarding.banner.text": "F\u00E6rdigg\u00F8re ops\u00E6tningen af din konto?",
+  "onboarding.banner.action": "Start ops\u00E6tning"
+}

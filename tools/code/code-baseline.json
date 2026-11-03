@@ -20,7 +20,7 @@
     },
     {
       "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs",
-      "max": 5689
+      "max": 991
     },
     {
       "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs",
@@ -33,10 +33,6 @@
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs",
       "max": 1044
-    },
-    {
-      "id": "src/Kumunita.Core/Localization/KnownTranslationKeys.cs",
-      "max": 12964
     },
     {
       "id": "src/Kumunita.Core/Localization/LocalizationService.cs",
@@ -138,46 +134,6 @@
       "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.BackfillUserGuidesAsync(IDocumentSession,CancellationToken)",
       "max": 75,
       "cc_max": 17
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.DaDefaultPages()",
-      "max": 109,
-      "cc_max": 1
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.DaGuidePages()",
-      "max": 1075,
-      "cc_max": 1
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.DeDefaultPages()",
-      "max": 111,
-      "cc_max": 1
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.DeGuidePages()",
-      "max": 1111,
-      "cc_max": 1
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.EnDefaultPages()",
-      "max": 107,
-      "cc_max": 1
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.FrDefaultPages()",
-      "max": 112,
-      "cc_max": 1
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.FrGuidePages()",
-      "max": 1151,
-      "cc_max": 1
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.GuidePages()",
-      "max": 986,
-      "cc_max": 1
     },
     {
       "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.SeedDefaultPagesAsync(IDocumentSession,IReadOnlyList\u003C(string Slug, string Title, string Body)\u003E,DateTimeOffset,CancellationToken)",

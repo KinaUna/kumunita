@@ -1,0 +1,14 @@
+{
+  "message.nav": "Beskeder",
+  "message.title": "Beskeder",
+  "message.new": "Nyt samtale",
+  "message.thread.empty": "Ingen beskeder endnu \u2014 sig hej.",
+  "message.compose.placeholder": "Skriv en besked\u2026",
+  "message.compose.send": "Send",
+  "message.unread": "ul\u00E6st",
+  "message.compose.disabled": "Denne person har sl\u00E5et direkte beskeder fra, s\u00E5 du kan ikke sende dem en ny besked.",
+  "message.disabled": "Direkte beskeder er sl\u00E5et fra p\u00E5 denne instans.",
+  "message.other": "den anden person",
+  "message.sent_to": "Sendt til {0}.",
+  "message.load_earlier": "Indl\u00E6s tidligere beskeder"
+}

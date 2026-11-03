@@ -1,0 +1,10 @@
+{
+  "whatsnew.eyebrow": "Nyheder",
+  "whatsnew.heading": "Nyheder, version for version",
+  "whatsnew.lead": "Hver udgivelse er datoeret og listet her \u2014 l\u00E6s, hvad der er landet i hver minor-version af platformen, du bruger.",
+  "whatsnew.version": "Version",
+  "whatsnew.show_more": "Vis flere versioner",
+  "whatsnew.show_more_remaining": "Vis de {n} tidligere versioner",
+  "whatsnew.toast_label": "Kumunita {v} er nu i brug.",
+  "whatsnew.toast_see": "Se nyhederne"
+}

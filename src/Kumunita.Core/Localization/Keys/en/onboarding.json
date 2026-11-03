@@ -1,0 +1,18 @@
+{
+  "onboarding.title": "Set up your account",
+  "onboarding.intro": "A quick guided tour of the few things that make Kumunita work for you. Everything links into the setting that already owns it \u2014 you can finish in a minute or come back any time.",
+  "onboarding.step_displayname": "Your display name",
+  "onboarding.step_avatar": "Your avatar",
+  "onboarding.step_language": "Your interface language",
+  "onboarding.step_timezone": "Your time zone",
+  "onboarding.step_dateformat": "Your date \u0026 time format",
+  "onboarding.step_email": "Your email \u0026 notification language",
+  "onboarding.step_contact": "Your contact details \u0026 who can see them",
+  "onboarding.step_messaging": "Whether you can use direct messaging",
+  "onboarding.visit": "Go to this setting",
+  "onboarding.finish": "I\u0027m all set \u2014 finish setup",
+  "onboarding.skip": "Skip for now",
+  "onboarding.flash_done": "Setup complete \u2014 welcome to your neighborhood.",
+  "onboarding.banner.text": "Finish setting up your account?",
+  "onboarding.banner.action": "Start setup"
+}

@@ -1,0 +1,6 @@
+{
+  "inventory.flash_item_updated": "Objet mis \u00E0 jour.",
+  "inventory.flash_item_deleted": "Objet supprim\u00E9.",
+  "inventory.flash_checked_out": "Objet emprunt\u00E9.",
+  "inventory.flash_checked_in": "Objet rendu."
+}

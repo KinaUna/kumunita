@@ -1,0 +1,13 @@
+{
+  "platform.scope_home": "Kumunita started out as a home for one neighbourhood \u2014 but it is just as at home with a club, a team, or the people behind a big event. The neighbourhood is the default, not the limit.",
+  "platform.fig_home": "It is built on the Fractal Integration Guidelines (FIG): the idea that a group\u0027s real value lives in the links between its people and parts, not in the parts themselves. Kumunita is the software that builds and holds those links.",
+  "platform.scope_heading": "Built for a neighbourhood \u2014 at home anywhere",
+  "platform.scope_body1": "Kumunita was originally built for one street: a private, shared home for the people who live there. But the core idea is not tied to a street at all. It is a private home for one group of people who want to coordinate, share, and build trust together \u2014 a neighbourhood, a club, a sports team, a workplace, a volunteer body, or even the people behind a single event. What changes is only the name and the details.",
+  "platform.scope_body2": "Everything that makes it fit a street \u2014 the quiet feed, the groups, the audience-scoped posts, the moderation and its audit trail, the multilingual interface \u2014 works the same way for any of those. So adapting it is a matter of configuration: the community name, the components that stand in for \u0027Safety\u0027 and \u0027Social\u0027, the groups that fit your world. Not a redesign.",
+  "platform.fig_heading": "The idea behind it: the Fractal Integration Guidelines",
+  "platform.fig_body1": "Kumunita is built on a small set of open guidelines we call the Fractal Integration Guidelines (FIG). Their central claim is that an integrated system is more than the sum of its parts, and that its quality is the quality of the linkage between those parts \u2014 a property no single part has on its own. A bag of features that never connect is just noise; the connections are where the value lives.",
+  "platform.fig_body2": "A neighbourhood is exactly such a system: many different people, households, and concerns, whose linkage \u2014 who knows whom, who can rely on whom, how a problem actually gets solved across people \u2014 is what produces a community. No single resident is a neighbourhood. Kumunita is the software that builds and holds that linkage.",
+  "platform.fig_body3": "So we develop Kumunita by the same rule we ask of it: quality is the quality of the linkage, not the count of the features. The guidelines repeat at every scale \u2014 a module, a feature, a community, the people who build it \u2014 which is why the whole project follows them, and why the philosophy is documented in the open.",
+  "platform.scope_eyebrow": "For any group",
+  "platform.fig_eyebrow": "The philosophy"
+}

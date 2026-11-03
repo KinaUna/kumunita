@@ -1,0 +1,14 @@
+{
+  "img.edit.close": "Luk",
+  "img.edit.crop_area": "Besk\u00E6ring",
+  "img.edit.width": "Bredde",
+  "img.edit.output": "Resultat",
+  "img.edit.reset_crop": "Nulstil besk\u00E6ring",
+  "img.edit.use_original": "Brug originalen",
+  "img.edit.apply": "Anvend",
+  "img.edit.title": "Besk\u00E6r dit avatar",
+  "img.edit.err_edit": "Redigeringen mislykkedes.",
+  "img.edit.err_could": "Billedet kunne ikke redigeres.",
+  "img.edit.err_load": "Billedet kunne ikke indl\u00E6ses til redigering.",
+  "img.edit.err_export": "Billedeksporten mislykkedes."
+}

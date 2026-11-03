@@ -1,0 +1,17 @@
+{
+  "translations.bulk.save_all": "Tout enregistrer",
+  "translations.bulk.mode_batch": "\u00C9dition par lot",
+  "translations.bulk.mode_single": "\u00C9dition une par une",
+  "translations.bulk.export": "T\u00E9l\u00E9charger les traductions (CSV)",
+  "translations.bulk.import": "T\u00E9l\u00E9verser les traductions (CSV)",
+  "translations.bulk.import_hint": "Les cellules vides sont ignor\u00E9es (elles n\u0027effacent jamais une traduction) ; un fichier contenant une cl\u00E9 inconnue ou une langue inconnue est refus\u00E9 sans modification.",
+  "translations.editor.back": "\u2190 Retour aux langues",
+  "translations.editor.title": "Cha\u00EEnes d\u0027interface pour {0}",
+  "translations.editor.lede": "La liste compl\u00E8te des cha\u00EEnes que la plateforme affiche \u00E0 ses r\u00E9sidents. Chaque ligne montre la cl\u00E9, son texte de r\u00E9f\u00E9rence en anglais et la valeur actuelle dans {0}. Enregistrer une ligne ajoute ou met \u00E0 jour sa traduction \u2014 visible \u00E0 la prochaine requ\u00EAte.",
+  "translations.editor.mode_label": "Mode d\u0027\u00E9dition",
+  "translations.editor.th_key": "Cl\u00E9",
+  "translations.editor.th_en_reference": "R\u00E9f\u00E9rence en anglais",
+  "translations.editor.th_value": "Valeur dans {0}",
+  "translations.editor.value_aria": "Valeur pour {0} dans {1}",
+  "translations.bulk.export_title": "T\u00E9l\u00E9charge les cha\u00EEnes d\u0027interface de cette langue au format fichier CSV"
+}

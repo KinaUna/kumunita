@@ -1,0 +1,11 @@
+{
+  "issue.title": "Signal\u00E9r et problem",
+  "issue.intro": "Noget virker ikke, eller er der et problem, vi b\u00F8r vide om? Fort\u00E6l os, hvad der skete \u2014 selvom der ikke er en fejlside foran dig.",
+  "issue.description.label": "Hvad er problemet?",
+  "issue.description.placeholder": "f.eks. Gruppens kalender side er down, eller jeg kan ikke logge ind",
+  "issue.email.label": "Din e-mail (valgfri)",
+  "issue.email.placeholder": "dig@eksempel.dk",
+  "issue.submit": "Send problemrapport",
+  "issue.thanks": "Tak \u2014 din problemrapport er indsendt.",
+  "issue.nav": "Signal\u00E9r et problem"
+}

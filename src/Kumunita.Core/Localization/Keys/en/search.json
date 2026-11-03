@@ -1,0 +1,19 @@
+{
+  "search.nav": "Search",
+  "search.title": "Search",
+  "search.placeholder": "Search posts, events, pages, announcements, projects, boards, to-dos, inventory, documents and people\u2026",
+  "search.no-results": "No results for",
+  "search.section.posts": "Posts",
+  "search.section.events": "Events",
+  "search.section.pages": "Pages",
+  "search.section.announcements": "Announcements",
+  "search.section.projects": "Projects",
+  "search.section.boards": "Boards",
+  "search.section.todos": "To-dos",
+  "search.section.inventory": "Inventory",
+  "search.section.documents": "Documents",
+  "search.section.people": "People",
+  "search.scope.community": "Community",
+  "search.scope.groups": "Groups",
+  "search.empty.hint": "Find posts, events, pages, announcements, projects, boards, to-dos, inventory, documents and people by text or tag \u2014 the results only show content you can already read."
+}

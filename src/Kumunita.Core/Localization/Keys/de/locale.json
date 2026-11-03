@@ -1,0 +1,19 @@
+{
+  "locale.settings_title": "Deine Einstellungen",
+  "locale.language_heading": "Sprache",
+  "locale.lede": "W\u00E4hle die Sprache, die dir die Plattform anzeigt. Deine Auswahl wird in einem Browser-Cookie gespeichert \u2014 sie wird beim n\u00E4chsten Request wirksam und betrifft nie andere Anwohner:innen.",
+  "locale.preferred_label": "Bevorzugte Sprache",
+  "locale.default_note": "Die Instanz-Voreinstellung ist ",
+  "locale.default_note_tail": ". Wenn deine Wunschsprache sp\u00E4ter vom Admin entfernt wird, f\u00E4llt die Plattform still auf die Instanz-Voreinstellung zur\u00FCck.",
+  "locale.save": "Speichern",
+  "locale.reset": "Auf die Instanz-Voreinstellung zur\u00FCcksetzen",
+  "locale.public_title": "W\u00E4hle deine Sprache",
+  "locale.instance_default": "\u2014 Instanz-Voreinstellung",
+  "locale.browser_matched": "\u2014 aus deinen Browser-Einstellungen",
+  "locale.browser_note": "Wir haben ",
+  "locale.browser_note_tail": " anhand deiner Browser-Einstellungen ausgew\u00E4hlt. Speichern macht es zu deiner Wunschsprache \u2014 sie bleibt bestehen, bis du sie \u00E4nderst.",
+  "locale.flash_set": "Sprache auf \u0022{0}\u0022 gesetzt \u2014 sie wirkt ab der n\u00E4chsten Anfrage.",
+  "locale.flash_reset": "Spracheinstellung zur\u00FCckgesetzt \u2014 die Instanz-Voreinstellung wird verwendet.",
+  "locale.reset_confirm": "Deine Sprachpr\u00E4ferenz auf den Instanz-Standard zur\u00FCcksetzen?",
+  "locale.email_reset_confirm": "Deine E-Mail- und Benachrichtigungssprache auf den Instanz-Standard zur\u00FCcksetzen?"
+}

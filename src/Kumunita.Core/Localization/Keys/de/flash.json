@@ -1,0 +1,17 @@
+{
+  "flash.translation_choose_language": "W\u00E4hle eine Sprache f\u00FCr die \u00DCbersetzung.",
+  "flash.translation_needs_text": "Eine \u00DCbersetzung braucht etwas Text.",
+  "flash.translation_added": "\u00DCbersetzung hinzugef\u00FCgt ({0}).",
+  "flash.translation_updated": "\u00DCbersetzung aktualisiert ({0}).",
+  "flash.translation_removed": "\u00DCbersetzung entfernt ({0}).",
+  "flash.not_signed_in": "Nicht angemeldet.",
+  "flash.comment_needs_text": "Ein Kommentar braucht etwas Text.",
+  "flash.comment_added": "Kommentar hinzugef\u00FCgt.",
+  "flash.comment_deleted": "Kommentar gel\u00F6scht.",
+  "flash.translation_gone_add": "Diese \u00DCbersetzung gibt es nicht mehr; f\u00FCge sie erneut hinzu.",
+  "flash.translation_gone": "Diese \u00DCbersetzung gibt es nicht mehr.",
+  "flash.choose_language_remove": "W\u00E4hle eine Sprache zum Entfernen.",
+  "flash.translation_needs_title_or_text": "Eine \u00DCbersetzung braucht einen Titel oder etwas Text.",
+  "flash.translation_needs_name_or_description": "Eine \u00DCbersetzung braucht einen Namen und/oder eine Beschreibung.",
+  "flash.report_submitted": "Meldung gesendet. Ein Moderator pr\u00FCft sie m\u00F6glicherweise."
+}

@@ -1,0 +1,13 @@
+{
+  "tags.events_example": "e.g. cleanup, social, garden",
+  "tags.pages_example": "e.g. sanitation, budget, maple-street",
+  "tags.flash_needs_name": "A translation needs a non-empty display name.",
+  "tags.flash_translation_saved": "Translation saved.",
+  "tags.list.heading": "Tags",
+  "tags.list.lede": "Subjects your posts and blog pages are tagged with \u2014 click one to browse what\u0027s been posted about it.",
+  "tags.list.empty": "No tags yet \u2014 tags appear here once a resident attaches one to a post or a blog page.",
+  "tags.bytag.heading": "Posts and pages about",
+  "tags.bytag.posts_heading": "Posts",
+  "tags.bytag.pages_heading": "Blog pages",
+  "tags.bytag.empty": "No readable posts or blog pages carry this tag."
+}

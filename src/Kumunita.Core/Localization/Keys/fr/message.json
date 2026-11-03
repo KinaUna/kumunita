@@ -1,0 +1,14 @@
+{
+  "message.nav": "Messages",
+  "message.title": "Messages",
+  "message.new": "Nouvelle conversation",
+  "message.thread.empty": "Pas encore de messages \u2014 dites bonjour.",
+  "message.compose.placeholder": "\u00C9crire un message\u2026",
+  "message.compose.send": "Envoyer",
+  "message.unread": "non lu",
+  "message.disabled": "La messagerie directe est d\u00E9sactiv\u00E9e sur cette instance.",
+  "message.compose.disabled": "Cette personne a d\u00E9sactiv\u00E9 la messagerie directe, vous ne pouvez donc pas lui envoyer de nouveau message.",
+  "message.other": "l\u0027autre personne",
+  "message.sent_to": "Envoy\u00E9 \u00E0 {0}.",
+  "message.load_earlier": "Charger les messages ant\u00E9rieurs"
+}

@@ -1,0 +1,10 @@
+{
+  "communities.flash_mandatory": "Markeret som obligatorisk \u2014 alle i nabolaget er medlemmer.",
+  "communities.flash_optional": "Markeret som valgfri.",
+  "communities.flash_gone": "Det f\u00E6llesskab findes ikke l\u00E6ngere.",
+  "communities.flash_member_added": "Medlem tilf\u00F8jet.",
+  "communities.flash_member_removed": "Medlem fjernet.",
+  "communities.flash_use_leave": "For at forlade f\u00E6llesskabet som medlem skal du bruge knappen \u201CForlad\u201D i f\u00E6llesskabets feed.",
+  "communities.flash_cannot_leave": "Du er medlem af {0}, fordi det er obligatorisk for alle \u2014 du kan ikke forlade det.",
+  "communities.flash_left": "Du har forladt {0}."
+}

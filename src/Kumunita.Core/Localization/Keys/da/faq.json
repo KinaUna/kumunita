@@ -1,0 +1,11 @@
+{
+  "faq.title": "Ofte stillede sp\u00F8rgsm\u00E5l",
+  "faq.q1": "Hvem kan se mine indl\u00E6g?",
+  "faq.a1": "Den, du v\u00E6lger, n\u00E5r du poster: kun dig, din gruppe, dit f\u00E6llesskab eller alle. Modtagerkreds er et valg pr. indl\u00E6g \u2014 ikke en global indstilling.",
+  "faq.q2": "Hvor ligger meddelelser som vandmangel og vejarbejde?",
+  "faq.a2_intro": "Faste meddelelser p\u00E5",
+  "faq.a2_link": "/announcements",
+  "faq.a2_outro": " \u2014 l\u00E6sningen er \u00E5ben, s\u00E5 ingen beh\u00F8ver at logge ind for at finde ud af, hvorn\u00E5r gaden skal males.",
+  "faq.q3": "Er dette privat som standard?",
+  "faq.a3": "Ja. Hver gang, der adgang til begr\u00E6nset indhold gives eller n\u00E6gtes, registreres det. Dataene bliver p\u00E5 \u00E9n database ejet af nabolagets v\u00E6rt, og der er ingen reklame eller tracking indbygget."
+}

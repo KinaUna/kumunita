@@ -1,0 +1,10 @@
+{
+  "grant.heading": "Who to grant to",
+  "grant.hint": "Check one or many \u2014 or use the \u0022Select all\u0022 row above each list as a shortcut.",
+  "grant.empty_users": "You\u0027re the only verified resident, so there\u0027s no one else to grant to yet.",
+  "grant.empty_groups": "No groups exist on the platform yet \u2014 create one under \u0022Groups\u0022 to add group-scoped visibility.",
+  "grant.select_all": "Select all",
+  "grant.label_residences": "Residences",
+  "grant.label_groups": "Groups",
+  "grant.count_selected": "{0} of {1} selected"
+}

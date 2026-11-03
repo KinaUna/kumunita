@@ -1,0 +1,10 @@
+{
+  "communities.flash_mandatory": "Als verpflichtend markiert \u2013 alle in der Nachbarschaft sind Mitglied.",
+  "communities.flash_optional": "Als optional markiert.",
+  "communities.flash_gone": "Diese Gemeinschaft gibt es nicht mehr.",
+  "communities.flash_member_added": "Mitglied hinzugef\u00FCgt.",
+  "communities.flash_member_removed": "Mitglied entfernt.",
+  "communities.flash_use_leave": "Um als Mitglied auszutreten, nutze die Schaltfl\u00E4che \u201EVerlassen\u201C im Gemeinschafts-Feed.",
+  "communities.flash_cannot_leave": "Du bist Mitglied von {0}, weil es f\u00FCr alle verpflichtend ist \u2013 du kannst es nicht verlassen.",
+  "communities.flash_left": "Du hast {0} verlassen."
+}

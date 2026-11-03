@@ -1,0 +1,23 @@
+{
+  "myportability.index.lede": "Deine selbst verfassten Inhalte \u2013 die Beitr\u00E4ge, Veranstaltungen, Projekte, Dokumente, Seiten, Nachrichten und Medien, die du erstellt hast \u2013 als ein portables *.kumunita-Archiv. Exportiere es als Datei oder importiere eines deiner Archive zur\u00FCck in diese Gemeinschaft. Dein Passwort ist nie enthalten, und es reisen nur deine eigenen Zeilen mit.",
+  "myportability.export_desc": "Ein *.kumunita-Archiv \u2013 deine selbst verfassten Inhalte und Medien (nie dein Passwort, und nur deine Zeilen).",
+  "myportability.import_desc": "Bringe eines deiner *.kumunita-Archive zur\u00FCck. Wir pr\u00FCfen, was in diese Gemeinschaft passt und wo deine Entscheidung gefragt ist \u2013 du entscheidest Eintrag f\u00FCr Eintrag, wohin jedes St\u00FCck kommt.",
+  "myportability.resolve.summary_lead": "Dein Archiv wurde mit dieser Gemeinschaft abgeglichen.",
+  "myportability.resolve.summary_counts": "Passende Zeilen, die importiert werden: {0}. Bereits vorhandene Duplikate, die \u00FCbersprungen werden: {1}.",
+  "myportability.resolve.summary_tail": "Die folgenden verweisen auf eine Gruppe, die es hier nicht gibt \u2013 du entscheidest einzeln, wohin sie geh\u00F6ren.",
+  "myportability.resolve.nothing": "Nichts zu kl\u00E4ren \u2013 jede Zeile deines Archivs passt in diese Gemeinschaft oder ist bereits vorhanden.",
+  "myportability.resolve.archive_label": "Dein *.kumunita-Archiv",
+  "myportability.resolve.archive_hint": "Dasselbe Archiv, das du oben importiert hast \u2013 deine Entscheidungen werden auf seinen Inhalt angewendet.",
+  "myportability.resolve.reason": "Dieser Eintrag ({0}) verweist auf {1} {2}, was es hier nicht gibt.",
+  "myportability.resolve.reason_unknown": "Ein Verweis dieser Zeile existiert hier nicht.",
+  "myportability.resolve.target_label": "Zielgruppe (f\u00FCr \u201EAnderswo hinzuf\u00FCgen\u201C)",
+  "myportability.resolve.choose_group": "\u2013 Gruppe w\u00E4hlen \u2013",
+  "myportability.resolve.no_groups": "Du bist hier in keiner Gruppe Mitglied \u2013 du kannst diese Zeile verwerfen.",
+  "myportability.index.title": "Meine Daten",
+  "myportability.export": "Exportieren",
+  "myportability.import": "Importieren",
+  "myportability.import.resolve": "Meine Auswahl anwenden",
+  "myportability.resolve.add_elsewhere": "Woanders hinzuf\u00FCgen",
+  "myportability.resolve.discard": "Verwerfen",
+  "myportability.status": "Status"
+}

@@ -1,0 +1,7 @@
+{
+  "email.verify_subject": "Verify your Kumunita account",
+  "email.verify_body": "Hi {0},\n\nYour Kumunita account is set to verify on its first sign-in. Open this one-time link to confirm the account (it also signs you in):\n\n{1}\n\nIf you didn\u0027t create this account, you can ignore this message.",
+  "email.verify_child_body": "Hi {0},\n\nYour Kumunita account is ready. Open this one-time link to confirm the account and set your password (it also signs you in):\n\n{1}\n\nIf you didn\u0027t create this account, you can ignore this message.",
+  "email.reminder_subject": "Reminder: {0}",
+  "email.reminder_body": "**{0}** is coming up: {1}{2}."
+}

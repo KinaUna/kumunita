@@ -1,0 +1,11 @@
+{
+  "faq.title": "Frequently asked questions",
+  "faq.q1": "Who can see my posts?",
+  "faq.a1": "Whoever you choose when you post: just you, your group, your community, or everyone. Audience is a choice you make per post \u2014 it\u0027s not a global setting.",
+  "faq.q2": "Where do announcements like water cuts and roadworks live?",
+  "faq.a2_intro": "Pinned announcements, at",
+  "faq.a2_link": "/announcements",
+  "faq.a2_outro": "\u2014 the read side is open so nobody has to log in to find out when the street gets repainted.",
+  "faq.q3": "Is this private by default?",
+  "faq.a3": "Yes. Every time someone is allowed (or denied) access to restricted content, it\u0027s recorded. The data stays on a single database owned by the neighbourhood\u0027s host, and there are no ads or tracking built in."
+}

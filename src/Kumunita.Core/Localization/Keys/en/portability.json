@@ -1,0 +1,10 @@
+{
+  "portability.index.title": "Portability",
+  "portability.export": "Export",
+  "portability.import": "Import",
+  "portability.confirm.import": "Import this archive? This replaces the instance\u0027s content (the restore path \u2014 the operator\u0027s pre-import backup is the rollback).",
+  "portability.import.keep_existing": "Keep existing accounts and content",
+  "portability.import.keep_existing_hint": "Unticked: the import replaces this instance\u0027s accounts and content. Ticked: existing accounts and content are kept unchanged, and only what is new is added.",
+  "portability.status.ok": "Done.",
+  "portability.status.failure": "Refused \u2014 the archive was rejected before anything was written:"
+}

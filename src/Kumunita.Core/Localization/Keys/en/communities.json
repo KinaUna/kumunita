@@ -1,0 +1,10 @@
+{
+  "communities.flash_mandatory": "Marked mandatory \u2014 everyone in the neighborhood is a member.",
+  "communities.flash_optional": "Marked optional.",
+  "communities.flash_gone": "That community no longer exists.",
+  "communities.flash_member_added": "Member added.",
+  "communities.flash_member_removed": "Member removed.",
+  "communities.flash_use_leave": "To leave as a member, use the Leave button on the community feed.",
+  "communities.flash_cannot_leave": "You\u2019re a member of {0} because it\u2019s mandatory for everyone \u2014 you can\u2019t leave it.",
+  "communities.flash_left": "You\u2019ve left {0}."
+}

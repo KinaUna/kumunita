@@ -1,0 +1,14 @@
+{
+  "img.edit.close": "Fermer",
+  "img.edit.crop_area": "Zone de rognage",
+  "img.edit.width": "Largeur",
+  "img.edit.output": "R\u00E9sultat",
+  "img.edit.reset_crop": "R\u00E9initialiser le rognage",
+  "img.edit.use_original": "Utiliser l\u0027original",
+  "img.edit.apply": "Appliquer",
+  "img.edit.title": "Rogner ton avatar",
+  "img.edit.err_edit": "La modification a \u00E9chou\u00E9.",
+  "img.edit.err_could": "L\u0027image n\u0027a pas pu \u00EAtre modifi\u00E9e.",
+  "img.edit.err_load": "L\u0027image n\u0027a pas pu \u00EAtre charg\u00E9e pour la modification.",
+  "img.edit.err_export": "L\u0027export de l\u0027image a \u00E9chou\u00E9."
+}

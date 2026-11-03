@@ -1,0 +1,7 @@
+{
+  "security.flash_totp_invalid_enable": "Godkendelseskoden var ikke gyldig. Aktiv\u00E9r tofaktorgodkendelse igen.",
+  "security.flash_2fa_enabled": "Tofaktorgodkendelse er nu aktiveret. Log herefter ind med din godkendelsesapp.",
+  "security.flash_codes_rotated": "Dine gendannelseskoder er fornyet. Kopi\u00E9r dem nu \u2014 de vises ikke igen.",
+  "security.flash_totp_invalid_disable": "Godkendelseskoden var ikke gyldig. Tofaktorgodkendelse er stadig aktiveret.",
+  "security.flash_2fa_disabled": "Tofaktorgodkendelse er deaktiveret."
+}
