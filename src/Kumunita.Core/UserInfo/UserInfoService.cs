@@ -1,4 +1,5 @@
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Translations;
 using Marten;
 using Marten.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -74,6 +75,87 @@ namespace Kumunita.Core.UserInfo;
 /// </summary>
 public sealed class UserInfoService(IDocumentStore store, IServiceProvider? services = null) : IUserInfoService
 {
+    // C06 (ADR 0288) — the one shared translation-variant write lane, one per
+    // parent type (Group / Component). The 6 write methods (Add/Update/Remove ×
+    // group / community) are thin forwarders into these (the caller's session
+    // shape — passed in as a parameter). The name/description surface differs
+    // from the posts / events / announcements / pages / projects surfaces: the
+    // "content" is (Name, Description), both nullable, gated by "at least a
+    // name or a description" (supplied via the descriptor's ValidateContent).
+    // The field initializers may reference the primary-constructor `store`
+    // (the D6-legal descriptor captures only store + the static standing
+    // resolvers, no other instance state).
+    private readonly TranslationLane<Group, GroupTranslation> _groupTranslationLane =
+        new(new TranslationDescriptor<Group, GroupTranslation>
+        {
+            TargetKind = "group",
+            ActionPrefix = "grouptranslation",
+            Noun = "Group",
+            ValidateContent = NameOrDescriptionRequired,
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Group group, object? _, string actorId, IReadOnlySet<string> actorRoles)
+                => ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles),
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Group>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<GroupTranslation>()
+                .Where(t => t.GroupId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? name, string? description, string actorId, DateTimeOffset created) => new GroupTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GroupId = id,
+                LanguageCode = lang,
+                Name = string.IsNullOrWhiteSpace(name) ? null : name,
+                Description = string.IsNullOrWhiteSpace(description) ? null : description,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (GroupTranslation row, string? name, string? description, string actorId, DateTimeOffset now) =>
+            {
+                row.Name = string.IsNullOrWhiteSpace(name) ? null : name;
+                row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+            }
+        });
+
+    private readonly TranslationLane<Component, CommunityTranslation> _communityTranslationLane =
+        new(new TranslationDescriptor<Component, CommunityTranslation>
+        {
+            TargetKind = "component",
+            ActionPrefix = "communitytranslation",
+            Noun = "Community",
+            ValidateContent = NameOrDescriptionRequired,
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Component _, object? __, string actorId, IReadOnlySet<string> actorRoles)
+                => ResolveCommunityTranslationStanding(actorId, actorRoles),
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Component>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<CommunityTranslation>()
+                .Where(t => t.ComponentId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? name, string? description, string actorId, DateTimeOffset created) => new CommunityTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ComponentId = id,
+                LanguageCode = lang,
+                Name = string.IsNullOrWhiteSpace(name) ? null : name,
+                Description = string.IsNullOrWhiteSpace(description) ? null : description,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (CommunityTranslation row, string? name, string? description, string actorId, DateTimeOffset now) =>
+            {
+                row.Name = string.IsNullOrWhiteSpace(name) ? null : name;
+                row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+            }
+        });
+
+    // C06 (ADR 0288) — the group / community content contract, shared by the
+    // two descriptors: at least one of (name, description) must be non-blank —
+    // a name/description translation with neither is not a translation.
+    private static void NameOrDescriptionRequired(string? name, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException("A name/description translation needs at least a name or a description.", nameof(name));
+    }
+
     // ── Read paths (plan step 3 — live-row reads, invariant C4) ───────────
 
     /// <inheritdoc />
@@ -609,55 +691,8 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         string groupId, string languageCode, string? name, string? description,
         string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group id is required.", nameof(groupId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
-            throw new ArgumentException(
-                "A name/description translation needs at least a name or a description.", nameof(name));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
-        if (group is null)
-            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to translate.");
-
-        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the group's owner (or a translator, or an admin) " +
-                "may add a translation of its name or description.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new GroupTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            GroupId = groupId,
-            LanguageCode = languageCode,
-            Name = string.IsNullOrWhiteSpace(name) ? null : name,
-            Description = string.IsNullOrWhiteSpace(description) ? null : description,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "grouptranslation.add",
-            TargetKind = "group",
-            TargetId = groupId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
+        return await _groupTranslationLane.AddAsync(session, groupId, languageCode, name, description, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -688,54 +723,8 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         string groupId, string languageCode, string? name, string? description,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(groupId))
-            throw new ArgumentException("A group id is required.", nameof(groupId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
-            throw new ArgumentException("A group translation requires a name or a description (at least one non-blank).", nameof(name));
-
-        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
-        if (group is null)
-            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to update.");
-
-        var row = await session.Query<GroupTranslation>()
-            .Where(t => t.GroupId == groupId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Group '{groupId}' has no translation in '{languageCode}'; nothing to update.");
-
-        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the group owner, an admin, or a translator may edit a group's translation.");
-
-        row.Name = string.IsNullOrWhiteSpace(name) ? null : name;
-        row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "grouptranslation.update",
-            TargetKind = "group",
-            TargetId = groupId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
+        return await _groupTranslationLane.UpdateAsync(session, groupId, languageCode, name, description, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -751,48 +740,8 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         string groupId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(groupId))
-            throw new ArgumentException("A group id is required.", nameof(groupId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
-        if (group is null)
-            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to remove.");
-
-        var row = await session.Query<GroupTranslation>()
-            .Where(t => t.GroupId == groupId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Group '{groupId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the group owner, an admin, or a translator may remove a group's translation.");
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "grouptranslation.remove",
-            TargetKind = "group",
-            TargetId = groupId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
+        await _groupTranslationLane.RemoveAsync(session, groupId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -2954,55 +2903,8 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         string componentId, string languageCode, string? name, string? description,
         string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(componentId)) throw new ArgumentException("A component id is required.", nameof(componentId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
-            throw new ArgumentException(
-                "A name/description translation needs at least a name or a description.", nameof(name));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
-        if (component is null)
-            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to translate.");
-
-        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only a translator (or an admin) may add a translation of " +
-                "the community's name or description.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new CommunityTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            ComponentId = componentId,
-            LanguageCode = languageCode,
-            Name = string.IsNullOrWhiteSpace(name) ? null : name,
-            Description = string.IsNullOrWhiteSpace(description) ? null : description,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "communitytranslation.add",
-            TargetKind = "component",
-            TargetId = componentId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
+        return await _communityTranslationLane.AddAsync(session, componentId, languageCode, name, description, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -3019,57 +2921,8 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         string componentId, string languageCode, string? name, string? description,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(componentId))
-            throw new ArgumentException("A component id is required.", nameof(componentId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
-            throw new ArgumentException(
-                "A name/description translation needs at least a name or a description.", nameof(name));
-
-        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
-        if (component is null)
-            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to update.");
-
-        var row = await session.Query<CommunityTranslation>()
-            .Where(t => t.ComponentId == componentId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Community '{componentId}' has no translation in '{languageCode}'; nothing to update.");
-
-        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only a translator (or an admin) may edit a translation of " +
-                "the community's name or description.");
-
-        row.Name = string.IsNullOrWhiteSpace(name) ? null : name;
-        row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "communitytranslation.update",
-            TargetKind = "component",
-            TargetId = componentId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
+        return await _communityTranslationLane.UpdateAsync(session, componentId, languageCode, name, description, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -3085,50 +2938,8 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         string componentId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(componentId))
-            throw new ArgumentException("A component id is required.", nameof(componentId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
-        if (component is null)
-            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to remove.");
-
-        var row = await session.Query<CommunityTranslation>()
-            .Where(t => t.ComponentId == componentId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Community '{componentId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only a translator (or an admin) may remove a translation of " +
-                "the community's name or description.");
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "communitytranslation.remove",
-            TargetKind = "component",
-            TargetId = componentId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
+        await _communityTranslationLane.RemoveAsync(session, componentId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
