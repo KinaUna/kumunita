@@ -93,6 +93,30 @@ not.
   pay for boundaries we keep, and we do not pay for a network we don't need.
 - Prefer few stable interfaces over many unstable ones.
 
+## The ratchet, the split, the comment
+
+Three code-shape rules that the IMPROVE-CODE gate (`tools/code/code-check.ps1`)
+enforces or the close applies. Each is stated here once; `AGENTS.md` links
+here rather than restating it.
+
+- **The ratchet (shrink-only).** The code-size baseline
+  (`tools/code/code-baseline.json`) only ever goes **down**. A new item over
+  its ceiling, a baselined item growing past its recorded max, a stale entry
+  left behind, or a max raised above `origin/main` — each fails the close.
+  Lowering an item re-tightens the baseline (`code-check.ps1 --tighten`).
+  Raising a number is only ever legitimate with an `adr:` reason on that entry
+  — the baseline is the point: a ceiling that can drift up protects nothing.
+- **The part-vs-whole test (for every new type).** A new type must satisfy at
+  least one of: (a) it has two or more callers, (b) it is a decision that gets
+  its own unit test, (c) it owns a route family or an aggregate. A type that
+  meets none of these is ceremony and is folded back. (The U04 per-surface
+  views were the example: 12 properties, zero consumers outside tests.)
+- **The comment rule (D4: contract + link, applied on touch).** A doc-comment
+  states **what, when, and throws**, plus the ADR number. History stays in the
+  ADR or the handoff note — not in a running change-log above the method. The
+  comment ratio is *reported* by the gate, not gated; the rule is about
+  *what* a comment says, not how many there are.
+
 ## Judge the whole
 
 - Privacy, trust, reliability, and "does the neighborhood actually use it" are

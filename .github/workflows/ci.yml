@@ -102,6 +102,53 @@ jobs:
         run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/docs-check.ps1
 
   # ---------------------------------------------------------------------------
+  # IMPROVE-CODE C00 — the code-size ratchet gate.
+  #
+  # A separate job (like `docs`, not a step in `test`): the gate reads the
+  # repo's source and the shrink-only baseline in
+  # `tools/code/code-baseline.json`, measuring with a Roslyn console tool
+  # (`tools/code/CodeMetrics`). It covers .cs/.ts/.cshtml (gates a/e/f of the
+  # docs script were retired into this finer gate by C00) and exits 0/1.
+  #
+  # The gate's `dotnet run` builds the CodeMetrics tool, so this job needs the
+  # .NET SDK (installed below). The ts-metrics pass shells out to Node, which
+  # `actions/setup-node` provides (ubuntu-latest also ships Node, but we pin
+  # the version for reproducibility — the tool only needs `node` on PATH, not
+  # a specific project).
+  #
+  # The `origin/main` comparison (the "max raised above main without an `adr:`"
+  # ratchet) runs against the default branch; on a PR the checkout is
+  # single-branch and the tool degrades gracefully (it skips that check), so
+  # no extra `fetch-depth` is required for C00.
+  # ---------------------------------------------------------------------------
+  code:
+    runs-on: ubuntu-latest
+    steps:
+      # SEC L5 (U25): tag + commit-SHA pin (same `# v5` convention as the test job).
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK the
+      # Roslyn tool needs (matches global.json's sdk.version, like the test job).
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.400'
+
+      # CI plumbing: Node for the ts-metrics.js pass (the CodeMetrics tool
+      # shells out to `node`; it needs no npm project).
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '20'
+
+      # The gate: runs code-check.ps1 (exit 0/1). Its Roslyn `--check`
+      # compares against tools/code/code-baseline.json and, when available,
+      # against the baseline on origin/main.
+      - name: Run code gate
+        run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/code/code-check.ps1
+
+  # ---------------------------------------------------------------------------
   # F19.U4 — the E2E job (TEST-03, `code`).
   #
   # This job is ADDED by F19.U4 on top of F14.U2's landed "test" job; the two

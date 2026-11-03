@@ -1,0 +1,3932 @@
+{
+  "version": 1,
+  "generated": "2026-11-03T00:00:00Z",
+  "generated_from": "4081cb299fe7a9967a5e76ff0a9331ee279677fe",
+  "ceilings": {
+    "cs_file": 600,
+    "method_lines": 80,
+    "method_cc": 15,
+    "class_public_methods": 25,
+    "interface_methods": 20,
+    "cshtml_lines": 600,
+    "ts_file": 600,
+    "ts_function_lines": 80,
+    "ts_function_cc": 15
+  },
+  "files": [
+    {
+      "id": "src/Kumunita.Core/Announcements/AnnouncementService.cs",
+      "max": 793
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs",
+      "max": 5689
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs",
+      "max": 1633
+    },
+    {
+      "id": "src/Kumunita.Core/Events/EventService.cs",
+      "max": 1064
+    },
+    {
+      "id": "src/Kumunita.Core/Identity/IdentityService.cs",
+      "max": 1044
+    },
+    {
+      "id": "src/Kumunita.Core/Localization/KnownTranslationKeys.cs",
+      "max": 12964
+    },
+    {
+      "id": "src/Kumunita.Core/Localization/LocalizationService.cs",
+      "max": 684
+    },
+    {
+      "id": "src/Kumunita.Core/Pages/PageService.cs",
+      "max": 977
+    },
+    {
+      "id": "src/Kumunita.Core/PersonalNotes/PersonalNoteService.cs",
+      "max": 788
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs",
+      "max": 947
+    },
+    {
+      "id": "src/Kumunita.Core/Posts/PostService.cs",
+      "max": 1047
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs",
+      "max": 2494
+    },
+    {
+      "id": "src/Kumunita.Core/Tags/TagService.cs",
+      "max": 736
+    },
+    {
+      "id": "src/Kumunita.Core/UserInfo/UserInfoService.cs",
+      "max": 2703
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/AdminController.cs",
+      "max": 777
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
+      "max": 613
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/EventController.cs",
+      "max": 1244
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/GroupsController.cs",
+      "max": 1648
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/GuardianController.cs",
+      "max": 746
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/PageController.cs",
+      "max": 833
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/PostsController.cs",
+      "max": 1014
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs",
+      "max": 3186
+    }
+  ],
+  "methods": [
+    {
+      "id": "src/Kumunita.Core/Announcements/AnnouncementService.cs::Kumunita.Core.Announcements.AnnouncementService.PublishAsync(string,string,IDocumentSession)",
+      "max": 83,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Core/Authorization/AuthorizationService.cs::Kumunita.Core.Authorization.AuthorizationService.Decide(IAuditableResource,string,string,IReadOnlySet\u003Cstring\u003E,IReadOnlySet\u003Cstring\u003E,bool,bool,IReadOnlySet\u003Cstring\u003E)",
+      "max": 51,
+      "cc_max": 20
+    },
+    {
+      "id": "src/Kumunita.Core/Bookmarks/BookmarkService.cs::Kumunita.Core.Bookmarks.BookmarkService.ResolveForListAsync(string,string,string)",
+      "max": 80,
+      "cc_max": 28
+    },
+    {
+      "id": "src/Kumunita.Core/Bookmarks/BookmarkService.cs::Kumunita.Core.Bookmarks.BookmarkService.ResolveTargetAsync(string,string,string)",
+      "max": 142,
+      "cc_max": 20
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.BackfillGuideTranslationsAsync(IDocumentSession,CancellationToken)",
+      "max": 85,
+      "cc_max": 22
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.BackfillPageTranslationsAsync(IDocumentSession,CancellationToken)",
+      "max": 66,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.BackfillUserGuidesAsync(IDocumentSession,CancellationToken)",
+      "max": 75,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.DaDefaultPages()",
+      "max": 109,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.DaGuidePages()",
+      "max": 1075,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.DeDefaultPages()",
+      "max": 111,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.DeGuidePages()",
+      "max": 1111,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.EnDefaultPages()",
+      "max": 107,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.FrDefaultPages()",
+      "max": 112,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.FrGuidePages()",
+      "max": 1151,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.GuidePages()",
+      "max": 986,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.SeedDefaultPagesAsync(IDocumentSession,IReadOnlyList\u003C(string Slug, string Title, string Body)\u003E,DateTimeOffset,CancellationToken)",
+      "max": 89,
+      "cc_max": 11
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.BackfillSampleCorpusAsync(AppDbContext,IDocumentStore,UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
+      "max": 782,
+      "cc_max": 128
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.EnsureUserAsync(UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IDocumentStore,string,string?,string,bool,string?,string?,string?,bool,ILogger,CancellationToken)",
+      "max": 69,
+      "cc_max": 23
+    },
+    {
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.SeedAsync(AppDbContext,IDocumentStore,UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
+      "max": 615,
+      "cc_max": 83
+    },
+    {
+      "id": "src/Kumunita.Core/DependencyInjection.cs::Kumunita.Core.ServiceCollectionExtensions.AddKumunitaCore(IServiceCollection)",
+      "max": 164,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Events/EventReminderService.cs::Kumunita.Core.Events.EventReminderService.SendRemindersAsync(IDocumentStore,EventReminderOptions,DateTimeOffset,IMailerStage,ILocalizationService,ITranslationProvider?,CancellationToken,Notifications.NotificationService?)",
+      "max": 106,
+      "cc_max": 26
+    },
+    {
+      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.RsvpAsync(string,string,RsvpStatus,CancellationToken)",
+      "max": 122,
+      "cc_max": 29
+    },
+    {
+      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.UpdateAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateEventRequest,CancellationToken)",
+      "max": 97,
+      "cc_max": 32
+    },
+    {
+      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.UpdateGroupEventAsync(string,string,GroupEventUpdate,IDocumentSession,CancellationToken)",
+      "max": 40,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Core/GroupMessaging/GroupMessagingService.cs::Kumunita.Core.GroupMessaging.GroupMessagingService.SendAsync(string,string,string)",
+      "max": 85,
+      "cc_max": 15
+    },
+    {
+      "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService.DeleteCoreAsync(string,User,string,Authorization.AccessVia,System.Func\u003CIDocumentSession, DateTimeOffset, Task\u003E?)",
+      "max": 166,
+      "cc_max": 23
+    },
+    {
+      "id": "src/Kumunita.Core/Identity/SmtpProbe.cs::Kumunita.Core.Identity.SmtpProbe.TryHandshakeAsync(SmtpOptions,CancellationToken)",
+      "max": 84,
+      "cc_max": 13
+    },
+    {
+      "id": "src/Kumunita.Core/Localization/TranslationBulkImporter.cs::Kumunita.Core.Localization.TranslationBulkImporter.Parse(string,IReadOnlySet\u003Cstring\u003E)",
+      "max": 60,
+      "cc_max": 19
+    },
+    {
+      "id": "src/Kumunita.Core/Localization/TranslationProvider.cs::Kumunita.Core.Localization.TranslationProvider.ResolveChainAsync(string?,IReadOnlyCollection\u003Cstring\u003E?)",
+      "max": 51,
+      "cc_max": 19
+    },
+    {
+      "id": "src/Kumunita.Core/Mentions/Mentions.cs::Kumunita.Core.Mentions.MentionTokens.BuildExcludedMask(string)",
+      "max": 55,
+      "cc_max": 22
+    },
+    {
+      "id": "src/Kumunita.Core/Messaging/MessagingService.cs::Kumunita.Core.Messaging.MessagingService.SendAsync(string,string,string)",
+      "max": 81,
+      "cc_max": 13
+    },
+    {
+      "id": "src/Kumunita.Core/Migrations/20260905190113_InitialIdentity.Designer.cs::Kumunita.Core.Migrations.InitialIdentity.BuildTargetModel(ModelBuilder)",
+      "max": 191,
+      "cc_max": 2
+    },
+    {
+      "id": "src/Kumunita.Core/Migrations/20260905190113_InitialIdentity.cs::Kumunita.Core.Migrations.InitialIdentity.Up(MigrationBuilder)",
+      "max": 194,
+      "cc_max": 1
+    },
+    {
+      "id": "src/Kumunita.Core/Migrations/AppDbContextModelSnapshot.cs::Kumunita.Core.Migrations.AppDbContextModelSnapshot.BuildModel(ModelBuilder)",
+      "max": 191,
+      "cc_max": 2
+    },
+    {
+      "id": "src/Kumunita.Core/Notifications/NotificationService.cs::Kumunita.Core.Notifications.NotificationService.EmitAsync(IDocumentSession,string,string,string,string?,string?,string?,string?,string?,CancellationToken)",
+      "max": 93,
+      "cc_max": 33
+    },
+    {
+      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.CreateAsync(Page,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "max": 117,
+      "cc_max": 30
+    },
+    {
+      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.MoveAsync(string,string?,string?,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "max": 60,
+      "cc_max": 21
+    },
+    {
+      "id": "src/Kumunita.Core/PersonalNotes/PersonalNoteService.cs::Kumunita.Core.PersonalNotes.PersonalNoteService.ResolveForListAsync(string,string,string)",
+      "max": 131,
+      "cc_max": 40
+    },
+    {
+      "id": "src/Kumunita.Core/PersonalNotes/PersonalNoteService.cs::Kumunita.Core.PersonalNotes.PersonalNoteService.ResolveTargetAsync(string,string,string)",
+      "max": 215,
+      "cc_max": 31
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/ImportOwnershipGuard.cs::Kumunita.Core.Portability.ImportOwnershipGuard.Check(string,object,string,Func\u003Cstring, string?\u003E,IReadOnlySet\u003Cstring\u003E?)",
+      "max": 52,
+      "cc_max": 24
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.ApplyAsync(Marten.IDocumentStore,KumunitaArchiveData,PortabilityImportMode,string?,Dictionary\u003Cstring, string\u003E?,CancellationToken)",
+      "max": 73,
+      "cc_max": 35
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.RemapReferencesInArchive(KumunitaArchiveData,string,Dictionary\u003Cstring, string\u003E,string[])",
+      "max": 67,
+      "cc_max": 24
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/PortabilityValidate.cs::Kumunita.Core.Portability.PortabilityValidate.Run(KumunitaArchiveData)",
+      "max": 156,
+      "cc_max": 47
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ClassifyAsync(string,Stream,CancellationToken)",
+      "max": 148,
+      "cc_max": 47
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ExportAsync(string,CancellationToken)",
+      "max": 156,
+      "cc_max": 28
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ResolveAsync(string,UserPortabilityImportPlan,IReadOnlyList\u003CUserPortabilityEntityResolution\u003E,Stream?,CancellationToken)",
+      "max": 251,
+      "cc_max": 70
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ScopeRowHoldsSeat(object,UserScopeEntry,string,IReadOnlySet\u003Cstring\u003E?,IReadOnlySet\u003Cstring\u003E?)",
+      "max": 39,
+      "cc_max": 20
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.StandingComponentAsync(Marten.IQuerySession,string,string,CancellationToken)",
+      "max": 24,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreatePostAsync(PostDraft,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "max": 90,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreateReplyAsync(string,string,string,IDocumentSession,string?,IReadOnlyList\u003Cstring\u003E?)",
+      "max": 65,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.BuildTodoAssignBodyAsync(TodoItem,string,CancellationToken)",
+      "max": 28,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.CreateTodoCommentAsync(string,string,IReadOnlySet\u003Cstring\u003E,string,string?,string?,CancellationToken)",
+      "max": 68,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.MoveTodoToAdjacentLaneAsync(string,string,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
+      "max": 62,
+      "cc_max": 19
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.MoveTodoToLanePositionAsync(string,string,int,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
+      "max": 77,
+      "cc_max": 22
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateLaneAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateLaneRequest,CancellationToken)",
+      "max": 33,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateProjectAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateProjectRequest,CancellationToken)",
+      "max": 55,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateTodoAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateTodoRequest,CancellationToken)",
+      "max": 116,
+      "cc_max": 46
+    },
+    {
+      "id": "src/Kumunita.Core/Search/SearchService.cs::Kumunita.Core.Search.SearchService.SearchAsync(string,SearchScope,string?,CancellationToken)",
+      "max": 47,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Core/SiteContent/SiteContentService.cs::Kumunita.Core.SiteContent.SiteContentService.UpdateTranslationAsync(string,string?,string?,string?,string?,string?,string?,string,CancellationToken)",
+      "max": 42,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToDocumentAsync(string,IReadOnlyList\u003Cstring\u003E,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "max": 82,
+      "cc_max": 9
+    },
+    {
+      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToPageAsync(string,IReadOnlyList\u003Cstring\u003E,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
+      "max": 82,
+      "cc_max": 11
+    },
+    {
+      "id": "src/Kumunita.Core/UserInfo/UserInfoService.cs::Kumunita.Core.UserInfo.UserInfoService.UpdateCommunityAsync(string,string?,string?,int?,bool?,bool?,string)",
+      "max": 36,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/AccountController.cs::Kumunita.Web.Controllers.AccountController.LoginMfa(LoginViewModel)",
+      "max": 84,
+      "cc_max": 19
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/AnnouncementController.cs::Kumunita.Web.Controllers.AnnouncementController.Index(int,string?,string?)",
+      "max": 64,
+      "cc_max": 24
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/DirectoryController.cs::Kumunita.Web.Controllers.DirectoryController.Index(string?,bool,string?,string?)",
+      "max": 47,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/DocumentController.cs::Kumunita.Web.Controllers.DocumentController.Edit(string,DocumentEditViewModel)",
+      "max": 92,
+      "cc_max": 21
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/DocumentController.cs::Kumunita.Web.Controllers.DocumentController.Upload(DocumentUploadViewModel)",
+      "max": 63,
+      "cc_max": 20
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/EventController.cs::Kumunita.Web.Controllers.EventController.Calendar(string?,string?,string?)",
+      "max": 177,
+      "cc_max": 36
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/EventController.cs::Kumunita.Web.Controllers.EventController.CreatePost(EventEditorModel)",
+      "max": 80,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/EventController.cs::Kumunita.Web.Controllers.EventController.Detail(string)",
+      "max": 134,
+      "cc_max": 25
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/EventController.cs::Kumunita.Web.Controllers.EventController.EditPost(string,EventEditorModel)",
+      "max": 93,
+      "cc_max": 15
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/EventController.cs::Kumunita.Web.Controllers.EventController.Index(string?,int,bool,string?,string?)",
+      "max": 117,
+      "cc_max": 32
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/GroupMessagesController.cs::Kumunita.Web.Controllers.GroupMessagesController.Thread(string,int?)",
+      "max": 76,
+      "cc_max": 19
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/GroupsController.cs::Kumunita.Web.Controllers.GroupsController.Detail(string,int,string?,string?)",
+      "max": 153,
+      "cc_max": 33
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/GroupsController.cs::Kumunita.Web.Controllers.GroupsController.GroupEventDetail(string,string)",
+      "max": 61,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/GuardianController.cs::Kumunita.Web.Controllers.GuardianController.Detail(string)",
+      "max": 88,
+      "cc_max": 25
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/HomeController.cs::Kumunita.Web.Controllers.HomeController.BuildPostRowsAsync(string?,string?)",
+      "max": 65,
+      "cc_max": 20
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/HomeController.cs::Kumunita.Web.Controllers.HomeController.Index()",
+      "max": 55,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/InventoryController.cs::Kumunita.Web.Controllers.InventoryController.List(string?,string?,int,string?,string?)",
+      "max": 60,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/KioskController.cs::Kumunita.Web.Controllers.KioskController.SettingsPost(CancellationToken)",
+      "max": 81,
+      "cc_max": 21
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/LocaleController.cs::Kumunita.Web.Controllers.LocaleController.BuildModel()",
+      "max": 72,
+      "cc_max": 30
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/LocaleController.cs::Kumunita.Web.Controllers.LocaleController.Save(string?,string?)",
+      "max": 39,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/MessagesController.cs::Kumunita.Web.Controllers.MessagesController.Thread(string,int?)",
+      "max": 77,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ModerationController.cs::Kumunita.Web.Controllers.ModerationController.Index()",
+      "max": 115,
+      "cc_max": 39
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ModerationController.cs::Kumunita.Web.Controllers.ModerationController.Resolve(string)",
+      "max": 128,
+      "cc_max": 36
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/PageController.cs::Kumunita.Web.Controllers.PageController.Index()",
+      "max": 68,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/PageController.cs::Kumunita.Web.Controllers.PageController.Show(string)",
+      "max": 150,
+      "cc_max": 36
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/PostsController.cs::Kumunita.Web.Controllers.PostsController.AllSections(int,string?,string?)",
+      "max": 86,
+      "cc_max": 23
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/PostsController.cs::Kumunita.Web.Controllers.PostsController.Detail(string)",
+      "max": 85,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/PostsController.cs::Kumunita.Web.Controllers.PostsController.Index(string,int,string?,string?)",
+      "max": 83,
+      "cc_max": 24
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.BoardDetail(string,string?)",
+      "max": 190,
+      "cc_max": 30
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.CreatePost(TodoEditorModel)",
+      "max": 72,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.ProjectCreate(ProjectComposerViewModel)",
+      "max": 54,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.ProjectDetail(string)",
+      "max": 124,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.ProjectRow(TodoItem,TodoItem?,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlySet\u003Cstring\u003E,IReadOnlyCollection\u003Cstring\u003E)",
+      "max": 49,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.ProjectsIndex(string?,int,string?,string?)",
+      "max": 103,
+      "cc_max": 26
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.TodoCreateAndLinkEvent(string,string?,DateTime,DateTime,string?)",
+      "max": 88,
+      "cc_max": 8
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.TodoDetail(string)",
+      "max": 173,
+      "cc_max": 26
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController.TodosIndex(string?,string?,bool,bool,bool,int,string?,string?)",
+      "max": 100,
+      "cc_max": 27
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/PublicLocaleController.cs::Kumunita.Web.Controllers.PublicLocaleController.Save(string?,string?,string?)",
+      "max": 41,
+      "cc_max": 20
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/SearchController.cs::Kumunita.Web.Controllers.SearchController.Index(string?,string?,string?,int?,string?,string?)",
+      "max": 80,
+      "cc_max": 25
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/TagController.cs::Kumunita.Web.Controllers.TagController.ByTag(string,int,string?,string?)",
+      "max": 64,
+      "cc_max": 19
+    },
+    {
+      "id": "src/Kumunita.Web/Localization/AccountValidationLocalizer.cs::Kumunita.Web.Localization.AccountValidationLocalizer.ApplyAsync(object,ModelStateDictionary?,HttpRequest?,ILocalizationService?,ITranslationProvider)",
+      "max": 39,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Web/Localization/AccountValidationLocalizer.cs::Kumunita.Web.Localization.AccountValidationLocalizer.Rewrite(ModelError,string,string,System.Collections.Generic.IReadOnlyDictionary\u003Cstring, string\u003E,Type,string,ITranslationProvider)",
+      "max": 53,
+      "cc_max": 16
+    },
+    {
+      "id": "src/Kumunita.Web/Security/MarkdownRenderer.cs::Kumunita.Web.Security.MarkdownRenderer.RenderHtml(string?)",
+      "max": 90,
+      "cc_max": 29
+    },
+    {
+      "id": "src/Kumunita.Web/Security/MentionRenderer.cs::Kumunita.Web.Security.MentionRenderer.Render(string?,IReadOnlyDictionary\u003Cstring, string\u003E?)",
+      "max": 54,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Web/Security/RequestLanguage.cs::Kumunita.Web.Security.RequestLanguage.ParseAcceptLanguage(string?)",
+      "max": 50,
+      "cc_max": 16
+    }
+  ],
+  "classes": [
+    {
+      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService",
+      "max": 30
+    },
+    {
+      "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService",
+      "max": 33
+    },
+    {
+      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService",
+      "max": 28
+    },
+    {
+      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService",
+      "max": 31
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService",
+      "max": 65
+    },
+    {
+      "id": "src/Kumunita.Core/UserInfo/UserInfoService.cs::Kumunita.Core.UserInfo.UserInfoService",
+      "max": 86
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/AdminController.cs::Kumunita.Web.Controllers.AdminController",
+      "max": 26
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/GroupsController.cs::Kumunita.Web.Controllers.GroupsController",
+      "max": 46
+    },
+    {
+      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs::Kumunita.Web.Controllers.ProjectsController",
+      "max": 63
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "src/Kumunita.Core/Announcements/IAnnouncementService.cs::Kumunita.Core.Announcements.IAnnouncementService",
+      "max": 21
+    },
+    {
+      "id": "src/Kumunita.Core/Events/IEventService.cs::Kumunita.Core.Events.IEventService",
+      "max": 27
+    },
+    {
+      "id": "src/Kumunita.Core/Identity/IIdentityService.cs::Kumunita.Core.Identity.IIdentityService",
+      "max": 33
+    },
+    {
+      "id": "src/Kumunita.Core/Localization/ILocalizationService.cs::Kumunita.Core.Localization.ILocalizationService",
+      "max": 22
+    },
+    {
+      "id": "src/Kumunita.Core/Projects/IProjectService.cs::Kumunita.Core.Projects.IProjectService",
+      "max": 58
+    },
+    {
+      "id": "src/Kumunita.Core/UserInfo/IUserInfoService.cs::Kumunita.Core.UserInfo.IUserInfoService",
+      "max": 86
+    }
+  ],
+  "views": [
+    {
+      "id": "src/Kumunita.Web/Views/Event/Detail.cshtml",
+      "max": 724
+    },
+    {
+      "id": "src/Kumunita.Web/Views/Groups/Detail.cshtml",
+      "max": 813
+    },
+    {
+      "id": "src/Kumunita.Web/Views/Groups/PostDetail.cshtml",
+      "max": 764
+    },
+    {
+      "id": "src/Kumunita.Web/Views/Guardian/Detail.cshtml",
+      "max": 747
+    },
+    {
+      "id": "src/Kumunita.Web/Views/Posts/Detail.cshtml",
+      "max": 662
+    },
+    {
+      "id": "src/Kumunita.Web/Views/Projects/BoardDetail.cshtml",
+      "max": 1090
+    },
+    {
+      "id": "src/Kumunita.Web/Views/Projects/TodoDetail.cshtml",
+      "max": 1154
+    },
+    {
+      "id": "src/Kumunita.Web/Views/Shared/_BoardCard.cshtml",
+      "max": 634
+    },
+    {
+      "id": "src/Kumunita.Web/Views/Shared/_Layout.cshtml",
+      "max": 830
+    }
+  ],
+  "ts": [
+    {
+      "id": "src/Kumunita.Web/client/lib/rich-editor.ts",
+      "max": 1023
+    }
+  ],
+  "ts_functions": [
+    {
+      "id": "src/Kumunita.Web/client/lib/dom-to-markdown.ts::inlineChildren",
+      "max": 41,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/dom-to-markdown.ts::sanitizeNode",
+      "max": 32,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/dom-to-markdown.ts::serializeNode",
+      "max": 60,
+      "cc_max": 25
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/events-calendar-time.ts::bindEventsCalendarTime",
+      "max": 176,
+      "cc_max": 30
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/events-calendar.ts::bindEventsCalendar",
+      "max": 69,
+      "cc_max": 18
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/image-editor.ts::ieInstance0",
+      "max": 94,
+      "cc_max": 10
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/kiosk-settings.ts::bindPicker",
+      "max": 177,
+      "cc_max": 46
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/kiosk-settings.ts::initKioskEditor",
+      "max": 301,
+      "cc_max": 81
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/note-modal.ts::wireNoteButton",
+      "max": 154,
+      "cc_max": 17
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/notifications-bell.ts::openDropdown",
+      "max": 109,
+      "cc_max": 11
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/rich-editor.ts::bindRichEditor",
+      "max": 828,
+      "cc_max": 126
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/rich-editor.ts::renderPreview",
+      "max": 106,
+      "cc_max": 28
+    },
+    {
+      "id": "src/Kumunita.Web/client/lib/tag-suggest.ts::bindTagSuggest",
+      "max": 189,
+      "cc_max": 21
+    }
+  ],
+  "boundary_violations": [
+    {
+      "from": "AdminOnboarding",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Mentions",
+      "symbol": "MentionTokens",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Notifications",
+      "symbol": "UgcSnippets",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Query",
+      "symbol": "MiscSortSupport",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "UserInfo",
+      "symbol": "ComponentMembership",
+      "count": 1
+    },
+    {
+      "from": "Announcements",
+      "to": "Web",
+      "symbol": "AttachmentIds",
+      "count": 2
+    },
+    {
+      "from": "Authorization",
+      "to": "Identity",
+      "symbol": "User",
+      "count": 2
+    },
+    {
+      "from": "Authorization",
+      "to": "Posts",
+      "symbol": "Report",
+      "count": 2
+    },
+    {
+      "from": "Authorization",
+      "to": "UserInfo",
+      "symbol": "Component",
+      "count": 1
+    },
+    {
+      "from": "Authorization",
+      "to": "UserInfo",
+      "symbol": "Group",
+      "count": 3
+    },
+    {
+      "from": "Authorization",
+      "to": "UserInfo",
+      "symbol": "ModeratorAssignment",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Inventory",
+      "symbol": "InventoryItem",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Pages",
+      "symbol": "PageToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Posts",
+      "symbol": "PostToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "UserInfo",
+      "symbol": "ProfileToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Bookmarks",
+      "to": "Web",
+      "symbol": "Row",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "AdminOnboarding",
+      "symbol": "AdminOnboarding",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Announcements",
+      "symbol": "AnnouncementTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 3
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Events",
+      "symbol": "EventRsvp",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Events",
+      "symbol": "EventTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Identity",
+      "symbol": "AppDbContext",
+      "count": 3
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Identity",
+      "symbol": "DbBootstrap",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Identity",
+      "symbol": "IdentityService",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Identity",
+      "symbol": "IdentityToken",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 2
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Identity",
+      "symbol": "SeedAdminOptions",
+      "count": 2
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Identity",
+      "symbol": "User",
+      "count": 3
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Identity",
+      "symbol": "VerificationOptions",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Inventory",
+      "symbol": "InventoryCheckout",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Inventory",
+      "symbol": "InventoryItem",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Localization",
+      "symbol": "DateFormat",
+      "count": 3
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Localization",
+      "symbol": "LanguageCatalog",
+      "count": 2
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 2
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Localization",
+      "symbol": "TranslationResource",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 2
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Pages",
+      "symbol": "PageTranslation",
+      "count": 2
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Posts",
+      "symbol": "PostReply",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Posts",
+      "symbol": "PostTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Posts",
+      "symbol": "ReplyTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Projects",
+      "symbol": "BoardItemPlacement",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Projects",
+      "symbol": "BoardTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Projects",
+      "symbol": "KanbanLane",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Projects",
+      "symbol": "ProjectGoal",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Projects",
+      "symbol": "ProjectTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "SiteContent",
+      "symbol": "SiteContent",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "SurfaceLabels",
+      "symbol": "SurfaceLabels",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Tags",
+      "symbol": "Tag",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Tags",
+      "symbol": "TagTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "UserInfo",
+      "symbol": "CommunityTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "UserInfo",
+      "symbol": "Group",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "UserInfo",
+      "symbol": "GroupMembership",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "UserInfo",
+      "symbol": "GroupTranslation",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "UserInfo",
+      "symbol": "GuardianLink",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "UserInfo",
+      "symbol": "ModeratorAssignment",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "UserInfo",
+      "symbol": "Profile",
+      "count": 2
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Web",
+      "symbol": "AttachmentIds",
+      "count": 1
+    },
+    {
+      "from": "Bootstrap",
+      "to": "Web",
+      "symbol": "TagSlugs",
+      "count": 2
+    },
+    {
+      "from": "Documents",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Documents",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 5
+    },
+    {
+      "from": "Documents",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Documents",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 2
+    },
+    {
+      "from": "Documents",
+      "to": "Query",
+      "symbol": "MiscSortSupport",
+      "count": 1
+    },
+    {
+      "from": "Documents",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Documents",
+      "to": "Web",
+      "symbol": "TagSlugs",
+      "count": 3
+    },
+    {
+      "from": "ErrorReports",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 2
+    },
+    {
+      "from": "ErrorReports",
+      "to": "Web",
+      "symbol": "Row",
+      "count": 2
+    },
+    {
+      "from": "Events",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Authorization",
+      "symbol": "AccessAuditFactory",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 5
+    },
+    {
+      "from": "Events",
+      "to": "Authorization",
+      "symbol": "StandingMatrix",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Identity",
+      "symbol": "OutboxEmail",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Localization",
+      "symbol": "DateFormat",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Mentions",
+      "symbol": "MentionTokens",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 2
+    },
+    {
+      "from": "Events",
+      "to": "Notifications",
+      "symbol": "UgcSnippets",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 2
+    },
+    {
+      "from": "Events",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "UserInfo",
+      "symbol": "GuardianLink",
+      "count": 1
+    },
+    {
+      "from": "Events",
+      "to": "UserInfo",
+      "symbol": "Profile",
+      "count": 2
+    },
+    {
+      "from": "Events",
+      "to": "Web",
+      "symbol": "AttachmentIds",
+      "count": 4
+    },
+    {
+      "from": "GroupMessaging",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "GroupMessaging",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 1
+    },
+    {
+      "from": "GroupMessaging",
+      "to": "Mentions",
+      "symbol": "MentionTokens",
+      "count": 1
+    },
+    {
+      "from": "GroupMessaging",
+      "to": "Messaging",
+      "symbol": "Conversation",
+      "count": 1
+    },
+    {
+      "from": "GroupMessaging",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "GroupMessaging",
+      "to": "Notifications",
+      "symbol": "UgcSnippets",
+      "count": 1
+    },
+    {
+      "from": "GroupMessaging",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Announcements",
+      "symbol": "AnnouncementComment",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Announcements",
+      "symbol": "AnnouncementTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Bookmarks",
+      "symbol": "Bookmark",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Bookmarks",
+      "symbol": "BookmarkFolder",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Bootstrap",
+      "symbol": "SampleDataSeeder",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Documents",
+      "symbol": "Document",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Documents",
+      "symbol": "DocumentFolder",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Events",
+      "symbol": "EventRsvp",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Events",
+      "symbol": "EventTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Inventory",
+      "symbol": "InventoryItem",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Media",
+      "symbol": "MediaObject",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Messaging",
+      "symbol": "Conversation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Messaging",
+      "symbol": "Message",
+      "count": 3
+    },
+    {
+      "from": "Identity",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Pages",
+      "symbol": "PageTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "PersonalNotes",
+      "symbol": "NoteFolder",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "PersonalNotes",
+      "symbol": "PersonalNote",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Posts",
+      "symbol": "PostReply",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Posts",
+      "symbol": "PostTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Posts",
+      "symbol": "ReplyTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "BoardItemPlacement",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "BoardTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "KanbanLane",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "ProjectGoal",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "ProjectTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "TodoComment",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Projects",
+      "symbol": "TodoTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Tags",
+      "symbol": "Tag",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "Tags",
+      "symbol": "TagTranslation",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "UserInfo",
+      "symbol": "ComponentMembership",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "UserInfo",
+      "symbol": "GroupMembership",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "UserInfo",
+      "symbol": "GuardianLink",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "UserInfo",
+      "symbol": "ModeratorAssignment",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "UserInfo",
+      "symbol": "Profile",
+      "count": 2
+    },
+    {
+      "from": "Inventory",
+      "to": "Authorization",
+      "symbol": "AccessAuditFactory",
+      "count": 1
+    },
+    {
+      "from": "Inventory",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 3
+    },
+    {
+      "from": "Inventory",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Inventory",
+      "to": "Query",
+      "symbol": "MiscSortSupport",
+      "count": 1
+    },
+    {
+      "from": "Inventory",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Kiosk",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "Kiosk",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Kiosk",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Kiosk",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 1
+    },
+    {
+      "from": "Kiosk",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "Localization",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Localization",
+      "to": "Bootstrap",
+      "symbol": "FirstBootSeeder",
+      "count": 1
+    },
+    {
+      "from": "Localization",
+      "to": "Messaging",
+      "symbol": "Message",
+      "count": 1
+    },
+    {
+      "from": "Localization",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 1
+    },
+    {
+      "from": "Localization",
+      "to": "Pages",
+      "symbol": "PageTranslation",
+      "count": 1
+    },
+    {
+      "from": "Mentions",
+      "to": "UserInfo",
+      "symbol": "DirectoryService",
+      "count": 1
+    },
+    {
+      "from": "Messaging",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Messaging",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 1
+    },
+    {
+      "from": "Messaging",
+      "to": "Mentions",
+      "symbol": "MentionTokens",
+      "count": 1
+    },
+    {
+      "from": "Messaging",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "Messaging",
+      "to": "Notifications",
+      "symbol": "UgcSnippets",
+      "count": 1
+    },
+    {
+      "from": "Messaging",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Migrations",
+      "to": "Identity",
+      "symbol": "AppDbContext",
+      "count": 2
+    },
+    {
+      "from": "Moderation",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Events",
+      "symbol": "EventToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Posts",
+      "symbol": "PostReply",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Posts",
+      "symbol": "PostToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Posts",
+      "symbol": "Report",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Projects",
+      "symbol": "KanbanBoardToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Projects",
+      "symbol": "ProjectToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "Projects",
+      "symbol": "TodoItemToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "UserInfo",
+      "symbol": "ModeratorAssignment",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "Bootstrap",
+      "symbol": "SampleDataSeeder",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "Events",
+      "symbol": "EventRsvp",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "Events",
+      "symbol": "GuardianEventRequest",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "Identity",
+      "symbol": "EmailDeadLetter",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "Identity",
+      "symbol": "VerificationOptions",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "Posts",
+      "symbol": "PostReply",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "UserInfo",
+      "symbol": "Profile",
+      "count": 1
+    },
+    {
+      "from": "Notifications",
+      "to": "Web",
+      "symbol": "Row",
+      "count": 1
+    },
+    {
+      "from": "Pages",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Pages",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 3
+    },
+    {
+      "from": "Pages",
+      "to": "Bootstrap",
+      "symbol": "FirstBootSeeder",
+      "count": 1
+    },
+    {
+      "from": "Pages",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Pages",
+      "to": "Identity",
+      "symbol": "User",
+      "count": 2
+    },
+    {
+      "from": "Pages",
+      "to": "Mentions",
+      "symbol": "MentionTokens",
+      "count": 1
+    },
+    {
+      "from": "Pages",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "Pages",
+      "to": "Notifications",
+      "symbol": "NotificationSubscription",
+      "count": 1
+    },
+    {
+      "from": "Pages",
+      "to": "Notifications",
+      "symbol": "UgcSnippets",
+      "count": 1
+    },
+    {
+      "from": "Pages",
+      "to": "Web",
+      "symbol": "AttachmentIds",
+      "count": 2
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Documents",
+      "symbol": "Document",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Documents",
+      "symbol": "DocumentToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Inventory",
+      "symbol": "InventoryItem",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Pages",
+      "symbol": "PageToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Posts",
+      "symbol": "PostToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "PersonalNotes",
+      "to": "UserInfo",
+      "symbol": "ProfileToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Announcements",
+      "symbol": "AnnouncementComment",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Announcements",
+      "symbol": "AnnouncementTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "Bookmarks",
+      "symbol": "Bookmark",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Documents",
+      "symbol": "Document",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Documents",
+      "symbol": "DocumentFolder",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "ErrorReports",
+      "symbol": "EscalationOutboundConfig",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Events",
+      "symbol": "EventRsvp",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Events",
+      "symbol": "EventTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Identity",
+      "symbol": "AppDbContext",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 4
+    },
+    {
+      "from": "Portability",
+      "to": "Identity",
+      "symbol": "User",
+      "count": 4
+    },
+    {
+      "from": "Portability",
+      "to": "Inventory",
+      "symbol": "InventoryItem",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Localization",
+      "symbol": "LanguageCatalog",
+      "count": 3
+    },
+    {
+      "from": "Portability",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "Localization",
+      "symbol": "TranslationResource",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Media",
+      "symbol": "MediaObject",
+      "count": 3
+    },
+    {
+      "from": "Portability",
+      "to": "Media",
+      "symbol": "MediaOptions",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Messaging",
+      "symbol": "Conversation",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "Messaging",
+      "symbol": "Message",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "Notifications",
+      "symbol": "Notification",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Notifications",
+      "symbol": "NotificationPreference",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Notifications",
+      "symbol": "NotificationSubscription",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "Pages",
+      "symbol": "PageTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Posts",
+      "symbol": "PostReply",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Posts",
+      "symbol": "PostTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Posts",
+      "symbol": "ReplyTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Posts",
+      "symbol": "Report",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "BoardItemPlacement",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "BoardTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "KanbanLane",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "ProjectGoal",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "ProjectTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "TodoComment",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Projects",
+      "symbol": "TodoTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Tags",
+      "symbol": "Tag",
+      "count": 3
+    },
+    {
+      "from": "Portability",
+      "to": "Tags",
+      "symbol": "TagTranslation",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "Usage",
+      "symbol": "CommunityStorageSettings",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "Usage",
+      "symbol": "StorageLimits",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "CommunityTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "Component",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "ComponentMembership",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "DelegationGrant",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "Group",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "GroupInvitation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "GroupJoinRequest",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "GroupMembership",
+      "count": 2
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "GroupTranslation",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "GuardianLink",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "ModeratorAssignment",
+      "count": 1
+    },
+    {
+      "from": "Portability",
+      "to": "UserInfo",
+      "symbol": "Profile",
+      "count": 2
+    },
+    {
+      "from": "Posts",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 4
+    },
+    {
+      "from": "Posts",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "Mentions",
+      "symbol": "MentionTokens",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "Notifications",
+      "symbol": "UgcSnippets",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 2
+    },
+    {
+      "from": "Posts",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "UserInfo",
+      "symbol": "ComponentMembership",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "UserInfo",
+      "symbol": "GroupMembership",
+      "count": 1
+    },
+    {
+      "from": "Posts",
+      "to": "Web",
+      "symbol": "AttachmentIds",
+      "count": 5
+    },
+    {
+      "from": "Posts",
+      "to": "Web",
+      "symbol": "TagSlugs",
+      "count": 2
+    },
+    {
+      "from": "Projects",
+      "to": "Authorization",
+      "symbol": "AccessAuditFactory",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 10
+    },
+    {
+      "from": "Projects",
+      "to": "Authorization",
+      "symbol": "StandingMatrix",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Events",
+      "symbol": "EventToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Localization",
+      "symbol": "DateFormat",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Mentions",
+      "symbol": "MentionTokens",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Notifications",
+      "symbol": "UgcSnippets",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "UserInfo",
+      "symbol": "Group",
+      "count": 1
+    },
+    {
+      "from": "Projects",
+      "to": "Web",
+      "symbol": "AttachmentIds",
+      "count": 2
+    },
+    {
+      "from": "Projects",
+      "to": "Web",
+      "symbol": "TagSlugs",
+      "count": 2
+    },
+    {
+      "from": "Search",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Documents",
+      "symbol": "Document",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Documents",
+      "symbol": "DocumentToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Events",
+      "symbol": "EventToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Inventory",
+      "symbol": "InventoryItem",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Inventory",
+      "symbol": "InventoryItemToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 2
+    },
+    {
+      "from": "Search",
+      "to": "Pages",
+      "symbol": "PageToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Posts",
+      "symbol": "PostToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Projects",
+      "symbol": "KanbanBoardToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Projects",
+      "symbol": "ProjectToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Projects",
+      "symbol": "TodoItemToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "Tags",
+      "symbol": "Tag",
+      "count": 1
+    },
+    {
+      "from": "Search",
+      "to": "UserInfo",
+      "symbol": "Group",
+      "count": 1
+    },
+    {
+      "from": "Sessions",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "SiteContent",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "SurfaceLabels",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Tags",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "Tags",
+      "to": "Documents",
+      "symbol": "Document",
+      "count": 2
+    },
+    {
+      "from": "Tags",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "Tags",
+      "to": "Identity",
+      "symbol": "User",
+      "count": 1
+    },
+    {
+      "from": "Tags",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 3
+    },
+    {
+      "from": "Tags",
+      "to": "Pages",
+      "symbol": "PageToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Tags",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 3
+    },
+    {
+      "from": "Tags",
+      "to": "Posts",
+      "symbol": "PostToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Tags",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 2
+    },
+    {
+      "from": "Tags",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 2
+    },
+    {
+      "from": "Tags",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "Tags",
+      "to": "Query",
+      "symbol": "TagPeopleSortSupport",
+      "count": 1
+    },
+    {
+      "from": "Usage",
+      "to": "Media",
+      "symbol": "MediaObject",
+      "count": 1
+    },
+    {
+      "from": "Usage",
+      "to": "Media",
+      "symbol": "MediaOptions",
+      "count": 1
+    },
+    {
+      "from": "Usage",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 1
+    },
+    {
+      "from": "UserInfo",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 1
+    },
+    {
+      "from": "UserInfo",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 3
+    },
+    {
+      "from": "UserInfo",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 1
+    },
+    {
+      "from": "UserInfo",
+      "to": "Localization",
+      "symbol": "DateFormat",
+      "count": 2
+    },
+    {
+      "from": "UserInfo",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 1
+    },
+    {
+      "from": "UserInfo",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 1
+    },
+    {
+      "from": "UserInfo",
+      "to": "Query",
+      "symbol": "TagPeopleSortSupport",
+      "count": 1
+    },
+    {
+      "from": "UserInfo",
+      "to": "Tags",
+      "symbol": "Tag",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "AdminOnboarding",
+      "symbol": "AdminOnboarding",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "AdminOnboarding",
+      "symbol": "AdminOnboardingDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Announcements",
+      "symbol": "Announcement",
+      "count": 5
+    },
+    {
+      "from": "Web",
+      "to": "Announcements",
+      "symbol": "AnnouncementService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Announcements",
+      "symbol": "AnnouncementTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Authorization",
+      "symbol": "AccessAudit",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Authorization",
+      "symbol": "AdminOverride",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Authorization",
+      "symbol": "Audience",
+      "count": 16
+    },
+    {
+      "from": "Web",
+      "to": "Authorization",
+      "symbol": "AuditPurgeOptions",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Authorization",
+      "symbol": "AuditPurgeService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Authorization",
+      "symbol": "AuthorizationFeature",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Bookmarks",
+      "symbol": "Bookmark",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Bootstrap",
+      "symbol": "FirstBootSeeder",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Bootstrap",
+      "symbol": "SampleDataSeeder",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Bootstrap",
+      "symbol": "SchemaBootstrap",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Documents",
+      "symbol": "Document",
+      "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "Documents",
+      "symbol": "DocumentFolder",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Documents",
+      "symbol": "DocumentFolderService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Documents",
+      "symbol": "DocumentService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "ErrorReports",
+      "symbol": "ErrorReport",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "ErrorReports",
+      "symbol": "ErrorReportDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "ErrorReports",
+      "symbol": "EscalationDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "ErrorReports",
+      "symbol": "EscalationOutboundConfig",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Events",
+      "symbol": "Event",
+      "count": 12
+    },
+    {
+      "from": "Web",
+      "to": "Events",
+      "symbol": "EventReminderOptions",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Events",
+      "symbol": "EventReminderService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Events",
+      "symbol": "EventRsvp",
+      "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "Events",
+      "symbol": "EventService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Events",
+      "symbol": "EventTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Events",
+      "symbol": "IcsWriter",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Events",
+      "symbol": "TodoIcsWriter",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "GroupMessaging",
+      "symbol": "GroupMessage",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "AppDbContext",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "ClaimShaping",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "ClaimTypes",
+      "count": 12
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "DbBootstrap",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "DisallowedEmailDomainException",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "EmailDeadLetterWriter",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "GuestAccess",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "HealthOptions",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "IdentityToken",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "NoopBotChallengeVerifier",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "OutboxEmail",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "Roles",
+      "count": 34
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "SampleDataOptions",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "SeedAdminOptions",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "SignupBotChallengeOptions",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "SmtpOptions",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "TurnstileBotChallengeVerifier",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "User",
+      "count": 71
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
+      "symbol": "VerificationOptions",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Inventory",
+      "symbol": "InventoryCheckout",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Inventory",
+      "symbol": "InventoryItem",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Kiosk",
+      "symbol": "KioskDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Kiosk",
+      "symbol": "KioskEntry",
+      "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "Localization",
+      "symbol": "DateFormat",
+      "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "Localization",
+      "symbol": "LanguageCatalog",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Localization",
+      "symbol": "LocaleSettings",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Localization",
+      "symbol": "TranslationBulkExporter",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Localization",
+      "symbol": "TranslationBulkImport",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Localization",
+      "symbol": "TranslationBulkImportRefused",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Localization",
+      "symbol": "TranslationBulkImporter",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Localization",
+      "symbol": "TranslationProvider",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Logging",
+      "symbol": "FileSinkOptions",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Media",
+      "symbol": "MediaLifecycleService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Media",
+      "symbol": "MediaObject",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Media",
+      "symbol": "MediaOptions",
+      "count": 8
+    },
+    {
+      "from": "Web",
+      "to": "Mentions",
+      "symbol": "MentionTokens",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Messaging",
+      "symbol": "Conversation",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Messaging",
+      "symbol": "Message",
+      "count": 18
+    },
+    {
+      "from": "Web",
+      "to": "Moderation",
+      "symbol": "ModerationService",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Notifications",
+      "symbol": "MailAlarmsService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Notifications",
+      "symbol": "Notification",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Notifications",
+      "symbol": "NotificationFlushService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Notifications",
+      "symbol": "NotificationOptions",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Notifications",
+      "symbol": "NotificationQuietSchedule",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Notifications",
+      "symbol": "NotificationService",
+      "count": 5
+    },
+    {
+      "from": "Web",
+      "to": "Pages",
+      "symbol": "Page",
+      "count": 17
+    },
+    {
+      "from": "Web",
+      "to": "Pages",
+      "symbol": "PageDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Pages",
+      "symbol": "PageService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Pages",
+      "symbol": "PageToAuditableResource",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Pages",
+      "symbol": "PageTranslation",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Posts",
+      "symbol": "Post",
+      "count": 12
+    },
+    {
+      "from": "Web",
+      "to": "Posts",
+      "symbol": "PostReply",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Posts",
+      "symbol": "PostService",
+      "count": 8
+    },
+    {
+      "from": "Web",
+      "to": "Posts",
+      "symbol": "PostToAuditableResource",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Posts",
+      "symbol": "PostTranslation",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Posts",
+      "symbol": "ReplyTranslation",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Posts",
+      "symbol": "Report",
+      "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "BoardItemPlacement",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "BoardTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "KanbanBoard",
+      "count": 5
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "KanbanLane",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "KanbanStatuses",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "Project",
+      "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "ProjectGoal",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "ProjectService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "ProjectTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "TodoItem",
+      "count": 5
+    },
+    {
+      "from": "Web",
+      "to": "Projects",
+      "symbol": "TodoTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Query",
+      "symbol": "PageSizer",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Query",
+      "symbol": "WeekAnchor",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Search",
+      "symbol": "SearchService",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Sessions",
+      "symbol": "SessionDoc",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Sessions",
+      "symbol": "SessionService",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "SiteContent",
+      "symbol": "SiteContent",
+      "count": 5
+    },
+    {
+      "from": "Web",
+      "to": "SiteContent",
+      "symbol": "SiteContentDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "SiteContent",
+      "symbol": "SiteContentService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "SiteContent",
+      "symbol": "SiteContentTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "SurfaceLabels",
+      "symbol": "SurfaceLabelTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "SurfaceLabels",
+      "symbol": "SurfaceLabels",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "SurfaceLabels",
+      "symbol": "SurfaceLabelsDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Tags",
+      "symbol": "Tag",
+      "count": 7
+    },
+    {
+      "from": "Web",
+      "to": "Tags",
+      "symbol": "TagTranslation",
+      "count": 2
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "CommunityStorageSettings",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "StorageHistoryDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "StorageLimits",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "StorageMetricsCaptureService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "StorageMetricsSample",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "StorageSettingsDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "SurfaceRow",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "UsageCaptureInput",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "UsageDailyTotal",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "UsageDocTypes",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "UsageEvent",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Usage",
+      "symbol": "UsagePurgeService",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "CommunityTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "Component",
+      "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "DirectoryService",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "Group",
+      "count": 3
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "GroupTranslation",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "GuardianLink",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "GuardianTimeLimitEvaluator",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "GuardianTimeLimitSchedule",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "ModeratorAssignment",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "Profile",
+      "count": 10
+    },
+    {
+      "from": "Web",
+      "to": "UserInfo",
+      "symbol": "ProfileToAuditableResource",
+      "count": 1
+    }
+  ],
+  "controllers_marten_allowlist": [
+    {
+      "file": "src/Kumunita.Web/Controllers/AccountController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/AdminAnalyticsController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/AdminController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/AdminGuestsController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/AdminHelpController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/AdminStorageController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/AttachmentController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/BookmarksController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/CommunityController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/ContentImageController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/DirectoryController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/DocumentController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/DocumentFolderController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/EscalationConfigController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/EventController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/GroupsController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/GuardianController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/HealthController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/KioskController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/LanguagesController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/LocaleController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/ModerationController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/MyDraftsController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/NotesController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/PageController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/PostsController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/ProjectsController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/PublicLocaleController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/ReportTargetsController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/TagController.cs",
+      "reason": "initial baseline (IMPROVE-CODE C00)"
+    }
+  ],
+  "seam_test": {
+    "mode": "report"
+  },
+  "tightened": "2026-11-03T09:30:25Z"
+}
