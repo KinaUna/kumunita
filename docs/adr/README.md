@@ -11,7 +11,7 @@ related:
 updated: 2026-11-02
 ---
 
-> **Abstract:** the index of the 285 architecture decision records (ADRs) —
+> **Abstract:** the index of the 289 architecture decision records (ADRs) —
 > one row per ADR (number, title, status), generated from the ADRs'
 > front-matter. **Who is it for:** anyone finding or adding an ADR.
 > **When to read the rest:** before writing a new ADR (start from
@@ -315,3 +315,7 @@ Decision / Consequences. New decisions take the next number.
 | 0283 | Icons on tab strips and button-group switches | Accepted |
 | 0284 | Home \"What's new\" feed for anonymous visitors | Accepted |
 | 0285 | Kiosk playlist: any item, per-entry duration, scroll and comments | Accepted |
+| 0286 | IUserInfoService back to the access core: four sibling interfaces for groups, community, guardian, and profile settings | Accepted |
+| 0287 | Projects module split: IProjectService (projects + goals), IBoardService (boards, lanes, placements), ITodoService (todos, comments, claim/assign) | Accepted |
+| 0288 | One shared translation-variant lane: the Core contract plus the Web action helper that every translatable surface uses | Accepted |
+| 0289 | Data as embedded resources: translation keys, guide pages, and the sample corpus are embedded resources, not C# literals | Accepted |
