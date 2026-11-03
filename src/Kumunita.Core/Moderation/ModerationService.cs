@@ -51,13 +51,13 @@ public sealed class ModerationService
     // M6 (U04) — the notification emitter (frozen surface, U03). Optional so the
     // existing (pre-M6) positional call sites keep compiling (CS1736, the TG-lane
     // precedent); production wiring passes the DI-registered instance.
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     public ModerationService(
         IUserInfoService userInfo,
         IAuthorizationService authz,
         IDocumentStore store,
-        NotificationService? notifications = null)
+        INotificationEmitter? notifications = null)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));

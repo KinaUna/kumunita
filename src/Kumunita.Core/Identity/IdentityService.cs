@@ -41,7 +41,7 @@ public sealed class IdentityService(
     IOptions<VerificationOptions> verificationOptions,
     Microsoft.Extensions.Logging.ILogger<IdentityService> logger,
     Kumunita.Core.Localization.ITranslationProvider? translationProvider = null,
-    NotificationService? notifications = null,
+    INotificationEmitter? notifications = null,
     // ADR 0138 — the SampleData__Enabled flag (config; the seeder's gate).
     // Placed last (optional, default null) so no existing positional caller
     // breaks: a null reader resolves as "not a sample-data instance" (the

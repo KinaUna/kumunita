@@ -58,7 +58,7 @@ public sealed class PostService
     // [tags]) keep compiling unchanged — the same CS1736 shape as `_tags` above.
     // The DI registration passes the live `Notifications.NotificationService`;
     // the frozen service's `EmitAsync` surface is untouched (unit-series rule 4).
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // M36 (ADR 0165, U04) — the mention-resolution read seam (the U03
     // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
@@ -70,7 +70,7 @@ public sealed class PostService
 
     public PostService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store,
         ITagService? tags = null,
-        NotificationService? notifications = null,
+        INotificationEmitter? notifications = null,
         Mentions.IMentionService? mentions = null)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));

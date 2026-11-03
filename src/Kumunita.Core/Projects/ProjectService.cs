@@ -49,7 +49,7 @@ public sealed class ProjectService : IProjectService
     // M6 (U04) — the notification emitter (frozen surface, U03). Optional so
     // the existing (pre-M6) positional call sites keep compiling (CS1736, the
     // TG-lane precedent); production wiring passes the DI-registered instance.
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // The todo.assign email body's status / date labels + the recipient's
     // effective time zone + date-time format (ADR 0019 / 0020 — the same
@@ -81,7 +81,7 @@ public sealed class ProjectService : IProjectService
 
     public ProjectService(
         IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
-        NotificationService? notifications = null, ITranslationProvider? translator = null,
+        INotificationEmitter? notifications = null, ITranslationProvider? translator = null,
         ILocalizationService? localization = null, ITagService? tags = null,
         Kumunita.Core.Mentions.IMentionService? mentions = null)
     {

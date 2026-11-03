@@ -60,7 +60,7 @@ public sealed class EventService : IEventService
     // `PostService`. The DI registration passes the live
     // `Notifications.NotificationService`; the frozen service's `EmitAsync`
     // surface is untouched (unit-series rule 4).
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
     // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
@@ -69,7 +69,7 @@ public sealed class EventService : IEventService
     private readonly Mentions.IMentionService? _mentions;
 
     public EventService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
-        NotificationService? notifications = null,
+        INotificationEmitter? notifications = null,
         Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

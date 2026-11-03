@@ -69,7 +69,7 @@ public class NotificationFlushHandlerTests(PostgresFixture fixture) : IClassFixt
 
         // The held email was staged exactly once, under the deferred key.
         Assert.Single(staged);
-        var expectedKey = NotificationService.DeferredKey(
+        var expectedKey = NotificationKeys.DeferredKey(
             NotificationKinds.PostReply, sourceId);
         Assert.Equal(expectedKey, staged[0].Key);
         Assert.Equal("notification:post.reply:reply-u05:deferred", expectedKey);

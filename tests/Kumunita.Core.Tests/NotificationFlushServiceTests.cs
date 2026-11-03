@@ -29,7 +29,7 @@ namespace Kumunita.Core.Tests;
 ///       (<see cref="Notification.EmailDeferred"/>) row for a recipient with
 ///       <i>no</i> quiet schedule (the C-M20·3 floor — never quiet) is released:
 ///       the flush stages the held email under the
-///       <see cref="NotificationService.DeferredKey"/> <i>once</i> and flips the
+///       <see cref="NotificationKeys.DeferredKey"/> <i>once</i> and flips the
 ///       row's <c>EmailDeferred = false</c>. A <b>second</b> flush run stages
 ///       nothing (the row is no longer in the pending set) — the email is
 ///       delivered exactly once (C-M20·4).</item>
@@ -95,7 +95,7 @@ public class NotificationFlushServiceTests(PostgresFixture fixture) : IClassFixt
         // (U03's DeferredKey — distinct from the emit-time key).
         Assert.Equal(1, delivered);
         Assert.Single(staged);
-        var key = NotificationService.DeferredKey(NotificationKinds.PostReply, sourceId);
+        var key = NotificationKeys.DeferredKey(NotificationKinds.PostReply, sourceId);
         Assert.Equal(key, staged[0].Key);
         Assert.Equal("notification:post.reply:reply-g4:deferred", key);
         Assert.Equal("cleared@kumunita", staged[0].Recipient);

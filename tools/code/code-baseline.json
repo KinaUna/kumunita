@@ -161,7 +161,7 @@
       "cc_max": 1
     },
     {
-      "id": "src/Kumunita.Core/Events/EventReminderService.cs::Kumunita.Core.Events.EventReminderService.SendRemindersAsync(IDocumentStore,EventReminderOptions,DateTimeOffset,IMailerStage,ILocalizationService,ITranslationProvider?,CancellationToken,Notifications.NotificationService?)",
+      "id": "src/Kumunita.Core/Events/EventReminderService.cs::Kumunita.Core.Events.EventReminderService.SendRemindersAsync(IDocumentStore,EventReminderOptions,DateTimeOffset,IMailerStage,ILocalizationService,ITranslationProvider?,CancellationToken,Notifications.INotificationEmitter?)",
       "max": 106,
       "cc_max": 26
     },
@@ -805,12 +805,6 @@
     {
       "from": "Announcements",
       "to": "Notifications",
-      "symbol": "NotificationService",
-      "count": 1
-    },
-    {
-      "from": "Announcements",
-      "to": "Notifications",
       "symbol": "UgcSnippets",
       "count": 1
     },
@@ -1351,12 +1345,6 @@
     {
       "from": "Events",
       "to": "Notifications",
-      "symbol": "NotificationService",
-      "count": 2
-    },
-    {
-      "from": "Events",
-      "to": "Notifications",
       "symbol": "UgcSnippets",
       "count": 1
     },
@@ -1418,12 +1406,6 @@
       "from": "GroupMessaging",
       "to": "Messaging",
       "symbol": "Conversation",
-      "count": 1
-    },
-    {
-      "from": "GroupMessaging",
-      "to": "Notifications",
-      "symbol": "NotificationService",
       "count": 1
     },
     {
@@ -1545,12 +1527,6 @@
       "to": "Messaging",
       "symbol": "Message",
       "count": 3
-    },
-    {
-      "from": "Identity",
-      "to": "Notifications",
-      "symbol": "NotificationService",
-      "count": 1
     },
     {
       "from": "Identity",
@@ -1819,12 +1795,6 @@
     {
       "from": "Messaging",
       "to": "Notifications",
-      "symbol": "NotificationService",
-      "count": 1
-    },
-    {
-      "from": "Messaging",
-      "to": "Notifications",
       "symbol": "UgcSnippets",
       "count": 1
     },
@@ -1856,12 +1826,6 @@
       "from": "Moderation",
       "to": "Events",
       "symbol": "EventToAuditableResource",
-      "count": 1
-    },
-    {
-      "from": "Moderation",
-      "to": "Notifications",
-      "symbol": "NotificationService",
       "count": 1
     },
     {
@@ -2018,12 +1982,6 @@
       "from": "Pages",
       "to": "Mentions",
       "symbol": "MentionTokens",
-      "count": 1
-    },
-    {
-      "from": "Pages",
-      "to": "Notifications",
-      "symbol": "NotificationService",
       "count": 1
     },
     {
@@ -2509,12 +2467,6 @@
     {
       "from": "Posts",
       "to": "Notifications",
-      "symbol": "NotificationService",
-      "count": 1
-    },
-    {
-      "from": "Posts",
-      "to": "Notifications",
       "symbol": "UgcSnippets",
       "count": 1
     },
@@ -2606,12 +2558,6 @@
       "from": "Projects",
       "to": "Mentions",
       "symbol": "MentionTokens",
-      "count": 1
-    },
-    {
-      "from": "Projects",
-      "to": "Notifications",
-      "symbol": "NotificationService",
       "count": 1
     },
     {
@@ -2907,12 +2853,6 @@
       "to": "Localization",
       "symbol": "DateFormat",
       "count": 2
-    },
-    {
-      "from": "UserInfo",
-      "to": "Notifications",
-      "symbol": "NotificationService",
-      "count": 1
     },
     {
       "from": "UserInfo",
@@ -3392,7 +3332,7 @@
       "from": "Web",
       "to": "Notifications",
       "symbol": "NotificationService",
-      "count": 5
+      "count": 4
     },
     {
       "from": "Web",

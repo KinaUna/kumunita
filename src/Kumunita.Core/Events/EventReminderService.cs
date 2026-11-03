@@ -107,7 +107,7 @@ public static class EventReminderService
         ILocalizationService localization,
         ITranslationProvider? translationProvider = null,
         CancellationToken ct = default,
-        Notifications.NotificationService? notifications = null)
+        Notifications.INotificationEmitter? notifications = null)
     {
         if (store is null) throw new ArgumentNullException(nameof(store));
         if (options is null) throw new ArgumentNullException(nameof(options));

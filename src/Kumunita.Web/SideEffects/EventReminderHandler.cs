@@ -62,7 +62,7 @@ public static class EventReminderHandler
         // event.reminder *inbox row* complements M4's existing email (the
         // design doc §6.4 per-recipient precedent). Wolverine resolves this
         // from the host's DI container.
-        NotificationService notifications)
+        INotificationEmitter notifications)
     {
         // `now` is passed explicitly to the service so the window boundary is
         // deterministic under Wolverine's test-time control; using UtcNow here

@@ -241,7 +241,7 @@ public static class ServiceCollectionExtensions
             // ctor param is optional (CS1736); production wiring passes the
             // DI-registered instance so the post-reply / group-post emitters
             // fire in production (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
             // M36 (ADR 0165, U04) — the mention-resolution read seam (U03).
             // The PostService ctor param is optional (CS1736); production
             // wiring passes the DI-registered instance so the post + reply
@@ -287,7 +287,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Announcements.IAnnouncementService>(sp => new Announcements.AnnouncementService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<UserInfo.IUserInfoService>(),
-            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
             sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M9 (ADR 0105, plan U02/U03): the messaging-side service seam (bounded
@@ -302,7 +302,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Messaging.IMessagingService>(sp => new Messaging.MessagingService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IUserInfoService>(),
-            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
             sp.GetRequiredService<Mentions.IMentionService>()));
 
         // Group messaging lane (the N:1 generalization of the M9 1:1 surface,
@@ -313,7 +313,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<GroupMessaging.IGroupMessagingService>(sp => new GroupMessaging.GroupMessagingService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IUserInfoService>(),
-            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
             sp.GetRequiredService<Mentions.IMentionService>()));
 
         // PG (ADR 0039, plan U01): the pages-side service seam (bounded
@@ -327,7 +327,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Tags.ITagService>(),
-            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
             sp.GetRequiredService<Mentions.IMentionService>()));
 
         // TG (ADR 0044, plan U5/U6): the tags-side service (bounded context
@@ -362,7 +362,7 @@ public static class ServiceCollectionExtensions
             // is optional (CS1736), production wiring passes the registered
             // instance so the report.filed / report.assigned /
             // report.resolved emitters fire (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.INotificationEmitter>()));
 
         services.AddTransient<IEmailDeadLetterCounter, EmailDeadLetterCounter>();
 
@@ -447,7 +447,7 @@ public static class ServiceCollectionExtensions
             // M6 (U04) — the frozen notification emitter (U03); the ctor param
             // is optional (CS1736), production wiring passes the registered
             // instance so the event.rsvp emitter fires (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
             // M36 (ADR 0165, U05) — the mention-resolution read seam; the
             // ctor param is optional (CS1736), production wiring passes the
             // registered instance so the event.mention emitter fires.
@@ -468,7 +468,7 @@ public static class ServiceCollectionExtensions
             // M6 (U04) — the frozen notification emitter (U03); the ctor param
             // is optional (CS1736), production wiring passes the registered
             // instance so the todo.assign emitter fires (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
             // The todo.assign email body's status / date labels (ADR 0061) +
             // the platform default time zone / date-time format (ADR 0019 /
             // 0020) — the recipient's effective zone/format floor (the kw-dt /
@@ -679,6 +679,27 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Sessions.SessionService>(sp => new Sessions.SessionService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        return services;
+    }
+
+    /// <summary>
+    /// C03 (IMPROVE-CODE lane) — the <c>INotificationEmitter</c> emission
+    /// contract (D6: cross-module callers resolve the interface, never the
+    /// concrete <see cref="Notifications.NotificationService"/>). Registered as
+    /// a **separate, module-local extension** (not inlined into
+    /// <see cref="AddKumunitaCore"/>, which is over the method ceiling and
+    /// baselined shrink-only) so the C03 registration does not grow the
+    /// baselined method. The concrete class is the owner surface (the Web
+    /// <c>NotificationsController</c>'s full inbox / preferences / quiet-schedule
+    /// / subscription API); this interface is the emission seam both resolve to
+    /// the same transient instance. The host calls this alongside
+    /// <see cref="AddKumunitaCore"/> (Core-root file — no module, so no D6
+    /// boundary edge).
+    /// </summary>
+    public static IServiceCollection AddNotificationEmitter(this IServiceCollection services)
+    {
+        services.AddTransient<Notifications.INotificationEmitter>(
+            sp => sp.GetRequiredService<Notifications.NotificationService>());
         return services;
     }
 }

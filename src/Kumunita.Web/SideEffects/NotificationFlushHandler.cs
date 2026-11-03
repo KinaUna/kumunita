@@ -19,7 +19,7 @@ namespace Kumunita.Web.SideEffects;
 /// <see cref="QuietScheduleEvaluator.IsQuietNow"/> (D3) at the <b>run</b>
 /// instant, stage the now-clear emails via the <b>frozen</b>
 /// <see cref="IMailerStage"/> under the deferred idempotency key
-/// (<see cref="NotificationService.DeferredKey"/>, D4), flip them
+/// (<see cref="NotificationKeys.DeferredKey"/>, D4), flip them
 /// <c>EmailDeferred = false</c>, and leave the still-quiet ones deferred — is
 /// the Wolverine-free <see cref="NotificationFlushService"/> in
 /// <c>Kumunita.Core</c> (U04). The harness tests prove the release /

@@ -370,7 +370,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         // <c>UserInfoService(store)</c> positionally pass
         // <c>services = null</c>, so the <c>GetService</c> call is a no-op
         // and the emission is silently skipped.
-        var ns = services?.GetService<Notifications.NotificationService>();
+        var ns = services?.GetService<INotificationEmitter>();
         if (ns is not null)
         {
             await ns.EmitAsync(
@@ -951,7 +951,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         }
         else
         {
-            var ns = services?.GetService<Notifications.NotificationService>();
+            var ns = services?.GetService<INotificationEmitter>();
             if (ns is not null)
             {
                 await ns.EmitAsync(
@@ -4133,7 +4133,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         string targetId,
         string body)
     {
-        var ns = services?.GetService<Notifications.NotificationService>();
+        var ns = services?.GetService<INotificationEmitter>();
         if (ns is null) return;
 
         var linkPath = $"/me/children/{childId}";
@@ -4168,7 +4168,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         string assigneeId,
         string conferrerId)
     {
-        var ns = services?.GetService<Notifications.NotificationService>();
+        var ns = services?.GetService<INotificationEmitter>();
         if (ns is null) return;
 
         var conferrerProfile = await session.Query<Profile>()

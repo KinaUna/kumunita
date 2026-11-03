@@ -63,7 +63,7 @@ public sealed class PageService : IPageService
     // PageService(store, tags) keep compiling unchanged — the same CS1736
     // shape as PostService._notifications / AnnouncementService._notifications).
     // The DI registration passes the live Notifications.NotificationService.
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
     // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
@@ -72,7 +72,7 @@ public sealed class PageService : IPageService
     private readonly Mentions.IMentionService? _mentions;
 
     public PageService(IDocumentStore store, ITagService? tags = null,
-        NotificationService? notifications = null,
+        INotificationEmitter? notifications = null,
         Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

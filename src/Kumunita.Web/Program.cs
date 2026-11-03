@@ -374,6 +374,13 @@ if (builder.Environment.IsDevelopment())
 // so Web is the composition root and registers IUserInfoService (→ UserInfoService)
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
+// C03 (IMPROVE-CODE lane) — the INotificationEmitter emission contract (the
+// cross-module seam for the ~10 Core modules + the Web side-effects). A
+// separate Core-root extension (DependencyInjection.cs) so the registration
+// does not grow the baselined AddKumunitaCore method; the concrete
+// NotificationService (AddKumunitaCore's owner registration) is the same
+// transient instance both resolve to.
+builder.Services.AddNotificationEmitter();
 
 // F12 (OBS-06, U2) — the human alert channel (pin §2c): the SupportEmail SMTP
 // sink, gated on CommunityOptions.SupportEmail being set (the off-by-default

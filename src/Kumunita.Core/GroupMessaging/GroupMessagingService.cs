@@ -37,13 +37,13 @@ public sealed class GroupMessagingService : IGroupMessagingService
 
     private readonly IDocumentStore _store;
     private readonly IUserInfoService? _userInfo;
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
     private readonly Kumunita.Core.Mentions.IMentionService? _mentions;
 
     public GroupMessagingService(
         IDocumentStore store,
         IUserInfoService? userInfo = null,
-        NotificationService? notifications = null,
+        INotificationEmitter? notifications = null,
         Kumunita.Core.Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
