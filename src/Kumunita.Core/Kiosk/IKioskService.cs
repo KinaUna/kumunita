@@ -56,4 +56,18 @@ public interface IKioskService
         string actorId,
         IDocumentSession session,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// The committed write lane (IMPROVE-CODE C09): saves the resident's
+    /// playlist, owning its own session — the <see cref="SavePlaylistAsync
+    /// (KioskPlaylistDraft, string, IDocumentSession, CancellationToken)"/>
+    /// semantics (one <c>kiosk.save</c> audit row, upsert) opened on a
+    /// fresh <c>LightweightSession</c> and committed. Lets the
+    /// <c>KioskController</c> drop the <c>IDocumentStore</c> dependency
+    /// entirely instead of opening the session itself.
+    /// </summary>
+    Task<KioskPlaylist> SavePlaylistAsync(
+        KioskPlaylistDraft draft,
+        string actorId,
+        CancellationToken ct = default);
 }

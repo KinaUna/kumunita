@@ -240,13 +240,13 @@ public class KioskControllerTests
     [Fact]
     public async Task M35_5_GlobalAdmin_SavePlaylist_OneAuditRow_Persists()
     {
-        var (controller, kiosk, _, _, store) = Build(role: GlobalAdmin);
+        var (controller, kiosk, _, _, _) = Build(role: GlobalAdmin);
 
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
         KioskPlaylistDraft? saved = null;
+        // IMPROVE-CODE C09 — the committed write lane (3-arg overload, no
+        // IDocumentSession) is what the controller now calls.
         kiosk.SavePlaylistAsync(Arg.Do<KioskPlaylistDraft>(d => saved = d),
-                Arg.Any<string>(), Arg.Any<IDocumentSession>(), Arg.Any<CancellationToken>())
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new KioskPlaylist { Id = Subject });
 
         // ADR 0285 — rows arrive in index order (gaps are fine); a row with no
@@ -281,7 +281,7 @@ public class KioskControllerTests
         Assert.NotNull(controller.TempData["info"]);
 
         await kiosk.Received(1).SavePlaylistAsync(
-            Arg.Any<KioskPlaylistDraft>(), Subject, Arg.Any<IDocumentSession>(), Arg.Any<CancellationToken>());
+            Arg.Any<KioskPlaylistDraft>(), Subject, Arg.Any<CancellationToken>());
         Assert.NotNull(saved);
         Assert.Equal(60, saved!.DefaultDurationSeconds);
         Assert.Equal(30, saved.RefreshIntervalSeconds);
@@ -314,8 +314,7 @@ public class KioskControllerTests
     [InlineData("Todo", "todo-1", "abc", "between 5 and 3600")]     // not a number
     public async Task ADR0285_SavePlaylist_RefusesAnInvalidEntry(string type, string itemId, string duration, string message)
     {
-        var (controller, kiosk, _, _, store) = Build(role: Member);
-        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+        var (controller, kiosk, _, _, _) = Build(role: Member);
 
         controller.HttpContext.Request.Form = new FormCollection(new Dictionary<string, StringValues>
         {
@@ -330,7 +329,7 @@ public class KioskControllerTests
 
         Assert.IsType<RedirectToActionResult>(action);
         Assert.Contains(message, controller.TempData["error"] as string ?? string.Empty);
-        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, default!, default);
+        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, default);
     }
 
     [Theory]
@@ -350,7 +349,7 @@ public class KioskControllerTests
 
         Assert.IsType<RedirectToActionResult>(action);
         Assert.NotNull(controller.TempData["error"]);
-        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, default!, default);
+        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, default);
     }
 
 
@@ -516,9 +515,9 @@ public class KioskControllerTests
         var kiosk    = Substitute.For<IKioskService>();
         var catalog  = Substitute.For<IKioskItemCatalog>();
         var events   = Substitute.For<IEventService>();
-        var store    = Substitute.For<IDocumentStore>();
+        var store    = null as IDocumentStore; // IMPROVE-CODE C09 — the controller no longer takes a store; kept in the tuple for the other deconstruction sites.
 
-        var controller = new KioskController(kiosk, events, null, store, catalog);
+        var controller = new KioskController(kiosk, events, null, catalog);
 
         var services = new ServiceCollection();
         services.AddHttpContextAccessor();
@@ -529,7 +528,6 @@ public class KioskControllerTests
         services.AddSingleton(kiosk);
         services.AddSingleton(catalog);
         services.AddSingleton(events);
-        services.AddSingleton(store);
         var provider = services.BuildServiceProvider();
 
         var httpContext = new DefaultHttpContext

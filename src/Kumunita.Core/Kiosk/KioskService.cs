@@ -138,4 +138,21 @@ public sealed class KioskService : IKioskService
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return row;
     }
+
+    /// <inheritdoc cref="IKioskService.SavePlaylistAsync(KioskPlaylistDraft, string, CancellationToken)"/>
+    /// <remarks>
+    /// The session-based <see cref="SavePlaylistAsync"/> commits on its own happy
+    /// path (it is the aggregate's single write lane, C3), so this committed
+    /// wrapper opens the session and delegates — no second
+    /// <c>SaveChangesAsync</c> (contrast the <c>BookmarkService</c> committed
+    /// overloads, whose inner lane defers the commit to the caller).
+    /// </remarks>
+    public async Task<KioskPlaylist> SavePlaylistAsync(
+        KioskPlaylistDraft draft,
+        string actorId,
+        CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        return await SavePlaylistAsync(draft, actorId, session, ct).ConfigureAwait(false);
+    }
 }

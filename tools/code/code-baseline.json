@@ -468,8 +468,8 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/KioskController.cs::Kumunita.Web.Controllers.KioskController.SettingsPost(CancellationToken)",
-      "max": 81,
-      "cc_max": 21
+      "max": 74,
+      "cc_max": 20
     },
     {
       "id": "src/Kumunita.Web/Controllers/LocaleController.cs::Kumunita.Web.Controllers.LocaleController.BuildModel()",
@@ -3140,7 +3140,7 @@
       "from": "Web",
       "to": "Localization",
       "symbol": "LocaleSettings",
-      "count": 2
+      "count": 1
     },
     {
       "from": "Web",
@@ -3695,10 +3695,6 @@
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {
-      "file": "src/Kumunita.Web/Controllers/KioskController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
       "file": "src/Kumunita.Web/Controllers/LocaleController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
@@ -3712,10 +3708,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/PublicLocaleController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {
