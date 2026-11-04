@@ -80,7 +80,7 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
-      "max": 613
+      "max": 611
     },
     {
       "id": "src/Kumunita.Web/Controllers/BoardsController.cs",
@@ -88,11 +88,11 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/EventController.cs",
-      "max": 1250
+      "max": 1244
     },
     {
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs",
-      "max": 1648
+      "max": 1639
     },
     {
       "id": "src/Kumunita.Web/Controllers/GuardianController.cs",
@@ -104,7 +104,7 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/PostsController.cs",
-      "max": 1014
+      "max": 1010
     },
     {
       "id": "src/Kumunita.Web/Controllers/ProjectsController.cs",
@@ -378,13 +378,13 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/DocumentController.cs::Kumunita.Web.Controllers.DocumentController.Edit(string,DocumentEditViewModel)",
-      "max": 92,
-      "cc_max": 21
+      "max": 75,
+      "cc_max": 17
     },
     {
       "id": "src/Kumunita.Web/Controllers/DocumentController.cs::Kumunita.Web.Controllers.DocumentController.Upload(DocumentUploadViewModel)",
-      "max": 63,
-      "cc_max": 20
+      "max": 46,
+      "cc_max": 16
     },
     {
       "id": "src/Kumunita.Web/Controllers/EventController.cs::Kumunita.Web.Controllers.EventController.Calendar(string?,string?,string?)",
@@ -675,12 +675,7 @@
       "max": 830
     }
   ],
-  "ts": [
-    {
-      "id": "src/Kumunita.Web/client/lib/rich-editor.ts",
-      "max": 1023
-    }
-  ],
+  "ts": [],
   "ts_functions": [
     {
       "id": "src/Kumunita.Web/client/lib/dom-to-markdown.ts::inlineChildren",
@@ -734,8 +729,8 @@
     },
     {
       "id": "src/Kumunita.Web/client/lib/rich-editor.ts::bindRichEditor",
-      "max": 828,
-      "cc_max": 126
+      "max": 166,
+      "cc_max": 17
     },
     {
       "id": "src/Kumunita.Web/client/lib/rich-editor.ts::renderPreview",

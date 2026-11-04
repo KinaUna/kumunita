@@ -20,6 +20,21 @@
  * (the `insert-image.ts` convention is followed for everything else;
  * the guard is the one deliberate deviation, recorded in the handoff).
  *
+ * **IMPROVE-CODE C11 — the split:** the pre-split 1 634-line file is now
+ * four modules along the seams that already existed in the code:
+ *   - `rich-editor.ts`        — the pure functions + the slim binder (this file);
+ *   - `rich-editor-shared.ts` — the `L` / `htmlEscape` / `isSafeUrl` helpers
+ *                               the other three modules share;
+ *   - `rich-editor-modal.ts`  — the shared Bootstrap Link / Attach-file modal;
+ *   - `rich-editor-commands.ts` — the WY U4 / U5 / U6 toolbar command surface
+ *                                (the DOM-splice primitives + the
+ *                                `wireToolbarButtons` loop + `onBeforeInput`
+ *                                + `wirePasteHandler` + `updateToolbarActiveState`).
+ * The binder owns the per-editor state (the `textarea` sink, the `pane`
+ * editing surface, the `toolbar`, the `pendingInline` armed-format set)
+ * and passes it to the command module via the explicit
+ * {@link RichEditorContext} — no module-level DOM state, no duplication.
+ *
  * **Frozen base (RC, unchanged — RE·3):** `MarkdownRenderer`,
  * `ContentImageIds`, `IMediaStore`, the four `ImageIds` fields, the
  * `/content-image` routes, the `.rc-body` / `.rc-image` CSS,
@@ -35,58 +50,18 @@
  * footnotes, raw HTML (U1 drift pause: `MarkdownRenderer` has no
  * blockquote branch — RE·2 forbids adding a marker the server lacks).
  */
-import { apiFetch } from './api.js';
-import { toMarkdown, sanitizeHtml } from './dom-to-markdown.js';
-import { openImageEditor } from './image-editor.js';
+import { htmlEscape, isSafeImageSrc, isSafeUrl } from './rich-editor-shared.js';
+export { isSafeImageSrc }; // public API (RE·2, D3): the IsSafeImageSrc client mirror.
+import { toMarkdown } from './dom-to-markdown.js';
+import {
+  onBeforeInput,
+  updateToolbarActiveState,
+  wirePasteHandler,
+  wireToolbarButtons,
+  type RichEditorContext,
+} from './rich-editor-commands.js';
 
-// ── Private helpers (not exported — internal to the module) ───────────────
-
-/**
- * The server-rendered strings bundle (P0-6): `_Layout.cshtml` emits the
- * closed client-facing key set resolved in the effective language as a
- * `<script type="application/json" id="kumunita-strings">` element. `L`
- * reads a key from it, falling back to the en floor when the bundle (or
- * the key) is absent, so the module keeps working unlocalized.
- */
-const S: Record<string, string> = (() => {
-  if (typeof document === 'undefined') return {}; // non-DOM / SSR (RE·2)
-  const el = document.getElementById('kumunita-strings');
-  try { return el ? JSON.parse(el.textContent || '{}') : {}; } catch { return {}; }
-})();
-const L = (key: string, fallback: string): string => S[key] || fallback;
-
-/**
- * HTML-escape the five HTML-significant characters. Applied to every
- * input character **before** any inline rules run (client-side R·2,
- * the same construction as `MarkdownRenderer.HtmlEscape`). A hostile
- * `<script>` / `onerror=` typed in the textarea therefore appears in
- * the preview as escaped text, never as a live tag/attribute.
- */
-function htmlEscape(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
- * Mirror of `MarkdownRenderer.IsSafeUrl` — accept `http` / `https` /
- * `mailto` / schemeless-relative; reject `javascript:` / `data:` / every
- * other scheme. A rejected link renders the label as plain escaped text
- * (RE·2: the preview must not emit an `<a>` the server renderer would
- * refuse).
- */
-function isSafeUrl(url: string): boolean {
-  if (!url || !url.trim()) return false;
-  // Relative URLs (no scheme, no protocol-relative //) are safe.
-  if (!url.includes('://') && !url.startsWith('//')) {
-    return !url.includes(':'); // a bare "foo:bar" is not a relative path
-  }
-  const scheme = url.split('://')[0].trim().toLowerCase();
-  return scheme === 'http' || scheme === 'https' || scheme === 'mailto';
-}
+// ── Private helpers (internal to this module) ─────────────────────────────
 
 /**
  * Inline Markdown → HTML. Escape first, then apply the inline rules
@@ -436,329 +411,8 @@ export function attachLink(label: string, id: string): string {
   return `[${label}](/attachment/${id})`;
 }
 
-/**
- * RE·2, D3 — the client `IsSafeImageSrc` mirror. **Exported** so
- * U07's parity tests can assert the accept/reject semantics directly
- * (the design doc pins this as a separate export).
- *
- * Two accept branches (verbatim mirror of `MarkdownRenderer.IsSafeImageSrc`):
- * 1. `/content-image/{id}` where `id` is 1–128 lowercase hex chars
- *    (`[0-9a-f]{1,128}`) — the platform route shape (exact; a query
- *    string or trailing slash is a malformed id → **reject**, not a
- *    fallback to branch 2).
- * 2. A schemeless relative path: no `:`, no leading `//`, no whitespace.
- *
- * **Rejects** (always): every URL scheme (`http:`, `https:`, `data:`,
- * `javascript:`, …) and any empty/malformed id. A rejected `src` renders
- * the whole `![alt](src)` as plain escaped text (RE·2, mirrors RC R·2).
- */
-export function isSafeImageSrc(src: string): boolean {
-  if (!src) return false;
-
-  // Branch 1: the platform route shape, /content-image/{id}.
-  const route = '/content-image/';
-  if (src.startsWith(route)) {
-    const id = src.slice(route.length);
-    return (
-      id.length >= 1 &&
-      id.length <= 128 &&
-      /^[0-9a-f]+$/.test(id)
-    );
-  }
-
-  // Branch 2: schemeless relative — no ':', no protocol-relative '//',
-  // no whitespace. (Defensive; the route branch is the intended
-  // producer.)
-  return !src.includes(':') && !src.startsWith('//') && !/\s/.test(src);
-}
-
-// ── Toolbar modals (Link / Attach file) ──────────────────────────────────
-// The Link and Attach-file toolbar actions previously used
-// `window.prompt` / `window.alert`. They now open a single shared Bootstrap
-// modal (Bootstrap JS is loaded globally in the layout —
-// `bootstrap.bundle.min.js`, so `bootstrap.Modal` is available in the
-// browser). The module also self-wires in a non-DOM test environment, so
-// every DOM touch below is lazy + guarded: the modal element is created on
-// first open, in a browser only. The pure splice helpers (`applyLink`,
-// `attachLink`, `isSafeUrl`, …) and the per-editor DOM splices
-// (`wrapSelection`, the attach `<a>` insert) are untouched — the modal only
-// collects the URL / label / file and hands them back to the editor's
-// `onConfirm` closure.
-//
-// One modal is shared by every editor on a page (multiple reply composers
-// each bind their own toolbar); the per-editor behavior comes from the
-// `onConfirm` closure the button handler passes in, which closes over that
-// editor's `wrapSelection` / `activeRange` / `syncTextarea`.
-type RcmModalInstance = {
-  show: () => void | Promise<unknown>;
-  hide: () => void | Promise<unknown>;
-};
-type RcmModalCtor = new (el: HTMLElement) => RcmModalInstance;
-type RcmField = {
-  id: string;
-  label: string;
-  type: 'url' | 'text' | 'file';
-  value?: string;
-  placeholder?: string;
-  required?: boolean;
-  hint?: string;
-};
-type RcmOpts = {
-  title: string;
-  fields: RcmField[];
-  confirmLabel: string;
-  busyLabel: string;
-  onConfirm: () => boolean | Promise<boolean>;
-};
-
-let rcmEl: HTMLDivElement | null = null;
-let rcmInstance: RcmModalInstance | null = null;
-let rcmSavedRange: Range | null = null;
-let rcmBusy = false;
-
-function rcmModalCtor(): RcmModalCtor {
-  // `bootstrap` is the global from `bootstrap.bundle.min.js` (loaded in the
-  // layout, before the module scripts). Guarded: a non-DOM / SSR context has
-  // no `bootstrap`, and the modal is only ever opened from a click handler.
-  const w = window as unknown as {
-    bootstrap?: { Modal?: RcmModalCtor };
-  };
-  const Ctor = w.bootstrap?.Modal;
-  if (!Ctor) throw new Error('Bootstrap modal is unavailable.');
-  return Ctor;
-}
-
-function rcmInstance0(): RcmModalInstance {
-  if (rcmInstance && rcmEl?.isConnected) return rcmInstance;
-  if (rcmEl) rcmEl.remove();
-  rcmEl = document.createElement('div');
-  rcmEl.className = 'modal fade';
-  rcmEl.setAttribute('tabindex', '-1');
-  rcmEl.setAttribute('role', 'dialog');
-  rcmEl.setAttribute('aria-modal', 'true');
-  rcmEl.setAttribute('aria-hidden', 'true');
-  rcmEl.innerHTML =
-    '<div class="modal-dialog modal-dialog-centered">' +
-      '<div class="modal-content">' +
-        '<div class="modal-header">' +
-          '<h5 class="modal-title"></h5>' +
-          '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' +
-            htmlEscape(L('common.close', 'Close')) + '"></button>' +
-        '</div>' +
-        '<div class="modal-body"></div>' +
-        '<div class="modal-footer"></div>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(rcmEl);
-  // `rcmModalCtor()` is the factory that returns the Bootstrap `Modal`
-  // constructor; `new … (rcmEl)` instantiates it against our element.
-  const inst = new (rcmModalCtor())(rcmEl);
-  rcmInstance = inst;
-  return inst;
-}
-
-function rcmField(id: string): HTMLInputElement {
-  return rcmEl!.querySelector<HTMLInputElement>('#' + id)!;
-}
-
-function rcmSetFieldError(id: string, message: string | null): void {
-  const field = rcmField(id);
-  const fb =
-    field.parentElement?.querySelector<HTMLElement>('.invalid-feedback') ??
-    null;
-  if (message) {
-    field.classList.add('is-invalid');
-    field.setAttribute('aria-invalid', 'true');
-    if (fb) {
-      fb.textContent = message;
-      fb.style.display = 'block';
-    }
-  } else {
-    field.classList.remove('is-invalid');
-    field.removeAttribute('aria-invalid');
-    if (fb) fb.style.display = 'none';
-  }
-}
-
-function rcmConfirmBtn(): HTMLButtonElement {
-  return rcmEl!.querySelector<HTMLButtonElement>('button.rcm-confirm')!;
-}
-
-function rcmSetBusy(
-  busy: boolean,
-  labels: { confirm: string; busy: string },
-): void {
-  rcmBusy = busy;
-  const btn = rcmConfirmBtn();
-  btn.disabled = busy;
-  if (busy) {
-    btn.innerHTML =
-      '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>' +
-      htmlEscape(labels.busy);
-  } else {
-    btn.textContent = labels.confirm;
-  }
-}
-
-function rcmClearError(): void {
-  const slot = rcmEl?.querySelector<HTMLElement>('.rcm-error');
-  if (slot) slot.style.display = 'none';
-}
-
-function rcmShowError(message: string): void {
-  let slot = rcmEl!.querySelector<HTMLElement>('.rcm-error');
-  if (!slot) {
-    slot = document.createElement('div');
-    slot.className = 'rcm-error alert alert-danger mt-3';
-    slot.setAttribute('role', 'alert');
-    rcmEl!.querySelector('.modal-body')!.appendChild(slot);
-  }
-  slot.textContent = message;
-  slot.style.display = 'block';
-}
-
-function rcmSaveRange(): void {
-  const sel = window.getSelection();
-  rcmSavedRange =
-    sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
-}
-
-function rcmRestoreRange(): void {
-  if (!rcmSavedRange) return;
-  const sel = window.getSelection();
-  if (!sel) return;
-  sel.removeAllRanges();
-  sel.addRange(rcmSavedRange);
-}
-
-function rcmAnyFilled(fields: RcmField[]): boolean {
-  return fields.every((f) => {
-    if (!f.required) return true;
-    const input = rcmField(f.id);
-    if (input.type === 'file') return input.files && input.files.length > 0;
-    return input.value.trim().length > 0;
-  });
-}
-
-/** The localized per-file limit text (admin setting), or undefined when unlimited / unavailable. */
-async function fetchUploadLimitHint(): Promise<string | undefined> {
-  try {
-    const { text } = await apiFetch<{ text: string | null }>('/upload-limit');
-    return text ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function rcmFieldGroup(f: RcmField): HTMLElement {
-  const group = document.createElement('div');
-  group.className = 'mb-3';
-
-  const label = document.createElement('label');
-  label.htmlFor = f.id;
-  label.textContent = f.label;
-  group.appendChild(label);
-
-  const input = document.createElement('input');
-  input.id = f.id;
-  input.className = 'form-control';
-  if (f.type === 'file') {
-    input.type = 'file';
-  } else {
-    input.type = f.type; // 'url' | 'text'
-    input.value = f.value ?? '';
-    if (f.placeholder) input.placeholder = f.placeholder;
-  }
-  group.appendChild(input);
-
-  if (f.hint) {
-    const hint = document.createElement('div');
-    hint.className = 'form-text small';
-    hint.textContent = f.hint;
-    group.appendChild(hint);
-  }
-
-  const fb = document.createElement('div');
-  fb.className = 'invalid-feedback';
-  fb.style.display = 'none';
-  group.appendChild(fb);
-
-  return group;
-}
-
-function rcmPresent(opts: RcmOpts): void {
-  const modal = rcmInstance0();
-  rcmBusy = false;
-
-  rcmEl!.querySelector('.modal-title')!.textContent = opts.title;
-
-  const body = rcmEl!.querySelector('.modal-body')!;
-  body.textContent = '';
-  const form = document.createElement('form');
-  form.id = 'rcm-form';
-  for (const f of opts.fields) form.appendChild(rcmFieldGroup(f));
-  body.appendChild(form);
-
-  const footer = rcmEl!.querySelector('.modal-footer')!;
-  footer.textContent = '';
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.className = 'btn btn-secondary';
-  cancel.dataset.bsDismiss = 'modal';
-  cancel.textContent = L('common.cancel', 'Cancel');
-  footer.appendChild(cancel);
-  // The confirm button lives in the footer, OUTSIDE the (body) form, so it
-  // is associated with that form via the `form` attribute. `type="submit"`
-  // then dispatches the form's `submit` event (handled below) on click,
-  // and pressing Enter in any field submits the same way.
-  const confirm = document.createElement('button');
-  confirm.type = 'submit';
-  // Associate with the (body) form without nesting (the `form` IDL property
-  // is read-only; set the `form` content attribute instead).
-  confirm.setAttribute('form', 'rcm-form');
-  confirm.className = 'btn btn-primary rcm-confirm';
-  confirm.textContent = opts.confirmLabel;
-  footer.appendChild(confirm);
-
-  rcmConfirmBtn().disabled = !rcmAnyFilled(opts.fields);
-  for (const f of opts.fields) {
-    if (!f.required) continue;
-    const revalidate = () => {
-      rcmConfirmBtn().disabled = !rcmAnyFilled(opts.fields);
-    };
-    rcmField(f.id).addEventListener('input', revalidate);
-    rcmField(f.id).addEventListener('change', revalidate);
-  }
-
-  form.addEventListener('submit', async (e: SubmitEvent) => {
-    e.preventDefault();
-    if (rcmBusy) return;
-    if (rcmConfirmBtn().disabled) return;
-    rcmSetBusy(true, { confirm: opts.confirmLabel, busy: opts.busyLabel });
-    let shouldClose = false;
-    try {
-      shouldClose = await opts.onConfirm();
-    } catch (err) {
-      rcmSetBusy(false, { confirm: opts.confirmLabel, busy: opts.busyLabel });
-      rcmShowError(
-        err instanceof Error
-          ? err.message
-          : L('rc.editor.error_generic', 'Something went wrong.'),
-      );
-      return;
-    }
-    rcmSetBusy(false, { confirm: opts.confirmLabel, busy: opts.busyLabel });
-    if (shouldClose) modal.hide();
-    // else: a required-field / safety error was set in onConfirm — the
-    // modal stays open so the resident can correct it.
-  });
-
-  const first = rcmField(opts.fields[0].id);
-  rcmEl!.addEventListener('shown.bs.modal', () => first.focus(), {
-    once: true,
-  });
-  modal.show();
-}
+// `isSafeImageSrc` (RE·2, D3) now lives in `rich-editor-shared.ts` and is
+// re-exported above (the public API is unchanged after the C11 split).
 
 // ── Binder (RE·1, D1/D2 — the one DOM-touching export) ────────────────────
 
@@ -775,14 +429,15 @@ function rcmPresent(opts: RcmOpts): void {
  *    RC drift pause; the text toolbar + preview are **unaffected**).
  * 3. Renders the preview pane on every `input` event (RE·1: the preview
  *    is a pure render of the textarea's current value).
- * 4. Wires each `button[data-md]` to the right `apply*` splice
- *    (re-focus + restore selection — the `insert-image.ts`
- *    `selectionStart`/`selectionEnd` idiom).
- * 5. The `data-md="image"` button reuses the **RC upload lane**
- *    (`POST /content-image` via `apiFetch`, the `insert-image.ts`
- *    convention — **no** new `api.ts` method, **no** second upload).
- *    On success, splices `imageLink(alt, id)` at the cursor (RC R·3
- *    byte-identical).
+ * 4. Wires each `button[data-md]` to its command (via
+ *    {@link wireToolbarButtons} in `rich-editor-commands.ts`) — the WY
+ *    U4 / U5 / U6 DOM-splice surface (the pre-split closure's "WY U5" +
+ *    "WY U6" + button-wiring block, now a separate module).
+ * 5. The `data-md="image"` / `data-md="attach"` buttons reuse the
+ *    **RC upload lane** (`POST /content-image` / `POST /attachment` via
+ *    `apiFetch`) + the shared Bootstrap modal (in
+ *    `rich-editor-modal.ts`) — **no** new route, **no** new `api.ts`
+ *    method, **no** second upload (RE·3 / ATT U10).
  *
  * **No** `document.write`, **no** untrusted user HTML, **no** package
  * import. The preview output is set via `innerHTML` on the
@@ -882,16 +537,34 @@ export function bindRichEditor(root: HTMLElement): void {
     });
   }
 
+  // ── The per-editor state (owned by the binder) ─────────────────────────
+  // The WY U4 / U5 / U6 command surface (in `rich-editor-commands.ts`)
+  // reads/writes this. The binder owns the lifetime of the state; the
+  // command module owns the behavior.
+  const pendingInline = new Set<string>();
+  const ctx: RichEditorContext = {
+    textarea,
+    pane: previewPane,
+    toolbar,
+    pendingInline,
+    // WY·2 — the binder keeps the textarea in sync on every pane input /
+    // splice (the pane is authoritative; the textarea is the read-only sink
+    // the server binds).
+    syncTextarea: () => {
+      if (previewPane) {
+        textarea.value = toMarkdown(previewPane.innerHTML);
+      }
+      updateToolbarActiveState(ctx);
+    },
+    updateToolbarActiveState: () => updateToolbarActiveState(ctx),
+  };
+
   // ── WY U4 — the editing loop (design doc §2.5, additive) ──────────────
   // WY·1: the pane becomes the editing surface (`contenteditable="true"`,
   // set at runtime — never in the Razor). WY·2: the binder keeps the
   // textarea in sync on every pane `input` (the pane is authoritative;
   // the textarea is the read-only sink the server binds). WY·6: the
-  // `paste` handler STUB (U4 installs the listener + `e.preventDefault()`
-  // + the `sanitizeHtml` call; U6 owns the insert + the `toMarkdown` sync).
-  // The existing RE/IE wiring above is untouched — this block is
-  // additive, guarded by `if (previewPane)` so a view that has not
-  // updated the pane yet still works exactly as it did before WY.
+  // `paste` handler is the full handler (in `rich-editor-commands.ts`).
   if (previewPane) {
     // (b) WY·1 — the pane is the editing surface.
     previewPane.contentEditable = 'true';
@@ -906,390 +579,20 @@ export function bindRichEditor(root: HTMLElement): void {
     // (d) WY·2 — the binder keeps the textarea in sync on every pane input.
     previewPane.addEventListener('input', () => {
       textarea.value = toMarkdown(previewPane.innerHTML);
-      updateToolbarActiveState(); // typing moves the caret — refresh the active button
+      updateToolbarActiveState(ctx); // typing moves the caret — refresh the active button
     });
-    // (e) WY·6 — the `paste` handler is the **full** handler (U6 completes
-    // the U4 stub with the insert + the `toMarkdown` sync). The full
-    // implementation is added later in `bindRichEditor`, right before the
-    // button wiring loop, where the U5 helpers (`activeRange()`,
-    // `syncTextarea()`) are in scope — see the U6 paste handler below.
+    // (e) WY·6 — the `paste` handler (in `rich-editor-commands.ts`).
+    wirePasteHandler(ctx);
   }
 
-  // ── WY U5 — the toolbar rework: splice DOM, not Markdown (WY·4) ─────────
-  // WY·4: the toolbar buttons splice **DOM** into the pane via the
-  // Selection / Range API (the per-button mapping, design doc §2.5e); the
-  // pane is the editing surface (WY·1, U4 — already `contenteditable`).
-  // **After every splice** the binder keeps the textarea in sync (WY·2) —
-  // the pane is authoritative, the textarea is the read-only sink. The 6
-  // RE pure functions + `renderPreview` are **untouched** (the WY block is
-  // additive); the DOM-splice helpers below are private to `bindRichEditor`.
-
-  /** Keep the textarea (the read-only sink) in sync with the pane (WY·2). */
-  const syncTextarea = (): void => {
-    if (previewPane) {
-      textarea.value = toMarkdown(previewPane.innerHTML);
-    }
-    updateToolbarActiveState(); // every splice ends here — refresh the active button
-  };
-
-  /** Get the active Selection/Range inside the pane, or `null`. */
-  const activeRange = (): Range | null => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
-    const r = sel.getRangeAt(0);
-    // A selection outside the pane (e.g. the textarea) is not ours to splice.
-    if (previewPane && !previewPane.contains(r.commonAncestorContainer)) {
-      return null;
-    }
-    return r;
-  };
-
-  /** Collapse the caret to just after `node` inside the pane. */
-  const placeCaretAfter = (node: Node): void => {
-    const range = document.createRange();
-    range.setStartAfter(node);
-    range.collapse(true);
-    const sel = window.getSelection();
-    if (sel) {
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-  };
-
-  /** Collapse the caret to just *inside* `node` (offset 0), so the next
-   *  keystroke lands in the element — the pending-format placeholder for a
-   *  collapsed selection (the resident's next characters become formatted).
-   */
-  const placeCaretInside = (node: Element): void => {
-    const range = document.createRange();
-    range.selectNodeContents(node);
-    range.collapse(true);
-    const sel = window.getSelection();
-    if (sel) {
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-  };
-
-  /** The tags that represent each inline kind (the WY·3 subset + the
-   *  browser synonyms contenteditable sometimes emits — `<b>` / `<i>`). */
-  const INLINE_KIND_TAGS: Record<'bold' | 'italic' | 'code', Set<string>> = {
-    bold: new Set(['strong', 'b']),
-    italic: new Set(['em', 'i']),
-    code: new Set(['code']),
-  };
-
-  /** The innermost ancestor of `node` (within the pane) that is one of
-   *  `tags`, or `null` if the caret/selection is not inside such an element. */
-  const findFormattingAncestor = (
-    node: Node | null,
-    tags: Set<string>,
-  ): Element | null => {
-    let n: Node | null = node;
-    while (n && n !== previewPane) {
-      if (n.nodeType === 1) {
-        const tag = (n as Element).tagName.toLowerCase();
-        if (tags.has(tag)) return n as Element;
-      }
-      n = n.parentNode;
-    }
-    return null;
-  };
-
-  /** Toggle-off: remove `el`, keeping its content in place (the bold / italic
-   *  / code toggle-off), and select the now-inlined content so a later action
-   *  can target it. For an empty element (a pending-format placeholder) the
-   *  caret is left at the end of the containing block. */
-  const unwrapElement = (el: Element): void => {
-    const parent = el.parentNode;
-    if (!parent) return;
-    const first = el.firstChild;
-    const last = el.lastChild;
-    // A pending-format run that was never typed into holds *only* its
-    // placeholder `<br>` (an empty inline can't carry the caret, WY·4).
-    // Removing the element outright — rather than splicing the `<br>` out —
-    // avoids leaving a stray line break (which the sink would serialize as a
-    // lone space) behind in the block.
-    if (first !== null && first === last &&
-        first.nodeType === 1 && (first as Element).tagName.toLowerCase() === 'br') {
-      el.remove();
-    } else {
-      while (el.firstChild) parent.insertBefore(el.firstChild, el);
-      el.remove();
-    }
-    const sel = window.getSelection();
-    if (!sel) return;
-    const range = document.createRange();
-    if (first && last && first !== last) {
-      range.setStartBefore(first);
-      range.setEndAfter(last);
-    } else {
-      range.selectNodeContents(parent);
-      range.collapse(false);
-    }
-    sel.removeAllRanges();
-    sel.addRange(range);
-  };
-
-  /**
-   * Wrap the current selection in a fresh `<tag>` element (bold / italic /
-   * code / link). Uses `range.surroundContents`; for a selection that
-   * crosses element boundaries, falls back to `extractContents` +
-   * `appendChild` + `insertNode` (design doc §2.5e). A collapsed / absent
-   * selection inserts an **empty** element and places the caret *inside* it,
-   * so the resident's next keystroke lands formatted (pending format) — it
-   * never inserts a literal placeholder word.
-   */
-  const wrapSelection = (
-    tag: string,
-    setAttrs?: (el: Element) => void,
-  ): void => {
-    if (!previewPane) return;
-    const el = document.createElement(tag);
-    if (setAttrs) setAttrs(el);
-    const range = activeRange();
-    if (!range || range.collapsed) {
-      // No (or collapsed) selection — start a **pending-format** run. An
-      // empty inline element cannot hold a caret (the first keystroke would
-      // escape it), so seed it with a `<br>` as a caret anchor: the caret sits
-      // just before the `<br>`, the first typed character replaces the `<br>`
-      // and lands *inside* the element — "click B, then type" yields **typed**
-      // text. A link run (`tag === 'a'`) stays empty (a label, not a run).
-      if (tag !== 'a') {
-        el.appendChild(document.createElement('br'));
-      }
-      if (range) {
-        range.insertNode(el);
-      } else {
-        previewPane.appendChild(el);
-      }
-      placeCaretInside(el); // caret at offset 0 — just before the `<br>`
-    } else {
-      try {
-        range.surroundContents(el);
-      } catch {
-        // Selection crosses element boundaries — the extract/append/insert
-        // fallback (design doc §2.5e).
-        const fragment = range.extractContents();
-        el.appendChild(fragment);
-        range.insertNode(el);
-      }
-      // Select the content so a second click can operate on it again.
-      const sel = window.getSelection();
-      if (sel) {
-        const contentRange = document.createRange();
-        contentRange.selectNodeContents(el);
-        sel.removeAllRanges();
-        sel.addRange(contentRange);
-      }
-    }
-    syncTextarea();
-  };
-
-  // The inline formats currently "armed" for the next keystroke (the WYSIWYG
-  // **mode** model the toolbar expresses: click B → the resident's next typing
-  // is bold; click B again → it turns off and what was already written stays
-  // bold). Held as element tags ('strong' | 'em' | 'code'); empty until a
-  // button is clicked with a collapsed caret. Shared by the toggle handler
-  // below and the `beforeinput` handler that applies the format on first type.
-  const pendingInline = new Set<string>();
-
-  // Reverse of INLINE_KIND_TAGS — the tag → its synonym set (contenteditable
-  // sometimes emits <b>/<i> for strong/em), for the "already inside?" checks.
-  const TAG_SYNONYMS: Record<string, Set<string>> = {
-    strong: INLINE_KIND_TAGS.bold,
-    em: INLINE_KIND_TAGS.italic,
-    code: INLINE_KIND_TAGS.code,
-  };
-
-  /** Bold / italic / code — a **mode toggle** (RE2 "clicking B again toggles
-   *  it back" FACES, in the DOM-splice model): with a collapsed caret the
-   *  click **arms / disarms** the format for subsequent typing (the already
-   *  written run keeps its formatting — it is never stripped or selected away);
-   *  with a real selection it **wraps / unwraps** that selection (the classic
-   *  "select text, click B" path). Arming is applied by the `beforeinput`
-   *  handler below, which wraps the first typed character — identical and
-   *  reliable for all three kinds. */
-  const toggleInlineFormat = (kind: 'bold' | 'italic' | 'code'): void => {
-    if (!previewPane) return;
-    const tag = kind === 'bold' ? 'strong' : kind === 'italic' ? 'em' : 'code';
-    const sel = window.getSelection();
-    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-    const inPane =
-      range !== null && previewPane.contains(range.commonAncestorContainer);
-    const anchor = inPane
-      ? ((sel && sel.anchorNode) ?? range!.startContainer)
-      : null;
-    const formatting = findFormattingAncestor(anchor, INLINE_KIND_TAGS[kind]);
-
-    // (1) A real selection in the pane → the classic wrap / unwrap of it.
-    if (inPane && range && !range.collapsed) {
-      if (formatting) {
-        unwrapElement(formatting); // select text, then B → remove the format
-      } else {
-        wrapSelection(tag); // select text, then B → apply the format
-      }
-      pendingInline.clear();
-      syncTextarea();
-      return;
-    }
-
-    // (2) Collapsed caret (or none) → arm / disarm the *mode*.
-    const isOn = formatting !== null || pendingInline.has(tag);
-    if (isOn) {
-      // Turn the mode OFF. If the caret is inside the run, exit it (the run
-      // KEEPS its formatting — the just-written text stays bold/italic/code)
-      // rather than stripping and re-selecting it. If the run is the LAST
-      // node in its block, place the caret just before a block-end `<br>`
-      // (inserted as a caret anchor if one is not already there) — a bare
-      // caret "after an inline at the end of a block" is what Chromium
-      // silently pulls back into the element, so the `<br>` gives the caret
-      // a real, stable position outside the formatting. The `<br>` is a
-      // canonical contenteditable line break: the sink serializes it as a
-      // space (the existing `<br>` handling in `toMarkdown`), and a
-      // resident typing over it replaces it, so no artifact leaks into the
-      // saved body.
-      pendingInline.delete(tag);
-      if (formatting) {
-        const parent = formatting.parentNode;
-        if (parent && parent.lastChild === formatting) {
-          // A ZWS text node is a stable caret anchor at the end of a block
-          // (unlike <br>, it does not get absorbed by Chromium's caret
-          // normalization). The serializer strips it (see unescapeHtml) so
-          // it never leaks into the saved body.
-          const zw = document.createTextNode('\u200b');
-          parent.appendChild(zw);
-          const r = document.createRange();
-          r.setStart(zw, 1);
-          r.collapse(true);
-          const s = window.getSelection();
-          if (s) { s.removeAllRanges(); s.addRange(r); }
-        } else {
-          placeCaretAfter(formatting);
-        }
-      }
-      syncTextarea();
-    } else {
-      // Turn the mode ON — arm it for the next keystroke (the beforeinput
-      // handler below wraps the first typed character in the element).
-      pendingInline.add(tag);
-      syncTextarea();
-    }
-  };
-
-  // Where an armed inline format is applied: the **first** typed character is
-  // wrapped in the armed element(s). The element is created at the moment of
-  // typing (not on the button click) and the browser's own `insertText` lands
-  // inside it — so "click B, then type" reliably yields **bold** text for
-  // bold / italic / code alike, with no fragile empty placeholder element to
-  // lose a caret in. Subsequent keystrokes are skipped (the caret is already
-  // inside the run) until the mode is turned off.
-  const onBeforeInput = (e: InputEvent): void => {
-    if (pendingInline.size === 0) return;
-    if (e.inputType !== 'insertText') return;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    if (!range.collapsed) return;
-    const container = range.startContainer;
-    if (!previewPane || !previewPane.contains(container)) return;
-    const tags = Array.from(pendingInline);
-    // Already inside every armed run → the text lands formatted on its own.
-    if (
-      tags.every(
-        (t) => findFormattingAncestor(container, TAG_SYNONYMS[t]) !== null,
-      )
-    ) {
-      return;
-    }
-    // Deterministic insert: build the nested element(s) (earliest-armed =
-    // outermost), place the element at the caret, put the typed text inside
-    // the innermost element, and park the caret just after it. Prevent the
-    // browser's default insert so the text lands exactly where we put it —
-    // no reliance on the browser re-resolving the caret into the new element.
-    const data = e.data ?? '';
-    let innermost: Element = document.createElement(tags[tags.length - 1]);
-    let outermost = innermost;
-    for (let i = tags.length - 2; i >= 0; i--) {
-      const outer = document.createElement(tags[i]);
-      outer.appendChild(outermost);
-      outermost = outer;
-    }
-    range.insertNode(outermost);
-    const text = document.createTextNode(data);
-    innermost.appendChild(text);
-    const caretRange = document.createRange();
-    caretRange.setStartAfter(text);
-    caretRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(caretRange);
-    e.preventDefault();
-    // We cancelled the default insert (deterministic placement), so the
-    // browser will NOT fire the `input` event the WY·2 sync listens to —
-    // keep the read-only textarea sink in sync ourselves.
-    syncTextarea();
-  };
+  // ── WY U5 — the toolbar rework (WY·4): splice DOM, not Markdown ───────
+  // The `beforeinput` handler that applies the armed inline format (the
+  // "click B, then type" path) is in `rich-editor-commands.ts`.
   if (previewPane) {
-    previewPane.addEventListener('beforeinput', onBeforeInput);
+    previewPane.addEventListener('beforeinput', (e: InputEvent) =>
+      onBeforeInput(ctx, e),
+    );
   }
-
-  /** The block-level elements the toolbar may re-tag / re-wrap. */
-  const BLOCK_ELEMENT_TAGS = new Set([
-    'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'pre', 'div',
-  ]);
-
-  /** Find the block element containing the caret (or `null`). */
-  const currentBlock = (): Element | null => {
-    const range = activeRange();
-    if (!range || !previewPane) return null;
-    let n: Node | null = range.commonAncestorContainer;
-    while (n && n !== previewPane) {
-      if (n.nodeType === 1) {
-        const tag = (n as Element).tagName.toLowerCase();
-        if (BLOCK_ELEMENT_TAGS.has(tag)) return n as Element;
-      }
-      n = n.parentNode;
-    }
-    return null;
-  };
-
-  /** Reflect the caret's formatting on the toolbar: highlight (and set
-   *  `aria-pressed` on) the bold / italic / code button when the caret or
-   *  selection is inside that inline element, and the H1 / H2 / H3 button
-   *  when the current block is a matching heading. The non-toggle buttons
-   *  (list / link / image) are left untouched — they are not toggles. */
-  const updateToolbarActiveState = (): void => {
-    if (!previewPane || !toolbar) return;
-    const sel = window.getSelection();
-    const anchor =
-      sel && sel.rangeCount > 0
-        ? (sel.anchorNode ?? sel.getRangeAt(0).startContainer)
-        : null;
-    const inPane = anchor !== null && previewPane.contains(anchor);
-    const block = inPane ? currentBlock() : null;
-    for (const btn of toolbar.querySelectorAll<HTMLButtonElement>('button[data-md]')) {
-      const kind = btn.dataset.md;
-      if (
-        kind !== 'bold' && kind !== 'italic' && kind !== 'code' &&
-        kind !== 'h1' && kind !== 'h2' && kind !== 'h3'
-      ) {
-        continue; // not a toggle-highlightable button (list / link / image)
-      }
-      let active = false;
-      if (kind === 'bold' || kind === 'italic' || kind === 'code') {
-        const tag =
-          kind === 'bold' ? 'strong' : kind === 'italic' ? 'em' : 'code';
-        active =
-          pendingInline.has(tag) ||
-          (inPane &&
-            findFormattingAncestor(anchor, INLINE_KIND_TAGS[kind]) !== null);
-      } else {
-        active = block !== null && block.tagName.toLowerCase() === kind;
-      }
-      btn.classList.toggle('rc-btn-active', active);
-      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-  };
 
   // The caret can move without a splice (clicking into existing bold text,
   // arrow-key navigation, typing) — `selectionchange` is the single reliable
@@ -1300,323 +603,13 @@ export function bindRichEditor(root: HTMLElement): void {
     if (!sel || sel.rangeCount === 0) return;
     const anchor = sel.anchorNode;
     if (anchor && previewPane && previewPane.contains(anchor)) {
-      updateToolbarActiveState();
+      updateToolbarActiveState(ctx);
     }
   });
 
-  /** Change the current block's tag to `<h1>` / `<h2>` / `<h3>` (WY·4). */
-  const changeBlockTag = (tag: string): void => {
-    if (!previewPane) return;
-    const block = currentBlock();
-    // The empty-block seed becomes post content on save, so it is deliberately
-    // left as the en floor (a contenteditable placeholder would be the fuller
-    // fix — a larger change, P0-6 out of scope).
-    const content = (block ? block.innerHTML : '') || 'Heading';
-    const newBlock = document.createElement(tag);
-    newBlock.innerHTML = content;
-    if (block && block.parentNode) {
-      block.parentNode.replaceChild(newBlock, block);
-    } else {
-      previewPane.appendChild(newBlock);
-    }
-    placeCaretAfter(newBlock);
-    syncTextarea();
-  };
-
-  /** Wrap the current block's content in `<ul><li>` / `<ol><li>` (WY·4). */
-  const wrapBlockInList = (listTag: string): void => {
-    if (!previewPane) return;
-    const block = currentBlock();
-    // Empty list-item seed — like the heading seed, left as the en floor
-    // (it becomes user content on save; a placeholder would be the real fix).
-    const content = (block ? block.innerHTML : '') || 'item';
-    const list = document.createElement(listTag);
-    const li = document.createElement('li');
-    li.innerHTML = content;
-    list.appendChild(li);
-    if (block && block.parentNode) {
-      block.parentNode.replaceChild(list, block);
-    } else {
-      previewPane.appendChild(list);
-    }
-    placeCaretAfter(li);
-    syncTextarea();
-  };
-
-  // ── WY U6 — the paste handler: sanitize + insert + sync (WY·6) ──────
-  // Design doc §2.5(d) + §2.4 (the primary sources). The U4 stub is
-  // replaced by the full handler here, where `activeRange()` and
-  // `syncTextarea()` (U5 helpers) are in scope.
-  //
-  // (a) intercepts the `paste` event on the pane;
-  // (b) reads the clipboard HTML (`text/html`), falling back to
-  //     `text/plain` (wrapped in a `<p>` before sanitizing —
-  //     `sanitizeHtml` handles text-only input natively);
-  // (c) sanitizes via `sanitizeHtml` (U3's pure function — WY·3 subset
-  //     only; the §2.4 reject list is enforced inside it);
-  // (d) inserts the sanitized HTML at the selection (the same
-  //     `activeRange()` helper U5 added; if the selection is outside
-  //     the pane, append at the end);
-  // (e) `e.preventDefault()` — the sanitized insert is the only paste
-  //     path (the browser's native paste is suppressed);
-  // (f) keeps the textarea in sync (`syncTextarea()` — WY·2).
-  if (previewPane) {
-    previewPane.addEventListener('paste', (e: ClipboardEvent) => {
-      e.preventDefault(); // (e) — the sanitized insert is the only paste path.
-      const html = e.clipboardData?.getData('text/html') ?? '';
-      // (b) — fallback: no HTML → use plain text wrapped in a `<p>`.
-      //     `sanitizeHtml` handles text-only input (it parses the string,
-      //     keeps text nodes, and strips any non-subset tags/attributes).
-      const raw = html.length > 0 ? html : `<p>${e.clipboardData?.getData('text/plain') ?? ''}</p>`;
-      // (c) — sanitize (the §2.4 reject list is enforced inside
-      //      `sanitizeHtml`; only the WY·3 subset survives).
-      const clean = sanitizeHtml(raw);
-      if (!clean) return; // nothing to insert
-      // (d) — parse the sanitized HTML into a DocumentFragment and insert
-      //      it at the selection (the same `activeRange()` helper U5
-      //      added; if the selection is outside the pane, append at the end).
-      const container = document.createElement('div');
-      container.innerHTML = clean;
-      const fragment = document.createDocumentFragment();
-      while (container.firstChild) {
-        fragment.appendChild(container.firstChild);
-      }
-      const range = activeRange();
-      if (range) {
-        range.deleteContents();
-        range.insertNode(fragment); // the fragment's children are spliced in
-      } else {
-        previewPane.appendChild(fragment);
-      }
-      // (f) — keep the textarea in sync (WY·2).
-      syncTextarea();
-    });
-  }
-
-  // Wire each toolbar button to a DOM splice on the pane (WY·4). The
-  // existing markup is unchanged — only the click handlers change.
-  const buttons = Array.from(
-    toolbar.querySelectorAll<HTMLButtonElement>('button[data-md]'),
-  );
-  for (const btn of buttons) {
-    const kind = btn.dataset.md;
-    if (!kind) continue;
-
-    // Keep the caret + selection in the **pane** when a toolbar button is
-    // pressed. A normal mousedown would focus the button (it is focusable),
-    // stealing focus from the contenteditable — the subsequent keystrokes
-    // would then type into the button (or nowhere) instead of the pane.
-    // The click event still fires (preventDefault only cancels the default
-    // focus change), so the handler below runs with the pane's selection
-    // intact. This is the standard contenteditable-toolbar pattern.
-    btn.addEventListener('mousedown', (e: Event) => {
-      e.preventDefault();
-    });
-
-    btn.addEventListener('click', async () => {
-      if (kind === 'bold' || kind === 'italic' || kind === 'code') {
-        // Bold / italic / code is a toggle: unwrap if the caret/selection is
-        // already inside the kind's element, otherwise wrap (or, for a
-        // collapsed selection, start a pending-format run).
-        toggleInlineFormat(kind);
-      } else if (
-        kind === 'h1' ||
-        kind === 'h2' ||
-        kind === 'h3'
-      ) {
-        // Change the current block's tag to <h1> / <h2> / <h3>.
-        changeBlockTag(kind);
-      } else if (kind === 'ul' || kind === 'ol') {
-        // Wrap the current block's text in <ul><li> / <ol><li>.
-        wrapBlockInList(kind);
-      } else if (kind === 'link') {
-        // The URL is collected in a modal (no more `window.prompt`), then the
-        // selection is wrapped in `<a href="…">`. A rejected url (empty or
-        // the isSafeUrl reject) shows a field error and leaves the selection
-        // as plain text — no `<a>` is spliced (the renderPreview / toMarkdown
-        // reject precedent, RC R·2).
-        rcmSaveRange();
-        rcmPresent({
-          title: L('rc.editor.link.title', 'Insert link'),
-          fields: [
-            {
-              id: 'rcm-url',
-              label: L('rc.editor.link.url', 'URL'),
-              type: 'url',
-              placeholder: 'https://…',
-              required: true,
-            },
-          ],
-          confirmLabel: L('rc.editor.link.confirm', 'Insert link'),
-          busyLabel: L('rc.editor.link.busy', 'Inserting…'),
-          onConfirm: () => {
-            const url = rcmField('rcm-url').value.trim();
-            if (!url) {
-              rcmSetFieldError('rcm-url', L('rc.editor.link.err_empty', 'Enter a URL.'));
-              return false;
-            }
-            if (!isSafeUrl(url)) {
-              rcmSetFieldError(
-                'rcm-url',
-                L(
-                  'rc.editor.link.err_invalid',
-                  'Enter a valid link (web address, email, or site-relative path).',
-                ),
-              );
-              return false;
-            }
-            rcmRestoreRange();
-            wrapSelection('a', (el) => el.setAttribute('href', url));
-            return true;
-          },
-        });
-      } else if (kind === 'image') {
-        // Reuse the **RC upload lane** — the same `POST /content-image`
-        // endpoint the RE image path used (RE·3: no new route, no second
-        // upload seam, no new `api.ts` method — `apiFetch` carries the
-        // CSRF token per the `client/lib/api.ts` convention). On success,
-        // splice `<img src="/content-image/{id}" alt="…">` into the pane
-        // at the caret (the `isSafeImageSrc` check is reused).
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
-        fileInput.addEventListener('change', async () => {
-          const file = fileInput.files?.[0];
-          if (!file) return;
-          try {
-            // ADR 0075 — offer the simple editor (crop + resize). **Optional**:
-            // `openImageEditor` resolves the edited `Blob` on Apply, or `null`
-            // on "Use original" / close — in which case the unedited file is
-            // uploaded. The edited blob is the payload we append, so the
-            // store's content-addressing (id = SHA-256 of the bytes) yields a
-            // fresh MediaObject with zero server / renderer / serializer change.
-            const edited = await openImageEditor({
-              title: L('rc.editor.image.title', 'Edit image'),
-              blob: file,
-              mime: file.type || 'image/png',
-              aspect: null,
-              targetWidth: 800,
-              presets: [400, 800, 1200],
-            });
-            const payload = edited ?? file;
-            const fd = new FormData();
-            // Append with the original file name so the store records a
-            // sensible extension and the allow-list guard sees the right type.
-            fd.append('file', payload, file.name);
-            const { id } = await apiFetch<{ id: string }>(
-              '/content-image',
-              { method: 'POST', body: fd },
-            );
-            // RC R·3 byte-identity: the **value** is the exact
-            // /content-image/{id} form ContentImageIds.FullSrcRe already
-            // parses (zero server change).
-            const canonical = `/content-image/${id}`;
-            if (!isSafeImageSrc(canonical)) {
-              window.alert(L('rc.editor.image.err_rejected', 'Uploaded image source was rejected.'));
-              return;
-            }
-            // Pinned alt rule (the RE image convention): the file name
-            // without its extension, truncated to 40 chars.
-            const alt = file.name.replace(/\.[^.]+$/, '').slice(0, 40);
-            const img = document.createElement('img');
-            // The serving route is orphan-safe (R·4 / ADR 0011): it 404s
-            // until a SAVED post references the id, so the canonical URL is
-            // not yet fetchable inside the pre-save editor — a plain
-            // <img src="/content-image/{id}"> would render as a broken icon.
-            // Display a local preview of the payload the resident just chose
-            // (a blob: URL, same-origin, always loads) and carry the
-            // canonical route in data-cid. serializeImage (dom-to-markdown)
-            // reads data-cid as the value, so the submitted body is still the
-            // byte-identical ![alt](/content-image/{id}) form (RC R·3) — the
-            // preview is never emitted and never 404s the value. The preview
-            // shows the *edited* payload when the editor was applied, so what
-            // the resident sees is what will be stored.
-            const displaySrc = URL.createObjectURL(payload);
-            img.setAttribute('src', displaySrc);
-            img.setAttribute('data-cid', canonical);
-            img.setAttribute('alt', alt);
-            img.className = 'rc-image';
-            img.setAttribute('loading', 'lazy');
-            const range = activeRange();
-            if (range) {
-              range.deleteContents();
-              range.insertNode(img);
-            } else {
-              previewPane!.appendChild(img);
-            }
-            placeCaretAfter(img);
-            syncTextarea();
-          } catch (err) {
-            window.alert(
-              err instanceof Error
-                ? err.message
-                : L('rc.editor.image.err_upload', 'Upload failed.'),
-            );
-          }
-        });
-        fileInput.click();
-      } else if (kind === 'attach') {
-        // ATT U10 (C-ATT·2) — the file is collected in a modal (no more
-        // `window.prompt`), uploaded through the **U8 upload lane**
-        // (`POST /attachment`, the same `apiFetch` convention — no new
-        // `api.ts` method), then spliced as an **`<a>` link** (a download),
-        // not an `<img>`. **No** `<img>`/blob-preview/`data-cid` — that is
-        // the image lane (C-ATT·9); an attachment is a link, not a second
-        // image (C-ATT·2). A rejected type 415s and the error is shown in
-        // the modal (C-ATT·6); the label defaults to "Attachment".
-        rcmSaveRange();
-        const limitHint = await fetchUploadLimitHint();
-        rcmPresent({
-          title: L('rc.editor.attach.title', 'Attach file'),
-          fields: [
-            { id: 'rcm-file', label: L('rc.editor.attach.file', 'File'), type: 'file', required: true, hint: limitHint },
-            {
-              id: 'rcm-attach-label',
-              label: L('rc.editor.attach.link_text', 'Link text'),
-              type: 'text',
-              value: L('rc.editor.attach.default_label', 'Attachment'),
-            },
-          ],
-          confirmLabel: L('rc.editor.attach.confirm', 'Attach'),
-          busyLabel: L('rc.editor.attach.busy', 'Uploading…'),
-          onConfirm: async () => {
-            const file = rcmField('rcm-file').files?.[0];
-            if (!file) {
-              rcmSetFieldError('rcm-file', L('rc.editor.attach.err_no_file', 'Choose a file to attach.'));
-              return false;
-            }
-            const label =
-              rcmField('rcm-attach-label').value.trim() ||
-              L('rc.editor.attach.default_label', 'Attachment');
-            const fd = new FormData();
-            fd.append('file', file);
-            const { id } = await apiFetch<{ id: string }>('/attachment', {
-              method: 'POST',
-              body: fd,
-            });
-            // F9: the value is the exact /attachment/{id} form U7's
-            // AttachmentIds.ExtractAttachmentIds parses (zero server change).
-            // Splice an <a> at the caret (the link convention), then sync.
-            const canonical = `/attachment/${id}`;
-            const a = document.createElement('a');
-            a.setAttribute('href', canonical);
-            a.textContent = label;
-            rcmRestoreRange();
-            const range = activeRange();
-            if (range) {
-              range.deleteContents();
-              range.insertNode(a);
-            } else if (previewPane) {
-              previewPane.appendChild(a);
-            }
-            placeCaretAfter(a);
-            syncTextarea();
-            return true;
-          },
-        });
-      }
-    });
-  }
+  // Wire each toolbar button to its command (WY·4) — the loop and the
+  // link / image / attach handlers are in `rich-editor-commands.ts`.
+  wireToolbarButtons(ctx);
 }
 
 // ── Self-wire at module load (the client/lib convention) ─────────────────
