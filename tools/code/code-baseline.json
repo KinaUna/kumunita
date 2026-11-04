@@ -162,11 +162,6 @@
       "cc_max": 83
     },
     {
-      "id": "src/Kumunita.Core/DependencyInjection.cs::Kumunita.Core.ServiceCollectionExtensions.AddKumunitaCore(IServiceCollection)",
-      "max": 193,
-      "cc_max": 1
-    },
-    {
       "id": "src/Kumunita.Core/Events/EventReminderService.cs::Kumunita.Core.Events.EventReminderService.SendRemindersAsync(IDocumentStore,EventReminderOptions,DateTimeOffset,IMailerStage,ILocalizationService,ITranslationProvider?,CancellationToken,Notifications.INotificationEmitter?)",
       "max": 106,
       "cc_max": 26
@@ -1689,7 +1684,8 @@
       "from": "Mentions",
       "to": "UserInfo",
       "symbol": "DirectoryService",
-      "count": 1
+      "count": 2,
+      "reason": "C10: module self-registration — the Mentions DI file now references the concrete DirectoryService (no IDirectoryService by Part 2.0 design); the ref moves from AddKumunitaCore to Mentions/DependencyInjection.cs"
     },
     {
       "from": "Messaging",
@@ -1851,7 +1847,8 @@
       "from": "Notifications",
       "to": "Identity",
       "symbol": "VerificationOptions",
-      "count": 1
+      "count": 2,
+      "reason": "C10: module self-registration — the Notifications DI file now references VerificationOptions (the ADR 0085 item-link BaseUrl option); the ref moves from AddKumunitaCore to Notifications/DependencyInjection.cs"
     },
     {
       "from": "Notifications",
@@ -1995,7 +1992,8 @@
       "from": "Portability",
       "to": "Identity",
       "symbol": "AppDbContext",
-      "count": 2
+      "count": 3,
+      "reason": "C10: module self-registration — the Portability DI file now references AppDbContext (ADR 0004 §B: EF only for Identity tables); the ref moves from AddKumunitaCore to Portability/DependencyInjection.cs"
     },
     {
       "from": "Portability",
@@ -2007,7 +2005,8 @@
       "from": "Portability",
       "to": "Identity",
       "symbol": "User",
-      "count": 4
+      "count": 5,
+      "reason": "C10: module self-registration — the Portability DI file now references UserManager<User>; the ref moves from AddKumunitaCore to Portability/DependencyInjection.cs"
     },
     {
       "from": "Portability",
