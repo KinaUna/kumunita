@@ -739,3 +739,63 @@ public sealed class GroupEventDetailViewModel
     /// populated only for the author — a non-author sees an empty list; GE·7).</summary>
     public IReadOnlyList<EventRsvpEntry> Rsvps { get; set; } = [];
 }
+/// <summary>
+/// The Members tab of the group detail page (the C11 extracted partial
+/// <c>_GroupMembers.cshtml</c>): the member list (the self-row /
+/// owner-row lane, ADR 0008), the pending invitations, the pending
+/// join-request review (ADR 0094), the owner's invite lane (m2b), and the
+/// owner ∪ GlobalAdmin's add-member lane (C-M2·3 / ADR 0007). The
+/// presentation is unchanged — the model threads the parent view-model
+/// plus the view-locals the tab uses (the owner ∪ GlobalAdmin gate,
+/// the actor's own subject, the invite/add filter placeholder, and the
+/// add-member form's action).
+/// </summary>
+public sealed record GroupMembersModel(
+    GroupDetailViewModel Model,
+    bool CanManage,
+    string? Subject,
+    string FilterNamePlaceholder,
+    string AddHref);
+
+/// <summary>
+/// The translation Edit/Add modals of the group detail page (the C11
+/// extracted partial <c>_GroupTranslationModals.cshtml</c>): one Bootstrap
+/// modal per language the standing-holder may edit or add (the ADR 0071
+/// shape; the group's translation fields are name + description, plain
+/// text — the ADR 0026 group translation surface). The markup is
+/// unchanged — the partial threads the parent view-model plus the
+/// view-locals the modals use (the code→native-name resolver and the
+/// close-button accessible name).
+/// </summary>
+public sealed record GroupTranslationModalsModel(
+    GroupDetailViewModel Model,
+    Func<string, string> LangName,
+    string AriaClose);
+
+/// <summary>
+/// The Replies section of the group-post detail page (the C11 extracted
+/// partial <c>_GroupPostReplies.cshtml</c>): the per-reply card (the
+/// ADR 0027 / ADR 0049 chip-swap variant, the ADR 0048 edit/remove
+/// translation lane, the ADR 0016 author edit + ADR 0024 soft-delete
+/// lane). The markup is unchanged — the replies' view-locals are
+/// threaded via the model.
+/// </summary>
+public sealed record GroupPostRepliesModel(
+    GroupPostDetailViewModel Model,
+    string PostId,
+    string DefaultVariant,
+    Func<string, string> LangName,
+    string ConfirmRemoveTrans,
+    string ConfirmDeleteReply);
+
+/// <summary>
+/// The Reply composer of the group-post detail page (the C11 extracted
+/// partial <c>_GroupPostComposer.cshtml</c>): the one-field body POST
+/// form (M3 shape, G·7: no per-reply audience) with the language picker
+/// and the rich-editor toolbar. The markup is unchanged — the composer's
+/// view-locals are threaded via the model.
+/// </summary>
+public sealed record GroupPostComposerModel(
+    GroupPostDetailViewModel Model,
+    string PostId,
+    string DefaultVariant);

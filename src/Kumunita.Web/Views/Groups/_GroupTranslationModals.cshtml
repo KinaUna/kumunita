@@ -1,0 +1,106 @@
+@model Kumunita.Web.Models.GroupTranslationModalsModel
+@* IMPROVE-CODE C11 — extracted from Groups/Detail.cshtml (the translation
+   Edit / Add modals: one Bootstrap modal per language the standing-holder
+   may edit or add, the ADR 0071 shape; the group's translation fields are
+   name + description, plain text — the ADR 0026 group translation surface).
+   The markup is unchanged — the modals' view-locals (the code→native-name
+   resolver, the close-button accessible name, the missing-languages set)
+   are now carried on the model or resolved from the parent view-model. *@
+@{
+    var missingLanguages = Model.Model.Languages.Where(l => !l.HasTranslation).ToList();
+}
+@foreach (var existing in Model.Model.GroupTranslations.OrderBy(x => x.LanguageCode))
+{
+    <div class="modal fade" id="@($"group-trans-edit-{existing.LanguageCode}")" tabindex="-1"
+         aria-labelledby="@($"group-trans-edit-label-{existing.LanguageCode}")" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="@($"/groups/{Model.Model.GroupId}/translations/update")" id="@($"group-trans-edit-form-{existing.LanguageCode}")">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="@($"group-trans-edit-label-{existing.LanguageCode}")">
+                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@Model.LangName(existing.LanguageCode)</b>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Model.AriaClose"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">
+                                @Model.LangName(existing.LanguageCode) <kw-l key="groups.translation_name_label">Name</kw-l>
+                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                            </label>
+                            <input class="form-control" type="text" name="name" value="@existing.Name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <kw-l key="groups.translation_desc_label">Description</kw-l>
+                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                            </label>
+                            <textarea class="form-control" name="description" rows="4" placeholder="…">@existing.Description</textarea>
+                        </div>
+                        <div class="form-text">
+                            <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <kw-l key="common.cancel">Cancel</kw-l>
+                        </button>
+                        <button type="submit" class="btn btn-primary" form="@($"group-trans-edit-form-{existing.LanguageCode}")">
+                            <kw-l key="groups.translation_save">Save translation</kw-l>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@foreach (var lang in missingLanguages)
+{
+    <div class="modal fade" id="@($"group-trans-add-{lang.Code}")" tabindex="-1"
+         aria-labelledby="@($"group-trans-add-label-{lang.Code}")" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="@($"/groups/{Model.Model.GroupId}/translations")" id="@($"group-trans-add-form-{lang.Code}")">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="languageCode" value="@lang.Code" />
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="@($"group-trans-add-label-{lang.Code}")">
+                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@Model.LangName(lang.Code)</b>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Model.AriaClose"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">
+                                @Model.LangName(lang.Code) <kw-l key="groups.translation_name_label">Name</kw-l>
+                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                            </label>
+                            <input class="form-control" type="text" name="name" value="@Model.Model.Name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <kw-l key="groups.translation_desc_label">Description</kw-l>
+                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                            </label>
+                            <textarea class="form-control" name="description" rows="4" placeholder="…">@Model.Model.Description</textarea>
+                        </div>
+                        <div class="form-text">
+                            <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <kw-l key="common.cancel">Cancel</kw-l>
+                        </button>
+                        <button type="submit" class="btn btn-primary" form="@($"group-trans-add-form-{lang.Code}")">
+                            <kw-l key="groups.translation_save">Save translation</kw-l>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}

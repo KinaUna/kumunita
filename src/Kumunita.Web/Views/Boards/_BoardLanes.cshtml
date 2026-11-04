@@ -1,0 +1,327 @@
+@model Kumunita.Web.Models.BoardLanesModel
+@using Kumunita.Web.Models
+@using Kumunita.Core.Projects
+@using Kumunita.Web.Views.Shared
+
+@* IMPROVE-CODE C11 — the board's Kanban lane surface (the .kanban-board
+   container: the full-screen close button, the per-lane head / menu /
+   rename-modal / cards / add-to-do, and the add-lane placeholder lane)
+   extracted from BoardDetail.cshtml; the served markup is unchanged. The
+   view-locals the lanes need (the *other* boards, the ADR 0072 add-to-do /
+   add-lane placeholders, the a11y strings) are threaded through the model;
+   the status glyph / label-key mapping is the shared BoardCardStatuses
+   helper. *@
+
+@if (Model.Lanes.Count == 0)
+{
+    <p class="kanban-board-empty p-4 text-muted border rounded">
+        <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
+    </p>
+}
+
+<div class="kanban-board" data-board-id="@Model.BoardId">
+    @* The full-screen close button — INSIDE the board because the
+       board element is what enters the Fullscreen API, so the
+       browser hides the rest of the page (header + toggle button
+       included). This is the visible way out (client/lib/
+       projects-board.ts posts exitFullscreen on click; Esc still
+       works too). Shown only while .kanban-full (site.css), fixed-
+       positioned relative to the fullscreen element. *@
+    <button type="button" class="btn btn-sm btn-outline-secondary kanban-fullscreen-close">
+        <svg class="kanban-fullscreen-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <span><kw-l key="projects.board.exit_fullscreen">Exit full screen</kw-l></span>
+    </button>
+    @foreach (var lane in Model.Lanes)
+    {
+        @* A lane has a left neighbor iff another lane on this board
+           carries a lower Order; a right neighbor iff a higher one.
+           The ⋮ dropdown's Move left / Move right items are rendered
+           only when the neighbor exists (the user's requirement); the
+           service's MoveLaneAsync also no-ops at the edge as a
+           server-side backstop (C3 — the view renders what the
+           service permits, never a gate). *@
+        var hasLeft = Model.Lanes.Any(l => l.Order < lane.Order);
+        var hasRight = Model.Lanes.Any(l => l.Order > lane.Order);
+        @* The Add to-do button is shown only while the lane has spare
+           capacity (a null MaxItems = unlimited). The service's
+           AddTodoToLaneAsync re-checks the limit server-side and
+           refuses (C-M5·5) — the view just hides the affordance when
+           the lane is visibly full. *@
+        var laneHasSpare = lane.MaxItems is null || lane.Cards.Count < lane.MaxItems;
+
+        @* The whole lane is draggable (ADR 0069 — the drag-drop
+           channel; the server stays authoritative, C-M5·9). The
+           dragstart handler disambiguates: if the grab point is
+           inside a .kanban-card it starts a *card* drag (reading that
+           card's data-placement-id), otherwise a *lane* drag (reading
+           this lane's data-lane-id). data-lane-id is read at drop
+           time from the lane under the drop point. *@
+        <div class="kanban-lane @(laneHasSpare ? "" : "kanban-lane-at-limit")" draggable="true" data-lane-id="@lane.LaneId">
+            <div class="kanban-lane-head">
+                <h3 class="h5 mb-0 kanban-lane-title">
+                    @if (!string.IsNullOrWhiteSpace(lane.Status))
+                    {
+                        @* The fixed-status icon (ADR 0069) — an inline
+                           SVG glyph for the lane's Status code (a null
+                           code shows the fallback circle); the raw
+                           value is carried in the title attr + the
+                           dropdown's Set status so a free-text /
+                           unrecognized value is never lost (C3). *@
+                        <span class="kanban-status" title="@lane.Status">@Html.Raw(BoardCardStatuses.StatusGlyph(lane.Status))</span>
+                    }
+                    @lane.Title
+                    @* The count / limit badge (ADR 0069, KinaUna
+                       parity): "N / MaxItems" when the lane has a
+                       limit (the at-limit state is styled), a bare
+                       "N" when unlimited. *@
+                    <span class="badge text-bg-light border ms-2 kanban-count"
+                          title="@(lane.MaxItems is null ? ("Cards: " + lane.Cards.Count) : ("Cards: " + lane.Cards.Count + " / " + lane.MaxItems))">
+                        @lane.Cards.Count@(lane.MaxItems is null ? "" : " / " + lane.MaxItems)
+                    </span>
+                </h3>
+                @* Lane editing (ADR 0071) — a single ⋮ dropdown at
+                   the head's right edge, holding every lane action
+                   in one menu. The Rename and Set limit rows are
+                   single-field forms to the U08 lane-update route
+                   (POST /projects/boards/{id}/lanes/{laneId}, the
+                   LaneEditorModel shape — a partial update; the
+                   service's UpdateLaneAsync change-detection is the
+                   authority; each non-Title form carries a hidden
+                   <c>Title</c> so the field can be edited without
+                   renaming), each submitted by a → arrow icon
+                   button to the right of its input (in place of
+                   the old named "Rename" / "Set limit" buttons).
+                   Set status is a Status select with NO submit
+                   button — it auto-POSTs on change via
+                   client/lib/projects-board.ts (a blank "None" is
+                   an explicit update). A <hr> divider separates the
+                   rename/limit/status group from the Move left /
+                   Move right reorder actions (the ADR 0068 lane-
+                   reorder routes, the service's MoveLaneAsync; the
+                   edge lane is a service no-op backstop, C-M5·9),
+                   which render only when a neighbor exists. The
+                   standing + limit decisions are the service's
+                   (F7 / F8 / F6); the view renders what the service
+                   returns (C3). *@
+                <div class="dropdown kanban-lane-menu ms-auto" data-detach>
+                    <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                            data-bs-toggle="dropdown" aria-expanded="false"
+                            aria-label="@(Model.AriaActionsFor.Replace("{0}", lane.Title))">⋮</button>
+                    <ul class="dropdown-menu dropdown-menu-end kanban-divided-menu">
+                        @* ADR 0071 (amendment) — the lane Rename row is a
+                           button opening a Bootstrap modal (the inline
+                           input + arrow is replaced; a single Title input
+                           fits cleanly in a modal). The MaxItems row below
+                           keeps its inline input + arrow (a single number
+                           field is fine inline). *@
+                        <li>
+                            <button type="button" class="dropdown-item text-dark"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="@($"#rename-lane-{lane.LaneId}")">
+                                <kw-l key="projects.board.lane.rename">Rename</kw-l>
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li>
+                            <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes/{lane.LaneId}")" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="Title" value="@lane.Title" />
+                                <div class="px-3 py-2">
+                                    <label class="form-label small text-muted mb-1" for="lane-limit-@lane.LaneId">
+                                        <kw-l key="projects.board.lane.max_items">Max items</kw-l>
+                                    </label>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <input class="form-control form-control-sm" type="number" name="MaxItems"
+                                               id="lane-limit-@lane.LaneId"
+                                               min="1" value="@lane.MaxItems" />
+                                        <button type="submit" class="kanban-arrow-submit"
+                                                aria-label="@(Model.AriaSetLimit.Replace("{0}", lane.Title))" title="@(Model.AriaSetLimit.Replace("{0}", lane.Title))">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li>
+                            <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes/{lane.LaneId}")" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="Title" value="@lane.Title" />
+                                <div class="px-3 py-2">
+                                    <label class="form-label small text-muted mb-1" for="lane-status-@lane.LaneId">
+                                        <kw-l key="projects.board.lane.status">Status</kw-l>
+                                    </label>
+                                    @* The fixed status vocabulary (ADR
+                                       0069) — None + the four known
+                                       codes. A free-text value is
+                                       preserved as an extra option so
+                                       editing never loses it (C3). *@
+                                    <select class="form-select form-select-sm kanban-lane-autosubmit" name="Status" id="lane-status-@lane.LaneId">
+                                        <option value="" selected="@(string.IsNullOrWhiteSpace(lane.Status))"><kw-l key="projects.board.status.none">None</kw-l></option>
+                                        @if (!string.IsNullOrWhiteSpace(lane.Status) && !KanbanStatuses.Known.Contains(lane.Status))
+                                        {
+                                            <option value="@lane.Status" selected>@lane.Status</option>
+                                        }
+                                        @foreach (var statusCode in KanbanStatuses.Known)
+                                        {
+                                            <option value="@statusCode" selected="@(lane.Status == statusCode)">
+                                                <kw-l key="@BoardCardStatuses.StatusLabelKey(statusCode)">@statusCode</kw-l>
+                                            </option>
+                                        }
+                                    </select>
+                                </div>
+                            </form>
+                        </li>
+                        @if (hasLeft || hasRight)
+                        {
+                            <li><hr class="dropdown-divider" /></li>
+                            @if (hasLeft)
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes/{lane.LaneId}/move-left")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.move_left">Move left</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                            @if (hasRight)
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes/{lane.LaneId}/move-right")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.move_right">Move right</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                        }
+                        @* ADR 0097 — the lane-delete row (the board
+                           ⋮ menu's "Delete board" idiom, scoped to
+                           one lane): the lane + its card placements
+                           are removed, the to-dos are kept
+                           standalone, the board's remaining lanes
+                           renumber. The standing (creator ∪
+                           GlobalAdmin) is the service's on write;
+                           the CanEdit flag is the same matrix (the
+                           board-delete item's gate). The confirm is
+                           the declarative data-confirm contract
+                           (SECURITY.md §6 no-inline-script). *@
+                        @if (Model.CanEdit)
+                        {
+                            <li><hr class="dropdown-divider" /></li>
+                            <li>
+                                <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes/{lane.LaneId}/delete")"
+                                      data-confirm="@("Delete this lane? Its cards come off this board — the to-dos themselves are kept.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.lane.delete">Delete lane</kw-l></button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+
+            @* ADR 0071 (amendment) — the Rename modal. The lane head's ⋮
+               menu "Rename" button opens this (Bootstrap 5 modal — the
+               first in-repo use; the bundle is already loaded). It posts
+               the lane-update route with just the new Title (MaxItems
+               omitted → preserved); Cancel dismisses. The submit button
+               lives in the modal footer outside the form, so it names the
+               form via the `form` attribute. *@
+            <div class="modal fade" id="@($"rename-lane-{lane.LaneId}")" tabindex="-1"
+                 aria-labelledby="@($"rename-lane-label-{lane.LaneId}")" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes/{lane.LaneId}")"
+                              id="@($"rename-lane-form-{lane.LaneId}")">
+                            @Html.AntiForgeryToken()
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="@($"rename-lane-label-{lane.LaneId}")">
+                                    <kw-l key="projects.board.lane.rename">Rename</kw-l> lane
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="@Model.AriaClose"></button>
+                            </div>
+                            <div class="modal-body">
+                                <label class="form-label" for="@($"rename-lane-input-{lane.LaneId}")">
+                                    <kw-l key="projects.board.lane.title">Lane title</kw-l>
+                                </label>
+                                <input class="form-control" type="text" name="Title"
+                                       id="@($"rename-lane-input-{lane.LaneId}")" value="@lane.Title"
+                                       maxlength="120" required />
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <kw-l key="common.cancel">Cancel</kw-l>
+                                </button>
+                                <button type="submit" class="btn btn-primary" form="@($"rename-lane-form-{lane.LaneId}")">
+                                    <kw-l key="common.save">Save</kw-l>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kanban-cards">
+                @if (lane.Cards.Count == 0)
+                {
+                    <p class="kanban-lane-empty text-body-tertiary small mb-2">
+                        <kw-l key="projects.board.lane.empty">No cards in this lane.</kw-l>
+                    </p>
+                }
+                @foreach (var card in lane.Cards)
+                {
+                    <partial name="_BoardCard" model="new BoardCardModel(card, Model.Board, lane.LaneId, lane.Status, Model.OtherBoards)" />
+
+                }
+            </div>
+
+            @* The add-to-do form at the lane's foot (ADR 0068) — a
+               single Title input + submit posting to the U08
+               add-to-do route (POST
+               /projects/boards/{id}/lanes/{laneId}/todos, the
+               service's AddTodoToLaneAsync: the new to-do is placed
+               on this lane at the end, the lane's Status imparted,
+               the lane's MaxItems the refusal gate). Shown only while
+               the lane has spare capacity (laneHasSpare — a null
+               MaxItems = unlimited); a full lane hides the affordance
+               and the service's server-side limit refusal (C-M5·5)
+               is the backstop. The standing decision is the
+               service's (C-M5·6); the view renders what the service
+               permits (C3). *@
+            @if (laneHasSpare)
+            {
+                <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes/{lane.LaneId}/todos")" class="kanban-lane-add">
+                    @Html.AntiForgeryToken()
+                    <input class="form-control form-control-sm" type="text" name="Title"
+                           maxlength="120" required
+                           aria-label="@Model.AddTodoPlaceholder" placeholder="@Model.AddTodoPlaceholder" />
+                    <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="projects.board.lane.add_todo">Add to-do</kw-l></button>
+                </form>
+            }
+        </div>
+    }
+
+    @* The add-lane placeholder lane (the far-right empty slot — the
+       flex row places it last). A dashed "new lane" column carrying
+       the single Title input + Add lane button that posts to the U08
+       add-lane route (POST /projects/boards/{id}/lanes, the
+       service's CreateLaneAsync: a new lane appended at the end, no
+       status imparted, no limit). NOT a real lane — a distinct class
+       (not .kanban-lane) so the drag-drop channel (client/lib/
+       projects-board.ts's .kanban-lane queries + lane drop index)
+       never sees it; not draggable, no data-lane-id. The standing +
+       shape decisions are the service's (C-M5·6); the view renders
+       what the service returns (C3). *@
+    <div class="kanban-lane-new">
+        <div class="kanban-lane-new-body">
+            <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes")" class="kanban-add-lane">
+                @Html.AntiForgeryToken()
+                <input class="form-control form-control-sm" type="text" name="Title"
+                       maxlength="120" required
+                       aria-label="@Model.AddLanePlaceholder" placeholder="@Model.AddLanePlaceholder" />
+                <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="projects.board.lane.add_lane">+ Add lane</kw-l></button>
+            </form>
+        </div>
+    </div>
+</div>

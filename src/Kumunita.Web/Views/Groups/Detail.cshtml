@@ -217,106 +217,12 @@
                     </ul>
                 </div>
 
-                @* ADR 0071 modal shape — one modal per language the
-                   standing-holder may edit or add. The group's
-                   translation fields are name + description (both
-                   plain text, no rich editor — the ADR 0026 group
-                   translation surface). *@
-                @foreach (var existing in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
-                {
-                    <div class="modal fade" id="@($"group-trans-edit-{existing.LanguageCode}")" tabindex="-1"
-                         aria-labelledby="@($"group-trans-edit-label-{existing.LanguageCode}")" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <form method="post" action="@($"/groups/{Model.GroupId}/translations/update")" id="@($"group-trans-edit-form-{existing.LanguageCode}")">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                    <div class="modal-header">
-                                        <h5 class="modal-title" id="@($"group-trans-edit-label-{existing.LanguageCode}")">
-                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                        </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                @LangName(existing.LanguageCode) <kw-l key="groups.translation_name_label">Name</kw-l>
-                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
-                                            </label>
-                                            <input class="form-control" type="text" name="name" value="@existing.Name" />
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                <kw-l key="groups.translation_desc_label">Description</kw-l>
-                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
-                                            </label>
-                                            <textarea class="form-control" name="description" rows="4" placeholder="…">@existing.Description</textarea>
-                                        </div>
-                                        <div class="form-text">
-                                            <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                            <kw-l key="common.cancel">Cancel</kw-l>
-                                        </button>
-                                        <button type="submit" class="btn btn-primary" form="@($"group-trans-edit-form-{existing.LanguageCode}")">
-                                            <kw-l key="groups.translation_save">Save translation</kw-l>
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                }
-
-                @foreach (var lang in missingLanguages)
-                {
-                    <div class="modal fade" id="@($"group-trans-add-{lang.Code}")" tabindex="-1"
-                         aria-labelledby="@($"group-trans-add-label-{lang.Code}")" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <form method="post" action="@($"/groups/{Model.GroupId}/translations")" id="@($"group-trans-add-form-{lang.Code}")">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="languageCode" value="@lang.Code" />
-                                    <div class="modal-header">
-                                        <h5 class="modal-title" id="@($"group-trans-add-label-{lang.Code}")">
-                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
-                                        </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                @LangName(lang.Code) <kw-l key="groups.translation_name_label">Name</kw-l>
-                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
-                                            </label>
-                                            <input class="form-control" type="text" name="name" value="@Model.Name" />
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                <kw-l key="groups.translation_desc_label">Description</kw-l>
-                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
-                                            </label>
-                                            <textarea class="form-control" name="description" rows="4" placeholder="…">@Model.Description</textarea>
-                                        </div>
-                                        <div class="form-text">
-                                            <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                            <kw-l key="common.cancel">Cancel</kw-l>
-                                        </button>
-                                        <button type="submit" class="btn btn-primary" form="@($"group-trans-add-form-{lang.Code}")">
-                                            <kw-l key="groups.translation_save">Save translation</kw-l>
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                }
+                @* IMPROVE-CODE C11 — the translation Edit / Add modals
+                   extracted into the _GroupTranslationModals partial (the
+                   markup is unchanged; the modals' view-locals are threaded
+                   via Model). *@
+                var _gtmModel = new Kumunita.Web.Models.GroupTranslationModalsModel(Model, LangName, ariaClose);
+                <partial name="_GroupTranslationModals" model="_gtmModel" />
             }
         </div>
 
@@ -352,6 +258,10 @@
             @* ── Feed (the posts, ADR 0013) ──────────────────────────────────── *@
             <div class="tab-pane fade @(activeTab == "feed" ? "show active" : string.Empty)" id="tab-feed" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-2">
+                    @* not extracted: the Posts tab (heading, sort, empty-state, the post-card @foreach,
+                       pager) is a single-use group surface — the same card shape is inlined once here,
+                       not repeated across views or independently touched — so it stays inline. The
+                       Members + translation-modals blocks DID extract (they are independently touched). *@
                     <h2 class="mb-0"><kw-l key="groups.posts_heading">Posts</kw-l></h2>
                     @if (Model.CanPost)
                     {
@@ -496,210 +406,15 @@
                 }
             </div>
 
-            @* ── Members (the list + owner's invite / add lanes, m2b) ───────── *@
-            <div class="tab-pane fade @(activeTab == "members" ? "show active" : string.Empty)" id="tab-members" role="tabpanel">
-                <h2><kw-l key="groups.members_heading">Members</kw-l></h2>
-                @if (Model.Members.Count == 0)
-                {
-                    <p class="text-muted"><kw-l key="groups.members_empty">No members yet.</kw-l></p>
-                }
-                else
-                {
-                    <ul class="kmb-member-list">
-                        @foreach (var m in Model.Members)
-                        {
-                            @*
-                                Per-row action (ADR 0008):
-                                · owner ∪ GlobalAdmin sees Remove — except on
-                                  the OWNER'S OWN row (the owner cannot leave
-                                  their own group; ownerSelfRow is the only row
-                                  they lose the button on, so removing OTHERS
-                                  stays intact);
-                                · a non-owner member sees Leave on their OWN
-                                  row (the self-lane POST /groups/{id}/leave —
-                                  the route mints the target from the signed-in
-                                  principal, no form field), and nothing on
-                                  anyone else's row;
-                                · what is offered is exactly what the route
-                                  accepts (the m2b invite-lane pattern: forms
-                                  are presentation, the controller gates keep
-                                  the SoD).
-                            *@
-                            var ownerSelfRow = Model.IsOwner && m.SubjectId == Model.OwnerSubjectId;
-                            var isSelfRow = m.SubjectId == subject;
-
-                            <li class="kmb-member-row"
-                                id="@($"member-{m.SubjectId}")">
-                                <span class="kmb-member-name">
-                                    <kw-avatar subject="@m.SubjectId" mono="@(string.IsNullOrWhiteSpace(m.DisplayName) ? string.Empty : char.ToUpperInvariant(m.DisplayName.TrimStart()[0]).ToString())"
-                                              mono-hue="@AvatarHue.For(m.SubjectId)" />
-                                    <span>@m.DisplayName</span>
-                                </span>
-                                @if (canManage && !ownerSelfRow && !isSelfRow)
-                                {
-                                    <form method="post" action="@Url.Action("RemoveMember", "Groups", new { id = Model.GroupId })">
-                                        @Html.AntiForgeryToken()
-                                        <input name="subjectId" type="hidden" value="@m.SubjectId" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                                            <kw-l key="common.remove">Remove</kw-l>
-                                        </button>
-                                    </form>
-                                }
-                                else if (isSelfRow && !ownerSelfRow)
-                                {
-                                    <form method="post" action="@Url.Action("LeaveGroup", "Groups", new { id = Model.GroupId })">
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary">
-                                            <kw-l key="groups.member_leave">Leave</kw-l>
-                                        </button>
-                                    </form>
-                                }
-                            </li>
-                        }
-                    </ul>
-                }
-
-                @*
-                    m2b — the owner's invite lane (C-M2b·1: owner ∪ GlobalAdmin).
-                    Pending invitations (with cancel links) render whenever the
-                    group holds any; both blocks are owner-visible (the route
-                    gate is the real SoD wall — a plain member's POST 404s, the
-                    form just isn't offered to them here).
-                *@
-                @if (Model.IsOwner && Model.PendingInvitations.Count > 0)
-                {
-                    <h2 class="mt-4"><kw-l key="groups.pending_invitations_heading">Pending invitations</kw-l></h2>
-                    <ul class="kmb-member-list mb-3">
-                        @foreach (var p in Model.PendingInvitations)
-                        {
-                            <li class="kmb-member-row">
-                                <span>@p.DisplayName</span>
-                                <form method="post"
-                                      action="@Url.Action("CancelInvitation", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm btn-outline-warning"><kw-l key="groups.invite_cancel">Cancel invite</kw-l></button>
-                                </form>
-                            </li>
-                        }
-                    </ul>
-                }
-
-                @*
-                    ADR 0094 — the owner ∪ GlobalAdmin's join-request review
-                    surface (Model.PendingJoinRequests). A resident's
-                    self-initiated request to join this (public) group: approve
-                    lands the membership (C4) / decline leaves the requester
-                    out. Offered to canManage (the route's TryResolveOwnerSurface
-                    gate is the real SoD wall — a plain member's POST 404s).
-                *@
-                @if (canManage && Model.PendingJoinRequests.Count > 0)
-                {
-                    <h2 class="mt-4">
-                        <kw-l key="groups.join_requests_pending_heading">Pending join requests</kw-l>
-                        <span class="kmb-chip">@Model.PendingJoinRequests.Count</span>
-                    </h2>
-                    <ul class="kmb-member-list mb-3">
-                        @foreach (var p in Model.PendingJoinRequests)
-                        {
-                            <li class="kmb-member-row">
-                                <span>@p.DisplayName</span>
-                                <span class="d-inline-flex gap-2">
-                                    <form method="post"
-                                          action="@Url.Action("ApproveJoinRequest", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-primary"><kw-l key="groups.join_approve">Approve</kw-l></button>
-                                    </form>
-                                    <form method="post"
-                                          action="@Url.Action("DeclineJoinRequest", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="groups.join_decline">Decline</kw-l></button>
-                                    </form>
-                                </span>
-                            </li>
-                        }
-                    </ul>
-                }
-
-                @if (Model.IsOwner)
-                {
-                    <h2 class="mt-4"><kw-l key="groups.invite_heading">Invite a resident</kw-l></h2>
-                    @if (Model.ResidentCandidates.Count > 0)
-                    {
-                        <form method="post"
-                              action="@Url.Action("InviteMember", "Groups", new { id = Model.GroupId })"
-                              class="row g-2">
-                            @Html.AntiForgeryToken()
-                            <div class="col-sm-8">
-                                <label class="visually-hidden" for="invite-filter"><kw-l key="groups.filter_residents_label">Filter residents</kw-l></label>
-                                <input type="text" class="form-control" id="invite-filter"
-                                       data-name-filter="invite-subjectId"
-                                       placeholder="@filterNamePlaceholder" autocomplete="off" />
-                                <label class="visually-hidden" for="invite-subjectId"><kw-l key="groups.resident_label">Resident</kw-l></label>
-                                <select id="invite-subjectId" name="subjectId" class="form-select mt-2" required>
-                                    @foreach (var r in Model.ResidentCandidates)
-                                    {
-                                        <option value="@r.SubjectId">@r.DisplayName</option>
-                                    }
-                                </select>
-                                <div class="text-muted small">
-                                    <kw-l key="groups.invite_note">They get an invitation on their Groups page to accept or decline.</kw-l>
-                                </div>
-                            </div>
-                            <div class="col-sm-auto align-self-end">
-                                <button type="submit" class="btn btn-primary"><kw-l key="groups.invite_submit">Invite</kw-l></button>
-                            </div>
-                        </form>
-                        @* Name filter handled by client/lib/name-filter.js
-                           (loaded in _Layout.cshtml — SECURITY.md §6). *@
-                    }
-                    else
-                    {
-                        <p class="text-muted"><kw-l key="groups.all_members_already">Every resident is already a member of this group.</kw-l></p>
-                    }
-                }
-
-                @*
-                    The add-member form — offered to owner ∪ GlobalAdmin only
-                    (C-M2·3 extended per ADR 0007; the route's owner-surface
-                    gate is the real SoD wall, a plain member's POST 404s —
-                    same pattern as the invite lane above).
-                *@
-                @if (canManage)
-                {
-                    <h2 class="mt-4"><kw-l key="groups.add_member_heading">Add a member</kw-l></h2>
-                    @if (Model.ResidentCandidates.Count > 0)
-                    {
-                        <form method="post" action="@addHref" class="row g-2">
-                            @Html.AntiForgeryToken()
-                            <div class="col-sm-8">
-                                <label class="visually-hidden" for="add-member-filter"><kw-l key="groups.filter_residents_label">Filter residents</kw-l></label>
-                                <input type="text" class="form-control" id="add-member-filter"
-                                       data-name-filter="add-subjectId"
-                                       placeholder="@filterNamePlaceholder" autocomplete="off" />
-                                <label class="visually-hidden" for="add-subjectId"><kw-l key="groups.resident_label">Resident</kw-l></label>
-                                <select id="add-subjectId" name="subjectId" class="form-select mt-2" required>
-                                    @foreach (var r in Model.ResidentCandidates)
-                                    {
-                                        <option value="@r.SubjectId">@r.DisplayName</option>
-                                    }
-                                </select>
-                                <div class="text-muted small">
-                                    <kw-l key="groups.add_member_note">They are added to the group immediately (no invitation).</kw-l>
-                                </div>
-                            </div>
-                            <div class="col-sm-auto align-self-end">
-                                <button type="submit" class="btn btn-primary"><kw-l key="common.add">Add</kw-l></button>
-                            </div>
-                        </form>
-                        @* Name filter handled by client/lib/name-filter.js
-                           (loaded in _Layout.cshtml — SECURITY.md §6). *@
-                    }
-                    else
-                    {
-                        <p class="text-muted"><kw-l key="groups.all_members_already">Every resident is already a member of this group.</kw-l></p>
-                    }
-                }
-            </div>
+            @* IMPROVE-CODE C11 — the Members tab (the member list + the
+               pending invitations + the pending join-request review + the
+               owner's invite lane + the add-member lane) extracted into
+               the _GroupMembers partial (the markup is unchanged; the
+               tab's view-locals are threaded via Model; activeTab via
+               ViewData["ActiveTab"]). *@
+            @{ ViewData["ActiveTab"] = activeTab; }
+            @{ var _gmModel = new Kumunita.Web.Models.GroupMembersModel(Model, canManage, subject, filterNamePlaceholder, addHref); }
+            <partial name="_GroupMembers" model="_gmModel" />
 
             @* ── Settings (About + Privacy + Translations; canManage only) ──── *@
             @if (canManage)

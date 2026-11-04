@@ -216,6 +216,59 @@ public sealed record TodoDetailViewModel(
     IReadOnlyList<(string Slug, string DisplayedName)>? Tags = null);
 
 /// <summary>
+/// The model the <c>Views/Projects/_TodoTranslationModals</c> partial
+/// renders (IMPROVE-CODE C11 — extracted from <c>TodoDetail.cshtml</c>).
+/// Carries the view-local resolution the modal block needed (the
+/// <c>LangName</c> resolver, the a11y <c>AriaClose</c>, the add/edit form
+/// actions, the original title pre-fill) so the partial is self-contained
+/// and the parent view no longer inlines the ~110-line block.
+/// </summary>
+public sealed record TodoTranslationModalsModel(
+    bool CanTranslate,
+    IReadOnlyList<Kumunita.Core.Projects.TodoTranslation>? Translations,
+    IReadOnlyList<LanguageOption>? Languages,
+    string OriginalTitle,
+    string EditAction,
+    string AddAction,
+    string AriaClose,
+    Func<string, string> LangName);
+
+/// <summary>
+/// The model the <c>Views/Projects/_TodoStatusAssignEvent</c> partial
+/// renders (IMPROVE-CODE C11 — extracted from <c>TodoDetail.cshtml</c>).
+/// Carries the view-local resolution the status / assign + event-picker
+/// region needed (the <c>CanUpdate</c> gate, the to-do id + status /
+/// assignee, the <see cref="TodoEventPicker"/>, the a11y <c>AriaClose</c>,
+/// and the fixed-vocabulary <c>StatusLabelKey</c>) so the partial is
+/// self-contained and the parent view no longer inlines the ~270-line
+/// block. The seeded <c>Assign_Users</c> options stay in <c>ViewData</c>
+/// (a partial inherits it), so they are not threaded here.
+/// </summary>
+public sealed record TodoStatusAssignEventModel(
+    bool CanUpdate,
+    string TodoId,
+    string? Status,
+    string? AssigneeId,
+    string? AssigneeDisplayName,
+    Func<string, string> StatusLabelKey,
+    TodoEventPicker? EventPicker,
+    string AriaClose);
+
+/// <summary>
+/// The model the <c>Views/Projects/_TodoComments</c> partial renders
+/// (IMPROVE-CODE C11 — extracted from <c>TodoDetail.cshtml</c>). Carries the
+/// to-do's comments + the <c>TodoId</c> the comment lanes POST to + the
+/// <c>DefaultVariant</c> (the ADR 0049 language the resident is reading in —
+/// the composer's language-picker default, resolved in the parent view). The
+/// seeded <c>TodoComment_Languages</c> option list stays in <c>ViewData</c>
+/// (a partial inherits it), so it is not threaded here.
+/// </summary>
+public sealed record TodoCommentsModel(
+    IReadOnlyList<CommentRow>? Comments,
+    string TodoId,
+    string DefaultVariant);
+
+/// <summary>
 /// The **event picker** affordance on the to-do detail (ADR 0115 D3, the M14
 /// interlock — the <c>set-event</c> lane's UI). Carries the actor's visible
 /// events (<see cref="Options"/>) + the to-do's current selection

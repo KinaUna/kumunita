@@ -1,0 +1,113 @@
+@model Kumunita.Web.Models.BoardLinkModalsModel
+@using Kumunita.Web.Models
+
+@* IMPROVE-CODE C11 — the board's "Add to Project…" (ADR 0086 D9) +
+   "Link to event…" (ADR 0115 D3) modals (extracted from BoardDetail.cshtml;
+   the served markup is unchanged). Both are display surfaces (never gates);
+   the service's write re-check is the authority. *@
+
+@if (Model.Projects is { Count: > 0 })
+{
+    @* ADR 0086 D9 — the "Add to Project…" modal (the BoardEdit
+       set-project card idiom, repackaged as a modal — the ⋮ menu's
+       "Add to Project…" item opens it). A picker over the actor's
+       readable projects posting to the U04 set-project lane; the
+       current association (Model.ProjectId — already dangling-filtered
+       for display) is preselected, and a blank choice clears it. The
+       write's standing (creator ∪ GlobalAdmin) + project guard are
+       the service's (C3 split) — this surface only renders the
+       options. *@
+    <div class="modal fade" id="add-project-modal" tabindex="-1"
+         aria-labelledby="add-project-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="@($"/projects/boards/{Model.BoardId}/set-project")">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="add-project-modal-label">
+                            <kw-l key="pl.board.add_to_project">Add to Project…</kw-l>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                aria-label="@Model.AriaClose"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label" for="add-project-select">
+                            <kw-l key="pl.board.project_link">Project</kw-l>
+                        </label>
+                        <select class="form-select" id="add-project-select" name="ProjectId">
+                            <option value="" selected="@(string.IsNullOrWhiteSpace(Model.ProjectId))">@(Html.Raw("&mdash;"))</option>
+                            @foreach (var (id, name) in Model.Projects)
+                            {
+                                <option value="@id" selected="@(id == Model.ProjectId)">@name</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="pl.board.project_hint">A project link is a display surface — it groups this board under the project, it never limits who can see it.</kw-l>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <kw-l key="common.cancel">Cancel</kw-l>
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <kw-l key="pl.board.set_project">Set project</kw-l>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@if (Model.EventPicker is { Options.Count: > 0 })
+{
+    @* ADR 0115 D3 (M14 interlock carried to the board surface) — the
+       "Link to event…" modal (the "Add to Project…" modal idiom,
+       mirrored — the ⋮ menu's "Link to event…" item opens it). A picker
+       over the actor's own events posting to the set-event lane; the
+       current association (Model.EventPicker.CurrentEventId — already
+       dangling-filtered for display) is preselected, and a blank choice
+       clears it. The write's standing (creator ∪ GlobalAdmin) + event
+       guard are the service's (C-M14·3 split) — this surface only
+       renders the options. *@
+    <div class="modal fade" id="link-event-modal" tabindex="-1"
+         aria-labelledby="link-event-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="@($"/projects/boards/{Model.BoardId}/set-event")">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="link-event-modal-label">
+                            <kw-l key="board.link_to_event">Link to event…</kw-l>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                aria-label="@Model.AriaClose"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label" for="link-event-select">
+                            <kw-l key="todo.set_event.label">Link to event</kw-l>
+                        </label>
+                        <select class="form-select" id="link-event-select" name="eventId">
+                            <option value="" selected="@(string.IsNullOrWhiteSpace(Model.EventPicker.CurrentEventId))">@(Html.Raw("&mdash;"))</option>
+                            @foreach (var (id, name) in Model.EventPicker.Options)
+                            {
+                                <option value="@id" selected="@(id == Model.EventPicker.CurrentEventId)">@name</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="board.event_hint">An event link is a display surface — it groups this board under the event, it never limits who can see it.</kw-l>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <kw-l key="common.cancel">Cancel</kw-l>
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <kw-l key="todo.set_event.label">Link to event</kw-l>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}

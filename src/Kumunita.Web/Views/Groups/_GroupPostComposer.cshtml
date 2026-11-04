@@ -1,0 +1,81 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Models.GroupPostComposerModel
+@* IMPROVE-CODE C11 — extracted from Groups/PostDetail.cshtml (the Reply
+   composer: the one-field body POST form, M3 shape; G·7 no per-reply
+   audience; the language picker + the rich-editor toolbar). The markup
+   is unchanged — the composer's view-locals are threaded via the model. *@
+@*
+    The reply form (exactly M3's Posts/Detail inline shape — a one-
+    field body POST). G·7: the reply inherits the parent's single
+    group-lane decision; there is no per-reply audience. The route
+    re-runs the parent's group-lane decision before the write (C4).
+*@
+<h2 class="h5 mt-4 mb-2 kmb-section-title kmb-composer-title" style="font-weight:600;">
+    @if (Model.Model.IsAuthor)
+    {
+        <kw-l key="posts.reply_heading_author">Reply (you are the author of this post)</kw-l>
+    }
+    else
+    {
+        <kw-l key="posts.reply_heading">Reply</kw-l>
+    }
+</h2>
+
+<div class="card kmb-detail-card kmb-detail-composer">
+    <div class="card-body">
+        <form class="mb-0" method="post"
+              action="@($"/groups/{Model.Model.GroupId}/posts/{Model.PostId}/replies")">
+            @Html.AntiForgeryToken()
+            <label class="form-label" for="reply-body" style="font-weight:600;">
+                <kw-l key="posts.reply_label">Reply</kw-l>
+            </label>
+            @* RE U06 — image OFF (same RC reply-image gap). *@
+            <div class="rc-editor">
+                <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                    <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                    <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                    <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                    <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                    <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                    <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                    <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                    <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                    <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                    <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                    <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                    <partial name="_RichEditorToggle" />
+                </div>
+                <textarea class="form-control mb-3" id="reply-body" name="body" rows="3"
+                          required placeholder="…" data-rich-editor></textarea>
+                <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+            </div>
+            @{
+                var replyLanguages =
+                    (ViewData["Reply_Languages"] as IReadOnlyList<(string Code, string NativeName)>)
+                    ?? new List<(string Code, string NativeName)>();
+            }
+            <div class="mb-3">
+                <label class="form-label" for="reply-language" style="font-weight:600;">
+                    <kw-l key="posts.reply_language_label">Language</kw-l>
+                </label>
+                <select class="form-control" id="reply-language" name="languageCode">
+                    @foreach (var (languageCode, nativeName) in replyLanguages)
+                    {
+                        @* ADR 0049 — default to the language the resident is reading in *@
+                        <option value="@languageCode" selected="@(String.Equals(languageCode, Model.DefaultVariant, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@nativeName</option>
+                    }
+                </select>
+                <div class="text-muted small mt-1">
+                    <kw-l key="posts.reply_language_note">The language you're replying in — a tag, not a translation.</kw-l>
+                </div>
+            </div>
+            <details class="kw-audience-disclosure mb-3">
+                <summary><kw-l key="posts.reply_audience_note_label">Who can see replies?</kw-l></summary>
+                <div class="text-muted small">
+                    <kw-l key="groups.reply_audience_note">Replies have no own audience — they are visible under this post's single group-membership decision. You are replying only where the post itself is visible.</kw-l>
+                </div>
+            </details>
+            <button type="submit" class="btn btn-primary"><kw-l key="posts.reply_submit">Reply</kw-l></button>
+        </form>
+    </div>
+</div>

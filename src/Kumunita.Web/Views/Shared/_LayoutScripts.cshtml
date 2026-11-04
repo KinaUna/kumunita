@@ -1,0 +1,143 @@
+@model string
+@* IMPROVE-CODE C11 — extracted from _Layout.cshtml (the global <script>
+   tags block + the client-JS strings bundle emission). The markup is
+   byte-identical: every <script> tag, comment, and the kumunita-strings
+   JSON emit are unchanged. `Model` is the `clientStringsJson` value,
+   resolved in _Layout's header `@{ }` block and threaded here. *@
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Avatar monogram fallback (client/lib/avatar.ts, tsc-built — SECURITY.md §6:
+     no inline on*/<script> in Razor views; the U8 onerror it replaced is per img) -->
+<script type="module" src="~/js/lib/avatar.js"></script>
+<!-- Avatar upload gating (client/lib/avatar-upload.ts, tsc-built — SECURITY.md §6:
+     no inline on*/<script> in Razor views; disables "Save avatar" until a file is chosen) -->
+<script type="module" src="~/js/lib/avatar-upload.js"></script>
+<!-- Translation display swap (client/lib/translation-swap.ts, tsc-built — TD / ADR 0027:
+     click-to-swap toggles the pre-rendered .td-variant containers; display-only, no fetch) -->
+<script type="module" src="~/js/lib/translation-swap.js"></script>
+<!-- Confirm-before-submit (SECURITY.md §6 no-inline-script; replaces the
+     onsubmit="return confirm(..." pattern across ~18 views) -->
+<script type="module" src="~/js/lib/confirm.js"></script>
+<!-- Reset-form (SECURITY.md §6 no-inline-script; replaces the
+     onclick="this.form.reset()" pattern) -->
+<script type="module" src="~/js/lib/reset-form.js"></script>
+<!-- Detach menu (SECURITY.md §6 no-inline-script): while an opted-in
+     dropdown (data-detach) is open, re-home its .dropdown-menu onto <body>
+     so it escapes overflow-clipping ancestors (Kanban board / to-do feed)
+     and always renders fully on top. Loaded after bootstrap.bundle so
+     window.bootstrap is available. -->
+<script type="module" src="~/js/lib/detach-menu.js"></script>
+<!-- Audience-toggle (SECURITY.md §6; ADR 0036 checkbox→panel visibility) -->
+<script type="module" src="~/js/lib/audience-toggle.js"></script>
+<!-- Name-filter (SECURITY.md §6; Groups/Detail invite + add-member forms) -->
+<script type="module" src="~/js/lib/name-filter.js"></script>
+<!-- Admin edit-row toggle (SECURITY.md §6; Admin/Index collapsed rows) -->
+<script type="module" src="~/js/lib/admin-edit-toggle.js"></script>
+<!-- Directory-card click→nav (SECURITY.md §6; Directory/Index whole-card) -->
+<script type="module" src="~/js/lib/directory-card.js"></script>
+<!-- Pinned-announcement dismissal (SECURITY.md §6; per-announcement sessionStorage) -->
+<script type="module" src="~/js/lib/pinned-announcement.js"></script>
+<!-- Page-form visibility (SECURITY.md §6; ADR 0041 scope/individual blocks) -->
+<script type="module" src="~/js/lib/page-form-visibility.js"></script>
+<!-- Grant-picker sync (SECURITY.md §6; hidden textarea ↔ checkbox pickers) -->
+<script type="module" src="~/js/lib/grant-picker-sync.js"></script>
+<!-- Flash toast (SECURITY.md §6; the one uniform flash surface — see
+     _FlashToast.cshtml). Wires Bootstrap 5.3's Toast to the .toast
+     element(s) the partial renders, so the close button + the
+     data-bs-autohide / data-bs-delay attributes drive the 5 s
+     auto-dismiss + fade-out. -->
+<script type="module" src="~/js/lib/flash-toast.js"></script>
+<!-- What's-new toast (the VN lane, ADR 0110; see _WhatsNewToast.cshtml):
+     hides the toast on load if this version was already seen in this
+     browser (localStorage), otherwise records it + arms the auto-hide. -->
+<script type="module" src="~/js/lib/whatsnew-toast.js"></script>
+<!-- Notice strip (ADR 0176): must load AFTER the per-notice dismissal
+     modules (pinned, onboarding, whatsnew) so it sees their hidden state. -->
+<script type="module" src="~/js/lib/notice-strip.js"></script>
+<!-- Phone sub-nav strips (ADR 0231): keeps the active tab in view and drives the edge fades. -->
+<script type="module" src="~/js/lib/tab-strip.js"></script>
+<!-- What's-new "show more" (the VN lane, ADR 0110; see About.cshtml):
+     reveals the hidden earlier releases in batches of 10 on click.
+     Self-guards: no-op if the list has ≤3 entries (no button). -->
+<script type="module" src="~/js/lib/whatsnew-more.js"></script>
+<!-- Home roadmap "show more" (both directions; see Home/Index.cshtml):
+     reveals the hidden earlier + upcoming milestones in batches of 10
+     on click. Self-guards: no-op on pages without #roadmap-list, and
+     per-side no-op where a direction has no button (≤3 items). -->
+<script type="module" src="~/js/lib/roadmap-more.js"></script>
+<!-- Events "your upcoming events" load-more (the EV-MINE section on
+     /events; see Event/Index.cshtml): reveals the hidden own-event rows
+     beyond the first five in batches of 5 on click. Self-guards: no-op
+     on pages without #events-mine-more-wrap (≤5 own events → no button). -->
+<script type="module" src="~/js/lib/mine-more.js"></script>
+<!-- Home "upcoming" load-more (the Upcoming section on /, the resident's
+     Profile.HomeShowUpcoming preference): reveals the hidden event +
+     to-do rows beyond the first five of each column in batches of 5 on
+     click. Self-guards: no-op on pages without the Upcoming section
+     (signed-out / not opted in) and per-column where ≤5 rows → no button. -->
+<script type="module" src="~/js/lib/home-upcoming-more.js"></script>
+<!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
+     Kanban board + the events calendar): wires the .page-expand-toggle /
+     .page-expand-close buttons to the body.kmb-page-expanded class
+     (site.css does the filling/hiding). Self-guards on pages without
+     either button, so loading it globally is safe. -->
+<script type="module" src="~/js/lib/expand-page.js"></script>
+<!-- M35 (ADR 0164) — the kiosk-mode auto-cycle / auto-refresh state
+     machine (client/lib/kiosk.ts, tsc-built). Drives the /kiosk display's
+     #kiosk-stage iframe: advances the visible slide to the next (wrapping
+     to the first) every data-view-interval, and re-points the iframe src
+     (re-running the surface's own Read decision on the frozen seam) every
+     data-refresh-interval; a slide the viewer cannot see shows the
+     localized kiosk.slide_denied shape (no leak, no 404). Self-guards on
+     pages without #kiosk-stage, so loading it globally is safe (the
+     expand-page.js idiom). No new npm package / build step (M35·7). -->
+<script type="module" src="~/js/lib/kiosk.js"></script>
+<!-- M37 (ADR 0167) — the personal-note modal (client/lib/note-modal.ts,
+     tsc-built). Wires the _NoteButton partial's Bootstrap modal to the
+     JSON API endpoints (GET/POST/PUT/DELETE /notes/api/...): add /
+     edit / delete a note without leaving the page. Self-guards on pages
+     without the [data-note-button] anchor (every page except the ten
+     detail surfaces), so loading it globally is safe (the expand-page.js
+     idiom). -->
+<script type="module" src="~/js/lib/note-modal.js"></script>
+<!-- M10 U03 (ADR 0107 D5/D10) — the PWA install affordance + the
+     service-worker registration (client/lib/pwa-install.ts, tsc-built).
+     Registers /sw.js (U02's passive SW) and reveals the #pwa-install
+     label source as one quiet fixed button on beforeinstallprompt;
+     a clean no-op where the browser never fires it (iOS). -->
+<script type="module" src="~/js/lib/pwa-install.js"></script>
+<!-- Nav-row overflow fold (client/lib/nav-more-fold.ts, tsc-built — ADR 0113):
+     in the variant-B "top row" nav, folds Community + Groups into the More
+     menu when the row doesn't fit, and back when there is room. Self-guards
+     (no-op) in variant C, signed-out, and where the data-nav-* hooks are
+     absent, so loading it globally is safe. -->
+<script type="module" src="~/js/lib/nav-more-fold.js"></script>
+<!-- Rail label expander (client/lib/rail-expander.ts, tsc-built — variant C):
+     toggles the body's .kmb-rail-expanded class when the .kmb-rail-expander
+     button is clicked (site.css widens the rail + reveals each section's
+     .kmb-rail-label + updates the content shift). The preference persists
+     in localStorage. Self-guards (no-op) in variant B and where the
+     expander button is absent, so loading it globally is safe. -->
+<script type="module" src="~/js/lib/rail-expander.js"></script>
+<!-- Rail hover/focus tooltips (client/lib/rail-tips.ts, tsc-built — variant C):
+     the .kmb-rail-tip is position:fixed (the rail clips its overflow, which hid
+     the old absolute tip); this sets its vertical position from the hovered
+     button and adds .kmb-rail-tips-js (site.css shows the tips only then).
+     Self-guards (no-op) in variant B / signed-out. -->
+<script type="module" src="~/js/lib/rail-tips.js"></script>
+@* P0-6 (translation audit) — the client-JS strings bundle: the closed
+   KnownTranslationKeys set resolved in the effective language, serialized
+   to JSON. The client modules (rich-editor / image-editor / tag-suggest /
+   notifications-bell / kiosk / note-modal / onboarding-modal) read this
+   once and localize their modals, labels and alerts (with the en floor
+   as the in-code fallback).
+
+   Must be emitted via Html.Raw so the JSON arrives unencoded (a bare
+   @expr inside a <script> IS HTML-encoded in .NET 10's Razor — the `"`
+   becomes &quot; and JSON.parse fails). The only hazard is a value
+   containing a literal `</script>` closing the element early, so
+   neutralize `</` to `<\/` (a valid JSON escape that cannot form
+   `</script>`). The previous form (HttpUtility.HtmlEncode) double-encoded
+   the block (&amp;quot;), making the entire P0-6 bundle unparseable —
+   the client modules silently fell back to the en floor strings. *@
+<script type="application/json" id="kumunita-strings">@Html.Raw(Model.Replace("</", "<\\/"))</script>

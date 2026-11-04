@@ -1,0 +1,564 @@
+@model Kumunita.Web.Models.BoardDetailViewModel
+@using Kumunita.Web.Security
+@using Kumunita.Core.Projects
+@using Kumunita.Web.Views.Shared
+@using Marten
+@inject Marten.IDocumentStore Store
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Board.Title) ? "Board" : Model.Board.Title;
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+
+    // The remove-translation form's data-confirm (the ADR 0072 attribute
+    // idiom — the confirm.js seam reads the attribute verbatim; the kw-l
+    // TagHelper can't wrap an attribute). The en floor is the server fallback
+    // (a null provider — a non-HTTP render — degrades to en).
+    string confirmRemoveTrans = "Remove this translation?";
+    // ADR 0285 D6 — the Board / List view switch's accessible name.
+    string ariaBoardView = Translation is null ? "Board view" : await Translation.GetAsync("projects.board.view_switch", _kwL);
+    // The board's modal close buttons + lane action menus carry accessible
+    // names the kw-l TagHelper can't wrap (an attribute) — server-resolved,
+    // same idiom (the a11y.* closed set is the floor).
+    string ariaClose       = "Close";
+    string ariaActionsFor  = "Actions for {0}";
+    string ariaSetLimit    = "Set limit on {0}";
+    string ariaBoardActions = "Board actions";
+    if (Translation is not null)
+    {
+        confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
+        ariaClose          = await Translation.GetAsync("a11y.close", _kwL);
+        ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
+        ariaSetLimit       = await Translation.GetAsync("a11y.set_limit", _kwL);
+        ariaBoardActions   = await Translation.GetAsync("a11y.board_actions", _kwL);
+    }
+    // ADR 0088 — the board's **default-visible** translation variant is the
+    // viewer's current language (_kwL) when a translation exists in it, else
+    // the authored-in language (the ADR 0027 floor) — the ADR 0049
+    // originalHidden flag (the Event/Announcement detail idiom).
+    bool _originalHidden = Model.Translations is { Count: > 0 }
+        && Model.Translations.Any(t => String.Equals(t.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase));
+    // ADR 0072 — the add-to-do / add-lane input placeholders (the only
+    // Kanban-board UI strings that were still hardcoded; the rest of the
+    // board is kw-l-wrapped). Resolved the same way the optional status
+    // placeholder above is: provider by the effective language, the
+    // provider floor (en registry) is the backstop.
+    var addTodoPlaceholder = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.board.lane.add_todo_placeholder"]
+        : await Translation.GetAsync("projects.board.lane.add_todo_placeholder", _kwL);
+    var addLanePlaceholder = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.board.lane.add_lane_placeholder"]
+        : await Translation.GetAsync("projects.board.lane.add_lane_placeholder", _kwL);
+    // The copy-to / move-to pickers need the *other* boards (the target
+    // board option list). The frozen view model carries no such list
+    // (C-M5·3: a board detail is board-scoped), so this is a read-only
+    // display convenience — never a gate (the audience decision already ran
+    // in the service's GetBoardAsync). The M4 / U07 board-placement idiom.
+    var otherBoards = await Store.QuerySession().Query<KanbanBoard>()
+        .Where(b => !b.IsDeleted && b.Id != Model.Board.Id)
+        .ToListAsync(CancellationToken.None);
+    otherBoards = otherBoards
+        .OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    // ── Status icon + label (ADR 0069) ────────────────────────────────────
+    // The fixed status vocabulary (KanbanStatuses) maps each code to an
+    // inline lucide-style SVG (the repo's icon convention — no icon font);
+    // a null/unknown code falls back to a plain circle. The status is
+    // stored as a free string on the document (no schema change), so the
+    // glyph is best-effort: an unrecognized value still renders the raw
+    // text next to the fallback circle (C3 — the view renders what the
+    // service stored). The <c>title</c> attr + a <kw-l> text sibling keep
+    // the icon accessible / screen-reader-legible.
+    // U06 — the status glyph / label-key mapping is now the shared
+    // BoardCardStatuses helper (Views/Shared/BoardCardStatuses.cs), shared
+    // with the _BoardCard partial (one definition, not two drifting copies —
+    // the "silent coupling" the IMPROVE lane closes). Byte-identical to the
+    // prior inline copies (the served-page diff is the evidence).
+    static string StatusGlyph(string? status) => BoardCardStatuses.StatusGlyph(status);
+    static string StatusLabelKey(string? status) => BoardCardStatuses.StatusLabelKey(status);
+    // ADR 0082 — the LangName helper: resolve a language code to its native
+    // name from Model.Languages (the ADR 0082 idiom; the fallback is the raw
+    // code). Used by the ⋮ dropdown's translation add / edit / remove items.
+    var langNames = (Model.Languages ?? []).ToDictionary(l => l.Code, l => l.NativeName);
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+
+    // IMPROVE-CODE C11 — the board's translation add / edit modals' model
+    // (extracted into the _BoardTranslationModals partial; the served markup
+    // is unchanged). Built here (not in the <partial model="…"> attribute) so
+    // the string interpolations don't fight Razor's attribute parser.
+    var boardTransModals = new Kumunita.Web.Models.BoardTranslationModalsModel(
+        Model.CanTranslate,
+        Model.Board.Id,
+        Model.Board.Title,
+        Model.Translations,
+        Model.Languages,
+        ariaClose,
+        LangName);
+
+    // IMPROVE-CODE C11 — the "Add to Project…" + "Link to event…" modals'
+    // model (extracted into the _BoardLinkModals partial; the served markup
+    // is unchanged).
+    var boardLinkModals = new Kumunita.Web.Models.BoardLinkModalsModel(
+        Model.Board.Id,
+        Model.ProjectId,
+        Model.Projects,
+        Model.EventPicker,
+        ariaClose);
+
+    // IMPROVE-CODE C11 — the Kanban lane surface's model (extracted into the
+    // _BoardLanes partial; the served markup is unchanged). The *other* boards
+    // + the ADR 0072 placeholders + the a11y strings are view-locals here, so
+    // they're threaded through the model.
+    var boardLanes = new Kumunita.Web.Models.BoardLanesModel(
+        Model.Board.Id,
+        Model.Board,
+        Model.CanEdit,
+        Model.Lanes,
+        // Project to the (Id, Title) pairs the picker renders (the model keeps
+        // no KanbanBoard domain type — the Web→Projects boundary edge stays at
+        // its baseline).
+        otherBoards.Select(b => (b.Id, b.Title)).ToList(),
+        addTodoPlaceholder,
+        addLanePlaceholder,
+        ariaClose,
+        ariaActionsFor,
+        ariaSetLimit);
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-12 col-lg-12">
+        @* M37 (ADR 0167) — the note-attach affordance + M17 (ADR 0118,
+           amendment 2026-10-16) — the bookmark affordance, on ONE right-
+           aligned row at the TOP of the parent column (just below the nav
+           bar, to the right). The bookmark toggle posts to
+           /bookmarks/toggle with the kind "board" (the D3 write-lane
+           check re-runs the owning surface's frozen IProjectService.
+           GetBoardAsync read — the same call the detail page uses, the
+           M37 PersonalNotes "board" D3 shape re-applied). *@
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            @{ var _bm = ("board", Model.Board.Id, $"/projects/boards/{Model.Board.Id}"); }
+            <partial name="_BookmarkButton" model="@_bm" />
+            @{ var _pn = ("board", Model.Board.Id, $"/projects/boards/{Model.Board.Id}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
+        <p>
+            <a href="/projects/boards" class="btn btn-link p-0 kanban-back"><kw-l key="projects.board.back">← Back to boards</kw-l></a>
+        </p>
+
+        @* The full-page expand mode's close button (client/lib/expand-page.js
+           toggles body.kmb-page-expanded — the site.css rules show this ✕
+           only while expanded, pinned top-right). A plain button, not a
+           link: collapsing is client-side (no navigation). *@
+        <button type="button" class="btn btn-sm btn-outline-secondary page-expand-close" aria-pressed="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <span><kw-l key="common.exit_full_page">Exit full page</kw-l></span>
+        </button>
+
+        <header class="airy-head kmb-board-head">
+            <div class="head-row">
+                @* flex:1 1 0 + min-w-0: the left column (title + description +
+                   author + tags + links) has a ZERO flex-basis and grows to fill
+                   the space left by the action cluster. A zero basis keeps the
+                   .head-row (flex-wrap:wrap) from wrapping the cluster under the
+                   title — the two stay on ONE line, with the cluster to the
+                   right of the title, across viewport widths (the left column's
+                   text simply wraps within its column). *@
+                <div class="min-w-0" style="flex:1 1 0">
+                    @* ADR 0088 — user-added translations of the board (the
+                       ADR 0059 chip-swap: the original + one variant per
+                       translation; ADR 0049 auto-selects the viewer's
+                       current-language variant as default-visible when one
+                       exists). The title + description (the board's two
+                       surfaces) swap together inside the group. The
+                       add/edit/remove management is gated on Model.CanTranslate. *@
+                    <div data-td-group="board">
+                        @* Original variant — default-visible unless ADR 0049
+                           auto-selects a translation into the viewer's language
+                           (_originalHidden). *@
+                        <div class="td-variant" data-td-variant="@(Model.OriginalLanguageCode)"
+                             @(_originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                            <h1>
+                                @* not extracted: the board title + per-translation display is the page's
+                               unique header (single-use, not repeated across views, not independently
+                               touched) — it stays inline rather than becoming a partial. *@
+                            @if (string.IsNullOrWhiteSpace(Model.Board.Title))
+                                {
+                                    <span class="text-body-tertiary"><kw-l key="projects.board.untitled">Untitled board</kw-l></span>
+                                }
+                                else
+                                {
+                                    @Model.Board.Title
+                                }
+                            </h1>
+                            @if (!string.IsNullOrWhiteSpace(Model.Board.Description))
+                            {
+                                <div class="rc-body mt-1">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Board.Description))</div>
+                            }
+                        </div>
+
+                        @* One variant per user-added translation — hidden by
+                           default, except the one matching the viewer's
+                           current language (ADR 0049). *@
+                        @if (Model.Translations is { Count: > 0 })
+                        {
+                            @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                bool tDefault = String.Equals(tr.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase);
+                                <div class="td-variant" data-td-variant="@tr.LanguageCode"
+                                     @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                                    @if (!string.IsNullOrWhiteSpace(tr.Title))
+                                    {
+                                        <h1>@tr.Title</h1>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(tr.Body))
+                                    {
+                                        <div class="rc-body mt-1">@Html.Raw(MarkdownRenderer.RenderHtml(tr.Body))</div>
+                                    }
+                                </div>
+                            }
+
+                            <div class="mt-2">
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <span class="text-muted small fw-semibold"><kw-l key="posts.translations_label">Translations</kw-l></span>
+                                    <button type="button" class="kmb-chip kmb-chip-btn"
+                                            data-translation-chip data-td-group="board"
+                                            data-td-variant="@(Model.Board.LanguageCode)"
+                                            aria-pressed="@(_originalHidden ? "false" : "true")">@Model.Board.LanguageCode</button>
+                                    @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
+                                    {
+                                        <button type="button" class="kmb-chip kmb-chip-btn"
+                                                data-translation-chip data-td-group="board"
+                                                data-td-variant="@tr.LanguageCode"
+                                                aria-pressed="@(String.Equals(tr.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase) ? "true" : "false")">@tr.LanguageCode</button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    @* IMPROVE-CODE C11 — the author byline (ADR 0200) + the
+                       community / project / event links + the tags row (ADR
+                       0044 / 0147) extracted into the _BoardBylineLinksTags
+                       partial (the served markup is unchanged). *@
+                    <partial name="_BoardBylineLinksTags" model="Model" />
+                    @* ADR 0086 D9 — the **project link**: present only when
+                       the board has a `ProjectId` that resolves to a
+                       readable, non-deleted project (the D6 dangling rule —
+                       both fields are `null` when the target is soft-deleted
+                       or unreadable, and the link is omitted entirely). A
+                       display surface, never a gate (C-PL·3). *@
+                </div>
+                @* The board action dropdown (the _AccountNav.cshtml Bootstrap
+                   dropdown shape): delete board — a plain POST form to the
+                   U08 route, CSRF-tokenized, redirect-after-POST. The cascade
+                   is the service's (F2 / F8); the view renders what the
+                   service returns (C3). This cluster is a flex child of the
+                   .head-row (align-items:flex-end), so without an override it
+                   bottom-aligns against the tall left column (title + author +
+                   tags) and the ⋮ lands well below the title. align-self:
+                   flex-start pins it to the TOP of the row, and flex-shrink-0
+                   (with the left column's flex-grow-1 min-w-0) keeps the ⋮ +
+                   Full page / Full screen toggles on the SAME line as the
+                   title — to the right of it — the community detail-page
+                   idiom. *@
+                <div class="d-flex align-items-center gap-2 align-self-start flex-shrink-0">
+                    @* The full-page expand toggle (expand-page.js's second
+                       display mode, the full-screen sibling): keeps the page
+                       in the normal viewport but hides the navbar / footer
+                       and stretches the board to fill 100% of the page body
+                       (the body.kmb-page-expanded rules in site.css). The ✕
+                       close sits above the content; Escape also collapses. *@
+                    <button type="button" class="btn btn-sm btn-outline-secondary page-expand-toggle"
+                            aria-pressed="false">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                        <span><kw-l key="common.full_page">Full page</kw-l></span>
+                    </button>
+                    @* The full-screen toggle (the board is the Fullscreen API
+                       element — the browser hides the rest of the page and
+                       client/lib/projects-board.ts syncs the .kanban-full
+                       class + the ⛶ / ✕ label on fullscreenchange). Works in
+                       a regular viewport; the :fullscreen styles in site.css
+                       give it the full-bleed look. *@
+                    <button type="button" class="btn btn-sm btn-outline-secondary kanban-fullscreen-toggle"
+                            aria-pressed="false" hidden="@(Model.ListView ? "hidden" : null)">
+                        <svg class="kanban-fullscreen-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                        <span><kw-l key="projects.board.fullscreen">Full screen</kw-l></span>
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="@ariaBoardActions">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            @if (Model.CanEdit)
+                            {
+                                @* ADR 0070 — the board edit lane (the card
+                                   ⋮ menu's "Edit" item shape, reused): a
+                                   link, not a form. The standing (creator ∪
+                                   GlobalAdmin) is the service's on write —
+                                   the CanEdit flag is the same matrix. *@
+                                <li>
+                                    <a class="dropdown-item text-dark" href="@($"/projects/boards/{Model.Board.Id}/edit")"><kw-l key="projects.board.edit">Edit board</kw-l></a>
+                                </li>
+                            }
+                            @if (Model.Projects is { Count: > 0 })
+                            {
+                                @* ADR 0086 D9 — "Add to Project…": opens the
+                                   modal (the BoardIndex row-modal idiom)
+                                   whose picker posts to the U04 set-project
+                                   lane (the BoardEdit set-project card
+                                   idiom, repackaged as a modal). Hidden when
+                                   the actor sees no readable project (F10). *@
+                                <li>
+                                    <button type="button" class="dropdown-item text-dark"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#add-project-modal">
+                                        <kw-l key="pl.board.add_to_project">Add to Project…</kw-l>
+                                    </button>
+                                </li>
+                            }
+                            @if (Model.EventPicker is { Options.Count: > 0 })
+                            {
+                                @* ADR 0115 D3 (M14 interlock carried to the
+                                   board surface) — "Link to event…": opens
+                                   the modal (the "Add to Project…" modal
+                                   idiom, mirrored) whose picker posts to the
+                                   set-event lane (the BoardEdit
+                                   set-project card idiom, repackaged as a
+                                   modal). Hidden when the actor sees no
+                                   readable event (the ADR 0086 D9 F10 rule). *@
+                                <li>
+                                    <button type="button" class="dropdown-item text-dark"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#link-event-modal">
+                                        <kw-l key="board.link_to_event">Link to event…</kw-l>
+                                    </button>
+                                </li>
+                            }
+                            @* ADR 0082 — the translation add / edit / remove
+                               as dropdown items opening the modals below
+                               (replacing the prior inline <details> block):
+                               one "Edit" per existing translation + one
+                               "Add" per enabled-but-missing language (both
+                               open modals), then a "Remove" per existing.
+                               Server-side gate on CanTranslate (the ADR 0088
+                               translator lane); the items are localized (the
+                               ADR 0015 kw-l tags — the same posts.translation_*
+                               keys the Community-post / Project / To-do
+                               surfaces use). *@
+                            @if (Model.CanTranslate)
+                            {
+                                @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#board-trans-edit-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#board-trans-add-{lang.Code}")">
+                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @if (Model.Translations is { Count: > 0 })
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                                    {
+                                        <li>
+                                            <form method="post" action="@($"/projects/boards/{Model.Board.Id}/translations/remove")"
+                                                  data-confirm="@confirmRemoveTrans" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                </button>
+                                            </form>
+                                        </li>
+                                    }
+                                }
+                            }
+                            @* ADR 0173 — the "Report this board" lane: any
+                               resident who can see the board may file a
+                               report (the C-M3b·1 standing). The dropdown
+                               item opens the shared _ReportModal below. *@
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#board-report-modal">
+                                    <kw-l key="posts.board_report_button">Report this board</kw-l>
+                                </button>
+                            </li>
+                            <li>
+                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/delete")"
+                                      data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.delete">Delete board</kw-l></button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        @* ADR 0173 — the "Report this board" modal (the shared
+           _ReportModal partial — the ADR 0082 modal idiom). Rendered
+           unconditionally: any resident who can see the board (the
+           detail's own Read decision already ran) may file a report
+           (C-M3b·1, the post-report lane's standing). *@
+        @{ var _repBd = (ActionUrl: "/projects/boards/" + Model.Board.Id + "/report", ModalId: "board-report-modal", TitleKey: "posts.board_report_button"); }
+        <partial name="_ReportModal" model="@_repBd" />
+
+        @* IMPROVE-CODE C11 — the board's translation add / edit modals
+           extracted into the _BoardTranslationModals partial (the served
+           markup is unchanged). *@
+        <partial name="_BoardTranslationModals" model="boardTransModals" />
+
+        @* ADR 0088 — the description now renders inside the board's
+           translation td-group variants (above), so the standalone card is
+           gone: a translation's body swaps in as the description. *@
+
+        @* ADR 0285 D6 — Board / List: two plain GET links (the calendar
+           Day/Week/Month toggle idiom); the active view is pressed. The list
+           view is read-only, so editing stays on the board view. *@
+        <div class="d-flex justify-content-end mb-2">
+            <div class="btn-group btn-group-sm" role="group" aria-label="@ariaBoardView">
+                <a class="btn btn-outline-secondary @(Model.ListView ? null : "active")" href="/projects/boards/@Model.Board.Id" aria-pressed="@(Model.ListView ? "false" : "true")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-boards"/></svg><kw-l key="projects.board.view_board">Board</kw-l></a>
+                <a class="btn btn-outline-secondary @(Model.ListView ? "active" : null)" href="/projects/boards/@Model.Board.Id?view=list" aria-pressed="@(Model.ListView ? "true" : "false")"><svg class="kmb-nav-icon kmb-icon" width="14" height="14" aria-hidden="true"><use href="#kmb-i-rows"/></svg><kw-l key="projects.board.view_list">List</kw-l></a>
+            </div>
+        </div>
+
+        @if (Model.ListView)
+        {
+            <partial name="_BoardList" model="Model" />
+        }
+        else
+        {
+            @* IMPROVE-CODE C11 — the Kanban lane surface (the .kanban-board
+               container: full-screen close, per-lane head / menu / rename
+               modal / cards / add-to-do, and the add-lane placeholder lane)
+               extracted into the _BoardLanes partial (the served markup is
+               unchanged). *@
+            <partial name="_BoardLanes" model="boardLanes" />
+        }
+    </div>
+
+    @* IMPROVE-CODE C11 — the "Add to Project…" (ADR 0086 D9) + "Link to
+       event…" (ADR 0115 D3) modals extracted into the _BoardLinkModals
+       partial (the served markup is unchanged). *@
+    <partial name="_BoardLinkModals" model="boardLinkModals" />
+
+    @* ADR 0195 — the board card's edit modal (ONE instance per board page,
+       not per card). The card click / the ⋮ menu's "Edit" item open this
+       (the client/lib/board-edit-modal.ts module) — it populates the
+       form's fields from the card's stored values (the
+       <c>card-edit-prefills</c> JSON data block below) and the board's
+       shared picker (the <c>CardEditPicker</c> seed), then shows it.
+       The form POSTs to <c>/projects/todos/{id}</c> (the UpdatePost lane) —
+       the <c>action</c> is set to the clicked card's TodoId by the client.
+       The body + tags are plain form fields (a Markdown textarea + a
+       comma-separated tags input) — the modal deliberately does NOT use
+       the <c>bindRichEditor</c> / <c>tag-suggest.ts</c> chip components
+       (they bind-once-at-load and read their seed attribute once per bind,
+       which is awkward in a single-instance modal reused per card; see the
+       <c>_BoardCardEditModal</c> comments). The board-modal.ts
+       re-home-to-body (the ADR 0071 / transform trap) covers this modal
+       too. *@
+    <partial name="_BoardCardEditModal"
+             model="new BoardCardEditModalModel(Model.CardEditPicker
+                        ?? new CardEditPicker([], [], [], [], [], []))" />
+
+    @* ADR 0195 — the per-card prefill JSON (the client reads it to populate
+       the modal's fields). Keyed by the card's TodoId. The values are
+       the card's stored Title / Body / Status / AssigneeId / ParentId /
+       BlockedByTodoId / StartAt / DueAt (wall-clock in the actor's zone) /
+       ComponentId / LanguageCode + the current tag slugs. A "read, not a
+       decision" surface (C-M5·3) — the standing write gate is the
+       service's on the POST lane. The **audience** is deliberately NOT
+       here: the modal mirrors the UpdateTodoRequest fields (no Audience
+       field on the update lane — see the _BoardCardEditModal comment);
+       the audience editor lives on the standalone Edit view. *@
+    @{
+        var cardEditPrefillsJson = System.Text.Json.JsonSerializer.Serialize(
+            (Model.CardEditPrefills ?? new Dictionary<string, CardEditPrefill>())
+                .ToDictionary(
+                    kv => kv.Key,
+                    kv => new
+                    {
+                        title = kv.Value.Title,
+                        body = kv.Value.Body,
+                        status = kv.Value.Status,
+                        assigneeId = kv.Value.AssigneeId,
+                        parentId = kv.Value.ParentId,
+                        blockedByTodoId = kv.Value.BlockedByTodoId,
+                        startAt = kv.Value.StartAt is not null
+                            ? kv.Value.StartAt.Value.ToString("yyyy-MM-ddTHH:mm")
+                            : null,
+                        dueAt = kv.Value.DueAt is not null
+                            ? kv.Value.DueAt.Value.ToString("yyyy-MM-ddTHH:mm")
+                            : null,
+                        componentId = kv.Value.ComponentId,
+                        languageCode = kv.Value.LanguageCode,
+                        tagSlugs = kv.Value.TagSlugs,
+                    }),
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = false });
+    }
+    @* ADR 0195 — this is a <script type="application/json"> data block that must
+       carry the RAW JSON so the client's JSON.parse can read it. In .NET 10's
+       Razor, a bare @expr inside a <script> IS html-encoded (the `"` becomes
+       &quot;), which would break JSON.parse — so the value must be emitted via
+       Html.Raw (which outputs as-is). The only remaining hazard is a body value
+       containing a literal `</script>` (a pasted HTML snippet) closing this
+       <script> early, so neutralize `</` to `<\/` (a valid JSON escape that
+       cannot form `</script>`). NOTE: the _Layout.cshtml #kumunita-strings block
+       wraps its JSON in HttpUtility.HtmlEncode — under this same encoding rule
+       that double-encodes it (&amp;quot;), so the P0-6 client strings bundle is
+       currently unparseable and falls back to the en floor; that is a separate
+       latent bug, NOT fixed here. *@
+    <script type="application/json" id="card-edit-prefills">@Html.Raw(cardEditPrefillsJson.Replace("</", "<\\/"))</script>
+</div>
+
+@section Scripts {
+    <!-- ADR 0082 — the rich editor for the board's translation "Add" modal
+         body (the ADR 0025 rc-editor lane; self-wires onto the modal's
+         textarea[data-rich-editor] at load, the same per-view <script>
+         idiom TodoDetail / ProjectDetail / the post + announcement
+         translation lanes use). data-rich-editor-no-image keeps the board
+         translation body text-only. -->
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+    <!-- ADR 0195 — the board card's edit modal (the card click / the ⋮
+         menu's "Edit" item). client/lib/board-edit-modal.ts: opens the
+         #board-card-edit-modal on card click, populates the form's fields
+         from the card's stored values (the <c>card-edit-prefills</c> JSON
+         below), binds the rich editor + tag-suggest (the modal is hidden at
+         load; bindRichEditor / bindTagSuggest are called after populating,
+         before showing), sets the form's action to the card's
+         /projects/todos/{id}, then shows the modal. The form POSTs natively
+         (CSRF via the anti-forgery token; the server is authoritative —
+         the standing gate is the service's on the POST lane). -->
+    <script type="module" src="~/js/lib/board-edit-modal.js"></script>
+    <!-- Projects board (M5 — ADR 0067) — client/lib/projects-board.ts,
+         tsc-built; keyboard reorder / move on a focused card (Arrow keys →
+         the card's own move-… POST form, CSRF-aware, server-authoritative —
+         C-M5·9 / D10: no HTML5 drag, no optimistic reordering). The menu
+         channel is the plain POST forms above (the browser handles them). -->
+    <script type="module" src="~/js/lib/projects-board.js"></script>
+    <!-- Board card modals (subtask / assign / edit) — client/lib/
+         board-modal.ts. Re-homes the card's Bootstrap modals to <body> on
+         open so they escape any transformed / stacking-context ancestor of
+         the board (a CSS transform on .kanban-board turns it into the
+         containing block + stacking context for the modal's position:fixed,
+         which lets the body-level backdrop paint above the modal and cover
+         the form fields — the "can't type in the Add-subtask modal" bug).
+         The detach-menu.ts precedent, generalized to modals. ADR 0195
+         extends this to the card edit modal. -->
+    <script type="module" src="~/js/lib/board-modal.js"></script>
+}

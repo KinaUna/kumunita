@@ -66,6 +66,27 @@ Each commit:
 4. **No route, served HTML, or document schema changed** — existing Web test suites still pass.
 5. **Both gates green**: `code-check: OK (0 violations)` + `improve-check: ALL GATES PASS`.
 
+## C11-1 close record — the six views (2026-11-04)
+
+**Extracted** (each into `.cshtml` partials in the feature folder; every parent view now ≤ 600 physical lines):
+
+| View | before → after | partials (new) |
+|---|---|---|
+| `Boards/BoardDetail` | 1 090 → 558 | `_BoardBylineLinksTags`, `_BoardLanes`, `_BoardLinkModals`, `_BoardTranslationModals` (+ `_BoardList` moved here) |
+| `Todos/TodoDetail` | 1 154 → 446 | `_TodoDisplay`, `_TodoStatusAssignEvent`, `_TodoSubtasksBoards`, `_TodoComments`, `_TodoTranslationModals` |
+| `Shared/_Layout` | 830 → 576 | `_LayoutNotices`, `_LayoutFooter`, `_LayoutScripts` |
+| `Groups/Detail` | 813 → 524 | `_GroupMembers`, `_GroupTranslationModals` |
+| `Groups/PostDetail` | 764 → 470 | `_GroupPostReplies`, `_GroupPostComposer` |
+| `Guardian/Detail` | 747 → 574 | `_GuardianEventAttendance` |
+
+**Blocks deliberately NOT extracted** (one `@* not extracted: <reason> *@` note at the site in each view): the board todo header; the to-do claim/assign action cluster; the group Posts/Events tab cards; the group-post delete + translation form cluster; the guardian messaging + time-limit sections; the `_Layout` nav bar. Each is a single-use, non-repeated surface — the U06 criterion (> 150 lines **and** repeated or independently touched) is not met.
+
+**Pre-existing C08 bug found + fixed (verified, not a C11-1 regression):** C08 (`62f9bd80`) split `ProjectsController` into `BoardsController` + `TodosController` but left the views in `Views/Projects/`. ASP.NET resolves a view by its folder matching the controller name, so `BoardDetail`/`TodoDetail` 500'd ("view not found") at runtime while the build stayed green — the old (pre-C08) Docker image rendered them, which is why the byte-identity baseline had real board/todo HTML. Fix: moved `Board*` → `Views/Boards/`, `Todo*`/`Create`/`Edit` → `Views/Todos/`, `_ProjectsTabs` (referenced by views in three controller folders) → `Views/Shared/`, `_BoardList` → `Views/Boards/`; `Views/Projects/` is now pure `ProjectsController`. All board/todo pages confirmed **200 with real content** in Docker.
+
+**Byte-identity verdict:** the five rendered pages (`/`, board detail, to-do detail, group detail, group post detail) are **byte-identical modulo** (a) whitespace from Razor re-indentation, (b) the known per-render noise (anti-forgery `CfDJ8…` tokens, 8-hex modal GUIDs, `datetime-local` now-values), and (c) **one neutral delta**: the `_Layout` extraction moved ~43 elements (footer + notice strip) into partials, dropping the inert ASP.NET scoped-CSS attribute (`b-xer229us5n`) that the default-template `_Layout.cshtml.css` used to inject. That attribute is visually inert — the scoped bundle (`Kumunita.Web.styles.css`) is **not** in the served `<link>` list and no served stylesheet references `b-xer`, so the drop changes no rendering. Accepted as neutral per the C11-1 close decision.
+
+**Baseline (all changes are decreases — no cap raised, no ADR needed):** `--tighten` brought the `views` list from 9 → **3** entries (`Event/Detail` 724, `Posts/Detail` 662, `Shared/_BoardCard` 634). The `Web → Projects : KanbanBoard` boundary edge went **7 → 6** (a *decrease*). Why: the `BoardLanesModel` I added in this unit initially carried `IReadOnlyList<Kumunita.Core.Projects.KanbanBoard> OtherBoards` (the copy-to / move-to picker source), which would have turned `Models/ProjectBoardViewModels.cs` into the **8th** file crossing that edge (at HEAD it referenced `KanbanBoard` only in doc comments) — a cap **raise**, which C11 forbids without an `adr:` reason. Fix: the picker reads only `b.Id` / `b.Title`, so `BoardLanesModel.OtherBoards` **and** `BoardCardModel.OtherBoards` were widened to the display projection `IReadOnlyList<(string Id, string Title)>` (the idiom `BoardLinkModalsModel.Projects` already uses), removing the `KanbanBoard` code reference from *both* files — so the edge fell to 6, not rose to 8. Board-detail served HTML re-verified **byte-identical** after this change (the `(Id, Title)` tuple renders the same `<option value="…">…</option>`). Both gates green: `code-check: OK (0 violations)`, `improve-check: ALL GATES PASS`.
+
 ## Mechanics (learned by prior agents — cost hours if you ignore them)
 
 - **xunit.v3 in-process runner:** `dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll -class "Kumunita.Web.Tests.<Class>"`. **Rebuild the test project before trusting a run.**

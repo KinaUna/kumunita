@@ -1,0 +1,169 @@
+@model Kumunita.Web.Models.TodoCommentsModel
+@using Kumunita.Web.Models
+@using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
+
+@* IMPROVE-CODE C11 — the to-do detail's comments + replies + composer
+   (extracted from TodoDetail.cshtml; the served markup is unchanged). The
+   ADR 0049 language the resident is reading in is threaded in as
+   <c>DefaultVariant</c> (the composer's language-picker default); the seeded
+   <c>TodoComment_Languages</c> option list stays in <c>ViewData</c> (a
+   partial inherits it). *@
+
+@* ADR 0100 — the comments + replies (C-M3·1: the to-do's single Read
+   decision already ran; a comment inherits it — no per-comment
+   decision). The list groups replies under their top-level parent; the
+   composer is the M3 reply-form shape (rc-editor + language picker). *@
+<section class="mb-4 kmb-discussion" id="todo-comments">
+    <h2 class="h5 mb-3"><kw-l key="projects.todo.comments">Comments</kw-l></h2>
+
+    @{
+        var comments = Model.Comments ?? [];
+        var topLevel = comments
+            .Where(c => c.ParentId is null)
+            .OrderBy(c => c.Created)
+            .ToList();
+        var repliesByParent = comments
+            .Where(c => c.ParentId is not null)
+            .GroupBy(c => c.ParentId!)
+            .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Created).ToList());
+    }
+
+    @if (topLevel.Count == 0)
+    {
+        <p class="text-body-tertiary mb-3"><kw-l key="projects.todo.comment_empty">No comments yet. If you can see this to-do, you can comment on it.</kw-l></p>
+    }
+    else
+    {
+        <div class="kmb-detail-comments mb-3">
+            @foreach (var c in topLevel)
+            {
+                <div class="kmb-detail-comment">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="d-inline-flex align-items-center flex-shrink-0 me-2">
+                            <kw-avatar subject="@c.AuthorId" mono="@(string.IsNullOrWhiteSpace(c.AuthorDisplayName) ? string.Empty : char.ToUpperInvariant(c.AuthorDisplayName.TrimStart()[0]).ToString())" size="sm" mono-hue="@AvatarHue.For(c.AuthorId)" />
+                        </div>
+                        <div class="flex-grow-1" style="min-width:0;">
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="fw-semibold">@c.AuthorDisplayName</span>
+                                <span class="text-muted small"><kw-dt dt="@c.Created" format="g"></kw-dt></span>
+                                @if (c.DeletedAt is not null)
+                                {
+                                    <span class="kmb-chip"><kw-l key="projects.todo.comment_deleted">This comment has been deleted by its author.</kw-l></span>
+                                }
+                                @if (c.IsAuthor && c.DeletedAt is null)
+                                {
+                                    <form class="d-inline ms-2" method="post"
+                                          action="@($"/projects/todos/{Model.TodoId}/comments/{c.Id}/delete")"
+                                          style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-link text-danger p-0"><kw-l key="projects.todo.comment_delete">Delete</kw-l></button>
+                                    </form>
+                                }
+                            </div>
+                            @if (c.DeletedAt is null)
+                            {
+                                <div class="rc-body mt-1"><partial name="_MentionRenderer" model="new MentionBodyModel(c.Body, c.AuthorId)" /></div>
+                            }
+                        </div>
+                    </div>
+
+                    @* Replies under this top-level comment (C-M5·7 — the
+                       sole hierarchy mechanism). *@
+                    @if (repliesByParent.TryGetValue(c.Id, out var replies) && replies.Count > 0)
+                    {
+                        <div class="mt-3 ms-3">
+                            @foreach (var r in replies)
+                            {
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="d-inline-flex align-items-center flex-shrink-0 me-2">
+                                        <kw-avatar subject="@r.AuthorId" mono="@(string.IsNullOrWhiteSpace(r.AuthorDisplayName) ? string.Empty : char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString())" size="sm" mono-hue="@AvatarHue.For(r.AuthorId)" />
+                                    </div>
+                                    <div class="flex-grow-1" style="min-width:0;">
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span class="fw-semibold">@r.AuthorDisplayName</span>
+                                            <span class="text-muted small"><kw-dt dt="@r.Created" format="g"></kw-dt></span>
+                                            @if (r.DeletedAt is not null)
+                                            {
+                                                <span class="kmb-chip"><kw-l key="projects.todo.comment_deleted">This comment has been deleted by its author.</kw-l></span>
+                                            }
+                                            @if (r.IsAuthor && r.DeletedAt is null)
+                                            {
+                                                <form class="d-inline ms-2" method="post"
+                                                      action="@($"/projects/todos/{Model.TodoId}/comments/{r.Id}/delete")"
+                                                      style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-link text-danger p-0"><kw-l key="projects.todo.comment_delete">Delete</kw-l></button>
+                                                </form>
+                                            }
+                                        </div>
+                                        @if (r.DeletedAt is null)
+                                        {
+                                            <div class="rc-body mt-1"><partial name="_MentionRenderer" model="new MentionBodyModel(r.Body, r.AuthorId)" /></div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @* The composer (any signed-in resident who can see the to-do may
+       comment — C-M3·1). The M3 reply-form shape: rc-editor + language
+       picker (ADR 0018 — the authored-in tag). *@
+    <div class="card kmb-detail-card kmb-detail-composer">
+        <div class="card-body">
+            <form class="mb-0" method="post" action="@($"/projects/todos/{Model.TodoId}/comments")">
+                @Html.AntiForgeryToken()
+                <label class="form-label" for="todo-comment-body" style="font-weight:600;">
+                    <kw-l key="projects.todo.comment_reply">Comment</kw-l>
+                </label>
+                <div class="rc-editor">
+                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                        <partial name="_RichEditorToggle" />
+                    </div>
+                    <textarea class="form-control mb-3" id="todo-comment-body" name="body" rows="3"
+                              required placeholder="…" data-rich-editor></textarea>
+                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                </div>
+                @{
+                    var commentLanguages =
+                        (ViewData["TodoComment_Languages"] as IReadOnlyList<(string Code, string NativeName)>)
+                        ?? new List<(string Code, string NativeName)>();
+                }
+                <div class="mb-3">
+                    <label class="form-label" for="todo-comment-language" style="font-weight:600;">
+                        <kw-l key="posts.reply_language_label">Language</kw-l>
+                    </label>
+                    <select class="form-control" id="todo-comment-language" name="languageCode">
+                        @foreach (var (languageCode, nativeName) in commentLanguages)
+                        {
+                            @* ADR 0049 — default to the language the resident is reading in *@
+                            <option value="@languageCode" selected="@(String.Equals(languageCode, Model.DefaultVariant, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@nativeName</option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-1">
+                        <kw-l key="posts.reply_language_note">The language you're replying in — a tag, not a translation.</kw-l>
+                    </div>
+                </div>
+                <details class="kw-audience-disclosure mb-3">
+                    <summary><kw-l key="projects.todo.comment_audience_note_label">Who can see comments?</kw-l></summary>
+                    <div class="text-muted small">
+                        <kw-l key="projects.todo.comment_audience_note">Comments have no own audience — they are visible under this to-do's single audience decision. You are commenting only where the to-do itself is visible.</kw-l>
+                    </div>
+                </details>
+                <button type="submit" class="btn btn-primary"><kw-l key="projects.todo.comment_submit">Comment</kw-l></button>
+            </form>
+        </div>
+    </div>
+</section>

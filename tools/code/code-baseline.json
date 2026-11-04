@@ -643,36 +643,12 @@
       "max": 724
     },
     {
-      "id": "src/Kumunita.Web/Views/Groups/Detail.cshtml",
-      "max": 813
-    },
-    {
-      "id": "src/Kumunita.Web/Views/Groups/PostDetail.cshtml",
-      "max": 764
-    },
-    {
-      "id": "src/Kumunita.Web/Views/Guardian/Detail.cshtml",
-      "max": 747
-    },
-    {
       "id": "src/Kumunita.Web/Views/Posts/Detail.cshtml",
       "max": 662
     },
     {
-      "id": "src/Kumunita.Web/Views/Projects/BoardDetail.cshtml",
-      "max": 1090
-    },
-    {
-      "id": "src/Kumunita.Web/Views/Projects/TodoDetail.cshtml",
-      "max": 1154
-    },
-    {
       "id": "src/Kumunita.Web/Views/Shared/_BoardCard.cshtml",
       "max": 634
-    },
-    {
-      "id": "src/Kumunita.Web/Views/Shared/_Layout.cshtml",
-      "max": 830
     }
   ],
   "ts": [],
@@ -3341,7 +3317,7 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "KanbanBoard",
-      "count": 7
+      "count": 6
     },
     {
       "from": "Web",

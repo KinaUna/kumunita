@@ -311,68 +311,10 @@
 
 <body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null) @(kmbKiosk ? "kmb-kiosk" : null) @(kmbKioskComments ? "kmb-kiosk-comments" : null)">
     <partial name="_IconSprite" />
-    @* Flash toast — the one, uniform flash-message surface (TempData["info"]
-       / ["error"]). Renders a fixed top-right Bootstrap toast when the
-       controller left a flash value on the last redirect. Replaces the
-       per-view .alert blocks that used to land inline wherever each view
-       author placed them. *@
-    @await Html.PartialAsync("_FlashToast")
-    @* ADR 0176 — one notice strip: the stacked banners below are children of
-       .kmb-notices; notice-strip.js shows the first non-dismissed one (DOM
-       order = priority: pinned > guest > onboarding > what's new) and folds
-       the rest behind a "+N" control. Without JS all of them render, compact.
-       The control's accessible name is server-resolved (the kw-l TagHelper
-       can't wrap an attribute); a null provider (a non-HTTP render) degrades
-       to the en floor, matching the a11y.* block above. *@
-    @{
-        string _noticesMore = "Show the next notice";
-        if (Translation is not null)
-        {
-            try
-            {
-                string _noticesLang = await EffectiveLanguageCode.ResolveAsync(
-                    HttpContextAccessor.HttpContext?.Request, Localization, Translation);
-                _noticesMore = await Translation.GetAsync("a11y.notices_more", _noticesLang);
-            }
-            catch
-            {
-                // Keep the en floor on a resolution failure — the label must never break.
-            }
-        }
-    }
-    <div class="kmb-notices" data-kmb-notices data-more-label="@_noticesMore">
-    @await Html.PartialAsync("_PinnedAnnouncement")
-    @* M19 F2 — the guest shell notice (the account.guest_welcome key).
-       Renders only when the Guest role is present, which is only minted by
-       KumunitaClaimsPrincipalFactory when the allowance window is live
-       (ValidFrom ≤ now < ValidUntil). An expired guest gets no Guest claim,
-       so the notice disappears automatically — no job, no extra DB read.
-       Use KumunitaPrincipal.HasRole (NOT ClaimsPrincipal.IsInRole): Kumunita's
-       roles ride the custom "Kumunita.Role" claim type, not the BCL default,
-       so the built-in IsInRole would never match. The kw-l TagHelper resolves
-       the label in the viewer's language. *@
-    @if (User.Identity?.IsAuthenticated == true && KumunitaPrincipal.HasRole(User, "Guest"))
-    {
-        <div class="container-fluid">
-            <div class="kmb-notice alert alert-info py-2" role="status" data-kmb-notice="guest">
-                <kw-l key="account.guest_welcome">You are signed in as a guest. Your access is limited to the surfaces the admin has allowed, for the window they set.</kw-l>
-            </div>
-        </div>
-    }
-    @* M22 (ADR 0132, D5) — the onboarding affordance: the dismissible home/nav
-       banner (the _OnboardingBanner partial). Rendered by the partial only
-       when the signed-in resident's OnboardingCompletedAt is null (the owner-
-       scope read, never a claim — the thin-token rule, ADR 0001-B / D6).
-       Non-blocking (D5): it never gates sign-in; the close button is a
-       client-side dismiss (onboarding-banner.js), and the only way to clear
-       it for real is the explicit finish/skip POST (D2/D4). *@
-    @await Html.PartialAsync("_OnboardingBanner")
-    @* What's-new toast (the VN lane, ADR 0110) — announces the current
-       platform version (WhatsNew.Latest) with a link to the About page's
-       "What's new" section. Dismissal is remembered per browser (see
-       _WhatsNewToast.cshtml + client/lib/whatsnew-toast.ts). *@
-    @await Html.PartialAsync("_WhatsNewToast")
-    </div>
+    @* IMPROVE-CODE C11 — the flash toast + the .kmb-notices banner strip
+       (pinned / guest / onboarding / what's-new) extracted into the
+       _LayoutNotices partial (the markup is unchanged). *@
+    <partial name="_LayoutNotices" />
     <header>
         @if (navVariant == NavLayoutCookie.Row)
         {
@@ -384,6 +326,14 @@
                are folded into a single Bootstrap "More" dropdown, so the flat
                row carries only Home · Announcements · Community · Groups +
                More ▾ + search + account. *@
+            @* not extracted: the nav bar (brand + the Home/Announcements/Community/Groups row +
+               the More menu + account) is the site's single-use chrome — the nav-more-fold /
+               nav-variant C logic is entangled with it and it is not repeated across views — so it
+               stays inline. The notices strip + footer + global <script> block DID extract (each is
+               independently touched). Note: extracting footer/notices drops the inert ASP.NET
+               scoped-CSS attribute (b-xer*) from those elements because the scoped bundle
+               (_Layout.cshtml.css) is never in the served <link> list — a neutral delta, see the
+               C11-1 close note. *@
             <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3 kmb-nav-row">
                 <div class="container-fluid">
                     <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
@@ -622,209 +572,13 @@
         }
     </main>
 
-    <footer class="kmb-footer">
-        <div class="container">
-            <div class="row g-4">
-                <div class="col-12 col-md-5 col-lg-4">
-                    <p class="navbar-brand mb-2">Kumunita</p>
-                    <p class="mb-2" style="max-width: 34ch;"><kw-l key="footer.tagline">A private home for one neighborhood — the feed, the groups and the pinned notes. What happens on your street stays on your street.</kw-l></p>
-                    <p class="small mb-0">&copy; @DateTime.Now.Year Kumunita <kw-l key="footer.copyright">· self-hosted by your community</kw-l></p>
-                </div>
-                <div class="col-6 col-md-4 col-lg-2">
-                    <h3><kw-l key="nav.community">Community</kw-l></h3>
-                    <ul class="list-unstyled d-grid gap-2">
-                        <li><a asp-area="" asp-controller="Home" asp-action="Index"><kw-l key="nav.home">Home</kw-l></a></li>
-                        @* ADR 0039 §3.8 — the mount-point resolver (footer/community slot):
-                           the page mounted here renders as a link; an unmounted slot
-                           renders nothing. Display, not access — the Show action is
-                           the Read decision. *@
-                        @{ ViewData["MountSlot"] = "footer/community"; }
-                        <partial name="_MountSlot" />
-                        <li><a href="/announcements"><kw-l key="nav.announcements">Announcements</kw-l></a></li>
-                        <li><a asp-controller="Posts" asp-action="AllSections"><kw-l key="footer.feed">The feed</kw-l></a></li>
-                    </ul>
-                </div>
-                @* SP U03 (ADR 0043 D4) — the footer "Platform" column: the five
-                   shipped platform surfaces, linked **unconditionally** for every
-                   visitor (floor-honesty — no existence probe, no @if: a link whose
-                   page is absent from the tree lands on its existing floor). The
-                   navbar is deliberately untouched (the recorded D4 decision). *@
-                <div class="col-6 col-md-4 col-lg-2">
-                    <h3><kw-l key="footer.platform.heading">Platform</kw-l></h3>
-                    <ul class="list-unstyled d-grid gap-2">
-                        <li><a href="/about"><kw-l key="footer.platform.about">About</kw-l></a></li>
-                        <li><a href="/terms"><kw-l key="footer.platform.terms">Terms of use</kw-l></a></li>
-                        <li><a href="/help"><kw-l key="footer.platform.help">Help</kw-l></a></li>
-                        <li><a href="/privacy"><kw-l key="footer.platform.privacy">Privacy</kw-l></a></li>
-                        <li><a href="/conduct"><kw-l key="footer.platform.conduct">Code of conduct</kw-l></a></li>
-                        @* M32 (ADR 0155) — the public "Report an issue" affordance
-                           (the issue.nav key, key 9 of the U06 closed set): links the
-                           M32 /issues/new general issue-submission surface. Linked
-                           unconditionally for every visitor (floor-honesty, the SP U03
-                           shape above) because M32·4 is public/anonymous-safe — the
-                           M31·2 500-form precedent. The design doc §2.3 named it "the
-                           nav entry (issue.nav)"; the footer Platform column is the
-                           public, platform-level seam that matches that intent — the
-                           signed-in-only More menu would gate a public surface. *@
-                        <li><a href="/issues/new"><kw-l key="issue.nav">Report an issue</kw-l></a></li>
-                    </ul>
-                </div>
-                <div class="col-6 col-md-4 col-lg-3">
-                    <h3><kw-l key="footer.project.heading">The project</kw-l></h3>
-                    <ul class="list-unstyled d-grid gap-2">
-                        @foreach (var link in RepositoryInfo.Links)
-                        {
-                            <li>
-                                <a href="@link.Url" target="_blank" rel="noopener noreferrer"><kw-l key="@link.Key">@link.Label</kw-l></a>
-                            </li>
-                        }
-                    </ul>
-                </div>
-                <div class="col-12 col-md-3 col-lg-3">
-                    <h3><kw-l key="footer.gtk_heading">Good to know</kw-l></h3>
-                    <p class="small mb-2"><kw-l key="footer.gtk_privacy">Private by default: each post's audience is chosen by its author, and everything is readable by you, not the world.</kw-l></p>
-                    <p class="small mb-0"><kw-l key="footer.gtk_oss">Kumunita is open source — the code, the decisions, the docs.</kw-l></p>
-                </div>
-            </div>
-        </div>
-    </footer>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Avatar monogram fallback (client/lib/avatar.ts, tsc-built — SECURITY.md §6:
-         no inline on*/<script> in Razor views; the U8 onerror it replaced is per img) -->
-    <script type="module" src="~/js/lib/avatar.js"></script>
-    <!-- Avatar upload gating (client/lib/avatar-upload.ts, tsc-built — SECURITY.md §6:
-         no inline on*/<script> in Razor views; disables "Save avatar" until a file is chosen) -->
-    <script type="module" src="~/js/lib/avatar-upload.js"></script>
-    <!-- Translation display swap (client/lib/translation-swap.ts, tsc-built — TD / ADR 0027:
-         click-to-swap toggles the pre-rendered .td-variant containers; display-only, no fetch) -->
-    <script type="module" src="~/js/lib/translation-swap.js"></script>
-    <!-- Confirm-before-submit (SECURITY.md §6 no-inline-script; replaces the
-         onsubmit="return confirm(..." pattern across ~18 views) -->
-    <script type="module" src="~/js/lib/confirm.js"></script>
-    <!-- Reset-form (SECURITY.md §6 no-inline-script; replaces the
-         onclick="this.form.reset()" pattern) -->
-    <script type="module" src="~/js/lib/reset-form.js"></script>
-    <!-- Detach menu (SECURITY.md §6 no-inline-script): while an opted-in
-         dropdown (data-detach) is open, re-home its .dropdown-menu onto <body>
-         so it escapes overflow-clipping ancestors (Kanban board / to-do feed)
-         and always renders fully on top. Loaded after bootstrap.bundle so
-         window.bootstrap is available. -->
-    <script type="module" src="~/js/lib/detach-menu.js"></script>
-    <!-- Audience-toggle (SECURITY.md §6; ADR 0036 checkbox→panel visibility) -->
-    <script type="module" src="~/js/lib/audience-toggle.js"></script>
-    <!-- Name-filter (SECURITY.md §6; Groups/Detail invite + add-member forms) -->
-    <script type="module" src="~/js/lib/name-filter.js"></script>
-    <!-- Admin edit-row toggle (SECURITY.md §6; Admin/Index collapsed rows) -->
-    <script type="module" src="~/js/lib/admin-edit-toggle.js"></script>
-    <!-- Directory-card click→nav (SECURITY.md §6; Directory/Index whole-card) -->
-    <script type="module" src="~/js/lib/directory-card.js"></script>
-    <!-- Pinned-announcement dismissal (SECURITY.md §6; per-announcement sessionStorage) -->
-    <script type="module" src="~/js/lib/pinned-announcement.js"></script>
-    <!-- Page-form visibility (SECURITY.md §6; ADR 0041 scope/individual blocks) -->
-    <script type="module" src="~/js/lib/page-form-visibility.js"></script>
-    <!-- Grant-picker sync (SECURITY.md §6; hidden textarea ↔ checkbox pickers) -->
-    <script type="module" src="~/js/lib/grant-picker-sync.js"></script>
-    <!-- Flash toast (SECURITY.md §6; the one uniform flash surface — see
-         _FlashToast.cshtml). Wires Bootstrap 5.3's Toast to the .toast
-         element(s) the partial renders, so the close button + the
-         data-bs-autohide / data-bs-delay attributes drive the 5 s
-         auto-dismiss + fade-out. -->
-    <script type="module" src="~/js/lib/flash-toast.js"></script>
-    <!-- What's-new toast (the VN lane, ADR 0110; see _WhatsNewToast.cshtml):
-         hides the toast on load if this version was already seen in this
-         browser (localStorage), otherwise records it + arms the auto-hide. -->
-    <script type="module" src="~/js/lib/whatsnew-toast.js"></script>
-    <!-- Notice strip (ADR 0176): must load AFTER the per-notice dismissal
-         modules (pinned, onboarding, whatsnew) so it sees their hidden state. -->
-    <script type="module" src="~/js/lib/notice-strip.js"></script>
-    <!-- Phone sub-nav strips (ADR 0231): keeps the active tab in view and drives the edge fades. -->
-    <script type="module" src="~/js/lib/tab-strip.js"></script>
-    <!-- What's-new "show more" (the VN lane, ADR 0110; see About.cshtml):
-         reveals the hidden earlier releases in batches of 10 on click.
-         Self-guards: no-op if the list has ≤3 entries (no button). -->
-    <script type="module" src="~/js/lib/whatsnew-more.js"></script>
-    <!-- Home roadmap "show more" (both directions; see Home/Index.cshtml):
-         reveals the hidden earlier + upcoming milestones in batches of 10
-         on click. Self-guards: no-op on pages without #roadmap-list, and
-         per-side no-op where a direction has no button (≤3 items). -->
-    <script type="module" src="~/js/lib/roadmap-more.js"></script>
-    <!-- Events "your upcoming events" load-more (the EV-MINE section on
-         /events; see Event/Index.cshtml): reveals the hidden own-event rows
-         beyond the first five in batches of 5 on click. Self-guards: no-op
-         on pages without #events-mine-more-wrap (≤5 own events → no button). -->
-    <script type="module" src="~/js/lib/mine-more.js"></script>
-    <!-- Home "upcoming" load-more (the Upcoming section on /, the resident's
-         Profile.HomeShowUpcoming preference): reveals the hidden event +
-         to-do rows beyond the first five of each column in batches of 5 on
-         click. Self-guards: no-op on pages without the Upcoming section
-         (signed-out / not opted in) and per-column where ≤5 rows → no button. -->
-    <script type="module" src="~/js/lib/home-upcoming-more.js"></script>
-    <!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
-         Kanban board + the events calendar): wires the .page-expand-toggle /
-         .page-expand-close buttons to the body.kmb-page-expanded class
-         (site.css does the filling/hiding). Self-guards on pages without
-         either button, so loading it globally is safe. -->
-    <script type="module" src="~/js/lib/expand-page.js"></script>
-    <!-- M35 (ADR 0164) — the kiosk-mode auto-cycle / auto-refresh state
-         machine (client/lib/kiosk.ts, tsc-built). Drives the /kiosk display's
-         #kiosk-stage iframe: advances the visible slide to the next (wrapping
-         to the first) every data-view-interval, and re-points the iframe src
-         (re-running the surface's own Read decision on the frozen seam) every
-         data-refresh-interval; a slide the viewer cannot see shows the
-         localized kiosk.slide_denied shape (no leak, no 404). Self-guards on
-         pages without #kiosk-stage, so loading it globally is safe (the
-         expand-page.js idiom). No new npm package / build step (M35·7). -->
-    <script type="module" src="~/js/lib/kiosk.js"></script>
-    <!-- M37 (ADR 0167) — the personal-note modal (client/lib/note-modal.ts,
-         tsc-built). Wires the _NoteButton partial's Bootstrap modal to the
-         JSON API endpoints (GET/POST/PUT/DELETE /notes/api/...): add /
-         edit / delete a note without leaving the page. Self-guards on pages
-         without the [data-note-button] anchor (every page except the ten
-         detail surfaces), so loading it globally is safe (the expand-page.js
-         idiom). -->
-    <script type="module" src="~/js/lib/note-modal.js"></script>
-    <!-- M10 U03 (ADR 0107 D5/D10) — the PWA install affordance + the
-         service-worker registration (client/lib/pwa-install.ts, tsc-built).
-         Registers /sw.js (U02's passive SW) and reveals the #pwa-install
-         label source as one quiet fixed button on beforeinstallprompt;
-         a clean no-op where the browser never fires it (iOS). -->
-    <script type="module" src="~/js/lib/pwa-install.js"></script>
-    <!-- Nav-row overflow fold (client/lib/nav-more-fold.ts, tsc-built — ADR 0113):
-         in the variant-B "top row" nav, folds Community + Groups into the More
-         menu when the row doesn't fit, and back when there is room. Self-guards
-         (no-op) in variant C, signed-out, and where the data-nav-* hooks are
-         absent, so loading it globally is safe. -->
-    <script type="module" src="~/js/lib/nav-more-fold.js"></script>
-    <!-- Rail label expander (client/lib/rail-expander.ts, tsc-built — variant C):
-         toggles the body's .kmb-rail-expanded class when the .kmb-rail-expander
-         button is clicked (site.css widens the rail + reveals each section's
-         .kmb-rail-label + updates the content shift). The preference persists
-         in localStorage. Self-guards (no-op) in variant B and where the
-         expander button is absent, so loading it globally is safe. -->
-    <script type="module" src="~/js/lib/rail-expander.js"></script>
-    <!-- Rail hover/focus tooltips (client/lib/rail-tips.ts, tsc-built — variant C):
-         the .kmb-rail-tip is position:fixed (the rail clips its overflow, which hid
-         the old absolute tip); this sets its vertical position from the hovered
-         button and adds .kmb-rail-tips-js (site.css shows the tips only then).
-         Self-guards (no-op) in variant B / signed-out. -->
-    <script type="module" src="~/js/lib/rail-tips.js"></script>
-    @* P0-6 (translation audit) — the client-JS strings bundle: the closed
-       KnownTranslationKeys set resolved in the effective language, serialized
-       to JSON. The client modules (rich-editor / image-editor / tag-suggest /
-       notifications-bell / kiosk / note-modal / onboarding-modal) read this
-       once and localize their modals, labels and alerts (with the en floor
-       as the in-code fallback).
-
-       Must be emitted via Html.Raw so the JSON arrives unencoded (a bare
-       @expr inside a <script> IS HTML-encoded in .NET 10's Razor — the `"`
-       becomes &quot; and JSON.parse fails). The only hazard is a value
-       containing a literal `</script>` closing the element early, so
-       neutralize `</` to `<\/` (a valid JSON escape that cannot form
-       `</script>`). The previous form (HttpUtility.HtmlEncode) double-encoded
-       the block (&amp;quot;), making the entire P0-6 bundle unparseable —
-       the client modules silently fell back to the en floor strings. *@
-    <script type="application/json" id="kumunita-strings">@Html.Raw(clientStringsJson.Replace("</", "<\\/"))</script>
+    @* IMPROVE-CODE C11 — the <footer> extracted into the _LayoutFooter
+       partial (the markup is unchanged). *@
+    <partial name="_LayoutFooter" />
+    @* IMPROVE-CODE C11 — the global <script> tags + the client-strings
+       bundle emission extracted into the _LayoutScripts partial (the
+       markup is unchanged; the bundle JSON is threaded via Model). *@
+    <partial name="_LayoutScripts" model="clientStringsJson" />
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -1,0 +1,66 @@
+@model Kumunita.Web.Models.BoardDetailViewModel
+@using Kumunita.Web.Security
+
+@* IMPROVE-CODE C11 — the board header's author byline (ADR 0200) + the
+   community / project / event links + the tags row (ADR 0044 / 0147)
+   (extracted from BoardDetail.cshtml; the served markup is unchanged).
+   References only <c>Model.*</c> + the <c>AvatarHue</c> helper, so it takes
+   the parent view-model directly. *@
+
+@* ADR 0200 — author byline (avatar + name + dates) and one chip row for
+   the community, project link and event link; same pattern as the
+   announcement detail (ADR 0184). The links keep their dangling rules. *@
+<div class="airy-post-head kmb-detail-byline mt-2">
+    <kw-avatar subject="@Model.Board.AuthorId"
+               mono="@(string.IsNullOrWhiteSpace(Model.Board.AuthorDisplayName) ? "" : char.ToUpperInvariant(Model.Board.AuthorDisplayName.TrimStart()[0]).ToString())"
+               mono-hue="@AvatarHue.For(Model.Board.AuthorId)" />
+    <span class="airy-post-author">
+        <span class="name">@Model.Board.AuthorDisplayName</span>
+        <span class="when">
+            <kw-l key="projects.todo.created">Created</kw-l>
+            <kw-dt dt="@Model.Board.Created" format="g"></kw-dt>
+            @if (Model.Board.Modified is not null)
+            {
+                <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                <kw-dt dt="@Model.Board.Modified" format="g"></kw-dt></span>
+            }
+        </span>
+    </span>
+</div>
+@if (Model.Board.ComponentDisplayName is not null
+     || (Model.ProjectId is not null && Model.ProjectTitle is not null)
+     || (Model.EventId is not null && Model.EventTitle is not null))
+{
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-2 kmb-board-links">
+        @if (Model.Board.ComponentDisplayName is not null)
+        {
+            <span class="kmb-chip">@Model.Board.ComponentDisplayName</span>
+        }
+        @if (Model.ProjectId is not null && Model.ProjectTitle is not null)
+        {
+            <a class="kmb-chip" href="@($"/projects/projects/{Model.ProjectId}")"><kw-l key="pl.board.project_link">Project</kw-l>:&nbsp;@Model.ProjectTitle</a>
+        }
+        @if (Model.EventId is not null && Model.EventTitle is not null)
+        {
+            <a class="kmb-chip" href="@Model.EventLinkPath"><kw-l key="board.event_link">Linked event</kw-l>:&nbsp;@Model.EventTitle</a>
+        }
+    </div>
+}
+@* ADR 0044 / 0147 — the board's tags (display names in
+   the viewer's language, resolved by the controller from
+   the access-scoped read seam — the
+   <see cref="BoardDetailViewModel.Tags"/> field, the
+   Posts/Detail.cshtml chip idiom). A label, never a gate
+   (C-TG·1): each badge links to the by-tag view
+   (/tags/{slug}); a broken reference is dropped upstream,
+   never an error. Empty = no chips. *@
+@if (Model.Tags is { Count: > 0 })
+{
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+        @foreach (var tag in Model.Tags)
+        {
+            <a class="kmb-chip"
+               href="/tags/@tag.Slug">@tag.DisplayedName</a>
+        }
+    </div>
+}
