@@ -63,18 +63,12 @@ public class AdminStorageControllerTests
         var (controller, settings, store, session) =
             Build(role: Kumunita.Core.Identity.Roles.GlobalAdmin);
 
-        // The C3 "one in-caller-session write" (C-UP·1): the controller opens
-        // its own session and hands it to the seam. The stand-in session is
-        // what store.LightweightSession() returns, so Received(…session) also
-        // pins that the controller used the caller's session (not a fresh one
-        // inside the service).
-        store.LightweightSession().Returns(session);
-
+        // The single write lane (C-UP·1) — the committed SetAsync seam (IMPROVE-CODE
+        // C09) owns its own session, so the controller no longer opens one.
         // A GlobalAdmin POST sets both values: per-file override 5 MiB +
         // per-user quota 2 MiB (concrete, non-sentinel figures so the
         // "stored doc reflects them" side is unambiguous). The seam is called
-        // with the byte equivalents, the actor minted from the principal, and
-        // the caller's session.
+        // with the byte equivalents and the actor minted from the principal.
         var result = await controller.Save("5", "2");
 
         // Redirect back to the GET view (the AdminMessagingController.Save /
@@ -83,14 +77,10 @@ public class AdminStorageControllerTests
         Assert.Equal(nameof(AdminStorageController.Index), redirect.ActionName);
 
         // The single write lane (C-UP·1) is the seam — called exactly once with
-        // the admin values (5 MiB → 5242880 bytes, 2 MiB → 2097152 bytes),
-        // the server-minted actor, and the caller's session.
+        // the admin values (5 MiB → 5242880 bytes, 2 MiB → 2097152 bytes) and
+        // the server-minted actor.
         await settings.Received(1)
-            .SetAsync(5 * 1024 * 1024L, 2 * 1024 * 1024L, Admin, session);
-
-        // The controller opened its session exactly once (one in-caller-session
-        // write; no second session, no re-read in this lane).
-        store.Received(1).LightweightSession();
+            .SetAsync(5 * 1024 * 1024L, 2 * 1024 * 1024L, Admin);
 
         // The read seam (U5's GET) is untouched by the set-lane.
         await settings.DidNotReceiveWithAnyArgs().GetOrCreateAsync(Arg.Any<CancellationToken>());
@@ -107,14 +97,13 @@ public class AdminStorageControllerTests
         // the sentinel branch.)
         var (controller, settings, store, session) =
             Build(role: Kumunita.Core.Identity.Roles.GlobalAdmin);
-        store.LightweightSession().Returns(session);
 
         var result = await controller.Save(string.Empty, "0");
         Assert.IsType<RedirectToActionResult>(result);
 
         // Blank per-file ⇒ null (not 0); quota "0" ⇒ 0 (unlimited sentinel).
         await settings.Received(1)
-            .SetAsync((long?)null, 0L, Admin, session);
+            .SetAsync((long?)null, 0L, Admin);
     }
 
     [Fact]
@@ -167,7 +156,10 @@ public class AdminStorageControllerTests
         // controller reads it only on the GET path; the set-lane ignores it.
         var mediaOpts = Options.Create(new MediaOptions());
 
-        var controller = new AdminStorageController(settings, metrics, mediaOpts, store);
+        // IMPROVE-CODE C09 — the committed SetAsync lane owns its own session;
+        // the controller no longer takes a store (store/session kept in the
+        // tuple for the other deconstructions, now unused).
+        var controller = new AdminStorageController(settings, metrics, mediaOpts);
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = BuildPrincipal(role);

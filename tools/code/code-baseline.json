@@ -3641,10 +3641,6 @@
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {
-      "file": "src/Kumunita.Web/Controllers/AdminStorageController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
       "file": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
