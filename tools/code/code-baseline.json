@@ -48,7 +48,7 @@
     },
     {
       "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs",
-      "max": 947
+      "max": 922
     },
     {
       "id": "src/Kumunita.Core/Posts/PostService.cs",
@@ -257,19 +257,24 @@
       "cc_max": 24
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ClassifyAsync(string,Stream,CancellationToken)",
-      "max": 148,
-      "cc_max": 47
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ApplyMediaAsync(KumunitaArchiveData,string,List\u003Cstring\u003E,CancellationToken)",
+      "max": 66,
+      "cc_max": 19
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ExportAsync(string,CancellationToken)",
-      "max": 156,
-      "cc_max": 28
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ClassifyTargetPrepassAsync(KumunitaArchiveData,JsonSerializerOptions,string,CancellationToken)",
+      "max": 46,
+      "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ResolveAsync(string,UserPortabilityImportPlan,IReadOnlyList\u003CUserPortabilityEntityResolution\u003E,Stream?,CancellationToken)",
-      "max": 251,
-      "cc_max": 70
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.DeriveOwnershipGuardInputs(ClassifyPrepass,KumunitaArchiveData,JsonSerializerOptions,string)",
+      "max": 38,
+      "cc_max": 20
+    },
+    {
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ResolveGuardInputsAsync(KumunitaArchiveData,Dictionary\u003Cstring, Type\u003E,string,CancellationToken)",
+      "max": 43,
+      "cc_max": 20
     },
     {
       "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ScopeRowHoldsSeat(object,UserScopeEntry,string,IReadOnlySet\u003Cstring\u003E?,IReadOnlySet\u003Cstring\u003E?)",
@@ -1684,8 +1689,7 @@
       "from": "Mentions",
       "to": "UserInfo",
       "symbol": "DirectoryService",
-      "count": 2,
-      "reason": "C10: module self-registration — the Mentions DI file now references the concrete DirectoryService (no IDirectoryService by Part 2.0 design); the ref moves from AddKumunitaCore to Mentions/DependencyInjection.cs"
+      "count": 2
     },
     {
       "from": "Messaging",
@@ -1847,8 +1851,7 @@
       "from": "Notifications",
       "to": "Identity",
       "symbol": "VerificationOptions",
-      "count": 2,
-      "reason": "C10: module self-registration — the Notifications DI file now references VerificationOptions (the ADR 0085 item-link BaseUrl option); the ref moves from AddKumunitaCore to Notifications/DependencyInjection.cs"
+      "count": 2
     },
     {
       "from": "Notifications",
@@ -1992,8 +1995,7 @@
       "from": "Portability",
       "to": "Identity",
       "symbol": "AppDbContext",
-      "count": 3,
-      "reason": "C10: module self-registration — the Portability DI file now references AppDbContext (ADR 0004 §B: EF only for Identity tables); the ref moves from AddKumunitaCore to Portability/DependencyInjection.cs"
+      "count": 3
     },
     {
       "from": "Portability",
@@ -2005,8 +2007,7 @@
       "from": "Portability",
       "to": "Identity",
       "symbol": "User",
-      "count": 5,
-      "reason": "C10: module self-registration — the Portability DI file now references UserManager<User>; the ref moves from AddKumunitaCore to Portability/DependencyInjection.cs"
+      "count": 5
     },
     {
       "from": "Portability",

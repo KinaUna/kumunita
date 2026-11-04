@@ -194,7 +194,7 @@ public sealed record UserPortabilityImportResult(
 /// Web surface target these members verbatim.
 /// </para>
 /// </summary>
-public sealed class UserPortabilityService(
+public sealed partial class UserPortabilityService(
     Marten.IDocumentStore documentStore,
     IUserInfoService userInfoService,
     IMediaStore mediaStore,
@@ -425,6 +425,18 @@ public sealed class UserPortabilityService(
         UserBusinessKeys.Matches(type, a, b);
 
     /// <inheritdoc />
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>orchestrator</b> over the per-phase
+    /// strategy seams extracted from the pre-split monolith: the §inventory
+    /// per-type scope-filter + media-id collection (<see cref="ExportDocsByTypeAsync"/>
+    /// — the per-entity-kind loop), the resident-media payload leg
+    /// (<see cref="ExportMediaAsync"/>), the no-secret principal leg
+    /// (<see cref="ExportPrincipalAsync"/>), the manifest + D2 marker leg
+    /// (<see cref="ExportManifest"/>), and the one <c>portability.export</c>
+    /// <c>AccessAudit</c> row (<see cref="EmitPortabilityAuditRowAsync"/>
+    /// — shared with the resolve lane). The public signature is the frozen
+    /// C08/C09 seam; only the body changed.
+    /// </summary>
     public async Task<Stream> ExportAsync(string residentSubjectId, CancellationToken ct = default)
     {
         // ── JSON options (the M11 PortabilityExportDocuments pattern) ─────
@@ -435,20 +447,83 @@ public sealed class UserPortabilityService(
         };
 
         // ── The name → Type map (the M11 NameToType + the 4 non-M11 types) ─
-        // The 4 non-M11 types (drift-guard entry 1) are resolved locally;
-        // they are NOT added to the frozen PortabilityDocTypes table.
+        var nameToType = BuildNameToTypeMap();
+
+        await using var session = documentStore.QuerySession();
+
+        // ── Per-phase strategy legs (the per-entity-kind extraction) ──────
+        var (docs, docCounts, mediaIds) = await ExportDocsByTypeAsync(session, nameToType, jsonOpts, residentSubjectId, ct);
+        var (media, mediaManifest, catalogDict) = await ExportMediaAsync(session, mediaIds, ct);
+        if (mediaIds.Count > 0)
+        {
+            var mediaObjs = mediaIds
+                .Where(id => catalogDict.TryGetValue(id, out var o))
+                .Select(id => catalogDict[id])
+                .ToList();
+            docs["MediaObject"] = JsonSerializer.SerializeToUtf8Bytes(mediaObjs, typeof(List<MediaObject>), jsonOpts);
+            docCounts["MediaObject"] = mediaObjs.Count;
+        }
+        var principals = await ExportPrincipalAsync(residentSubjectId);
+        var config = KumunitaArchive.ToJson(new PortabilityConfig());
+        var manifest = ExportManifest(docCounts, mediaManifest, residentSubjectId);
+        await EmitPortabilityAuditRowAsync("portability.export", residentSubjectId, ct);
+
+        // ── Write the archive ────────────────────────────────────────────
+        var stream = new MemoryStream();
+        await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the per-type <b>name → Type map</b> strategy
+    /// leg, extracted from <see cref="ExportAsync"/> / <see cref="ClassifyAsync"/>
+    /// / <see cref="ResolveAsync"/> (the three monoliths each duplicated the
+    /// M11 <see cref="PortabilityExportDocuments.NameToType"/> clone + the 4
+    /// non-M11 drift-guard entry 1 types). One shared map — the 4 non-M11
+    /// types are resolved locally, NOT added to the frozen
+    /// <see cref="PortabilityDocTypes"/> table (the C-M11·5 closed-set pin).
+    /// </summary>
+    private static Dictionary<string, Type> BuildNameToTypeMap()
+    {
         var nameToType = new Dictionary<string, Type>(PortabilityExportDocuments.NameToType, StringComparer.Ordinal);
         nameToType["InventoryItem"]    = typeof(Kumunita.Core.Inventory.InventoryItem);
         nameToType["Document"]         = typeof(Kumunita.Core.Documents.Document);
         nameToType["DocumentFolder"]   = typeof(Kumunita.Core.Documents.DocumentFolder);
         nameToType["Bookmark"]         = typeof(Kumunita.Core.Bookmarks.Bookmark);
+        return nameToType;
+    }
 
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>per-entity-kind export loop</b>
+    /// (the design doc §2.2 closed §inventory, the per-type strategy seam)
+    /// extracted from <see cref="ExportAsync"/>: the two-principal seat sets
+    /// (Conversation in-scope id set + Group owner-or-member set, the
+    /// Message indirect-basis / Group union seats the <see cref="ScopeFilter"/>
+    /// doc-comment defines) are resolved once, then every in-scope
+    /// <c>UserScopeInventory.Entries</c> kind is scope-filtered to the
+    /// resident's own rows (the C-M27·3 ownership-not-read pin), serialized
+    /// to the <c>docs/{Type}.json</c> bytes, and its media-reference ids
+    /// (ImageIds / AttachmentIds / AvatarId / MediaId — the §2.2 "minimal
+    /// identity reference set") are collected for the media leg. Ordering +
+    /// identity of the in-scope rows are preserved (no copy, no clone — the
+    /// C-M27·1 format pin). Returns the docs-by-type bytes, the doc-count
+    /// map, and the referenced media-id set.
+    /// </summary>
+    private async Task<(Dictionary<string, byte[]> Docs,
+        Dictionary<string, int> DocCounts,
+        HashSet<string> MediaIds)>
+        ExportDocsByTypeAsync(
+            Marten.IQuerySession session,
+            Dictionary<string, Type> nameToType,
+            JsonSerializerOptions jsonOpts,
+            string residentSubjectId,
+            CancellationToken ct)
+    {
         // ── Pre-query Conversation + GroupMembership (the seat sets) ──────
         // Message (indirect basis) needs inScopeConversationIds; Group
         // (owner-or-member union) needs residentGroupIds. Both are derived
         // from the resident's own rows before the main loop.
-        await using var session = documentStore.QuerySession();
-
         var allConversations = await QueryAllRowsAsync(session, typeof(Kumunita.Core.Messaging.Conversation), ct);
         var inScopeConversations = ScopeFilter("Conversation", allConversations, residentSubjectId);
         var inScopeConversationIds = inScopeConversations
@@ -502,36 +577,66 @@ public sealed class UserPortabilityService(
             docs[type] = JsonSerializer.SerializeToUtf8Bytes(inScopeRows, inScopeRows.GetType(), jsonOpts);
             docCounts[type] = inScopeRows.Count;
 
-            // Collect media references from the in-scope rows (the
-            // resident's media scope: ImageIds / AttachmentIds /
-            // AvatarId / MediaId — the design doc §2.2 "minimal
-            // identity reference set").
             foreach (var row in inScopeRows)
-            {
-                var rowType = row.GetType();
-                foreach (var propName in new[] { "ImageIds", "AttachmentIds" })
-                {
-                    if (rowType.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance)?.GetValue(row)
-                        is System.Collections.IEnumerable ids)
-                    {
-                        foreach (var id in ids)
-                            if (id is string s && s.Length > 0)
-                                mediaIds.Add(s);
-                    }
-                }
-                foreach (var propName in new[] { "AvatarId", "MediaId" })
-                {
-                    if (rowType.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance)?.GetValue(row)
-                        is string singleId && singleId.Length > 0)
-                        mediaIds.Add(singleId);
-                }
-            }
+                CollectMediaReferenceIds(row, mediaIds);
         }
 
-        // ── Resident media (the M11 MediaExport pattern, filtered) ───────
-        // Query the MediaObject catalog rows for the referenced media ids,
-        // then read the payload bytes (the same OpenReadAsync + size-check
-        // + manifest-entry pattern as the M11 MediaExport.ExportAsync).
+        return (docs, docCounts, mediaIds);
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — one in-scope row's media-reference id
+    /// collection (the design doc §2.2 "minimal identity reference set":
+    /// the <c>ImageIds</c> / <c>AttachmentIds</c> array seats + the
+    /// <c>AvatarId</c> / <c>MediaId</c> single seats), extracted from the
+    /// <see cref="ExportDocsByTypeAsync"/> per-type loop body as the
+    /// per-row strategy leg. Reflection over the locked property names
+    /// (the M11 <c>ReadFieldValue</c> pattern — no per-type code); a
+    /// missing property or null value contributes no id (fail-closed
+    /// default).
+    /// </summary>
+    private static void CollectMediaReferenceIds(object row, HashSet<string> mediaIds)
+    {
+        var rowType = row.GetType();
+        foreach (var propName in new[] { "ImageIds", "AttachmentIds" })
+        {
+            if (rowType.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance)?.GetValue(row)
+                is System.Collections.IEnumerable ids)
+            {
+                foreach (var id in ids)
+                    if (id is string s && s.Length > 0)
+                        mediaIds.Add(s);
+            }
+        }
+        foreach (var propName in new[] { "AvatarId", "MediaId" })
+        {
+            if (rowType.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance)?.GetValue(row)
+                is string singleId && singleId.Length > 0)
+                mediaIds.Add(singleId);
+        }
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>resident media payload leg</b>
+    /// (the M11 <see cref="MediaExport"/> pattern, filtered), extracted
+    /// from <see cref="ExportAsync"/>: the MediaObject catalog rows are
+    /// read once, then each referenced media id (the
+    /// <see cref="ExportDocsByTypeAsync"/> media-id set) is opened via
+    /// <see cref="IMediaStore.OpenReadAsync"/>, its payload byte-length is
+    /// checked against the catalog's <c>size_bytes</c> (a mismatch throws —
+    /// refusing to ship a corrupt byte), and the bytes + manifest entry are
+    /// recorded. Returns the media-by-id bytes, the manifest entries, and
+    /// the catalog dictionary (reused by the <c>docs/MediaObject.json</c>
+    /// leg).
+    /// </summary>
+    private async Task<(Dictionary<string, byte[]> Media,
+        List<PortabilityMediaEntry> MediaManifest,
+        Dictionary<string, MediaObject> CatalogDict)>
+        ExportMediaAsync(
+            Marten.IQuerySession session,
+            HashSet<string> mediaIds,
+            CancellationToken ct)
+    {
         var catalogDict = (await QueryAllRowsAsync(session, typeof(MediaObject), ct))
             .Cast<MediaObject>()
             .ToDictionary(o => o.Id, StringComparer.Ordinal);
@@ -569,24 +674,22 @@ public sealed class UserPortabilityService(
             }
         }
 
-        // Include the resident's MediaObject catalog rows in the docs
-        // section (the M11 docs/MediaObject.json shape, filtered to the
-        // resident's media — the design doc §2.2 "minimal identity
-        // reference set" pin).
-        if (mediaIds.Count > 0)
-        {
-            var mediaObjs = mediaIds
-                .Where(id => catalogDict.TryGetValue(id, out var o))
-                .Select(id => catalogDict[id])
-                .ToList();
-            docs["MediaObject"] = JsonSerializer.SerializeToUtf8Bytes(mediaObjs, typeof(List<MediaObject>), jsonOpts);
-            docCounts["MediaObject"] = mediaObjs.Count;
-        }
+        return (media, mediaManifest, catalogDict);
+    }
 
-        // ── No-secret principal (the M11 PortabilityPrincipal shape) ─────
-        // The C-M27·2 boundary: only the eight allowed §principals fields
-        // are read; PasswordHash / SecurityStamp / AccessToken / RefreshToken
-        // / RecoveryCode are never touched.
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>no-secret principal leg</b> (the M11
+    /// <see cref="PrincipalsExport"/> shape), extracted from
+    /// <see cref="ExportAsync"/>: the resident's Identity account is
+    /// resolved, their profile read, and exactly the eight
+    /// <c>PortabilityPrincipal</c> allowed fields are read (the C-M27·2
+    /// boundary: PasswordHash / SecurityStamp / AccessToken / RefreshToken /
+    /// RecoveryCode are never touched). Throws <see cref="InvalidOperationException"/>
+    /// when no Identity account exists for the resident (a fail-closed
+    /// export refusal — no audit row for a refused export).
+    /// </summary>
+    private async Task<byte[]> ExportPrincipalAsync(string residentSubjectId)
+    {
         var user = await userManager.FindByIdAsync(residentSubjectId);
         if (user is null)
             throw new InvalidOperationException(
@@ -603,16 +706,25 @@ public sealed class UserPortabilityService(
             Blocked = profile?.Blocked ?? false,
             Roles = (await userManager.GetRolesAsync(user)).ToList(),
         };
-        var principals = KumunitaArchive.ToJson(new[] { principal });
+        return KumunitaArchive.ToJson(new[] { principal });
+    }
 
-        // ── Config (the resident does not own it — an empty block) ───────
-        // The design doc §2.2 "Excluded" table: LocaleSettings /
-        // LanguageCatalog / CommunityName are operator instance-identity
-        // (travels via config.json in M11; the resident does not own it).
-        // An empty PortabilityConfig keeps the archive structurally valid.
-        var config = KumunitaArchive.ToJson(new PortabilityConfig());
-
-        // ── Manifest finalize + the D2 resident-scope marker ─────────────
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>manifest + D2 resident-scope marker
+    /// leg</b> (the M11 <see cref="ManifestFinalize"/> shape + the D2
+    /// <c>Scope = "resident"</c> marker), extracted from
+    /// <see cref="ExportAsync"/>: the doc-count + media-manifest maps are
+    /// folded into the manifest, then the resident-scope marker fields are
+    /// set (the design doc §2.2 "Excluded" table: the resident does not own
+    /// the community name — <c>null</c>; LocaleSettings / LanguageCatalog /
+    /// CommunityName are operator instance-identity, the config leg writes
+    /// the empty <c>PortabilityConfig</c>).
+    /// </summary>
+    private static PortabilityManifest ExportManifest(
+        Dictionary<string, int> docCounts,
+        List<PortabilityMediaEntry> mediaManifest,
+        string residentSubjectId)
+    {
         var manifest = ManifestFinalize.Build(
             null, // the resident does not own the community name
             docCounts,
@@ -620,12 +732,20 @@ public sealed class UserPortabilityService(
             DateTimeOffset.UtcNow);
         manifest.Scope = "resident";
         manifest.ResidentSubjectId = residentSubjectId;
+        return manifest;
+    }
 
-        // ── The one AccessAudit row (Via = Owner, verb export) ───────────
-        // The service emits it; the controller adds none (the ADR 0105
-        // messaging.toggle shape). Emitted after the archive is built
-        // (a failed build throws before this point, so no audit row for a
-        // refused export).
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>one AccessAudit row leg</b> (the ADR
+    /// 0105 <c>messaging.toggle</c> shape: the service emits it, the
+    /// controller adds none), extracted from <see cref="ExportAsync"/> and
+    /// shared with <see cref="ResolveAsync"/> (the <c>portability.export</c>
+    /// / <c>portability.import.resolve</c> verbs parameterized). A failed
+    /// build / apply throws before this point, so no audit row for a
+    /// refused action (the "no audit for a refused action" posture).
+    /// </summary>
+    private async Task EmitPortabilityAuditRowAsync(string action, string residentSubjectId, CancellationToken ct)
+    {
         await using var auditSession = documentStore.OpenSession(new Marten.Services.SessionOptions());
         auditSession.Store(new Authorization.AccessAudit
         {
@@ -633,19 +753,13 @@ public sealed class UserPortabilityService(
             At = DateTimeOffset.UtcNow,
             ActorId = residentSubjectId,
             EffectivePrincipalId = residentSubjectId,
-            Action = "portability.export",
+            Action = action,
             TargetKind = "portability",
             TargetId = "portability",
             Via = Authorization.AccessVia.Owner,
             Outcome = Authorization.AccessOutcome.Allow,
         });
         await auditSession.SaveChangesAsync(ct).ConfigureAwait(false);
-
-        // ── Write the archive ────────────────────────────────────────────
-        var stream = new MemoryStream();
-        await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);
-        stream.Position = 0;
-        return stream;
     }
 
     /// <summary>
@@ -713,31 +827,26 @@ public sealed class UserPortabilityService(
 
     /// <inheritdoc />
     /// <summary>
-    /// U04 (classify) — the <c>clean</c>/<c>duplicate</c>/<c>conflict</c>
-    /// classification over the uploaded resident archive (the design doc
-    /// §2.4 contract, verbatim) + the per-entity reference-availability
-    /// report. **Read-only** (C-M27·5 — the pre-write pin): the
-    /// <see cref="Marten.IDocumentStore"/> is opened as a
-    /// <c>QuerySession</c> (read-only), the <c>userManager.Users</c> read is
-    /// the principal source (read-only), and **no**
-    /// <c>session.Store</c> / <c>SaveChangesAsync</c> is called — a
-    /// <c>conflict</c> entity is only ever <em>reported</em>, never
-    /// applied (C-M27·4 — the resident's per-entity choice is the only
-    /// apply path, owned by U06's <see cref="ResolveAsync"/>).
+    /// C10-3b (IMPROVE-CODE) — the <b>orchestrator</b> over the per-phase
+    /// strategy seams extracted from the pre-split monolith: the archive is
+    /// read (a <see cref="InvalidDataException"/> is surfaced as a
+    /// fail-closed plan, the SEC-lane U14 zip-bomb pin), the target pre-pass
+    /// (<see cref="ClassifyTargetPrepassAsync"/> — the target rows + id sets
+    /// + the principal / language code sets the per-entity leg resolves
+    /// against), the SEC-lane H1 ownership-guard inputs
+    /// (<see cref="DeriveOwnershipGuardInputs"/>), then every in-scope
+    /// archive entity is classified (<see cref="ClassifyEntityRow"/> — the
+    /// per-entity-kind leg: <c>Rejected</c> → <c>Duplicate</c> →
+    /// <c>Clean</c>/<c>Conflict</c>). **Read-only** (C-M27·5): a
+    /// <c>QuerySession</c> only, no <c>session.Store</c> / <c>SaveChanges</c>.
+    /// The public signature is the frozen C08/C09 seam; only the body
+    /// changed.
     /// </summary>
     public async Task<UserPortabilityImportPlan> ClassifyAsync(
         string residentSubjectId, Stream archive, CancellationToken ct = default)
     {
         // ── JSON options (the M11 PortabilityValidate pattern) ────────────
         var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-        // ── The name → Type map (the M11 NameToType + the 4 non-M11 types) ─
-        var nameToType = new Dictionary<string, Type>(
-            PortabilityExportDocuments.NameToType, StringComparer.Ordinal);
-        nameToType["InventoryItem"]  = typeof(Kumunita.Core.Inventory.InventoryItem);
-        nameToType["Document"]       = typeof(Kumunita.Core.Documents.Document);
-        nameToType["DocumentFolder"] = typeof(Kumunita.Core.Documents.DocumentFolder);
-        nameToType["Bookmark"]       = typeof(Kumunita.Core.Bookmarks.Bookmark);
 
         // ── Read the archive (the M11 KumunitaArchive reader) ─────────────
         // SEC-lane U14 (M2 / U13 carry-forward): a zip-bomb rejection (U13's
@@ -754,9 +863,66 @@ public sealed class UserPortabilityService(
                 [$"archive.invalid:{ex.Message}"]);
         }
 
-        // ── Pre-pass: the target id sets (the M11 validate pre-pass, over
-        //    the target store — read-only) ─────────────────────────────────
+        // ── Per-phase strategy legs (the per-entity-kind extraction) ──────
+        var prepass = await ClassifyTargetPrepassAsync(data, jsonOpts, residentSubjectId, ct);
+        var guard = DeriveOwnershipGuardInputs(prepass, data, jsonOpts, residentSubjectId);
+
+        var nameToType = BuildNameToTypeMap();
+        var entities = new List<UserPortabilityEntityClassification>();
+        foreach (var (type, _) in UserScopeInventory.Entries)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!data.Docs.TryGetValue(type, out var json))
+                continue; // a type not in the archive contributes no entities
+
+            var docType = nameToType[type];
+            var listType = typeof(List<>).MakeGenericType(docType);
+            if (JsonSerializer.Deserialize(json, listType, jsonOpts) is not System.Collections.IEnumerable archiveRows)
+                continue;
+
+            foreach (var archiveRow in archiveRows)
+            {
+                if (archiveRow is null)
+                    continue;
+                entities.Add(ClassifyEntityRow(
+                    type, archiveRow, prepass, guard, residentSubjectId));
+            }
+        }
+
+        // ── The no-write pin (C-M27·5) — no session.Store / SaveChanges ───
+        // was called; the classification is read-only (the QuerySession +
+        // the userManager.Users read are the only I/O, both read-only).
+        return new UserPortabilityImportPlan(Ok: true, Entities: entities, Failures: []);
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>classify target pre-pass</b>
+    /// (the M11 validate pre-pass, over the target store — read-only),
+    /// extracted from <see cref="ClassifyAsync"/>: for every in-scope kind
+    /// the target rows (the <c>duplicate</c> match set) + their id set (the
+    /// <c>conflict</c> reference-resolution target) are read, plus the
+    /// referenced out-of-scope doc types' id sets (e.g. <c>Announcement</c>
+    /// — the <c>Bookmark.TargetId</c> multi-kind union), the target
+    /// principal id set (the <c>→ principal</c> references always resolve
+    /// for the resident — they are the anchor), and the <c>LanguageCode</c>
+    /// set (the <c>→ LanguageCatalog</c> references). Bundled in the
+    /// <see cref="ClassifyPrepass"/> shape the <see cref="ClassifyEntityRow"/>
+    /// leg resolves against.
+    /// </summary>
+    private sealed record ClassifyPrepass(
+        Dictionary<string, IReadOnlyList<object>> TargetRowsByType,
+        Dictionary<string, HashSet<string>> TypeSetById,
+        HashSet<string> PrincipalIds,
+        HashSet<string> LanguageCodes);
+
+    private async Task<ClassifyPrepass> ClassifyTargetPrepassAsync(
+        KumunitaArchiveData data,
+        JsonSerializerOptions jsonOpts,
+        string residentSubjectId,
+        CancellationToken ct)
+    {
         await using var session = documentStore.QuerySession();
+        var nameToType = BuildNameToTypeMap();
 
         // The in-scope types' target rows (the <c>duplicate</c> match set) +
         // their id sets (the <c>conflict</c> reference-resolution target).
@@ -805,17 +971,34 @@ public sealed class UserPortabilityService(
             if (ReadId(row) is string lc && lc.Length > 0)
                 languageCodes.Add(lc);
 
-        // ── SEC-lane H1 (U5): the ownership-guard inputs (derived, read-only) ──
-        // (a) The <c>existingOwnerOf</c> probe (the U4 guard contract): for a
-        //     row <c>Id</c>, the owner subject id of the target row already
-        //     stored with that <c>Id</c> — read off the type's first
-        //     <c>OwnershipFields</c> entry (the ownership anchor:
-        //     <c>AuthorId</c> / <c>OwnerId</c> / <c>UserId</c> /
-        //     <c>SubjectId</c> / <c>CreatedBy</c>). A <c>null</c> result
-        //     (no row with that id, or the type has no direct ownership
-        //     field — <c>Message</c>) means "not owned by another" to the
-        //     probe, so the guard's collision check does not fire; the
-        //     ownership rules are what carry the H1 pin.
+        return new ClassifyPrepass(targetRowsByType, typeSetById, principalIds, languageCodes);
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>SEC-lane H1 ownership-guard inputs</b>
+    /// (the U4/U6 pure decision's derived inputs), extracted from
+    /// <see cref="ClassifyAsync"/> and shared with <see cref="ResolveAsync"/>
+    /// (the same two shapes, the exact contract in design doc §2.2): (a) the
+    /// <c>existingOwnerOf</c> probe — per-type <c>row.Id → owner</c> map read
+    /// off the type's first <see cref="UserScopeEntry.OwnershipFields"/> entry
+    /// (the ownership anchor); a null result means "not owned by another" to
+    /// the probe; (b) the actor's conversation-id set — the union of the
+    /// target's <c>Conversation</c> rows the actor holds a seat in and the
+    /// archive's own <c>Conversation</c> rows the actor holds a seat in (a
+    /// <c>Message</c> whose conversation ships in the same archive is the
+    /// actor's own). Fail-closed: an empty union rejects every
+    /// <c>Message</c>.
+    /// </summary>
+    private sealed record OwnershipGuardInputs(
+        Dictionary<string, Dictionary<string, string>> OwnerByIdByType,
+        HashSet<string> ActorConversationIds);
+
+    private OwnershipGuardInputs DeriveOwnershipGuardInputs(
+        ClassifyPrepass prepass,
+        KumunitaArchiveData data,
+        JsonSerializerOptions jsonOpts,
+        string residentSubjectId)
+    {
         var ownerByIdByType = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
         foreach (var (t, entry) in UserScopeInventory.Entries)
         {
@@ -823,7 +1006,7 @@ public sealed class UserPortabilityService(
             var map = new Dictionary<string, string>(StringComparer.Ordinal);
             if (ownerField is not null)
             {
-                foreach (var row in targetRowsByType.GetValueOrDefault(t) ?? [])
+                foreach (var row in prepass.TargetRowsByType.GetValueOrDefault(t) ?? [])
                 {
                     if (ReadId(row) is string rowId && rowId.Length > 0
                         && (string?)ReadFieldValue(row.GetType(), ownerField, row) is { Length: > 0 } owner)
@@ -833,21 +1016,14 @@ public sealed class UserPortabilityService(
             ownerByIdByType[t] = map;
         }
 
-        // (b) The actor's conversation ids (the U4 <c>Message</c> rule): the
-        //     union of the target's <c>Conversation</c> rows the actor holds a
-        //     seat in (<c>ParticipantA</c> ∪ <c>ParticipantB</c>) and the
-        //     archive's own <c>Conversation</c> rows the actor holds a seat in
-        //     (a <c>Message</c> whose conversation ships in the same archive
-        //     is the actor's own). <c>fail-closed</c>: an empty union rejects
-        //     every <c>Message</c>.
         var actorConversationIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var row in targetRowsByType.GetValueOrDefault("Conversation") ?? [])
+        foreach (var row in prepass.TargetRowsByType.GetValueOrDefault("Conversation") ?? [])
             if (IsActorConversation(row, residentSubjectId))
                 if (ReadId(row) is string idT && idT.Length > 0)
                     actorConversationIds.Add(idT);
         if (data.Docs.TryGetValue("Conversation", out var convJson))
         {
-            var convListType = typeof(List<>).MakeGenericType(nameToType["Conversation"]);
+            var convListType = typeof(List<>).MakeGenericType(typeof(Kumunita.Core.Messaging.Conversation));
             if (JsonSerializer.Deserialize(convJson, convListType, jsonOpts) is System.Collections.IEnumerable archiveConversations)
                 foreach (var row in archiveConversations)
                     if (row is not null && IsActorConversation(row, residentSubjectId))
@@ -855,263 +1031,26 @@ public sealed class UserPortabilityService(
                             actorConversationIds.Add(idA);
         }
 
-        // ── Classify each in-scope entity (the §2.4 contract) ─────────────
-        var entities = new List<UserPortabilityEntityClassification>();
-        foreach (var (type, _) in UserScopeInventory.Entries)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            // The archive's rows for this type (the in-scope entities to
-            // classify). A type not in the archive contributes no entities.
-            if (!data.Docs.TryGetValue(type, out var json))
-                continue;
-            var docType = nameToType[type];
-            var listType = typeof(List<>).MakeGenericType(docType);
-            if (JsonSerializer.Deserialize(json, listType, jsonOpts) is not System.Collections.IEnumerable archiveRows)
-                continue;
-
-            // SEC-lane H1 (U5): the <c>Message</c> guard input is the union of
-            // the target's conversations the actor is in and this archive's
-            // own <c>Conversation</c> rows the actor holds a seat in (a
-            // <c>Message</c> whose conversation ships in the same archive is
-            var messageConversationIds = type == "Message" ? actorConversationIds : null;
-
-            var targetRows = targetRowsByType[type];
-            foreach (var archiveRow in archiveRows)
-            {
-                if (archiveRow is null)
-                    continue;
-                var entityId = ReadId(archiveRow) ?? "";
-
-                // (a) SEC-lane H1 (U5) — the ownership guard (the U4 pure
-                //     decision) runs BEFORE a row is marked importable: a
-                //     hostile row (forged ownership, an <c>Id</c> collision
-                //     with a row another resident owns, or an
-                //     access-granting row) is classified <c>Rejected</c> and
-                //     never reaches the <c>Clean</c>/<c>Duplicate</c>/
-                //     <c>Conflict</c> set (S-1 — an import never creates or
-                //     changes a row the actor does not own). The reason code
-                //     is the user-visible <c>RejectedReason</c> (U6 records
-                //     it as <c>import.rejected:&lt;reason&gt;</c>).
-                var ownerProbe = ownerByIdByType.GetValueOrDefault(type);
-                var verdict = ImportOwnershipGuard.Check(
-                    type,
-                    archiveRow,
-                    residentSubjectId,
-                    id => ownerProbe is not null ? ownerProbe.GetValueOrDefault(id) : null,
-                    type == "Message" ? messageConversationIds : null);
-                if (!verdict.Allowed)
-                {
-                    entities.Add(new UserPortabilityEntityClassification(
-                        Kind: type,
-                        EntityId: entityId,
-                        Status: UserPortabilityEntityStatus.Rejected,
-                        AbsentReferences: [],
-                        DuplicateId: null,
-                        RejectedReason: verdict.RejectionReason));
-                    continue;
-                }
-
-                // (b) duplicate — the U02 business-key match.
-                var duplicate = targetRows
-                    .FirstOrDefault(t => t is not null && MatchBusinessKey(type, archiveRow, t));
-                if (duplicate is not null)
-                {
-                    entities.Add(new UserPortabilityEntityClassification(
-                        Kind: type,
-                        EntityId: entityId,
-                        Status: UserPortabilityEntityStatus.Duplicate,
-                        AbsentReferences: [],
-                        DuplicateId: ReadId(duplicate)));
-                    continue;
-                }
-
-                // (c) conflict — the M11 referential-integrity loop over
-                //     the target (the §2.4 conflict reason shape).
-                var absent = ResolveAbsentReferences(
-                    type, archiveRow, typeSetById, principalIds, languageCodes);
-                entities.Add(new UserPortabilityEntityClassification(
-                    Kind: type,
-                    EntityId: entityId,
-                    Status: absent.Count > 0
-                        ? UserPortabilityEntityStatus.Conflict
-                        : UserPortabilityEntityStatus.Clean,
-                    AbsentReferences: absent,
-                    DuplicateId: null));
-            }
-        }
-
-        // ── The no-write pin (C-M27·5) — no session.Store / SaveChanges ───
-        // was called; the classification is read-only (the QuerySession +
-        // the userManager.Users read are the only I/O, both read-only).
-        return new UserPortabilityImportPlan(Ok: true, Entities: entities, Failures: []);
+        return new OwnershipGuardInputs(ownerByIdByType, actorConversationIds);
     }
 
-    // ── U04 (classify) helpers (pure, over the POCO set) ──────────────────
-
-    /// <summary>The doc types referenced by the in-scope types' reference
-    /// fields (the M11 reference map + the 4 non-M11 docs' own fields) — the
-    /// <c>conflict</c> reference-resolution target set.</summary>
-    private static IEnumerable<string> ReferencedDocTypes()
-    {
-        var set = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (type, _) in UserScopeInventory.Entries)
-        {
-            foreach (var rf in GetReferenceFields(type))
-            {
-                if (rf.Target == PortabilityReferenceField.PrincipalTarget)
-                    continue;
-                if (rf.Target == PortabilityReferenceField.LanguageCatalogTarget)
-                    continue;
-                if (rf.Target.Contains('|', StringComparison.Ordinal))
-                {
-                    foreach (var part in rf.Target.Split('|'))
-                        if (part.Length > 0)
-                            set.Add(part);
-                    continue;
-                }
-                set.Add(rf.Target);
-            }
-        }
-        return set;
-    }
-
-    /// <summary>The reference fields for a type (the M11 reference map, or
-    /// the 4 non-M11 docs' own fields).</summary>
-    private static IReadOnlyList<PortabilityReferenceField> GetReferenceFields(string type)
-    {
-        if (PortabilityDocTypes.ByType.TryGetValue(type, out var entry))
-            return entry.ReferenceFields;
-        if (NonM11RefFields.TryGetValue(type, out var fields))
-            return fields;
-        return [];
-    }
-
-    /// <summary>The per-entity absent-reference report (the §2.4 (c)
-    /// <c>conflict</c> reason — the M11 referential-integrity loop over the
-    /// target, restructured into the
-    /// <see cref="UserPortabilityAbsentReference"/> shape).</summary>
-    private static List<UserPortabilityAbsentReference> ResolveAbsentReferences(
-        string type, object row,
-        Dictionary<string, HashSet<string>> typeSetById,
-        HashSet<string> principalIds,
-        HashSet<string> languageCodes)
-    {
-        var absent = new List<UserPortabilityAbsentReference>();
-        var rowType = row.GetType();
-        foreach (var rf in GetReferenceFields(type))
-        {
-            var value = ReadFieldValue(rowType, rf.Field, row);
-            if (value is null)
-                continue;  // a null field is a satisfied reference.
-
-            HashSet<string>? targetSet = rf.Target switch
-            {
-                PortabilityReferenceField.PrincipalTarget => principalIds,
-                PortabilityReferenceField.LanguageCatalogTarget => languageCodes,
-                _ when rf.Target.Contains('|', StringComparison.Ordinal) => null,  // multi-kind
-                _ when typeSetById.TryGetValue(rf.Target, out var ts) => ts,
-                _ => null,
-            };
-
-            if (rf.IsArray)
-            {
-                if (value is not System.Collections.IList list)
-                    continue;
-                foreach (var item in list)
-                {
-                    if (item is not string id || id.Length == 0)
-                        continue;
-                    if (!RefResolves(id, rf, targetSet, typeSetById))
-                        absent.Add(new UserPortabilityAbsentReference(rf.Target, rf.Field, id));
-                }
-            }
-            else
-            {
-                if (value is not string id || id.Length == 0)
-                    continue;
-                if (!RefResolves(id, rf, targetSet, typeSetById))
-                    absent.Add(new UserPortabilityAbsentReference(rf.Target, rf.Field, id));
-            }
-        }
-        return absent;
-    }
-
-    /// <summary>Resolves one reference value against the field's target set
-    /// (the M11 <c>ReferenceResolves</c> pattern; the multi-kind union for
-    /// the 4 non-M11 docs' own fields).</summary>
-    private static bool RefResolves(
-        string id, PortabilityReferenceField rf,
-        HashSet<string>? directTarget,
-        Dictionary<string, HashSet<string>> typeSetById)
-    {
-        if (rf.Target.Contains('|', StringComparison.Ordinal))
-        {
-            foreach (var part in rf.Target.Split('|'))
-            {
-                if (part.Length == 0)
-                    continue;
-                if (typeSetById.TryGetValue(part, out var set) && set.Contains(id))
-                    return true;
-            }
-            return true;  // a sentinel — treated as satisfied
-        }
-        return directTarget is not null && directTarget.Contains(id);
-    }
-
-    /// <summary>Reads one reference field's value off a row (the M11
-    /// <c>ReadFieldValue</c> pattern — reflection on the property name,
-    /// not per-type code).</summary>
-    private static object? ReadFieldValue(Type rowType, string fieldName, object row)
-    {
-        var prop = rowType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance);
-        if (prop is null)
-            return null;  // an absent field is a satisfied reference.
-        return prop.GetValue(row);
-    }
-
-    /// <summary>The row's identity (the <c>Id</c> or <c>SubjectId</c> property,
-    /// the M11 validate id-set convention — <c>Profile</c> is keyed by
-    /// <c>SubjectId</c>, the rest by <c>Id</c>).</summary>
-    private static string? ReadId(object row)
-    {
-        var t = row.GetType();
-        var idProp = t.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)
-            ?? t.GetProperty("SubjectId", BindingFlags.Public | BindingFlags.Instance);
-        if (idProp is null)
-            return null;
-        if (idProp.PropertyType == typeof(string))
-            return idProp.GetValue(row) as string;
-        if (idProp.PropertyType == typeof(Guid))
-            return (idProp.GetValue(row) as Guid?)?.ToString("N");
-        return idProp.GetValue(row)?.ToString();
-    }
-
-    /// <summary>Does <paramref name="conversation"/> carry the actor in a
-    /// seat (<c>ParticipantA</c> or <c>ParticipantB</c>)? (The SEC-lane H1
-    /// <c>Message</c> guard input derivation — the U4
-    /// <see cref="ImportOwnershipGuard"/> <c>Conversation</c> rule.)</summary>
-    private static bool IsActorConversation(object conversation, string actorSubjectId)
-    {
-        var t = conversation.GetType();
-        var a = (string?)ReadFieldValue(t, "ParticipantA", conversation);
-        var b = (string?)ReadFieldValue(t, "ParticipantB", conversation);
-        return string.Equals(a, actorSubjectId, StringComparison.Ordinal)
-            || string.Equals(b, actorSubjectId, StringComparison.Ordinal);
-    }
 
     /// <inheritdoc />
     /// <summary>
-    /// U06 (resolve + apply) — the <c>clean</c>/<c>duplicate</c>/<c>conflict</c>
-    /// per-entity apply (the design doc §2.5 contract, verbatim) + the
-    /// <c>AddElsewhere</c> re-point + the <c>Discard</c> no-write + the
-    /// no-auto-merge pin (C-M27·4) + the fail-closed contract (C-M27·4).
-    /// The apply reads the entity rows from the uploaded archive (the M11
-    /// <see cref="PortabilityApplyDocuments"/> pattern: the
-    /// <c>docs/{Type}.json</c> array bytes are the single source of truth
-    /// for the apply). One commit (a single <c>SaveChangesAsync</c> — the
-    /// C-M27·4 "one commit" pin). One <c>portability.import.resolve</c>
-    /// <c>AccessAudit</c> row (<c>Via = Owner</c>).
+    /// C10-3b (IMPROVE-CODE) — the <b>orchestrator</b> over the per-phase
+    /// strategy seams extracted from the pre-split monolith (the design doc
+    /// §2.5 contract, verbatim). The public signature is the frozen C08/C09
+    /// seam; only the body changed. Legs (in order): archive read (a
+    /// <see cref="InvalidDataException"/> is surfaced as a fail-closed
+    /// result, the SEC-lane U14 zip-bomb pin), the §2.5 (3) standing pre-pass
+    /// (<see cref="ResolveStandingPrepassAsync"/>), the archive row read
+    /// (<see cref="ResolveArchiveRowsAsync"/>), the per-entity apply loop
+    /// (<see cref="ApplyPlanEntitiesAsync"/> — the M11 dependency-order
+    /// uniform loop, one commit), the media leg (<see cref="ApplyMediaAsync"/>
+    /// — the SEC-lane U14 size/quota/type gate), and the one
+    /// <c>portability.import.resolve</c> <c>AccessAudit</c> row
+    /// (<see cref="EmitPortabilityAuditRowAsync"/> — shared with the export
+    /// lane).
     /// </summary>
     public async Task<UserPortabilityImportResult> ResolveAsync(
         string residentSubjectId,
@@ -1142,22 +1081,73 @@ public sealed class UserPortabilityService(
                 [$"archive.invalid:{ex.Message}"]);
         }
 
-        // ── The name → Type map (the M11 NameToType + the 4 non-M11 types) ─
-        var nameToType = new Dictionary<string, Type>(
-            PortabilityExportDocuments.NameToType, StringComparer.Ordinal);
-        nameToType["InventoryItem"]  = typeof(Kumunita.Core.Inventory.InventoryItem);
-        nameToType["Document"]       = typeof(Kumunita.Core.Documents.Document);
-        nameToType["DocumentFolder"] = typeof(Kumunita.Core.Documents.DocumentFolder);
-        nameToType["Bookmark"]       = typeof(Kumunita.Core.Bookmarks.Bookmark);
+        var nameToType = BuildNameToTypeMap();
 
-        // ── Pre-pass: the standing check (the §2.5 (3) fail-closed rejection) ─
-        // For every AddElsewhere resolution, the resident must have standing
-        // over PickedTargetId (a group they are a member of, a tag they own,
-        // a component they are a member of, a page they authored). A
-        // PickedTargetId the resident has no standing over is a fail-closed
-        // rejection (the entity is not applied; the failure is recorded in
-        // UserPortabilityImportResult.Failures). The transaction has not
-        // started yet, so no rows are written (the C-M27·4 fail-closed pin).
+        // ── Per-phase strategy legs (the per-entity-kind extraction) ──────
+        // (1) standing pre-pass (the §2.5 (3) fail-closed rejection) — the
+        // transaction has not started yet, so no rows are written (C-M27·4).
+        var standingRejection = await ResolveStandingPrepassAsync(resolutions, residentSubjectId, ct);
+        if (standingRejection is not null)
+            return new UserPortabilityImportResult(false, 0, 0, standingRejection);
+
+        // (2) archive row read (the M11 PortabilityApplyDocuments pattern —
+        // the docs/{Type}.json array bytes are the single source of truth
+        // for the apply).
+        var archiveRowsByType = ResolveArchiveRowsAsync(data, nameToType, plan);
+        var resolutionByEntity = BuildResolutionLookup(resolutions);
+
+        // (3) per-entity apply (the M11 dependency order, one commit) — the
+        // SEC-lane H1 (U6) ownership-guard inputs are derived read-only,
+        // and the guard is re-run per <c>session.Store(row)</c> (defense in
+        // depth: a plan tampered between classify and apply, or a forged
+        // resolve form, cannot write a foreign row — invariant S-1).
+        var apply = await ApplyPlanEntitiesAsync(
+            data, nameToType, plan, archiveRowsByType, resolutionByEntity,
+            residentSubjectId, ct);
+        if (apply.Ok is false)
+            return new UserPortabilityImportResult(false, 0, 0, apply.Failures);
+
+        var (appliedCount, discardedCount, rejectedReasons) = (
+            apply.AppliedCount, apply.DiscardedCount, apply.RejectedReasons);
+
+        // (4) media leg (the SEC-lane U14 size/quota/type gate) — a skipped
+        // media appends a <c>media.skipped:<reason></c> entry; the
+        // import stays Ok (a partial skip is not a fail-closed rollback).
+        await ApplyMediaAsync(data, residentSubjectId, rejectedReasons, ct);
+
+        // (5) the one AccessAudit row (shared leg with the export lane).
+        await EmitPortabilityAuditRowAsync("portability.import.resolve", residentSubjectId, ct);
+
+        // SEC-lane H1 (U6): the resolve-time guard's rejections are surfaced
+        // in the result's message list — one <c>import.rejected:<reason></c>
+        // entry per rejected row, so the rejection is counted and the reason
+        // is recorded (the guard's verbatim code). The import is still
+        // <c>Ok</c> = <c>true</c> (the actor's genuine rows imported; the
+        // hostile rows were skipped, not written) — a partial rejection is
+        // not a fail-closed rollback (the C-M27·4 rollback is for a
+        // <em>mid-apply exception</em>, not for a guard rejection).
+        return new UserPortabilityImportResult(true, appliedCount, discardedCount, rejectedReasons);
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>§2.5 (3) standing pre-pass</b>
+    /// (the fail-closed rejection), extracted from
+    /// <see cref="ResolveAsync"/>: for every <c>AddElsewhere</c> resolution
+    /// the resident must have standing over <c>PickedTargetId</c> (a group
+    /// they are a member of, a tag they own, a component they are a member
+    /// of, a page they authored — the <see cref="HasStandingAsync"/> per-kind
+    /// leg). A <c>PickedTargetId</c> the resident has no standing over is a
+    /// fail-closed rejection (the entity is not applied; the failure is
+    /// recorded in <c>UserPortabilityImportResult.Failures</c>). Returns
+    /// <c>null</c> when every standing check passed (the apply may proceed),
+    /// or the closed <c>["standing.denied:..."]</c> failure list on the
+    /// first rejection.
+    /// </summary>
+    private async Task<IReadOnlyList<string>?> ResolveStandingPrepassAsync(
+        IReadOnlyList<UserPortabilityEntityResolution> resolutions,
+        string residentSubjectId,
+        CancellationToken ct)
+    {
         await using var readSession = documentStore.QuerySession();
         foreach (var res in resolutions)
         {
@@ -1168,16 +1158,26 @@ public sealed class UserPortabilityService(
             if (!await HasStandingAsync(readSession, res.AbsentRefKind, res.PickedTargetId,
                     residentSubjectId, ct).ConfigureAwait(false))
             {
-                return new UserPortabilityImportResult(
-                    false, 0, 0,
-                    [$"standing.denied:{res.Kind}:{res.EntityId}:{res.AbsentRefKind}:{res.PickedTargetId}"]);
+                return [$"standing.denied:{res.Kind}:{res.EntityId}:{res.AbsentRefKind}:{res.PickedTargetId}"];
             }
         }
+        return null;
+    }
 
-        // ── Pre-pass: read the archive's rows for each entity type ────────
-        // The apply reads the entity rows from the archive (the M11
-        // PortabilityApplyDocuments pattern: the docs/{Type}.json array
-        // bytes are the single source of truth for the apply).
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>archive row read leg</b> (the M11
+    /// <see cref="PortabilityApplyDocuments"/> pattern), extracted from
+    /// <see cref="ResolveAsync"/>: for every distinct kind in the plan the
+    /// archive's <c>docs/{Type}.json</c> bytes are deserialized into their
+    /// declared POCO row set (the <c>Kind</c> is the strategy-table key —
+    /// the M11 "string key" convention). A kind not in the archive
+    /// contributes no rows (the fail-closed default).
+    /// </summary>
+    private static Dictionary<string, List<object>> ResolveArchiveRowsAsync(
+        KumunitaArchiveData data,
+        Dictionary<string, Type> nameToType,
+        UserPortabilityImportPlan plan)
+    {
         var archiveRowsByType = new Dictionary<string, List<object>>(StringComparer.Ordinal);
         foreach (var type in plan.Entities.Select(e => e.Kind).Distinct(StringComparer.Ordinal))
         {
@@ -1189,48 +1189,249 @@ public sealed class UserPortabilityService(
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
             archiveRowsByType[type] = rows.Cast<object>().ToList();
         }
+        return archiveRowsByType;
+    }
 
-        // ── The resolution lookup (the per-entity decision) ────────────────
-        // String key (the "Kind|EntityId" convention — no tuple comparer
-        // needed, the M11 "string key" convention).
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>per-entity resolution lookup</b>
+    /// (the M11 "string key" convention), extracted from
+    /// <see cref="ResolveAsync"/>: the resident's per-entity decisions are
+    /// keyed by <c>"Kind|EntityId"</c> so the apply loop can resolve them
+    /// without a tuple comparer.
+    /// </summary>
+    private static Dictionary<string, UserPortabilityEntityResolution> BuildResolutionLookup(
+        IReadOnlyList<UserPortabilityEntityResolution> resolutions)
+    {
         var resolutionByEntity = new Dictionary<string, UserPortabilityEntityResolution>(
             StringComparer.Ordinal);
         foreach (var r in resolutions)
             resolutionByEntity[$"{r.Kind}|{r.EntityId}"] = r;
+        return resolutionByEntity;
+    }
 
-        // ── Apply the docs in the M11 dependency order (one commit) ────────
-        // The locked order (the design doc §2.5 (1)): the clean entities are
-        // applied in the M11 §inventory import order (parents before children
-        // — the D7 order; the uniform loop, not per-type code). The
-        // AddElsewhere entities are applied with the absent reference
-        // re-pointed to PickedTargetId (the §2.5 (3) rule). The duplicate +
-        // discarded + unresolved-conflict entities are not applied (the
-        // C-M27·4 no-auto-merge pin).
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the per-entity apply leg (§2.5 (1)–(3), the
+    /// per-entity-kind strategy loop). Docs apply in M11 dependency order;
+    /// the SEC-lane H1 (U6) ownership guard re-runs per
+    /// <c>session.Store(row)</c> (defense in depth — invariant S-1). One
+    /// commit (C-M27·4). Returns the apply outcome (a mid-apply exception
+    /// is the documented rollback path — <c>Ok = false</c> + the closed
+    /// failure set; a guard rejection appends an
+    /// <c>import.rejected:&lt;reason&gt;</c> entry but is not a fail-closed
+    /// rollback — the C-M27·4 rollback is for a mid-apply exception, not a
+    /// guard rejection).
+    /// </summary>
+    private sealed record ApplyOutcome(
+        bool Ok,
+        int AppliedCount,
+        int DiscardedCount,
+        List<string> RejectedReasons,
+        IReadOnlyList<string> Failures);
+
+    /// <summary>
+    /// The per-row guard decision (the U4 pure decision) — the delegate the
+    /// <see cref="ApplyTypeRows"/> leg calls per <c>session.Store(row)</c>
+    /// (the <c>out rejectionReason</c> carries the guard's verbatim reason
+    /// code for the <c>import.rejected:&lt;reason&gt;</c> tally).
+    /// </summary>
+    private delegate bool GuardRow(string type, object row, out string? rejectionReason);
+
+    private async Task<ApplyOutcome> ApplyPlanEntitiesAsync(
+        KumunitaArchiveData data,
+        Dictionary<string, Type> nameToType,
+        UserPortabilityImportPlan plan,
+        Dictionary<string, List<object>> archiveRowsByType,
+        Dictionary<string, UserPortabilityEntityResolution> resolutionByEntity,
+        string residentSubjectId,
+        CancellationToken ct)
+    {
+        var guard = await ResolveGuardInputsAsync(data, nameToType, residentSubjectId, ct);
+        bool TryImportRow(string type, object row, out string? rejectionReason)
+        {
+            var ownerProbe = guard.OwnerByIdByType.GetValueOrDefault(type);
+            var verdict = ImportOwnershipGuard.Check(
+                type, row, residentSubjectId,
+                id => ownerProbe is not null ? ownerProbe.GetValueOrDefault(id) : null,
+                type == "Message" ? guard.ActorConversationIds : null);
+            rejectionReason = verdict.RejectionReason;
+            return verdict.Allowed;
+        }
+
         var appliedCount = 0;
         var discardedCount = 0;
-        // SEC-lane H1 (U6): the resolve-time guard's rejections — rows hostile
-        // for the actor (a forged owner, an <c>Id</c> collision with another
-        // resident's row, or an access-granting row). Each rejected row is
-        // <em>skipped</em> (never stored, not counted in
-        // <c>AppliedCount</c>) and tallied here: the list is both the
-        // rejection count (<see cref="List{T}.Count"/>) and the result's
-        // message list — one <c>import.rejected:&lt;reason&gt;</c> entry per
-        // rejected row (the design doc §2.2 U6 contract; the reason is the
-        // guard's verbatim <see cref="ImportOwnershipGuard"/> code).
         var rejectedReasons = new List<string>();
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        try
+        {
+            foreach (var entry in PortabilityDocTypes.InOrder())
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!UserScopeInventory.IsInScope(entry.Type))
+                    continue;
+                if (!archiveRowsByType.TryGetValue(entry.Type, out var rows))
+                    continue;
+                var (a, d, r) = ApplyTypeRows(
+                    entry.Type, rows, plan, resolutionByEntity, rejectedReasons,
+                    session, TryImportRow);
+                appliedCount += a;
+                discardedCount += d;
+            }
 
-        // ── SEC-lane H1 (U6): the ownership-guard inputs (derived, read-only) ──
-        // The exact shapes U5 derives in the classify loop (design doc §2.2 U6).
-        // The resolve-time guard re-runs <see cref="ImportOwnershipGuard.Check"/>
-        // immediately before <em>each</em> <c>session.Store(row)</c> so a plan
-        // tampered with between classify and apply (or a forged resolve form)
-        // cannot write a foreign row (invariant S-1).
-        //   (a) The <c>existingOwnerOf</c> probe: per-type map
-        //       <c>row.Id → owner</c>, where owner is the type's first
-        //       <c>OwnershipFields</c> value read off the target row (the
-        //       ownership anchor). A null result means "not owned by another"
-        //       to the probe, so the guard's collision check does not fire; the
-        //       ownership rules carry the H1 pin.
+            // One commit (the C-M27·4 "one commit" pin) — every doc type's rows
+            // are staged in a single session; one SaveChangesAsync commits them
+            // atomically (a mid-apply failure is the documented rollback path).
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // C-M27·4 fail-closed pin: a mid-apply failure is the documented
+            // rollback path (the transaction rolls back, no rows are written).
+            return new ApplyOutcome(false, 0, 0, [], Failures: [$"apply.failed:{ex.Message}"]);
+        }
+        return new ApplyOutcome(true, appliedCount, discardedCount, rejectedReasons, []);
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the per-type row apply leg (the inner loop of
+    /// <see cref="ApplyPlanEntitiesAsync"/>, extracted to keep it under the
+    /// 80-line / CC-15 ceiling): for every archive row in the type's set, the
+    /// plan's classification drives the §2.5 (1)–(3) decision —
+    /// <c>Clean</c> → apply (after the per-row guard), <c>Duplicate</c> →
+    /// discard, <c>Conflict</c> → the resident's decision (the no-auto-merge
+    /// pin C-M27·4: an unresolved conflict is not applied). Returns the
+    /// per-type (applied, discarded, rejected) tallies; the guard rejections
+    /// are appended to the shared <paramref name="rejectedReasons"/> list.
+    /// </summary>
+    private static (int Applied, int Discarded, int Rejected) ApplyTypeRows(
+        string type,
+        List<object> rows,
+        UserPortabilityImportPlan plan,
+        Dictionary<string, UserPortabilityEntityResolution> resolutionByEntity,
+        List<string> rejectedReasons,
+        Marten.IDocumentSession session,
+        GuardRow tryImportRow)
+    {
+        var applied = 0;
+        var discarded = 0;
+        var rejected = 0;
+        foreach (var row in rows)
+        {
+            if (row is null)
+                continue;
+            var entityId = ReadId(row) ?? "";
+            var cls = plan.Entities
+                .FirstOrDefault(e => e.Kind == type && e.EntityId == entityId);
+            if (cls is null)
+                continue; // not in the plan (shouldn't happen)
+
+            // (1) clean → apply (the M11 import order, the §2.5 (1) rule).
+            if (cls.Status == UserPortabilityEntityStatus.Clean)
+            {
+                // SEC-lane H1 (U6): the resolve-time ownership guard (defense
+                // in depth — the plan's <c>Clean</c> mark was computed at
+                // classify; a plan tampered with in between, or a forged
+                // resolve form, must not be trusted). A rejected row is
+                // <em>skipped</em> (never stored, S-1) and recorded as
+                // <c>import.rejected:&lt;reason&gt;</c>.
+                if (!tryImportRow(type, row, out string? cleanReason))
+                {
+                    rejectedReasons.Add($"import.rejected:{cleanReason}");
+                    rejected++;
+                    continue;
+                }
+                session.Store(row);
+                applied++;
+                continue;
+            }
+
+            // (2) duplicate → not applied (the §2.5 (2) rule).
+            if (cls.Status == UserPortabilityEntityStatus.Duplicate)
+            {
+                discarded++;
+                continue;
+            }
+
+            // (3) conflict → the resident's decision.
+            if (!resolutionByEntity.TryGetValue($"{type}|{entityId}", out var res))
+            {
+                // C-M27·4 no-auto-merge pin: a conflict entity the resident
+                // did not resolve is not applied (no default, no fallback,
+                // no auto-re-point).
+                continue;
+            }
+
+            if (res.Resolution == UserPortabilityResolutionKind.Discard)
+            {
+                // §2.5 (3) Discard rule: not applied (no write).
+                discarded++;
+                continue;
+            }
+
+            if (res.Resolution == UserPortabilityResolutionKind.AddElsewhere)
+            {
+                // §2.5 (3) AddElsewhere rule: apply with the absent reference
+                // re-pointed to PickedTargetId (the target the resident chose).
+                RepointAbsentReference(row, res);
+                // SEC-lane H1 (U6): the resolve-time ownership guard — same
+                // defense-in-depth re-check as the <c>Clean</c> site: a
+                // conflict row that is hostile for the actor must not be
+                // written, even if the resident resolved it (S-1).
+                if (!tryImportRow(type, row, out string? addElseReason))
+                {
+                    rejectedReasons.Add($"import.rejected:{addElseReason}");
+                    rejected++;
+                    continue;
+                }
+                session.Store(row);
+                applied++;
+            }
+        }
+        return (applied, discarded, rejected);
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the AddElsewhere re-point leg (the §2.5 (3)
+    /// rule), extracted from the per-type apply loop: the absent reference
+    /// field is re-pointed to <c>PickedTargetId</c> (the target the resident
+    /// chose). A missing / non-writable property is a no-op (the fail-closed
+    /// default — the row is stored as-is, the M11 re-point pattern).
+    /// </summary>
+    private static void RepointAbsentReference(
+        object row, UserPortabilityEntityResolution res)
+    {
+        if (res.AbsentRefField is null || res.PickedTargetId is null)
+            return;
+        var prop = row.GetType().GetProperty(
+            res.AbsentRefField, BindingFlags.Public | BindingFlags.Instance);
+        if (prop is not null && prop.CanWrite)
+            prop.SetValue(row, res.PickedTargetId);
+    }
+
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>resolve-time ownership-guard inputs</b>
+    /// leg (the same two shapes U5 derives in the classify loop — the
+    /// <see cref="OwnershipGuardInputs"/> shared shape), extracted from
+    /// <see cref="ResolveAsync"/>: (a) the <c>existingOwnerOf</c> probe —
+    /// per-type <c>row.Id → owner</c> map read off the type's first
+    /// <see cref="UserScopeEntry.OwnershipFields"/> entry (the ownership
+    /// anchor); a null result means "not owned by another" to the probe; (b)
+    /// the actor's conversation-id set — the union of the target's
+    /// <c>Conversation</c> rows the actor holds a seat in and the archive's
+    /// own <c>Conversation</c> rows the actor holds a seat in (a
+    /// <c>Message</c> whose conversation ships in the same archive is the
+    /// actor's own). Fail-closed: an empty union rejects every
+    /// <c>Message</c>. The resolve-time guard re-runs
+    /// <see cref="ImportOwnershipGuard.Check"/> immediately before each
+    /// <c>session.Store(row)</c> so a plan tampered with between classify
+    /// and apply (or a forged resolve form) cannot write a foreign row
+    /// (invariant S-1).
+    /// </summary>
+    private async Task<OwnershipGuardInputs> ResolveGuardInputsAsync(
+        KumunitaArchiveData data,
+        Dictionary<string, Type> nameToType,
+        string residentSubjectId,
+        CancellationToken ct)
+    {
         var ownerByIdByType = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
         foreach (var (t, entry) in UserScopeInventory.Entries)
         {
@@ -1250,13 +1451,6 @@ public sealed class UserPortabilityService(
             ownerByIdByType[t] = map;
         }
 
-        //   (b) The actor's conversation ids (the <c>Message</c> rule): the
-        //       union of the target's <c>Conversation</c> rows the actor holds
-        //       a seat in (<c>ParticipantA</c> ∪ <c>ParticipantB</c>) and the
-        //       archive's own <c>Conversation</c> rows the actor holds a seat
-        //       in (a <c>Message</c> whose conversation ships in the same
-        //       archive is the actor's own). Fail-closed: an empty union
-        //       rejects every <c>Message</c>.
         var actorConversationIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var row in await QueryAllRowsAsync(
                 documentStore.QuerySession(), nameToType["Conversation"], ct).ConfigureAwait(false))
@@ -1275,156 +1469,36 @@ public sealed class UserPortabilityService(
                             actorConversationIds.Add(idA);
         }
 
-        // The per-row guard decision (the U4 pure decision) — captured over the
-        // two derived inputs above; <c>Message</c> is the only type that uses
-        // the conversation set (all other types ignore it).
-        bool TryImportRow(string type, object row, out string? rejectionReason)
-        {
-            var ownerProbe = ownerByIdByType.GetValueOrDefault(type);
-            var verdict = ImportOwnershipGuard.Check(
-                type,
-                row,
-                residentSubjectId,
-                id => ownerProbe is not null ? ownerProbe.GetValueOrDefault(id) : null,
-                type == "Message" ? actorConversationIds : null);
-            rejectionReason = verdict.RejectionReason;
-            return verdict.Allowed;
-        }
+        return new OwnershipGuardInputs(ownerByIdByType, actorConversationIds);
+    }
 
-        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
-        try
-        {
-            foreach (var entry in PortabilityDocTypes.InOrder())
-            {
-                ct.ThrowIfCancellationRequested();
-                if (!UserScopeInventory.IsInScope(entry.Type))
-                    continue;
-                if (!archiveRowsByType.TryGetValue(entry.Type, out var rows))
-                    continue;
-
-                foreach (var row in rows)
-                {
-                    if (row is null)
-                        continue;
-                    var entityId = ReadId(row) ?? "";
-                    var cls = plan.Entities
-                        .FirstOrDefault(e => e.Kind == entry.Type && e.EntityId == entityId);
-                    if (cls is null)
-                        continue; // not in the plan (shouldn't happen)
-
-                    // (1) clean → apply (the M11 import order, the §2.5 (1) rule).
-                    if (cls.Status == UserPortabilityEntityStatus.Clean)
-                    {
-                        // SEC-lane H1 (U6): the resolve-time ownership guard
-                        // (defense in depth — the plan's <c>Clean</c> mark was
-                        // computed at classify; a plan tampered with in between,
-                        // or a forged resolve form, must not be trusted). A
-                        // rejected row is <em>skipped</em> (never stored, S-1)
-                        // and recorded as <c>import.rejected:&lt;reason&gt;</c>.
-                        if (!TryImportRow(entry.Type, row, out string? cleanReason))
-                        {
-                            rejectedReasons.Add($"import.rejected:{cleanReason}");
-                            continue;
-                        }
-                        session.Store(row);
-                        appliedCount++;
-                        continue;
-                    }
-
-                    // (2) duplicate → not applied (the §2.5 (2) rule).
-                    if (cls.Status == UserPortabilityEntityStatus.Duplicate)
-                    {
-                        discardedCount++;
-                        continue;
-                    }
-
-                    // (3) conflict → the resident's decision.
-                    if (!resolutionByEntity.TryGetValue($"{entry.Type}|{entityId}", out var res))
-                    {
-                        // C-M27·4 no-auto-merge pin: a conflict entity the
-                        // resident did not resolve is not applied (there is
-                        // no default, no fallback, no auto-re-point).
-                        continue;
-                    }
-
-                    if (res.Resolution == UserPortabilityResolutionKind.Discard)
-                    {
-                        // §2.5 (3) Discard rule: not applied (no write).
-                        discardedCount++;
-                        continue;
-                    }
-
-                    if (res.Resolution == UserPortabilityResolutionKind.AddElsewhere)
-                    {
-                        // §2.5 (3) AddElsewhere rule: apply with the absent
-                        // reference re-pointed to PickedTargetId (the target
-                        // the resident chose). The re-point rule: the absent
-                        // reference field is re-pointed to PickedTargetId.
-                        if (res.AbsentRefField is not null && res.PickedTargetId is not null)
-                        {
-                            var prop = row.GetType().GetProperty(
-                                res.AbsentRefField, BindingFlags.Public | BindingFlags.Instance);
-                            if (prop is not null && prop.CanWrite)
-                                prop.SetValue(row, res.PickedTargetId);
-                        }
-                        // SEC-lane H1 (U6): the resolve-time ownership guard —
-                        // same defense-in-depth re-check as the <c>Clean</c>
-                        // site: a conflict row that is hostile for the actor
-                        // must not be written, even if the resident resolved
-                        // it (S-1).
-                        if (!TryImportRow(entry.Type, row, out string? addElseReason))
-                        {
-                            rejectedReasons.Add($"import.rejected:{addElseReason}");
-                            continue;
-                        }
-                        session.Store(row);
-                        appliedCount++;
-                        continue;
-                    }
-                }
-            }
-
-            // One commit (the C-M27·4 "one commit" pin) — every doc type's
-            // rows are staged in a single session; one SaveChangesAsync
-            // commits them atomically (a mid-apply failure is the
-            // documented rollback path, never a silently-accepted
-            // half-import).
-            await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            // C-M27·4 fail-closed pin: a mid-apply failure is the
-            // documented rollback path (the transaction rolls back, no
-            // rows are written).
-            return new UserPortabilityImportResult(
-                false, 0, 0, [$"apply.failed:{ex.Message}"]);
-        }
-
-        // ── Apply the media (the M11 PortabilityApplyMedia pattern) ────────
-        // For each media byte in the archive, IMediaStore.PutAsync
-        // (idempotent — the C-MED·4 dedup: identical bytes → same id →
-        // no second volume file). The resident's own write lane for media
-        // (not a new bulk importer).
-        //
-        // SEC-lane U14 (M2 / S-5): each imported media now runs the
-        // **same** size/quota/type decision as an upload. Per design
-        // doc §2.2 (U14), the decision already lives in a reachable
-        // **Core** seam — <see cref="StorageLimits.Decide"/> (the pure
-        // decision the Web <c>IUploadGate</c> composes) + the C-SM·7
-        // usage read + the platform-space read + the <see cref="MediaOptions"/>
-        // allowlist — all registered by <c>AddKumunitaCore</c>. So the
-        // "one new interface in the lane" branch is **not** needed: the
-        // service consumes the Core seams directly and Core stays
-        // HTTP-free (ADR 0006-D). A media that fails the gate is
-        // **skipped** (no byte written) and recorded as
-        // <c>media.skipped:&lt;reason&gt;</c> in the result's message
-        // list (the U6 <c>import.rejected:</c> shape) — the import
-        // stays <c>Ok</c> (a partial skip is not a fail-closed rollback;
-        // the actor's genuine rows + allowed media still import). When
-        // the policy seams are absent (a unit boot that constructs the
-        // service without the Core DI registrations) the legacy
-        // no-gate behaviour applies — the production registration
-        // (Core <c>DependencyInjection.cs</c>) always resolves them.
+    /// <summary>
+    /// C10-3b (IMPROVE-CODE) — the <b>media leg</b> (the M11
+    /// <see cref="PortabilityApplyMedia"/> pattern), extracted from
+    /// <see cref="ResolveAsync"/>: for each media byte in the archive,
+    /// <see cref="IMediaStore.PutAsync"/> (idempotent — the C-MED·4 dedup:
+    /// identical bytes → same id → no second volume file). SEC-lane U14
+    /// (M2 / S-5): each imported media runs the <b>same</b> size/quota/type
+    /// decision as an upload (the <see cref="StorageLimits.Decide"/> pure
+    /// decision the Web <c>IUploadGate</c> composes + the C-SM·7 usage read
+    /// + the platform-space read + the <see cref="MediaOptions"/> allowlist
+    /// — all registered by <c>AddKumunitaCore</c>; Core stays HTTP-free,
+    /// ADR 0006-D). A media that fails the gate is <b>skipped</b> (no byte
+    /// written) and recorded as <c>media.skipped:<reason></c> in the
+    /// result's message list (the U6 <c>import.rejected:</c> shape) — the
+    /// import stays <c>Ok</c> (a partial skip is not a fail-closed rollback;
+    /// the actor's genuine rows + allowed media still import). When the
+    /// policy seams are absent (a unit boot that constructs the service
+    /// without the Core DI registrations) the legacy no-gate behaviour
+    /// applies — the production registration (Core
+    /// <c>DependencyInjection.cs</c>) always resolves them.
+    /// </summary>
+    private async Task ApplyMediaAsync(
+        KumunitaArchiveData data,
+        string residentSubjectId,
+        List<string> rejectedReasons,
+        CancellationToken ct)
+    {
         var mediaGateEnabled = storageSettings is not null && mediaOpts is not null;
         CommunityStorageSettings? mediaSettings = null;
         long mediaUsage = 0;
@@ -1501,40 +1575,6 @@ public sealed class UserPortabilityService(
             await mediaStore.PutAsync(bytes, null, "application/octet-stream",
                 residentSubjectId, ct).ConfigureAwait(false);
         }
-
-        // ── The one AccessAudit row (Via = Owner, verb import.resolve) ─────
-        // The service emits it; the controller adds none (the ADR 0105
-        // messaging.toggle shape). After a clean apply (a pre-pass failure
-        // returned the closed failure set before this point, so no audit row
-        // for a refused resolve — the same "no audit for a refused action"
-        // posture as the export lane).
-        await using var auditSession = documentStore.OpenSession(new Marten.Services.SessionOptions());
-        auditSession.Store(new Authorization.AccessAudit
-        {
-            Id = System.Guid.NewGuid().ToString("N"),
-            At = DateTimeOffset.UtcNow,
-            ActorId = residentSubjectId,
-            EffectivePrincipalId = residentSubjectId,
-            Action = "portability.import.resolve",
-            TargetKind = "portability",
-            TargetId = "portability",
-            Via = Authorization.AccessVia.Owner,
-            Outcome = Authorization.AccessOutcome.Allow,
-        });
-        await auditSession.SaveChangesAsync(ct).ConfigureAwait(false);
-
-        // SEC-lane H1 (U6): the resolve-time guard's rejections are surfaced
-        // in the result's message list (<see cref="UserPortabilityImportResult.Failures"/>)
-        // — one <c>import.rejected:&lt;reason&gt;</c> entry per rejected row,
-        // so the rejection is counted (the list's
-        // <see cref="List{T}.Count"/>) and the reason is recorded (the guard's
-        // verbatim code). The import is still <c>Ok</c> = <c>true</c> (the
-        // actor's genuine rows imported; the hostile rows were skipped, not
-        // written) — a partial rejection is not a fail-closed rollback (the
-        // C-M27·4 rollback is for a <em>mid-apply exception</em>, not for a
-        // guard rejection). An empty list (the genuine round-trip) renders as
-        // <c>[]</c>, preserving the M27 shape.
-        return new UserPortabilityImportResult(true, appliedCount, discardedCount, rejectedReasons);
     }
 
     // ── U06 (resolve) helpers — the resident standing check ─────────────
@@ -1667,3 +1707,4 @@ public sealed class UserPortabilityService(
         return false;
     }
 }
+
