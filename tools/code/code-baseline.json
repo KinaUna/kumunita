@@ -3630,87 +3630,87 @@
   "controllers_marten_allowlist": [
     {
       "file": "src/Kumunita.Web/Controllers/AccountController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the 2FA 'authenticator setup' lane reads the actor's IdentityToken for a one-time QR payload (Identity-module read); needs a committed IIdentityService read overload, tracked C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/AdminAnalyticsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the audit-log export writes an AccessAudit row (Authorization-module write); routing it through a Usage-module service would mint a new Usage->Authorization boundary edge, so it stays on the store"
     },
     {
       "file": "src/Kumunita.Web/Controllers/AdminController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: first-run setup + seed-user creation are multi-document writes across Identity/UserInfo/Authorization; needs committed IAdminService overloads, tracked C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the announcement create/edit/delete lanes write the Post + its Translation + moderation side-rows in one aggregate (Post/Moderation split); C10+ scope"
     },
     {
       "file": "src/Kumunita.Web/Controllers/AttachmentController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the attach/retrieve/delete lanes span the Posts (parent Post read) + Media (MediaObject quarantine) modules; needs a Media-module committed service, tracked C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/CommunityController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the community create/rename/describe lanes write the Community + its Translations + membership in one aggregate; C10+ scope"
     },
     {
       "file": "src/Kumunita.Web/Controllers/ContentImageController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: same shape as AttachmentController — Posts (parent read) + Media (MediaObject quarantine) span; needs a Media-module committed service, tracked C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/DirectoryController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the directory read resolves each member's display tag via a Tags-module (Tag + TagTranslation) read; needs a Tags-module committed read overload, tracked C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/DocumentController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: uses the concrete DocumentService (no interface) + cross-context Tag/DocumentFolder reads + a Media quarantine write; out of C09's single-owner scope, C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/DocumentFolderController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: same DocumentService-concrete + Tags-module span as DocumentController; needs an IDocumentFolderService committed surface, C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/GroupsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the group create/edit/leave lanes write the Group + Translations + membership in one aggregate; C10+ scope"
     },
     {
       "file": "src/Kumunita.Web/Controllers/GuardianController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the guardian bind/consent lanes write the GuardianConsent + a UserInfo side-row in one aggregate; needs a committed IGuardianService surface, C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/HealthController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "pure diagnostics: the only store op is the readiness connectivity probe (Storage.Database.AssertConnectivityAsync) — the plan's named diagnostics example; no owning service to route it through"
     },
     {
       "file": "src/Kumunita.Web/Controllers/PageController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the page create/edit lanes are the multi-session aggregate writes (page + block + translation + moderation rows); long-method reshaping + a committed IPageService surface is C10's entry"
     },
     {
       "file": "src/Kumunita.Web/Controllers/PostsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the post/reply create/edit/delete lanes write the Post + Translation + moderation rows in one aggregate across Posts/Moderation; C10+ scope"
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C08 Projects cluster: the BoardDetail/TodoDetail builders + the ProjectsBase store reads are C08's frozen surface; C09 does not reshape it (the builder extraction is C08's exit)"
     },
     {
       "file": "src/Kumunita.Web/Controllers/ReportTargetsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the report-target lanes read the Post/Reply + its Translations across Posts + Moderation; needs a committed IReportTargetsService surface, C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/TagController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C09 survivor: the tag create/rename lanes write the Tag + its Translation + a side-row; needs a committed ITagsService surface, C10+"
     },
     {
       "file": "src/Kumunita.Web/Controllers/BoardsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C08 Projects cluster: the board lanes read the Board + BoardItemPlacement + membership (C08's frozen surface); C09 does not reshape it"
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsBaseController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C08 Projects cluster: the shared base's tag-read + project-list reads are C08's frozen surface; C09 does not reshape it"
     },
     {
       "file": "src/Kumunita.Web/Controllers/TodosController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
+      "reason": "C08 Projects cluster: the todo lanes read the Todo + BoardItemPlacement + membership (C08's frozen surface); C09 does not reshape it"
     }
   ],
   "seam_test": {
