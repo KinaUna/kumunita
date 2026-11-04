@@ -176,41 +176,22 @@ public sealed class ContentImageController(
         // volume file that must not exist; M25 C-UP·2 guards-before-write):
         if (file is null || file.Length == 0)
             return BadRequest(await this.FlashAsync("validation.choose_image", "Choose an image."));                          // empty → 400 (untouched)
-        // M25 (U8) — the size/over-quota guard is now the Web-only
-        // IUploadGate (C-UP·3): the single 413 producer, running the pure Core
-        // StorageLimits.Decide over the admin doc + the subject's usage. Runs
-        // BEFORE PutAsync, so a reject writes no byte (C-UP·2). Allowlist +
-        // empty-file checks untouched, same positions.
-        var requestServices = HttpContext.RequestServices;
-        var settingsSvc = requestServices.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
-        var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
-        var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
-        var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
+        // M25 (U8) — the size/over-quota guard (C-UP·3): the single 413
+        // producer, now the shared UploadGateHandler (the one UploadHandler,
+        // IMPROVE-CODE C11) running the pure Core StorageLimits.Decide over
+        // the admin doc + the subject's usage. Runs BEFORE PutAsync, so a
+        // reject writes no byte (C-UP·2). Allowlist + empty-file checks
+        // untouched, same positions.
+        var reject = await UploadGateHandler.CheckGateAsync(this, file.Length, subject, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
         if (reject is not null) return reject;                              // oversize/over-quota → 413 (the gate)
         if (!mediaOpts.Value.IsAllowed(file.ContentType))
             return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type (incl. SVG) → 415 (untouched)
 
-        // SEC U21 (owner decision, 2026-10-31) — magic-byte sniffer wire.
-        // Reject on **`Mismatch`** only (declared type whose known signature
-        // is contradicted by the bytes); `Match` and `Unknown` pass through.
-        // The wire reads the leading 16 bytes via `OpenReadStream` so it
-        // works for every `IFormFile` implementation without materialising
-        // the payload twice; the read is bounded to 16 bytes so it cannot
-        // leak a full upload into memory.
-        var head = new byte[Math.Min(16L, file.Length)];
-        if (head.Length > 0)
-        {
-            await using var rs = file.OpenReadStream();
-            var n = 0;
-            while (n < head.Length)
-            {
-                var got = await rs.ReadAsync(head.AsMemory(n));
-                if (got == 0) break;
-                n += got;
-            }
-            if (n < head.Length) Array.Resize(ref head, n);
-        }
-        if (UploadSignatureSniffer.Classify(file.ContentType, head) == UploadSignatureSniffer.SniffVerdict.Mismatch)
+        // SEC U21 (owner decision, 2026-10-31) — the magic-byte sniffer wire
+        // (the shared UploadGateHandler.SniffAsync): reject on **`Mismatch`**
+        // only (a declared type whose known signature the bytes contradict);
+        // `Match` and `Unknown` pass through.
+        if (await UploadGateHandler.SniffAsync(file, file.ContentType) == UploadSignatureSniffer.SniffVerdict.Mismatch)
             return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // declared type contradicted by the bytes → 415
 
         // R·5: the IFormFile never crosses into Core — copy to bytes, then
