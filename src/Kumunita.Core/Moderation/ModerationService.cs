@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -42,7 +43,7 @@ namespace Kumunita.Core.Moderation;
 /// deliverable is the ctor + this one write lane only.
 /// </para>
 /// </summary>
-public sealed class ModerationService
+public sealed class ModerationService : IModerationService
 {
     // C07 (ADR 0286) — SetComponentModeratorAccessAsync moved to
     // IProfileSettingsService; this service now holds only the sibling.
@@ -55,17 +56,32 @@ public sealed class ModerationService
     // precedent); production wiring passes the DI-registered instance.
     private readonly INotificationEmitter? _notifications;
 
+    // IMPROVE-CODE C09 — the profile read seam (the queue / detail's reporter,
+    // reply-author, target-author and standing-moderator display names, moved
+    // off the controller). Optional so the existing positional call sites keep
+    // compiling (CS1736, the TG-lane precedent); production wiring passes the
+    // DI-registered instance. The read seam's methods throw when it is absent
+    // (the write lanes are unaffected — they never read profiles).
+    private readonly IUserInfoService? _userInfo;
+
     public ModerationService(
         IProfileSettingsService profileSettings,
         IAuthorizationService authz,
         IDocumentStore store,
-        INotificationEmitter? notifications = null)
+        INotificationEmitter? notifications = null,
+        IUserInfoService? userInfo = null)
     {
         _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));
         _store    = store    ?? throw new ArgumentNullException(nameof(store));
         _notifications = notifications;
+        _userInfo = userInfo;
     }
+
+    private IUserInfoService UserInfo =>
+        _userInfo ?? throw new InvalidOperationException(
+            "The profile read seam (IUserInfoService) is not wired — the " +
+            "ModerationService read seam (IMPROVE-CODE C09) requires it.");
 
     /// <summary>
     /// M6 (U04) — the emitter-body truncation helper (design doc §6.3
@@ -945,5 +961,429 @@ public sealed class ModerationService
         return await _authz.CanAsync(
             actorId, AccessAction.Read, new PostToAuditableResource(post))
             .ConfigureAwait(false);
+    }
+
+    // ── Committed write overloads (IMPROVE-CODE C09 — the controller's
+    //    write lanes moved off the controller's own session) ───────────
+
+    /// <summary>
+    /// The committed <c>Assign</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.ModerationController"/>'s
+    /// <c>Assign</c> write lane moved behind this service, ADR 0006 §D
+    /// "route + authz + shape"). Delegates to the frozen
+    /// <see cref="AssignReportAsync"/> in the service's own session
+    /// (the SoD <c>CanAsync(Moderate)</c> gate inside that method is
+    /// unchanged); the web-side validation reads (the report's
+    /// <c>ComponentId</c> + the standing-moderator <see
+    /// cref="ModeratorAssignment"/> check) stay in the controller over
+    /// the <see cref="GetDetailAsync"/> /
+    /// <see cref="IsStandingModeratorOnComponentAsync"/> read seams
+    /// (route + authz + shape — ADR 0006 §D). The controller's
+    /// <c>TempData</c> / <c>Redirect</c> / <c>NotFound</c> shape is
+    /// unchanged (the served HTML is unchanged; only the Marten reads
+    /// moved).
+    /// </summary>
+    public async Task AssignReportAsync(
+        string reportId,
+        string assignedToModeratorId,
+        string globalAdminId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(reportId))              throw new ArgumentException("A report id is required.",             nameof(reportId));
+        if (string.IsNullOrEmpty(assignedToModeratorId)) throw new ArgumentException("An assigned moderator id is required.", nameof(assignedToModeratorId));
+        if (string.IsNullOrEmpty(globalAdminId))         throw new ArgumentException("A GlobalAdmin actor id is required.",   nameof(globalAdminId));
+
+        await using var session = _store.LightweightSession();
+        await AssignReportAsync(
+            reportId, assignedToModeratorId, globalAdminId, session)
+            .ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The committed <c>Unlock</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.ModerationController"/>'s
+    /// <c>Unlock</c> moved behind this service, ADR 0006 §D). Delegates
+    /// to the frozen <see cref="UnlockAsync"/> in the service's own
+    /// session (the C5 <c>SetComponentModeratorAccessAsync</c> flag-flip
+    /// inside that method is unchanged); the controller's
+    /// <c>TempData</c> / <c>Redirect</c> / <c>NotFound</c> shape is
+    /// unchanged.
+    /// </summary>
+    public async Task UnlockAsync(
+        string reportId,
+        string globalAdminId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(reportId))      throw new ArgumentException("A report id is required.",         nameof(reportId));
+        if (string.IsNullOrEmpty(globalAdminId)) throw new ArgumentException("A GlobalAdmin actor id is required.", nameof(globalAdminId));
+
+        await using var session = _store.LightweightSession();
+        await UnlockAsync(reportId, globalAdminId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The committed <c>Resolve</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.ModerationController"/>'s
+    /// <c>ResolvePost</c> moved behind this service, ADR 0006 §D).
+    /// Delegates to the frozen <see cref="ResolveReportAsync"/> in the
+    /// service's own session (the C5 <c>SetComponentModeratorAccessAsync</c>
+    /// flag-flip inside that method is unchanged); the controller's
+    /// <c>TempData</c> / <c>Redirect</c> / <c>NotFound</c> shape is
+    /// unchanged.
+    /// </summary>
+    public async Task ResolveReportAsync(
+        string reportId,
+        string globalAdminId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(reportId))      throw new ArgumentException("A report id is required.",         nameof(reportId));
+        if (string.IsNullOrEmpty(globalAdminId)) throw new ArgumentException("A GlobalAdmin actor id is required.", nameof(globalAdminId));
+
+        await using var session = _store.LightweightSession();
+        await ResolveReportAsync(reportId, globalAdminId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The standing-moderator read for the <c>Assign</c> web-side
+    /// defense-in-depth (IMPROVE-CODE C09 — the controller's previous
+    /// <c>AnyAsync</c> read moved behind this service, ADR 0006 §D): a
+    /// <c>true</c> when <paramref name="moderatorId"/> holds a
+    /// <see cref="ModeratorAssignment"/> row on <paramref
+    /// name="componentId"/>, a <c>false</c> otherwise (the controller's
+    /// previous <c>flash_not_moderator</c> redirect shape — the form
+    /// was out of sync, not a 404).
+    /// </summary>
+    public async Task<bool> IsStandingModeratorOnComponentAsync(
+        string componentId,
+        string moderatorId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(componentId)) return false;
+        if (string.IsNullOrEmpty(moderatorId)) return false;
+
+        await using var session = _store.LightweightSession();
+        return await session
+            .Query<ModeratorAssignment>()
+            .AnyAsync(a => a.ComponentId == componentId && a.UserId == moderatorId)
+            .ConfigureAwait(false);
+    }
+
+    // ── Read seam (IMPROVE-CODE C09 — the controller's raw Marten reads) ──
+
+    /// <inheritdoc />
+    public async Task<ModerationQueueReadModel> GetQueueAsync(
+        string actorId,
+        bool isGlobalAdmin,
+        bool isStanding,
+        CancellationToken ct = default)
+    {
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+        // The raw queue — sorted At desc + Status desc (the plan's line-254
+        // pin; the controller's previous <c>Index</c> shape, verbatim).
+        var reports = await session
+            .Query<Report>()
+            .OrderByDescending(r => r.At)
+            .ThenByDescending(r => r.Status)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        // The scoped-read filter (the controller's <c>Index</c> block,
+        // verbatim): a GlobalAdmin sees every report; a standing-moderator
+        // sees only the reports where (a) they hold a
+        // <see cref="ModeratorAssignment"/> row on the report's
+        // <c>ComponentId</c>, AND (b) that component's
+        // <see cref="Kumunita.Core.UserInfo.Component.ModeratorAccess"/>
+        // flag is ON; a plain resident sees no reports. A read lane, not a
+        // decision lane (no <c>CanAsync</c> call, no <c>AccessAudit</c> row).
+        if (!isGlobalAdmin && isStanding)
+        {
+            var myComponents = (await _profileSettings
+                .GetAssignmentsAsync(actorId).ConfigureAwait(false))
+                .Where(a => a.ComponentId is not null)
+                .Select(a => a.ComponentId)
+                .ToHashSet();
+            var components = (await session.Query<Kumunita.Core.UserInfo.Component>()
+                .ToListAsync().ConfigureAwait(false)).ToDictionary(c => c.Id);
+            var scopedComponentIds = new HashSet<string>();
+            foreach (var componentName in components.Keys)
+            {
+                if (!myComponents.Contains(componentName))
+                    continue;
+                if (components[componentName].ModeratorAccess == true)
+                    scopedComponentIds.Add(componentName);
+            }
+            reports = reports.Where(r =>
+                r.ComponentId is not null && scopedComponentIds.Contains(r.ComponentId))
+                .ToList();
+        }
+        else if (!isGlobalAdmin)
+        {
+            // A plain resident (Member, no standing-moderator row) sees NO
+            // reports (the C-M3b·4 SoD pin projects at the display level on
+            // the read lanes).
+            reports = [];
+        }
+
+        var componentNames = (await session.Query<Kumunita.Core.UserInfo.Component>()
+            .ToListAsync().ConfigureAwait(false))
+            .ToDictionary(c => c.Id, c => c.Name);
+
+        var rows = new List<ModerationQueueRow>(reports.Count);
+        var byStatus = new Dictionary<string, int>
+        {
+            ["filed"]    = 0,
+            ["assigned"] = 0,
+            ["unlocked"] = 0,
+            ["resolved"] = 0,
+        };
+
+        foreach (var r in reports)
+        {
+            var reporter = await UserInfo.GetProfileAsync(r.ReporterId).ConfigureAwait(false);
+
+            // ADR 0023 — the reply-report-target lane (the controller's
+            // previous reply block, verbatim).
+            string? replyAuthorName = null;
+            if (r.ReplyId is not null)
+            {
+                var reply = await session.LoadAsync<PostReply>(r.ReplyId).ConfigureAwait(false);
+                if (reply is not null)
+                    replyAuthorName =
+                        (await UserInfo.GetProfileAsync(reply.AuthorId).ConfigureAwait(false))?.DisplayName;
+            }
+
+            // ADR 0173 — the report-targets lane (the controller's previous
+            // target block, verbatim).
+            string? targetKind = r.TargetKind, targetId = r.TargetId;
+            string? targetTitle = null, targetAuthorName = null;
+            if (targetKind is not null && targetId is not null)
+            {
+                (string? title, string? authorId) = (null, null);
+                switch (targetKind)
+                {
+                    case "event":
+                        var ev = await session.LoadAsync<Kumunita.Core.Events.Event>(targetId).ConfigureAwait(false);
+                        title = ev?.Title; authorId = ev?.AuthorId; break;
+                    case "project":
+                        var pr = await session.LoadAsync<Kumunita.Core.Projects.Project>(targetId).ConfigureAwait(false);
+                        title = pr?.Title; authorId = pr?.AuthorId; break;
+                    case "board":
+                        var bd = await session.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
+                        title = bd?.Title; authorId = bd?.AuthorId; break;
+                    case "todo":
+                        var td = await session.LoadAsync<TodoItem>(targetId).ConfigureAwait(false);
+                        title = td?.Title; authorId = td?.AuthorId; break;
+                    case "grouppost":
+                        var gp = await session.LoadAsync<Post>(targetId).ConfigureAwait(false);
+                        title = gp?.Title; authorId = gp?.AuthorId; break;
+                }
+                targetTitle = title;
+                targetAuthorName = authorId is null
+                    ? null
+                    : (await UserInfo.GetProfileAsync(authorId).ConfigureAwait(false))?.DisplayName;
+            }
+
+            var statusKey = r.Status ?? "filed";   // "filed" as the M3-registered POCO default
+            if (!byStatus.ContainsKey(statusKey))
+                byStatus[statusKey] = 0;
+            byStatus[statusKey] += 1;
+
+            rows.Add(new ModerationQueueRow
+            {
+                Id          = r.Id,
+                PostId      = r.PostId,
+                PostTitle   = r.PostId.Length > 0 ? (await session.LoadAsync<Post>(r.PostId).ConfigureAwait(false))?.Title : null,
+                ComponentId = r.ComponentId,
+                ComponentName = r.ComponentId is not null ? componentNames.GetValueOrDefault(r.ComponentId) : null,
+                ReporterName = reporter?.DisplayName,
+                Reason      = r.Reason,
+                Status      = statusKey,
+                At          = r.At,
+                ReplyId     = r.ReplyId,
+                ReplyAuthorName = replyAuthorName,
+                TargetKind  = targetKind,
+                TargetId    = targetId,
+                TargetTitle = targetTitle,
+                TargetAuthorName = targetAuthorName,
+            });
+        }
+
+        return new ModerationQueueReadModel
+        {
+            Rows     = rows,
+            ByStatus = byStatus,
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<ModerationDetailReadModel> GetDetailAsync(
+        string reportId,
+        CancellationToken ct = default)
+    {
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+        var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
+        if (report is null)
+            throw new KeyNotFoundException($"Report '{reportId}' was not found.");
+
+        // ADR 0173 — the report-targets lane (the controller's previous
+        // <c>Resolve</c> target block, verbatim): the report's target is
+        // EITHER a post (PostId set) OR one of the new surfaces
+        // (TargetKind / TargetId set). A missing target is a 404 (the
+        // controller's previous <c>return NotFound()</c> shape — the
+        // <c>KeyNotFoundException</c> the Web layer maps).
+        string? postTitle = null, postBody = null, postAuthorId = null;
+        string? targetKind = report.TargetKind, targetId = report.TargetId;
+        string? targetTitle = null, targetAuthorId = null;
+
+        if (targetKind is not null && targetId is not null)
+        {
+            switch (targetKind)
+            {
+                case "event":
+                {
+                    var ev = await session.LoadAsync<Kumunita.Core.Events.Event>(targetId).ConfigureAwait(false);
+                    if (ev is null)
+                        throw new KeyNotFoundException($"Event '{targetId}' (referenced by report '{report.Id}') was not found.");
+                    targetTitle = ev.Title; postBody = ev.Body; targetAuthorId = ev.AuthorId;
+                    break;
+                }
+                case "project":
+                {
+                    var pr = await session.LoadAsync<Kumunita.Core.Projects.Project>(targetId).ConfigureAwait(false);
+                    if (pr is null)
+                        throw new KeyNotFoundException($"Project '{targetId}' (referenced by report '{report.Id}') was not found.");
+                    targetTitle = pr.Title; postBody = pr.Description; targetAuthorId = pr.AuthorId;
+                    break;
+                }
+                case "board":
+                {
+                    var bd = await session.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
+                    if (bd is null)
+                        throw new KeyNotFoundException($"Board '{targetId}' (referenced by report '{report.Id}') was not found.");
+                    targetTitle = bd.Title; postBody = bd.Description; targetAuthorId = bd.AuthorId;
+                    break;
+                }
+                case "todo":
+                {
+                    var td = await session.LoadAsync<TodoItem>(targetId).ConfigureAwait(false);
+                    if (td is null)
+                        throw new KeyNotFoundException($"To-do '{targetId}' (referenced by report '{report.Id}') was not found.");
+                    targetTitle = td.Title; targetAuthorId = td.AuthorId;
+                    break;
+                }
+                case "grouppost":
+                {
+                    var gp = await session.LoadAsync<Post>(targetId).ConfigureAwait(false);
+                    if (gp is null)
+                        throw new KeyNotFoundException($"Group post '{targetId}' (referenced by report '{report.Id}') was not found.");
+                    targetTitle = gp.Title; postBody = gp.Body; targetAuthorId = gp.AuthorId;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
+            if (post is null)
+                throw new KeyNotFoundException($"Post '{report.PostId}' (referenced by report '{report.Id}') was not found.");
+            postTitle = post.Title; postBody = post.Body; postAuthorId = post.AuthorId;
+        }
+
+        var reporter  = await UserInfo.GetProfileAsync(report.ReporterId).ConfigureAwait(false);
+        var postAuthor = await UserInfo.GetProfileAsync(
+            (postAuthorId ?? targetAuthorId) ?? string.Empty).ConfigureAwait(false);
+
+        var componentNames = (await session.Query<Kumunita.Core.UserInfo.Component>()
+            .ToListAsync().ConfigureAwait(false))
+            .ToDictionary(c => c.Id, c => c.Name);
+
+        // ADR 0023 — the reply-report-target lane (the controller's previous
+        // reply block, verbatim).
+        string? replyId = report.ReplyId;
+        string? replyBody = null;
+        string? replyAuthorName = null;
+        if (replyId is not null)
+        {
+            var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
+            if (reply is not null)
+            {
+                replyBody       = reply.Body;
+                replyAuthorName =
+                    (await UserInfo.GetProfileAsync(reply.AuthorId).ConfigureAwait(false))?.DisplayName;
+            }
+        }
+
+        var moderators = await GetStandingModeratorsAsync(report.ComponentId).ConfigureAwait(false);
+
+        var statusKey = report.Status ?? "filed";
+        return new ModerationDetailReadModel
+        {
+            ReportId         = report.Id,
+            PostId           = report.PostId,
+            ComponentId      = report.ComponentId,
+            ComponentName    = report.ComponentId is not null ? componentNames.GetValueOrDefault(report.ComponentId) : null,
+            Reason           = report.Reason,
+            Status           = statusKey,
+            At               = report.At,
+            ReporterName     = reporter?.DisplayName,
+            PostTitle        = postTitle,
+            PostBody         = postBody,
+            PostAuthorName   = postAuthor?.DisplayName,
+            ReplyId          = replyId,
+            ReplyBody        = replyBody,
+            ReplyAuthorName  = replyAuthorName,
+            TargetKind       = targetKind,
+            TargetId         = targetId,
+            TargetTitle      = targetTitle,
+            TargetAuthorName = targetAuthorId is null
+                ? null
+                : (await UserInfo.GetProfileAsync(targetAuthorId).ConfigureAwait(false))?.DisplayName,
+            Moderators       = moderators,
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ModerationStandingModerator>> GetStandingModeratorsAsync(
+        string? componentId,
+        CancellationToken ct = default)
+    {
+        if (componentId is null)
+            return [];   // C-M3b·4 "no fabricated component"
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var standingModeratorIds = await session
+            .Query<ModeratorAssignment>()
+            .Where(a => a.ComponentId == componentId)
+            .Select(a => a.UserId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var moderators = new List<ModerationStandingModerator>(standingModeratorIds.Count);
+        foreach (var uid in standingModeratorIds)
+        {
+            var profile = await UserInfo.GetProfileAsync(uid).ConfigureAwait(false);
+            moderators.Add(new ModerationStandingModerator(uid, profile?.DisplayName));
+        }
+        return moderators;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsInActorScopeAsync(
+        string actor,
+        string? componentId,
+        CancellationToken ct = default)
+    {
+        if (componentId is null) return false;   // C-M3b·4 "no fabricated component"
+        var assignments = await _profileSettings.GetAssignmentsAsync(actor).ConfigureAwait(false);
+        if (!assignments.Any(a => a.ComponentId == componentId))
+            return false;
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var component = await session.LoadAsync<Kumunita.Core.UserInfo.Component>(componentId).ConfigureAwait(false);
+        return component?.ModeratorAccess == true;
     }
 }

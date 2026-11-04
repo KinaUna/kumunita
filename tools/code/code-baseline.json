@@ -39,6 +39,10 @@
       "max": 684
     },
     {
+      "id": "src/Kumunita.Core/Moderation/ModerationService.cs",
+      "max": 753
+    },
+    {
       "id": "src/Kumunita.Core/Pages/PageService.cs",
       "max": 897
     },
@@ -159,7 +163,7 @@
     },
     {
       "id": "src/Kumunita.Core/DependencyInjection.cs::Kumunita.Core.ServiceCollectionExtensions.AddKumunitaCore(IServiceCollection)",
-      "max": 188,
+      "max": 191,
       "cc_max": 1
     },
     {
@@ -231,6 +235,16 @@
       "id": "src/Kumunita.Core/Migrations/AppDbContextModelSnapshot.cs::Kumunita.Core.Migrations.AppDbContextModelSnapshot.BuildModel(ModelBuilder)",
       "max": 191,
       "cc_max": 2
+    },
+    {
+      "id": "src/Kumunita.Core/Moderation/ModerationService.cs::Kumunita.Core.Moderation.ModerationService.GetDetailAsync(string,CancellationToken)",
+      "max": 110,
+      "cc_max": 25
+    },
+    {
+      "id": "src/Kumunita.Core/Moderation/ModerationService.cs::Kumunita.Core.Moderation.ModerationService.GetQueueAsync(string,bool,bool,CancellationToken)",
+      "max": 117,
+      "cc_max": 37
     },
     {
       "id": "src/Kumunita.Core/Notifications/NotificationService.cs::Kumunita.Core.Notifications.NotificationService.EmitAsync(IDocumentSession,string,string,string,string?,string?,string?,string?,string?,CancellationToken)",
@@ -471,16 +485,6 @@
       "id": "src/Kumunita.Web/Controllers/MessagesController.cs::Kumunita.Web.Controllers.MessagesController.Thread(string,int?)",
       "max": 77,
       "cc_max": 16
-    },
-    {
-      "id": "src/Kumunita.Web/Controllers/ModerationController.cs::Kumunita.Web.Controllers.ModerationController.Index()",
-      "max": 115,
-      "cc_max": 39
-    },
-    {
-      "id": "src/Kumunita.Web/Controllers/ModerationController.cs::Kumunita.Web.Controllers.ModerationController.Resolve(string)",
-      "max": 128,
-      "cc_max": 36
     },
     {
       "id": "src/Kumunita.Web/Controllers/PageController.cs::Kumunita.Web.Controllers.PageController.Index()",
@@ -1808,6 +1812,12 @@
     {
       "from": "Moderation",
       "to": "UserInfo",
+      "symbol": "Component",
+      "count": 1
+    },
+    {
+      "from": "Moderation",
+      "to": "UserInfo",
       "symbol": "ModeratorAssignment",
       "count": 1
     },
@@ -2932,7 +2942,7 @@
       "from": "Web",
       "to": "Events",
       "symbol": "Event",
-      "count": 13
+      "count": 12
     },
     {
       "from": "Web",
@@ -3207,8 +3217,14 @@
     {
       "from": "Web",
       "to": "Moderation",
+      "symbol": "ModerationDetailReadModel",
+      "count": 1
+    },
+    {
+      "from": "Web",
+      "to": "Moderation",
       "symbol": "ModerationService",
-      "count": 3
+      "count": 2
     },
     {
       "from": "Web",
@@ -3280,13 +3296,13 @@
       "from": "Web",
       "to": "Posts",
       "symbol": "Post",
-      "count": 12
+      "count": 11
     },
     {
       "from": "Web",
       "to": "Posts",
       "symbol": "PostReply",
-      "count": 3
+      "count": 2
     },
     {
       "from": "Web",
@@ -3316,7 +3332,7 @@
       "from": "Web",
       "to": "Posts",
       "symbol": "Report",
-      "count": 4
+      "count": 3
     },
     {
       "from": "Web",
@@ -3340,7 +3356,7 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "KanbanBoard",
-      "count": 8
+      "count": 7
     },
     {
       "from": "Web",
@@ -3358,7 +3374,7 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "Project",
-      "count": 5
+      "count": 4
     },
     {
       "from": "Web",
@@ -3382,7 +3398,7 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "TodoItem",
-      "count": 7
+      "count": 6
     },
     {
       "from": "Web",
@@ -3562,7 +3578,7 @@
       "from": "Web",
       "to": "UserInfo",
       "symbol": "Component",
-      "count": 4
+      "count": 3
     },
     {
       "from": "Web",
@@ -3598,12 +3614,6 @@
       "from": "Web",
       "to": "UserInfo",
       "symbol": "GuardianTimeLimitSchedule",
-      "count": 1
-    },
-    {
-      "from": "Web",
-      "to": "UserInfo",
-      "symbol": "ModeratorAssignment",
       "count": 1
     },
     {
@@ -3706,10 +3716,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/LocaleController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/ModerationController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {

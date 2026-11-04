@@ -369,7 +369,17 @@ public static class ServiceCollectionExtensions
             // is optional (CS1736), production wiring passes the registered
             // instance so the report.filed / report.assigned /
             // report.resolved emitters fire (the C-M6 lane).
-            sp.GetRequiredService<Notifications.INotificationEmitter>()));
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
+            // IMPROVE-CODE C09 — the queue / detail read seam's profile
+            // reads (reporter / reply-author / target-author /
+            // standing-moderator display names) moved off the controller.
+            sp.GetRequiredService<IUserInfoService>()));
+
+        // IMPROVE-CODE C09 — the read seam interface (the controller
+        // resolves the interface, not the concrete; ADR 0006 §D "route +
+        // authz + shape").
+        services.AddTransient<Moderation.IModerationService>(sp =>
+            sp.GetRequiredService<Moderation.ModerationService>());
 
         services.AddTransient<IEmailDeadLetterCounter, EmailDeadLetterCounter>();
 

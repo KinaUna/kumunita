@@ -1,0 +1,173 @@
+using Kumunita.Core.UserInfo;
+
+namespace Kumunita.Core.Moderation;
+
+/// <summary>
+/// The <c>ModerationService</c> read seam (IMPROVE-CODE C09 — the
+/// <see cref="Controllers.ModerationController"/>'s raw Marten reads moved
+/// behind this interface, ADR 0006 §D "route + authz + shape"). The Web
+/// layer maps the read models onto its view-models verbatim (served HTML
+/// unchanged); the write lanes (<see cref="ModerationService"/>
+/// <c>AssignReportAsync</c> / <c>UnlockAsync</c> / <c>ResolveReportAsync</c>)
+/// are unchanged (they already take an <see cref="Marten.IDocumentSession"/>,
+/// the C3 same-transaction lane — the controller's session).
+/// <para>
+/// <b>E11 (the SEC lane's decision, not C09's):</b>
+/// <see cref="IsInActorScopeAsync"/> is the <see
+/// cref="Controllers.ModerationController"/>'s
+/// <c>IsInActorScopeAsync</c> moved **verbatim** (the
+/// <c>ModeratorAssignment</c> read + the <c>Component.ModeratorAccess</c>
+/// flag read). Routing it through <see cref="IAuthorizationService"/> is the
+/// SEC lane's decision (the E11 handoff); C09 does **not** change who may
+/// do what — the <c>ModeratorAssignment</c> read stays as-is.
+/// </para>
+/// </summary>
+public interface IModerationService
+{
+    /// <summary>
+    /// The scoped <c>GET /moderation</c> queue (the controller's
+    /// <c>Index</c> body minus the shape mapping): the raw report rows in
+    /// the queue's order (<c>At</c> desc, <c>Status</c> desc) filtered by
+    /// the actor's scope (GlobalAdmin → every report; standing-moderator →
+    /// the reports on their components with <c>ModeratorAccess</c> ON; a
+    /// plain resident → no reports), with the component name, the reporter
+    /// name, the reply / target title + author name resolved (the raw
+    /// Marten reads moved here, ADR 0006 §D). <paramref name="actorId"/>
+    /// is the subject's id (empty for a non-actor — the queue is empty);
+    /// <paramref name="isGlobalAdmin"/> / <paramref name="isStanding"/>
+    /// are the actor's role flags (resolved by the controller, passed in —
+    /// the C08 base-controller idiom: the service "calls through, not
+    /// re-derive"). The <c>ByStatus</c> counts are over the **scoped**
+    /// rows (the controller's previous <c>ByStatus</c> shape).
+    /// </summary>
+    Task<ModerationQueueReadModel> GetQueueAsync(
+        string actorId,
+        bool isGlobalAdmin,
+        bool isStanding,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The <c>GET /moderation/{id}</c> detail (the controller's
+    /// <c>Resolve</c> body minus the shape mapping): the report + its
+    /// resolved target (post, or event / project / board / todo /
+    /// grouppost via <c>TargetKind</c> / <c>TargetId</c>) + the reply
+    /// discriminator (ADR 0023) + the standing-moderator list for the
+    /// assign form. Throws <see cref="KeyNotFoundException"/> when the
+    /// report is absent (the controller maps to 404 — non-leaky). The
+    /// scoped-read gate (a standing-moderator sees only the reports on
+    /// their components with <c>ModeratorAccess</c> ON) is the caller's
+    /// concern (the controller's <c>IsInActorScopeAsync</c> call before
+    /// the <c>GetDetailAsync</c> call) — the seam is the **sole reader**
+    /// of the report + target docs, not the scope decision (C-M37·1
+    /// shape, the Notes precedent).
+    /// </summary>
+    Task<ModerationDetailReadModel> GetDetailAsync(
+        string reportId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The standing-moderator scope read for the assign form (the
+    /// <c>ModeratorAssignment</c> rows on <paramref name="componentId"/>):
+    /// the <c>UserId</c> + the display name (resolved via
+    /// <see cref="IUserInfoService.GetProfileAsync"/>, the controller's
+    /// previous <c>StandingModerator</c> shape). An empty list when the
+    /// <c>ComponentId</c> is null (the C-M3b·4 "no fabricated component"
+    /// shape).
+    /// </summary>
+    Task<IReadOnlyList<ModerationStandingModerator>> GetStandingModeratorsAsync(
+        string? componentId,
+        CancellationToken ct = default);
+
+    // ── E11 (the SEC lane's decision) — moved verbatim, behaviour unchanged ─
+
+    /// <summary>
+    /// The full scoped-read check (one report row): the actor (a
+    /// standing-moderator) has a <see cref="ModeratorAssignment"/> row on
+    /// the report's <c>ComponentId</c> (the M1 <c>AdminController</c>'s
+    /// line 64 shape — the standing-moderator-scope read seam), AND the
+    /// component's <c>ModeratorAccess</c> flag is <c>true</c> (the U6
+    /// handoff's "flag ON branch via the read seam" note — the flag is a
+    /// plain POCO field read, NEVER via
+    /// <c>IProfileSettingsService.SetComponentModeratorAccessAsync</c>
+    /// which is the GlobalAdmin-only WRITE seam). A <c>null</c>
+    /// <c>ComponentId</c> is always <c>false</c> (a standing-moderator
+    /// has no scope on a global report — the C-M3b·4 "no fabricated
+    /// component" shape).
+    /// <para>
+    /// <b>TODO ❓ SEC (E11):</b> this is an access decision outside
+    /// <see cref="IAuthorizationService"/> — routing it through the
+    /// authorization seam is the SEC lane's decision (the IMPROVE-CODE
+    /// plan's E11 handoff, "the authorization path is unique" ADR 0006 §D).
+    /// C09 moves it verbatim off the controller (the ADR 0006 §D thin-HTTP
+    /// seam) and does **not** change who may do what.
+    /// </para>
+    /// </summary>
+    Task<bool> IsInActorScopeAsync(
+        string actor,
+        string? componentId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The standing-moderator read for the <c>Assign</c> web-side
+    /// defense-in-depth (IMPROVE-CODE C09 — the controller's previous
+    /// <c>AnyAsync</c> read moved behind this service, ADR 0006 §D): a
+    /// <c>true</c> when <paramref name="moderatorId"/> holds a
+    /// <see cref="ModeratorAssignment"/> row on <paramref
+    /// name="componentId"/>, a <c>false</c> otherwise (the controller's
+    /// previous <c>flash_not_moderator</c> redirect shape — the form
+    /// was out of sync, not a 404).
+    /// </summary>
+    Task<bool> IsStandingModeratorOnComponentAsync(
+        string componentId,
+        string moderatorId,
+        CancellationToken ct = default);
+
+    // ── Committed write lanes (IMPROVE-CODE C09 — the controller's write
+    //    lanes moved off the controller's own session) ───────────────
+
+    /// <summary>
+    /// The committed <c>Assign</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.ModerationController"/>'s
+    /// <c>Assign</c> write lane moved behind this service, ADR 0006 §D
+    /// "route + authz + shape"). Delegates to the session-based
+    /// <c>AssignReportAsync</c> in the service's own session (the SoD
+    /// <c>CanAsync(Moderate)</c> gate inside that method is unchanged).
+    /// Throws <see cref="KeyNotFoundException"/> when the report is
+    /// absent (the controller maps to a 404).
+    /// </summary>
+    Task AssignReportAsync(
+        string reportId,
+        string assignedToModeratorId,
+        string globalAdminId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The committed <c>Unlock</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.ModerationController"/>'s
+    /// <c>Unlock</c> moved behind this service, ADR 0006 §D). Delegates
+    /// to the session-based <c>UnlockAsync</c> in the service's own
+    /// session (the C5 <c>SetComponentModeratorAccessAsync</c>
+    /// flag-flip inside that method is unchanged). Throws
+    /// <see cref="KeyNotFoundException"/> when the report is absent
+    /// (the controller maps to a 404).
+    /// </summary>
+    Task UnlockAsync(
+        string reportId,
+        string globalAdminId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The committed <c>Resolve</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.ModerationController"/>'s
+    /// <c>ResolvePost</c> moved behind this service, ADR 0006 §D).
+    /// Delegates to the session-based <c>ResolveReportAsync</c> in the
+    /// service's own session (the C5 <c>SetComponentModeratorAccessAsync</c>
+    /// flag-flip inside that method is unchanged). Throws
+    /// <see cref="KeyNotFoundException"/> when the report is absent
+    /// (the controller maps to a 404).
+    /// </summary>
+    Task ResolveReportAsync(
+        string reportId,
+        string globalAdminId,
+        CancellationToken ct = default);
+}
