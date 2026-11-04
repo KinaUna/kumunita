@@ -32,7 +32,7 @@
     },
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs",
-      "max": 1047
+      "max": 989
     },
     {
       "id": "src/Kumunita.Core/Localization/LocalizationService.cs",
@@ -122,7 +122,7 @@
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Authorization/AuthorizationService.cs::Kumunita.Core.Authorization.AuthorizationService.Decide(IAuditableResource,string,string,IReadOnlySet<string>,IReadOnlySet<string>,bool,bool,IReadOnlySet<string>)",
+      "id": "src/Kumunita.Core/Authorization/AuthorizationService.cs::Kumunita.Core.Authorization.AuthorizationService.Decide(IAuditableResource,string,string,IReadOnlySet\u003Cstring\u003E,IReadOnlySet\u003Cstring\u003E,bool,bool,IReadOnlySet\u003Cstring\u003E)",
       "max": 51,
       "cc_max": 20
     },
@@ -142,22 +142,22 @@
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.SeedDefaultPagesAsync(IDocumentSession,IReadOnlyList<(string Slug, string Title, string Body)>,DateTimeOffset,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.SeedDefaultPagesAsync(IDocumentSession,IReadOnlyList\u003C(string Slug, string Title, string Body)\u003E,DateTimeOffset,CancellationToken)",
       "max": 89,
       "cc_max": 11
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.BackfillSampleCorpusAsync(AppDbContext,IDocumentStore,UserManager<User>,RoleManager<IdentityRole>,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.BackfillSampleCorpusAsync(AppDbContext,IDocumentStore,UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
       "max": 782,
       "cc_max": 128
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.EnsureUserAsync(UserManager<User>,RoleManager<IdentityRole>,IDocumentStore,string,string?,string,bool,string?,string?,string?,bool,ILogger,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.EnsureUserAsync(UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IDocumentStore,string,string?,string,bool,string?,string?,string?,bool,ILogger,CancellationToken)",
       "max": 69,
       "cc_max": 23
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.SeedAsync(AppDbContext,IDocumentStore,UserManager<User>,RoleManager<IdentityRole>,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.SeedAsync(AppDbContext,IDocumentStore,UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
       "max": 615,
       "cc_max": 83
     },
@@ -177,7 +177,7 @@
       "cc_max": 29
     },
     {
-      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.UpdateAsync(string,string,IReadOnlySet<string>,UpdateEventRequest,CancellationToken)",
+      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.UpdateAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateEventRequest,CancellationToken)",
       "max": 97,
       "cc_max": 32
     },
@@ -192,22 +192,17 @@
       "cc_max": 15
     },
     {
-      "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService.DeleteCoreAsync(string,User,string,Authorization.AccessVia,System.Func<IDocumentSession, DateTimeOffset, Task>?)",
-      "max": 166,
-      "cc_max": 23
-    },
-    {
       "id": "src/Kumunita.Core/Identity/SmtpProbe.cs::Kumunita.Core.Identity.SmtpProbe.TryHandshakeAsync(SmtpOptions,CancellationToken)",
       "max": 84,
       "cc_max": 13
     },
     {
-      "id": "src/Kumunita.Core/Localization/TranslationBulkImporter.cs::Kumunita.Core.Localization.TranslationBulkImporter.Parse(string,IReadOnlySet<string>)",
+      "id": "src/Kumunita.Core/Localization/TranslationBulkImporter.cs::Kumunita.Core.Localization.TranslationBulkImporter.Parse(string,IReadOnlySet\u003Cstring\u003E)",
       "max": 60,
       "cc_max": 19
     },
     {
-      "id": "src/Kumunita.Core/Localization/TranslationProvider.cs::Kumunita.Core.Localization.TranslationProvider.ResolveChainAsync(string?,IReadOnlyCollection<string>?)",
+      "id": "src/Kumunita.Core/Localization/TranslationProvider.cs::Kumunita.Core.Localization.TranslationProvider.ResolveChainAsync(string?,IReadOnlyCollection\u003Cstring\u003E?)",
       "max": 51,
       "cc_max": 19
     },
@@ -247,22 +242,22 @@
       "cc_max": 37
     },
     {
-      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.MoveAsync(string,string?,string?,string,IReadOnlySet<string>,IDocumentSession)",
+      "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService.MoveAsync(string,string?,string?,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
       "max": 60,
       "cc_max": 21
     },
     {
-      "id": "src/Kumunita.Core/Portability/ImportOwnershipGuard.cs::Kumunita.Core.Portability.ImportOwnershipGuard.Check(string,object,string,Func<string, string?>,IReadOnlySet<string>?)",
+      "id": "src/Kumunita.Core/Portability/ImportOwnershipGuard.cs::Kumunita.Core.Portability.ImportOwnershipGuard.Check(string,object,string,Func\u003Cstring, string?\u003E,IReadOnlySet\u003Cstring\u003E?)",
       "max": 52,
       "cc_max": 24
     },
     {
-      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.ApplyAsync(Marten.IDocumentStore,KumunitaArchiveData,PortabilityImportMode,string?,Dictionary<string, string>?,CancellationToken)",
+      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.ApplyAsync(Marten.IDocumentStore,KumunitaArchiveData,PortabilityImportMode,string?,Dictionary\u003Cstring, string\u003E?,CancellationToken)",
       "max": 73,
       "cc_max": 35
     },
     {
-      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.RemapReferencesInArchive(KumunitaArchiveData,string,Dictionary<string, string>,string[])",
+      "id": "src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs::Kumunita.Core.Portability.PortabilityApplyDocuments.RemapReferencesInArchive(KumunitaArchiveData,string,Dictionary\u003Cstring, string\u003E,string[])",
       "max": 67,
       "cc_max": 24
     },
@@ -282,12 +277,12 @@
       "cc_max": 28
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ResolveAsync(string,UserPortabilityImportPlan,IReadOnlyList<UserPortabilityEntityResolution>,Stream?,CancellationToken)",
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ResolveAsync(string,UserPortabilityImportPlan,IReadOnlyList\u003CUserPortabilityEntityResolution\u003E,Stream?,CancellationToken)",
       "max": 251,
       "cc_max": 70
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ScopeRowHoldsSeat(object,UserScopeEntry,string,IReadOnlySet<string>?,IReadOnlySet<string>?)",
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ScopeRowHoldsSeat(object,UserScopeEntry,string,IReadOnlySet\u003Cstring\u003E?,IReadOnlySet\u003Cstring\u003E?)",
       "max": 39,
       "cc_max": 20
     },
@@ -297,32 +292,32 @@
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreatePostAsync(PostDraft,string,IReadOnlySet<string>,IDocumentSession)",
+      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreatePostAsync(PostDraft,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
       "max": 90,
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreateReplyAsync(string,string,string,IDocumentSession,string?,IReadOnlyList<string>?)",
+      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService.CreateReplyAsync(string,string,string,IDocumentSession,string?,IReadOnlyList\u003Cstring\u003E?)",
       "max": 65,
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.MoveTodoToAdjacentLaneAsync(string,string,string,IReadOnlySet<string>,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.MoveTodoToAdjacentLaneAsync(string,string,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
       "max": 62,
       "cc_max": 19
     },
     {
-      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.MoveTodoToLanePositionAsync(string,string,int,string,IReadOnlySet<string>,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.MoveTodoToLanePositionAsync(string,string,int,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
       "max": 77,
       "cc_max": 22
     },
     {
-      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.UpdateLaneAsync(string,string,IReadOnlySet<string>,UpdateLaneRequest,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.UpdateLaneAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateLaneRequest,CancellationToken)",
       "max": 33,
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateProjectAsync(string,string,IReadOnlySet<string>,UpdateProjectRequest,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService.UpdateProjectAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateProjectRequest,CancellationToken)",
       "max": 55,
       "cc_max": 17
     },
@@ -334,11 +329,10 @@
     {
       "id": "src/Kumunita.Core/Projects/TodoService.cs::Kumunita.Core.Projects.TodoService.ComputeTodoEditChanged(TodoItem,UpdateTodoRequest,string?,string?,string?,string?)",
       "max": 20,
-      "cc_max": 20,
-      "reason": "C10: the per-editable-field changed-detection disjunction (10 fields: Title/Body/ComponentId/Status + hierarchy/association/2 dates/languageCode/TagSlugs), one posted-and-different boolean per field — the EventService.UpdateAsync changed precedent. Irreducibly branchy; the 4 ? in the CC are the string? params. Not split further (splitting per-field would be ceremony, violating the part-vs-whole rule)."
+      "cc_max": 20
     },
     {
-      "id": "src/Kumunita.Core/Projects/TodoService.cs::Kumunita.Core.Projects.TodoService.CreateTodoCommentAsync(string,string,IReadOnlySet<string>,string,string?,string?,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/TodoService.cs::Kumunita.Core.Projects.TodoService.CreateTodoCommentAsync(string,string,IReadOnlySet\u003Cstring\u003E,string,string?,string?,CancellationToken)",
       "max": 68,
       "cc_max": 18
     },
@@ -353,12 +347,12 @@
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToDocumentAsync(string,IReadOnlyList<string>,string,IReadOnlySet<string>,IDocumentSession)",
+      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToDocumentAsync(string,IReadOnlyList\u003Cstring\u003E,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
       "max": 82,
       "cc_max": 9
     },
     {
-      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToPageAsync(string,IReadOnlyList<string>,string,IReadOnlySet<string>,IDocumentSession)",
+      "id": "src/Kumunita.Core/Tags/TagService.cs::Kumunita.Core.Tags.TagService.AttachToPageAsync(string,IReadOnlyList\u003Cstring\u003E,string,IReadOnlySet\u003Cstring\u003E,IDocumentSession)",
       "max": 82,
       "cc_max": 11
     },
@@ -503,7 +497,7 @@
       "cc_max": 24
     },
     {
-      "id": "src/Kumunita.Web/Controllers/ProjectsBaseController.cs::Kumunita.Web.Controllers.ProjectsBaseController.ProjectRow(TodoItem,TodoItem?,IReadOnlyDictionary<string, string>,IReadOnlyDictionary<string, string>,IReadOnlyDictionary<string, string>,IReadOnlySet<string>,IReadOnlyCollection<string>)",
+      "id": "src/Kumunita.Web/Controllers/ProjectsBaseController.cs::Kumunita.Web.Controllers.ProjectsBaseController.ProjectRow(TodoItem,TodoItem?,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlyDictionary\u003Cstring, string\u003E,IReadOnlySet\u003Cstring\u003E,IReadOnlyCollection\u003Cstring\u003E)",
       "max": 49,
       "cc_max": 16
     },
@@ -563,7 +557,7 @@
       "cc_max": 17
     },
     {
-      "id": "src/Kumunita.Web/Localization/AccountValidationLocalizer.cs::Kumunita.Web.Localization.AccountValidationLocalizer.Rewrite(ModelError,string,string,System.Collections.Generic.IReadOnlyDictionary<string, string>,Type,string,ITranslationProvider)",
+      "id": "src/Kumunita.Web/Localization/AccountValidationLocalizer.cs::Kumunita.Web.Localization.AccountValidationLocalizer.Rewrite(ModelError,string,string,System.Collections.Generic.IReadOnlyDictionary\u003Cstring, string\u003E,Type,string,ITranslationProvider)",
       "max": 53,
       "cc_max": 16
     },
@@ -573,7 +567,7 @@
       "cc_max": 29
     },
     {
-      "id": "src/Kumunita.Web/Security/MentionRenderer.cs::Kumunita.Web.Security.MentionRenderer.Render(string?,IReadOnlyDictionary<string, string>?)",
+      "id": "src/Kumunita.Web/Security/MentionRenderer.cs::Kumunita.Web.Security.MentionRenderer.Render(string?,IReadOnlyDictionary\u003Cstring, string\u003E?)",
       "max": 54,
       "cc_max": 18
     },
@@ -1567,7 +1561,19 @@
     {
       "from": "Identity",
       "to": "UserInfo",
+      "symbol": "Component",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "UserInfo",
       "symbol": "ComponentMembership",
+      "count": 1
+    },
+    {
+      "from": "Identity",
+      "to": "UserInfo",
+      "symbol": "Group",
       "count": 1
     },
     {
@@ -3621,87 +3627,87 @@
   "controllers_marten_allowlist": [
     {
       "file": "src/Kumunita.Web/Controllers/AccountController.cs",
-      "reason": "C09 survivor: the 2FA 'authenticator setup' lane reads the actor's IdentityToken for a one-time QR payload (Identity-module read); needs a committed IIdentityService read overload, tracked C10+"
+      "reason": "C09 survivor: the 2FA \u0027authenticator setup\u0027 lane reads the actor\u0027s IdentityToken for a one-time QR payload (Identity-module read); needs a committed IIdentityService read overload, tracked C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/AdminAnalyticsController.cs",
-      "reason": "C09 survivor: the audit-log export writes an AccessAudit row (Authorization-module write); routing it through a Usage-module service would mint a new Usage->Authorization boundary edge, so it stays on the store"
+      "reason": "C09 survivor: the audit-log export writes an AccessAudit row (Authorization-module write); routing it through a Usage-module service would mint a new Usage-\u003EAuthorization boundary edge, so it stays on the store"
     },
     {
       "file": "src/Kumunita.Web/Controllers/AdminController.cs",
-      "reason": "C09 survivor: first-run setup + seed-user creation are multi-document writes across Identity/UserInfo/Authorization; needs committed IAdminService overloads, tracked C10+"
+      "reason": "C09 survivor: first-run setup \u002B seed-user creation are multi-document writes across Identity/UserInfo/Authorization; needs committed IAdminService overloads, tracked C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
-      "reason": "C09 survivor: the announcement create/edit/delete lanes write the Post + its Translation + moderation side-rows in one aggregate (Post/Moderation split); C10+ scope"
+      "reason": "C09 survivor: the announcement create/edit/delete lanes write the Post \u002B its Translation \u002B moderation side-rows in one aggregate (Post/Moderation split); C10\u002B scope"
     },
     {
       "file": "src/Kumunita.Web/Controllers/AttachmentController.cs",
-      "reason": "C09 survivor: the attach/retrieve/delete lanes span the Posts (parent Post read) + Media (MediaObject quarantine) modules; needs a Media-module committed service, tracked C10+"
+      "reason": "C09 survivor: the attach/retrieve/delete lanes span the Posts (parent Post read) \u002B Media (MediaObject quarantine) modules; needs a Media-module committed service, tracked C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/CommunityController.cs",
-      "reason": "C09 survivor: the community create/rename/describe lanes write the Community + its Translations + membership in one aggregate; C10+ scope"
+      "reason": "C09 survivor: the community create/rename/describe lanes write the Community \u002B its Translations \u002B membership in one aggregate; C10\u002B scope"
     },
     {
       "file": "src/Kumunita.Web/Controllers/ContentImageController.cs",
-      "reason": "C09 survivor: same shape as AttachmentController — Posts (parent read) + Media (MediaObject quarantine) span; needs a Media-module committed service, tracked C10+"
+      "reason": "C09 survivor: same shape as AttachmentController \u2014 Posts (parent read) \u002B Media (MediaObject quarantine) span; needs a Media-module committed service, tracked C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/DirectoryController.cs",
-      "reason": "C09 survivor: the directory read resolves each member's display tag via a Tags-module (Tag + TagTranslation) read; needs a Tags-module committed read overload, tracked C10+"
+      "reason": "C09 survivor: the directory read resolves each member\u0027s display tag via a Tags-module (Tag \u002B TagTranslation) read; needs a Tags-module committed read overload, tracked C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/DocumentController.cs",
-      "reason": "C09 survivor: uses the concrete DocumentService (no interface) + cross-context Tag/DocumentFolder reads + a Media quarantine write; out of C09's single-owner scope, C10+"
+      "reason": "C09 survivor: uses the concrete DocumentService (no interface) \u002B cross-context Tag/DocumentFolder reads \u002B a Media quarantine write; out of C09\u0027s single-owner scope, C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/DocumentFolderController.cs",
-      "reason": "C09 survivor: same DocumentService-concrete + Tags-module span as DocumentController; needs an IDocumentFolderService committed surface, C10+"
+      "reason": "C09 survivor: same DocumentService-concrete \u002B Tags-module span as DocumentController; needs an IDocumentFolderService committed surface, C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/GroupsController.cs",
-      "reason": "C09 survivor: the group create/edit/leave lanes write the Group + Translations + membership in one aggregate; C10+ scope"
+      "reason": "C09 survivor: the group create/edit/leave lanes write the Group \u002B Translations \u002B membership in one aggregate; C10\u002B scope"
     },
     {
       "file": "src/Kumunita.Web/Controllers/GuardianController.cs",
-      "reason": "C09 survivor: the guardian bind/consent lanes write the GuardianConsent + a UserInfo side-row in one aggregate; needs a committed IGuardianService surface, C10+"
+      "reason": "C09 survivor: the guardian bind/consent lanes write the GuardianConsent \u002B a UserInfo side-row in one aggregate; needs a committed IGuardianService surface, C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/HealthController.cs",
-      "reason": "pure diagnostics: the only store op is the readiness connectivity probe (Storage.Database.AssertConnectivityAsync) — the plan's named diagnostics example; no owning service to route it through"
+      "reason": "pure diagnostics: the only store op is the readiness connectivity probe (Storage.Database.AssertConnectivityAsync) \u2014 the plan\u0027s named diagnostics example; no owning service to route it through"
     },
     {
       "file": "src/Kumunita.Web/Controllers/PageController.cs",
-      "reason": "C09 survivor: the page create/edit lanes are the multi-session aggregate writes (page + block + translation + moderation rows); long-method reshaping + a committed IPageService surface is C10's entry"
+      "reason": "C09 survivor: the page create/edit lanes are the multi-session aggregate writes (page \u002B block \u002B translation \u002B moderation rows); long-method reshaping \u002B a committed IPageService surface is C10\u0027s entry"
     },
     {
       "file": "src/Kumunita.Web/Controllers/PostsController.cs",
-      "reason": "C09 survivor: the post/reply create/edit/delete lanes write the Post + Translation + moderation rows in one aggregate across Posts/Moderation; C10+ scope"
+      "reason": "C09 survivor: the post/reply create/edit/delete lanes write the Post \u002B Translation \u002B moderation rows in one aggregate across Posts/Moderation; C10\u002B scope"
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsController.cs",
-      "reason": "C08 Projects cluster: the BoardDetail/TodoDetail builders + the ProjectsBase store reads are C08's frozen surface; C09 does not reshape it (the builder extraction is C08's exit)"
+      "reason": "C08 Projects cluster: the BoardDetail/TodoDetail builders \u002B the ProjectsBase store reads are C08\u0027s frozen surface; C09 does not reshape it (the builder extraction is C08\u0027s exit)"
     },
     {
       "file": "src/Kumunita.Web/Controllers/ReportTargetsController.cs",
-      "reason": "C09 survivor: the report-target lanes read the Post/Reply + its Translations across Posts + Moderation; needs a committed IReportTargetsService surface, C10+"
+      "reason": "C09 survivor: the report-target lanes read the Post/Reply \u002B its Translations across Posts \u002B Moderation; needs a committed IReportTargetsService surface, C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/TagController.cs",
-      "reason": "C09 survivor: the tag create/rename lanes write the Tag + its Translation + a side-row; needs a committed ITagsService surface, C10+"
+      "reason": "C09 survivor: the tag create/rename lanes write the Tag \u002B its Translation \u002B a side-row; needs a committed ITagsService surface, C10\u002B"
     },
     {
       "file": "src/Kumunita.Web/Controllers/BoardsController.cs",
-      "reason": "C08 Projects cluster: the board lanes read the Board + BoardItemPlacement + membership (C08's frozen surface); C09 does not reshape it"
+      "reason": "C08 Projects cluster: the board lanes read the Board \u002B BoardItemPlacement \u002B membership (C08\u0027s frozen surface); C09 does not reshape it"
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsBaseController.cs",
-      "reason": "C08 Projects cluster: the shared base's tag-read + project-list reads are C08's frozen surface; C09 does not reshape it"
+      "reason": "C08 Projects cluster: the shared base\u0027s tag-read \u002B project-list reads are C08\u0027s frozen surface; C09 does not reshape it"
     },
     {
       "file": "src/Kumunita.Web/Controllers/TodosController.cs",
-      "reason": "C08 Projects cluster: the todo lanes read the Todo + BoardItemPlacement + membership (C08's frozen surface); C09 does not reshape it"
+      "reason": "C08 Projects cluster: the todo lanes read the Todo \u002B BoardItemPlacement \u002B membership (C08\u0027s frozen surface); C09 does not reshape it"
     }
   ],
   "seam_test": {

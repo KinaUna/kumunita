@@ -4,6 +4,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
 using Kumunita.Core.Pages;
+using Kumunita.Core.PersonalNotes;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
@@ -147,6 +148,57 @@ public sealed class IdentityServiceDeleteLaneGdprTests(PostgresFixture fixture) 
         // A's post is gone; B's post is still present (the delete is scoped to A).
         Assert.Null(await LoadAsync<Post>(boot.Store, postA));
         Assert.NotNull(await LoadAsync<Post>(boot.Store, postB));
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the <see cref="Kumunita.Core.Identity.ResidentContentEraser"/>
+    /// part, proven directly (part-vs-whole: this test names the part, not the
+    /// <see cref="IdentityService"/> composer). It erases the resident's
+    /// cross-module content docs — a <c>Post</c> (Posts module) + a
+    /// <c>PersonalNote</c> (PersonalNotes module) — in a single session, and a
+    /// fresh-session read proves both are gone. This is the §2A closed-list
+    /// erasure seam extracted from <see cref="IdentityService"/>'s DeleteCoreAsync
+    /// (F1 / DB-13 GDPR) as a testable unit — the integration proof of full
+    /// erasure across the module set.
+    /// </summary>
+    [Fact]
+    public async Task ResidentContentEraser_EraseAsync_RemovesResidentContentDocsAcrossModules()
+    {
+        var boot = await BootAsync();
+        var resident = await SeedAccountAsync(boot, "eraser-resident@examplium.com", globalAdmin: false);
+        var postA = Guid.NewGuid().ToString("N");
+        var noteA = Guid.NewGuid().ToString("N");
+        await using (var session = boot.Store.LightweightSession())
+        {
+            session.Store(new Post { Id = postA, AuthorId = resident, Body = "eraser post", Created = DateTimeOffset.UtcNow });
+            session.Store(new PersonalNote
+            {
+                Id = noteA,
+                OwnerId = resident,
+                TargetKind = "post",
+                TargetId = postA,
+                Body = "eraser note"
+            });
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // The part, called directly (not the DeleteAccountAsync composer) —
+        // erases the resident's content docs in its own session (C3: this
+        // session's SaveChangesAsync commits it; the part does not commit).
+        await using var eraserSession = boot.Store.LightweightSession();
+        var (contentDocs, mediaIds) = await Kumunita.Core.Identity.ResidentContentEraser
+            .EraseAsync(eraserSession, resident, TestContext.Current.CancellationToken);
+        await eraserSession.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // The part reports it erased ≥2 content docs (the post + the note) and
+        // no media (we stored none).
+        Assert.True(contentDocs >= 2, "Expected ≥2 content docs erased (post + note); got " + contentDocs);
+        Assert.Empty(mediaIds);
+
+        // Fresh session: the resident's content docs are gone (the erasure seam
+        // works as a standalone unit, across the Posts + PersonalNotes modules).
+        Assert.Null(await LoadAsync<Post>(boot.Store, postA));
+        Assert.Null(await LoadAsync<PersonalNote>(boot.Store, noteA));
     }
 
     // ── Harness ─────────────────────────────────────────────────────────────

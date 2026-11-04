@@ -1081,49 +1081,19 @@ public sealed class IdentityService(
         //    rows remain, the actor id is rewritten to a tombstone). The
         //    summary row (step 9 below) is the audit-of-the-deletion; the
         //    per-row rewrites are the pseudonymization itself.
-        var tombstone = $"deleted:{targetSubjectId}";
-        var auditRows = await session.Query<Authorization.AccessAudit>()
-            .Where(a => a.ActorId == targetSubjectId)
-            .ToListAsync(ct).ConfigureAwait(false);
-        foreach (var row in auditRows)
-        {
-            row.ActorId = tombstone;
-            if (row.EffectivePrincipalId == targetSubjectId)
-                row.EffectivePrincipalId = tombstone;
-            session.Store(row);
-        }
+        var auditRowCount =
+            await PseudonymizeAuditRowsAsync(session, targetSubjectId, ct).ConfigureAwait(false);
 
-        // 6. Remove the target's group memberships (they leave every group;
-        //    the strong-consistency C4 invariant means the next
-        //    GetGroupIdsAsync call will not find them). The audit rows for
-        //    the *individual* removals are subsumed by the single
-        //    "account.delete" summary row (step 9) — the same "one summary,
-        //    many rows" shape the purge job's AuditPurgeSummary follows.
-        var groupMemberships = await session.Query<Kumunita.Core.UserInfo.GroupMembership>()
-            .Where(m => m.UserId == targetSubjectId)
-            .ToListAsync(ct).ConfigureAwait(false);
-        foreach (var gm in groupMemberships)
-        {
-            session.Delete(gm);
-        }
-
-        // 7. Remove the target's component memberships (posting rights) and
-        //    moderator assignments (governing scope).
-        var compMemberships = await session.Query<Kumunita.Core.UserInfo.ComponentMembership>()
-            .Where(m => m.UserId == targetSubjectId)
-            .ToListAsync(ct).ConfigureAwait(false);
-        foreach (var cm in compMemberships)
-        {
-            session.Delete(cm);
-        }
-
-        var modAssignments = await session.Query<Kumunita.Core.UserInfo.ModeratorAssignment>()
-            .Where(m => m.UserId == targetSubjectId)
-            .ToListAsync(ct).ConfigureAwait(false);
-        foreach (var ma in modAssignments)
-        {
-            session.Delete(ma);
-        }
+        // 6 + 7. Remove the target's group memberships, component memberships
+        //       (posting rights), and moderator assignments (governing scope)
+        //       — they leave every group / lose their posting + governing
+        //       standing (the strong-consistency C4 invariant: the next
+        //       GetGroupIdsAsync call will not find them). The audit rows for
+        //       the *individual* removals are subsumed by the single
+        //       "account.delete" summary row (step 9) — the same "one summary,
+        //       many rows" shape the purge job's AuditPurgeSummary follows.
+        var (groupCount, compCount, modCount) =
+            await RemoveAccountMembershipsAsync(session, targetSubjectId, ct).ConfigureAwait(false);
 
         // 8. Remove the target's Profile row (their PII — name, email, phone,
         //    address, bio, preferences — is gone). The directory's
@@ -1158,97 +1128,9 @@ public sealed class IdentityService(
         //     TranslationResource is a global UI-string resource with no
         //     principal field at all. MediaObject rows + their bytes are U4's
         //     set — not touched here (only IdentityService.cs, this one commit).
-        int contentDocs = 0;
-        async Task<int> DeleteResidentRows<T>(
-            System.Linq.Expressions.Expression<System.Func<T, bool>> predicate)
-            where T : notnull
-        {
-            var rows = await session.Query<T>().Where(predicate)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            return rows.Count;
-        }
-
-        // §2A primary set — one query per doc type, owner field == resident.
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.Post>(p => p.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.PostReply>(p => p.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.PostTranslation>(p => p.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Posts.ReplyTranslation>(p => p.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.Announcement>(a => a.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.AnnouncementTranslation>(a => a.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Announcements.AnnouncementComment>(a => a.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.Event>(e => e.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.EventTranslation>(e => e.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Events.EventRsvp>(r => r.UserId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.Project>(p => p.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.ProjectGoal>(p => p.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoItem>(t => t.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoComment>(t => t.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.TodoTranslation>(t => t.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.BoardTranslation>(b => b.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.ProjectTranslation>(p => p.AuthorId == targetSubjectId);
-        // KanbanBoard + its owner-field-less sub-entities (cascade — the
-        // DeleteBoardAsync shape: the board's placements + lanes go first,
-        // then the board itself). The to-dos themselves are deleted above by
-        // their own AuthorId (a to-do is a standalone row, not a board child).
-        {
-            var boardIds = await session.Query<Kumunita.Core.Projects.KanbanBoard>()
-                .Where(b => b.AuthorId == targetSubjectId)
-                .Select(b => b.Id)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var boardId in boardIds)
-            {
-                var placements = await session.Query<Kumunita.Core.Projects.BoardItemPlacement>()
-                    .Where(p => p.BoardId == boardId)
-                    .ToListAsync(ct).ConfigureAwait(false);
-                foreach (var placement in placements)
-                    session.Delete(placement);
-
-                var lanes = await session.Query<Kumunita.Core.Projects.KanbanLane>()
-                    .Where(l => l.BoardId == boardId)
-                    .ToListAsync(ct).ConfigureAwait(false);
-                foreach (var lane in lanes)
-                    session.Delete(lane);
-            }
-            contentDocs += await DeleteResidentRows<Kumunita.Core.Projects.KanbanBoard>(b => b.AuthorId == targetSubjectId);
-        }
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Pages.Page>(p => p.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Pages.PageTranslation>(p => p.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Inventory.InventoryItem>(i => i.AuthorId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Documents.Document>(d => d.OwnerId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Documents.DocumentFolder>(d => d.OwnerId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Bookmarks.Bookmark>(b => b.OwnerId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Bookmarks.BookmarkFolder>(b => b.OwnerId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Tags.Tag>(t => t.CreatedBy == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Tags.TagTranslation>(t => t.AuthorId == targetSubjectId);
-        // Conversation — the two-principal union (the resident holds a seat).
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Messaging.Conversation>(
-            c => c.ParticipantA == targetSubjectId || c.ParticipantB == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Messaging.Message>(m => m.SenderId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.PersonalNote>(n => n.OwnerId == targetSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.NoteFolder>(n => n.OwnerId == targetSubjectId);
-
-        // F1.U4 (DB-13 GDPR) — the resident's MediaObject catalog rows, in this
-        // SAME session / SAME commit as the content-doc deletes above (C3
-        // single-write-lane, ADR 0006; the §4 catalog pin in
-        // docs/design/prod-hardening-f1-gdpr-deletion.md). The owner field is
-        // <c>CreatedById</c> (the resident who first stored the unique file).
-        // We collect each row's <c>Id</c> (the lowercase-hex SHA-256 content id
-        // — the exact byte-store key for F1.U2's DeleteIfExistsAsync) into
-        // <c>mediaIds</c> so the post-commit byte-delete loop below can run;
-        // the catalog rows themselves are session-deleted here and committed by
-        // the single SaveChangesAsync (step 9). Orphan policy (pinned §4,
-        // owner-accepted): a dedup'd byte referenced by another resident's doc
-        // is deleted anyway — the dangling ref degrades to a 404 (C-MED·7),
-        // not a crash — so NO reference check is performed.
-        var mediaRows = await session.Query<Kumunita.Core.Media.MediaObject>()
-            .Where(o => o.CreatedById == targetSubjectId)
-            .ToListAsync(ct).ConfigureAwait(false);
-        var mediaIds = mediaRows.Select(o => o.Id).ToList();
-        foreach (var mediaRow in mediaRows)
-            session.Delete(mediaRow);
-        contentDocs += mediaRows.Count;
+        var (contentDocs, mediaIds) =
+            await ResidentContentEraser.EraseAsync(session, targetSubjectId, ct)
+                .ConfigureAwait(false);
 
         // 8b. ADR 0143 — dissolve every GuardianLink row for the deleted
         //     child (any status) in this same session (C·5 — no dangling
@@ -1290,24 +1172,8 @@ public sealed class IdentityService(
         //     ALWAYS completes. Skipped entirely when the store seam was not
         //     supplied (the two direct-construction test harnesses), which
         //     leaves only the already-committed catalog-row deletes in place.
-        var mediaDeleted = 0;
-        if (mediaStore is not null)
-        {
-            foreach (var mediaId in mediaIds)
-            {
-                try
-                {
-                    if (await mediaStore.DeleteIfExistsAsync(mediaId, ct).ConfigureAwait(false))
-                        mediaDeleted++;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex,
-                        "F1.U4 — byte-delete failed for media id {MediaId} during account {Target} deletion; leaving a reclaimable orphan (orphan-safe per C-MED·7) and continuing.",
-                        mediaId, targetSubjectId);
-                }
-            }
-        }
+        var mediaDeleted =
+            await DeleteResidentMediaBytesAsync(mediaIds, targetSubjectId, ct).ConfigureAwait(false);
 
         // 10. Delete the Identity account (EF Core, the identity schema).
         //     This removes the password hash, the role assignments, and the
@@ -1328,11 +1194,109 @@ public sealed class IdentityService(
         }
 
         logger.LogInformation(
-            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed, {ContentDocs} resident content docs removed (incl. {MediaRows} MediaObject catalog rows), {MediaBytes} media bytes deleted.",
+            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed, {ContentDocs} resident content docs removed (incl. {MediaCatalog} MediaObject catalog rows), {MediaBytes} media bytes deleted.",
             actorId, via, targetSubjectId,
-            auditRows.Count, groupMemberships.Count,
-            compMemberships.Count, modAssignments.Count, contentDocs,
-            mediaRows.Count, mediaDeleted);
+            auditRowCount, groupCount,
+            compCount, modCount, contentDocs,
+            mediaIds.Count, mediaDeleted);
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — step 5 of <see cref="DeleteCoreAsync"/> (extracted
+    /// along the phase seam it already comments): pseudonymize the target's
+    /// <c>AccessAudit</c> rows in the caller's <paramref name="session"/> —
+    /// the rows remain (the OPS.md §9 / ARCHITECTURE.md §5 "Deletion-of-account
+    /// interaction"), only the actor id is rewritten to a tombstone. Returns
+    /// the number of rows touched (the log summary's <c>{AuditRows}</c>). The
+    /// caller's single <c>SaveChangesAsync</c> commits the re-stores (C3).
+    /// </summary>
+    private async Task<int> PseudonymizeAuditRowsAsync(
+        IDocumentSession session, string targetSubjectId, CancellationToken ct)
+    {
+        var tombstone = $"deleted:{targetSubjectId}";
+        var rows = await session.Query<Authorization.AccessAudit>()
+            .Where(a => a.ActorId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+        {
+            row.ActorId = tombstone;
+            if (row.EffectivePrincipalId == targetSubjectId)
+                row.EffectivePrincipalId = tombstone;
+            session.Store(row);
+        }
+        return rows.Count;
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — steps 6 + 7 of <see cref="DeleteCoreAsync"/>
+    /// (extracted along the phase seam): remove the target's <c>GroupMembership</c>
+    /// (they leave every group — the strong-consistency C4 invariant),
+    /// <c>ComponentMembership</c> (posting rights), and <c>ModeratorAssignment</c>
+    /// (governing scope) rows in the caller's <paramref name="session"/>. The
+    /// per-row removal audit is subsumed by the single "account.delete" summary
+    /// row (the purge job's AuditPurgeSummary "one summary, many rows" shape).
+    /// Returns the three row counts (the log summary's three placeholders).
+    /// The caller's single <c>SaveChangesAsync</c> commits the deletes (C3).
+    /// </summary>
+    private async Task<(int Group, int Component, int Moderator)> RemoveAccountMembershipsAsync(
+        IDocumentSession session, string targetSubjectId, CancellationToken ct)
+    {
+        // The query-then-delete shape is preserved exactly (a query, then
+        // session.Delete of each row) — the row set is the same, so we
+        // query, delete each, and return the count (the three calls below).
+        var group = await session.Query<Kumunita.Core.UserInfo.GroupMembership>()
+            .Where(m => m.UserId == targetSubjectId).ToListAsync(ct).ConfigureAwait(false);
+        foreach (var gm in group) session.Delete(gm);
+
+        var comp = await session.Query<Kumunita.Core.UserInfo.ComponentMembership>()
+            .Where(m => m.UserId == targetSubjectId).ToListAsync(ct).ConfigureAwait(false);
+        foreach (var cm in comp) session.Delete(cm);
+
+        var mod = await session.Query<Kumunita.Core.UserInfo.ModeratorAssignment>()
+            .Where(m => m.UserId == targetSubjectId).ToListAsync(ct).ConfigureAwait(false);
+        foreach (var ma in mod) session.Delete(ma);
+
+        return (group.Count, comp.Count, mod.Count);
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — step 9b of <see cref="DeleteCoreAsync"/> (extracted
+    /// along the phase seam): delete the resident's media BYTES on the local
+    /// volume, AFTER the Marten commit and BEFORE the EF Identity delete (the
+    /// §5 ordering pin). These are filesystem ops, NOT in the Marten session —
+    /// the catalog rows were committed in the caller's single
+    /// <c>SaveChangesAsync</c>; only the bytes are removed here. Each
+    /// <c>DeleteIfExistsAsync</c> (F1.U2) is idempotent and never throws for a
+    /// missing file; we additionally swallow + log any unexpected failure (a
+    /// byte-delete failure after the commit leaves a reclaimable orphan —
+    /// orphan-safe per C-MED·7 — the §5 "accepted cross-store window" for this
+    /// store) so the account deletion ALWAYS completes. Returns the number of
+    /// bytes deleted (the log summary's <c>{MediaBytes}</c>). Skipped entirely
+    /// when the store seam was not supplied (the two direct-construction test
+    /// harnesses), which leaves only the already-committed catalog-row deletes
+    /// in place.
+    /// </summary>
+    private async Task<int> DeleteResidentMediaBytesAsync(
+        List<string> mediaIds, string targetSubjectId, CancellationToken ct)
+    {
+        if (mediaStore is null)
+            return 0;
+        var deleted = 0;
+        foreach (var mediaId in mediaIds)
+        {
+            try
+            {
+                if (await mediaStore.DeleteIfExistsAsync(mediaId, ct).ConfigureAwait(false))
+                    deleted++;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "F1.U4 — byte-delete failed for media id {MediaId} during account {Target} deletion; leaving a reclaimable orphan (orphan-safe per C-MED·7) and continuing.",
+                    mediaId, targetSubjectId);
+            }
+        }
+        return deleted;
     }
 
     // ── ADR 0077 — the account-lane GlobalAdmin emitters ──────────────────
