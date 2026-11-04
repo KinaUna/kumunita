@@ -1,6 +1,5 @@
 using Kumunita.Core.Pages;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -37,8 +36,7 @@ namespace Kumunita.Web.Controllers;
 [Route("admin/help")]
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
 public sealed class AdminHelpController(
-    IPageService pages,
-    IDocumentStore store) : Controller
+    IPageService pages) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -73,8 +71,8 @@ public sealed class AdminHelpController(
         var roles = KumunitaPrincipal.RoleSet(User);
         try
         {
-            using var session = store.LightweightSession();
-            await pages.ResetToSeededAsync(pageId, actor, roles, session);
+            // IMPROVE-CODE C09 — the committed reset lane owns its own session.
+            await pages.ResetToSeededAsync(pageId, actor, roles);
             TempData["info"] = await this.FlashAsync("admin.flash_help_reset", "Page reset to its seeded text.");
         }
         catch (InvalidOperationException ex)
@@ -98,8 +96,8 @@ public sealed class AdminHelpController(
     {
         var actor = ActorId(User) ?? string.Empty;
         var roles = KumunitaPrincipal.RoleSet(User);
-        using var session = store.LightweightSession();
-        var count = await pages.ResetAllSeededPagesAsync(actor, roles, session);
+        // IMPROVE-CODE C09 — the committed batch-reset lane owns its own session.
+        var count = await pages.ResetAllSeededPagesAsync(actor, roles);
         TempData["info"] = count == 1
             ? "1 page reset to its seeded text."
             : $"{count} pages reset to their seeded text.";

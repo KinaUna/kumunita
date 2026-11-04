@@ -1491,6 +1491,22 @@ public sealed class PageService : IPageService
         return resetCount;
     }
 
+    /// <inheritdoc cref="IPageService.ResetToSeededAsync(string, string, IReadOnlySet{string})"/>
+    public async Task ResetToSeededAsync(
+        string pageId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        await using var session = _store.LightweightSession();
+        await ResetToSeededAsync(pageId, actorId, actorRoles, session).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IPageService.ResetAllSeededPagesAsync(string, IReadOnlySet{string})"/>
+    public async Task<int> ResetAllSeededPagesAsync(
+        string actorId, IReadOnlySet<string> actorRoles)
+    {
+        await using var session = _store.LightweightSession();
+        return await ResetAllSeededPagesAsync(actorId, actorRoles, session).ConfigureAwait(false);
+    }
+
     // ─── Write-lane standing resolvers (U03 — distinct from U02's helpers) ─
 
     /// <summary>

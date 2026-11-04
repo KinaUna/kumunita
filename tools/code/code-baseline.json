@@ -44,7 +44,7 @@
     },
     {
       "id": "src/Kumunita.Core/Pages/PageService.cs",
-      "max": 897
+      "max": 909
     },
     {
       "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs",
@@ -603,7 +603,7 @@
     },
     {
       "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService",
-      "max": 28
+      "max": 30
     },
     {
       "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService",
@@ -637,6 +637,10 @@
     },
     {
       "id": "src/Kumunita.Core/Localization/ILocalizationService.cs::Kumunita.Core.Localization.ILocalizationService",
+      "max": 22
+    },
+    {
+      "id": "src/Kumunita.Core/Pages/IPageService.cs::Kumunita.Core.Pages.IPageService",
       "max": 22
     },
     {
@@ -3640,10 +3644,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/AdminController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/AdminHelpController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {

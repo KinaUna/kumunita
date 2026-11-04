@@ -316,4 +316,24 @@ public interface IPageService
     /// </summary>
     Task<int> ResetAllSeededPagesAsync(
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
+
+    /// <summary>
+    /// The committed single-page reset lane (IMPROVE-CODE C09): the
+    /// <see cref="ResetToSeededAsync(string, string, IReadOnlySet{string}, IDocumentSession)"/>
+    /// semantics (one <c>page.reset</c> audit row, GlobalAdmin-only) on a
+    /// fresh <c>LightweightSession</c>. The session-based form commits on its
+    /// own, so this wrapper opens the session and delegates. Lets the
+    /// <c>AdminHelpController</c> drop the <c>IDocumentStore</c> dependency.
+    /// </summary>
+    Task ResetToSeededAsync(
+        string pageId, string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// The committed batch reset lane (IMPROVE-CODE C09): the
+    /// <see cref="ResetAllSeededPagesAsync(string, IReadOnlySet{string}, IDocumentSession)"/>
+    /// semantics (one <c>page.reset</c> audit row per page, single save) on a
+    /// fresh <c>LightweightSession</c>. Returns the number of pages reset.
+    /// </summary>
+    Task<int> ResetAllSeededPagesAsync(
+        string actorId, IReadOnlySet<string> actorRoles);
 }
