@@ -262,11 +262,6 @@
       "cc_max": 24
     },
     {
-      "id": "src/Kumunita.Core/Portability/PortabilityValidate.cs::Kumunita.Core.Portability.PortabilityValidate.Run(KumunitaArchiveData)",
-      "max": 156,
-      "cc_max": 47
-    },
-    {
       "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ClassifyAsync(string,Stream,CancellationToken)",
       "max": 148,
       "cc_max": 47
