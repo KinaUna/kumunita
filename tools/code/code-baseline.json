@@ -28,7 +28,7 @@
     },
     {
       "id": "src/Kumunita.Core/Events/EventService.cs",
-      "max": 986
+      "max": 997
     },
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs",
@@ -595,7 +595,7 @@
   "classes": [
     {
       "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService",
-      "max": 30
+      "max": 31
     },
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService",
@@ -629,7 +629,7 @@
     },
     {
       "id": "src/Kumunita.Core/Events/IEventService.cs::Kumunita.Core.Events.IEventService",
-      "max": 27
+      "max": 28
     },
     {
       "id": "src/Kumunita.Core/Identity/IIdentityService.cs::Kumunita.Core.Identity.IIdentityService",
@@ -2942,7 +2942,7 @@
       "from": "Web",
       "to": "Events",
       "symbol": "Event",
-      "count": 12
+      "count": 11
     },
     {
       "from": "Web",
@@ -3700,10 +3700,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/LocaleController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/MyDraftsController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {

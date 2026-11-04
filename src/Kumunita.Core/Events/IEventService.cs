@@ -158,6 +158,19 @@ public interface IEventService
     /// </summary>
     Task<IReadOnlyList<Event>> ListMineAsync(string actorId, CancellationToken ct = default);
 
+    /// <summary>
+    /// The actor's own <b>draft</b> events — a pure
+    /// <c>IsDraft &amp;&amp; AuthorId == actorId &amp;&amp; !IsDeleted</c>
+    /// author-scope read (the ADR 0037 author-only pin), ordered by
+    /// <see cref="Event.Created"/> descending. This is the <see cref="IAnnouncementService
+    /// .ListMyDraftsAsync"/> / <c>PostService.ListMyDraftsAsync</c> draft-list
+    /// lane applied to the M4 event surface (IMPROVE-CODE C09 — the
+    /// <c>MyDraftsController</c> reads its draft events through this seam
+    /// instead of opening the store itself). No <c>AccessAudit</c> row, no
+    /// role input (a routine self-read; the standing owner is the actor).
+    /// </summary>
+    Task<IReadOnlyList<Event>> ListDraftsAsync(string actorId, CancellationToken ct = default);
+
     // --- Write lanes (U04) — standing re-checked server-side (§3.4, C3) --------
 
     /// <summary>

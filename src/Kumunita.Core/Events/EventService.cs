@@ -510,6 +510,20 @@ public sealed class EventService : IEventService
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc cref="IEventService.ListDraftsAsync"/>
+    public async Task<IReadOnlyList<Event>> ListDraftsAsync(string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An actor is required to read their draft events.");
+
+        await using var session = _store.QuerySession();
+        return await session.Query<Event>()
+            .Where(e => e.IsDraft && e.AuthorId == actorId && !e.IsDeleted)
+            .OrderByDescending(e => e.Created)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
     // ─── Standing-matrix gate helpers (ADR 0054 §3.4 — pure, no store) ───
     //
     // C04: these pure decisions moved to the <see cref="EventStandingPolicy"/>

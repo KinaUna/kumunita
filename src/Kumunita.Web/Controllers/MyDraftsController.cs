@@ -4,7 +4,6 @@ using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security; // MarkdownRenderer (a static in this namespace, used for the body preview).
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -48,7 +47,7 @@ public sealed class MyDraftsController(
     PostService posts,
     IAnnouncementService announcements,
     IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
-    IDocumentStore store) : Controller
+    IEventService events) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -118,16 +117,13 @@ public sealed class MyDraftsController(
 
         // The actor's own draft events (M4, ADR 0054 / ADR 0037) — the same
         // author-only <c>IsDraft &amp; AuthorId == actor &amp; !IsDeleted</c>
-        // read as the post / announcement draft lanes, opened on a dedicated
-        // read session (the C3 read-lane shape — a read never touches the
-        // caller's write session). No role, no <c>AccessAudit</c> row (a
-        // routine self-read, the same posture as the two service lanes above).
-        await using var eventSession = store.QuerySession();
-        var draftEvents = await eventSession
-            .Query<Event>()
-            .Where(e => e.IsDraft && e.AuthorId == actor && !e.IsDeleted)
-            .OrderByDescending(e => e.Created)
-            .ToListAsync();
+        // read as the post / announcement draft lanes, now on the
+        // <see cref="IEventService.ListDraftsAsync"/> seam (IMPROVE-CODE C09
+        // — the controller no longer opens a session for it; the C3
+        // read-lane shape is the service's). No role, no <c>AccessAudit</c>
+        // row (a routine self-read, the same posture as the two service
+        // lanes above).
+        var draftEvents = await events.ListDraftsAsync(actor);
 
         return View(new MyDraftsViewModel
         {
