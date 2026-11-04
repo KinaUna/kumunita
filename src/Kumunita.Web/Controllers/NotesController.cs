@@ -3,7 +3,6 @@ using System.Security.Claims;
 using Kumunita.Core.Localization;
 using Kumunita.Core.PersonalNotes;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -41,10 +40,8 @@ namespace Kumunita.Web.Controllers;
 /// frozen <c>Task&lt;NoteRow&gt;</c> return does not distinguish
 /// "freshly created" from "already noted" — the F1 no-op and the F1 fresh
 /// create both produce a <c>NoteRow</c>; the drift is recorded in the U04
-/// handoff note). The controller commits in its own fresh
-/// <see cref="IDocumentSession"/> (the C3 same-transaction lane —
-/// <see cref="PersonalNoteService"/> never commits internally; the caller
-/// owns the single write — the M17 <c>BookmarkService</c> shape), then
+/// handoff note). The seam owns the single write (and its commit —
+/// IMPROVE-CODE C09: the controller no longer opens a Marten session), then
 /// redirects back to the <c>returnUrl</c> form field (the surface's own
 /// detail URL) when present, falling back to <c>/notes</c> when it is
 /// absent (the "redirect after write" precedent — the M16
@@ -82,7 +79,6 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class NotesController(
     IPersonalNoteService notes,
-    IDocumentStore store,
     ILocalizationService? localization = null,
     ITranslationProvider? translationProvider = null) : Controller
 {
@@ -166,10 +162,8 @@ public sealed class NotesController(
     /// F1 no-op and the F1 fresh create both produce a <c>NoteRow</c>; the
     /// drift is recorded in the U04 handoff note — the plan intended a
     /// 200/201 split but the frozen interface does not carry that
-    /// distinction). The controller commits in its own fresh
-    /// <see cref="IDocumentSession"/> (the C3 same-transaction lane —
-    /// <see cref="PersonalNoteService"/> never commits internally; the
-    /// caller owns the single write — the M17 <c>BookmarkService</c> shape),
+    /// distinction). The seam owns the single write (and its commit —
+    /// IMPROVE-CODE C09: the controller no longer opens a Marten session),
     /// then redirects back to the <c>returnUrl</c> form field (the surface's
     /// own detail URL) when present, falling back to <c>/notes</c> when it
     /// is absent (the "redirect after write" precedent — the M16
@@ -195,13 +189,10 @@ public sealed class NotesController(
             return NotFound();
         }
 
-        // C3 same-transaction lane: the seam's store write goes into the
-        // caller's in-flight session (the M17 <c>BookmarkService</c> shape);
-        // the controller commits (the <c>PersonalNoteService</c> never
-        // calls <c>SaveChangesAsync</c> internally — the caller owns the
-        // single write).
-        await using var session = store.LightweightSession();
-
+        // IMPROVE-CODE C09 — the seam owns the single write (and its commit):
+        // the controller no longer opens a Marten session; the committed
+        // <c>CreateNoteAsync</c> form is the sole writer (the M17
+        // <c>BookmarkService</c> shape, with the commit moved into the seam).
         // D3 (design doc §2.3) — the seam re-runs the target's own frozen
         // <c>CanAsync(Read)</c> BEFORE the row is created. Deny / absent /
         // soft-deleted ⇒ the seam throws <c>KeyNotFoundException</c> (the
@@ -210,7 +201,7 @@ public sealed class NotesController(
         try
         {
             await notes.CreateNoteAsync(
-                actorId, targetKind, targetId, body ?? string.Empty, session);
+                actorId, targetKind, targetId, body ?? string.Empty);
         }
         catch (KeyNotFoundException)
         {
@@ -222,7 +213,6 @@ public sealed class NotesController(
             return NotFound();
         }
 
-        // The seam wrote into the session; the caller commits (C3).
         // Both the F1 fresh-create and the F1 no-op (already noted) reach
         // here — the unique-index witness guarantees at-most-one row per
         // (owner, target), and the frozen <c>Task&lt;NoteRow&gt;</c> return
@@ -231,7 +221,6 @@ public sealed class NotesController(
         // drift pause in the U04 handoff note; the redirect-after-write
         // + flash toast is the M17 <c>BookmarksController</c> precedent
         // and works for both branches identically).
-        await session.SaveChangesAsync();
         TempData["info"] = await T("pn.note.attached");
         return Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/notes" : returnUrl);
     }
@@ -331,12 +320,10 @@ public sealed class NotesController(
             string.IsNullOrWhiteSpace(req?.TargetId))
             return NotFound();
 
-        await using var session = store.LightweightSession();
         try
         {
             var row = await notes.CreateNoteAsync(
-                actorId, req.TargetKind, req.TargetId, req.Body ?? string.Empty, session);
-            await session.SaveChangesAsync();
+                actorId, req.TargetKind, req.TargetId, req.Body ?? string.Empty);
             return Ok(new { row.Id, row.Body, row.Created, row.Modified, row.Tags });
         }
         catch (KeyNotFoundException)
@@ -359,12 +346,10 @@ public sealed class NotesController(
         if (string.IsNullOrEmpty(actorId))
             return NotFound();
 
-        await using var session = store.LightweightSession();
         try
         {
             var row = await notes.UpdateNoteBodyAsync(
-                actorId, noteId, req?.Body ?? string.Empty, session);
-            await session.SaveChangesAsync();
+                actorId, noteId, req?.Body ?? string.Empty);
             return Ok(new { row.Id, row.Body, row.Created, row.Modified, row.Tags });
         }
         catch (KeyNotFoundException)
@@ -386,12 +371,10 @@ public sealed class NotesController(
         if (string.IsNullOrEmpty(actorId))
             return NotFound();
 
-        await using var session = store.LightweightSession();
-        var status = await notes.DeleteNoteAsync(actorId, noteId, session);
+        var status = await notes.DeleteNoteAsync(actorId, noteId);
         if (status == NoteDeleteStatus.NotNoted)
             return NotFound();
 
-        await session.SaveChangesAsync();
         return Ok(new { deleted = true });
     }
 
@@ -401,12 +384,10 @@ public sealed class NotesController(
     // Views/Notes/Index.cshtml (edit / move / add-tag / remove-tag / delete).
     // Each follows the same C-M37·2 non-leaky-404 + zero-audit shape as the
     // existing routes: the controller never re-derives access, the frozen
-    // IPersonalNoteService seam is the sole reader/writer, and a non-owner
-    // (a GlobalAdmin included) gets a non-leaky 404 (the ADR 0105 "operator
-    // has no read standing" precedent). The controller commits in its own
-    // fresh IDocumentSession (the C3 same-transaction lane —
-    // PersonalNoteService never commits internally; the caller owns the
-    // single write).
+    // IPersonalNoteService seam is the sole reader/writer (and owner of the
+    // commit — IMPROVE-CODE C09: the controller no longer opens a Marten
+    // session), and a non-owner (a GlobalAdmin included) gets a non-leaky
+    // 404 (the ADR 0105 "operator has no read standing" precedent).
 
     /// <summary>
     /// <c>GET /notes/{noteId}/edit</c> — the note body edit form (D4: the
@@ -440,11 +421,9 @@ public sealed class NotesController(
     {
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId)) return NotFound();
-        await using var session = store.LightweightSession();
         try
         {
-            await notes.UpdateNoteBodyAsync(actorId, noteId, body ?? string.Empty, session);
-            await session.SaveChangesAsync();
+            await notes.UpdateNoteBodyAsync(actorId, noteId, body ?? string.Empty);
             TempData["info"] = await T("common.done");
             return Redirect("/notes");
         }
@@ -487,11 +466,9 @@ public sealed class NotesController(
     {
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId)) return NotFound();
-        await using var session = store.LightweightSession();
         try
         {
-            await notes.MoveNoteToFolderAsync(actorId, noteId, folderId, session);
-            await session.SaveChangesAsync();
+            await notes.MoveNoteToFolderAsync(actorId, noteId, folderId);
             TempData["info"] = await T("common.done");
             return Redirect("/notes");
         }
@@ -535,11 +512,9 @@ public sealed class NotesController(
         if (string.IsNullOrWhiteSpace(tag))
             return Redirect($"/notes/{noteId}/tags");
 
-        await using var session = store.LightweightSession();
         try
         {
-            await notes.AddTagAsync(actorId, noteId, tag, session);
-            await session.SaveChangesAsync();
+            await notes.AddTagAsync(actorId, noteId, tag);
             TempData["info"] = await T("common.done");
             return Redirect("/notes");
         }
@@ -583,11 +558,9 @@ public sealed class NotesController(
         if (string.IsNullOrWhiteSpace(tag))
             return Redirect($"/notes/{noteId}/tags/remove");
 
-        await using var session = store.LightweightSession();
         try
         {
-            await notes.RemoveTagAsync(actorId, noteId, tag, session);
-            await session.SaveChangesAsync();
+            await notes.RemoveTagAsync(actorId, noteId, tag);
             TempData["info"] = await T("common.done");
             return Redirect("/notes");
         }
@@ -608,11 +581,9 @@ public sealed class NotesController(
     {
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId)) return NotFound();
-        await using var session = store.LightweightSession();
-        var status = await notes.DeleteNoteAsync(actorId, noteId, session);
+        var status = await notes.DeleteNoteAsync(actorId, noteId);
         if (status == NoteDeleteStatus.NotNoted)
             return NotFound();
-        await session.SaveChangesAsync();
         TempData["info"] = await T("common.done");
         return Redirect("/notes");
     }
@@ -646,11 +617,9 @@ public sealed class NotesController(
         if (string.IsNullOrWhiteSpace(name))
             return Redirect("/notes/folders/new");
 
-        await using var session = store.LightweightSession();
         try
         {
-            await notes.CreateFolderAsync(actorId, name.Trim(), null, session);
-            await session.SaveChangesAsync();
+            await notes.CreateFolderAsync(actorId, name.Trim(), null);
             TempData["info"] = await T("common.done");
             return Redirect("/notes");
         }
@@ -701,11 +670,9 @@ public sealed class NotesController(
         if (string.IsNullOrWhiteSpace(name))
             return Redirect($"/notes/folders/{folderId}/rename");
 
-        await using var session = store.LightweightSession();
         try
         {
-            await notes.RenameFolderAsync(actorId, folderId, name.Trim(), session);
-            await session.SaveChangesAsync();
+            await notes.RenameFolderAsync(actorId, folderId, name.Trim());
             TempData["info"] = await T("common.done");
             return Redirect("/notes");
         }
@@ -732,11 +699,9 @@ public sealed class NotesController(
     {
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId)) return NotFound();
-        await using var session = store.LightweightSession();
         try
         {
-            await notes.DeleteFolderAsync(actorId, folderId, session);
-            await session.SaveChangesAsync();
+            await notes.DeleteFolderAsync(actorId, folderId);
             TempData["info"] = await T("common.done");
             return Redirect("/notes");
         }

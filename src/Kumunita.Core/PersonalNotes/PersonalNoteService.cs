@@ -161,6 +161,23 @@ public sealed class PersonalNoteService : IPersonalNoteService
             Link: link);
     }
 
+    /// <summary>
+    /// The committed form of <see cref="CreateNoteAsync(string, string, string,
+    /// string, IDocumentSession)"/> (IMPROVE-CODE C09 — the Web seam no
+    /// longer opens a Marten session): the row commits in this service's own
+    /// fresh <c>IDocumentSession</c> before the return. The visibility table
+    /// and the <see cref="KeyNotFoundException"/> contract are unchanged.
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<NoteRow> CreateNoteAsync(
+        string ownerId, string targetKind, string targetId, string body)
+    {
+        await using var session = _store.LightweightSession();
+        var row = await CreateNoteAsync(ownerId, targetKind, targetId, body, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
     // ── GetNoteAsync (C-M37·2 zero-audit personal read) ───────────────────
 
     /// <inheritdoc />
@@ -290,6 +307,21 @@ public sealed class PersonalNoteService : IPersonalNoteService
         return ToNoteRow(note, title, link);
     }
 
+    /// <summary>
+    /// The committed form of <see cref="UpdateNoteBodyAsync(string, string,
+    /// string, IDocumentSession)"/> (IMPROVE-CODE C09 — same committed-write
+    /// shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<NoteRow> UpdateNoteBodyAsync(
+        string ownerId, string noteId, string body)
+    {
+        await using var session = _store.LightweightSession();
+        var row = await UpdateNoteBodyAsync(ownerId, noteId, body, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
     // ── DeleteNoteAsync (D7 / F4 — no target read) ────────────────────────
 
     /// <inheritdoc />
@@ -309,6 +341,20 @@ public sealed class PersonalNoteService : IPersonalNoteService
         // D4 — physical removal (no IsDeleted to flip).
         session.Delete(note);
         return NoteDeleteStatus.Deleted;
+    }
+
+    /// <summary>
+    /// The committed form of <see cref="DeleteNoteAsync(string, string,
+    /// IDocumentSession)"/> (IMPROVE-CODE C09 — same committed-write shape as
+    /// <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<NoteDeleteStatus> DeleteNoteAsync(string ownerId, string noteId)
+    {
+        await using var session = _store.LightweightSession();
+        var status = await DeleteNoteAsync(ownerId, noteId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return status;
     }
 
     // ── AddTagAsync (D5 tag normalization) ────────────────────────────────
@@ -372,6 +418,34 @@ public sealed class PersonalNoteService : IPersonalNoteService
         var (title, link) =
             await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         return ToNoteRow(note, title, link);
+    }
+
+    /// <summary>
+    /// The committed form of <see cref="AddTagAsync(string, string, string,
+    /// IDocumentSession)"/> (IMPROVE-CODE C09 — same committed-write shape as
+    /// <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<NoteRow> AddTagAsync(string ownerId, string noteId, string tag)
+    {
+        await using var session = _store.LightweightSession();
+        var row = await AddTagAsync(ownerId, noteId, tag, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// The committed form of <see cref="RemoveTagAsync(string, string,
+    /// string, IDocumentSession)"/> (IMPROVE-CODE C09 — same committed-write
+    /// shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<NoteRow> RemoveTagAsync(string ownerId, string noteId, string tag)
+    {
+        await using var session = _store.LightweightSession();
+        var row = await RemoveTagAsync(ownerId, noteId, tag, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
     }
 
     // ── HasNoteAsync (F1 witness, C-M37·2 zero-audit) ─────────────────────
@@ -605,6 +679,62 @@ public sealed class PersonalNoteService : IPersonalNoteService
         var (title, link) =
             await _resolver.ResolveForListAsync(note.TargetKind, note.TargetId, ownerId, ContentTargetKinds.PersonalNotes).ConfigureAwait(false);
         return ToNoteRow(note, title, link);
+    }
+
+    /// <summary>
+    /// The committed form of <see cref="CreateFolderAsync(string, string,
+    /// string, IDocumentSession)"/> (IMPROVE-CODE C09 — same committed-write
+    /// shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<FolderRow> CreateFolderAsync(string ownerId, string name, string? parentId)
+    {
+        await using var session = _store.LightweightSession();
+        var row = await CreateFolderAsync(ownerId, name, parentId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// The committed form of <see cref="RenameFolderAsync(string, string,
+    /// string, IDocumentSession)"/> (IMPROVE-CODE C09 — same committed-write
+    /// shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<FolderRow> RenameFolderAsync(string ownerId, string folderId, string newName)
+    {
+        await using var session = _store.LightweightSession();
+        var row = await RenameFolderAsync(ownerId, folderId, newName, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// The committed form of <see cref="DeleteFolderAsync(string, string,
+    /// IDocumentSession)"/> (IMPROVE-CODE C09 — same committed-write shape as
+    /// <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<FolderDeleteResult> DeleteFolderAsync(string ownerId, string folderId)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await DeleteFolderAsync(ownerId, folderId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// The committed form of <see cref="MoveNoteToFolderAsync(string, string,
+    /// string, IDocumentSession)"/> (IMPROVE-CODE C09 — same committed-write
+    /// shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    /// <inheritdoc />
+    public async Task<NoteRow> MoveNoteToFolderAsync(string ownerId, string noteId, string? folderId)
+    {
+        await using var session = _store.LightweightSession();
+        var row = await MoveNoteToFolderAsync(ownerId, noteId, folderId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
     }
 
     // ── Folder-tree private helpers (U03) ─────────────────────────────────

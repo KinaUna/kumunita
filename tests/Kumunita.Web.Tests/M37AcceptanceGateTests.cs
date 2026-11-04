@@ -21,9 +21,10 @@ namespace Kumunita.Web.Tests;
 /// U03's 3).
 /// <para>
 /// **No database, no Testcontainers** — a pure NSubstitute seam test over
-/// the frozen <see cref="IPersonalNoteService"/> +
-/// <see cref="Marten.IDocumentStore"/> (the same harness shape as
-/// <see cref="M17AcceptanceGateTests"/> / <see cref="NotesControllerTests"/>).
+/// the frozen <see cref="IPersonalNoteService"/> (the same harness shape as
+/// <see cref="M17AcceptanceGateTests"/> / <see cref="NotesControllerTests"/> —
+/// IMPROVE-CODE C09: the controller no longer composes a Marten store; the
+/// seam owns the single write and its commit).
 /// The per-row write lanes (<c>UpdateNoteBodyAsync</c> /
 /// <c>AddTagAsync</c> / <c>RemoveTagAsync</c> / <c>MoveNoteToFolderAsync</c>
 /// / <c>DeleteNoteAsync</c> / <c>CreateFolderAsync</c>) are exercised at
@@ -80,7 +81,7 @@ public sealed class M37AcceptanceGateTests
         notes
             .CreateNoteAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<string>(), Arg.Any<IDocumentSession>())
+                Arg.Any<string>())
             .Returns(
                 new NoteRow(noteId, kind, target, "Initial note body", null,
                     [], created, null, false, "Visible post", $"/posts/{target}"),
@@ -104,8 +105,7 @@ public sealed class M37AcceptanceGateTests
         //    D4 "content, not pointer" witness).
         notes
             .UpdateNoteBodyAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<IDocumentSession>())
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
             .Returns(new NoteRow(noteId, kind, target, "Edited note body", null,
                 [], created, modified, false, "Visible post", $"/posts/{target}"));
 
@@ -114,8 +114,7 @@ public sealed class M37AcceptanceGateTests
         //    normalization shape, the idempotency witness).
         notes
             .AddTagAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<IDocumentSession>())
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
             .Returns(new NoteRow(noteId, kind, target, "Edited note body", null,
                 ["meeting"], created, modified, false, "Visible post",
                 $"/posts/{target}"));
@@ -124,8 +123,7 @@ public sealed class M37AcceptanceGateTests
         //    index is the witness (the D6 pin).
         notes
             .CreateFolderAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(),
-                Arg.Any<IDocumentSession>())
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>())
             .Returns(new FolderRow(folderId, "meetings", null, 0));
 
         // 6 — Move to folder: the note's <c>FolderId</c> is the owner's
@@ -133,8 +131,7 @@ public sealed class M37AcceptanceGateTests
         //    resident's folder).
         notes
             .MoveNoteToFolderAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(),
-                Arg.Any<IDocumentSession>())
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>())
             .Returns(new NoteRow(noteId, kind, target, "Edited note body",
                 folderId, ["meeting"], created, modified, false,
                 "Visible post", $"/posts/{target}"));
@@ -144,15 +141,10 @@ public sealed class M37AcceptanceGateTests
         //    gone).
         notes
             .DeleteNoteAsync(
-                Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<IDocumentSession>())
+                Arg.Any<string>(), Arg.Any<string>())
             .Returns(NoteDeleteStatus.Deleted);
 
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(notes, store, subjectId: actor);
+        var controller = Build(notes, subjectId: actor);
 
         // 1 — Attach (the D3 write-lane visibility check passed: the
         //    target is visible to the owner, the seam created the row —
@@ -189,7 +181,7 @@ public sealed class M37AcceptanceGateTests
         //    seam — the Web layer does not ship a
         //    <c>PUT /notes/{id}</c> route, the U06 drift-pause shape).
         var updated = await notes.UpdateNoteBodyAsync(
-            actor, noteId, "Edited note body", session);
+            actor, noteId, "Edited note body");
         Assert.Equal(noteId, updated.Id);
         Assert.Equal("Edited note body", updated.Body);
         Assert.NotNull(updated.Modified);
@@ -200,7 +192,7 @@ public sealed class M37AcceptanceGateTests
         //    lowercase, trimmed, deduped, sorted; the M26 <c>Tag</c>
         //    doc's <c>Name</c> normalization shape).
         var tagged = await notes.AddTagAsync(
-            actor, noteId, "  Meeting  ", session);
+            actor, noteId, "  Meeting  ");
         Assert.Equal(noteId, tagged.Id);
         Assert.Equal(["meeting"], tagged.Tags); // normalized (lowercase,
                                                 // trimmed, deduped,
@@ -210,7 +202,7 @@ public sealed class M37AcceptanceGateTests
         //    <c>(OwnerId, ParentId, Name)</c> unique index is the
         //    witness).
         var folder = await notes.CreateFolderAsync(
-            actor, "meetings", null, session);
+            actor, "meetings", null);
         Assert.Equal(folderId, folder.Id);
         Assert.Equal("meetings", folder.Name);
         Assert.Null(folder.ParentId); // a root folder (depth ≤ 2).
@@ -219,13 +211,13 @@ public sealed class M37AcceptanceGateTests
         //    live in another resident's folder; the <c>FolderId</c> is
         //    the owner's folder id).
         var moved = await notes.MoveNoteToFolderAsync(
-            actor, noteId, folderId, session);
+            actor, noteId, folderId);
         Assert.Equal(noteId, moved.Id);
         Assert.Equal(folderId, moved.FolderId);
 
         // 7 — Delete the note (the M17 <c>Bookmark</c> physical-removal
         //    shape — the body is gone, the note row is gone).
-        var deleted = await notes.DeleteNoteAsync(actor, noteId, session);
+        var deleted = await notes.DeleteNoteAsync(actor, noteId);
         Assert.Equal(NoteDeleteStatus.Deleted, deleted);
 
         // 8 — Re-attach after deletion (the F1 / C-M37·4 witness — the
@@ -243,8 +235,7 @@ public sealed class M37AcceptanceGateTests
         // drift-pause precedent — the redirect-after-write + flash
         // toast handles both branches identically).
         await notes.Received(2).CreateNoteAsync(
-            actor, kind, target, "Initial note body",
-            Arg.Any<IDocumentSession>());
+            actor, kind, target, "Initial note body");
 
         // The seam's <c>ListNotesAsync</c> was called exactly once (the
         // owner's own list — the D2 personal read, C-M37·2: zero
@@ -255,28 +246,22 @@ public sealed class M37AcceptanceGateTests
         // (the U06 drift-pause shape — the per-row write lanes are the
         // frozen Core seam, not new Web routes).
         await notes.Received(1).UpdateNoteBodyAsync(
-            actor, noteId, "Edited note body", Arg.Any<IDocumentSession>());
+            actor, noteId, "Edited note body");
         await notes.Received(1).AddTagAsync(
-            actor, noteId, "  Meeting  ", Arg.Any<IDocumentSession>());
+            actor, noteId, "  Meeting  ");
         await notes.Received(1).CreateFolderAsync(
-            actor, "meetings", null, Arg.Any<IDocumentSession>());
+            actor, "meetings", null);
         await notes.Received(1).MoveNoteToFolderAsync(
-            actor, noteId, folderId, Arg.Any<IDocumentSession>());
+            actor, noteId, folderId);
         await notes.Received(1).DeleteNoteAsync(
-            actor, noteId, Arg.Any<IDocumentSession>());
+            actor, noteId);
 
-        // The caller owned the session commits for the two attach calls
-        // (the C3 same-transaction lane — the controller commits, the
-        // service never does). The direct Core-seam calls
-        // (<c>UpdateNoteBodyAsync</c> / <c>AddTagAsync</c> /
-        // <c>CreateFolderAsync</c> / <c>MoveNoteToFolderAsync</c> /
-        // <c>DeleteNoteAsync</c>) are exercised against the substituted
-        // <see cref="IPersonalNoteService"/> directly — they do not go
-        // through the controller's commit path, so they are not counted
-        // here (the U06 drift-pause shape: the per-row write lanes are the
-        // frozen Core seam, not new Web routes, and the gate witnesses
-        // the controller's own commit count — the 2 attach calls).
-        await session.Received(2).SaveChangesAsync(Arg.Any<CancellationToken>());
+        // IMPROVE-CODE C09 — the seam owns the single write (and its commit):
+        // the controller no longer opens a Marten session, so the commit
+        // witness is now the seam's committed <c>CreateNoteAsync</c> calls
+        // (the 2 attach calls — initial + re-attach after deletion).
+        await notes.Received(2).CreateNoteAsync(
+            actor, kind, target, "Initial note body");
     }
 
     // ── (b) Handoff authorization boundary ─────────────────────────────────
@@ -301,14 +286,10 @@ public sealed class M37AcceptanceGateTests
 
         var notes = Substitute.For<IPersonalNoteService>();
 
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
         // A caller with **no** <c>SubjectId</c> (a <c>GlobalAdmin</c>
         // who is not the owner, or any operator without read standing) —
         // the ADR 0105 "operator has no read standing" precedent.
-        var controller = Build(notes, store, subjectId: null);
+        var controller = Build(notes, subjectId: null);
 
         // 1 — GET /notes: non-leaky 404, no <c>AccessAudit</c> row, the
         //    seam is **not** called (the "operator has no read standing"
@@ -327,8 +308,8 @@ public sealed class M37AcceptanceGateTests
         var attachResult = await controller.Attach(kind, target, "my note");
         Assert.IsType<NotFoundResult>(attachResult);
         await notes.DidNotReceive().CreateNoteAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<string>(), Arg.Any<IDocumentSession>());
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<string>());
 
         // 3 — GET /notes/has/{targetKind}/{targetId}: non-leaky 404, no
         //    <c>AccessAudit</c> row, the seam is **not** called (the
@@ -340,14 +321,10 @@ public sealed class M37AcceptanceGateTests
         await notes.DidNotReceive().HasNoteAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
 
-        // No session was created at all on the list / has-note reads
-        // (the 404 short-circuits before any read is delegated — the
-        // "operator has no read standing" gate, C-M37·2), and no
-        // <c>SaveChangesAsync</c> commit ran on the attach refuse path
-        // (the witness — no note row is committed, no <c>AccessAudit</c>
-        // row is committed; the M16 create-gate posture, the
-        // "Deny row does not survive" pin).
-        await session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        // IMPROVE-CODE C09 — the seam's <c>CreateNoteAsync</c> was not
+        // called (the witness above — no note row is created, no commit
+        // runs; the M16 create-gate posture, the "Deny row does not
+        // survive" pin).
     }
 
     // ── (c) Part-vs-whole audit completeness ───────────────────────────────
@@ -384,7 +361,7 @@ public sealed class M37AcceptanceGateTests
         notes
             .CreateNoteAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<string>(), Arg.Any<IDocumentSession>())
+                Arg.Any<string>())
             .Returns(new NoteRow(noteId, kind, target, "The owner's note",
                 null, [], created, null, false, "Visible post",
                 $"/posts/{target}"));
@@ -405,11 +382,7 @@ public sealed class M37AcceptanceGateTests
                 ]),
             ], []));
 
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(notes, store, subjectId: actor);
+        var controller = Build(notes, subjectId: actor);
 
         // 1 — Attach (the D3 write-lane check is the target's own frozen
         //    <c>Read</c> decision — the C-M37·3 pin: one decision, the
@@ -422,12 +395,11 @@ public sealed class M37AcceptanceGateTests
         // write lane ran; the D3 write-lane check is the target's own
         // frozen <c>Read</c> decision, not a note row's decision).
         await notes.Received(1).CreateNoteAsync(
-            actor, kind, target, "The owner's note",
-            Arg.Any<IDocumentSession>());
+            actor, kind, target, "The owner's note");
 
-        // The caller committed the attach (the C3 same-transaction lane
-        // — the controller commits, the service never does).
-        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        // IMPROVE-CODE C09 — the seam owns the single write and its commit;
+        // the commit witness is the <c>CreateNoteAsync</c> call above (the
+        // committed form commits internally).
 
         // 2 — The owner's list load commits **zero** <c>AccessAudit</c>
         //    rows and runs **zero** <c>CanSeeAsync</c> passes over the
@@ -452,7 +424,7 @@ public sealed class M37AcceptanceGateTests
         // personal read, audited zero; C-M37·1 — the surface adds zero
         // authorization) are witnessed by the seam's own substitute:
         // the controller's composition is <c>IPersonalNoteService</c>
-        // + <c>IDocumentStore</c> only, so a <c>CanSeeAsync</c> pass or
+        // + nothing else, so a <c>CanSeeAsync</c> pass or
         // an <c>AccessAudit</c> row cannot be committed from this
         // layer without a new dependency being injected (a drift
         // event — the frozen-shape pin, the §2.7 drift-guard).
@@ -468,22 +440,17 @@ public sealed class M37AcceptanceGateTests
     /// / C-M37·2 — the controller composes **only** the note service; no
     /// <c>IAuthorizationService</c>, no <c>IUserInfoService</c> — the
     /// owner's read is a personal read, zero audit). The
-    /// <see cref="IDocumentStore"/> is a plain substitute for the write
-    /// lane's <c>LightweightSession()</c> (the C3 same-transaction lane
-    /// — <see cref="PersonalNoteService"/> never commits internally; the
-    /// caller owns the single write). A no-op
+    /// IMPROVE-CODE C09: the seam owns the single write (and its commit)
+    /// — the controller no longer composes a Marten store. A no-op
     /// <see cref="ITempDataProvider"/> closes the <c>TempData</c> bag so
     /// the write lane's success branch doesn't NRE
     /// (<c>DefaultHttpContext</c> leaves <c>Session</c> null by default).
     /// </summary>
     private static NotesController Build(
         IPersonalNoteService notes,
-        IDocumentStore? store = null,
         string? subjectId = null)
     {
-        store ??= Substitute.For<IDocumentStore>();
-
-        var controller = new NotesController(notes, store);
+        var controller = new NotesController(notes);
         controller.ControllerContext =
             new ControllerContext { HttpContext = new DefaultHttpContext() };
 

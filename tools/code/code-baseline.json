@@ -636,6 +636,10 @@
       "max": 22
     },
     {
+      "id": "src/Kumunita.Core/PersonalNotes/IPersonalNoteService.cs::Kumunita.Core.PersonalNotes.IPersonalNoteService",
+      "max": 22
+    },
+    {
       "id": "src/Kumunita.Core/Projects/IBoardService.cs::Kumunita.Core.Projects.IBoardService",
       "max": 24
     },
@@ -3710,10 +3714,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/MyDraftsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/NotesController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {
