@@ -163,7 +163,7 @@
     },
     {
       "id": "src/Kumunita.Core/DependencyInjection.cs::Kumunita.Core.ServiceCollectionExtensions.AddKumunitaCore(IServiceCollection)",
-      "max": 191,
+      "max": 193,
       "cc_max": 1
     },
     {
@@ -1201,7 +1201,7 @@
       "from": "ErrorReports",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 2
+      "count": 3
     },
     {
       "from": "ErrorReports",
@@ -2834,7 +2834,7 @@
       "from": "Web",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 3
+      "count": 2
     },
     {
       "from": "Web",
@@ -2936,7 +2936,7 @@
       "from": "Web",
       "to": "ErrorReports",
       "symbol": "EscalationOutboundConfig",
-      "count": 2
+      "count": 1
     },
     {
       "from": "Web",
@@ -3684,10 +3684,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/DocumentFolderController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/EscalationConfigController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {

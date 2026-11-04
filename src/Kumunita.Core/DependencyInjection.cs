@@ -166,6 +166,18 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ErrorReports.IEscalationTokenService>(sp => new ErrorReports.EscalationTokenService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // IMPROVE-CODE C09 (ADR 0159, ESC·4): the escalation outbound-config
+        // seam — the EscalationOutboundConfig singleton's read + the
+        // single-write-lane save (the ADR 0006 C3 single-write-lane shape,
+        // the EscalationTokenService sibling idiom — the M32 MarkResolvedAsync
+        // precedent). The EscalationConfigController's raw Marten read/write
+        // (the design doc §2.1.3 read-seam resolution U05 left in the Web
+        // layer) moved behind this interface, ADR 0006 §D "route + authz +
+        // shape". Fully qualified ErrorReports.IEscalationOutboundConfigService
+        // for the type/namespace-collision idiom (like IErrorReportService).
+        services.AddTransient<ErrorReports.IEscalationOutboundConfigService>(sp => new ErrorReports.EscalationOutboundConfigService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // M35 (ADR 0164, U03): the kiosk-mode seam — the KioskPlaylist
         // singleton's read + audited-write lanes (the ADR 0150
         // single-write-lane shape, the LocaleSettings-parallel bounded
