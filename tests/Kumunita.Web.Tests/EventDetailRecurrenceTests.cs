@@ -305,7 +305,7 @@ public sealed class EventDetailRecurrenceTests
 
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
 
-        var controller = new EventController(events, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(events, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

@@ -292,7 +292,7 @@ public class EventComposerRecurrenceTests
 
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
 
-        var controller = new EventController(events, userInfo, profileSettings, groupService, localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(events, userInfo, profileSettings, groupService, localization, timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

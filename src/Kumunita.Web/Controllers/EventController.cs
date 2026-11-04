@@ -10,7 +10,6 @@ using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -76,7 +75,6 @@ public sealed class EventController : Controller
     private readonly IProfileSettingsService profileSettings;
     private readonly IGroupService groupService;
     private readonly ILocalizationService localization;
-    private readonly IDocumentStore store;
     private readonly EffectiveTimezoneResolver timezone;
     private readonly ITranslationProvider? translationProvider;
     // M12 (ADR 0112, §field-map) — the tag read seam, resolving the
@@ -127,7 +125,6 @@ public sealed class EventController : Controller
         IEventService events,
         IUserInfoService userInfo, IProfileSettingsService profileSettings, IGroupService groupService,
         ILocalizationService localization,
-        IDocumentStore store,
         EffectiveTimezoneResolver timezone,
         ITranslationProvider? translationProvider = null,
         ITagService? tags = null,
@@ -141,7 +138,6 @@ public sealed class EventController : Controller
 this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         this.groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
         this.localization = localization;
-        this.store = store;
         this.timezone = timezone;
         this.translationProvider = translationProvider;
         this.tags = tags;
@@ -1971,7 +1967,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
     // a missing event/row is a 404 (<see cref="KeyNotFoundException"/> →
     // <c>NotFound</c>). The M4 convention: the service opens its **own** write
     // session (C3) — the controller does **not** wrap the call in
-    // <see cref="IDocumentStore.LightweightSession"/> (contrast the M3
+    // a document-store write session (contrast the M3
     // <see cref="PostsController"/> translation lanes).
 
     /// <summary>

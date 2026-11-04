@@ -253,7 +253,7 @@ public class M7NewlyPagedTests
         localization.GetDefaultLanguageCodeAsync().Returns("en");
 
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
-        var controller = new EventController(iEvents, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(iEvents, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         controller.ControllerContext.HttpContext.User =
             new ClaimsPrincipal(

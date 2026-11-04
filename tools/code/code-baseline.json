@@ -88,7 +88,7 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/EventController.cs",
-      "max": 1254
+      "max": 1250
     },
     {
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs",
@@ -3676,10 +3676,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/DocumentFolderController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/EventController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {

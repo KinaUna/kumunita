@@ -1911,7 +1911,7 @@ public class EventControllerTests
         var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, httpContextAccessor);
         var dateFormat = new EffectiveDateFormatResolver(userInfoImpl, localization, httpContextAccessor);
 
-        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, Substitute.For<IDocumentStore>(), timezone, translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone, translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
         controller.ControllerContext = new ControllerContext { HttpContext = sharedHttpContext };
         sharedHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
             new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subject) },
@@ -1985,7 +1985,7 @@ public class EventControllerTests
         var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, httpContextAccessor);
         var dateFormat = new EffectiveDateFormatResolver(userInfoImpl, localization, httpContextAccessor);
 
-        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, Substitute.For<IDocumentStore>(), timezone, translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone, translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
         controller.ControllerContext = new ControllerContext { HttpContext = sharedHttpContext };
         sharedHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
             new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subject) },
@@ -2270,7 +2270,7 @@ public class EventControllerTests
         localization.GetDefaultTimezoneAsync().Returns(zoneId);
         var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, new HttpContextAccessor());
 
-        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();
@@ -2355,7 +2355,7 @@ public class EventControllerTests
         // a shape test only needs a non-throwing, non-null zone.
         var timezone = new EffectiveTimezoneResolver(
             userInfoImpl, localization, new HttpContextAccessor());
-        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

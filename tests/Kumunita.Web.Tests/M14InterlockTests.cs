@@ -545,7 +545,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         localization.GetDefaultLanguageCodeAsync().Returns("en");
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
 
-        var controller = new EventController(events, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, Substitute.For<IDocumentStore>(), timezone, projects: projects, todos: (ITodoService)projects, boards: (IBoardService)projects);
+        var controller = new EventController(events, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, timezone, projects: projects, todos: (ITodoService)projects, boards: (IBoardService)projects);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim> { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId) };
