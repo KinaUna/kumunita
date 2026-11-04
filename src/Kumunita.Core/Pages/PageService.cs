@@ -692,32 +692,10 @@ public sealed class PageService : IPageService
 
         // Root-slug guard (the index does not cover it — Postgres treats NULLs
         // as distinct, the U01 drift note): if ParentId is null, no *other*
-        // root page may already carry this slug **in the same namespace**.
-        // ADR 0040 scopes the collision by (Kind, AuthorId):
-        //   • a <b>system</b> root (Kind=System) collides only with another
-        //     same-slug system root — the <c>system/</c> namespace is singular;
-        //   • a <b>blog</b> root (Kind=User) collides only with another
-        //     same-slug root owned by the <b>same</b> author — two residents'
-        //     blogs are disjoint by ownership, so two residents may both have
-        //     a root page slugged <c>"recipes"</c> (their <c>blog/{uid}</c>
-        //     namespaces never overlap), while a single resident is still
-        //     capped at one blog root (a second top-level page of theirs
-        //     nests under the first).
-        if (page.ParentId is null)
-        {
-            var existingRoot = await session.Query<Page>()
-                .Where(p => p.ParentId == null
-                    && p.Slug == page.Slug
-                    && p.Kind == page.Kind
-                    && p.AuthorId == page.AuthorId
-                    && p.IsDeleted == false)
-                .FirstOrDefaultAsync()
-                .ConfigureAwait(false);
-            if (existingRoot is not null && !string.Equals(existingRoot.Id, page.Id, StringComparison.Ordinal))
-                throw new InvalidOperationException(
-                    $"A root page with slug '{page.Slug}' already exists in this namespace (id '{existingRoot.Id}'); " +
-                    "choose a different slug or nest the new page under a parent.");
-        }
+        // root page may already carry this slug **in the same namespace**
+        // (ADR 0040 scopes the collision by (Kind, AuthorId)) — see
+        // <see cref="EnsureCreateRootSlugAsync"/>.
+        await EnsureCreateRootSlugAsync(page, session).ConfigureAwait(false);
 
         var now = DateTimeOffset.UtcNow;
         if (string.IsNullOrEmpty(page.Id))
@@ -751,6 +729,59 @@ public sealed class PageService : IPageService
         session.Store(page);
         session.Store(audit);
 
+        // ADR 0084 (page-child emitter) + M36 ADR 0165 (page-mention
+        // emitter) — the two notification emitters on the create path,
+        // extracted along the comment-marked phase seam. One
+        // SaveChangesAsync below commits the page + the audit row + the
+        // inbox rows atomically (C3) — see
+        // <see cref="EmitPageCreationNotificationsAsync"/>.
+        await EmitPageCreationNotificationsAsync(page, actorId, session).ConfigureAwait(false);
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+
+        // TG (ADR 0044, U8b) — the tag attach lane on the create path (C3
+        // single-transaction idiom, same session as the page write — the
+        // <c>PostService.AddPostTranslationAsync</c> precedent). Only if the
+        // form gave slugs (null/empty ⇒ no tags, the U4 additive
+        // default-empty pin) **and** the page is a <c>PageKind.User</c>
+        // (blog) page — the <c>System</c>-page refusal already fired above
+        // (the U4 write-lane gate, C-TG·6, D6), so this code is reached only
+        // for a <c>User</c> page with non-empty tags. The
+        // <c>AttachToPageAsync</c> lane re-checks the standing (author ∪
+        // GlobalAdmin, ADR 0040, C-TG·5) and create-or-reuses each tag
+        // (C-TG·4); it stores the resolved <c>Tag</c> ids onto
+        // <c>Page.TagIds</c> (replacing the POCO's default-empty list). A
+        // bad <c>Slug</c> is an <c>ArgumentException</c> from
+        // <c>DeriveSlug</c> (C-TG·4) — the Web layer maps it to a form
+        // error (the M3 "a form is a shape" precedent).
+        if (page.TagIds is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToPageAsync(page.Id, page.TagIds, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            page.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(page);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+        }
+
+        return page;
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the two create-path notification emitters
+    /// extracted along the comment-marked phase seam of <see
+    /// cref="CreateAsync"/>: the ADR 0084 page-child emitter (opt-IN; the
+    /// parent page's enabled subscribers, excluding the author, a draft never
+    /// notifying — the intake-honesty pin) and the M36 (ADR 0165)
+    /// page-mention emitter (the author is never a recipient, M36·5). Runs
+    /// on the caller's in-flight <paramref name="session"/> and does **not**
+    /// commit — the single <c>SaveChangesAsync</c> in <see cref="CreateAsync"/>
+    /// commits the page + audit row + inbox rows atomically (C3). Behaviour
+    /// is unchanged: the same guards, the same recipients, the same
+    /// idempotency keys / bodies / link paths.
+    /// </summary>
+    private async Task EmitPageCreationNotificationsAsync(
+        Page page, string actorId, IDocumentSession session)
+    {
         // ADR 0084 — the page-child emitter (opt-IN kind: the resident must
         // have stored an Enabled=true subscription row for the parent page's
         // id; IsSubscriptionEnabledForAsync short-circuits the emission for
@@ -762,8 +793,6 @@ public sealed class PageService : IPageService
         // intake they did not consent to reading (intake honesty — the same
         // pin as PostService's group/post lane). Notification is deferred to
         // the publish lane (the moment the page becomes visible).
-        // One SaveChangesAsync commits the page + the audit row + the inbox
-        // rows atomically (C3).
         if (_notifications is not null && !page.IsDraft && page.ParentId is { } parentId)
         {
             var subscribers = await session.Query<Notifications.NotificationSubscription>()
@@ -827,34 +856,6 @@ public sealed class PageService : IPageService
                 }
             }
         }
-
-        await session.SaveChangesAsync().ConfigureAwait(false);
-
-        // TG (ADR 0044, U8b) — the tag attach lane on the create path (C3
-        // single-transaction idiom, same session as the page write — the
-        // <c>PostService.AddPostTranslationAsync</c> precedent). Only if the
-        // form gave slugs (null/empty ⇒ no tags, the U4 additive
-        // default-empty pin) **and** the page is a <c>PageKind.User</c>
-        // (blog) page — the <c>System</c>-page refusal already fired above
-        // (the U4 write-lane gate, C-TG·6, D6), so this code is reached only
-        // for a <c>User</c> page with non-empty tags. The
-        // <c>AttachToPageAsync</c> lane re-checks the standing (author ∪
-        // GlobalAdmin, ADR 0040, C-TG·5) and create-or-reuses each tag
-        // (C-TG·4); it stores the resolved <c>Tag</c> ids onto
-        // <c>Page.TagIds</c> (replacing the POCO's default-empty list). A
-        // bad <c>Slug</c> is an <c>ArgumentException</c> from
-        // <c>DeriveSlug</c> (C-TG·4) — the Web layer maps it to a form
-        // error (the M3 "a form is a shape" precedent).
-        if (page.TagIds is { Count: > 0 } && _tags is not null)
-        {
-            var resolved = await _tags.AttachToPageAsync(page.Id, page.TagIds, actorId, actorRoles, session)
-                .ConfigureAwait(false);
-            page.TagIds = resolved.Select(t => t.Id).ToList();
-            session.Store(page);
-            await session.SaveChangesAsync().ConfigureAwait(false);
-        }
-
-        return page;
     }
 
     /// <summary>
@@ -1686,6 +1687,39 @@ public sealed class PageService : IPageService
             throw new UnauthorizedAccessException(
                 $"A blog page may only be nested under the actor's own blog root " +
                 $"(found root author '{root.AuthorId}', actor '{actorId}').");
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the <b>root-slug guard</b> of <see
+    /// cref="CreateAsync"/> extracted along the comment-marked phase seam.
+    /// The <c>(ParentId, Slug)</c> unique index does not cover the root case
+    /// (Postgres treats NULLs as distinct, the U01 drift note), so when
+    /// <c>ParentId</c> is null no *other* root page may already carry this
+    /// slug **in the same namespace**. ADR 0040 scopes the collision by
+    /// (Kind, AuthorId): a <b>system</b> root collides only with another
+    /// same-slug system root (the <c>system/</c> namespace is singular); a
+    /// <b>blog</b> root collides only with another same-slug root owned by the
+    /// <b>same</b> author (two residents' blogs are disjoint by ownership). A
+    /// collision is an <see cref="InvalidOperationException"/>. Pure read +
+    /// throws — no write. Behaviour is unchanged.
+    /// </summary>
+    private static async Task EnsureCreateRootSlugAsync(Page page, IDocumentSession session)
+    {
+        if (page.ParentId is not null)
+            return;   // not a root — the guard only applies to top-level pages
+
+        var existingRoot = await session.Query<Page>()
+            .Where(p => p.ParentId == null
+                && p.Slug == page.Slug
+                && p.Kind == page.Kind
+                && p.AuthorId == page.AuthorId
+                && p.IsDeleted == false)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (existingRoot is not null && !string.Equals(existingRoot.Id, page.Id, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"A root page with slug '{page.Slug}' already exists in this namespace (id '{existingRoot.Id}'); " +
+                "choose a different slug or nest the new page under a parent.");
     }
 
     /// <summary>

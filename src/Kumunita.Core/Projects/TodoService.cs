@@ -689,157 +689,27 @@ public sealed class TodoService : ProjectsStore, ITodoService
 
         // **The hierarchy / reparenting (C-M5·7)** — resolved **before** any
         // write (the guard runs before the store, so a refused reparent writes
-        // nothing):
-        //   * `ClearParent == true`  → unparent (ParentId = null) — always safe
-        //     (removing a parent can never create a cycle).
-        //   * `ParentId != null`     → reparent to that to-do — the **cycle
-        //     guard**: if the target is the to-do itself or one of its
-        //     descendants, the to-do would become its own ancestor — refuse.
-        //   * neither                → no-op on the hierarchy.
-        string? newParentId = todo.ParentId;
-        if (request.ClearParent)
-        {
-            newParentId = null;
-        }
-        else if (!string.IsNullOrEmpty(request.ParentId))
-        {
-            var wouldBeParent = request.ParentId;
-            if (wouldBeParent == todoItemId)
-                throw new InvalidOperationException(
-                    $"To-do '{todoItemId}' cannot be reparented to itself.");
-
-            // Walk the descendant subtree (transitively reachable via ParentId)
-            // in one pass; if the would-be parent is the to-do or a descendant,
-            // the reparent would create a cycle — refuse, nothing written
-            // (F9_ReparentToDescendant_Refused).
-            var descendants = new HashSet<string>(StringComparer.Ordinal);
-            var frontier = new Queue<string>(new[] { todoItemId });
-            while (frontier.Count > 0)
-            {
-                var current = frontier.Dequeue();
-                var children = await session.Query<TodoItem>()
-                    .Where(t => t.ParentId == current)
-                    .ToListAsync(ct)
-                    .ConfigureAwait(false);
-                foreach (var child in children)
-                {
-                    if (descendants.Add(child.Id))
-                        frontier.Enqueue(child.Id);
-                }
-            }
-
-            if (descendants.Contains(wouldBeParent))
-            {
-                var parentTitle = (await session.LoadAsync<TodoItem>(wouldBeParent, ct).ConfigureAwait(false))?.Title
-                    ?? wouldBeParent;
-                throw new InvalidOperationException(
-                    $"To-do '{todoItemId}' cannot be reparented to '{parentTitle}': that to-do is a descendant of the to-do being moved (it would create a cycle).");
-            }
-
-            newParentId = wouldBeParent;
-        }
+        // nothing): `ClearParent == true` → unparent (always safe);
+        // `ParentId != null` → reparent, with the **cycle guard** (the target
+        // is the to-do itself or a descendant → refuse); neither → no-op. See
+        // <see cref="ResolveReparentAsync"/>.
+        var newParentId = await ResolveReparentAsync(todo, request, session, ct).ConfigureAwait(false);
 
         // **The "waiting on" association (ADR 0087 D5 / C-TBD·3)** — resolved
         // **before** any write (the guard runs before the store, so a refused
-        // set writes nothing):
-        //   * `ClearBlockedBy == true`  → un-block (BlockedByTodoId = null) —
-        //     always safe (removing a blocker can never create a cycle).
-        //   * `BlockedByTodoId != null` → the **cycle guard**: if the target is
-        //     the to-do itself or the to-do is reachable by following the
-        //     BlockedByTodoId chain **up** from the target, the association
-        //     would create a cycle — refuse (C-TBD·3). The target must also
-        //     exist and not be soft-deleted (C3 404-vs-403 split).
-        //   * neither                   → no-op on the association.
-        string? newBlockedByTodoId = todo.BlockedByTodoId;
-        if (request.ClearBlockedBy)
-        {
-            newBlockedByTodoId = null;
-        }
-        else if (!string.IsNullOrEmpty(request.BlockedByTodoId))
-        {
-            var wouldBeBlocker = request.BlockedByTodoId;
-            if (wouldBeBlocker == todoItemId)
-                throw new InvalidOperationException(
-                    $"To-do '{todoItemId}' cannot be blocked by itself.");
+        // set writes nothing): `ClearBlockedBy == true` → un-block (always
+        // safe); `BlockedByTodoId != null` → the **cycle guard** (the to-do
+        // reachable up the blocker chain → refuse, C-TBD·3) + the target must
+        // exist and not be soft-deleted (C3 404-vs-403 split); neither → no-op.
+        // See <see cref="ResolveBlockedByAsync"/>.
+        var newBlockedByTodoId = await ResolveBlockedByAsync(todo, request, session, ct).ConfigureAwait(false);
 
-            // The target must exist and not be soft-deleted (C3 split).
-            var blocker = await session.LoadAsync<TodoItem>(wouldBeBlocker, ct).ConfigureAwait(false);
-            if (blocker is null || blocker.IsDeleted)
-                throw new KeyNotFoundException(
-                    $"To-do '{wouldBeBlocker}' (the would-be blocker) was not found; a blocked-by target must exist and not be soft-deleted.");
-
-            // The cycle guard: walk the BlockedByTodoId chain UP from the target.
-            // Each to-do has at most ONE blocker (BlockedByTodoId), so this is
-            // a linear chain — if the chain reaches todoItemId, setting this
-            // to-do's blocker to the target would close the cycle (C-TBD·3).
-            var current = blocker;
-            while (current.BlockedByTodoId is not null)
-            {
-                if (current.BlockedByTodoId == todoItemId)
-                    throw new InvalidOperationException(
-                        $"To-do '{todoItemId}' cannot be blocked by '{blocker.Title ?? wouldBeBlocker}': following the blocker chain would create a cycle.");
-                current = (await session.LoadAsync<TodoItem>(current.BlockedByTodoId, ct).ConfigureAwait(false))!;
-            }
-
-            newBlockedByTodoId = wouldBeBlocker;
-        }
-
-        // ADR 0018 — resolve the authored-in tag on **both** sides before
-        // comparing (the EventService.UpdateAsync shape): a no-op re-save that
-        // leaves the picker at the instance default must compare as
-        // "unchanged", so it does not falsely stamp Modified.
-        var existingLanguageCode = await ResolveLanguageCodeAsync(todo.LanguageCode, session, ct).ConfigureAwait(false);
-        var updatedLanguageCode = request.LanguageCode is not null
-            ? await ResolveLanguageCodeAsync(request.LanguageCode, session, ct).ConfigureAwait(false)
-            : existingLanguageCode;
-
-        // A "real change" is any of the editable fields differing from the
-        // stored row (the EventService.UpdateAsync `changed` shape — a no-op
-        // re-save leaves the stamp untouched). ADR 0079 — the optional dates
-        // differ in value (null vs value, or a different instant): unlike the
-        // other partial fields, a `null` here is the *clear* intent (the edit
-        // form's blank field), so the comparison is the plain `!=`.
-        var changed = request.Title is not null && todo.Title != request.Title
-            || request.Body is not null && todo.Body != request.Body
-            || request.ComponentId is not null && !string.Equals(todo.ComponentId, request.ComponentId, StringComparison.Ordinal)
-            || request.Status is not null && !string.Equals(todo.Status, request.Status, StringComparison.Ordinal)
-            || newParentId != todo.ParentId
-            || newBlockedByTodoId != todo.BlockedByTodoId
-            || todo.StartAt != request.StartAt
-            || todo.DueAt != request.DueAt
-            || (request.LanguageCode is not null && existingLanguageCode != updatedLanguageCode)
-            || (request.TagSlugs is not null && _tags is not null); // ADR 0044 / 0147 — a posted tag set (incl. empty = detach all) is a real change (tags are resolved via the attach lane below).
-
-        // Apply the request's fields verbatim (ADR 0001-B — the written fields
-        // are the author's choice). AuthorId / Created / AssigneeId / IsDeleted
-        // are **deliberately not** reassigned here — the standing owner is not
-        // re-assigned on an edit (C-M5·6), the assignee is the
-        // AssignTodoAsync lane's, the delete state the DeleteTodoAsync lane's.
-        if (request.Title is not null)
-            todo.Title = request.Title;
-        if (request.Body is not null)
-            todo.Body = request.Body;
-        if (request.ComponentId is not null)
-            todo.ComponentId = request.ComponentId;
-        if (request.Status is not null)
-            todo.Status = request.Status;
-        // ADR 0079 — the optional dates are *always* assigned (not gated on
-        // non-null): a `null` in the request is the *clear* intent (the edit
-        // form posts a blank `datetime-local` as null), so the stored value is
-        // overwritten verbatim — value or clear, both land.
-        todo.StartAt = request.StartAt;
-        todo.DueAt = request.DueAt;
-        todo.ParentId = newParentId;                       // C-M5·7 — the resolved hierarchy (no-op when unchanged).
-        todo.BlockedByTodoId = newBlockedByTodoId;         // ADR 0087 D5 — the resolved "waiting on" (no-op when unchanged; C-TBD·3 cycle guard applied above).
-        if (request.LanguageCode is not null)
-            todo.LanguageCode = updatedLanguageCode;       // ADR 0018
-        // ADR 0044 / 0147 — the tags are **not** assigned here; they are
-        // resolved to <c>Tag</c> ids + written via the <c>AttachToTodoAsync</c>
-        // lane below (the <c>PostService</c> re-store shape). A non-null
-        // <c>request.TagSlugs</c> (possibly empty = detach all) triggers the
-        // attach; a null value leaves the stored tags untouched.
-        if (changed)
-            todo.Modified = DateTimeOffset.UtcNow;
+        // ADR 0018 (authored-in tag) + ADR 0079 (optional dates) + the
+        // `changed` detection + the verbatim field apply (ADR 0001-B) + the
+        // Modified stamp — the "apply the request's fields" phase of
+        // <see cref="UpdateTodoAsync"/>, extracted along the comment-marked
+        // seam. See <see cref="ApplyTodoEditFieldsAsync"/>.
+        await ApplyTodoEditFieldsAsync(todo, request, newParentId, newBlockedByTodoId, session, ct).ConfigureAwait(false);
 
         // ADR 0044 / 0147 — resolve the posted tag slugs to <c>Tag</c> ids
         // (create-or-reuse, C-TG·4) via the <c>AttachToTodoAsync</c> lane and
@@ -866,6 +736,200 @@ public sealed class TodoService : ProjectsStore, ITodoService
         session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.update", TargetKindTodo, todo.Id, StandingMatrix.AuditVia(actorId, todo.AuthorId)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the <b>hierarchy / reparenting</b> phase of
+    /// <see cref="UpdateTodoAsync"/> extracted along the C-M5·7 comment-marked
+    /// seam: `ClearParent == true` → unparent (always safe); `ParentId !=
+    /// null` → reparent, with the **cycle guard** (the target is the to-do
+    /// itself or one of its descendants → the to-do would become its own
+    /// ancestor → refuse, nothing written, F9_ReparentToDescendant_Refused);
+    /// neither → no-op (returns the stored <c>ParentId</c>). Pure read +
+    /// throws (no write). Behaviour is unchanged — the same descendant walk
+    /// and the same error messages.
+    /// </summary>
+    private async Task<string?> ResolveReparentAsync(
+        TodoItem todo, UpdateTodoRequest request, IDocumentSession session, CancellationToken ct)
+    {
+        if (request.ClearParent)
+            return null;
+
+        if (string.IsNullOrEmpty(request.ParentId))
+            return todo.ParentId;
+
+        var wouldBeParent = request.ParentId;
+        if (wouldBeParent == todo.Id)
+            throw new InvalidOperationException(
+                $"To-do '{todo.Id}' cannot be reparented to itself.");
+
+        // Walk the descendant subtree (transitively reachable via ParentId) in
+        // one pass; if the would-be parent is the to-do or a descendant, the
+        // reparent would create a cycle — refuse, nothing written.
+        var descendants = new HashSet<string>(StringComparer.Ordinal);
+        var frontier = new Queue<string>(new[] { todo.Id });
+        while (frontier.Count > 0)
+        {
+            var current = frontier.Dequeue();
+            var children = await session.Query<TodoItem>()
+                .Where(t => t.ParentId == current)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+            foreach (var child in children)
+            {
+                if (descendants.Add(child.Id))
+                    frontier.Enqueue(child.Id);
+            }
+        }
+
+        if (descendants.Contains(wouldBeParent))
+        {
+            var parentTitle = (await session.LoadAsync<TodoItem>(wouldBeParent, ct).ConfigureAwait(false))?.Title
+                ?? wouldBeParent;
+            throw new InvalidOperationException(
+                $"To-do '{todo.Id}' cannot be reparented to '{parentTitle}': that to-do is a descendant of the to-do being moved (it would create a cycle).");
+        }
+
+        return wouldBeParent;
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the <b>"waiting on"</b> phase of <see
+    /// cref="UpdateTodoAsync"/> extracted along the ADR 0087 D5 / C-TBD·3
+    /// comment-marked seam: `ClearBlockedBy == true` → un-block (always safe);
+    /// `BlockedByTodoId != null` → the **cycle guard** (the to-do reachable up
+    /// the blocker chain → refuse, C-TBD·3) + the target must exist and not be
+    /// soft-deleted (C3 404-vs-403 split); neither → no-op (returns the stored
+    /// <c>BlockedByTodoId</c>). Pure read + throws (no write). Behaviour is
+    /// unchanged — the same chain walk and the same error messages.
+    /// </summary>
+    private async Task<string?> ResolveBlockedByAsync(
+        TodoItem todo, UpdateTodoRequest request, IDocumentSession session, CancellationToken ct)
+    {
+        if (request.ClearBlockedBy)
+            return null;
+
+        if (string.IsNullOrEmpty(request.BlockedByTodoId))
+            return todo.BlockedByTodoId;
+
+        var wouldBeBlocker = request.BlockedByTodoId;
+        if (wouldBeBlocker == todo.Id)
+            throw new InvalidOperationException(
+                $"To-do '{todo.Id}' cannot be blocked by itself.");
+
+        // The target must exist and not be soft-deleted (C3 split).
+        var blocker = await session.LoadAsync<TodoItem>(wouldBeBlocker, ct).ConfigureAwait(false);
+        if (blocker is null || blocker.IsDeleted)
+            throw new KeyNotFoundException(
+                $"To-do '{wouldBeBlocker}' (the would-be blocker) was not found; a blocked-by target must exist and not be soft-deleted.");
+
+        // The cycle guard: walk the BlockedByTodoId chain UP from the target.
+        // Each to-do has at most ONE blocker, so this is a linear chain — if
+        // the chain reaches todo.Id, setting this to-do's blocker to the
+        // target would close the cycle (C-TBD·3).
+        var current = blocker;
+        while (current.BlockedByTodoId is not null)
+        {
+            if (current.BlockedByTodoId == todo.Id)
+                throw new InvalidOperationException(
+                    $"To-do '{todo.Id}' cannot be blocked by '{blocker.Title ?? wouldBeBlocker}': following the blocker chain would create a cycle.");
+            current = (await session.LoadAsync<TodoItem>(current.BlockedByTodoId, ct).ConfigureAwait(false))!;
+        }
+
+        return wouldBeBlocker;
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the <b>field-apply</b> phase of <see
+    /// cref="UpdateTodoAsync"/> extracted along the ADR 0018 / ADR 0079 /
+    /// ADR 0001-B comment-marked seam: resolves the authored-in tag on both
+    /// sides (ADR 0018 — a no-op re-save must compare as "unchanged"),
+    /// computes the `changed` flag (the EventService.UpdateAsync shape, a
+    /// no-op re-save leaves the stamp untouched), applies the request's fields
+    /// verbatim (AuthorId / Created / AssigneeId / IsDeleted deliberately
+    /// untouched, C-M5·6), and stamps <c>Modified</c> when a real change
+    /// occurred. Mutates <paramref name="todo"/>; no session write (the caller
+    /// stores + saves). Behaviour is unchanged — the same comparisons and the
+    /// same assignments.
+    /// </summary>
+    private async Task ApplyTodoEditFieldsAsync(
+        TodoItem todo, UpdateTodoRequest request,
+        string? newParentId, string? newBlockedByTodoId,
+        IDocumentSession session, CancellationToken ct)
+    {
+        // ADR 0018 — resolve the authored-in tag on **both** sides before
+        // comparing: a no-op re-save that leaves the picker at the instance
+        // default must compare as "unchanged", so it does not falsely stamp
+        // Modified.
+        var existingLanguageCode = await ResolveLanguageCodeAsync(todo.LanguageCode, session, ct).ConfigureAwait(false);
+        var updatedLanguageCode = request.LanguageCode is not null
+            ? await ResolveLanguageCodeAsync(request.LanguageCode, session, ct).ConfigureAwait(false)
+            : existingLanguageCode;
+
+        // A "real change" is any of the editable fields differing from the
+        // stored row (the EventService.UpdateAsync `changed` shape — a no-op
+        // re-save leaves the stamp untouched) — the change-detection seam,
+        // extracted into <see cref="ComputeTodoEditChanged"/> (one boolean per
+        // editable field, the EventService.UpdateAsync precedent).
+        var changed = ComputeTodoEditChanged(
+            todo, request, newParentId, newBlockedByTodoId, existingLanguageCode, updatedLanguageCode);
+
+        // Apply the request's fields verbatim (ADR 0001-B — the written fields
+        // are the author's choice). AuthorId / Created / AssigneeId / IsDeleted
+        // are **deliberately not** reassigned — the standing owner is not
+        // re-assigned on an edit (C-M5·6).
+        if (request.Title is not null)
+            todo.Title = request.Title;
+        if (request.Body is not null)
+            todo.Body = request.Body;
+        if (request.ComponentId is not null)
+            todo.ComponentId = request.ComponentId;
+        if (request.Status is not null)
+            todo.Status = request.Status;
+        // ADR 0079 — the optional dates are *always* assigned (not gated on
+        // non-null): a `null` in the request is the *clear* intent, so the
+        // stored value is overwritten verbatim — value or clear, both land.
+        todo.StartAt = request.StartAt;
+        todo.DueAt = request.DueAt;
+        todo.ParentId = newParentId;                       // C-M5·7 — the resolved hierarchy (no-op when unchanged).
+        todo.BlockedByTodoId = newBlockedByTodoId;         // ADR 0087 D5 — the resolved "waiting on" (C-TBD·3 cycle guard applied by the caller).
+        if (request.LanguageCode is not null)
+            todo.LanguageCode = updatedLanguageCode;       // ADR 0018
+        if (changed)
+            todo.Modified = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the <b>change-detection</b> seam of <see
+    /// cref="UpdateTodoAsync"/> extracted along the EventService.UpdateAsync
+    /// <c>changed</c> precedent. A "real change" is any of the editable fields
+    /// differing from the stored row; a no-op re-save leaves the
+    /// <c>Modified</c> stamp untouched. ADR 0079 — the optional dates differ
+    /// in value (null vs value, or a different instant): a <c>null</c> is the
+    /// *clear* intent, so the comparison is the plain <c>!=</c>. Pure over the
+    /// two POCOs (no session, no write). The per-field "posted-and-different"
+    /// disjunction is irreducibly branchy (one boolean per editable field) —
+    /// this is the C10 baseline entry that carries a specific reason.
+    /// </summary>
+    private bool ComputeTodoEditChanged(
+        TodoItem todo, UpdateTodoRequest request,
+        string? newParentId, string? newBlockedByTodoId,
+        string? existingLanguageCode, string? updatedLanguageCode)
+    {
+        var textChanged =
+            (request.Title is not null && todo.Title != request.Title)
+            || (request.Body is not null && todo.Body != request.Body)
+            || (request.ComponentId is not null && !string.Equals(todo.ComponentId, request.ComponentId, StringComparison.Ordinal))
+            || (request.Status is not null && !string.Equals(todo.Status, request.Status, StringComparison.Ordinal));
+        var structuralChanged =
+            newParentId != todo.ParentId
+            || newBlockedByTodoId != todo.BlockedByTodoId
+            || todo.StartAt != request.StartAt
+            || todo.DueAt != request.DueAt;
+        var miscChanged =
+            (request.LanguageCode is not null && existingLanguageCode != updatedLanguageCode)
+            || (request.TagSlugs is not null && _tags is not null); // ADR 0044 / 0147 — a posted tag set (incl. empty = detach all) is a real change.
+        return textChanged || structuralChanged || miscChanged;
     }
 
     public async Task<TodoItem> AssignTodoAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? assigneeId, CancellationToken ct = default)
