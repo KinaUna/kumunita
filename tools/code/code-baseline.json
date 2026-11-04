@@ -3643,10 +3643,6 @@
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {
-      "file": "src/Kumunita.Web/Controllers/AdminGuestsController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
       "file": "src/Kumunita.Web/Controllers/AdminHelpController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
@@ -3700,10 +3696,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/KioskController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/LanguagesController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {

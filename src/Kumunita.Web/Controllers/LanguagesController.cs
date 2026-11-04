@@ -34,7 +34,7 @@ namespace Kumunita.Web.Controllers;
 /// the codebase documents for this lane, regardless of whether the actor is a
 /// GlobalAdmin or a Translator; <see cref="Roles.Translator"/> saves are attributed
 /// to the account via <c>ActorId</c>, ADR 0021); this controller never touches an
-/// <c>AccessAudit</c> row and never reads <c>IDocumentStore</c> directly (ADR 0006-D
+/// <c>AccessAudit</c> row and never reads the document store directly (ADR 0006-D
 /// — Core stays HTTP-free, the Web is a thin wrapper).
 ///
 /// The thin-token rule (ADR 0001-B) holds: the actor is read per action from

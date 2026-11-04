@@ -21,7 +21,7 @@ namespace Kumunita.Web.Controllers;
 /// pinned by two Web-layer test harnesses, so a new dependency there would
 /// break them (the ADR 0050 dedicated-controller rationale).
 /// <para>
-/// The gate (D6, C-M19·5): the controller does **not** <c>IDocumentSession</c>
+/// The gate (D6, C-M19·5): the controller does **not** own the write session
 /// — it delegates the write to <see cref="IIdentityService.SetGuestAccessAsync"/>
 /// (U01's single audited lane). The GlobalAdmin standing is enforced by
 /// <c>[Authorize(Roles = Roles.GlobalAdmin)]</c> at the boundary (the Web owns
@@ -89,7 +89,7 @@ public sealed class AdminGuestsController(IIdentityService identity) : Controlle
         if (directory)     surfaces |= GuestSurface.Directory;
 
         // Delegate to the SINGLE audited write lane (C-M19·5) — the
-        // controller does NOT IDocumentSession the document itself.
+        // controller does not own the document write itself.
         var actor = ActorId(User) ?? string.Empty;
         await identity.SetGuestAccessAsync(
             new GuestAccess
