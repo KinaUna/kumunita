@@ -3663,10 +3663,6 @@
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {
-      "file": "src/Kumunita.Web/Controllers/BookmarksController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
       "file": "src/Kumunita.Web/Controllers/CommunityController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },

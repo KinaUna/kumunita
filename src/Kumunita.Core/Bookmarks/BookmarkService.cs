@@ -562,5 +562,119 @@ public sealed class BookmarkService : IBookmarkService
         }
     }
 
+    // ── Committed write overloads (IMPROVE-CODE C09 — the controller's
+    //    caller-owns-commit write lanes moved off the controller) ─────────
+    // The house idiom (the <c>PersonalNoteService</c> C09 precedent): a
+    // service method with NO <see cref="IDocumentSession"/> param opens its
+    // own session, does the work, and commits — the controller drops
+    // <c>IDocumentStore</c> from its ctor (ADR 0006 §D "route + authz +
+    // shape"). Each overload delegates to the frozen session-based method
+    // above (the D3 / D4 / ADR 0168 pins are unchanged) and owns the single
+    // write (the C3 "caller owns the single write" lane, now the service's).
 
+    /// <summary>
+    /// The committed <c>Toggle</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>Toggle</c> write lane moved behind this service, ADR 0006 §D).
+    /// Delegates to the session-based <see cref="ToggleAsync"/> in the
+    /// service's own session (the D3 write-lane check is unchanged); the
+    /// controller's flash / redirect / 404 mapping is unchanged.
+    /// </summary>
+    public async Task<BookmarkToggleResult> ToggleAsync(
+        string ownerId, string targetKind, string targetId, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await ToggleAsync(ownerId, targetKind, targetId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// The committed <c>Remove</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>Remove</c> write lane moved behind this service, ADR 0006 §D).
+    /// Delegates to the session-based <see cref="RemoveAsync"/> in the
+    /// service's own session (the D4 physical-removal pin is unchanged);
+    /// the controller's flash / redirect mapping is unchanged.
+    /// </summary>
+    public async Task<BookmarkToggleResult> RemoveAsync(
+        string ownerId, string targetKind, string targetId, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await RemoveAsync(ownerId, targetKind, targetId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// The committed <c>CreateFolder</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>FolderNewSave</c> write lane moved behind this service, ADR
+    /// 0006 §D). Delegates to the session-based
+    /// <see cref="CreateFolderAsync"/> in the service's own session (the
+    /// ADR 0168 D2 pins are unchanged); the controller's flash / redirect
+    /// / 404 / 400 mapping is unchanged.
+    /// </summary>
+    public async Task<FolderRow> CreateFolderAsync(
+        string ownerId, string name, string? parentId, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await CreateFolderAsync(ownerId, name, parentId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// The committed <c>RenameFolder</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>FolderRenameSave</c> write lane moved behind this service, ADR
+    /// 0006 §D). Delegates to the session-based
+    /// <see cref="RenameFolderAsync"/> in the service's own session (the
+    /// ADR 0168 D2 pins are unchanged); the controller's flash / redirect
+    /// / 404 / 400 mapping is unchanged.
+    /// </summary>
+    public async Task<FolderRow> RenameFolderAsync(
+        string ownerId, string folderId, string newName, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await RenameFolderAsync(ownerId, folderId, newName, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// The committed <c>DeleteFolder</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>FolderDelete</c> write lane moved behind this service, ADR
+    /// 0006 §D). Delegates to the session-based
+    /// <see cref="DeleteFolderAsync"/> in the service's own session (the
+    /// ADR 0168 D2 pins are unchanged); the controller's flash / redirect
+    /// / 404 mapping is unchanged.
+    /// </summary>
+    public async Task<BookmarkFolderDeleteResult> DeleteFolderAsync(
+        string ownerId, string folderId, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await DeleteFolderAsync(ownerId, folderId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// The committed <c>MoveBookmarkToFolder</c> lane (IMPROVE-CODE C09 —
+    /// the <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>BookmarkMoveSave</c> write lane moved behind this service, ADR
+    /// 0006 §D). Delegates to the session-based
+    /// <see cref="MoveBookmarkToFolderAsync"/> in the service's own
+    /// session (the ADR 0168 D2 pins are unchanged); the controller's flash
+    /// / redirect / 404 mapping is unchanged.
+    /// </summary>
+    public async Task<BookmarkRow> MoveBookmarkToFolderAsync(
+        string ownerId, string targetKind, string targetId, string? folderId, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await MoveBookmarkToFolderAsync(ownerId, targetKind, targetId, folderId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
 }

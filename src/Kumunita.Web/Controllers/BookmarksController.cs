@@ -3,7 +3,6 @@ using System.Security.Claims;
 using Kumunita.Core.Bookmarks;
 using Kumunita.Core.Localization;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -37,11 +36,10 @@ namespace Kumunita.Web.Controllers;
 /// still works — the row is keyed on the owner's own <c>Bookmark</c> row,
 /// not the target's id, so the unbookmark needs no target read at all —
 /// D5 / F4). The seam's <c>RemoveAsync</c> is the sole writer; the
-/// controller commits in the caller's <c>IDocumentSession</c> (the C3
-/// same-transaction lane — <see cref="BookmarkService"/> never commits
-/// internally; the U02 <c>RunInSession</c> harness witnesses the
-/// caller-commits shape), then sets a localized flash (<c>bm.toggle.removed</c>)
-/// and redirects back to <c>/bookmarks</c> (the "redirect after write" precedent).</item>
+/// controller delegates to the committed overload (IMPROVE-CODE C09 — the
+/// service owns the single write, ADR 0006 §D), then sets a localized
+/// flash (<c>bm.toggle.removed</c>) and redirects back to
+/// <c>/bookmarks</c> (the "redirect after write" precedent).</item>
 /// </list>
 /// <para>
 /// **D2 / C-M17·2:** a bookmark is a personal-by-id record — a
@@ -60,8 +58,14 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 public sealed class BookmarksController(
+    // IMPROVE-CODE C09 — the caller-owns-commit write lanes (the 6
+    // Toggle / Remove / CreateFolder / RenameFolder / DeleteFolder /
+    // MoveBookmarkToFolder commits) moved to the owning module's seam
+    // committed overloads (ADR 0006 §D "route + authz + shape"); the
+    // controller drops the raw store (it was the C3 "caller owns the
+    // single write" lane, now the service's). The served HTML is
+    // unchanged.
     IBookmarkService bookmarks,
-    IDocumentStore store,
     ILocalizationService? localization = null,
     ITranslationProvider? translationProvider = null) : Controller
 {
@@ -129,10 +133,8 @@ public sealed class BookmarksController(
     /// <see cref="Bookmark"/> row, not the target's id, so the unbookmark
     /// needs no target read at all — D5 / F4). The seam's
     /// <see cref="IBookmarkService.RemoveAsync"/> is the sole writer; the
-    /// controller commits in the caller's <see cref="IDocumentSession"/>
-    /// (the C3 same-transaction lane — <see cref="BookmarkService"/> never
-    /// commits internally; the U02 <c>RunInSession</c> harness witnesses
-    /// the caller-commits shape), then redirects back to the
+    /// controller delegates to the committed overload (IMPROVE-CODE C09 — the
+    /// service owns the single write, ADR 0006 §D), then redirects back to the
     /// <c>returnUrl</c> form field (the surface's own detail URL) when present,
     /// falling back to <c>/bookmarks</c> when it is absent (the obs-2
     /// redirect-back shape, the <see cref="Toggle"/> precedent — the M16
@@ -155,15 +157,10 @@ public sealed class BookmarksController(
             return NotFound();
         }
 
-        // C3 same-transaction lane: the service's <c>Store</c> /
-        // <c>Delete</c> writes into the caller's in-flight session
-        // (the U02 <c>RunInSession</c> shape); the controller commits
-        // (the <c>BookmarkService</c> never calls
-        // <c>SaveChangesAsync</c> internally — the caller owns the
-        // single write).
-        await using var session = store.LightweightSession();
-        await bookmarks.RemoveAsync(actorId, targetKind, targetId, session);
-        await session.SaveChangesAsync();
+        // IMPROVE-CODE C09 — the committed write lane (the service owns
+        // the single write, ADR 0006 §D; the C3 "caller owns the single
+        // write" lane was the controller's, now the service's).
+        await bookmarks.RemoveAsync(actorId, targetKind, targetId);
         TempData["info"] = await T("bm.toggle.removed");
         return Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/bookmarks" : returnUrl);
     }
@@ -174,10 +171,9 @@ public sealed class BookmarksController(
     /// <see cref="IBookmarkService.ToggleAsync"/> seam is the **sole writer**
     /// (C-M17·1: the controller never re-derives access; the seam composes
     /// only frozen seams — the target's own frozen <c>CanAsync(Read)</c> +
-    /// the unique-index idempotency witness). The controller commits in its
-    /// own fresh <see cref="IDocumentSession"/> (the C3 same-transaction
-    /// lane — <see cref="BookmarkService"/> never commits internally; the
-    /// caller owns the single write), then sets a localized flash
+    /// the unique-index idempotency witness). The controller delegates to the
+    /// committed overload (IMPROVE-CODE C09 — the service owns the single
+    /// write, ADR 0006 §D), then sets a localized flash
     /// (<c>bm.toggle.bookmarked</c>) and redirects to the <c>returnUrl</c>
     /// form field (the surface's own detail URL), falling back to
     /// <c>/bookmarks</c> when the field is absent (the "redirect after
@@ -225,13 +221,9 @@ public sealed class BookmarksController(
             return NotFound();
         }
 
-        // C3 same-transaction lane: the seam's store/delete writes into the
-        // caller's in-flight session (the U02 <c>RunInSession</c> shape);
-        // the controller commits (the <c>BookmarkService</c> never calls
-        // <c>SaveChangesAsync</c> internally — the caller owns the single
-        // write).
-        await using var session = store.LightweightSession();
-        var result = await bookmarks.ToggleAsync(actorId, kind, id, session);
+        // IMPROVE-CODE C09 — the committed write lane (the service owns
+        // the single write, ADR 0006 §D).
+        var result = await bookmarks.ToggleAsync(actorId, kind, id);
 
         // D3 write-lane visibility check failed — the target is not visible
         // to the owner (Deny / absent / soft-deleted). The D4 "no row
@@ -243,11 +235,9 @@ public sealed class BookmarksController(
             return NotFound();
         }
 
-        // The seam wrote into the session; the caller commits (C3).
         // Bookmarked / AlreadyBookmarked both reach here (the F1 idempotency
         // — the unique-index witness guarantees at-most-one row per
-        // (owner, target)).
-        await session.SaveChangesAsync();
+        // (owner, target)); the service already committed (C09).
         TempData["info"] = await T("bm.toggle.bookmarked");
         return Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/bookmarks" : returnUrl);
     }
@@ -259,9 +249,10 @@ public sealed class BookmarksController(
     //    the controller never re-derives access, the frozen IBookmarkService
     //    seam is the sole reader/writer, and a non-owner (a GlobalAdmin
     //    included) gets a non-leaky 404 (the ADR 0105 "operator has no read
-    //    standing" precedent). The controller commits in its own fresh
-    //    IDocumentSession (the C3 same-transaction lane — BookmarkService
-    //    never commits internally; the caller owns the single write).
+    //    standing" precedent). The controller delegates to the committed
+    //    overloads (IMPROVE-CODE C09 — the service owns the single write,
+    //    ADR 0006 §D; BookmarkService never commits internally; the
+    //    C09 committed-lane idiom, the PersonalNoteService C09 precedent).
 
     /// <summary>
     /// <c>GET /bookmarks/folders/new</c> — the new-folder form (ADR 0168
@@ -290,11 +281,10 @@ public sealed class BookmarksController(
         if (string.IsNullOrWhiteSpace(name))
             return Redirect("/bookmarks/folders/new");
 
-        await using var session = store.LightweightSession();
+        // IMPROVE-CODE C09 — the committed write lane (ADR 0006 §D).
         try
         {
-            await bookmarks.CreateFolderAsync(actorId, name.Trim(), null, session);
-            await session.SaveChangesAsync();
+            await bookmarks.CreateFolderAsync(actorId, name.Trim(), null);
             TempData["info"] = await T("common.done");
             return Redirect("/bookmarks");
         }
@@ -346,11 +336,10 @@ public sealed class BookmarksController(
         if (string.IsNullOrWhiteSpace(name))
             return Redirect($"/bookmarks/folders/{folderId}/rename");
 
-        await using var session = store.LightweightSession();
+        // IMPROVE-CODE C09 — the committed write lane (ADR 0006 §D).
         try
         {
-            await bookmarks.RenameFolderAsync(actorId, folderId, name.Trim(), session);
-            await session.SaveChangesAsync();
+            await bookmarks.RenameFolderAsync(actorId, folderId, name.Trim());
             TempData["info"] = await T("common.done");
             return Redirect("/bookmarks");
         }
@@ -377,11 +366,10 @@ public sealed class BookmarksController(
     {
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId)) return NotFound();
-        await using var session = store.LightweightSession();
+        // IMPROVE-CODE C09 — the committed write lane (ADR 0006 §D).
         try
         {
-            await bookmarks.DeleteFolderAsync(actorId, folderId, session);
-            await session.SaveChangesAsync();
+            await bookmarks.DeleteFolderAsync(actorId, folderId);
             TempData["info"] = await T("common.done");
             return Redirect("/bookmarks");
         }
@@ -430,11 +418,10 @@ public sealed class BookmarksController(
     {
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId)) return NotFound();
-        await using var session = store.LightweightSession();
+        // IMPROVE-CODE C09 — the committed write lane (ADR 0006 §D).
         try
         {
-            await bookmarks.MoveBookmarkToFolderAsync(actorId, targetKind, targetId, folderId, session);
-            await session.SaveChangesAsync();
+            await bookmarks.MoveBookmarkToFolderAsync(actorId, targetKind, targetId, folderId);
             TempData["info"] = await T("common.done");
             return Redirect("/bookmarks");
         }
