@@ -78,27 +78,11 @@ public sealed class GroupsController(
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
 
-    /// <summary>
-    /// The group-post composer's + reply form's <b>authored-in language</b>
-    /// picker options (ADR 0018, ADR 0005 B) — the instance's **enabled**
-    /// <see cref="LanguageCatalog"/>, ordered by <c>SortOrder</c>. Read through
-    /// <see cref="ILocalizationService.ListLanguagesAsync"/> (the HTTP-free
-    /// seam, ADR 0005 D) — the exact catalog read the
-    /// <see cref="LocaleController.Index"/> page uses. The create lane
-    /// pre-selects the actor's current effective language (ADR 0049 —
-    /// <see cref="ResolveComposeDefaultLanguageAsync"/>) so the picker
-    /// highlights the language the resident is reading the platform in; the
-    /// reply/comment forms mark the same code selected in their option list.
-    /// </summary>
-    private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-    {
-        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
-        return catalog
-            .Where(l => l.Enabled)
-            .OrderBy(l => l.SortOrder)
-            .Select(l => (l.Id, l.NativeName))
-            .ToList();
-    }
+    // U05, IMPROVE lane — the composer trio is defined once in
+    // <see cref="ComposerSeedOptions"/>; the per-controller copy that used
+    // to live here is deleted (C11 — the call sites call the helper
+    // directly). The create lane pre-selects the actor's current effective
+    // language (ADR 0049 — <see cref="ResolveComposeDefaultLanguageAsync"/>>)
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the
@@ -1576,7 +1560,7 @@ public sealed class GroupsController(
         // the standing is author ∪ GlobalAdmin only (the component-moderator
         // branch is excluded by CanAddTranslation's isGroupLane flag — ADR 0007).
         var postTranslations = await posts.GetPostTranslationsAsync(result.Post.Id);
-        var enabledLanguages = await SeedLanguagePickerAsync();
+        var enabledLanguages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
         var translationCodes = postTranslations.Select(t => t.LanguageCode).ToHashSet();
         var languages = enabledLanguages
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
@@ -1678,7 +1662,7 @@ public sealed class GroupsController(
 
         return View("New", new GroupPostComposeViewModel
         {
-            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization), // ADR 0018 — the authored-in language picker.
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
@@ -1726,7 +1710,7 @@ public sealed class GroupsController(
         if (group is null)
             return NotFound();
 
-        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization); // ADR 0018 — re-seed on re-render
 
         if (!model.IsValid)
         {
@@ -1827,7 +1811,7 @@ public sealed class GroupsController(
             // editable on this lane (ADR 0016 surface extended): seed the
             // picker from the enabled catalog and pre-select the post's
             // stored tag (the ADR 0017 edit-lane precedent).
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             LanguageCode = post.LanguageCode,
         });
     }
@@ -1870,7 +1854,7 @@ public sealed class GroupsController(
         {
             // Re-render the editor, prefilled with what the actor typed (the
             // GET /groups/{id}/posts/{postId}/edit shape).
-            model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+            model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization); // ADR 0018 — re-seed on re-render
             ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.post_needs_text", "A post needs some text."));
             return View("Edit", model);
         }
@@ -2332,7 +2316,7 @@ public sealed class GroupsController(
 
         return View("EventNew", new GroupEventComposeViewModel
         {
-            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization), // ADR 0018 — the authored-in language picker.
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
@@ -2378,7 +2362,7 @@ public sealed class GroupsController(
         if (group is null)
             return NotFound();
 
-        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization); // ADR 0018 — re-seed on re-render
 
         if (!model.IsValid)
         {
@@ -2481,7 +2465,7 @@ public sealed class GroupsController(
             Location = @event.Location,
             Capacity = @event.Capacity,
             Color = @event.Color,
-            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization), // ADR 0018 — the authored-in language picker.
             LanguageCode = @event.LanguageCode,          // ADR 0018 (amended) — the authored-in tag.
         });
     }
@@ -2519,7 +2503,7 @@ public sealed class GroupsController(
         if (!model.IsValid)
         {
             // Re-render the editor, prefilled with what the actor typed.
-            model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+            model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization); // ADR 0018 — re-seed on re-render
             if (string.IsNullOrWhiteSpace(model.Body))
                 ModelState.AddModelError(nameof(model.Body), await this.FlashAsync("validation.event_needs_text", "An event needs some text."));
             if (model.Start == default || model.End == default)

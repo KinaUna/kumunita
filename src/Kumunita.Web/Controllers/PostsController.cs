@@ -580,7 +580,7 @@ public sealed class PostsController(
         // GetPostAsync) and the enabled-catalog language set the chips /
         // "add a translation" candidate list render from.
         var postTranslations = await posts.GetPostTranslationsAsync(result.Post.Id);
-        var enabledLanguages = await SeedLanguagePickerAsync();
+        var enabledLanguages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
         var translationCodes = postTranslations.Select(t => t.LanguageCode).ToHashSet();
         var languages = enabledLanguages
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
@@ -766,15 +766,9 @@ public sealed class PostsController(
         return all.Where(c => accessible.Contains(c.Id)).ToList();
     }
 
-    // ── Seed helpers (U05, IMPROVE lane — the composer trio is now defined
-    // once in <see cref="ComposerSeedOptions"/>; the per-controller copies
-    // that used to live here are thin delegates to that helper.)
-
-    private Task SeedGrantPickerOptionsAsync()
-        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
-
-    private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+    // U05, IMPROVE lane — the composer trio is defined once in
+    // <see cref="ComposerSeedOptions"/>; the per-controller stubs that used to
+    // live here are deleted (C11 — the call sites call the helper directly).
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the
@@ -816,7 +810,7 @@ public sealed class PostsController(
         {
             Components = components.Select(c => (c.Id, c.Name)).ToList(),
             ComponentId = first is null ? string.Empty : first.Id, // empty when zero reachable components
-            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization), // ADR 0018 — the authored-in language picker.
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
@@ -845,7 +839,7 @@ public sealed class PostsController(
         // The "Who to grant to" option lists (verified residents +
         // groups) the shared _GrantPickers partial renders — the same
         // single source the M2 Profile/Edit editor uses.
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
         return View(model);
     }
@@ -905,13 +899,13 @@ public sealed class PostsController(
         // admissible component (the §2.3 row 2 shape).
         var components = await AccessibleComponentsAsync(User);
         model.Components = components.Select(c => (c.Id, c.Name)).ToList();
-        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization); // ADR 0018 — re-seed on re-render
 
         // Re-seed the picker option lists so a failed-shape re-render
         // below still shows the "Who to grant to" options (the
         // unauthenticated guard above renders without them — an
         // acceptable edge: the picker then shows its empty-pool note).
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
         if (!model.IsValid)
         {
@@ -1060,13 +1054,13 @@ public sealed class PostsController(
             // editable on this lane: seed the picker from the enabled catalog
             // and pre-select the post's stored tag (the ADR 0017 edit-lane
             // precedent — pre-select the stored value, not the instance default).
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             LanguageCode = post.LanguageCode,
             // ADR 0044 (TG lane) — the tag-suggest input's starting chips (slugs,
             // each removable). Rendered as data-tag-suggest-initial on #tags.
             ExistingTagSlugs = await SeedExistingTagSlugsAsync(post),
         };
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
         return View(model);
     }
 
@@ -1145,8 +1139,8 @@ public sealed class PostsController(
 
         model.ComponentId = post.ComponentId;
         model.Components = await SeedEditableComponentListAsync(post.ComponentId);
-        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
-        await SeedGrantPickerOptionsAsync();
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization); // ADR 0018 — re-seed on re-render
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
         // ADR 0044 (TG lane) — the re-render (a validation error, or a bad tag
         // slug below) must re-seed the tag input's chips from the post's
         // current tags: the bound model's ExistingTagSlugs is [BindNever] and

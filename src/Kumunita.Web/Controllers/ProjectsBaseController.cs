@@ -162,20 +162,15 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
     protected static IReadOnlySet<string> RoleSet(ClaimsPrincipal user) =>
         KumunitaPrincipal.RoleSet(user);
 
-    // ── Seed helpers (U05, IMPROVE lane — the composer trio is now defined
-    // once in <see cref="ComposerSeedOptions"/>; the per-controller copies
-    // that used to live here are thin delegates to that helper. The
-    // class-level doc-comment's "M2/M3/M4 shared pattern, reused not
-    // reinvented" claim is now true.)
-
-    // ADR 0106 — the **assign** people list (the <c>Assign_Users</c>
-    // ViewData key) is the ProjectsController-specific surface: it is the
-    // same verified/non-blocked set as <c>Audience_Users</c> but **includes
-    // the actor** (the self-assign lane — a resident can take a to-do onto
-    // themselves). The other three composers leave the default
-    // <c>includeAssignUsers: false</c> and do not set the key.
-    protected Task SeedGrantPickerOptionsAsync()
-        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
+    // U05, IMPROVE lane — the composer trio is defined once in
+    // <see cref="ComposerSeedOptions"/>; the per-controller stubs that used
+    // to live here are deleted (C11 — the call sites call the helper
+    // directly). ADR 0106 — the **assign** people list (the <c>Assign_Users</c>
+    // ViewData key) is the ProjectsController-specific surface: the same
+    // verified/non-blocked set as <c>Audience_Users</c> but **including the
+    // actor** (the self-assign lane — a resident can take a to-do onto
+    // themselves). The call sites pass <c>includeAssignUsers: true</c>;
+    // the other composers leave the default (<c>false</c>) and do not set it.
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the
@@ -195,12 +190,6 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
             return await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
         return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
     }
-
-    protected Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
-
-    protected Task<IReadOnlyList<(string Id, string Name)>> SeedComponentPickerAsync()
-        => ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
 
     /// <summary>
     /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a

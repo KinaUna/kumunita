@@ -352,7 +352,7 @@ public sealed class AnnouncementController(
         // chips / "add a translation" candidate list render from (the
         // ADR 0022 post-detail shape).
         var translations = await announcements.GetAnnouncementTranslationsAsync(a.Id) ?? [];
-        var enabledLanguages = await SeedLanguagePickerAsync();
+        var enabledLanguages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
         var translationCodes = translations.Select(t => t.LanguageCode).ToHashSet();
         var languages = enabledLanguages
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
@@ -609,11 +609,9 @@ public sealed class AnnouncementController(
         return RedirectToAction("Detail", "Announcement", new { id });
     }
 
-    // U05, IMPROVE lane — the composer trio is now defined once in
-    // <see cref="ComposerSeedOptions"/>; the per-controller copy that used
-    // to live here is a thin delegate to that helper.
-    private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+    // U05, IMPROVE lane — the composer trio is defined once in
+    // <see cref="ComposerSeedOptions"/>; the per-controller stub that used to
+    // live here is deleted (C11 — the call site calls the helper directly).
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the

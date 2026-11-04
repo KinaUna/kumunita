@@ -152,16 +152,9 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
     private static IReadOnlySet<string> RoleSet(ClaimsPrincipal user) =>
         KumunitaPrincipal.RoleSet(user);
 
-    // ── Seed helpers (U05, IMPROVE lane — the composer trio is now defined
-    // once in <see cref="ComposerSeedOptions"/>; the per-controller copies
-    // that used to live here are thin delegates to that helper. The
-    // doc-comment's "mirrored, not re-invented" claim is now true.)
-
-    private Task SeedGrantPickerOptionsAsync()
-        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
-
-    private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+    // U05, IMPROVE lane — the composer trio is defined once in
+    // <see cref="ComposerSeedOptions"/>; the per-controller stubs that used to
+    // live here are deleted (C11 — the call sites call the helper directly).
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the
@@ -181,9 +174,6 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
             return await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
         return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
     }
-
-    private Task<IReadOnlyList<(string Id, string Name)>> SeedComponentPickerAsync()
-        => ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
 
     /// <summary>
     /// ADR 0051 — in place, swap <paramref name="event"/>'s Title/Body to the
@@ -990,7 +980,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         // display pin (author / Translator / GlobalAdmin) — the real gate is the
         // server-side re-check in the Add/Update/Remove lanes at POST.
         var eventTranslations = await this.events.GetEventTranslationsAsync(id);
-        var enabledLanguages = await SeedLanguagePickerAsync();
+        var enabledLanguages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
         var translationCodes = eventTranslations.Select(t => t.LanguageCode).ToHashSet();
         var languages = enabledLanguages
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
@@ -1418,14 +1408,14 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
             End = start.DateTime.AddHours(1),
             ReminderEnabled = true,
             SaveAsDraft = true, // ADR 0037 — a new event is a draft until published.
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
             LanguageCode = await ResolveComposeDefaultLanguageAsync(),
-            Components = await SeedComponentPickerAsync(),
+            Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
         };
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
         return View("Create", model);
     }
 
@@ -1468,9 +1458,9 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
 
         // Re-seed the pickers so a failed-shape re-render below still shows the
         // language + component + grant options.
-        model.Components = await SeedComponentPickerAsync();
-        model.Languages = await SeedLanguagePickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
         if (!model.IsValid)
         {
@@ -1613,8 +1603,8 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
             ReminderEnabled = ev.ReminderEnabled,
             LanguageCode = ev.LanguageCode,
             TagIds = ev.TagIds.Count > 0 ? JsonSerializer.Serialize(ev.TagIds) : "[]",
-            Languages = await SeedLanguagePickerAsync(),
-            Components = await SeedComponentPickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
+            Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             // M18 (ADR 0119, D3) — a non-head occurrence's rule is null (the
             // head carries the rule), so the composer hides the picker on a
             // non-head row (the @if guard in Edit.cshtml); false on the create
@@ -1636,7 +1626,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
                 model.EndsOnDate = TimeZoneInfo.ConvertTime(headEnds, editorZone).DateTime;
         }
 
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
         return View("Edit", model);
     }
 
@@ -1678,9 +1668,9 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         }
 
         model.Id = id;
-        model.Components = await SeedComponentPickerAsync();
-        model.Languages = await SeedLanguagePickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
         if (!model.IsValid)
         {

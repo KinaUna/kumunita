@@ -111,7 +111,7 @@ public sealed class BoardsController : ProjectsBaseController
 
         var vm = new BoardIndexViewModel(
             Boards: rows,
-            Components: await SeedComponentPickerAsync(),
+            Components: await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             CurrentComponentId: componentId,
             CurrentPage: page,
             // ADR 0086 D9 — the row dropdown's "Add to Project…" modal
@@ -383,7 +383,7 @@ public sealed class BoardsController : ProjectsBaseController
             // GlobalAdmin) — the real gate is the server-side re-check in the
             // Add/Update/Remove lanes at POST.
             Translations: boardTranslations,
-            Languages: LanguageOptionsFrom(boardTranslations, await SeedLanguagePickerAsync(), t => t.LanguageCode),
+            Languages: LanguageOptionsFrom(boardTranslations, await ComposerSeedOptions.SeedLanguagePickerAsync(localization), t => t.LanguageCode),
             CanTranslate: !string.IsNullOrEmpty(actorId)
                           && BoardService.CanAddBoardTranslation(result.Board.AuthorId, actorId, RoleSet(User)),
             OriginalLanguageCode: result.Board.LanguageCode,
@@ -400,7 +400,7 @@ public sealed class BoardsController : ProjectsBaseController
         // and adds the instance's enabled components as the community
         // choices; all three are display options, never a gate (the
         // standing decision is the service's on write).
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         var communityOptions = (await profileSettings.GetComponentsAsync(enabledOnly: true))
             .Select(c => new GrantOption
             {
@@ -464,8 +464,8 @@ public sealed class BoardsController : ProjectsBaseController
             CardEditPicker = new CardEditPicker(
                 ParentOptions: await SeedTodoParentOptionsAsync(actorId0),
                 BlockerOptions: await SeedBlockerPickerAsync(),
-                Components: await SeedComponentPickerAsync(),
-                Languages: await SeedLanguagePickerAsync(),
+                Components: await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
+                Languages: await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
                 GrantUsers: (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>(),
                 GrantGroups: (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>()),
         };
@@ -536,7 +536,7 @@ public sealed class BoardsController : ProjectsBaseController
         };
         // The _GrantPickers partial reads these from ViewData (the M2/M3/M4
         // shared shape — the create lane's precedent).
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         ViewData["boardId"] = id; // the edit form's POST action (POST /projects/boards/{id}).
         return View("BoardEdit", model);
     }
@@ -564,7 +564,7 @@ public sealed class BoardsController : ProjectsBaseController
         // Re-seed the pickers so a failed-shape re-render below still shows
         // the project + grant options (the create lane's precedent).
         model.Projects = await SeedProjectPickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
 
         if (!model.IsValid)
         {
@@ -741,19 +741,19 @@ public sealed class BoardsController : ProjectsBaseController
                 Grants = "[]",
                 CommunityVisible = true,
             },
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
             LanguageCode = await ResolveComposeDefaultLanguageAsync(),
-            Components = await SeedComponentPickerAsync(),
+            Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             // ADR 0086 D9 — the **project picker** on the new form (a
             // display surface, never a gate — C-PL·3); a new board has no
             // association yet, so `ProjectId` stays `null` and the picker
             // offers a leading "no project" option.
             Projects = await SeedProjectPickerAsync(),
         };
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         return View("BoardNew", model);
     }
 
@@ -782,10 +782,10 @@ public sealed class BoardsController : ProjectsBaseController
 
         // Re-seed the pickers so a failed-shape re-render below still shows
         // the language + component + grant + project options.
-        model.Languages = await SeedLanguagePickerAsync();
-        model.Components = await SeedComponentPickerAsync();
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+        model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
         model.Projects = await SeedProjectPickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
 
         if (!model.IsValid)
         {

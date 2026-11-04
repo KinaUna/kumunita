@@ -154,7 +154,7 @@ public sealed class TodosController : ProjectsBaseController
 
         var vm = new TodoIndexViewModel(
             Todos: rows,
-            Components: await SeedComponentPickerAsync(),
+            Components: await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             CurrentComponentId: componentId,
             CurrentAssigneeId: effectiveAssigneeId,
             UnassignedOnly: unassignedOnly,
@@ -188,7 +188,7 @@ public sealed class TodosController : ProjectsBaseController
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         // The row dropdown's "Assign to…" modal (the board card menu's ADR 0074
         // shape) needs the instance's enabled components as the community
         // choices — the same seeded list BoardDetail's card modal reads.
@@ -369,7 +369,7 @@ public sealed class TodosController : ProjectsBaseController
         // GlobalAdmin) — the real gate is the server-side re-check in the
         // Add/Update/Remove lanes at POST.
         var todoTranslations = await this.todos.GetTodoTranslationsAsync(id);
-        var todoLanguages = LanguageOptionsFrom(todoTranslations, await SeedLanguagePickerAsync(), t => t.LanguageCode);
+        var todoLanguages = LanguageOptionsFrom(todoTranslations, await ComposerSeedOptions.SeedLanguagePickerAsync(localization), t => t.LanguageCode);
         var canTranslateTodo = !string.IsNullOrEmpty(actorId)
             && TodoService.CanAddTodoTranslation(result.Todo.AuthorId, result.Todo.AssigneeId, actorId, RoleSet(User));
 
@@ -482,11 +482,11 @@ public sealed class TodosController : ProjectsBaseController
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
 
         // ADR 0100 — the comment composer's authored-in language picker (the
-        // M3 reply-form idiom; the <see cref="SeedLanguagePickerAsync"/> seed).
-        ViewData["TodoComment_Languages"] = await SeedLanguagePickerAsync();
+        // M3 reply-form idiom; the <see cref="ComposerSeedOptions.SeedLanguagePickerAsync"/> seed).
+        ViewData["TodoComment_Languages"] = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
 
         return View(vm);
     }
@@ -548,8 +548,8 @@ public sealed class TodosController : ProjectsBaseController
             // hidden field is the form field on POST.
             TagIds      = null,
             ExistingTagSlugs = await SeedExistingTagSlugsAsync(todo.TagIds),
-            Languages   = await SeedLanguagePickerAsync(),
-            Components  = await SeedComponentPickerAsync(),
+            Languages   = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
+            Components  = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             // ADR 0086 D9 — the **project picker** (display surface, never a
             // gate — C-PL·3): prefill the current association + seed the actor's
             // readable, non-deleted project options (a `null` association
@@ -564,7 +564,7 @@ public sealed class TodosController : ProjectsBaseController
             BlockerOptions  = await SeedBlockerPickerAsync(),
         };
         await ReSeedParentOptionsAsync(model, actorId);
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         return View("Edit", model);
     }
 
@@ -618,12 +618,12 @@ public sealed class TodosController : ProjectsBaseController
                 // non-null `false` would defeat (the form opened author-only).
                 CommunityVisible = true,
             },
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
             LanguageCode = await ResolveComposeDefaultLanguageAsync(),
-            Components = await SeedComponentPickerAsync(),
+            Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             ParentOptions = parentCandidates
                 .Select(t => (Id: t.Id, Title: t.Title))
                 .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
@@ -638,7 +638,7 @@ public sealed class TodosController : ProjectsBaseController
             // prefill posts as "no blocker").
             BlockerOptions = await SeedBlockerPickerAsync(),
         };
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         return View("Create", model);
     }
 
@@ -671,11 +671,11 @@ public sealed class TodosController : ProjectsBaseController
         // Re-seed the pickers so a failed-shape re-render below still shows
         // the language + component + grant + parent + project + blocker
         // options.
-        model.Languages = await SeedLanguagePickerAsync();
-        model.Components = await SeedComponentPickerAsync();
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+        model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
         model.Projects = await SeedProjectPickerAsync();
         model.BlockerOptions = await SeedBlockerPickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         await ReSeedParentOptionsAsync(model, actorId);
 
         if (!model.IsValid)
@@ -790,9 +790,9 @@ public sealed class TodosController : ProjectsBaseController
 
         if (!model.IsValid)
         {
-            model.Languages = await SeedLanguagePickerAsync();
-            model.Components = await SeedComponentPickerAsync();
-            await SeedGrantPickerOptionsAsync();
+            model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+            model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
+            await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
             await ReSeedParentOptionsAsync(model, actorId);
             await ReSeedProjectPickerAsync(model, id); // ADR 0086 D9 — the standalone set-project card.
             model.BlockerOptions = await SeedBlockerPickerAsync(); // ADR 0087 — the blocker picker (C-TBD·4 display surface).
@@ -849,9 +849,9 @@ public sealed class TodosController : ProjectsBaseController
             // would-be cycle) or another shape refusal — a form error, not
             // a 500 (the M4 "a form is a shape" precedent).
             ModelState.AddModelError(string.Empty, ex.Message);
-            model.Languages = await SeedLanguagePickerAsync();
-            model.Components = await SeedComponentPickerAsync();
-            await SeedGrantPickerOptionsAsync();
+            model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+            model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
+            await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
             await ReSeedParentOptionsAsync(model, actorId);
             await ReSeedProjectPickerAsync(model, id); // ADR 0086 D9 — the standalone set-project card.
             model.BlockerOptions = await SeedBlockerPickerAsync(); // ADR 0087 — the blocker picker (C-TBD·4 display surface).

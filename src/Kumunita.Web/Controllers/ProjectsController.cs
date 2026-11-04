@@ -173,7 +173,7 @@ public sealed class ProjectsController : ProjectsBaseController
         var vm = new ProjectsIndexViewModel(
             Goals: goalCards,
             StandaloneProjects: projectCards,
-            ComponentPickerOptions: await SeedComponentPickerAsync(),
+            ComponentPickerOptions: await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             CurrentComponentId: componentId,
             CurrentPage: page,
             // M7 (ADR 0090 D5) — the two paged sections' pagers (F2 one-page
@@ -369,14 +369,14 @@ public sealed class ProjectsController : ProjectsBaseController
                 // non-null `false` would defeat (the form opened author-only).
                 CommunityVisible = true,
             },
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
             LanguageCode = await ResolveComposeDefaultLanguageAsync(),
-            Components = await SeedComponentPickerAsync(),
+            Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
         };
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         return View("GoalNew", model);
     }
 
@@ -406,9 +406,9 @@ public sealed class ProjectsController : ProjectsBaseController
         // Re-seed the pickers so a failed-shape re-render below still shows
         // the language + component + grant options (the M5 board-create
         // shape).
-        model.Languages = await SeedLanguagePickerAsync();
-        model.Components = await SeedComponentPickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+        model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
 
         if (!model.IsValid)
         {
@@ -732,7 +732,7 @@ public sealed class ProjectsController : ProjectsBaseController
             // GlobalAdmin) — the real gate is the server-side re-check in the
             // Add/Update/Remove lanes at POST.
             Translations: projectTranslations,
-            Languages: LanguageOptionsFrom(projectTranslations, await SeedLanguagePickerAsync(), t => t.LanguageCode),
+            Languages: LanguageOptionsFrom(projectTranslations, await ComposerSeedOptions.SeedLanguagePickerAsync(localization), t => t.LanguageCode),
             CanTranslate: !string.IsNullOrEmpty(actorId)
                           && ProjectService.CanAddProjectTranslation(project.AuthorId, actorId, RoleSet(User)),
             OriginalLanguageCode: project.LanguageCode);
@@ -765,15 +765,15 @@ public sealed class ProjectsController : ProjectsBaseController
                 // non-null `false` would defeat (the form opened author-only).
                 CommunityVisible = true,
             },
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
             LanguageCode = await ResolveComposeDefaultLanguageAsync(),
-            Components = await SeedComponentPickerAsync(),
+            Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             Goals = await SeedGoalPickerAsync(),
         };
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
         return View("ProjectNew", model);
     }
 
@@ -804,10 +804,10 @@ public sealed class ProjectsController : ProjectsBaseController
         // Re-seed the pickers so a failed-shape re-render below still shows
         // the language + component + goal + grant options (the M5
         // board-create shape).
-        model.Languages = await SeedLanguagePickerAsync();
-        model.Components = await SeedComponentPickerAsync();
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+        model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
         model.Goals = await SeedGoalPickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings, includeAssignUsers: true);
 
         if (!model.IsValid)
         {
