@@ -66,6 +66,8 @@ public class BookmarkBatchReadTests(PostgresFixture fixture) : IClassFixture<Pos
             Substitute.For<Kumunita.Core.Announcements.IAnnouncementService>(),
             Substitute.For<Kumunita.Core.Events.IEventService>(),
             Substitute.For<Kumunita.Core.Projects.IProjectService>(),
+            Substitute.For<Kumunita.Core.Projects.IBoardService>(),
+            Substitute.For<Kumunita.Core.Projects.ITodoService>(),
             Substitute.For<Kumunita.Core.Inventory.IInventoryService>(),
             Substitute.For<Kumunita.Core.Identity.IIdentityService>());
         var svc = new BookmarkService(store, resolver);

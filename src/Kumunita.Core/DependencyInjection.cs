@@ -526,6 +526,32 @@ public static class ServiceCollectionExtensions
         // frozen seams (C-M17·1): the frozen IAuthorizationService (the D3
         // check only) + the owning surfaces' read seams (the D5 resolution).
         // **No** INotificationService (D7 — the nudge lane is §deferred).
+        // IMPROVE-CODE C08 (ADR 0287): the Projects split — the Board and Todo
+        // aggregates now have their own sibling seams (IBoardService /
+        // ITodoService), split from IProjectService. Each composes the same frozen
+        // seams the original ProjectService composed (the ProjectsStore base holds
+        // the shared helpers); the registration shape is identical. The C06
+        // TranslationLane is owned per-service in each ctor (_boardTranslationLane
+        // / _todoTranslationLane), so no DI change is needed for the lane itself.
+        services.AddTransient<Projects.IBoardService>(sp => new Projects.BoardService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
+            sp.GetRequiredService<Localization.ITranslationProvider>(),
+            sp.GetRequiredService<Localization.ILocalizationService>(),
+            sp.GetRequiredService<Tags.ITagService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
+        services.AddTransient<Projects.ITodoService>(sp => new Projects.TodoService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<Notifications.INotificationEmitter>(),
+            sp.GetRequiredService<Localization.ITranslationProvider>(),
+            sp.GetRequiredService<Localization.ILocalizationService>(),
+            sp.GetRequiredService<Tags.ITagService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
+
         // IMPROVE-CODE C05 — the single content-target resolution seam (ADR 0118
         // D3/D5 + ADR 0167 D1/D7). Replaces the four private clones
         // (BookmarkService.ResolveTargetAsync/ResolveForListAsync and the
@@ -543,6 +569,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Announcements.IAnnouncementService>(),
             sp.GetRequiredService<Events.IEventService>(),
             sp.GetRequiredService<Projects.IProjectService>(),
+            sp.GetRequiredService<Projects.IBoardService>(),
+            sp.GetRequiredService<Projects.ITodoService>(),
             sp.GetRequiredService<Inventory.IInventoryService>(),
             sp.GetRequiredService<IIdentityService>()));
 

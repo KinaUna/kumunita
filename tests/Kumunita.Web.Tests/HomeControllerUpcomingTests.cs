@@ -31,7 +31,7 @@ namespace Kumunita.Web.Tests;
 /// </para>
 public class HomeControllerUpcomingTests
 {
-    private static (HomeController controller, IUserInfoService userInfo, IEventService events, IProjectService projects) Build(
+    private static (HomeController controller, IUserInfoService userInfo, IEventService events, ITodoService todos) Build(
         bool homeShowUpcoming,
         bool homeUpcomingMineOnly = false,
         IReadOnlyList<Event> events = default!,
@@ -58,12 +58,12 @@ public class HomeControllerUpcomingTests
         eventsService.GetEventTranslationsAsync(Arg.Any<string>())
             .Returns(Task.FromResult<IReadOnlyList<EventTranslation>>([]));
 
-        var projectsService = Substitute.For<IProjectService>();
-        projectsService.ListTodosAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(),
+        var todosService = Substitute.For<ITodoService>();
+        todosService.ListTodosAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(),
             Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(),
             Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(Task.FromResult(new TodoPage(todos, HasMore: false)));
-        projectsService.GetTodoTranslationsAsync(Arg.Any<string>())
+        todosService.GetTodoTranslationsAsync(Arg.Any<string>())
             .Returns(Task.FromResult<IReadOnlyList<TodoTranslation>>([]));
 
         var options = Options.Create(new CommunityOptions
@@ -77,7 +77,7 @@ public class HomeControllerUpcomingTests
             options,
             userInfo: userInfo,
             events: eventsService,
-            projects: projectsService);
+            todos: todosService);
 
         const string subjectId = "u08-hsu-01";
         var httpContext = new DefaultHttpContext();
@@ -87,7 +87,7 @@ public class HomeControllerUpcomingTests
                 authenticationType: "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
-        return (controller, userInfo, eventsService, projectsService);
+        return (controller, userInfo, eventsService, todosService);
     }
 
     // ── 1 — a fresh profile (HomeShowUpcoming = false) ⇒ Upcoming is null ─
@@ -98,7 +98,7 @@ public class HomeControllerUpcomingTests
     [Fact(DisplayName = "FreshProfile_HomeShowUpcomingFalse_UpcomingIsNull")]
     public async Task FreshProfile_HomeShowUpcomingFalse_UpcomingIsNull()
     {
-        var (controller, _, events, projects) = Build(homeShowUpcoming: false);
+        var (controller, _, events, todos) = Build(homeShowUpcoming: false);
 
         var result = await controller.Index();
         var view = Assert.IsType<ViewResult>(result);
@@ -111,7 +111,7 @@ public class HomeControllerUpcomingTests
         await events.DidNotReceive().ListUpcomingAsync(
             Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(),
             Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
-        await projects.DidNotReceive().ListTodosAsync(
+        await todos.DidNotReceive().ListTodosAsync(
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(),
             Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(),
             Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
@@ -221,7 +221,7 @@ public class HomeControllerUpcomingTests
         // form is the unambiguous pin). ICall exposes GetMethodInfo() +
         // GetArguments().
         var todoCall = prSvc.ReceivedCalls()
-            .FirstOrDefault(c => c.GetMethodInfo().Name == nameof(IProjectService.ListTodosAsync));
+            .FirstOrDefault(c => c.GetMethodInfo().Name == nameof(ITodoService.ListTodosAsync));
         Assert.NotNull(todoCall);
         var args = todoCall!.GetArguments();
         Assert.Null(args[0]);                    // componentId
@@ -237,7 +237,7 @@ public class HomeControllerUpcomingTests
     [Fact(DisplayName = "Anonymous_NoSubject_UpcomingIsNull")]
     public async Task Anonymous_NoSubject_UpcomingIsNull()
     {
-        var (controller, userInfo, _, _) = Build(homeShowUpcoming: true);
+        var (controller, userInfo, _, todos) = Build(homeShowUpcoming: true);
 
         // Replace the context with an anonymous principal (no subject claim).
         var httpContext = new DefaultHttpContext();

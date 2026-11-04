@@ -48,7 +48,12 @@ public sealed class ReportTargetsController(
     ModerationService moderation,
     Kumunita.Core.Events.IEventService events,
     Kumunita.Core.Projects.IProjectService projects,
-    Kumunita.Core.Posts.PostService posts) : Controller
+    Kumunita.Core.Posts.PostService posts,
+    // C08 (ADR 0287) — the Projects split: the board / todo report intake reads
+    // (GetBoardAsync / GetTodoAsync) moved off IProjectService to the sibling
+    // seams; the project read (GetProjectAsync) stays on IProjectService.
+    Kumunita.Core.Projects.IBoardService boards,
+    Kumunita.Core.Projects.ITodoService todos) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -183,7 +188,7 @@ public sealed class ReportTargetsController(
         KanbanBoard board;
         try
         {
-            var result = await projects.GetBoardAsync(id, actor, HttpContext.RequestAborted);
+            var result = await boards.GetBoardAsync(id, actor, HttpContext.RequestAborted);
             board = result.Board;
         }
         catch (KeyNotFoundException)
@@ -234,7 +239,7 @@ public sealed class ReportTargetsController(
         TodoItem todo;
         try
         {
-            var result = await projects.GetTodoAsync(id, actor, HttpContext.RequestAborted);
+            var result = await todos.GetTodoAsync(id, actor, HttpContext.RequestAborted);
             todo = result.Todo;
         }
         catch (KeyNotFoundException)

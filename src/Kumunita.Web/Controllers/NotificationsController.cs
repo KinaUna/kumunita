@@ -52,6 +52,12 @@ namespace Kumunita.Web.Controllers;
 public sealed class NotificationsController(
     NotificationService notifications,
     IProjectService? projects = null,
+    // C08 (ADR 0287) — the Projects split: the todo.assign enrichment reads the
+    // to-do (ITodoService.GetTodoAsync) + its boards (IBoardService.
+    // ListBoardsForTodoAsync). Added as optional ctor params (the CS1736 idiom);
+    // DI supplies them, existing test sites keep compiling.
+    ITodoService? todos = null,
+    IBoardService? boards = null,
     // ADR 0084 — the subscriptions settings surface (the per-target list)
     // resolves display names for the resident's communities / groups / pages
     // through these seams. Optional so existing test-construction sites keep
@@ -99,9 +105,9 @@ public sealed class NotificationsController(
 
                 try
                 {
-                    var detail = await projects.GetTodoAsync(row.SourceId, actorId);
-                    var boards = await projects.ListBoardsForTodoAsync(row.SourceId, actorId);
-                    todoCards[row.SourceId] = new TodoCard(detail.Todo, boards, detail.Subtasks);
+                    var detail = await todos.GetTodoAsync(row.SourceId, actorId);
+                    var linkedBoards = await boards.ListBoardsForTodoAsync(row.SourceId, actorId);
+                    todoCards[row.SourceId] = new TodoCard(detail.Todo, linkedBoards, detail.Subtasks);
                 }
                 catch (Exception ex) when (
                     ex is KeyNotFoundException or UnauthorizedAccessException)

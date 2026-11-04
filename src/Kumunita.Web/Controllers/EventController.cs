@@ -101,6 +101,13 @@ public sealed class EventController : Controller
     // <see cref="ProjectsController"/> idiom); absent, the section simply
     // omits.
     private readonly IProjectService? projects;
+    // C08 (ADR 0287) — the Projects split: the event-detail linked to-dos /
+    // boards read lanes (ListTodosForEventAsync / ListBoardsForEventAsync) and
+    // the event-create-to-do lanes (CreateTodoAsync / SetTodoEventAsync) now
+    // live on the sibling seams. Optional (the CS1736 idiom) so test sites keep
+    // compiling; DI supplies them in the app.
+    private readonly ITodoService? todos;
+    private readonly IBoardService? boards;
 
     // ADR 0020 — the per-request **effective date-time format** resolver,
     // injected (like the <c>EffectiveTimezoneResolver</c> above) so the
@@ -125,6 +132,8 @@ public sealed class EventController : Controller
         ITranslationProvider? translationProvider = null,
         ITagService? tags = null,
         IProjectService? projects = null,
+        ITodoService? todos = null,
+        IBoardService? boards = null,
         EffectiveDateFormatResolver? dateFormat = null)
     {
         this.events = events;
@@ -137,6 +146,8 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         this.translationProvider = translationProvider;
         this.tags = tags;
         this.projects = projects;
+        this.todos = todos;
+        this.boards = boards;
         this.dateFormat = dateFormat;
     }
     private static string? SubjectId(ClaimsPrincipal user) =>
@@ -1003,7 +1014,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         IReadOnlyList<LinkedTodoRow>? linkedTodos = null;
         if (projects is not null)
         {
-            var linkedPage = await projects.ListTodosForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
+            var linkedPage = await todos.ListTodosForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
             if (linkedPage.Items.Count > 0)
             {
                 linkedTodos = linkedPage.Items
@@ -1030,7 +1041,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         IReadOnlyList<LinkedBoardRow>? linkedBoards = null;
         if (projects is not null)
         {
-            var linkedBoardsPage = await projects.ListBoardsForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
+            var linkedBoardsPage = await boards.ListBoardsForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
             if (linkedBoardsPage.Items.Count > 0)
             {
                 linkedBoards = linkedBoardsPage.Items
@@ -1172,7 +1183,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         TodoItem todo;
         try
         {
-            todo = await projects.CreateTodoAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
+            todo = await todos.CreateTodoAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
         {
@@ -1195,7 +1206,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         // already-successful create).
         try
         {
-            await projects.SetTodoEventAsync(
+            await todos.SetTodoEventAsync(
                 todo.Id, actorId, RoleSet(User), id, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)

@@ -53,6 +53,8 @@ public sealed class ContentTargetResolver : IContentTargetResolver
     private readonly IAnnouncementService _announcements;
     private readonly IEventService _events;
     private readonly IProjectService _projects;
+    private readonly IBoardService _boards;
+    private readonly ITodoService _todos;
     private readonly IInventoryService _inventory;
     private readonly IIdentityService _identity;
 
@@ -64,6 +66,8 @@ public sealed class ContentTargetResolver : IContentTargetResolver
         IAnnouncementService announcements,
         IEventService events,
         IProjectService projects,
+        IBoardService boards,
+        ITodoService todos,
         IInventoryService inventory,
         IIdentityService identity)
     {
@@ -74,6 +78,8 @@ public sealed class ContentTargetResolver : IContentTargetResolver
         _announcements = announcements ?? throw new ArgumentNullException(nameof(announcements));
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _projects = projects ?? throw new ArgumentNullException(nameof(projects));
+        _boards = boards ?? throw new ArgumentNullException(nameof(boards));
+        _todos = todos ?? throw new ArgumentNullException(nameof(todos));
         _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
         _identity = identity ?? throw new ArgumentNullException(nameof(identity));
     }
@@ -227,7 +233,7 @@ public sealed class ContentTargetResolver : IContentTargetResolver
     {
         try
         {
-            var detail = await _projects.GetTodoAsync(targetId, actorId).ConfigureAwait(false);
+            var detail = await _todos.GetTodoAsync(targetId, actorId).ConfigureAwait(false);
             return (true, detail.Todo.Title, ContentTargetKinds.TodoLink(targetId));
         }
         catch (KeyNotFoundException) { return (false, null, null); }
@@ -251,7 +257,7 @@ public sealed class ContentTargetResolver : IContentTargetResolver
     {
         try
         {
-            var detail = await _projects.GetBoardAsync(targetId, actorId).ConfigureAwait(false);
+            var detail = await _boards.GetBoardAsync(targetId, actorId).ConfigureAwait(false);
             return (true, detail.Board.Title, ContentTargetKinds.BoardLink(targetId));
         }
         catch (KeyNotFoundException) { return (false, null, null); }

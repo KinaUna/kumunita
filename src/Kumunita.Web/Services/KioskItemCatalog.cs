@@ -41,6 +41,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
     private readonly IGroupService groupService;
     private readonly IProfileSettingsService profileSettings;
     private readonly IProjectService? projects;
+    private readonly IBoardService? boards;
+    private readonly ITodoService? todos;
     private readonly IEventService? events;
     private readonly IPageService? pages;
     private readonly IAnnouncementService? announcements;
@@ -53,6 +55,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         IGroupService groupService,
         IProfileSettingsService profileSettings,
         IProjectService? projects = null,
+        IBoardService? boards = null,
+        ITodoService? todos = null,
         IEventService? events = null,
         IPageService? pages = null,
         IAnnouncementService? announcements = null,
@@ -64,6 +68,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         this.groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
         this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         this.projects = projects;
+        this.boards = boards;
+        this.todos = todos;
         this.events = events;
         this.pages = pages;
         this.announcements = announcements;
@@ -215,8 +221,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private async Task<KioskResolvedItem> ResolveBoardAsync(KioskEntry entry, string id, string actorId, CancellationToken ct)
     {
-        if (projects is null) return KioskResolvedItem.Hidden;
-        var board = await projects.GetBoardAsync(id, actorId, ct).ConfigureAwait(false);
+        if (boards is null) return KioskResolvedItem.Hidden;
+        var board = await boards.GetBoardAsync(id, actorId, ct).ConfigureAwait(false);
         var list = entry.BoardView == KioskBoardView.List;
         var boardId = board.Board?.Id ?? id;
         var href = $"/projects/boards/{Uri.EscapeDataString(boardId)}" + (list ? "?view=list" : string.Empty);
@@ -225,8 +231,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private async Task<KioskResolvedItem> ResolveTodoAsync(KioskEntry entry, string id, string actorId, CancellationToken ct)
     {
-        if (projects is null) return KioskResolvedItem.Hidden;
-        var detail = await projects.GetTodoAsync(id, actorId, ct).ConfigureAwait(false);
+        if (todos is null) return KioskResolvedItem.Hidden;
+        var detail = await todos.GetTodoAsync(id, actorId, ct).ConfigureAwait(false);
         var t = detail.Todo;
         if (t.IsDeleted) return KioskResolvedItem.Hidden;
         var v = new StringBuilder("T");
