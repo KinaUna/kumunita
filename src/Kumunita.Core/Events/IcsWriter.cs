@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Kumunita.Core.Events;
 
 /// <summary>
@@ -100,30 +98,30 @@ public static class IcsWriter
         DateTimeOffset nowUtc,
         IReadOnlyDictionary<string, IReadOnlyList<string>>? categoriesByEventId = null)
     {
+        // C11 — the envelope + the escape / fold / stamp primitives are the
+        // shared <see cref="IcsFormat"/> (the one calendar serializer, ADR
+        // 0112 D1 / ADR 0115 D4); this method keeps the VEVENT property set
+        // (the ADR 0112 §ics pin) and its CATEGORIES map.
         var lines = new List<string>(8 + events.Count * 8);
-        lines.Add("BEGIN:VCALENDAR");
-        lines.Add("VERSION:2.0");
-        lines.Add("PRODID:-//Kumunita//community calendar//EN");
-        lines.Add("CALSCALE:GREGORIAN");
-        lines.Add("METHOD:PUBLISH");
+        IcsFormat.AppendEnvelope(lines);
 
         foreach (var ev in events)
         {
             lines.Add("BEGIN:VEVENT");
             lines.Add($"UID:kw-eve-{ev.Id}@kumunita");
-            lines.Add($"DTSTAMP:{FormatUtc(nowUtc)}");
-            lines.Add($"DTSTART:{FormatUtc(ev.Start)}");
-            lines.Add($"DTEND:{FormatUtc(ev.End)}");
-            lines.Add($"SUMMARY:{Escape(ev.Title)}");
+            lines.Add($"DTSTAMP:{IcsFormat.FormatUtc(nowUtc)}");
+            lines.Add($"DTSTART:{IcsFormat.FormatUtc(ev.Start)}");
+            lines.Add($"DTEND:{IcsFormat.FormatUtc(ev.End)}");
+            lines.Add($"SUMMARY:{IcsFormat.Escape(ev.Title)}");
             if (!string.IsNullOrEmpty(ev.Body))
-                lines.Add($"DESCRIPTION:{Escape(ev.Body)}");
+                lines.Add($"DESCRIPTION:{IcsFormat.Escape(ev.Body)}");
             if (!string.IsNullOrEmpty(ev.Location))
-                lines.Add($"LOCATION:{Escape(ev.Location)}");
+                lines.Add($"LOCATION:{IcsFormat.Escape(ev.Location)}");
             if (categoriesByEventId is not null
                 && categoriesByEventId.TryGetValue(ev.Id, out var names)
                 && names is not null
                 && names.Count > 0)
-                lines.Add("CATEGORIES:" + string.Join(",", names.Select(Escape)));
+                lines.Add("CATEGORIES:" + string.Join(",", names.Select(IcsFormat.Escape)));
             if (ev.IsDeleted)
                 lines.Add("STATUS:CANCELLED");
             lines.Add("END:VEVENT");
@@ -131,73 +129,11 @@ public static class IcsWriter
 
         lines.Add("END:VCALENDAR");
 
-        return string.Join("\r\n", lines.SelectMany(Fold)) + "\r\n";
+        return string.Join("\r\n", lines.SelectMany(IcsFormat.Fold)) + "\r\n";
     }
 
-    /// <summary>
-    /// Format a UTC instant as <c>yyyyMMddTHHmmssZ</c> (no offset).
-    /// <c>DTSTART</c> / <c>DTEND</c> / <c>DTSTAMP</c> are **formatted, not
-    /// text** — never escaped (§ics field pin).
-    /// </summary>
-    private static string FormatUtc(DateTimeOffset utc) => utc.UtcDateTime.ToString("yyyyMMdd'T'HHmmss'Z'");
-
-    /// <summary>
-    /// Escape an ICS TEXT value (§ics escape pin): backslash → <c>\\</c>
-    /// (first), semicolon → <c>\;</c>, comma → <c>\,</c>, CR/LF → <c>\n</c>
-    /// (a CRLF or a lone LF becomes the two-char backslash-<c>n</c>
-    /// sequence). All other characters pass through.
-    /// </summary>
-    private static string Escape(string value)
-    {
-        var sb = new StringBuilder(value.Length + 8);
-        foreach (var c in value)
-        {
-            switch (c)
-            {
-                case '\\': sb.Append("\\\\"); break;
-                case ';': sb.Append("\\;"); break;
-                case ',': sb.Append("\\,"); break;
-                case '\r': case '\n': sb.Append("\\n"); break;
-                default: sb.Append(c); break;
-            }
-        }
-        return sb.ToString();
-    }
-
-    /// <summary>
-    /// Fold one logical content line to physical lines of ≤ 75 **octets**
-    /// (UTF-8 bytes). A line ≤ 75 octets is **not** folded. Splits are made
-    /// on UTF-16 character boundaries, so a multi-byte UTF-8 sequence is
-    /// never broken; each continuation line carries a single leading space.
-    /// Unfolding (strip the CRLF + one leading space, concatenate)
-    /// reconstructs the original logical line exactly.
-    /// </summary>
-    private static IEnumerable<string> Fold(string logicalLine)
-    {
-        if (System.Text.Encoding.UTF8.GetByteCount(logicalLine) <= 75)
-            return new[] { logicalLine };
-
-        var result = new List<string>();
-        var sb = new StringBuilder();
-        var octets = 0;
-        const int limit = 75;
-
-        foreach (var c in logicalLine)
-        {
-            var cOctets = System.Text.Encoding.UTF8.GetByteCount(c.ToString());
-            if (octets + cOctets > limit && sb.Length > 0)
-            {
-                // The first physical line carries no leading space; every
-                // subsequent (continuation) line carries exactly one.
-                result.Add(result.Count == 0 ? sb.ToString() : " " + sb.ToString());
-                sb.Clear();
-                octets = 0;
-            }
-            sb.Append(c);
-            octets += cOctets;
-        }
-        if (sb.Length > 0)
-            result.Add(result.Count == 0 ? sb.ToString() : " " + sb.ToString());
-        return result;
-    }
+    // The escape / fold / stamp primitives (the ADR 0112 §ics format pin) and
+    // the VCALENDAR envelope live in the shared <see cref="IcsFormat"/> since
+    // C11 — no private copies here (the C10/C11 de-duplication of the
+    // IcsWriter ↔ TodoIcsWriter clone, the IMPROVE-CODE E7 seam).
 }
