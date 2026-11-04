@@ -44,14 +44,13 @@ public class SettingsSectionSplitTests
         userInfo.GetProfileAsync(Subject)
             .Returns(Task.FromResult(profile));
 
-        var store = Substitute.For<IDocumentStore>();
-        var readSession = Substitute.For<IQuerySession>();
+        // IMPROVE-CODE C09 — the instance-default read is on the localization
+        // seam (GetDefaultLanguageCodeAsync, the `en` floor), not the store.
         var defaultSettings = new LocaleSettings { DefaultLanguageCode = "en" };
-        readSession.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<LocaleSettings?>(defaultSettings));
-        store.QuerySession().Returns(readSession);
+        localization.GetDefaultLanguageCodeAsync()
+            .Returns(Task.FromResult(string.IsNullOrWhiteSpace(defaultSettings.DefaultLanguageCode) ? "en" : defaultSettings.DefaultLanguageCode));
 
-        var controller = new LocaleController(localization, userInfo, Substitute.For<IProfileSettingsService>(), store);
+        var controller = new LocaleController(localization, userInfo, Substitute.For<IProfileSettingsService>());
         var httpContext = new DefaultHttpContext();
         if (signedIn)
         {

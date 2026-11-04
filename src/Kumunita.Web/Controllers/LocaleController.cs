@@ -4,7 +4,6 @@ using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -45,7 +44,6 @@ namespace Kumunita.Web.Controllers;
 public sealed class LocaleController(
     ILocalizationService localization,
     IUserInfoService userInfo, IProfileSettingsService profileSettings,
-    IDocumentStore store,
     // The per-request translation read seam — used to render the
     // language-change flash message in the resident's current language
     // (the locale.flash_set / locale.flash_reset keys). Optional (default
@@ -223,14 +221,12 @@ public sealed class LocaleController(
                 ? await notifications.GetQuietScheduleAsync(subject)
                 : null;
 
-        // The instance default (M·1: preference → default → "en").
-        // ILocalizationService does not expose a GetDefaultLanguageAsync;
-        // the U5 handoff note confirms U6 sources this from its own read path.
-        string defaultCode = "en";
-        await using var session = store.QuerySession();
-        var settings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, System.Threading.CancellationToken.None);
-        if (settings is not null)
-            defaultCode = settings.DefaultLanguageCode;
+        // The instance default (M·1: preference → default → "en") — the
+        // ILocalizationService.GetDefaultLanguageCodeAsync seam (the `en`
+        // floor), the same read the compact PublicLocaleController uses
+        // (IMPROVE-CODE C09 — the controller no longer loads the
+        // LocaleSettings singleton itself).
+        string defaultCode = await localization.GetDefaultLanguageCodeAsync();
 
         // ADR 0046: the pre-selection = the saved preference (the cookie) or,
         // failing that, the browser's Accept-Language match against the

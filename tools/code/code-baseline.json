@@ -473,8 +473,8 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/LocaleController.cs::Kumunita.Web.Controllers.LocaleController.BuildModel()",
-      "max": 72,
-      "cc_max": 30
+      "max": 68,
+      "cc_max": 29
     },
     {
       "id": "src/Kumunita.Web/Controllers/LocaleController.cs::Kumunita.Web.Controllers.LocaleController.Save(string?,string?)",
@@ -3143,12 +3143,6 @@
     {
       "from": "Web",
       "to": "Localization",
-      "symbol": "LocaleSettings",
-      "count": 1
-    },
-    {
-      "from": "Web",
-      "to": "Localization",
       "symbol": "TranslationBulkExporter",
       "count": 1
     },
@@ -3688,10 +3682,6 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/HealthController.cs",
-      "reason": "initial baseline (IMPROVE-CODE C00)"
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/LocaleController.cs",
       "reason": "initial baseline (IMPROVE-CODE C00)"
     },
     {
