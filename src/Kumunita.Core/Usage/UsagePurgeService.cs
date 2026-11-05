@@ -41,13 +41,21 @@ public static class UsagePurgeService
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(store);
-        var cutoff = now.AddDays(-RetentionDays);
+        // The M13 retention cutoff (ADR 0114 D5) is the pure
+        // <see cref="UsagePurgePolicy"/> decision surface (C2-06, the DoD #7
+        // unit-tested decision part) — computed here over the injected
+        // <c>now</c>, the single source of the cutoff.
+        var cutoff = UsagePurgePolicy.ComputeCutoff(now);
 
         await using var session = store.OpenSession(new Marten.Services.SessionOptions());
         {
             // Batched id-collection + delete in ONE session (the
             // AuditPurgeService house shape): one SaveChangesAsync for the
             // whole batch, never a per-row round-trip.
+            // The predicate is the <see cref="UsagePurgePolicy.ShouldPurge"/>
+            // rule (row purged iff At < cutoff) inlined as <c>e.At < cutoff</c>
+            // so Marten translates it to SQL server-side — it must never drift
+            // from the pure predicate.
             var ids = (await session.Query<UsageEvent>()
                                       .Where(e => e.At < cutoff)
                                       .Select(e => e.Id)
