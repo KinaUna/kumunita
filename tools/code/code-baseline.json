@@ -2880,18 +2880,7 @@
       "symbol": "DocumentFolder",
       "count": 1
     },
-    {
-      "from": "Web",
-      "to": "Documents",
-      "symbol": "DocumentFolderService",
-      "count": 1
-    },
-    {
-      "from": "Web",
-      "to": "Documents",
-      "symbol": "DocumentService",
-      "count": 1
-    },
+
     {
       "from": "Web",
       "to": "ErrorReports",

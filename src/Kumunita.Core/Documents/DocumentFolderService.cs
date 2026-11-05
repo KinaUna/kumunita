@@ -31,7 +31,7 @@ namespace Kumunita.Core.Documents;
 /// ADR 0125 owner-only edit lane precedent: the owner's intent is absolute).
 /// </para>
 /// </summary>
-public sealed class DocumentFolderService
+public sealed class DocumentFolderService : IDocumentFolderService
 {
     private readonly IDocumentStore _store;
     public DocumentFolderService(IDocumentStore store)

@@ -27,7 +27,7 @@ namespace Kumunita.Web.Controllers;
 /// </para>
 /// </summary>
 public sealed class DocumentFolderController(
-    DocumentFolderService folders,
+    IDocumentFolderService folders,
     IDocumentStore store,
     Kumunita.Core.Localization.ILocalizationService? localization = null,
     Kumunita.Core.Localization.ITranslationProvider? translationProvider = null) : Controller

@@ -26,6 +26,12 @@ public static class DocumentsModule
         services.AddTransient<Documents.DocumentFolderService>(sp => new Documents.DocumentFolderService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // IMPROVE-CODE-2 C2-03 — the crossing Web layer (the DocumentController
+        // + the DocumentFolderController) codes against the interfaces (the C03
+        // INotificationEmitter pattern; ADR 0006-D "route + authz + shape").
+        services.AddTransient<Documents.IDocumentService>(sp => sp.GetRequiredService<Documents.DocumentService>());
+        services.AddTransient<Documents.IDocumentFolderService>(sp => sp.GetRequiredService<Documents.DocumentFolderService>());
+
         return services;
     }
 }

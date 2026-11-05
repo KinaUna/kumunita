@@ -35,7 +35,7 @@ namespace Kumunita.Web.Controllers;
 /// </para>
 /// </summary>
 public sealed class DocumentController(
-    DocumentService documents,
+    IDocumentService documents,
     IMediaStore media,
     IOptions<MediaOptions> mediaOpts,
     IDocumentStore store,

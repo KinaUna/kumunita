@@ -885,3 +885,50 @@ public class DocumentServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         return await s.LoadAsync<Document>(id);
     }
 }
+
+/// <summary>
+/// C2-03 seam tests: the <see cref="Kumunita.Core.Documents.IDocumentService"/>
+/// + <see cref="Kumunita.Core.Documents.IDocumentFolderService"/> interfaces
+/// the crossing Web layer codes against (IMPROVE-CODE-2 C2-03 — the C03
+/// INotificationEmitter pattern; ADR 0006-D "route + authz + shape"). Names
+/// both interfaces for the seam-test Rule 2 (I*Service named by a test).
+/// </summary>
+public class IDocumentServiceSeamTest
+{
+    [Fact]
+    public void DocumentService_Implements_IDocumentService()
+    {
+        Assert.True(typeof(Kumunita.Core.Documents.IDocumentService).IsAssignableFrom(typeof(Kumunita.Core.Documents.DocumentService)));
+    }
+
+    [Fact]
+    public void DocumentFolderService_Implements_IDocumentFolderService()
+    {
+        Assert.True(typeof(Kumunita.Core.Documents.IDocumentFolderService).IsAssignableFrom(typeof(Kumunita.Core.Documents.DocumentFolderService)));
+    }
+
+    [Fact]
+    public void IDocumentService_Expose_The_Seven_Crossing_Methods()
+    {
+        var t = typeof(Kumunita.Core.Documents.IDocumentService);
+        Assert.NotNull(t.GetMethod("ListAsync"));
+        Assert.NotNull(t.GetMethod("GetAsync"));
+        Assert.NotNull(t.GetMethod("UploadAsync"));
+        Assert.NotNull(t.GetMethod("UpdateAsync"));
+        Assert.NotNull(t.GetMethod("DeleteAsync"));
+        Assert.NotNull(t.GetMethod("ListDeletedAsync"));
+        Assert.NotNull(t.GetMethod("RestoreAsync"));
+    }
+
+    [Fact]
+    public void IDocumentFolderService_Expose_The_Six_Crossing_Methods()
+    {
+        var t = typeof(Kumunita.Core.Documents.IDocumentFolderService);
+        Assert.NotNull(t.GetMethod("CreateAsync"));
+        Assert.NotNull(t.GetMethod("ListByParentAsync"));
+        Assert.NotNull(t.GetMethod("MoveDocumentAsync"));
+        Assert.NotNull(t.GetMethod("RenameAsync"));
+        Assert.NotNull(t.GetMethod("MoveAsync"));
+        Assert.NotNull(t.GetMethod("DeleteAsync"));
+    }
+}
