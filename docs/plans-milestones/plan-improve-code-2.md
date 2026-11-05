@@ -175,6 +175,12 @@ record the failures, do not land the flip, and hand the remainder to
 `IMPROVE-CODE-3`. The gate (now honest) is what makes that hand-off
 honest-by-construction rather than by self-report.
 
+> **The hand-off is written.** `C2-08` closed the lane **held** (DoD #3/#4
+> files `23 > 8`; DoD #6 Marten-allowlist `20 > 5`); the remainder is
+> [`plan-improve-code-3`](plan-improve-code-3.md) — the successor register,
+> which works the two held lines (the module surface + the still-large files)
+> and lands the six-member flip the predecessor withheld.
+
 ## Evidence / starting numbers (measured 2026-11-05, `development` `ebf5b3b5`)
 
 - **Gate:** the fixed `code-check.ps1` runs `CODE_BASELINE_BASE`

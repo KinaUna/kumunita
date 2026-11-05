@@ -8,6 +8,7 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/archive/README.md
   - docs/DOCS-CONVENTIONS.md
+  - docs/plans-milestones/plan-improve-code-3.md
   - docs/plans-milestones/plan-improve-code-2.md
 updated: 2026-11-05
 ---
@@ -38,17 +39,28 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
-The in-flight lane is **`IMPROVE-CODE-2`** — the successor to
+The in-flight lane is **`IMPROVE-CODE-3`** — the successor to
+`IMPROVE-CODE-2`, which closed on 2026-11-05 **held** (DoD #3/#4 files `23 > 8`
+and DoD #6 Marten-allowlist `20 > 5` fail; #1, #5, #6-concrete-edges, #7, #8
+hold) and **deliberately did not land the six-member "shipped" flip** — its
+register is
+[plan-improve-code-3](plan-improve-code-3.md) and the running log (the
+scratch tier) is
+[improve-code-2-handoff-notes.md](improve-code-2-handoff-notes.md). Its whole
+reason to exist is to finish the two held lines — the module surface (the
+Marten allowlist `20 → ≤ 5`, unblocked by the god-service shrinks) and the
+still-large files (`23 → ≤ 8`, including the `SampleDataSeeder` decomposition
+and the 7 god-service splits) — and then land the six-member flip the two
+predecessor lanes withheld.
+
+The two predecessor lanes are both archived/closed with the gaps intact:
+`IMPROVE-CODE-2` (register
+[plan-improve-code-2](plan-improve-code-2.md), the first unit plan
+[c2-00-prompt](c2-00-prompt.md), the running log
+[improve-code-2-handoff-notes.md](improve-code-2-handoff-notes.md)) and
 `IMPROVE-CODE`, which closed on 2026-11-05 **with unmet DoD** (DoD #1/#3/#4/#5/#6/#8
 fail, #7 partial) and moved to
-[`archive/lanes/improve-code/`](../archive/lanes/improve-code/) at that close. Its
-register is
-[plan-improve-code-2](plan-improve-code-2.md) and the first unit plan is
-[c2-00-prompt](c2-00-prompt.md); the running log (the scratch tier, `handoff-notes.md`)
-is written as the lane's units land. Its whole reason to exist is to land the
-reduction the predecessor promised — starting with DoD #1, making the ratchet
-honest (the `CODE_BASELINE_BASE` check that was dead in CI is now fixed, commit
-`ebf5b3b5`), and resolving the 30 unjustified baseline raises it now surfaces.
+[`archive/lanes/improve-code/`](../archive/lanes/improve-code/) at that close.
 
 ## The three-tier contract (per lane)
 
