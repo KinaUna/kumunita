@@ -1060,7 +1060,7 @@ public sealed class ProjectsController : ProjectsBaseController
     /// <paramref name="languageCode"/> (ADR 0088):
     /// <c>POST /projects/projects/{id}/translations</c>. A thin Web lane (ADR
     /// 0006-D) delegating to
-    /// <see cref="IProjectService.AddProjectTranslationAsync"/>.
+    /// <see cref="IProjectService.ProjectTranslationLane"/> (ADR 0288).
     /// <para>
     /// <b>Precondition (C-M3·1):</b> the viewer must be able to see the project
     /// (re-run the parent's single <c>Read</c> decision via
@@ -1110,11 +1110,10 @@ public sealed class ProjectsController : ProjectsBaseController
 
         try
         {
-            await projects.AddProjectTranslationAsync(
-                id, languageCode,
-                string.IsNullOrWhiteSpace(title) ? null : title,
-                string.IsNullOrWhiteSpace(body) ? null : body,
-                actorId, RoleSet(User), HttpContext.RequestAborted);
+            // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
+            // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
+            await using var session = store.LightweightSession();
+            await this.projects.ProjectTranslationLane.AddAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {
@@ -1136,7 +1135,7 @@ public sealed class ProjectsController : ProjectsBaseController
     /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 edit-lane
     /// shape): <c>POST /projects/projects/{id}/translations/update</c>. Thin
     /// Web lane; delegates to
-    /// <see cref="IProjectService.UpdateProjectTranslationAsync"/>.
+    /// <see cref="IProjectService.ProjectTranslationLane"/> (ADR 0288).
     /// Precondition + failure shapes mirror <see cref="AddProjectTranslation"/>.
     /// </summary>
     [HttpPost("/projects/projects/{id}/translations/update")]
@@ -1180,11 +1179,10 @@ public sealed class ProjectsController : ProjectsBaseController
 
         try
         {
-            await projects.UpdateProjectTranslationAsync(
-                id, languageCode,
-                string.IsNullOrWhiteSpace(title) ? null : title,
-                string.IsNullOrWhiteSpace(body) ? null : body,
-                actorId, RoleSet(User), HttpContext.RequestAborted);
+            // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
+            // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
+            await using var session = store.LightweightSession();
+            await this.projects.ProjectTranslationLane.UpdateAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {
@@ -1206,7 +1204,7 @@ public sealed class ProjectsController : ProjectsBaseController
     /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 remove-lane
     /// shape): <c>POST /projects/projects/{id}/translations/remove</c>. Thin
     /// Web lane; delegates to
-    /// <see cref="IProjectService.RemoveProjectTranslationAsync"/>. Failure
+    /// <see cref="IProjectService.ProjectTranslationLane"/> (ADR 0288). Failure
     /// shapes mirror <see cref="AddProjectTranslation"/>.
     /// </summary>
     [HttpPost("/projects/projects/{id}/translations/remove")]
@@ -1243,7 +1241,10 @@ public sealed class ProjectsController : ProjectsBaseController
 
         try
         {
-            await projects.RemoveProjectTranslationAsync(id, languageCode, actorId, RoleSet(User), HttpContext.RequestAborted);
+            // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
+            // session, C3 one SaveChangesAsync).
+            await using var session = store.LightweightSession();
+            await this.projects.ProjectTranslationLane.RemoveAsync(session, id, languageCode, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {

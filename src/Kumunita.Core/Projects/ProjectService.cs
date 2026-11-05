@@ -21,7 +21,14 @@ namespace Kumunita.Core.Projects;
 /// </summary>
 public sealed class ProjectService : ProjectsStore, IProjectService, ITodoService, IBoardService
 {
-    private readonly TranslationLane<Project, ProjectTranslation> _projectTranslationLane;
+    // C2-02 (ADR 0288, IMPROVE-CODE-2 DoD #5) — the shared translation-variant
+    // write lane (the C06/C2-01 `PostService.PostTranslationLane` shape). Exposed
+    // as a public property (a D6-legal `record` cross-module target) so the Web
+    // layer codes against the lane directly; the per-surface `Add/Update/Remove`
+    // *ProjectTranslation* forwarders are retired — the lane + descriptor own the
+    // standing / audit / atomic-commit shape once. The caller supplies the
+    // `IDocumentSession` (M3 shape).
+    public TranslationLane<Project, ProjectTranslation> ProjectTranslationLane { get; }
 
     // C08 (ADR 0287) — test-compat facade (the Projects split). ProjectService hosts
     // the project/goal lanes; the board / todo lanes live on the sibling
@@ -45,7 +52,7 @@ public sealed class ProjectService : ProjectsStore, IProjectService, ITodoServic
         Boards = new BoardService(store, authorization, userInfo, notifications, translator, localization, tags, mentions);
         Todos = new TodoService(store, authorization, userInfo, notifications, translator, localization, tags, mentions);
 
-        _projectTranslationLane = new TranslationLane<Project, ProjectTranslation>(new TranslationDescriptor<Project, ProjectTranslation>
+        ProjectTranslationLane = new TranslationLane<Project, ProjectTranslation>(new TranslationDescriptor<Project, ProjectTranslation>
         {
             TargetKind = TargetKindProject,
             ActionPrefix = "projecttranslation",
@@ -605,29 +612,15 @@ public sealed class ProjectService : ProjectsStore, IProjectService, ITodoServic
             .ConfigureAwait(false);
     }
 
-    public async Task<ProjectTranslation> AddProjectTranslationAsync(
-        string projectId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        return await _projectTranslationLane.AddAsync(session, projectId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
-    }
-
-    public async Task<ProjectTranslation> UpdateProjectTranslationAsync(
-        string projectId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        return await _projectTranslationLane.UpdateAsync(session, projectId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
-    }
-
-    public async Task RemoveProjectTranslationAsync(
-        string projectId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        await _projectTranslationLane.RemoveAsync(session, projectId, languageCode, actorId, actorRoles).ConfigureAwait(false);
-    }
+    // C2-02 (ADR 0288, IMPROVE-CODE-2 DoD #5) — the three per-surface write
+    // forwarders (Add/Update/Remove *ProjectTranslation*Async) are retired; the
+    // shared <see cref="ProjectTranslationLane"/> (this surface's descriptor)
+    // owns the standing / audit / atomic-commit shape once, and the Web layer
+    // codes against it directly (the C06/C2-01 `PostService.PostTranslationLane`
+    // shape). The read seam <see cref="GetProjectTranslationsAsync"/> stays on
+    // the service — its shape is surface-specific (a single-parent
+    // self-`QuerySession`), which the write lane intentionally does not own
+    // (ADR 0288 "What the lane does NOT own").
 
     /// <summary>
     /// The **project translation** display pin (ADR 0088, the

@@ -2,6 +2,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
+using Kumunita.Core.Translations;
 
 namespace Kumunita.Core.Projects;
 
@@ -171,59 +172,25 @@ public interface IProjectService
     Task<IReadOnlyList<ProjectTranslation>> GetProjectTranslationsAsync(string projectId);
 
     /// <summary>
-    /// Add a **user-added translation** of a project into a language other than
-    /// the one it was authored in (ADR 0088). One row per
-    /// <c>(projectId, languageCode)</c> pair (the
+    /// The **shared translation-variant write lane** (ADR 0288) for a project —
+    /// <see cref="TranslationLane{TParent,TVar}.AddAsync"/> /
+    /// <see cref="TranslationLane{TParent,TVar}.UpdateAsync"/> /
+    /// <see cref="TranslationLane{TParent,TVar}.RemoveAsync"/> over the
+    /// <c>(projectId, languageCode)</c> pair the
     /// <see cref="ProjectDocTypes.Configure"/>'s <c>(ProjectId, LanguageCode)</c>
-    /// unique index). <b>Standing (ADR 0088 D3):</b> the project's
-    /// <b>creator</b> (<see cref="AccessVia.Owner"/>), a <b>Translator</b>
-    /// (ADR 0021, <see cref="AccessVia.Admin"/>), or a <b>GlobalAdmin</b>
-    /// (ADR 0030, <see cref="AccessVia.Admin"/>). A denied actor throws
-    /// <see cref="UnauthorizedAccessException"/> before anything is stored. The
-    /// <c>AccessAudit</c> row (<c>projecttranslation.add</c>,
-    /// <c>TargetKind = "project"</c>) commits atomically with the write (C3).
+    /// unique index enforces. C2-02 (IMPROVE-CODE-2 DoD #5) retired the three
+    /// per-surface <c>Add/Update/Remove*ProjectTranslationAsync</c> forwarders
+    /// in favour of this lane + the project's
+    /// <see cref="TranslationDescriptor{TParent,TVar}"/> (the C06/C2-01
+    /// <c>PostService.PostTranslationLane</c> shape). The standing (the project's
+    /// <b>creator</b> <see cref="AccessVia.Owner"/>, or a
+    /// <b>Translator</b> / <b>GlobalAdmin</b> (ADR 0021/0030), ADR 0088 D3),
+    /// the hand-written <c>AccessAudit</c> row, and the single atomic
+    /// <c>SaveChangesAsync</c> (C3) all live on the lane; the caller supplies
+    /// the <c>IDocumentSession</c>. A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing project or row throws
+    /// <see cref="KeyNotFoundException"/>.
     /// </summary>
-    /// <exception cref="KeyNotFoundException">The project id is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / Translator / GlobalAdmin standings.</exception>
-    Task<ProjectTranslation> AddProjectTranslationAsync(
-        string projectId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
-
-    /// <summary>
-    /// Edit an existing project translation (ADR 0088, the ADR 0048 edit-lane
-    /// shape): updates the <see cref="ProjectTranslation.Title"/> /
-    /// <see cref="ProjectTranslation.Body"/> for the
-    /// <c>(projectId, languageCode)</c> pair, stamps
-    /// <see cref="ProjectTranslation.Created"/> and re-records
-    /// <see cref="ProjectTranslation.AuthorId"/>. Same standing as
-    /// <see cref="AddProjectTranslationAsync"/>. A missing row is a
-    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
-    /// (<c>projecttranslation.update</c>, <c>TargetKind = "project"</c>) commits
-    /// atomically with the write (C3).
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The project or the (project,
-    /// language) row is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / Translator / GlobalAdmin standings.</exception>
-    Task<ProjectTranslation> UpdateProjectTranslationAsync(
-        string projectId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
-
-    /// <summary>
-    /// Remove a project translation (ADR 0088, the ADR 0048 remove-lane shape):
-    /// deletes the <c>(projectId, languageCode)</c> row. Same standing as
-    /// <see cref="AddProjectTranslationAsync"/>. A missing row is a
-    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
-    /// (<c>projecttranslation.remove</c>, <c>TargetKind = "project"</c>) commits
-    /// atomically with the write (C3).
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The project or the (project,
-    /// language) row is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / Translator / GlobalAdmin standings.</exception>
-    Task RemoveProjectTranslationAsync(
-        string projectId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+    TranslationLane<Project, ProjectTranslation> ProjectTranslationLane { get; }
 
 }
