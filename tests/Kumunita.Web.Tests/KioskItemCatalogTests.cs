@@ -20,13 +20,13 @@ public class KioskItemCatalogTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Theory]
-    [InlineData(KioskItemType.Board, SearchService.BoardsSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.Todo, SearchService.TodosSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.Project, SearchService.ProjectsSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.Page, SearchService.PagesSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.Announcement, SearchService.AnnouncementsSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.CommunityPost, SearchService.PostsSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.GroupPost, SearchService.PostsSurface, SearchScope.Groups)]
+    [InlineData(KioskItemType.Board, SearchKeys.BoardsSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.Todo, SearchKeys.TodosSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.Project, SearchKeys.ProjectsSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.Page, SearchKeys.PagesSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.Announcement, SearchKeys.AnnouncementsSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.CommunityPost, SearchKeys.PostsSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.GroupPost, SearchKeys.PostsSurface, SearchScope.Groups)]
     public async Task BlankQuery_Browses_TheTypesSurface(KioskItemType type, string surface, SearchScope scope)
     {
         var (catalog, search, _, _, _) = Build();
@@ -43,9 +43,9 @@ public class KioskItemCatalogTests
     public async Task Query_Searches_WithTheResultCap()
     {
         var (catalog, search, _, _, _) = Build();
-        search.SearchSurfaceAsync(SearchService.TodosSurface, "bins", SearchScope.Community, Actor, 1,
+        search.SearchSurfaceAsync(SearchKeys.TodosSurface, "bins", SearchScope.Community, Actor, 1,
                 Arg.Any<CancellationToken>(), null, IKioskItemCatalog.MaxResults)
-            .Returns(new SearchSurfacePage(SearchService.TodosSurface, [Hit("t1", "Put the bins out", DaysAgo(2))], 1, false));
+            .Returns(new SearchSurfacePage(SearchKeys.TodosSurface, [Hit("t1", "Put the bins out", DaysAgo(2))], 1, false));
 
         var items = await catalog.SearchAsync(KioskItemType.Todo, " bins ", Actor, Ct);
 
@@ -57,9 +57,9 @@ public class KioskItemCatalogTests
     public async Task Event_Merges_CommunityAndGroupScopes_NewestFirst_WithGroupName()
     {
         var (catalog, search, _, groupService, _) = Build();
-        search.BrowseSurfaceAsync(SearchService.EventsSurface, SearchScope.Community, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
+        search.BrowseSurfaceAsync(SearchKeys.EventsSurface, SearchScope.Community, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Hits(Hit("e-old", "Street party", DaysAgo(5))));
-        search.BrowseSurfaceAsync(SearchService.EventsSurface, SearchScope.Groups, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
+        search.BrowseSurfaceAsync(SearchKeys.EventsSurface, SearchScope.Groups, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Hits(Hit("e-new", "Choir practice", DaysAgo(1), groupId: "g-1")));
         groupService.GetGroupsForUserAsync(Actor).Returns(Task.FromResult<IReadOnlyList<Group>>([new Group { Id = "g-1", Name = "Choir" }]));
 
@@ -75,8 +75,8 @@ public class KioskItemCatalogTests
     public async Task UntitledPost_UsesTheBodyExcerpt_OnOneLine()
     {
         var (catalog, search, _, _, _) = Build();
-        search.BrowseSurfaceAsync(SearchService.PostsSurface, SearchScope.Community, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(Hits(new SearchHit("p1", SearchService.PostsSurface, null, null, "Lost cat\n  near the park", DaysAgo(1))));
+        search.BrowseSurfaceAsync(SearchKeys.PostsSurface, SearchScope.Community, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Hits(new SearchHit("p1", SearchKeys.PostsSurface, null, null, "Lost cat\n  near the park", DaysAgo(1))));
 
         var items = await catalog.SearchAsync(KioskItemType.CommunityPost, "", Actor, Ct);
 

@@ -3405,12 +3405,7 @@
       "symbol": "WeekAnchor",
       "count": 3
     },
-    {
-      "from": "Web",
-      "to": "Search",
-      "symbol": "SearchService",
-      "count": 2
-    },
+
     {
       "from": "Web",
       "to": "Sessions",

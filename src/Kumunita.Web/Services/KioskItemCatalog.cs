@@ -93,17 +93,17 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         // merged newest first. Every other type is a single surface + scope.
         (string Surface, SearchScope Scope)[] lanes = type switch
         {
-            KioskItemType.Board         => [(SearchService.BoardsSurface, SearchScope.Community)],
-            KioskItemType.Todo          => [(SearchService.TodosSurface, SearchScope.Community)],
-            KioskItemType.Project       => [(SearchService.ProjectsSurface, SearchScope.Community)],
-            KioskItemType.Page          => [(SearchService.PagesSurface, SearchScope.Community)],
-            KioskItemType.Announcement  => [(SearchService.AnnouncementsSurface, SearchScope.Community)],
-            KioskItemType.CommunityPost => [(SearchService.PostsSurface, SearchScope.Community)],
-            KioskItemType.GroupPost     => [(SearchService.PostsSurface, SearchScope.Groups)],
+            KioskItemType.Board         => [(SearchKeys.BoardsSurface, SearchScope.Community)],
+            KioskItemType.Todo          => [(SearchKeys.TodosSurface, SearchScope.Community)],
+            KioskItemType.Project       => [(SearchKeys.ProjectsSurface, SearchScope.Community)],
+            KioskItemType.Page          => [(SearchKeys.PagesSurface, SearchScope.Community)],
+            KioskItemType.Announcement  => [(SearchKeys.AnnouncementsSurface, SearchScope.Community)],
+            KioskItemType.CommunityPost => [(SearchKeys.PostsSurface, SearchScope.Community)],
+            KioskItemType.GroupPost     => [(SearchKeys.PostsSurface, SearchScope.Groups)],
             KioskItemType.Event         =>
             [
-                (SearchService.EventsSurface, SearchScope.Community),
-                (SearchService.EventsSurface, SearchScope.Groups),
+                (SearchKeys.EventsSurface, SearchScope.Community),
+                (SearchKeys.EventsSurface, SearchScope.Groups),
             ],
             _ => [],
         };

@@ -73,18 +73,18 @@ public sealed class SearchService : ISearchService
     public const int TruncationRadius = 120;
 
     /// <summary>The four original search surfaces (D2 — the four resident content surfaces).</summary>
-    public const string PostsSurface = "posts";
-    public const string EventsSurface = "events";
-    public const string PagesSurface = "pages";
-    public const string AnnouncementsSurface = "announcements";
+    public const string PostsSurface = SearchKeys.PostsSurface;
+    public const string EventsSurface = SearchKeys.EventsSurface;
+    public const string PagesSurface = SearchKeys.PagesSurface;
+    public const string AnnouncementsSurface = SearchKeys.AnnouncementsSurface;
 
     /// <summary>The six extended surfaces (ADR 0124 — the M8 D2 "out" list, realized).</summary>
-    public const string ProjectsSurface = "projects";
-    public const string BoardsSurface = "boards";
-    public const string TodosSurface = "todos";
-    public const string InventorySurface = "inventory";
-    public const string DocumentsSurface = "documents";
-    public const string PeopleSurface = "people";
+    public const string ProjectsSurface = SearchKeys.ProjectsSurface;
+    public const string BoardsSurface = SearchKeys.BoardsSurface;
+    public const string TodosSurface = SearchKeys.TodosSurface;
+    public const string InventorySurface = SearchKeys.InventorySurface;
+    public const string DocumentsSurface = SearchKeys.DocumentsSurface;
+    public const string PeopleSurface = SearchKeys.PeopleSurface;
 
     private readonly IDocumentStore _store;
     private readonly IAuthorizationService _authz;

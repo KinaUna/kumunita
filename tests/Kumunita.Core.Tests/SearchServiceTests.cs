@@ -523,14 +523,14 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
                 IsDraft = false, Audience = null,
             });
 
-        var page1 = await svc.SearchSurfaceAsync(SearchService.EventsSurface, "picnic",
+        var page1 = await svc.SearchSurfaceAsync(SearchKeys.EventsSurface, "picnic",
             SearchScope.Community, actor, page: 1,
                 TestContext.Current.CancellationToken);
         Assert.Equal(SearchService.PageSize, page1.Hits.Count);
         Assert.True(page1.HasMore);
         Assert.Equal(1, page1.Page);
 
-        var page2 = await svc.SearchSurfaceAsync(SearchService.EventsSurface, "picnic",
+        var page2 = await svc.SearchSurfaceAsync(SearchKeys.EventsSurface, "picnic",
             SearchScope.Community, actor, page: 2,
                 TestContext.Current.CancellationToken);
         Assert.Single(page2.Hits);
@@ -538,7 +538,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
         Assert.Equal(2, page2.Page);
 
         // Page floors to 1 (C-M7·2 / ADR 0090).
-        var floored = await svc.SearchSurfaceAsync(SearchService.EventsSurface, "picnic",
+        var floored = await svc.SearchSurfaceAsync(SearchKeys.EventsSurface, "picnic",
             SearchScope.Community, actor, page: 0,
                 TestContext.Current.CancellationToken);
         Assert.Equal(1, floored.Page);
@@ -917,13 +917,13 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
                 Created = baseCreated.AddHours(i),
             });
 
-        var page1 = await svc.SearchSurfaceAsync(SearchService.ProjectsSurface, "garden",
+        var page1 = await svc.SearchSurfaceAsync(SearchKeys.ProjectsSurface, "garden",
             SearchScope.Community, actor, page: 1,
                 TestContext.Current.CancellationToken);
         Assert.Equal(SearchService.PageSize, page1.Hits.Count);
         Assert.True(page1.HasMore);
 
-        var page2 = await svc.SearchSurfaceAsync(SearchService.ProjectsSurface, "garden",
+        var page2 = await svc.SearchSurfaceAsync(SearchKeys.ProjectsSurface, "garden",
             SearchScope.Community, actor, page: 2,
                 TestContext.Current.CancellationToken);
         Assert.Single(page2.Hits);
@@ -985,7 +985,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, other)]),
         });
 
-        var hits = await svc.BrowseSurfaceAsync(SearchService.ProjectsSurface,
+        var hits = await svc.BrowseSurfaceAsync(SearchKeys.ProjectsSurface,
             SearchScope.Community, actor, take: 3, TestContext.Current.CancellationToken);
 
         Assert.Equal(["t30-p-3", "t30-p-2", "t30-p-1"], hits.Select(h => h.Id).ToArray());
@@ -1006,7 +1006,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Title = "garden plan", Description = "x", Created = DateTimeOffset.UtcNow,
         });
 
-        var hits = await svc.BrowseSurfaceAsync(SearchService.ProjectsSurface,
+        var hits = await svc.BrowseSurfaceAsync(SearchKeys.ProjectsSurface,
             SearchScope.Community, actorId: "", take: 10, TestContext.Current.CancellationToken);
 
         Assert.Empty(hits);
