@@ -120,6 +120,12 @@ public sealed class EventController : Controller
     // Calendar_Label_IsViewAppropriate</c> pin, invariant/en). DI always
     // supplies the live resolver in the app.
     private readonly EffectiveDateFormatResolver? dateFormat;
+    // C3-00 (ADR 0290 named seam) — the guardian event-attendance RSVP seam
+    // (the self-lane <c>RsvpAsync</c> now lives on this seam, extracted from
+    // <c>EventService</c>). Nullable (the CS1736 idiom) so the pre-seam test
+    // construction sites keep compiling; the <c>Rsvp</c> action null-guards
+    // (a missing seam is a 404 — the <see cref="GuardianController"/> idiom).
+    private readonly IEventRsvpGuardian? rsvpGuardian;
 
     public EventController(
         IEventService events,
@@ -131,9 +137,16 @@ public sealed class EventController : Controller
         IProjectService? projects = null,
         ITodoService? todos = null,
         IBoardService? boards = null,
-        EffectiveDateFormatResolver? dateFormat = null)
+        EffectiveDateFormatResolver? dateFormat = null,
+        IEventRsvpGuardian? rsvpGuardian = null)
     {
         this.events = events;
+        // C3-00 (ADR 0290 named seam) — the guardian event-attendance RSVP
+        // cluster (the self-lane RsvpAsync lives here now, extracted from
+        // EventService). Nullable (the CS1736 idiom) so the pre-seam test
+        // construction sites keep compiling; the Rsvp action null-guards (a
+        // missing seam is a 404 — the <see cref="GuardianController"/> idiom).
+        this.rsvpGuardian = rsvpGuardian;
         this.userInfo = userInfo;
 this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         this.groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
@@ -1920,10 +1933,16 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Rsvp(string id, [FromForm] RsvpStatus status)
     {
+        // C3-00 (ADR 0290 named seam) — the self-lane RSVP now lives on the
+        // <see cref="IEventRsvpGuardian"/> seam (extracted from EventService).
+        // A missing seam (the pre-seam test construction sites) is a 404 —
+        // the <see cref="GuardianController"/> null-guard idiom.
+        if (rsvpGuardian is null)
+            return NotFound();
         var actorId = SubjectId(User) ?? string.Empty;
         try
         {
-            await this.events.RsvpAsync(id, actorId, status, HttpContext.RequestAborted);
+            await rsvpGuardian.RsvpAsync(id, actorId, status, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
         {

@@ -22,6 +22,12 @@ public static class EventsModule
             sp.GetRequiredService<Core.UserInfo.IUserInfoService>(),
             sp.GetRequiredService<Core.Notifications.INotificationEmitter>(),
             sp.GetRequiredService<Core.Mentions.IMentionService>()));
+        // C3-00 (ADR 0290 named seam) — the guardian event-attendance RSVP
+        // cluster extracted from EventService as a real part-vs-whole surface.
+        services.AddTransient<IEventRsvpGuardian>(sp => new EventRsvpGuardianService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Core.UserInfo.IUserInfoService>(),
+            sp.GetRequiredService<Core.Notifications.INotificationEmitter>()));
         return services;
     }
 }

@@ -24,7 +24,7 @@
     },
     {
       "id": "src/Kumunita.Core/Events/EventService.cs",
-      "max": 997
+      "max": 709
     },
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs",
@@ -84,7 +84,8 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/EventController.cs",
-      "max": 1244
+      "max": 1249,
+      "adr": "0290"
     },
     {
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs",
@@ -92,7 +93,8 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/GuardianController.cs",
-      "max": 746
+      "max": 747,
+      "adr": "0290"
     },
     {
       "id": "src/Kumunita.Web/Controllers/PageController.cs",
@@ -159,7 +161,7 @@
       "cc_max": 26
     },
     {
-      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.RsvpAsync(string,string,RsvpStatus,CancellationToken)",
+      "id": "src/Kumunita.Core/Events/EventRsvpGuardianService.cs::Kumunita.Core.Events.EventRsvpGuardianService.RsvpAsync(string,string,RsvpStatus,CancellationToken)",
       "max": 122,
       "cc_max": 29
     },
@@ -567,11 +569,6 @@
   ],
   "classes": [
     {
-      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService",
-      "max": 31,
-      "adr": "0290"
-    },
-    {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService",
       "max": 33
     },
@@ -600,8 +597,7 @@
     },
     {
       "id": "src/Kumunita.Core/Events/IEventService.cs::Kumunita.Core.Events.IEventService",
-      "max": 28,
-      "adr": "0290"
+      "max": 22
     },
     {
       "id": "src/Kumunita.Core/Identity/IIdentityService.cs::Kumunita.Core.Identity.IIdentityService",

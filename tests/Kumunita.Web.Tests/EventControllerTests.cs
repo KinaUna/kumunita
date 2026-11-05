@@ -246,14 +246,18 @@ public class EventControllerTests
     {
         const string id = "ev-rsvp-denied";
         var events = Substitute.For<IEventService>();
-        events.RsvpAsync(id, Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>())
+        // C3-00 (ADR 0290 named seam) — the self-lane RSVP now lives on the
+        // IEventRsvpGuardian seam; mock the denial there (the service is the
+        // one that raises the 403, the Web maps it to a ForbidResult).
+        var rsvp = Substitute.For<IEventRsvpGuardian>();
+        rsvp.RsvpAsync(id, Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<EventRsvp>(new UnauthorizedAccessException($"Actor may not RSVP to event '{id}'.")));
-        var controller = Build(events, subjectId: "subj-resident-001");
+        var controller = Build(events, subjectId: "subj-resident-001", rsvpGuardian: rsvp);
 
         var result = await controller.Rsvp(id, RsvpStatus.Going);
 
         Assert.IsType<ForbidResult>(result);
-        await events.Received(1).RsvpAsync(id, Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>());
+        await rsvp.Received(1).RsvpAsync(id, Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>());
     }
 
     // ── Feed (GET /events) ─────────────────────────────────────────────────────
@@ -937,15 +941,20 @@ public class EventControllerTests
     {
         const string id = "ev-rsvp-post";
         var events = Substitute.For<IEventService>();
-        events.RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>())
+        // C3-00 (ADR 0290 named seam) — the self-lane RSVP now lives on the
+        // IEventRsvpGuardian seam; the posted status passes to it verbatim
+        // (the last-write-wins write — the seam / the unique index converge a
+        // conflicting earlier row, not the Web).
+        var rsvp = Substitute.For<IEventRsvpGuardian>();
+        rsvp.RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>())
             .Returns(new EventRsvp { Id = "rsvp-new", EventId = id, UserId = "subj-resident-001", Status = RsvpStatus.Maybe, At = DateTimeOffset.UnixEpoch });
-        var controller = Build(events, subjectId: "subj-resident-001");
+        var controller = Build(events, subjectId: "subj-resident-001", rsvpGuardian: rsvp);
 
         var result = await controller.Rsvp(id, RsvpStatus.Maybe);
 
         Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/events/{id}", ((RedirectResult)result).Url);
-        await events.Received(1).RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>());
+        await rsvp.Received(1).RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>());
     }
 
     // ── ADR 0059 — the event-translation lane (author ∪ Translator ∪ GlobalAdmin) ─
@@ -2333,7 +2342,8 @@ public class EventControllerTests
         IUserInfoService? userInfo = null,
         IProfileSettingsService? profileSettings = null,
         string[]? roles = null,
-        string? subjectId = null)
+        string? subjectId = null,
+        IEventRsvpGuardian? rsvpGuardian = null)
     {
         var userInfoImpl = userInfo ?? Substitute.For<IUserInfoService>();
         var callerProfileSettings = profileSettings;
@@ -2355,7 +2365,11 @@ public class EventControllerTests
         // a shape test only needs a non-throwing, non-null zone.
         var timezone = new EffectiveTimezoneResolver(
             userInfoImpl, localization, new HttpContextAccessor());
-        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone);
+        // C3-00 (ADR 0290 named seam) — the RSVP cluster now lives on the
+        // IEventRsvpGuardian seam; default a Substitute so the Rsvp action's
+        // null-guard passes, and the RSVP tests override it with their own.
+        rsvpGuardian ??= Substitute.For<IEventRsvpGuardian>();
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone, rsvpGuardian: rsvpGuardian);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

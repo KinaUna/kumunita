@@ -43,7 +43,7 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("me/children")]
-public sealed class GuardianController(IUserInfoService userInfo, IGroupService groupService, IGuardianService guardian, IProfileSettingsService profileSettings, IIdentityService identity, IDocumentStore store, Kumunita.Core.Events.IEventService? events = null) : Controller
+public sealed class GuardianController(IUserInfoService userInfo, IGroupService groupService, IGuardianService guardian, IProfileSettingsService profileSettings, IIdentityService identity, IDocumentStore store, Kumunita.Core.Events.IEventService? events = null, Kumunita.Core.Events.IEventRsvpGuardian? rsvpGuardian = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -54,6 +54,14 @@ public sealed class GuardianController(IUserInfoService userInfo, IGroupService 
     /// lane actions 404 when it is absent (the <see cref="SetChildMessaging"/>
     /// idiom).</summary>
     private readonly Kumunita.Core.Events.IEventService? _events = events;
+
+    /// <summary>The guardian event-attendance RSVP seam (C3-00, ADR 0290 named
+    /// seam — the 6-method RSVP cluster extracted from <c>EventService</c>).
+    /// Nullable — the pre-seam constructor call sites that pass no rsvp guard
+    /// still compile; the DI registration passes the live
+    /// <c>EventRsvpGuardianService</c>. Null-safe: the lane actions 404 when it
+    /// is absent (the <see cref="_events"/> idiom).</summary>
+    private readonly Kumunita.Core.Events.IEventRsvpGuardian? _rsvpGuardian = rsvpGuardian;
 
     /// <summary>
     /// The guardian's <b>own</b> active child list (G·2 — the active
@@ -226,17 +234,17 @@ public sealed class GuardianController(IUserInfoService userInfo, IGroupService 
         // GuardianApproves posture (the lane's most-protective default).
         ViewData["EventRsvpMode"] = childProfile?.EventRsvpMode ?? Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves;
 
-        if (_events is not null)
+        if (_rsvpGuardian is not null)
         {
             var childNameForEvents = string.IsNullOrWhiteSpace(childProfile?.DisplayName) ? childId : childProfile!.DisplayName;
-            var pendingRequests = await _events.GetPendingEventRsvpRequestsAsync(childId);
+            var pendingRequests = await _rsvpGuardian!.GetPendingEventRsvpRequestsAsync(childId);
             ViewData["PendingEventRsvpRequests"] = pendingRequests.Select(r => new EventRsvpRequestItem(
                 r.EventId,
                 childNameForEvents,
                 r.DesiredStatus,
                 r.RequestedAt.ToString("O")));
 
-            var childRsvps = await _events.GetChildRsvpsAsync(childId);
+            var childRsvps = await _rsvpGuardian!.GetChildRsvpsAsync(childId);
             ViewData["ChildEventRsvps"] = childRsvps.Select(r => new EventRsvpVetoItem(
                 r.EventId,
                 r.Status,
@@ -421,7 +429,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IGroupService 
     public async Task<IActionResult> ApproveEventRsvp(string childId, string eventId)
     {
         var subject = SubjectId(User);
-        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _events is null)
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _rsvpGuardian is null)
             return NotFound();
 
         // The standing gate lives in the Core seam (the GU G·2/G·3 deny-by-
@@ -430,7 +438,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IGroupService 
         // "UnauthorizedAccessException"/> from the seam is the 404).
         try
         {
-            await _events.ApproveEventRsvpAsync(eventId, childId, subject);
+            await _rsvpGuardian!.ApproveEventRsvpAsync(eventId, childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_rsvp_approved", "Attendance approved — the child’s RSVP has been recorded.");
         }
         catch (UnauthorizedAccessException)
@@ -462,12 +470,12 @@ public sealed class GuardianController(IUserInfoService userInfo, IGroupService 
     public async Task<IActionResult> DenyEventRsvp(string childId, string eventId)
     {
         var subject = SubjectId(User);
-        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _events is null)
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _rsvpGuardian is null)
             return NotFound();
 
         try
         {
-            await _events.DenyEventRsvpAsync(eventId, childId, subject);
+            await _rsvpGuardian!.DenyEventRsvpAsync(eventId, childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_rsvp_denied", "Attendance denied — the child’s request was not approved.");
         }
         catch (UnauthorizedAccessException)
@@ -500,12 +508,12 @@ public sealed class GuardianController(IUserInfoService userInfo, IGroupService 
     public async Task<IActionResult> VetoEventRsvp(string childId, string eventId)
     {
         var subject = SubjectId(User);
-        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _events is null)
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _rsvpGuardian is null)
             return NotFound();
 
         try
         {
-            await _events.VetoEventRsvpAsync(eventId, childId, subject);
+            await _rsvpGuardian!.VetoEventRsvpAsync(eventId, childId, subject);
             TempData["info"] = await this.FlashAsync("guardian.flash_rsvp_vetoed", "Attendance vetoed — the child’s RSVP has been removed.");
         }
         catch (UnauthorizedAccessException)

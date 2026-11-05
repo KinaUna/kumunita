@@ -70,7 +70,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
 
         // The self-lane is refused with the user-presentable error...
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
         // ...NO RSVP row landed (the child is not yet attending)...
         Assert.Empty(await RsvpsFor(boot.Store, ChildId));
@@ -104,7 +104,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         await boot.GuardianService.CreateGuardianLinkAsync(ChildId, SecondGuardianId);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
         var g1 = await NotificationsFor(boot.Store, GuardianId,
             NotificationKinds.GuardianEventRequest);
@@ -123,14 +123,14 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         var boot = await BootAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
-        await boot.Events.DenyEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
+            () => boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
+        await boot.Rsvp.DenyEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
 
         // A fresh act by the child supersedes the resolved row — the
         // (EventId, ChildId) unique index keeps ONE row; it flips back to
         // Pending with the child's new desired status.
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Maybe, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Maybe, TestContext.Current.CancellationToken));
 
         var rows = await RequestsFor(boot.Store, EventId, ChildId);
         var row = Assert.Single(rows);
@@ -149,7 +149,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
             ChildId, EventRsvpMode.GuardianNotifies, GuardianId);
 
         // The self-lane is allowed (auto-approve)...
-        var rsvp = await boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        var rsvp = await boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken);
         Assert.Equal(RsvpStatus.Going, rsvp.Status);
 
         // ...and the guardian got the veto-window notification (kind
@@ -171,7 +171,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         await boot.GuardianService.SetChildEventRsvpModeAsync(
             ChildId, EventRsvpMode.ChildDecides, GuardianId);
 
-        var rsvp = await boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        var rsvp = await boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken);
         Assert.Equal(RsvpStatus.Going, rsvp.Status);
 
         // The child decided for themselves — the guardian got NOTHING.
@@ -188,7 +188,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
 
         // A stranger (no active GuardianLink over them) is never gated
         // regardless of posture — the ADR 0054 self-service shape.
-        var rsvp = await boot.Events.RsvpAsync(EventId, StrangerId, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        var rsvp = await boot.Rsvp.RsvpAsync(EventId, StrangerId, RsvpStatus.Going, TestContext.Current.CancellationToken);
         Assert.Equal(RsvpStatus.Going, rsvp.Status);
         Assert.Empty(await RequestsFor(boot.Store, EventId, StrangerId));
         Assert.Empty(await NotificationsFor(boot.Store, GuardianId, null));
@@ -201,9 +201,9 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     {
         var boot = await BootAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
-        var request = await boot.Events.ApproveEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
+        var request = await boot.Rsvp.ApproveEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
         Assert.Equal(GuardianEventRequestStatus.Approved, request.Status);
         Assert.Equal(GuardianId, request.ResolvedBy);
         Assert.NotNull(request.ResolvedAt);
@@ -226,9 +226,9 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     {
         var boot = await BootAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
-        var request = await boot.Events.DenyEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
+        var request = await boot.Rsvp.DenyEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
         Assert.Equal(GuardianEventRequestStatus.Denied, request.Status);
         Assert.Equal(GuardianId, request.ResolvedBy);
 
@@ -246,12 +246,12 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         var boot = await BootAsync();
         await boot.GuardianService.SetChildEventRsvpModeAsync(
             ChildId, EventRsvpMode.GuardianNotifies, GuardianId);
-        await boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken);
         var rsvps = await RsvpsFor(boot.Store, ChildId);
         Assert.Single(rsvps);
 
         // The veto (the GuardianNotifies posture's window to undo).
-        await boot.Events.VetoEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
+        await boot.Rsvp.VetoEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
 
         Assert.Empty(await RsvpsFor(boot.Store, ChildId));
 
@@ -267,7 +267,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
 
         // A veto over nothing is a user-presentable 404.
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => boot.Events.VetoEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.VetoEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken));
     }
 
     // ── Standing (G·2/G·3) + state-machine pins ─────────────────────────────
@@ -277,14 +277,14 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     {
         var boot = await BootAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => boot.Events.ApproveEventRsvpAsync(EventId, ChildId, StrangerId, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.ApproveEventRsvpAsync(EventId, ChildId, StrangerId, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => boot.Events.DenyEventRsvpAsync(EventId, ChildId, StrangerId, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.DenyEventRsvpAsync(EventId, ChildId, StrangerId, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => boot.Events.VetoEventRsvpAsync(EventId, ChildId, StrangerId, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.VetoEventRsvpAsync(EventId, ChildId, StrangerId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -292,13 +292,13 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
     {
         var boot = await BootAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
-        await boot.Events.DenyEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
+            () => boot.Rsvp.RsvpAsync(EventId, ChildId, RsvpStatus.Going, TestContext.Current.CancellationToken));
+        await boot.Rsvp.DenyEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken);
 
         // A resolved request cannot be re-approved — the child's fresh act
         // (a new request row) is the only path.
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => boot.Events.ApproveEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.ApproveEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -308,7 +308,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
 
         // Nothing to approve (the child never asked).
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => boot.Events.ApproveEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken));
+            () => boot.Rsvp.ApproveEventRsvpAsync(EventId, ChildId, GuardianId, TestContext.Current.CancellationToken));
     }
 
     // ── The posture write lane (SetChildEventRsvpModeAsync) ─────────────────
@@ -352,6 +352,10 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         public required UserInfoService UserInfo { get; init; }
         public required GuardianService GuardianService { get; init; }
         public required EventService Events { get; init; }
+        // C3-00 (ADR 0290 named seam) — the extracted RSVP cluster now lives
+        // on the EventRsvpGuardianService; the 6 RSVP methods were moved here
+        // from EventService. The test exercises the same cluster, re-pointed.
+        public required EventRsvpGuardianService Rsvp { get; init; }
     }
 
     private async Task<Boot> BootAsync()
@@ -442,8 +446,13 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         var guardianService = new GuardianService(store, sp);
         var events = new EventService(
             store, new AuthorizationService(store, userInfo), userInfo, ns);
+        // C3-00 (ADR 0290 named seam) — the RSVP cluster extracted to its own
+        // service; wire it with the same store / userInfo / notifications the
+        // EventService used (the guardian gate reads GuardianLink/Profile the
+        // same way — ADR 0028 / ADR 0115).
+        var rsvp = new EventRsvpGuardianService(store, userInfo, ns);
 
-        return new Boot { Store = store, UserInfo = userInfo, Events = events, GuardianService = guardianService };
+        return new Boot { Store = store, UserInfo = userInfo, Events = events, GuardianService = guardianService, Rsvp = rsvp };
     }
 
     private static async Task<IReadOnlyList<GuardianEventRequest>> RequestsFor(

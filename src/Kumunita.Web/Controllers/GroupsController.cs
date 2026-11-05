@@ -65,7 +65,15 @@ public sealed class GroupsController(
     // language when a user-added name translation exists (the ADR 0026
     // floor). **Optional** so the existing test-construction site keeps
     // compiling; DI always supplies the live ITranslationProvider in the app.
-    ITranslationProvider? translationProvider = null) : Controller
+    ITranslationProvider? translationProvider = null,
+    // C3-00 (ADR 0290 named seam) — the guardian event-attendance RSVP seam
+    // (the self-lane <c>RsvpAsync</c> now lives on this seam, extracted from
+    // <c>EventService</c>). **Optional** (null default) so the pre-seam test
+    // construction sites keep compiling; the group-RSVP action null-guards (a
+    // missing seam is a 404 — the <see cref="GuardianController"/> idiom).
+    // Appended **last** so the existing positional call sites keep their shape.
+    // DI always supplies the live <c>EventRsvpGuardianService</c> in the app.
+    IEventRsvpGuardian? rsvpGuardian = null) : Controller
 {
     private readonly EffectiveTimezoneResolver? _timezone = timezone;
 
@@ -2634,9 +2642,15 @@ public sealed class GroupsController(
         if (@event is null)
             return NotFound();
 
+        // C3-00 (ADR 0290 named seam) — the self-lane RSVP now lives on the
+        // <see cref="IEventRsvpGuardian"/> seam (extracted from EventService).
+        // A missing seam (the pre-seam test construction sites) is a 404 —
+        // the <see cref="GuardianController"/> null-guard idiom.
+        if (rsvpGuardian is null)
+            return NotFound();
         try
         {
-            await events.RsvpAsync(eventId, actor, status, HttpContext.RequestAborted);
+            await rsvpGuardian.RsvpAsync(eventId, actor, status, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
         {

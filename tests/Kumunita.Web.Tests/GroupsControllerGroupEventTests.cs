@@ -49,7 +49,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task GroupEventDetail_NonMember_404()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: "subj-nonmember");
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: "subj-nonmember");
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember", Arg.Any<CancellationToken>()).Returns((Kumunita.Core.Events.Event?)null);
 
@@ -63,7 +63,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task GroupEventDetail_MissingGroup_404()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: Author);
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: Author);
         groupService.GetGroupAsync(GroupId).Returns((Group?)null);
 
         var result = await controller.GroupEventDetail(GroupId, EventId);
@@ -75,7 +75,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task GroupEventDetail_Author_HappyPath_RendersEventDetail()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: Author);
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: Author);
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         var ev = new Event
         {
@@ -101,7 +101,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task CreateGroupEvent_NonMember_404_NoWrite()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: "subj-nonmember");
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: "subj-nonmember");
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         events.CreateGroupEventAsync(
             Arg.Any<GroupEventDraft>(), Arg.Any<string>(), Arg.Any<IDocumentSession>(), Arg.Any<CancellationToken>())
@@ -121,7 +121,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task CreateGroupEvent_MissingGroup_404_NoWrite()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: Author);
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: Author);
         groupService.GetGroupAsync(GroupId).Returns((Group?)null);
 
         var result = await controller.CreateGroupEvent(GroupId, ValidCompose());
@@ -134,7 +134,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task CreateGroupEvent_Author_HappyPath_Redirects()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: Author);
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: Author);
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         var created = new Event
         {
@@ -158,7 +158,7 @@ public class GroupsControllerGroupEventTests
     {
         // The actor is a member (so GetGroupEventAsync returns the event) but
         // not the author → the controller's author gate is a 404 (GE·4).
-        var (controller, events, userInfo, groupService) = Build(subjectId: "subj-member");
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: "subj-member");
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         var ev = new Event
         {
@@ -176,7 +176,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task EditGroupEvent_Post_NonAuthor_404_NoWrite()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: "subj-member");
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: "subj-member");
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         events.UpdateGroupEventAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<GroupEventUpdate>(),
@@ -191,7 +191,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task EditGroupEvent_Post_MissingOrNonGroup_404()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: Author);
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: Author);
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         events.UpdateGroupEventAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<GroupEventUpdate>(),
@@ -206,7 +206,7 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task PublishGroupEvent_NonMember_404_NoPublish()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: "subj-nonmember");
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: "subj-nonmember");
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember", Arg.Any<CancellationToken>()).Returns((Kumunita.Core.Events.Event?)null);
 
@@ -221,7 +221,7 @@ public class GroupsControllerGroupEventTests
     {
         // A member who is not the author: the decision returns the event, but
         // the author-only publish lane throws → 404 (GE·4, no GlobalAdmin skip).
-        var (controller, events, userInfo, groupService) = Build(subjectId: "subj-member");
+        var (controller, events, _, userInfo, groupService) = Build(subjectId: "subj-member");
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         events.GetGroupEventAsync(GroupId, EventId, "subj-member", Arg.Any<CancellationToken>()).Returns(new Event
         {
@@ -240,20 +240,20 @@ public class GroupsControllerGroupEventTests
     [Fact]
     public async Task GroupEventRsvp_NonMember_404_NoRsvp()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: "subj-nonmember");
+        var (controller, events, rsvp, userInfo, groupService) = Build(subjectId: "subj-nonmember");
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember", Arg.Any<CancellationToken>()).Returns((Kumunita.Core.Events.Event?)null);
 
         var result = await controller.GroupEventRsvp(GroupId, EventId, RsvpStatus.Going);
 
         Assert.IsType<NotFoundResult>(result);
-        await events.DidNotReceive().RsvpAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>());
+        await rsvp.DidNotReceive().RsvpAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task GroupEventRsvp_Member_HappyPath_Redirects()
     {
-        var (controller, events, userInfo, groupService) = Build(subjectId: "subj-member");
+        var (controller, events, rsvp, userInfo, groupService) = Build(subjectId: "subj-member");
         groupService.GetGroupAsync(GroupId).Returns(GeGroup);
         events.GetGroupEventAsync(GroupId, EventId, "subj-member", Arg.Any<CancellationToken>()).Returns(new Event
         {
@@ -266,12 +266,12 @@ public class GroupsControllerGroupEventTests
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/groups/{GroupId}/events/{EventId}", redirect.Url);
-        await events.Received(1).RsvpAsync(EventId, "subj-member", RsvpStatus.Maybe, Arg.Any<CancellationToken>());
+        await rsvp.Received(1).RsvpAsync(EventId, "subj-member", RsvpStatus.Maybe, Arg.Any<CancellationToken>());
     }
 
     // ── Harness ─────────────────────────────────────────────────────────────
 
-    private static (GroupsController controller, IEventService events, IUserInfoService userInfo, IGroupService groupService)
+    private static (GroupsController controller, IEventService events, IEventRsvpGuardian rsvp, IUserInfoService userInfo, IGroupService groupService)
         Build(string? subjectId = null)
     {
         var userInfo = Substitute.For<IUserInfoService>();
@@ -289,8 +289,12 @@ public class GroupsControllerGroupEventTests
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
         var events = Substitute.For<IEventService>();
+        // C3-00 (ADR 0290 named seam) — the RSVP cluster now lives on the
+        // IEventRsvpGuardian seam; default a Substitute so the GroupEventRsvp
+        // action's null-guard passes.
+        var rsvp = Substitute.For<IEventRsvpGuardian>();
 
-        var controller = new GroupsController(userInfo, groupService, Substitute.For<IProfileSettingsService>(), posts, localization, store, events);
+        var controller = new GroupsController(userInfo, groupService, Substitute.For<IProfileSettingsService>(), posts, localization, store, events, rsvpGuardian: rsvp);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
@@ -306,7 +310,7 @@ public class GroupsControllerGroupEventTests
         }
 
         controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
-        return (controller, events, userInfo, groupService);
+        return (controller, events, rsvp, userInfo, groupService);
     }
 
     private static GroupEventComposeViewModel ValidCompose() => new()
