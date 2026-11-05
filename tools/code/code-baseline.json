@@ -434,7 +434,8 @@
     {
       "id": "src/Kumunita.Web/Controllers/HomeController.cs::Kumunita.Web.Controllers.HomeController.BuildPostRowsAsync(string?,string?)",
       "max": 65,
-      "cc_max": 22
+      "cc_max": 22,
+      "adr": "0290"
     },
     {
       "id": "src/Kumunita.Web/Controllers/HomeController.cs::Kumunita.Web.Controllers.HomeController.Index()",
@@ -575,7 +576,8 @@
   "classes": [
     {
       "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService",
-      "max": 31
+      "max": 31,
+      "adr": "0290"
     },
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService",
@@ -583,7 +585,8 @@
     },
     {
       "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService",
-      "max": 30
+      "max": 30,
+      "adr": "0290"
     },
     {
       "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService",
@@ -609,7 +612,8 @@
     },
     {
       "id": "src/Kumunita.Core/Events/IEventService.cs::Kumunita.Core.Events.IEventService",
-      "max": 28
+      "max": 28,
+      "adr": "0290"
     },
     {
       "id": "src/Kumunita.Core/Identity/IIdentityService.cs::Kumunita.Core.Identity.IIdentityService",
@@ -1156,7 +1160,8 @@
       "from": "ErrorReports",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 3
+      "count": 3,
+      "adr": "0290"
     },
     {
       "from": "ErrorReports",
@@ -1660,7 +1665,8 @@
       "from": "Mentions",
       "to": "UserInfo",
       "symbol": "DirectoryService",
-      "count": 2
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Messaging",
@@ -1822,7 +1828,8 @@
       "from": "Notifications",
       "to": "Identity",
       "symbol": "VerificationOptions",
-      "count": 2
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Notifications",
@@ -1834,7 +1841,8 @@
       "from": "Notifications",
       "to": "UserInfo",
       "symbol": "Profile",
-      "count": 2
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Notifications",
@@ -1966,7 +1974,8 @@
       "from": "Portability",
       "to": "Identity",
       "symbol": "AppDbContext",
-      "count": 3
+      "count": 3,
+      "adr": "0290"
     },
     {
       "from": "Portability",
@@ -1978,7 +1987,8 @@
       "from": "Portability",
       "to": "Identity",
       "symbol": "User",
-      "count": 5
+      "count": 5,
+      "adr": "0290"
     },
     {
       "from": "Portability",
@@ -2254,7 +2264,8 @@
       "from": "Posts",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 2
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Posts",
@@ -2314,37 +2325,43 @@
       "from": "Projects",
       "to": "Authorization",
       "symbol": "AccessAuditFactory",
-      "count": 3
+      "count": 3,
+      "adr": "0290"
     },
     {
       "from": "Projects",
       "to": "Authorization",
       "symbol": "Audience",
-      "count": 12
+      "count": 12,
+      "adr": "0290"
     },
     {
       "from": "Projects",
       "to": "Authorization",
       "symbol": "StandingMatrix",
-      "count": 3
+      "count": 3,
+      "adr": "0290"
     },
     {
       "from": "Projects",
       "to": "Events",
       "symbol": "Event",
-      "count": 2
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Projects",
       "to": "Events",
       "symbol": "EventToAuditableResource",
-      "count": 2
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Projects",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 7
+      "count": 7,
+      "adr": "0290"
     },
     {
       "from": "Projects",
@@ -2374,7 +2391,8 @@
       "from": "Projects",
       "to": "Query",
       "symbol": "PageSizer",
-      "count": 3
+      "count": 3,
+      "adr": "0290"
     },
     {
       "from": "Projects",
@@ -2392,7 +2410,8 @@
       "from": "Projects",
       "to": "Web",
       "symbol": "TagSlugs",
-      "count": 3
+      "count": 3,
+      "adr": "0290"
     },
     {
       "from": "Search",
@@ -2729,7 +2748,8 @@
       "from": "UserInfo",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 5
+      "count": 5,
+      "adr": "0290"
     },
     {
       "from": "UserInfo",
@@ -2741,7 +2761,8 @@
       "from": "UserInfo",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 4
+      "count": 4,
+      "adr": "0290"
     },
     {
       "from": "UserInfo",
@@ -2813,7 +2834,8 @@
       "from": "Web",
       "to": "Authorization",
       "symbol": "Audience",
-      "count": 19
+      "count": 19,
+      "adr": "0290"
     },
     {
       "from": "Web",
@@ -3023,7 +3045,8 @@
       "from": "Web",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 36
+      "count": 36,
+      "adr": "0290"
     },
     {
       "from": "Web",
@@ -3059,7 +3082,8 @@
       "from": "Web",
       "to": "Identity",
       "symbol": "User",
-      "count": 74
+      "count": 74,
+      "adr": "0290"
     },
     {
       "from": "Web",
@@ -3173,7 +3197,8 @@
       "from": "Web",
       "to": "Messaging",
       "symbol": "Message",
-      "count": 21
+      "count": 21,
+      "adr": "0290"
     },
     {
       "from": "Web",
@@ -3299,7 +3324,8 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "BoardItemPlacement",
-      "count": 2
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Web",
@@ -3317,7 +3343,8 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "KanbanBoard",
-      "count": 6
+      "count": 6,
+      "adr": "0290"
     },
     {
       "from": "Web",
@@ -3341,7 +3368,8 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "ProjectGoal",
-      "count": 2
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Web",
@@ -3359,7 +3387,8 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "TodoItem",
-      "count": 6
+      "count": 6,
+      "adr": "0290"
     },
     {
       "from": "Web",
@@ -3449,7 +3478,8 @@
       "from": "Web",
       "to": "Tags",
       "symbol": "Tag",
-      "count": 9
+      "count": 9,
+      "adr": "0290"
     },
     {
       "from": "Web",

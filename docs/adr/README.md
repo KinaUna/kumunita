@@ -319,3 +319,4 @@ Decision / Consequences. New decisions take the next number.
 | 0287 | Projects module split: IProjectService (projects + goals), IBoardService (boards, lanes, placements), ITodoService (todos, comments, claim/assign) | Accepted |
 | 0288 | One shared translation-variant lane: the Core contract plus the Web action helper that every translatable surface uses | Accepted |
 | 0289 | Data as embedded resources: translation keys, guide pages, and the sample corpus are embedded resources, not C# literals | Accepted |
+| 0290 | IMPROVE-CODE-2 C2-00: the 30 baseline raises — 4 named seams (pending split) + 26 intended-coupling edges (C2-03 to extract where accidental) | Proposed |
