@@ -23,7 +23,7 @@ namespace Kumunita.Web.Tests;
 /// <list type="number">
 /// <item><b>Seeded en body (gap 1):</b> a cookie-less <c>GET /privacy</c> /
 ///       <c>GET /conduct</c> renders the shared <c>Page</c> view whose body is
-///       the canonical <see cref="FirstBootSeeder.EnDefaultPages"/>() text —
+///       the canonical <see cref="SeededContentCatalog.EnDefaultPages"/>() text —
 ///       the Web route is tied to the single source the seeder writes, not a
 ///       hand-copied string. (U01 pinned "renders the Page view" with a literal
 ///       body; this closes the "matches the source" half.)</item>
@@ -54,14 +54,14 @@ public class StaticPagesSP_U04Tests
 
     /// <summary>
     /// A cookie-less <c>GET</c> for <paramref name="slug"/> seeds the page from
-    /// the canonical <see cref="FirstBootSeeder.EnDefaultPages"/>() entry (the
+    /// the canonical <see cref="SeededContentCatalog.EnDefaultPages"/>() entry (the
     /// exact shape the seeder writes to the tree) and asserts the shared
     /// <c>Page</c> view carries that body verbatim — the Web route is the
     /// reader of the single source, not a second copy.
     /// </summary>
     private static (StaticPagesController controller, string expectedBody) BuildSeeded(string slug)
     {
-        var (_, title, body) = FirstBootSeeder.EnDefaultPages()
+        var (_, title, body) = SeededContentCatalog.EnDefaultPages()
             .Single(p => p.Slug == slug);
 
         var pages = Substitute.For<IPageService>();
@@ -132,10 +132,10 @@ public class StaticPagesSP_U04Tests
     [Fact(DisplayName = "ADR 0043 D7: effective language de → the de PageTranslation body is picked over the en body")]
     public async Task Privacy_EffectiveLanguageDe_RendersDeTranslationBody()
     {
-        var (enTitle, enBody) = (FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "privacy").Title,
-                                FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "privacy").Body);
-        var (deTitle, deBody) = (FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "privacy").Title,
-                                FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "privacy").Body);
+        var (enTitle, enBody) = (SeededContentCatalog.EnDefaultPages().Single(p => p.Slug == "privacy").Title,
+                                SeededContentCatalog.EnDefaultPages().Single(p => p.Slug == "privacy").Body);
+        var (deTitle, deBody) = (SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == "privacy").Title,
+                                SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == "privacy").Body);
 
         var pages = Substitute.For<IPageService>();
         var page = new Page
@@ -235,8 +235,8 @@ public class StaticPagesSP_U04Tests
         Id = "page-privacy-seed",
         ParentId = "system-root",
         Slug = "privacy",
-        Title = FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "privacy").Title,
-        Body = FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "privacy").Body,
+        Title = SeededContentCatalog.EnDefaultPages().Single(p => p.Slug == "privacy").Title,
+        Body = SeededContentCatalog.EnDefaultPages().Single(p => p.Slug == "privacy").Body,
         LanguageCode = "en",
         Audience = null,
         AuthorId = string.Empty,
@@ -247,8 +247,8 @@ public class StaticPagesSP_U04Tests
 
     private static IReadOnlyList<PageTranslation> PrivacyDeFrTranslations()
     {
-        var de = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "privacy");
-        var fr = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == "privacy");
+        var de = SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == "privacy");
+        var fr = SeededContentCatalog.FrDefaultPages().Single(p => p.Slug == "privacy");
         return new List<PageTranslation>
         {
             new() { Id = "tr-privacy-de", PageId = "page-privacy-seed", LanguageCode = "de", Title = de.Title, Body = de.Body, AuthorId = string.Empty },
@@ -284,9 +284,9 @@ public class StaticPagesSP_U04Tests
         // Each variant's body is the canonical baseline from the seeder source
         // (De/FrDefaultPages) — the read path resolves the PageTranslation rows.
         Assert.Contains(model.Translations, t => t.LanguageCode == "de"
-            && t.Body == FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "privacy").Body);
+            && t.Body == SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == "privacy").Body);
         Assert.Contains(model.Translations, t => t.LanguageCode == "fr"
-            && t.Body == FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == "privacy").Body);
+            && t.Body == SeededContentCatalog.FrDefaultPages().Single(p => p.Slug == "privacy").Body);
 
         // The Languages chip set marks de + fr as having a translation, and en
         // as the authored-in language — the chip row the view renders from.

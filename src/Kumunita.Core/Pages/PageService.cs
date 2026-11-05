@@ -1198,8 +1198,8 @@ public sealed class PageService : IPageService
     /// <c>de</c> / <c>fr</c> / <c>da</c> <see cref="PageTranslation"/> rows
     /// are overwritten with the code-owned seed registries (the same text the
     /// seeder writes on first boot — <see cref="Bootstrap
-    /// .FirstBootSeeder.EnDefaultPages"/> / <see cref="Bootstrap
-    /// .FirstBootSeeder.GuidePages"/> and the matching baselines), so a
+    /// .SeededContentCatalog.EnDefaultPages"/> / <see cref="Bootstrap
+    /// .SeededContentCatalog.GuidePages"/> and the matching baselines), so a
     /// page's text can be re-seeded to the latest shipped version after a
     /// code release. <para>
     /// **Standing (ADR 0040, amending §3.7):** the **same as edit** — a
@@ -1220,7 +1220,7 @@ public sealed class PageService : IPageService
     /// slug never seeded) is a <see cref="InvalidOperationException"/> — the
     /// Web layer maps that to a re-rendered form error (there is nothing to
     /// reset to; the button is hidden in that case by <see
-    /// cref="Bootstrap.FirstBootSeeder.HasSeededText"/>). One
+    /// cref="Bootstrap.SeededContentCatalog.HasSeededText"/>). One
     /// <c>SaveChangesAsync</c>; a hand-written <see cref="AccessAudit"/> row
     /// (action <c>page.reset</c>) is stored in the caller's session.
     /// </para>
@@ -1251,7 +1251,7 @@ public sealed class PageService : IPageService
         // InvalidOperationException when the slug has no seeded baseline;
         // the Web lane maps that to a form error.
         var now = DateTimeOffset.UtcNow;
-        await Bootstrap.FirstBootSeeder.ResetSeededTextAsync(session, page, now, CancellationToken.None).ConfigureAwait(false);
+        await Bootstrap.SeededContentCatalog.ResetSeededTextAsync(session, page, now, CancellationToken.None).ConfigureAwait(false);
 
         // Audit: the narrowest standing that applied (the edit resolver —
         // Owner if the actor is the author of a blog page, else Admin for a
@@ -1291,7 +1291,7 @@ public sealed class PageService : IPageService
         // decision.
         await using var session = _store.QuerySession();
 
-        var slugs = Bootstrap.FirstBootSeeder.AllSeededSlugs();
+        var slugs = Bootstrap.SeededContentCatalog.AllSeededSlugs();
         var slugSet = new HashSet<string>(slugs, StringComparer.Ordinal);
 
         // One bulk query over the seeded slugs (the (ParentId, Slug) index is
@@ -1315,14 +1315,14 @@ public sealed class PageService : IPageService
             .ToListAsync()
             .ConfigureAwait(false);
 
-        var enDefault = Bootstrap.FirstBootSeeder.EnDefaultPages();
-        var deDefault = Bootstrap.FirstBootSeeder.DeDefaultPages();
-        var frDefault = Bootstrap.FirstBootSeeder.FrDefaultPages();
-        var daDefault = Bootstrap.FirstBootSeeder.DaDefaultPages();
-        var enGuides = Bootstrap.FirstBootSeeder.GuidePages();
-        var deGuides = Bootstrap.FirstBootSeeder.DeGuidePages();
-        var frGuides = Bootstrap.FirstBootSeeder.FrGuidePages();
-        var daGuides = Bootstrap.FirstBootSeeder.DaGuidePages();
+        var enDefault = Bootstrap.SeededContentCatalog.EnDefaultPages();
+        var deDefault = Bootstrap.SeededContentCatalog.DeDefaultPages();
+        var frDefault = Bootstrap.SeededContentCatalog.FrDefaultPages();
+        var daDefault = Bootstrap.SeededContentCatalog.DaDefaultPages();
+        var enGuides = Bootstrap.SeededContentCatalog.GuidePages();
+        var deGuides = Bootstrap.SeededContentCatalog.DeGuidePages();
+        var frGuides = Bootstrap.SeededContentCatalog.FrGuidePages();
+        var daGuides = Bootstrap.SeededContentCatalog.DaGuidePages();
 
         var result = new List<SeededPageStatus>(slugs.Count);
         foreach (var slug in slugs)
@@ -1424,7 +1424,7 @@ public sealed class PageService : IPageService
                 "Resetting the seeded pages requires GlobalAdmin standing.");
 
         var now = DateTimeOffset.UtcNow;
-        var slugs = Bootstrap.FirstBootSeeder.AllSeededSlugs();
+        var slugs = Bootstrap.SeededContentCatalog.AllSeededSlugs();
 
         // Load every seeded page that exists in one query (the read path's
         // slug-set shape).
@@ -1442,7 +1442,7 @@ public sealed class PageService : IPageService
             // (the caller owns it). It throws InvalidOperationException when
             // the slug has no seeded baseline; the slug came from AllSeededSlugs
             // so that cannot happen here.
-            await Bootstrap.FirstBootSeeder
+            await Bootstrap.SeededContentCatalog
                 .ResetSeededTextAsync(session, page, now, CancellationToken.None)
                 .ConfigureAwait(false);
 

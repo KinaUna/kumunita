@@ -158,13 +158,13 @@ public static class SchemaBootstrap
             //     never clobbering a community Translator's edit; ADR 0057 amended
             //     2026-09-21)
             await using var backfillSession = store.OpenSession(new Marten.Services.SessionOptions());
-            await FirstBootSeeder
+            await SeededContentCatalog
                 .BackfillPageTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
-            await FirstBootSeeder
+            await SeededContentCatalog
                 .BackfillUiStringBaselinesAsync(backfillSession, ct).ConfigureAwait(false);
-            await FirstBootSeeder
+            await SeededContentCatalog
                 .BackfillUserGuidesAsync(backfillSession, ct).ConfigureAwait(false);
-            await FirstBootSeeder
+            await SeededContentCatalog
                 .BackfillGuideTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
             logger.LogInformation(
                 "Warm boot: backfill complete (de/fr/da rows for the canonical " +

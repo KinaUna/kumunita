@@ -19,10 +19,6 @@
       "max": 704
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs",
-      "max": 991
-    },
-    {
       "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs",
       "max": 1633
     },
@@ -127,17 +123,17 @@
       "cc_max": 20
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.BackfillGuideTranslationsAsync(IDocumentSession,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SeededContentCatalog.cs::Kumunita.Core.Bootstrap.SeededContentCatalog.BackfillGuideTranslationsAsync(IDocumentSession,CancellationToken)",
       "max": 85,
       "cc_max": 22
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.BackfillPageTranslationsAsync(IDocumentSession,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SeededContentCatalog.cs::Kumunita.Core.Bootstrap.SeededContentCatalog.BackfillPageTranslationsAsync(IDocumentSession,CancellationToken)",
       "max": 66,
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs::Kumunita.Core.Bootstrap.FirstBootSeeder.BackfillUserGuidesAsync(IDocumentSession,CancellationToken)",
+      "id": "src/Kumunita.Core/Bootstrap/SeededContentCatalog.cs::Kumunita.Core.Bootstrap.SeededContentCatalog.BackfillUserGuidesAsync(IDocumentSession,CancellationToken)",
       "max": 75,
       "cc_max": 17
     },
@@ -845,7 +841,8 @@
       "from": "Bootstrap",
       "to": "Authorization",
       "symbol": "Audience",
-      "count": 3
+      "count": 4,
+      "adr": "0290"
     },
     {
       "from": "Bootstrap",
@@ -947,19 +944,22 @@
       "from": "Bootstrap",
       "to": "Localization",
       "symbol": "TranslationResource",
-      "count": 1
+      "count": 2,
+      "adr": "0290"
     },
     {
       "from": "Bootstrap",
       "to": "Pages",
       "symbol": "Page",
-      "count": 2
+      "count": 3,
+      "adr": "0290"
     },
     {
       "from": "Bootstrap",
       "to": "Pages",
       "symbol": "PageTranslation",
-      "count": 2
+      "count": 3,
+      "adr": "0290"
     },
     {
       "from": "Bootstrap",
@@ -1637,7 +1637,7 @@
     {
       "from": "Localization",
       "to": "Bootstrap",
-      "symbol": "FirstBootSeeder",
+      "symbol": "SeededContentCatalog",
       "count": 1
     },
     {
@@ -1855,7 +1855,7 @@
     {
       "from": "Pages",
       "to": "Bootstrap",
-      "symbol": "FirstBootSeeder",
+      "symbol": "SeededContentCatalog",
       "count": 1
     },
     {
@@ -2852,7 +2852,7 @@
     {
       "from": "Web",
       "to": "Bootstrap",
-      "symbol": "FirstBootSeeder",
+      "symbol": "SeededContentCatalog",
       "count": 1
     },
     {

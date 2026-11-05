@@ -270,8 +270,8 @@ public interface IPageService
     /// 0058): overwrites the page's <c>en</c> (source) title/body and its
     /// <c>de</c> / <c>fr</c> / <c>da</c> <see cref="PageTranslation"/> rows
     /// with the code-owned seeded registries (<see cref="Bootstrap
-    /// .FirstBootSeeder.EnDefaultPages"/> / <see cref="Bootstrap
-    /// .FirstBootSeeder.GuidePages"/> and the matching baseline sets), so a
+    /// .SeededContentCatalog.EnDefaultPages"/> / <see cref="Bootstrap
+    /// .SeededContentCatalog.GuidePages"/> and the matching baseline sets), so a
     /// page can be re-seeded to the latest shipped text after a code
     /// release. Standing is the **same as edit** (ADR 0040 §3.7): a
     /// <see cref="Authorization.AccessVia.Admin"/> (GlobalAdmin) on either
@@ -306,7 +306,7 @@ public interface IPageService
     /// ADR 0128 — **batch reset**: resets every seeded page (the
     /// four-surface set + the UG guides) back to its seeded baseline in a
     /// single session + single save. Delegates the per-page applier to
-    /// <see cref="Bootstrap.FirstBootSeeder.ResetSeededTextAsync"/> (the
+    /// <see cref="Bootstrap.SeededContentCatalog.ResetSeededTextAsync"/> (the
     /// same content the per-page lane uses, ADR 0058). Writes one
     /// <c>page.reset</c> audit row per page (the same trail the per-page
     /// lane emits). Standing is the same as the per-page lane: GlobalAdmin

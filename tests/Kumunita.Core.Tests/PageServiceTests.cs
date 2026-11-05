@@ -1534,7 +1534,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     public async Task PG5_Seeder_TermsAndHelp_UnderSystemRoot_NoDuplicates_AcrossTwoBoots()
     {
         var store = await BootStoreAsync();
-        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var defaultPages = SeededContentCatalog.EnDefaultPages();
         var ct = TestContext.Current.CancellationToken;
 
         // Boot 1 — seed into one session, commit.
@@ -1588,7 +1588,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     public async Task PG5_Seeder_About_IsNotSeeded_ProductStoryStaysAuthoritative()
     {
         var store = await BootStoreAsync();
-        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var defaultPages = SeededContentCatalog.EnDefaultPages();
         var ct = TestContext.Current.CancellationToken;
 
         await using (var s = newSession(store))
@@ -1612,7 +1612,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     public async Task PG5_Seeder_SeededPages_ArePublic_AudienceNull_LanguageEn_EmptyAuthor()
     {
         var store = await BootStoreAsync();
-        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var defaultPages = SeededContentCatalog.EnDefaultPages();
         var ct = TestContext.Current.CancellationToken;
 
         await using (var s = newSession(store))
@@ -1662,7 +1662,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         // the seeder flows the new rows from the baseline arrays (ADR 0043
         // D3 — generic loop, no seeder-branch change).
         var store = await BootStoreAsync();
-        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var defaultPages = SeededContentCatalog.EnDefaultPages();
         var ct = TestContext.Current.CancellationToken;
 
         await using (var s = newSession(store))
@@ -1717,8 +1717,8 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
 
             // Baseline parity with the canonical sources (structure preserved —
             // the ADR 0042 D2 bar holds for the two new pages too).
-            var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == slug);
-            var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == slug);
+            var deBaseline = SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == slug);
+            var frBaseline = SeededContentCatalog.FrDefaultPages().Single(p => p.Slug == slug);
             Assert.Equal(deBaseline.Body, de.Body);
             Assert.Equal(deBaseline.Title, de.Title);
             Assert.Equal(frBaseline.Body, fr.Body);
@@ -1781,7 +1781,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
                 .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
                 .FirstAsync(ct);
             var termsId = terms.Id;
-            var seededEn = FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "terms");
+            var seededEn = SeededContentCatalog.EnDefaultPages().Single(p => p.Slug == "terms");
 
             // Customize: overwrite the en body + a de translation with
             // admin-authored text (the "keep my customizations" state the
@@ -1815,7 +1815,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
                 Assert.Equal(FirstBootSeeder.SourceLanguage, after.LanguageCode);
 
                 // The de translation is back to the seeded baseline too.
-                var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "terms");
+                var deBaseline = SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == "terms");
                 var deAfter = await q2.Query<PageTranslation>()
                     .Where(t => t.PageId == termsId && t.LanguageCode == "de")
                     .FirstAsync(ct);
@@ -1824,8 +1824,8 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
 
                 // The fr + da rows still carry their seeded baselines (the
                 // reset re-applied them — idempotent content).
-                var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == "terms");
-                var daBaseline = FirstBootSeeder.DaDefaultPages().Single(p => p.Slug == "terms");
+                var frBaseline = SeededContentCatalog.FrDefaultPages().Single(p => p.Slug == "terms");
+                var daBaseline = SeededContentCatalog.DaDefaultPages().Single(p => p.Slug == "terms");
                 var frAfter = await q2.Query<PageTranslation>()
                     .Where(t => t.PageId == termsId && t.LanguageCode == "fr")
                     .FirstAsync(ct);
@@ -1859,7 +1859,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         // ADR 0043 D7 / ADR 0044 D5 gap the backfill lane serves). The reset
         // must create the de/fr/da rows from the seeded baselines (the
         // create-if-missing branch of the applier).
-        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var defaultPages = SeededContentCatalog.EnDefaultPages();
         await using (var s = newSession(store))
         {
             await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
@@ -1891,9 +1891,9 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             // de / fr / da rows now exist, each carrying its seeded baseline.
             await using (var q2 = store.QuerySession())
             {
-                var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "help");
-                var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == "help");
-                var daBaseline = FirstBootSeeder.DaDefaultPages().Single(p => p.Slug == "help");
+                var deBaseline = SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == "help");
+                var frBaseline = SeededContentCatalog.FrDefaultPages().Single(p => p.Slug == "help");
+                var daBaseline = SeededContentCatalog.DaDefaultPages().Single(p => p.Slug == "help");
                 var de = await q2.Query<PageTranslation>()
                     .Where(t => t.PageId == helpId && t.LanguageCode == "de")
                     .FirstAsync(ct);
@@ -1999,7 +1999,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await using (var q = store.QuerySession())
         {
             var after = await q.LoadAsync<Page>("pg6-res-blog", TestContext.Current.CancellationToken);
-            var seeded = FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "terms");
+            var seeded = SeededContentCatalog.EnDefaultPages().Single(p => p.Slug == "terms");
             Assert.Equal(seeded.Body, after!.Body);
 
             // The audit Via is Owner (the author of a blog page — the
@@ -2050,7 +2050,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
                 }
 
                 // The content is still the seeded baseline (idempotent).
-                var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "privacy");
+                var deBaseline = SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == "privacy");
                 var de = await q2.Query<PageTranslation>()
                     .Where(t => t.PageId == privacyId && t.LanguageCode == "de")
                     .FirstAsync(ct);
@@ -2075,19 +2075,19 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         // The pure registry probe (the button-visibility gate): a seeded slug
         // is recognized; a non-seeded slug is not.
-        Assert.True(FirstBootSeeder.HasSeededText("terms"));
-        Assert.True(FirstBootSeeder.HasSeededText("help"));
-        Assert.True(FirstBootSeeder.HasSeededText("privacy"));
-        Assert.True(FirstBootSeeder.HasSeededText("conduct"));
+        Assert.True(SeededContentCatalog.HasSeededText("terms"));
+        Assert.True(SeededContentCatalog.HasSeededText("help"));
+        Assert.True(SeededContentCatalog.HasSeededText("privacy"));
+        Assert.True(SeededContentCatalog.HasSeededText("conduct"));
         // A UG guide slug is seeded too (the guide set is part of the
         // reset-eligible universe).
-        var guideSlug = FirstBootSeeder.GuidePages().First().Slug;
-        Assert.True(FirstBootSeeder.HasSeededText(guideSlug));
+        var guideSlug = SeededContentCatalog.GuidePages().First().Slug;
+        Assert.True(SeededContentCatalog.HasSeededText(guideSlug));
 
         // A slug the seed registries do not carry is not reset-eligible.
-        Assert.False(FirstBootSeeder.HasSeededText("my-custom-page"));
-        Assert.False(FirstBootSeeder.HasSeededText(string.Empty));
-        Assert.False(FirstBootSeeder.HasSeededText("about"));   // not seeded (the U05 pin)
+        Assert.False(SeededContentCatalog.HasSeededText("my-custom-page"));
+        Assert.False(SeededContentCatalog.HasSeededText(string.Empty));
+        Assert.False(SeededContentCatalog.HasSeededText("about"));   // not seeded (the U05 pin)
     }
 
     // ─── ADR 0128 — the /admin/help status probe + bulk reset ──────────────
@@ -2225,7 +2225,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             var terms = await q2.Query<Page>()
                 .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
                 .FirstAsync(ct);
-            var seededEn = FirstBootSeeder.EnDefaultPages().Single(b => b.Slug == "terms");
+            var seededEn = SeededContentCatalog.EnDefaultPages().Single(b => b.Slug == "terms");
             Assert.Equal(seededEn.Body, terms.Body);
 
             // One page.reset audit row for the terms page, Via = Admin.
@@ -2251,7 +2251,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         }
 
         // No audit row was written for any page (the write never happened).
-        var slugs = FirstBootSeeder.AllSeededSlugs();
+        var slugs = SeededContentCatalog.AllSeededSlugs();
         var ct = TestContext.Current.CancellationToken;
         await using (var q = store.QuerySession())
         {
@@ -2390,7 +2390,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     private static async Task SeedCanonicalPagesAndTranslationsAsync(
         IDocumentStore store, CancellationToken ct)
     {
-        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var defaultPages = SeededContentCatalog.EnDefaultPages();
         await using var s = store.OpenSession(new Marten.Services.SessionOptions());
         var pageIds = await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
         await FirstBootSeeder.SeedPageTranslationsAsync(s, pageIds, DateTimeOffset.UtcNow, ct);

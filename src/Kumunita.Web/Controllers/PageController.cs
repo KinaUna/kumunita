@@ -688,7 +688,7 @@ public sealed class PageController(
             // with no seeded baseline has nothing to reset to, so the
             // button is hidden (the service's standing re-check is the
             // separate 403 gate on the POST).
-            CanReset = Kumunita.Core.Bootstrap.FirstBootSeeder.HasSeededText(page.Slug),
+            CanReset = Kumunita.Core.Bootstrap.SeededContentCatalog.HasSeededText(page.Slug),
         };
         await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
         return View(model);

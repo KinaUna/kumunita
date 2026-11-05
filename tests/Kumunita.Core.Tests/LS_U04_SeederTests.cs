@@ -256,7 +256,7 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         await using (var session = store.OpenSession(new SessionOptions()))
         {
             var pageIds = await FirstBootSeeder.SeedDefaultPagesAsync(
-                session, FirstBootSeeder.EnDefaultPages(), DateTimeOffset.UtcNow, ct);
+                session, SeededContentCatalog.EnDefaultPages(), DateTimeOffset.UtcNow, ct);
             await FirstBootSeeder.SeedPageTranslationsAsync(session, pageIds, DateTimeOffset.UtcNow, ct);
             await session.SaveChangesAsync(ct);
         }
@@ -304,9 +304,9 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
             Assert.False(string.IsNullOrWhiteSpace(da.Title));
             // Baseline parity with the canonical sources (structure preserved —
             // the ADR 0042 D2 bar holds for all four pages, all three baselines).
-            var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == slug);
-            var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == slug);
-            var daBaseline = FirstBootSeeder.DaDefaultPages().Single(p => p.Slug == slug);
+            var deBaseline = SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == slug);
+            var frBaseline = SeededContentCatalog.FrDefaultPages().Single(p => p.Slug == slug);
+            var daBaseline = SeededContentCatalog.DaDefaultPages().Single(p => p.Slug == slug);
             Assert.Equal(deBaseline.Body, de.Body);
             Assert.Equal(frBaseline.Body, fr.Body);
             Assert.Equal(daBaseline.Body, da.Body);
@@ -360,7 +360,7 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         await using (var session = store.OpenSession(new SessionOptions()))
         {
             await FirstBootSeeder.SeedDefaultPagesAsync(
-                session, FirstBootSeeder.EnDefaultPages(), DateTimeOffset.UtcNow, ct);
+                session, SeededContentCatalog.EnDefaultPages(), DateTimeOffset.UtcNow, ct);
             // Deliberately NOT calling SeedPageTranslationsAsync — the state
             // a deployment seeded before the de/fr/da baselines shipped has.
             await session.SaveChangesAsync(ct);
@@ -388,7 +388,7 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         // Run the backfill (the warm-boot path in SchemaBootstrap).
         await using (var session = store.OpenSession(new SessionOptions()))
         {
-            await FirstBootSeeder.BackfillPageTranslationsAsync(session, ct);
+            await SeededContentCatalog.BackfillPageTranslationsAsync(session, ct);
         }
 
         // After the backfill: each page has exactly de + fr + da rows (3 total),
@@ -414,19 +414,19 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
                 var de = await q.Query<PageTranslation>()
                     .Where(t => t.PageId == page.Id && t.LanguageCode == "de")
                     .FirstAsync(ct);
-                var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == slug);
+                var deBaseline = SeededContentCatalog.DeDefaultPages().Single(p => p.Slug == slug);
                 Assert.Equal(deBaseline.Body, de.Body);
 
                 var fr = await q.Query<PageTranslation>()
                     .Where(t => t.PageId == page.Id && t.LanguageCode == "fr")
                     .FirstAsync(ct);
-                var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == slug);
+                var frBaseline = SeededContentCatalog.FrDefaultPages().Single(p => p.Slug == slug);
                 Assert.Equal(frBaseline.Body, fr.Body);
 
                 var da = await q.Query<PageTranslation>()
                     .Where(t => t.PageId == page.Id && t.LanguageCode == "da")
                     .FirstAsync(ct);
-                var daBaseline = FirstBootSeeder.DaDefaultPages().Single(p => p.Slug == slug);
+                var daBaseline = SeededContentCatalog.DaDefaultPages().Single(p => p.Slug == slug);
                 Assert.Equal(daBaseline.Body, da.Body);
             }
         }
@@ -434,7 +434,7 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         // Re-run the backfill (idempotency — the ADR 0042 D1 skip path).
         await using (var session = store.OpenSession(new SessionOptions()))
         {
-            await FirstBootSeeder.BackfillPageTranslationsAsync(session, ct);
+            await SeededContentCatalog.BackfillPageTranslationsAsync(session, ct);
         }
 
         // After the re-run: still exactly 3 rows per page (no duplicates).
@@ -523,7 +523,7 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         // Run the backfill (the warm-boot path in SchemaBootstrap).
         await using (var session = store.OpenSession(new SessionOptions()))
         {
-            await FirstBootSeeder.BackfillUiStringBaselinesAsync(session, ct);
+            await SeededContentCatalog.BackfillUiStringBaselinesAsync(session, ct);
         }
 
         await using (var q = store.QuerySession())
@@ -576,7 +576,7 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         // Re-run the backfill (idempotency — the ADR 0042 D1 skip path).
         await using (var session = store.OpenSession(new SessionOptions()))
         {
-            await FirstBootSeeder.BackfillUiStringBaselinesAsync(session, ct);
+            await SeededContentCatalog.BackfillUiStringBaselinesAsync(session, ct);
         }
 
         await using (var q = store.QuerySession())

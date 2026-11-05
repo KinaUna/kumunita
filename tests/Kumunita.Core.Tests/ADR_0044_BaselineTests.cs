@@ -29,7 +29,7 @@ namespace Kumunita.Core.Tests;
 /// store → the <c>de</c> <see cref="TranslationResource"/> rows equal
 /// <see cref="KnownTranslationKeys.DeValues"/> key-for-key and value-for-value,
 /// and the <c>de</c> <see cref="PageTranslation"/> rows equal
-/// <see cref="FirstBootSeeder.DeDefaultPages"/>; the <c>en</c> rows are
+/// <see cref="SeededContentCatalog.DeDefaultPages"/>; the <c>en</c> rows are
 /// unchanged. Same pin for <c>fr</c>.</li>
 /// <li><b>Warm-add is a no-op</b> — re-adding an already-added bundled code
 /// does not overwrite an admin edit (create-if-missing, the ADR 0042 D1
@@ -82,9 +82,9 @@ public class ADR_0044_BaselineTests(PostgresFixture fixture) : IClassFixture<Pos
         };
         var baselinePages = code switch
         {
-            "de" => FirstBootSeeder.DeDefaultPages(),
-            "fr" => FirstBootSeeder.FrDefaultPages(),
-            "da" => FirstBootSeeder.DaDefaultPages(),
+            "de" => SeededContentCatalog.DeDefaultPages(),
+            "fr" => SeededContentCatalog.FrDefaultPages(),
+            "da" => SeededContentCatalog.DaDefaultPages(),
             _ => throw new NotSupportedException(code)
         };
 
@@ -237,7 +237,7 @@ public class ADR_0044_BaselineTests(PostgresFixture fixture) : IClassFixture<Pos
         var pageCount2 = await q2.Query<PageTranslation>()
             .Where(t => t.LanguageCode == code)
             .CountAsync(ct);
-        Assert.Equal(FirstBootSeeder.DeDefaultPages().Length, pageCount2);
+        Assert.Equal(SeededContentCatalog.DeDefaultPages().Length, pageCount2);
     }
 
     // ── 3b — Reset: a non-bundled code's rows are RETAINED (M·7) ────────────
@@ -320,7 +320,7 @@ public class ADR_0044_BaselineTests(PostgresFixture fixture) : IClassFixture<Pos
         var de = await svc.GetBundledBaselineAsync("de");
         Assert.NotNull(de);
         Assert.Equal(KnownTranslationKeys.DeValues.Count, de!.UiStrings.Count);
-        Assert.Equal(FirstBootSeeder.DeDefaultPages().Length, de.PageBaselines.Count);
+        Assert.Equal(SeededContentCatalog.DeDefaultPages().Length, de.PageBaselines.Count);
     }
 
     // ─── Shared helpers ─────────────────────────────────────────────────────
@@ -384,7 +384,7 @@ public class ADR_0044_BaselineTests(PostgresFixture fixture) : IClassFixture<Pos
         // The en system pages (terms / help / privacy / conduct under the
         // `system` root) — the seeder's exact page-seeding surface.
         await FirstBootSeeder.SeedDefaultPagesAsync(
-            session, FirstBootSeeder.EnDefaultPages(), now, ct);
+            session, SeededContentCatalog.EnDefaultPages(), now, ct);
 
         await session.SaveChangesAsync(ct);
     }

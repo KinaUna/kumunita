@@ -121,7 +121,7 @@ public sealed class C02_DataAsEmbeddedResourcesTests
     [InlineData("da")]
     public void EveryEnGuideHasACounterpartInLanguage(string lang)
     {
-        var enGuides = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToHashSet(StringComparer.Ordinal);
+        var enGuides = SeededContentCatalog.GuidePages().Select(g => g.Slug).ToHashSet(StringComparer.Ordinal);
         var langGuides = Accessor.GuideSet(lang).Select(g => g.Slug).ToHashSet(StringComparer.Ordinal);
 
         var missing = enGuides.Where(s => !langGuides.Contains(s)).OrderBy(s => s).ToList();
@@ -132,8 +132,8 @@ public sealed class C02_DataAsEmbeddedResourcesTests
     [Fact(DisplayName = "C02: every nested-guide parent is itself a seeded guide slug")]
     public void GuideParentMapReferencesOnlySeededGuideSlugs()
     {
-        var parentMap = FirstBootSeeder.GuideParentMap();
-        var slugs = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToHashSet(StringComparer.Ordinal);
+        var parentMap = SeededContentCatalog.GuideParentMap();
+        var slugs = SeededContentCatalog.GuidePages().Select(g => g.Slug).ToHashSet(StringComparer.Ordinal);
 
         // Every child in the map is a real guide; every parent is a real guide (so
         // SeedUserGuidesAsync's parent resolution always finds a seeded parent).
@@ -178,10 +178,10 @@ public sealed class C02_DataAsEmbeddedResourcesTests
 
         public static (string Slug, string Title, string Body)[] GuideSet(string lang) => lang switch
         {
-            "en" => FirstBootSeeder.GuidePages(),
-            "de" => FirstBootSeeder.DeGuidePages(),
-            "fr" => FirstBootSeeder.FrGuidePages(),
-            "da" => FirstBootSeeder.DaGuidePages(),
+            "en" => SeededContentCatalog.GuidePages(),
+            "de" => SeededContentCatalog.DeGuidePages(),
+            "fr" => SeededContentCatalog.FrGuidePages(),
+            "da" => SeededContentCatalog.DaGuidePages(),
             _ => throw new ArgumentException($"unknown language '{lang}'", nameof(lang)),
         };
     }

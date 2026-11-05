@@ -225,15 +225,15 @@ public sealed class LocalizationService : ILocalizationService
         {
             case "de":
                 uiStrings = KnownTranslationKeys.DeValues;
-                pages = FirstBootSeeder.DeDefaultPages();
+                pages = SeededContentCatalog.DeDefaultPages();
                 break;
             case "fr":
                 uiStrings = KnownTranslationKeys.FrValues;
-                pages = FirstBootSeeder.FrDefaultPages();
+                pages = SeededContentCatalog.FrDefaultPages();
                 break;
             case "da":
                 uiStrings = KnownTranslationKeys.DaValues;
-                pages = FirstBootSeeder.DaDefaultPages();
+                pages = SeededContentCatalog.DaDefaultPages();
                 break;
             default:
                 return Task.FromResult<BundledLanguageBaseline?>(null);
