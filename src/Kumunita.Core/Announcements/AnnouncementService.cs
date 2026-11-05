@@ -849,7 +849,7 @@ public sealed class AnnouncementService : IAnnouncementService
     /// </summary>
     public static bool CanTranslateAnnouncement(
         AnnouncementScope scope, string? communityId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveTranslationStanding(scope, communityId, actorId, actorRoles) is not null;
+        => AnnouncementTranslationPolicy.CanTranslateAnnouncement(scope, communityId, actorId, actorRoles);
 
     /// <summary>
     /// The ADR 0029 announcement-translation standing resolver (shared by
@@ -870,20 +870,7 @@ public sealed class AnnouncementService : IAnnouncementService
     /// </summary>
     private static Authorization.AccessVia? ResolveTranslationStanding(
         AnnouncementScope scope, string? communityId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (actorRoles.Contains(Roles.Translator))
-            return Authorization.AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return Authorization.AccessVia.Admin;
-
-        if (scope == AnnouncementScope.Community
-            && communityId is not null
-            && actorRoles.Contains(Roles.ModeratorComponent(communityId)))
-            return Authorization.AccessVia.Moderator;
-
-        return null;
-    }
+        => AnnouncementTranslationPolicy.ResolveTranslationStanding(scope, communityId, actorId, actorRoles);
 
     /// <summary>
     /// Resolves the actor's read-visibility for announcements: whether they are signed in

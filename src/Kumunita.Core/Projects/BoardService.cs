@@ -121,18 +121,7 @@ public sealed class BoardService : ProjectsStore, IBoardService
 
     private static AccessVia? ResolveBoardTranslationStanding(
         string boardAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (string.Equals(boardAuthorId, actorId, StringComparison.Ordinal))
-            return AccessVia.Owner;
-
-        if (actorRoles.Contains(Roles.Translator))
-            return AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return AccessVia.Admin;
-
-        return null;
-    }
+        => BoardTranslationPolicy.ResolveTranslationStanding(boardAuthorId, actorId, actorRoles);
 
     public async Task<BoardPage> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
@@ -1536,5 +1525,5 @@ public sealed class BoardService : ProjectsStore, IBoardService
     /// </summary>
     public static bool CanAddBoardTranslation(
         string boardAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveBoardTranslationStanding(boardAuthorId, actorId, actorRoles) is not null;
+        => BoardTranslationPolicy.CanAddBoardTranslation(boardAuthorId, actorId, actorRoles);
 }

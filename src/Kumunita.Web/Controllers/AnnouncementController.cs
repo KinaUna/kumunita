@@ -358,7 +358,7 @@ public sealed class AnnouncementController(
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
             .ToList();
         var actor = SubjectId(User) ?? string.Empty;
-        var canTranslate = AnnouncementService.CanTranslateAnnouncement(
+        var canTranslate = AnnouncementTranslationPolicy.CanTranslateAnnouncement(
             a.Scope, a.CommunityId, actor, RoleSet(User));
 
         // ADR 0101 — the resident-comment surface on the detail page. It

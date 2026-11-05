@@ -87,18 +87,7 @@ public sealed class ProjectService : ProjectsStore, IProjectService, ITodoServic
 
     private static AccessVia? ResolveProjectTranslationStanding(
         string projectAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (string.Equals(projectAuthorId, actorId, StringComparison.Ordinal))
-            return AccessVia.Owner;
-
-        if (actorRoles.Contains(Roles.Translator))
-            return AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return AccessVia.Admin;
-
-        return null;
-    }
+        => ProjectTranslationPolicy.ResolveTranslationStanding(projectAuthorId, actorId, actorRoles);
 
     private static bool ListsEqual(IReadOnlyList<string> a, IReadOnlyList<string> b)
         => new HashSet<string>(a, StringComparer.Ordinal).SetEquals(b);
@@ -150,22 +139,7 @@ public sealed class ProjectService : ProjectsStore, IProjectService, ITodoServic
     /// </summary>
     private static AccessVia? ResolveTodoTranslationStanding(
         string todoAuthorId, string? todoAssigneeId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (string.Equals(todoAuthorId, actorId, StringComparison.Ordinal))
-            return AccessVia.Owner;
-
-        if (!string.IsNullOrEmpty(todoAssigneeId)
-            && string.Equals(todoAssigneeId, actorId, StringComparison.Ordinal))
-            return AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.Translator))
-            return AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return AccessVia.Admin;
-
-        return null;
-    }
+        => TodoTranslationPolicy.ResolveTranslationStanding(todoAuthorId, todoAssigneeId, actorId, actorRoles);
 
     public async Task<GoalPage> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
@@ -634,7 +608,7 @@ public sealed class ProjectService : ProjectsStore, IProjectService, ITodoServic
     /// </summary>
     public static bool CanAddProjectTranslation(
         string projectAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveProjectTranslationStanding(projectAuthorId, actorId, actorRoles) is not null;
+        => ProjectTranslationPolicy.CanAddProjectTranslation(projectAuthorId, actorId, actorRoles);
 
     // ── C08 (ADR 0287) — board / todo forwards (test-compat facade) ──
     public Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null) => Todos.ListTodosAsync(componentId,assigneeId,actorId,page,unassignedOnly,projectId,blockedOnly,ct,sort,pageSize);

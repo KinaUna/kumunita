@@ -385,7 +385,7 @@ public sealed class BoardsController : ProjectsBaseController
             Translations: boardTranslations,
             Languages: LanguageOptionsFrom(boardTranslations, await ComposerSeedOptions.SeedLanguagePickerAsync(localization), t => t.LanguageCode),
             CanTranslate: !string.IsNullOrEmpty(actorId)
-                          && BoardService.CanAddBoardTranslation(result.Board.AuthorId, actorId, RoleSet(User)),
+                          && BoardTranslationPolicy.CanAddBoardTranslation(result.Board.AuthorId, actorId, RoleSet(User)),
             OriginalLanguageCode: result.Board.LanguageCode,
             Tags: boardTagRows,
             // ADR 0285 D6 — "list" is the only other value; anything else is

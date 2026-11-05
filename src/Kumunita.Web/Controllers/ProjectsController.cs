@@ -734,7 +734,7 @@ public sealed class ProjectsController : ProjectsBaseController
             Translations: projectTranslations,
             Languages: LanguageOptionsFrom(projectTranslations, await ComposerSeedOptions.SeedLanguagePickerAsync(localization), t => t.LanguageCode),
             CanTranslate: !string.IsNullOrEmpty(actorId)
-                          && ProjectService.CanAddProjectTranslation(project.AuthorId, actorId, RoleSet(User)),
+                          && ProjectTranslationPolicy.CanAddProjectTranslation(project.AuthorId, actorId, RoleSet(User)),
             OriginalLanguageCode: project.LanguageCode);
 
         return View("ProjectDetail", vm);

@@ -1388,7 +1388,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         var expectedAllow = role is "GlobalAdmin" or "Translator"
             || (role == "Moderator" && lane == "targeted-community");
 
-        var actual = AnnouncementService.CanTranslateAnnouncement(
+        var actual = AnnouncementTranslationPolicy.CanTranslateAnnouncement(
             shape.scope, shape.communityId, "u-actor", roles);
 
         Assert.Equal(expectedAllow, actual);

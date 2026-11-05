@@ -736,7 +736,8 @@
       "from": "Announcements",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 1
+      "count": 2,
+      "adr": "0291"
     },
     {
       "from": "Announcements",
@@ -1861,13 +1862,15 @@
       "from": "Pages",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 1
+      "count": 2,
+      "adr": "0291"
     },
     {
       "from": "Pages",
       "to": "Identity",
       "symbol": "User",
-      "count": 2
+      "count": 3,
+      "adr": "0291"
     },
     {
       "from": "Pages",
@@ -2798,12 +2801,6 @@
     {
       "from": "Web",
       "to": "Announcements",
-      "symbol": "AnnouncementService",
-      "count": 1
-    },
-    {
-      "from": "Web",
-      "to": "Announcements",
       "symbol": "AnnouncementTranslation",
       "count": 1
     },
@@ -3236,12 +3233,6 @@
     {
       "from": "Web",
       "to": "Pages",
-      "symbol": "PageService",
-      "count": 1
-    },
-    {
-      "from": "Web",
-      "to": "Pages",
       "symbol": "PageToAuditableResource",
       "count": 3
     },
@@ -3303,12 +3294,6 @@
     {
       "from": "Web",
       "to": "Projects",
-      "symbol": "BoardService",
-      "count": 1
-    },
-    {
-      "from": "Web",
-      "to": "Projects",
       "symbol": "BoardTranslation",
       "count": 1
     },
@@ -3347,12 +3332,6 @@
     {
       "from": "Web",
       "to": "Projects",
-      "symbol": "ProjectService",
-      "count": 1
-    },
-    {
-      "from": "Web",
-      "to": "Projects",
       "symbol": "ProjectTranslation",
       "count": 1
     },
@@ -3362,12 +3341,6 @@
       "symbol": "TodoItem",
       "count": 6,
       "adr": "0290"
-    },
-    {
-      "from": "Web",
-      "to": "Projects",
-      "symbol": "TodoService",
-      "count": 1
     },
     {
       "from": "Web",

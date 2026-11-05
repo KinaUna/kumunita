@@ -414,7 +414,7 @@ public sealed class PageController(
         // server-side (U06; the PostService.CanAddTranslation /
         // AnnouncementService.CanTranslateAnnouncement shape). A display
         // convenience only — the real gate is the service (C3).
-        var canTranslate = PageService.CanTranslatePage(
+        var canTranslate = PageTranslationPolicy.CanTranslatePage(
             actorId ?? string.Empty, KumunitaPrincipal.RoleSet(User), page);
 
         // ADR 0049 — the default-visible variant is the viewer's current

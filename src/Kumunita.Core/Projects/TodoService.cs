@@ -230,22 +230,7 @@ public sealed class TodoService : ProjectsStore, ITodoService
 
     private static AccessVia? ResolveTodoTranslationStanding(
         string todoAuthorId, string? todoAssigneeId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (string.Equals(todoAuthorId, actorId, StringComparison.Ordinal))
-            return AccessVia.Owner;
-
-        if (!string.IsNullOrEmpty(todoAssigneeId)
-            && string.Equals(todoAssigneeId, actorId, StringComparison.Ordinal))
-            return AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.Translator))
-            return AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return AccessVia.Admin;
-
-        return null;
-    }
+        => TodoTranslationPolicy.ResolveTranslationStanding(todoAuthorId, todoAssigneeId, actorId, actorRoles);
 
     public async Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
@@ -1329,5 +1314,5 @@ public sealed class TodoService : ProjectsStore, ITodoService
     /// </summary>
     public static bool CanAddTodoTranslation(
         string todoAuthorId, string? todoAssigneeId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveTodoTranslationStanding(todoAuthorId, todoAssigneeId, actorId, actorRoles) is not null;
+        => TodoTranslationPolicy.CanAddTodoTranslation(todoAuthorId, todoAssigneeId, actorId, actorRoles);
 }

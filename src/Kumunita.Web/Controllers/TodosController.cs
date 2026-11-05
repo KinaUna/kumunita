@@ -371,7 +371,7 @@ public sealed class TodosController : ProjectsBaseController
         var todoTranslations = await this.todos.GetTodoTranslationsAsync(id);
         var todoLanguages = LanguageOptionsFrom(todoTranslations, await ComposerSeedOptions.SeedLanguagePickerAsync(localization), t => t.LanguageCode);
         var canTranslateTodo = !string.IsNullOrEmpty(actorId)
-            && TodoService.CanAddTodoTranslation(result.Todo.AuthorId, result.Todo.AssigneeId, actorId, RoleSet(User));
+            && TodoTranslationPolicy.CanAddTodoTranslation(result.Todo.AuthorId, result.Todo.AssigneeId, actorId, RoleSet(User));
 
         // ADR 0100 — the to-do's comments + replies (C-M3·1: the to-do's single
         // Read decision already ran in GetTodoAsync; a comment inherits it —

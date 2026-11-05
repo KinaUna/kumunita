@@ -381,14 +381,7 @@ public sealed class PageService : IPageService
     /// .CanTranslateAnnouncement"/> shape).
     /// </summary>
     public static bool CanTranslatePage(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (page is null)
-            return false;
-        if (string.IsNullOrEmpty(actorId))
-            return false;
-        return CanTranslatePageCore(actorId, actorRoles, page);
-    }
+        => PageTranslationPolicy.CanTranslatePage(actorId, actorRoles, page);
 
     /// <summary>
     /// The single shared translation-standing decision (ADR 0040, amending
@@ -410,23 +403,7 @@ public sealed class PageService : IPageService
     /// never disagree.
     /// </summary>
     private static bool CanTranslatePageCore(string actorId, IReadOnlySet<string> actorRoles, Page page)
-    {
-        // ADR 0161 — the author of a blog (User) page may translate it, the
-        // same branch CheckEditStanding grants for editing (author ∪
-        // GlobalAdmin on a User page). A System page's author is an audit
-        // identity, not a standing branch, so this is scoped to User kind —
-        // a resident cannot translate a system page by being its author (only
-        // GlobalAdmin / Translator may, as before).
-        if (page.Kind == PageKind.User
-            && string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
-            return true;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return true;
-        if (actorRoles.Contains(Roles.Translator))
-            return true;
-        return false;
-    }
+        => PageTranslationPolicy.ResolveStanding(actorId, actorRoles, page);
 
     // ─── Hierarchy guards (ADR 0039 §3.3 — cycle-guard + depth-cap) ───────
     //
