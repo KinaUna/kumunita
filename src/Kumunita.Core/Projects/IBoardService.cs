@@ -2,6 +2,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
+using Kumunita.Core.Translations;
 
 namespace Kumunita.Core.Projects;
 
@@ -357,60 +358,24 @@ public interface IBoardService
     Task<IReadOnlyList<BoardTranslation>> GetBoardTranslationsAsync(string boardId);
 
     /// <summary>
-    /// Add a **user-added translation** of a Kanban board into a language other
-    /// than the one it was authored in (ADR 0088). One row per
-    /// <c>(boardId, languageCode)</c> pair (the
-    /// <see cref="ProjectDocTypes.Configure"/>'s <c>(BoardId, LanguageCode)</c>
-    /// unique index). <b>Standing (ADR 0088 D3):</b> the board's
-    /// <b>creator</b> (<see cref="AccessVia.Owner"/>), a <b>Translator</b>
-    /// (ADR 0021, <see cref="AccessVia.Admin"/>), or a <b>GlobalAdmin</b>
-    /// (ADR 0030, <see cref="AccessVia.Admin"/>). A denied actor throws
-    /// <see cref="UnauthorizedAccessException"/> before anything is stored. The
-    /// <c>AccessAudit</c> row (<c>boardtranslation.add</c>,
-    /// <c>TargetKind = "board"</c>) commits atomically with the write (C3).
+    /// The **shared translation-variant write lane** (ADR 0288) for a Kanban
+    /// board — <see cref="TranslationLane{TParent,TVar}.AddAsync"/> /
+    /// <see cref="TranslationLane{TParent,TVar}.UpdateAsync"/> /
+    /// <see cref="TranslationLane{TParent,TVar}.RemoveAsync"/> over the
+    /// <c>(boardId, languageCode)</c> pair the <c>(BoardId, LanguageCode)</c>
+    /// unique index enforces. C2-02 (IMPROVE-CODE-2 DoD #5) retired the three
+    /// per-surface <c>Add/Update/Remove*BoardTranslationAsync</c> forwarders in
+    /// favour of this lane + the board's <see cref="TranslationDescriptor{TParent,TVar}"/>
+    /// (the C06/C2-01 <c>PostService.PostTranslationLane</c> shape). The standing
+    /// (the board's <b>creator</b> <see cref="AccessVia.Owner"/>, a
+    /// <b>Translator</b> (ADR 0021) or a <b>GlobalAdmin</b> (ADR 0030), ADR 0088 D3),
+    /// the hand-written <c>AccessAudit</c> row, and the single atomic
+    /// <c>SaveChangesAsync</c> (C3) all live on the lane; the caller supplies the
+    /// <c>IDocumentSession</c>. A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing board or row throws
+    /// <see cref="KeyNotFoundException"/>.
     /// </summary>
-    /// <exception cref="KeyNotFoundException">The board id is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / Translator / GlobalAdmin standings.</exception>
-    Task<BoardTranslation> AddBoardTranslationAsync(
-        string boardId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
-
-    /// <summary>
-    /// Edit an existing board translation (ADR 0088, the ADR 0048 edit-lane
-    /// shape): updates the <see cref="BoardTranslation.Title"/> /
-    /// <see cref="BoardTranslation.Body"/> for the
-    /// <c>(boardId, languageCode)</c> pair, stamps
-    /// <see cref="BoardTranslation.Created"/> and re-records
-    /// <see cref="BoardTranslation.AuthorId"/>. Same standing as
-    /// <see cref="AddBoardTranslationAsync"/>. A missing row is a
-    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
-    /// (<c>boardtranslation.update</c>, <c>TargetKind = "board"</c>) commits
-    /// atomically with the write (C3).
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The board or the (board, language)
-    /// row is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / Translator / GlobalAdmin standings.</exception>
-    Task<BoardTranslation> UpdateBoardTranslationAsync(
-        string boardId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
-
-    /// <summary>
-    /// Remove a board translation (ADR 0088, the ADR 0048 remove-lane shape):
-    /// deletes the <c>(boardId, languageCode)</c> row. Same standing as
-    /// <see cref="AddBoardTranslationAsync"/>. A missing row is a
-    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
-    /// (<c>boardtranslation.remove</c>, <c>TargetKind = "board"</c>) commits
-    /// atomically with the write (C3).
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The board or the (board, language)
-    /// row is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / Translator / GlobalAdmin standings.</exception>
-    Task RemoveBoardTranslationAsync(
-        string boardId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+    TranslationLane<KanbanBoard, BoardTranslation> BoardTranslationLane { get; }
 
     /// <summary>
     /// **Reorder within the lane** — <paramref name="direction"/> is

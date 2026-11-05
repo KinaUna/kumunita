@@ -1247,7 +1247,7 @@ public sealed class BoardsController : ProjectsBaseController
     /// Adds a **user-added translation** of the board into
     /// <paramref name="languageCode"/> (ADR 0088):
     /// <c>POST /projects/boards/{id}/translations</c>. A thin Web lane (ADR
-    /// 0006-D) delegating to <see cref="IProjectService.AddBoardTranslationAsync"/>.
+    /// 0006-D) delegating to <see cref="IBoardService.BoardTranslationLane"/> (ADR 0288).
     /// <para>
     /// <b>Precondition (C-M3·1):</b> the viewer must be able to see the board
     /// (re-run the parent's single <c>Read</c> decision via
@@ -1295,13 +1295,12 @@ public sealed class BoardsController : ProjectsBaseController
             return new ForbidResult();
         }
 
+        // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
+        // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
+        await using var session = store.LightweightSession();
         try
         {
-            await this.boards.AddBoardTranslationAsync(
-                id, languageCode,
-                string.IsNullOrWhiteSpace(title) ? null : title,
-                string.IsNullOrWhiteSpace(body) ? null : body,
-                actorId, RoleSet(User), HttpContext.RequestAborted);
+            await this.boards.BoardTranslationLane.AddAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {
@@ -1323,7 +1322,7 @@ public sealed class BoardsController : ProjectsBaseController
     /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 edit-lane
     /// shape): <c>POST /projects/boards/{id}/translations/update</c>. Thin Web
     /// lane; delegates to
-    /// <see cref="IProjectService.UpdateBoardTranslationAsync"/>. Precondition +
+    /// <see cref="IBoardService.BoardTranslationLane"/> (ADR 0288). Precondition +
     /// failure shapes mirror <see cref="AddBoardTranslation"/>.
     /// </summary>
     [HttpPost("/projects/boards/{id}/translations/update")]
@@ -1365,13 +1364,12 @@ public sealed class BoardsController : ProjectsBaseController
             return new ForbidResult();
         }
 
+        // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
+        // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
+        await using var session = store.LightweightSession();
         try
         {
-            await this.boards.UpdateBoardTranslationAsync(
-                id, languageCode,
-                string.IsNullOrWhiteSpace(title) ? null : title,
-                string.IsNullOrWhiteSpace(body) ? null : body,
-                actorId, RoleSet(User), HttpContext.RequestAborted);
+            await this.boards.BoardTranslationLane.UpdateAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {
@@ -1393,7 +1391,7 @@ public sealed class BoardsController : ProjectsBaseController
     /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 remove-lane
     /// shape): <c>POST /projects/boards/{id}/translations/remove</c>. Thin Web
     /// lane; delegates to
-    /// <see cref="IProjectService.RemoveBoardTranslationAsync"/>. Failure
+    /// <see cref="IBoardService.BoardTranslationLane"/> (ADR 0288). Failure
     /// shapes mirror <see cref="AddBoardTranslation"/>.
     /// </summary>
     [HttpPost("/projects/boards/{id}/translations/remove")]
@@ -1428,9 +1426,12 @@ public sealed class BoardsController : ProjectsBaseController
             return new ForbidResult();
         }
 
+        // C2-02 (ADR 0288) — the shared write lane (M3 shape: the controller
+        // owns the in-flight session; one SaveChangesAsync, C3).
+        await using var session = store.LightweightSession();
         try
         {
-            await this.boards.RemoveBoardTranslationAsync(id, languageCode, actorId, RoleSet(User), HttpContext.RequestAborted);
+            await this.boards.BoardTranslationLane.RemoveAsync(session, id, languageCode, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {

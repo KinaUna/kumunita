@@ -686,21 +686,17 @@ public sealed class ProjectService : ProjectsStore, IProjectService, ITodoServic
     public Task<KanbanLane> CreateLaneAsync(string boardId, string title, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.CreateLaneAsync(boardId,title,actorId,actorRoles,ct);
     public Task<KanbanLane> MoveLaneToPositionAsync(string laneId, int index, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.MoveLaneToPositionAsync(laneId,index,actorId,actorRoles,ct);
     public Task<BoardItemPlacement> MoveTodoToLanePositionAsync(string placementId, string targetLaneId, int index, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.MoveTodoToLanePositionAsync(placementId,targetLaneId,index,actorId,actorRoles,ct);
-    public Task<BoardTranslation> AddBoardTranslationAsync(
-        string boardId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.AddBoardTranslationAsync(boardId,languageCode,title,body,actorId,actorRoles,ct);
-    public Task<BoardTranslation> UpdateBoardTranslationAsync(
-        string boardId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.UpdateBoardTranslationAsync(boardId,languageCode,title,body,actorId,actorRoles,ct);
+    // C2-02 (ADR 0288) — the board translation write seam is the shared
+    // <see cref="BoardTranslationLane"/> (this surface delegates to the
+    // <see cref="BoardService"/>'s lane); the per-surface
+    // Add/Update/Remove*BoardTranslationAsync forwarders are retired.
+    public TranslationLane<KanbanBoard, BoardTranslation> BoardTranslationLane => Boards.BoardTranslationLane;
     public Task<BoardItemPlacement> MoveTodoWithinLaneAsync(string placementId, string direction, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.MoveTodoWithinLaneAsync(placementId,direction,actorId,actorRoles,ct);
     public Task<BoardItemPlacement> MoveTodoToAdjacentLaneAsync(string placementId, string direction, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.MoveTodoToAdjacentLaneAsync(placementId,direction,actorId,actorRoles,ct);
     public Task<BoardItemPlacement> MoveTodoToBoardAsync(string todoItemId, string targetBoardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.MoveTodoToBoardAsync(todoItemId,targetBoardId,actorId,actorRoles,ct);
     public Task<TodoItem> CopyTodoToBoardAsync(string todoItemId, string targetBoardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.CopyTodoToBoardAsync(todoItemId,targetBoardId,actorId,actorRoles,ct);
     public Task DeleteLaneAsync(string laneId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.DeleteLaneAsync(laneId,actorId,actorRoles,ct);
     public Task DeleteBoardAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.DeleteBoardAsync(boardId,actorId,actorRoles,ct);
-    public Task RemoveBoardTranslationAsync(
-        string boardId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Boards.RemoveBoardTranslationAsync(boardId,languageCode,actorId,actorRoles,ct);
 
     public Task<IReadOnlyList<TodoTranslation>> GetTodoTranslationsAsync(string todoItemId) => Todos.GetTodoTranslationsAsync(todoItemId);
     public Task<IReadOnlyList<KanbanBoard>> ListBoardsForTodoAsync(string todoItemId, string actorId, CancellationToken ct = default) => Boards.ListBoardsForTodoAsync(todoItemId, actorId, ct);

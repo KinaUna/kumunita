@@ -20,7 +20,14 @@ namespace Kumunita.Core.Projects;
 /// </summary>
 public sealed class BoardService : ProjectsStore, IBoardService
 {
-    private readonly TranslationLane<KanbanBoard, BoardTranslation> _boardTranslationLane;
+    // C2-02 (ADR 0288, IMPROVE-CODE-2 DoD #5) — the shared translation-variant
+    // write lane (the C06/C2-01 `PostService.PostTranslationLane` shape). Exposed
+    // as a public property (a D6-legal `record` cross-module target) so the Web
+    // layer codes against the lane directly; the per-surface `Add/Update/Remove`
+    // *BoardTranslation* forwarders are retired — the lane + descriptor own the
+    // standing / audit / atomic-commit shape once. The caller supplies the
+    // `IDocumentSession` (M3 shape).
+    public TranslationLane<KanbanBoard, BoardTranslation> BoardTranslationLane { get; }
 
     public BoardService(
         IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
@@ -28,7 +35,7 @@ public sealed class BoardService : ProjectsStore, IBoardService
         ILocalizationService? localization = null, ITagService? tags = null,
         Kumunita.Core.Mentions.IMentionService? mentions = null) : base(store, authorization, userInfo, notifications, translator, localization, tags, mentions)
     {
-        _boardTranslationLane = new TranslationLane<KanbanBoard, BoardTranslation>(new TranslationDescriptor<KanbanBoard, BoardTranslation>
+        BoardTranslationLane = new TranslationLane<KanbanBoard, BoardTranslation>(new TranslationDescriptor<KanbanBoard, BoardTranslation>
         {
             TargetKind = TargetKindBoard,
             ActionPrefix = "boardtranslation",
@@ -1157,29 +1164,15 @@ public sealed class BoardService : ProjectsStore, IBoardService
             .ConfigureAwait(false);
     }
 
-    public async Task<BoardTranslation> AddBoardTranslationAsync(
-        string boardId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        return await _boardTranslationLane.AddAsync(session, boardId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
-    }
-
-    public async Task<BoardTranslation> UpdateBoardTranslationAsync(
-        string boardId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        return await _boardTranslationLane.UpdateAsync(session, boardId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
-    }
-
-    public async Task RemoveBoardTranslationAsync(
-        string boardId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        await _boardTranslationLane.RemoveAsync(session, boardId, languageCode, actorId, actorRoles).ConfigureAwait(false);
-    }
+    // C2-02 (ADR 0288, IMPROVE-CODE-2 DoD #5) — the three per-surface write
+    // forwarders (Add/Update/Remove *BoardTranslation*Async) are retired; the
+    // shared <see cref="BoardTranslationLane"/> (this surface's descriptor) owns
+    // the standing / audit / atomic-commit shape once, and the Web layer codes
+    // against it directly (the C06/C2-01 `PostService.PostTranslationLane`
+    // shape). The read seam <see cref="GetBoardTranslationsAsync"/> stays on the
+    // service — its shape is surface-specific (a single-parent
+    // self-`QuerySession`), which the write lane intentionally does not own
+    // (ADR 0288 "What the lane does NOT own").
 
     public async Task<BoardItemPlacement> MoveTodoWithinLaneAsync(string placementId, string direction, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
