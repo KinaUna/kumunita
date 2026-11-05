@@ -427,4 +427,45 @@ public sealed class DocumentFolderService : IDocumentFolderService
         session.Store(audit);
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
+
+    // ── C2-04 session-owning overloads (the Web controller stops opening its
+    //    own LightweightSession; the service opens it internally). Behaviour is
+    //    identical to the IDocumentSession overloads — the same documents are
+    //    written, the same AccessAudit rows are recorded, the same single C3
+    //    SaveChangesAsync — only which layer owns the session moves. ─────────
+
+    /// <summary>Session-owning Create (C2-04) — the Web controller no longer opens its own session.</summary>
+    public async Task<DocumentFolder> CreateAsync(string name, string? parentId, string actorId)
+    {
+        await using var session = _store.LightweightSession();
+        return await CreateAsync(name, parentId, actorId, session).ConfigureAwait(false);
+    }
+
+    /// <summary>Session-owning MoveDocument (C2-04).</summary>
+    public async Task<Document> MoveDocumentAsync(string documentId, string? newFolderId, string actorId)
+    {
+        await using var session = _store.LightweightSession();
+        return await MoveDocumentAsync(documentId, newFolderId, actorId, session).ConfigureAwait(false);
+    }
+
+    /// <summary>Session-owning Rename (C2-04).</summary>
+    public async Task<DocumentFolder> RenameAsync(string folderId, string name, string actorId, IReadOnlySet<string> roles)
+    {
+        await using var session = _store.LightweightSession();
+        return await RenameAsync(folderId, name, actorId, roles, session).ConfigureAwait(false);
+    }
+
+    /// <summary>Session-owning Move (C2-04).</summary>
+    public async Task<DocumentFolder> MoveAsync(string folderId, string? newParentId, string actorId, IReadOnlySet<string> roles)
+    {
+        await using var session = _store.LightweightSession();
+        return await MoveAsync(folderId, newParentId, actorId, roles, session).ConfigureAwait(false);
+    }
+
+    /// <summary>Session-owning Delete (C2-04).</summary>
+    public async Task DeleteAsync(string folderId, string actorId, IReadOnlySet<string> roles)
+    {
+        await using var session = _store.LightweightSession();
+        await DeleteAsync(folderId, actorId, roles, session).ConfigureAwait(false);
+    }
 }

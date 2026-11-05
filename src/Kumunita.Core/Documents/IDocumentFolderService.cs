@@ -30,6 +30,9 @@ public interface IDocumentFolderService
     /// </summary>
     Task<DocumentFolder> CreateAsync(string name, string? parentId, string actorId, IDocumentSession session);
 
+    /// <summary>Session-owning overload (C2-04) — the Web controller no longer opens its own session; the service owns the write + the single <c>SaveChangesAsync</c>.</summary>
+    Task<DocumentFolder> CreateAsync(string name, string? parentId, string actorId);
+
     /// <summary>
     /// List folders under a parent (the controller's <c>Index</c> read). The
     /// <see cref="DocumentFolderService"/> implementation is unchanged.
@@ -43,11 +46,17 @@ public interface IDocumentFolderService
     /// </summary>
     Task<Document> MoveDocumentAsync(string documentId, string? newFolderId, string actorId, IDocumentSession session);
 
+    /// <summary>Session-owning overload (C2-04) — the Web controller no longer opens its own session.</summary>
+    Task<Document> MoveDocumentAsync(string documentId, string? newFolderId, string actorId);
+
     /// <summary>
     /// Rename a folder (the controller's <c>Rename</c> write lane). The
     /// <see cref="DocumentFolderService"/> implementation is unchanged.
     /// </summary>
     Task<DocumentFolder> RenameAsync(string folderId, string name, string actorId, System.Collections.Generic.IReadOnlySet<string> roles, IDocumentSession session);
+
+    /// <summary>Session-owning overload (C2-04) — the Web controller no longer opens its own session.</summary>
+    Task<DocumentFolder> RenameAsync(string folderId, string name, string actorId, System.Collections.Generic.IReadOnlySet<string> roles);
 
     /// <summary>
     /// Move a folder to a different parent (the controller's <c>Move</c>
@@ -56,9 +65,15 @@ public interface IDocumentFolderService
     /// </summary>
     Task<DocumentFolder> MoveAsync(string folderId, string? newParentId, string actorId, System.Collections.Generic.IReadOnlySet<string> roles, IDocumentSession session);
 
+    /// <summary>Session-owning overload (C2-04) — the Web controller no longer opens its own session.</summary>
+    Task<DocumentFolder> MoveAsync(string folderId, string? newParentId, string actorId, System.Collections.Generic.IReadOnlySet<string> roles);
+
     /// <summary>
     /// Delete a folder (the controller's <c>Delete</c> write lane). The
     /// <see cref="DocumentFolderService"/> implementation is unchanged.
     /// </summary>
     Task DeleteAsync(string folderId, string actorId, System.Collections.Generic.IReadOnlySet<string> roles, IDocumentSession session);
+
+    /// <summary>Session-owning overload (C2-04) — the Web controller no longer opens its own session.</summary>
+    Task DeleteAsync(string folderId, string actorId, System.Collections.Generic.IReadOnlySet<string> roles);
 }

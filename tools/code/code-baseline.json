@@ -3597,10 +3597,6 @@
       "reason": "C09 survivor: uses the concrete DocumentService (no interface) \u002B cross-context Tag/DocumentFolder reads \u002B a Media quarantine write; out of C09\u0027s single-owner scope, C10\u002B"
     },
     {
-      "file": "src/Kumunita.Web/Controllers/DocumentFolderController.cs",
-      "reason": "C09 survivor: same DocumentService-concrete \u002B Tags-module span as DocumentController; needs an IDocumentFolderService committed surface, C10\u002B"
-    },
-    {
       "file": "src/Kumunita.Web/Controllers/GroupsController.cs",
       "reason": "C09 survivor: the group create/edit/leave lanes write the Group \u002B Translations \u002B membership in one aggregate; C10\u002B scope"
     },

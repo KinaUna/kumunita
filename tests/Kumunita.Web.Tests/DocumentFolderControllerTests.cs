@@ -25,8 +25,7 @@ public sealed class DocumentFolderControllerTests
         var store = NSubstitute.Substitute.For<Marten.IDocumentStore>();
         var folders = new DocumentFolderService(store);
         var controller = new DocumentFolderController(
-            folders: folders,
-            store: store);
+            folders: folders);
 
         var httpContext = new DefaultHttpContext();
         if (signedIn)
