@@ -28,10 +28,20 @@ updated: 2026-11-05
 > Directory / Session / Document / DocumentFolder services → `I*Service`;
 > Moderation / Search / SiteContent re-pointed) and **named the 9 remaining**
 > with `adr: 0291` (the 7 static-utility services → C2-06; `NotificationService`
-> + `PostService` → C2-05). **Who is
-> it for:** the successor units C2-04…C2-08, and the reviewer of C2-08's
-> close. **When to read the rest:** before starting any C2-unit, or before
-> deciding whether a DoD line that "looks done" actually is.
+> + `PostService` → C2-05). C2-04 cut the Marten allowlist **21 → 19** (2 clean
+> moves + 19 reasoned keeps) **and named the ≤ 5 line not-met**; C2-05 split
+> `FirstBootSeeder` + `ProjectsController` (RED **25 → 23**) and named
+> `SampleDataSeeder` + the 7 god-services as honest keeps **and the ≤ 8 line
+> not-met**; C2-06 gave `MailAlarms` + `UsagePurge` a unit-tested decision
+> part; C2-07 added the missing E11 SEC pointer. **C2-08, the close,
+> re-verified every DoD line against the tree from a clean state and — because
+> DoD #3/#4 (files ≤ 8, measured **23**) and the DoD #6 Marten-allowlist half
+> (≤ 5, measured **20**) do not hold — did not land the six-member flip. The
+> lane is closed *held*, with the two failing lines named and the remainder
+> handed to `IMPROVE-CODE-3`.** **Who is
+> it for:** the reviewer of C2-08's close, and `IMPROVE-CODE-3`. **When to
+> read the rest:** before deciding whether a DoD line that "looks done"
+> actually is, or picking up a remaining C2-08 handoff.
 
 # IMPROVE-CODE-2 — handoff notes
 
@@ -1113,3 +1123,149 @@ change who may do what" close.
   items (Moderation = pre-existing, unchanged; `ClaimTodoAsync` = added
   here, at the standing call), the exact wording/refs used, and why DoD #8
   is now met.
+
+## C2-08 — the close: re-verify every DoD line, then (conditionally) land the six-member flip (2026-11-05)
+
+### The scope (the close + independent verification)
+
+C2-08 is the **close**. Per the plan's C2-08 row and *"The close (the
+six-member flip…)"* section: re-run the tooling from a clean state and capture
+the numbers; check **every** carried-in DoD line **against the tree** (measured
+values, not intent); and then — *and only if every line holds* — land the
+six-member "shipped" flip the predecessor deliberately withheld (the
+`AGENTS.md` contract: `Milestones.cs` / `WhatsNew.cs` / `README.md` /
+`STATUS.md` / `ARCHITECTURE.md` / the two pin tests). The branch rule is
+unconditional and binary: *"Any line fails → do not land the flip. Record the
+failing lines and their measured values, and hand the remainder to
+`IMPROVE-CODE-3` — exactly as the predecessor's C13 did."* This unit does **no
+new reduction** (the plan's anti-pattern: *"a 'shipped reduction' would have
+recorded a reduction that did not happen"*).
+
+### The clean-state gate runs (all captured, all green)
+
+| Run | Command | Result |
+|---|---|---|
+| Ratchet, local | `pwsh tools/code/code-check.ps1` | **OK (0 violations)**, exit 0 |
+| Ratchet, CI-shaped vs the predecessor's "before" | `CI=true CODE_BASELINE_BASE=311d0a4b pwsh tools/code/code-check.ps1` | **OK (0 violations)**, exit 0 — **proves all 30 raises carry an `adr:`** (the gate would report each un-`adr`'d raise) |
+| Docs | `pwsh tools/docs/improve-check.ps1` | **ALL GATES PASS** (b/c/d/g) |
+| Build | `dotnet build Kumunita.slnx` | **Build succeeded, 0 errors** (113 pre-existing warnings) |
+| Pin tests | `Kumunita.Web.Tests.dll -filter …/WhatsNewTests/` · `…/MilestonesTests/` | **7/0 · 4/0** (green, unmodified) |
+
+### The measured baseline (the tree at HEAD `f4487e19`)
+
+| category | measured | (ceiling / DoD target) |
+|---|---:|---|
+| files (cs_file) | **23** | target **≤ 8** |
+| methods | 91 | (DoD #3/#4 ≤ 45) |
+| classes | 6 | (DoD #3/#4 ≤ 3) |
+| interfaces | 8 | (DoD #3/#4 ≤ 2) |
+| views | 3 | (≤ 3 ✓) |
+| ts / ts_functions | 0 / 13 | (≤ 2 / ≤ 2) |
+| boundary_violations | 465 | (478 at predecessor close — **down** 13) |
+| controllers_marten_allowlist | **20** | target **≤ 5** |
+| seam_test | `mode: gate` | (unchanged) |
+
+### Every carried-in DoD line, measured (not intent)
+
+| # | DoD line | measured value | **holds?** |
+|---|---|---|---|
+| **#1** | Ratchet honest + the 30 raises resolved (no `max` rose without `adr:`) | CI-shaped gate vs `311d0a4b` = **0 violations** (all 30 carry `adr: 0290`); local + CI green | ✅ **HOLDS** |
+| **#5** | Translation `≤ 40` + clone regions `≤ 5 000` | `*Translation*` lane methods on concrete services = **39** on the C06/ADR 0288 basis (per-surface declarations, the same basis C2-01/C2-02 used: 54 → 39 here; from the predecessor's ~132–195); gate `OK (0 violations)` (clone regions in ceiling) | ✅ **HOLDS** |
+| **#6** (concrete-edges half) | Concrete-`*Service` crossings → interfaces/policies; count down | **21 → 9** (12 retired in C2-03; the 9 all carry `adr: 0291`) — **0 silent** | ✅ **HOLDS** |
+| **#6** (Marten-allowlist half) | `controllers_marten_allowlist` **≤ 5** (or the named keeps) | **20** (21 → 19 in C2-04, then +1 in C2-05's `GoalsController` split) — 19 reasoned keeps, **1 over the ≤ 5 target** | ❌ **FAILS** |
+| **#3/#4** | The still-large files off the list (**files ≤ 8** · methods ≤ 45 · classes ≤ 3 · interfaces ≤ 2 · the 7 named god-files gone) | **files 23** · methods 91 · classes 6 · interfaces 8 · the 7 god-services still over 600 (only `FirstBootSeeder` + `ProjectsController` split; `SampleDataSeeder` + the god-services are named keeps) | ❌ **FAILS** |
+| **#7** | The two untested services covered | `MailAlarmThresholdPolicy` + `MailAlarmThresholdPolicyTests` · `UsagePurgePolicy` + `UsagePurgePolicyTests` — both present, plain unit tests | ✅ **HOLDS** |
+| **#8** | Both E11 SEC pointers present | `IModerationService.cs:98` (pre-existing) + `TodoService.cs:1033` (`ClaimTodoAsync` standing, added C2-07) — both present | ✅ **HOLDS** |
+
+**5 of 7 carry lines hold; 2 fail (the DoD #6 Marten-allowlist half at 20, and
+DoD #3/#4 files at 23).** The two failures were *already honestly recorded as
+not-met by their own units* (C2-04 named the ≤ 5 line not-met; C2-05 named the
+≤ 8 line not-met and deferred the remainder to a successor) — C2-08 did not
+discover them, it *measured* them.
+
+### The outcome (exactly one of two, per the branch rule)
+
+**HELD — the six-member flip is NOT landed.** Because DoD #3/#4 and the DoD #6
+Marten-allowlist half fail their targets, the C2-08 rule is unambiguous:
+*"Any line fails → do not land the flip. Record the failing lines and their
+measured values, and hand the remainder to `IMPROVE-CODE-3`."* This is the
+predecessor's C13 move exactly (the "close flip — deliberately *not* landed"
+section, `handoff-notes.md`), not a softened reading of "does the lane have a
+good enough story." The reduction the plan promised (the six lines the first
+lane left unmet) is **not all there yet**: the ratchet is honest (#1 ✅), the
+translation lane is collapsed (#5 ✅), the concrete-edges half of #6 is down
+(9 named) and the two untested services are covered (#7 ✅) and the SEC
+pointers are in (#8 ✅) — but the module surface is not fully reduced (#6 allowlist
+still 20) and the still-large files are not off the list (#3/#4 still 23 over
+600, 7 god-services retained). Landing a "shipped reduction" `WhatsNew` 0.86.x
+entry + `Milestones` entry now would record a reduction that did not happen —
+the exact anti-pattern the predecessor's C13 named.
+
+**What did NOT change in this unit:** no `WhatsNew.cs` / `Milestones.cs` /
+`README.md` / `STATUS.md` / `ARCHITECTURE.md` edit; no pin-test edit; no C# or
+baseline change; no ADR. The only diff is **this handoff entry** (the docs-only
+close the prompt prescribes for the honest-fail path: *"If you instead close
+with unmet DoD, the commits are docs-only"*).
+
+### Lane status
+
+**The lane is closed *held* (DoD #3/#4 fail: files 23 > 8; DoD #6
+Marten-allowlist fails: 20 > 5; DoD #1, #5, #6-concrete-edges, #7, #8 hold;
+all clean-state gates green).** The differentiation C2-00…C2-07 built is real
+and stays in the tree (the honest ratchet, the collapsed translation lane, the
+12 retired concrete edges, the 2 clean allowlist moves, the 2 clean file
+splits, the two unit-tested policies, the two SEC pointers) — the reduction is
+not *fully* there yet, and the "shipped" flip is withheld so the record does
+not claim it.
+
+### Handoffs to `IMPROVE-CODE-3` (the successor)
+
+Pick these up as the successor's units. Each is the *named remainder* of a line
+that C2-08 measured as failing — not a new question.
+
+1. **DoD #6 — the Marten allowlist (20 → ≤ 5).** The 19 keeps C2-04 named
+   (groups a/b/c/d) are the input: the (a) god-file keeps resolve once the
+   god-services shrink (the next line's work); the (b) no-service keeps each
+   need their own unit (a new owning service or an aggregate decision — the
+   ceremony-type anti-pattern C2-04 forbade); the (c) edge-minting keeps
+   resolve on an edge decision. C2-05's `GoalsController` entry (the 20th) is
+   a *clean* one (the service owns it — `ProjectService` owns the Goals
+   surface) and is the natural first retirement to test the path.
+2. **DoD #3/#4 — the still-large files (23 → ≤ 8).** ADR 0290's de-scoped
+   class/interface/method shrinks (the `EventRsvpGuardianService` /
+   `PageTranslationStandingService` seams) + the 7 god-service per-entity
+   decompositions (each a real part-vs-whole split with its own unit test) +
+   the `SampleDataSeeder` `SeedAsync` / `BackfillSampleCorpusAsync`
+   per-entity builders. C2-05's honest-keep names them.
+3. **The 3 flagged-accidental boundary edges** C2-00 named in ADR 0290
+   (`Notifications→Identity:VerificationOptions`, `Portability→Identity:AppDbContext`,
+   `Projects→Web:TagSlugs`) — C2-03 retired the other accidental ones; these
+   three still carry `adr: 0290` and are the contract-extraction remainder.
+
+### DoD check (C2-08)
+
+- [x] **Every carried-in DoD line re-verified against the tree** — measured
+  values recorded (not intent); the clean-state gate runs captured (
+  `code-check.ps1` OK local **and** CI-shaped vs `311d0a4b`; `improve-check.ps1`
+  ALL GATES PASS; build 0 errors; `WhatsNewTests` 7/0 + `MilestonesTests` 4/0
+  green).
+- [x] **The outcome is one of exactly two, honestly recorded:** **HELD** — a
+  DoD line fails → the flip is **not** landed, the failing lines (#3/#4 files
+  23 > 8; #6 allowlist 20 > 5) + measured values are recorded, and the
+  remainder is handed to `IMPROVE-CODE-3` (the two named handoffs above).
+- [x] **The C2-08 handoff entry is written** (this section): the scope, the
+  clean-state verification table, the measured baseline, the per-line DoD
+  table with each line's measured value and holds/fails verdict, the outcome
+  (HELD), and why the lane is closed held rather than shipped.
+- [x] **No DoD line is fixed silently** — the two failing lines are named with
+  their measured values and their resolving units (the `IMPROVE-CODE-3`
+  handoffs above).
+
+**C2-08 is complete (the honest close).** The lane closes **held** — not
+shipped, not papered over. The ratchet (honest since C2-00) + this clean-state
+re-measurement is what makes that hold honest-by-construction rather than by
+self-report: the gate that the predecessor's C13 found dead in CI now runs
+against the real "before" and reports 0 violations, so the 5 lines that hold
+are *proven* to hold and the 2 that fail are *measured* to fail, and the
+"shipped" flip stays where it belongs — in the lane that actually finishes the
+reduction.
