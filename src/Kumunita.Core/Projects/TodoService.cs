@@ -1030,6 +1030,11 @@ public sealed class TodoService : ProjectsStore, ITodoService
         // Standing (server-side, C3 single-source): unassigned + a group or
         // community membership standing (ADR 0073). The helper returns the
         // AccessVia the actor qualified under (for the audit tag) or throws 403.
+        // TODO ❓ SEC (E11): this is an access decision outside
+        // IAuthorizationService — routing it through the authorization seam is
+        // the SEC lane's decision (the IMPROVE-CODE plan's E11 handoff, "the
+        // authorization path is unique" ADR 0006 §D). This pointer marks the
+        // decision and does **not** change who may do what.
         var via = await ClaimStandingAsync(todo, actorId, ct).ConfigureAwait(false);
 
         todo.AssigneeId = actorId;                        // the claimer becomes the assignee.
