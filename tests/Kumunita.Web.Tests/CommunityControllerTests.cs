@@ -310,9 +310,9 @@ public class CommunityControllerTests
         localization.ListLanguagesAsync().Returns(new List<Kumunita.Core.Localization.LanguageCatalog>());
         community = community ?? Substitute.For<ICommunityMembershipService>();
         community.GetCommunityTranslationsAsync(CompId).Returns(new List<Kumunita.Core.UserInfo.CommunityTranslation>());
-        var store = Substitute.For<Marten.IDocumentStore>();
-
-        var controller = new CommunityController(userInfo, community, profileSettings ?? Substitute.For<IProfileSettingsService>(), localization, store);
+        // C2-04 — the controller no longer takes a document store (the service
+        // owns the session); drop the store arg from this construction.
+        var controller = new CommunityController(userInfo, community, profileSettings ?? Substitute.For<IProfileSettingsService>(), localization);
 
         // TempData writes need a Session — substitute (the /leave lane and the
         // form-refusal branches both touch TempData).

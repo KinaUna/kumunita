@@ -46,7 +46,7 @@ public class CommunityControllerTranslationTests
         Assert.IsType<RedirectToActionResult>(result);
         await community.Received(1).UpdateCommunityTranslationAsync(
             CompId, "fr", "Nouveau", "Desc", "subj-admin",
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)));
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class CommunityControllerTranslationTests
         Assert.IsType<RedirectToActionResult>(result);
         await community.Received(1).UpdateCommunityTranslationAsync(
             CompId, "fr", "Nouveau", "Desc", "subj-translator",
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)), Arg.Any<IDocumentSession>());
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)));
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class CommunityControllerTranslationTests
         var community = Substitute.For<ICommunityMembershipService>();
         community.UpdateCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException<CommunityTranslation>(new UnauthorizedAccessException("Denied.")));
 
         var controller = Build(userInfo, community, roles: new[] { Roles.Member }, subjectId: "subj-member");
@@ -92,7 +92,7 @@ public class CommunityControllerTranslationTests
         var community = Substitute.For<ICommunityMembershipService>();
         community.UpdateCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException<CommunityTranslation>(new KeyNotFoundException("No row.")));
 
         var controller = Build(userInfo, community, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
@@ -115,7 +115,7 @@ public class CommunityControllerTranslationTests
         Assert.IsType<ForbidResult>(result);
         await community.DidNotReceive().UpdateCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>());
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class CommunityControllerTranslationTests
         Assert.IsType<RedirectToActionResult>(result);
         await community.Received(1).RemoveCommunityTranslationAsync(
             CompId, "fr", "subj-admin",
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)));
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class CommunityControllerTranslationTests
         Assert.IsType<RedirectToActionResult>(result);
         await community.Received(1).RemoveCommunityTranslationAsync(
             CompId, "fr", "subj-translator",
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)), Arg.Any<IDocumentSession>());
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)));
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public class CommunityControllerTranslationTests
         var community = Substitute.For<ICommunityMembershipService>();
         community.RemoveCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException(new UnauthorizedAccessException("Denied.")));
 
         var controller = Build(userInfo, community, roles: new[] { Roles.Member }, subjectId: "subj-member");
@@ -178,7 +178,7 @@ public class CommunityControllerTranslationTests
         var community = Substitute.For<ICommunityMembershipService>();
         community.RemoveCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException(new KeyNotFoundException("No row.")));
 
         var controller = Build(userInfo, community, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
@@ -295,10 +295,9 @@ public class CommunityControllerTranslationTests
         var localization = Substitute.For<ILocalizationService>();
         localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>());
 
-        var store = Substitute.For<IDocumentStore>();
-        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
-
-        var controller = new CommunityController(userInfo, community ?? Substitute.For<ICommunityMembershipService>(), profileSettings ?? Substitute.For<IProfileSettingsService>(), localization, store);
+        // C2-04 — the controller no longer opens its own session; the service
+        // owns the write, so the test no longer fakes a document store.
+        var controller = new CommunityController(userInfo, community ?? Substitute.For<ICommunityMembershipService>(), profileSettings ?? Substitute.For<IProfileSettingsService>(), localization);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 

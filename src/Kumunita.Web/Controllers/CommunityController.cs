@@ -20,7 +20,6 @@ using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,15 +30,13 @@ public sealed class CommunityController : Controller
     private readonly ICommunityMembershipService community;
     private readonly IProfileSettingsService profileSettings;
     private readonly ILocalizationService localization;
-    private readonly IDocumentStore store;
 
-    public CommunityController(IUserInfoService userInfo, ICommunityMembershipService community, IProfileSettingsService profileSettings, ILocalizationService localization, IDocumentStore store)
+    public CommunityController(IUserInfoService userInfo, ICommunityMembershipService community, IProfileSettingsService profileSettings, ILocalizationService localization)
     {
         this.userInfo = userInfo;
 this.community = community ?? throw new ArgumentNullException(nameof(community));
 this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         this.localization = localization;
-        this.store = store;
     }
 
     // ── Standing (fail-closed, mirrors the posting gate) ──────────────────
@@ -307,17 +304,17 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        await using var session = store.LightweightSession();
         try
         {
+            // C2-04 — the service owns the session (the single C3 SaveChangesAsync);
+            // the controller no longer opens its own LightweightSession.
             await community.AddCommunityTranslationAsync(
                 componentId,
                 languageCode,
                 string.IsNullOrWhiteSpace(name) ? null : name,
                 string.IsNullOrWhiteSpace(description) ? null : description,
                 actorId,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -368,17 +365,16 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        await using var session = store.LightweightSession();
         try
         {
+            // C2-04 — the service owns the session (the single C3 SaveChangesAsync).
             await community.UpdateCommunityTranslationAsync(
                 componentId,
                 languageCode,
                 string.IsNullOrWhiteSpace(name) ? null : name,
                 string.IsNullOrWhiteSpace(description) ? null : description,
                 actorId,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -419,10 +415,10 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        await using var session = store.LightweightSession();
         try
         {
-            await community.RemoveCommunityTranslationAsync(componentId, languageCode, actorId, actorRoles, session);
+            // C2-04 — the service owns the session (the single C3 SaveChangesAsync).
+            await community.RemoveCommunityTranslationAsync(componentId, languageCode, actorId, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {

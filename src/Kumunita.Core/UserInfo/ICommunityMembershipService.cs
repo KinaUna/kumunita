@@ -109,6 +109,17 @@ public interface ICommunityMembershipService
         string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
 
     /// <summary>
+    /// Session-owning overload (C2-04 — the Web controller stops opening its own
+    /// session; the service owns the write + the single <c>SaveChangesAsync</c>).
+    /// Identical behaviour to the <c>IDocumentSession</c> overload except the
+    /// service opens the <c>LightweightSession</c> internally (the C3 single-
+    /// write-lane is unchanged).
+    /// </summary>
+    Task<CommunityTranslation> AddCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
     /// **Updates** an existing user-added translation of a community's name
     /// and/or description (ADR 0048). Standing is the same as
     /// <see cref="AddCommunityTranslationAsync"/> (a GlobalAdmin or a
@@ -124,6 +135,16 @@ public interface ICommunityMembershipService
         string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
 
     /// <summary>
+    /// Session-owning overload (C2-04 — the Web controller stops opening its own
+    /// session; the service owns the write + the single <c>SaveChangesAsync</c>).
+    /// Identical behaviour to the <c>IDocumentSession</c> overload except the
+    /// service opens the <c>LightweightSession</c> internally.
+    /// </summary>
+    Task<CommunityTranslation> UpdateCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
     /// **Removes** an existing user-added translation of a community's name
     /// and/or description (ADR 0048). Standing is the same as
     /// <see cref="AddCommunityTranslationAsync"/>; a denied actor throws
@@ -135,6 +156,16 @@ public interface ICommunityMembershipService
     Task RemoveCommunityTranslationAsync(
         string componentId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// Session-owning overload (C2-04 — the Web controller stops opening its own
+    /// session; the service owns the write + the single <c>SaveChangesAsync</c>).
+    /// Identical behaviour to the <c>IDocumentSession</c> overload except the
+    /// service opens the <c>LightweightSession</c> internally.
+    /// </summary>
+    Task RemoveCommunityTranslationAsync(
+        string componentId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles);
 
     /// <summary>
     /// The public ADR 0026 standing probe the Web layer calls to decide

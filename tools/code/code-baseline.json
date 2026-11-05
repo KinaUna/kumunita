@@ -3585,10 +3585,6 @@
       "reason": "C09 survivor: the attach/retrieve/delete lanes span the Posts (parent Post read) \u002B Media (MediaObject quarantine) modules; needs a Media-module committed service, tracked C10\u002B"
     },
     {
-      "file": "src/Kumunita.Web/Controllers/CommunityController.cs",
-      "reason": "C09 survivor: the community create/rename/describe lanes write the Community \u002B its Translations \u002B membership in one aggregate; C10\u002B scope"
-    },
-    {
       "file": "src/Kumunita.Web/Controllers/ContentImageController.cs",
       "reason": "C09 survivor: same shape as AttachmentController \u2014 Posts (parent read) \u002B Media (MediaObject quarantine) span; needs a Media-module committed service, tracked C10\u002B"
     },

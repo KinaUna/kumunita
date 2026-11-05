@@ -225,6 +225,23 @@ public sealed class CommunityMembershipService(IDocumentStore store, IServicePro
     }
 
     /// <summary>
+    /// Session-owning overload (C2-04 — the Web controller no longer opens its
+    /// own session; the service owns the write + the single
+    /// <c>SaveChangesAsync</c>). Behaviour is identical to the
+    /// <c>IDocumentSession</c> overload — the only difference is that the service
+    /// opens the <c>LightweightSession</c> internally (the C3 single-write-lane is
+    /// unchanged: the same <see cref="Authorization.AccessAudit"/> row + the same
+    /// <c>CommunityTranslation</c> row commit atomically in one session).
+    /// </summary>
+    public async Task<CommunityTranslation> AddCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles)
+    {
+        await using var session = store.LightweightSession();
+        return await AddCommunityTranslationAsync(componentId, languageCode, name, description, actorId, actorRoles, session).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// **Updates** the existing <see cref="CommunityTranslation"/> row for
     /// (<paramref name="componentId"/>, <paramref name="languageCode"/>) in the
     /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
@@ -243,6 +260,20 @@ public sealed class CommunityMembershipService(IDocumentStore store, IServicePro
     }
 
     /// <summary>
+    /// Session-owning overload (C2-04) — the Web controller no longer opens its
+    /// own session; the service owns the write + the single
+    /// <c>SaveChangesAsync</c>. Identical behaviour to the <c>IDocumentSession</c>
+    /// overload.
+    /// </summary>
+    public async Task<CommunityTranslation> UpdateCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles)
+    {
+        await using var session = store.LightweightSession();
+        return await UpdateCommunityTranslationAsync(componentId, languageCode, name, description, actorId, actorRoles, session).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// **Removes** the existing <see cref="CommunityTranslation"/> row for
     /// (<paramref name="componentId"/>, <paramref name="languageCode"/>) in the
     /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
@@ -257,6 +288,20 @@ public sealed class CommunityMembershipService(IDocumentStore store, IServicePro
     {
         ArgumentNullException.ThrowIfNull(session);
         await _communityTranslationLane.RemoveAsync(session, componentId, languageCode, actorId, actorRoles).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Session-owning overload (C2-04) — the Web controller no longer opens its
+    /// own session; the service owns the write + the single
+    /// <c>SaveChangesAsync</c>. Identical behaviour to the <c>IDocumentSession</c>
+    /// overload.
+    /// </summary>
+    public async Task RemoveCommunityTranslationAsync(
+        string componentId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles)
+    {
+        await using var session = store.LightweightSession();
+        await RemoveCommunityTranslationAsync(componentId, languageCode, actorId, actorRoles, session).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
