@@ -45,7 +45,7 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class ReportTargetsController(
     IDocumentStore store,
-    ModerationService moderation,
+    IModerationService moderation,
     Kumunita.Core.Events.IEventService events,
     Kumunita.Core.Projects.IProjectService projects,
     Kumunita.Core.Posts.PostService posts,

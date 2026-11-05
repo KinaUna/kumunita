@@ -1,4 +1,5 @@
 using Kumunita.Core.UserInfo;
+using Marten;
 
 namespace Kumunita.Core.Moderation;
 
@@ -170,4 +171,54 @@ public interface IModerationService
         string reportId,
         string globalAdminId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// The resident-facing <c>POST /posts/{postId}/report</c> intake lane
+    /// (IMPROVE-CODE-2 C2-03 — added to the seam so the Web crossing of the
+    /// <c>Posts</c> / <c>ReportTargets</c> controllers codes against the
+    /// interface, not the <see cref="ModerationService"/> concrete). The
+    /// <c>ModerationService</c> implementation is unchanged (the SoD
+    /// <c>CanAsync(Report)</c> gate inside is intact). Returns the row count
+    /// filed (the <c>0</c> / <c>1</c> the controller maps to its flash).
+    /// Throws <see cref="ArgumentException"/> on an empty post id / actor,
+    /// <see cref="System.ArgumentNullException"/> on a null session.
+    /// </summary>
+    Task<int> FileReportAsync(
+        string postId,
+        string actorId,
+        string? reason,
+        IDocumentSession session);
+
+    /// <summary>
+    /// The resident-facing report-on-a-target intake lane (IMPROVE-CODE-2
+    /// C2-03 — added to the seam so the <c>ReportTargets</c> controller codes
+    /// against the interface, not the <see cref="ModerationService"/>
+    /// concrete). The <c>ModerationService</c> implementation is unchanged.
+    /// Returns the row count filed. Throws <see cref="ArgumentException"/>
+    /// on an empty target id / actor, <see cref="System.ArgumentNullException"/>
+    /// on a null session.
+    /// </summary>
+    Task<int> FileReportTargetAsync(
+        string targetKind,
+        string targetId,
+        string? componentId,
+        string? authorId,
+        string actorId,
+        string? reason,
+        IDocumentSession session);
+
+    /// <summary>
+    /// The resident-facing report-on-a-reply intake lane (IMPROVE-CODE-2
+    /// C2-03 — added to the seam so the <c>Posts</c> controller codes against
+    /// the interface, not the <see cref="ModerationService"/> concrete). The
+    /// <c>ModerationService</c> implementation is unchanged. Returns the row
+    /// count filed. Throws <see cref="ArgumentException"/> on an empty reply
+    /// id / actor, <see cref="System.ArgumentNullException"/> on a null
+    /// session.
+    /// </summary>
+    Task<int> FileReplyReportAsync(
+        string replyId,
+        string actorId,
+        string? reason,
+        IDocumentSession session);
 }

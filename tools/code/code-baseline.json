@@ -3202,12 +3202,7 @@
       "symbol": "ModerationDetailReadModel",
       "count": 1
     },
-    {
-      "from": "Web",
-      "to": "Moderation",
-      "symbol": "ModerationService",
-      "count": 2
-    },
+
     {
       "from": "Web",
       "to": "Notifications",

@@ -77,7 +77,7 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class PostsController(
     PostService posts,
-    ModerationService moderation,
+    IModerationService moderation,
     IUserInfoService userInfo, ICommunityMembershipService community, IProfileSettingsService profileSettings, IGroupService groupService,
     ILocalizationService localization,
     IDocumentStore store,
