@@ -103,10 +103,6 @@
       "max": 1010
     },
     {
-      "id": "src/Kumunita.Web/Controllers/ProjectsController.cs",
-      "max": 797
-    },
-    {
       "id": "src/Kumunita.Web/Controllers/TodosController.cs",
       "max": 1096
     }
@@ -2820,7 +2816,7 @@
       "from": "Web",
       "to": "Authorization",
       "symbol": "Audience",
-      "count": 19,
+      "count": 20,
       "adr": "0290"
     },
     {
@@ -3024,7 +3020,7 @@
       "from": "Web",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 36,
+      "count": 37,
       "adr": "0290"
     },
     {
@@ -3061,7 +3057,7 @@
       "from": "Web",
       "to": "Identity",
       "symbol": "User",
-      "count": 74,
+      "count": 75,
       "adr": "0290"
     },
     {
@@ -3178,7 +3174,7 @@
       "from": "Web",
       "to": "Messaging",
       "symbol": "Message",
-      "count": 21,
+      "count": 22,
       "adr": "0290"
     },
     {
@@ -3334,13 +3330,14 @@
       "from": "Web",
       "to": "Projects",
       "symbol": "Project",
-      "count": 4
+      "count": 5,
+      "adr": "0290"
     },
     {
       "from": "Web",
       "to": "Projects",
       "symbol": "ProjectGoal",
-      "count": 2,
+      "count": 3,
       "adr": "0290"
     },
     {
@@ -3635,6 +3632,10 @@
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsBaseController.cs",
       "reason": "C08 Projects cluster: the shared base's tag-read + project-list reads are C08's frozen surface (the builder extraction was deferred as C08's exit, not C2-04's scope). ProjectService (src/Kumunita.Core/Projects/ProjectService.cs, 579 lines) does not own these shared base reads. Kept on the store."
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/GoalsController.cs",
+      "reason": "C08 Projects cluster (the C2-05 D5 seam split it off ProjectsController): the goal composer + detail lanes read the ProjectGoal + its Project cards + membership (C08 frozen surface - the builder extraction was deferred as C08 exit). ProjectService (src/Kumunita.Core/Projects/ProjectService.cs) does not own these builder reads. Kept on the store (the IDocumentStore ctor-forward, same as the Boards/Todos twins)."
     },
     {
       "file": "src/Kumunita.Web/Controllers/TodosController.cs",

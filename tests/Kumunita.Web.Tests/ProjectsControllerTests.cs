@@ -998,7 +998,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListProjectsForGoalAsync(goalId, actor, Arg.Any<CancellationToken>())
             .Returns(new List<Project> { project });
 
-        var controller = BuildProjects(projects, subjectId: actor);
+        var controller = BuildGoals(projects, subjectId: actor);
         var result = await controller.GoalDetail(goalId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -1017,7 +1017,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
         missingProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new KeyNotFoundException("no goal")));
-        var missingController = BuildProjects(missingProjects, subjectId: actor);
+        var missingController = BuildGoals(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.GoalDetail(goalId));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
@@ -1025,7 +1025,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
-        var deniedController = BuildProjects(deniedProjects, subjectId: actor);
+        var deniedController = BuildGoals(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.GoalDetail(goalId));
     }
 
@@ -1053,7 +1053,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.CreateGoalAsync(
                 actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>())
             .Returns(created);
-        var controller = BuildProjects(projects, subjectId: actor);
+        var controller = BuildGoals(projects, subjectId: actor);
 
         var model = new GoalComposerViewModel
         {
@@ -1072,7 +1072,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // A blank title is a form error: the seam is never called at all.
         var blankProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
         ITodoService blankProjects_T = (ITodoService)blankProjects; IBoardService blankProjects_B = (IBoardService)blankProjects;
-        var blankController = BuildProjects(blankProjects, subjectId: actor);
+        var blankController = BuildGoals(blankProjects, subjectId: actor);
         var blankModel = new GoalComposerViewModel
         {
             Title = "   ",
@@ -1089,7 +1089,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         deniedProjects.CreateGoalAsync(
                 Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
-        var deniedController = BuildProjects(deniedProjects, subjectId: actor);
+        var deniedController = BuildGoals(deniedProjects, subjectId: actor);
         var deniedModel = new GoalComposerViewModel
         {
             Title = "Goal",
@@ -1120,7 +1120,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
         ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
-        var controller = BuildProjects(projects, subjectId: actor);
+        var controller = BuildGoals(projects, subjectId: actor);
 
         var result = await controller.GoalEdit(goalId);
 
@@ -1136,7 +1136,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
         missingProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new KeyNotFoundException("no goal")));
-        var missingController = BuildProjects(missingProjects, subjectId: actor);
+        var missingController = BuildGoals(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.GoalEdit(goalId));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
@@ -1144,7 +1144,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
-        var deniedController = BuildProjects(deniedProjects, subjectId: actor);
+        var deniedController = BuildGoals(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.GoalEdit(goalId));
     }
 
@@ -1170,7 +1170,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.UpdateGoalAsync(
                 goalId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>())
             .Returns(new ProjectGoal { Id = goalId, Title = "New title" });
-        var controller = BuildProjects(projects, subjectId: creator);
+        var controller = BuildGoals(projects, subjectId: creator);
 
         var model = new GoalComposerViewModel { Title = "New title", Description = "new body" };
         var result = await controller.GoalUpdate(goalId, model);
@@ -1184,7 +1184,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // A blank title is a form error: the seam is never called at all.
         var blankProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
         ITodoService blankProjects_T = (ITodoService)blankProjects; IBoardService blankProjects_B = (IBoardService)blankProjects;
-        var blankController = BuildProjects(blankProjects, subjectId: creator);
+        var blankController = BuildGoals(blankProjects, subjectId: creator);
         var blankResult = await blankController.GoalUpdate(goalId, new GoalComposerViewModel { Title = "   " });
         Assert.IsType<ViewResult>(blankResult);
         await blankProjects.DidNotReceive()
@@ -1197,7 +1197,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         deniedProjects.UpdateGoalAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
-        var deniedController = BuildProjects(deniedProjects, subjectId: other, roles: []);
+        var deniedController = BuildGoals(deniedProjects, subjectId: other, roles: []);
         var deniedResult = await deniedController.GoalUpdate(goalId, new GoalComposerViewModel { Title = "New title" });
         Assert.IsType<ForbidResult>(deniedResult);
     }
@@ -1945,7 +1945,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.DeleteGoalAsync(
                 goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
-        var controller = BuildProjects(projects, subjectId: actor);
+        var controller = BuildGoals(projects, subjectId: actor);
 
         var result = await controller.GoalDelete(goalId);
 
@@ -1962,7 +1962,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         missingProjects.DeleteGoalAsync(
                 goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new KeyNotFoundException("no goal")));
-        var missingController = BuildProjects(missingProjects, subjectId: actor);
+        var missingController = BuildGoals(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.GoalDelete(goalId));
 
         // The C3 403 split: a denied actor (not creator ∪ GlobalAdmin) is a
@@ -1972,7 +1972,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         deniedProjects.DeleteGoalAsync(
                 goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
-        var deniedController = BuildProjects(deniedProjects, subjectId: actor, roles: []);
+        var deniedController = BuildGoals(deniedProjects, subjectId: actor, roles: []);
         Assert.IsType<ForbidResult>(await deniedController.GoalDelete(goalId));
     }
 
@@ -2180,11 +2180,15 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Assert.IsType<ViewResult>(await todosController.CreateGet()).ViewData.Model);
         Assert.True(todo.Audience.CommunityVisible);
 
-        var projController = BuildProjects(projects, subjectId: actor);
+        // C2-05 D5 split — the goal composer now lives on the GoalsController
+        // (the C08 twin child), so the two "new form" lanes build two controllers.
+        var goalController = BuildGoals(projects, subjectId: actor);
 
         var goal = Assert.IsType<GoalComposerViewModel>(
-            Assert.IsType<ViewResult>(await projController.GoalNew()).ViewData.Model);
+            Assert.IsType<ViewResult>(await goalController.GoalNew()).ViewData.Model);
         Assert.True(goal.Audience.CommunityVisible);
+
+        var projController = BuildProjects(projects, subjectId: actor);
 
         var project = Assert.IsType<ProjectComposerViewModel>(
             Assert.IsType<ViewResult>(await projController.ProjectNew()).ViewData.Model);
@@ -2343,6 +2347,42 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
         var controller = new ProjectsController(projects, userInfo, Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store ?? Substitute.For<IDocumentStore>(), boards: (IBoardService)projects, todos: (ITodoService)projects);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var claims = new List<Claim>();
+        if (subjectId is not null)
+            claims.Add(new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId));
+        if (roles is { Length: > 0 })
+            claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
+
+        if (claims.Count > 0)
+            controller.ControllerContext.HttpContext.User =
+                new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+        return controller;
+    }
+
+    /// <summary>
+    /// Builds a <see cref="GoalsController"/> over NSubstitute seams (the C2-05
+    /// D5 split moved the Goals route family into this C08 child — the same
+    /// shape as <see cref="TodosController"/> / <see cref="BoardsController"/>).
+    /// </summary>
+    private static GoalsController BuildGoals(
+        IProjectService projects,
+        IDocumentStore? store = null,
+        string? subjectId = null,
+        string[]? roles = null)
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
+
+        var controller = new GoalsController(projects, userInfo, groupService, profileSettings, DefaultLocalization(), store ?? Substitute.For<IDocumentStore>(), boards: (IBoardService)projects, todos: (ITodoService)projects);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();
