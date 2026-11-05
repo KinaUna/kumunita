@@ -104,7 +104,7 @@ public class HomeController : Controller
         ProfileSettings = profileSettings;
         CommunityMembership = communityMembership;
         TranslationProvider = translationProvider;
-        SiteContentService = siteContent;
+        SiteContentSeam = siteContent;
         ErrorReports = errorReports;
         Events = events;
         Todos = todos;
@@ -121,7 +121,7 @@ public class HomeController : Controller
     internal IProfileSettingsService? ProfileSettings { get; }
     internal ICommunityMembershipService? CommunityMembership { get; }
     internal ITranslationProvider? TranslationProvider { get; }
-    internal ISiteContentService? SiteContentService { get; }
+    internal ISiteContentService? SiteContentSeam { get; }
     internal IErrorReportService? ErrorReports { get; }
     internal Kumunita.Core.Events.IEventService? Events { get; }
     // C08 (ADR 0287) — the Projects split: the home "upcoming" to-dos column
@@ -182,11 +182,11 @@ public class HomeController : Controller
         // always renders — never a blank page, never an error (SITE·1). This is a
         // *display* read only — it never gates anything.
         Kumunita.Core.SiteContent.SiteContent? site = null;
-        if (SiteContentService is not null)
+        if (SiteContentSeam is not null)
         {
             try
             {
-                site = await SiteContentService.GetAsync().ConfigureAwait(false);
+                site = await SiteContentSeam.GetAsync().ConfigureAwait(false);
             }
             catch
             {

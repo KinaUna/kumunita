@@ -3440,12 +3440,7 @@
       "symbol": "SiteContentDocTypes",
       "count": 1
     },
-    {
-      "from": "Web",
-      "to": "SiteContent",
-      "symbol": "SiteContentService",
-      "count": 1
-    },
+
     {
       "from": "Web",
       "to": "SiteContent",
