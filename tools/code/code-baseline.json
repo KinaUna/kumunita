@@ -56,11 +56,11 @@
     },
     {
       "id": "src/Kumunita.Core/Projects/BoardService.cs",
-      "max": 1046
+      "max": 1025
     },
     {
       "id": "src/Kumunita.Core/Projects/TodoService.cs",
-      "max": 860
+      "max": 839
     },
     {
       "id": "src/Kumunita.Core/Tags/TagService.cs",
@@ -84,7 +84,7 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/BoardsController.cs",
-      "max": 862
+      "max": 857
     },
     {
       "id": "src/Kumunita.Web/Controllers/EventController.cs",
@@ -108,11 +108,11 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/ProjectsController.cs",
-      "max": 802
+      "max": 797
     },
     {
       "id": "src/Kumunita.Web/Controllers/TodosController.cs",
-      "max": 1101
+      "max": 1096
     }
   ],
   "methods": [
@@ -590,7 +590,7 @@
     },
     {
       "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService",
-      "max": 59
+      "max": 50
     },
     {
       "id": "src/Kumunita.Web/Controllers/AdminController.cs::Kumunita.Web.Controllers.AdminController",
@@ -629,7 +629,7 @@
     },
     {
       "id": "src/Kumunita.Core/Projects/IBoardService.cs::Kumunita.Core.Projects.IBoardService",
-      "max": 24
+      "max": 21
     },
     {
       "id": "src/Kumunita.Core/UserInfo/IGroupService.cs::Kumunita.Core.UserInfo.IGroupService",
