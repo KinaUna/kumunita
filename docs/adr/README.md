@@ -320,3 +320,4 @@ Decision / Consequences. New decisions take the next number.
 | 0288 | One shared translation-variant lane: the Core contract plus the Web action helper that every translatable surface uses | Accepted |
 | 0289 | Data as embedded resources: translation keys, guide pages, and the sample corpus are embedded resources, not C# literals | Accepted |
 | 0290 | IMPROVE-CODE-2 C2-00: the 30 baseline raises — 4 named seams (pending split) + 26 intended-coupling edges (C2-03 to extract where accidental) | Proposed |
+| 0291 | IMPROVE-CODE-2 C2-03: the 9 remaining Web→concrete-*Service crossings — 7 static-utility services (C2-06) + NotificationService (Wolverine binding) + PostService (C2-05 god-surface) | Proposed |
