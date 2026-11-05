@@ -88,21 +88,37 @@ papering over them, and hands them to `IMPROVE-CODE-2`.
 
 DoD #1 is the lane's whole reason to exist: *"no baseline `max` went up during
 the lane (`git log -p tools/code/code-baseline.json` shows only decreases and
-removals)."* It went **up three times**, all in C09, all **without an `adr:`
-field** (the gate's escape hatch, unused):
+removals)."* Running the ratchet gate against the lane's real "before" (C00,
+`311d0a4b`) shows **30 baseline values rose without an `adr:` field** (the
+gate's escape hatch, unused). The first read here undercounted this as "3";
+the gate-fix pass (below) measured the true number. The 30 split two ways:
 
-| Baseline entry | C00 (`311d0a4b`) | Now | Raised in |
-|---|---:|---:|---|
-| `Core/Events/EventService.cs` **class** (public methods) | 30 | **31** | `12b5c0b5` (C09) |
-| `Core/Pages/PageService.cs` **class** (public methods) | 28 | **30** | `004a253e` (C09) |
-| `Core/Events/IEventService.cs` **interface** (methods) | 27 | **28** | `12b5c0b5` (C09) |
+- **4 shrinkable god-type / method raises** (the class/interface/method
+  surface went up) — these are the "shrink the type back under the ceiling"
+  items:
+
+  | Baseline entry | C00 (`311d0a4b`) | Now | Raised in |
+  |---|---:|---:|---|
+  | `Core/Events/EventService.cs` **class** (public methods) | 30 | **31** | `12b5c0b5` (C09) |
+  | `Core/Pages/PageService.cs` **class** (public methods) | 28 | **30** | `004a253e` (C09) |
+  | `Core/Events/IEventService.cs` **interface** (methods) | 27 | **28** | `12b5c0b5` (C09) |
+  | one method **cc_max** (complexity) | 20 | **22** | (C07/C08 era) |
+
+- **26 boundary-count raises** — cross-module edge *counts* went up (e.g.
+  `Web->Identity:User` 71→74, `Web->Tags:Tag` 7→9,
+  `Projects->Authorization:Audience` 10→12, `Web->Messaging:Message` 18→21).
+  These are **not** shrinkable god-types; the fix is an `adr:` justification
+  (the C06/C07/C08 splits added real cross-module edges) or accepting the
+  coupling — not a refactor.
 
 `git log -p tools/code/code-baseline.json 311d0a4b..HEAD` shows the added
-`+ "max": 31` / `+ "max": 30` lines. These three carry **no `adr` field**. On
-this sandbox the gate is green only because `origin/main` does not yet contain
-`code-baseline.json`, so the gate's "raise without `adr:`" check silently
-skips; on a CI where `origin/main` predates the file, this is a red gate.
-**This is exactly the failure the plan opens with** — the gate that was
+`+ "max": …` / `+ "count": …` lines; none of the 30 carries an `adr` field.
+**The gate was dead in CI, which is how they stayed green:** it hardcoded
+`origin/main` (CI targets `release`; the file only exists on `development`),
+it silently skipped when the base was unreadable, and a guard bug made it
+never flag even a readable base. That is now fixed (see the gate-fix note
+below), so these 30 are the red-gate reality going forward. **This is exactly
+the failure the plan opens with** — the gate that was
 supposed to stop growth allowed three increments of it.
 
 ### DoD line by line (met / failed + measured)
@@ -113,7 +129,7 @@ successor lane's scope.
 
 | # | DoD line | Target | Before (C00/plan) | After (measured @ `219ba33c`) | Verdict |
 |---|---|---|---|---|---|
-| 1 | No baseline `max` went up | decreases/removals only | — | **3 raises**, none with `adr:` (table above) | ❌ **FAIL** |
+| 1 | No baseline `max` went up | decreases/removals only | — | **30 raises**, none with `adr:` — 4 shrinkable god-type/method (table above) + 26 boundary-coupling | ❌ **FAIL** |
 | 2 | Gates a/e/f gone + re-baseline block deleted | retired | a/e/f present | marked `RETIRED (IMPROVE-CODE C00)`; `improve-check` = ALL GATES PASS | ✅ met |
 | 3 | List sizes ↓ to files≤8 · methods≤45 · classes≤3 · interfaces≤2 · views≤3 · TS≤2 | ≤ those | files 22 · methods 107 · classes 9 · interfaces 6 · views 9 · ts 1 (+13 funcs) | **files 25** · methods 91 · classes 7 · **interfaces 8** · views 3 · ts 0 (**13 ts functions baselined**) | ❌ **FAIL** (files *grew* 22→25; 4 of 6 sub-metrics over) |
 | 4 | `KnownTranslationKeys`/`FirstBootSeeder`/`SampleDataSeeder`/`ProjectsController`/`ProjectService`/`UserInfoService`/`IUserInfoService` **off** the lists | 7 gone | — | `KnownTranslationKeys`, `UserInfoService`, `IUserInfoService`, `ProjectService`(class split) **gone**; but **`FirstBootSeeder` (991), `SampleDataSeeder` (1633), `ProjectsController` (802) still on the file list** | ❌ **FAIL** (3 of 7 still present) |
@@ -184,15 +200,34 @@ promised is not there yet.
 ## Handoffs to `IMPROVE-CODE-2` (the successor)
 
 Pick these up as the successor lane's units, in this order (DoD #1 first — it
-is the gate that lets the others be honest):
+is the gate that lets the others be honest).
 
-1. **DoD #1 — repair the ratchet.** Decide, for the three raised entries
-   (`EventService` class, `PageService` class, `IEventService` interface):
-   either **shrink them back under the ceiling** (the class/interface ceiling
-   is 25/20; all three are over it and baselined), or give each an **`adr:`
-   reason** (a new amending ADR) so the raise is a *named, defensible*
-   exception instead of a silent one. Whichever is chosen, the gate must
-   fail on a fresh clone until it is — that is the point of the ratchet.
+> **The gate is already fixed (2026-11-05).** The C13 close recorded DoD #1
+> with the gate still dead in CI (it hardcoded `origin/main`, skipped on an
+> unreadable base, and a guard bug made it never flag). A follow-up commit
+> fixed all three in `tools/code/CodeMetrics/Program.cs` + `ci.yml`: the base
+> ref is now `CODE_BASELINE_BASE` (CI sets it to the PR base; local default
+> `origin/development`), it **fails closed under CI** when the base is
+> unreadable, and the guard bug is gone. The DoD #1 number below is the
+> authoritative one the fixed gate produces. The fix is a genuine improvement
+> independent of the raises it now surfaces.
+
+1. **DoD #1 — resolve the 30 unjustified raises.** Two distinct sub-tasks:
+   - **4 shrinkable god-type / method raises** (`EventService` class 31,
+     `PageService` class 30, `IEventService` 28, + one method cc_max 22).
+     Either **shrink them back under the ceiling** (class 25 / interface 20;
+     all are over it and baselined) or give each an **`adr:` reason** (a new
+     amending ADR) so the raise is a *named, defensible* exception instead of
+     a silent one.
+   - **26 boundary-count raises** (cross-module edges went up: `Web->Identity:User`
+     71→74, `Web->Tags:Tag` 7→9, `Projects->Authorization:Audience` 10→12,
+     `Web->Messaging:Message` 18→21, …). These are **not** shrinkable —
+     they are the real coupling the C06/C07/C08 splits introduced. Decide
+     per-edge: justify with `adr:` (the split is intentional) or reduce the
+     coupling. A blanket `adr:` on all 26 is the honest default; picking the
+     ones that are genuine accidental-integration is the improvement.
+   Whichever is chosen, the gate (now fixed) fails until it is — that is the
+   point of the ratchet.
 2. **DoD #5 — the translation lane.** `*Translation*` methods are ~132–195
    (target ≤40). C06 built the `TranslationLane` + descriptors, but the
    per-surface `*Translation*` methods were not collapsed onto it. Finish the

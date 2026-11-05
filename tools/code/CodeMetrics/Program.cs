@@ -629,7 +629,11 @@ public static class Program
             failures.Add("controller on Marten without an allowlist entry: " + file);
         }
 
-        // rule 4: max must not be higher than on origin/main without adr:
+        // rule 4: max must not be higher than on the base ref (default
+        // origin/development — the branch this repo develops on, where the
+        // baseline file lives) without adr:. See CheckOriginMain for the
+        // CI fail-closed behaviour (an unreadable base fails the gate under
+        // CI instead of silently skipping it).
         failures.AddRange(CheckOriginMain(bs, root));
 
         // seam-test gate (C12 — promoted from report to gate)
@@ -667,74 +671,118 @@ public static class Program
     private static List<string> CheckOriginMain(ParsedBaseline bs, string root)
     {
         var failures = new List<string>();
-        string oldJson;
+
+        // The base ref to compare against. Default is origin/development: this
+        // repo develops on `development` (the baseline file lives only on that
+        // branch, not on main/release), and the "max raised without an `adr:`"
+        // rule means "raised relative to the branch a PR is landing into".
+        // Overridable via CODE_BASELINE_BASE (CI sets it to the PR base).
+        string baseRef = Environment.GetEnvironmentVariable("CODE_BASELINE_BASE")?.Trim();
+        if (string.IsNullOrWhiteSpace(baseRef)) { baseRef = "origin/development"; }
+        string basePath = baseRef + ":tools/code/code-baseline.json";
+
+        // Under CI (the real gate) an unreadable base is a gate FAILURE, not a
+        // skip: a ratchet that switches itself off when it cannot read its
+        // base is worse than one that fails (that is how the C09 raises slipped
+        // through — the base was origin/main, which does not have the file, so
+        // the check silently skipped). Locally (no CI= set) a missing base is a
+        // loud warning but does not fail the developer's laptop.
+        bool underCi = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CI"))
+                    || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"));
+
+        string? oldJson = null;
+        string? readError = null;
+        var psi = new ProcessStartInfo("git")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        psi.ArgumentList.Add("-C");
+        psi.ArgumentList.Add(root);
+        psi.ArgumentList.Add("show");
+        psi.ArgumentList.Add(basePath);
         try
         {
-            var psi = new ProcessStartInfo("git")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            };
-            psi.ArgumentList.Add("-C");
-            psi.ArgumentList.Add(root);
-            psi.ArgumentList.Add("show");
-            psi.ArgumentList.Add("origin/main:tools/code/code-baseline.json");
             using var proc = Process.Start(psi) ?? throw new InvalidOperationException("git start failed");
             string output = proc.StandardOutput.ReadToEnd();
             string errOut = proc.StandardError.ReadToEnd();
             proc.WaitForExit(30_000);
-            if (proc.ExitCode != 0)
+            if (proc.ExitCode != 0) { readError = errOut.Trim(); }
+            else { oldJson = output; }
+        }
+        catch (Exception ex) { readError = ex.Message; }
+
+        if (oldJson is null)
+        {
+            // Two distinct failure modes, and only one of them is a gate failure:
+            //   (a) the base branch never had the file ("exists on disk, but not
+            //       in <ref>") — this is the legitimate first introduction of the
+            //       baseline, so the comparison is skipped (nothing to compare to).
+            //   (b) the base ref itself is unreadable ("invalid object name", or
+            //       any other git failure) — in CI that is a plumbing problem the
+            //       gate must NOT paper over, so it fails closed.
+            bool fileNeverOnBase = readError is not null && readError.Contains("exists on disk, but not in", StringComparison.Ordinal);
+            if (fileNeverOnBase)
             {
-                Console.Error.WriteLine("note: could not read origin/main baseline (git: " + errOut.Trim() + ") — origin/main comparison skipped");
+                Console.Error.WriteLine("note: baseline is new at " + baseRef + " (not present on the base branch) — first-introduction, base-ref comparison skipped (this is expected when a lane lands its baseline for the first time)");
                 return failures;
             }
-            oldJson = output;
-        }
-        catch (Exception)
-        {
-            Console.Error.WriteLine("note: git unavailable — origin/main comparison skipped");
+            string msg = $"could not read baseline at {baseRef}: {readError}";
+            if (underCi)
+            {
+                failures.Add($"baseline base unreadable (the `max raised without adr:` check cannot run): {msg}");
+            }
+            else
+            {
+                Console.Error.WriteLine("note: " + msg + " — base-ref comparison skipped (would FAIL under CI)");
+            }
             return failures;
         }
 
         ParsedBaseline old;
         try { old = ParseBaseline(oldJson); }
-        catch { Console.Error.WriteLine("note: could not parse origin/main baseline — comparison skipped"); return failures; }
-
-        void CheckOne(string idField, JsonNode? entry, JsonNode? oldEntry, string id)
+        catch (Exception ex)
         {
-            if (entry is null || oldEntry is null) { return; }
-            if (oldEntry[idField]?.ToString() != id) { return; }
-            int max = JsonInt(entry["max"]);
-            int oldMax = JsonInt(oldEntry["max"]);
-            if (max > oldMax && entry["adr"] is null) { failures.Add($"baseline max raised without an `adr` field (origin/main was {oldMax}, now {max}): {id}"); }
-            int ccMax = JsonInt(entry["cc_max"]);
-            int oldCcMax = JsonInt(oldEntry["cc_max"]);
-            if (ccMax > 0 && ccMax > oldCcMax && entry["adr"] is null) { failures.Add($"baseline cc_max raised without an `adr` field (origin/main was {oldCcMax}, now {ccMax}): {id}"); }
-            int cnt = JsonInt(entry["count"]);
-            int oldCnt = JsonInt(oldEntry["count"]);
-            if (cnt > 0 && cnt > oldCnt && entry["adr"] is null) { failures.Add($"baseline count raised without an `adr` field (origin/main was {oldCnt}, now {cnt}): {id}"); }
+            string msg = "could not parse baseline at " + baseRef + ": " + ex.Message;
+            if (underCi) { failures.Add(msg); }
+            else { Console.Error.WriteLine("note: " + msg + " — base-ref comparison skipped (would FAIL under CI)"); }
+            return failures;
         }
 
-        void CheckArray(string arrayName, List<JsonNode?> newItems, List<JsonNode?> oldItems, string keyField, string idOf)
+        void CheckOne(JsonNode? entry, JsonNode? oldEntry)
+        {
+            if (entry is null || oldEntry is null) { return; }
+            int max = JsonInt(entry["max"]);
+            int oldMax = JsonInt(oldEntry["max"]);
+            if (max > oldMax && entry["adr"] is null) { failures.Add($"baseline max raised without an `adr` field ({baseRef} was {oldMax}, now {max})"); }
+            int ccMax = JsonInt(entry["cc_max"]);
+            int oldCcMax = JsonInt(oldEntry["cc_max"]);
+            if (ccMax > 0 && ccMax > oldCcMax && entry["adr"] is null) { failures.Add($"baseline cc_max raised without an `adr` field ({baseRef} was {oldCcMax}, now {ccMax})"); }
+            int cnt = JsonInt(entry["count"]);
+            int oldCnt = JsonInt(oldEntry["count"]);
+            if (cnt > 0 && cnt > oldCnt && entry["adr"] is null) { failures.Add($"baseline count raised without an `adr` field ({baseRef} was {oldCnt}, now {cnt})"); }
+        }
+
+        void CheckArray(string arrayName, List<JsonNode?> newItems, List<JsonNode?> oldItems, string keyField)
         {
             var oldMap = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
             foreach (var e in oldItems) { if (e is null) { continue; } oldMap[e[keyField]?.ToString() ?? ""] = e; }
             foreach (var e in newItems)
             {
                 if (e is null) { continue; }
-                string id = e[idOf]?.ToString() ?? "";
-                if (oldMap.TryGetValue(id, out var oe)) { CheckOne(idOf, e, oe, id); }
+                string id = e[keyField]?.ToString() ?? "";
+                if (oldMap.TryGetValue(id, out var oe)) { CheckOne(e, oe); }
             }
         }
 
-        CheckArray("files", bs.Files, old.Files, "id", "id");
-        CheckArray("methods", bs.Methods, old.Methods, "id", "id");
-        CheckArray("classes", bs.Classes, old.Classes, "id", "id");
-        CheckArray("interfaces", bs.Interfaces, old.Interfaces, "id", "id");
-        CheckArray("views", bs.Views, old.Views, "id", "id");
-        CheckArray("ts", bs.Ts, old.Ts, "id", "id");
-        CheckArray("ts_functions", bs.TsFunctions, old.TsFunctions, "id", "id");
+        CheckArray("files", bs.Files, old.Files, "id");
+        CheckArray("methods", bs.Methods, old.Methods, "id");
+        CheckArray("classes", bs.Classes, old.Classes, "id");
+        CheckArray("interfaces", bs.Interfaces, old.Interfaces, "id");
+        CheckArray("views", bs.Views, old.Views, "id");
+        CheckArray("ts", bs.Ts, old.Ts, "id");
+        CheckArray("ts_functions", bs.TsFunctions, old.TsFunctions, "id");
         // boundary: key is from->to:symbol
         var oldEdges = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
         foreach (var e in old.BoundaryViolations)
@@ -751,7 +799,7 @@ public static class Program
             {
                 int cnt = JsonInt(e["count"]);
                 int oldCnt = JsonInt(oe["count"]);
-                if (cnt > oldCnt && e["adr"] is null) { failures.Add($"boundary count raised without an `adr` field (origin/main was {oldCnt}, now {cnt}): {key}"); }
+                if (cnt > oldCnt && e["adr"] is null) { failures.Add($"boundary count raised without an `adr` field ({baseRef} was {oldCnt}, now {cnt}): {key}"); }
             }
         }
         return failures;

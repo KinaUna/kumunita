@@ -6,7 +6,11 @@
 # It is the gate half of the ratchet (plan-improve-code.md §D1): the baseline
 # in tools/code/code-baseline.json only goes DOWN. A new item over its ceiling,
 # a baselined item growing past its max, a stale entry that was forgotten, or a
-# max raised above origin/main without an `adr:` reason each fail the close.
+# max raised above the *base branch* without an `adr:` reason each fail the
+# close. The base branch is CODE_BASELINE_BASE (CI sets it to the PR base;
+# locally it defaults to origin/development, where this repo develops). Under
+# CI an unreadable base fails the gate rather than being skipped; a base that
+# never had the file (first introduction of the baseline) is skipped.
 #
 # Runs the CodeMetrics tool in --check mode against the baseline. Intended to
 # be run from the repo root; if the CWD is not the repo root, it walks up
