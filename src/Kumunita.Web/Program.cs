@@ -894,7 +894,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             // never fail the sign-in (C-S1·4 — the sign-in flow is unchanged).
             try
             {
-                var sessionService = ctx.HttpContext!.RequestServices.GetRequiredService<Kumunita.Core.Sessions.SessionService>();
+                var sessionService = ctx.HttpContext!.RequestServices.GetRequiredService<Kumunita.Core.Sessions.ISessionService>();
                 var userAgent = ctx.HttpContext.Request.Headers.UserAgent.ToString();
                 var ip = ctx.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
                 var newDoc = await sessionService.CreateSessionAsync(user.Id, userAgent, ip);

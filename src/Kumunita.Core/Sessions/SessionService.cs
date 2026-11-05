@@ -28,7 +28,7 @@ namespace Kumunita.Core.Sessions;
 /// (<c>SessionRevocationMiddleware</c>, U6) is the smart rate-limit gate.
 /// </para>
 /// </summary>
-public sealed class SessionService
+public sealed class SessionService : ISessionService
 {
     private readonly IDocumentStore _store;
 

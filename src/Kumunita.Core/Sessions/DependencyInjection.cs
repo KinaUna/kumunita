@@ -18,6 +18,11 @@ public static class SessionsModule
     {
         services.AddTransient<Sessions.SessionService>(sp => new Sessions.SessionService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
+        // IMPROVE-CODE-2 C2-03 — the crossing modules (the SecuritySettings
+        // controller, the Program sign-in handler, the SessionRevocation
+        // middleware) code against the ISessionService interface (the C03
+        // INotificationEmitter pattern; ADR 0006-D "route + authz + shape").
+        services.AddTransient<Sessions.ISessionService>(sp => sp.GetRequiredService<Sessions.SessionService>());
         return services;
     }
 }

@@ -85,7 +85,7 @@ public sealed class SecuritySettingsController(
     UserManager<User> userManager,
     SignInManager<User> signInManager,
     IIdentityService identity,
-    SessionService sessionService) : Controller
+    ISessionService sessionService) : Controller
 {
     private static readonly string AuthenticatorProvider = "Authenticator";
     private const int RecoveryCodeCount = 10;

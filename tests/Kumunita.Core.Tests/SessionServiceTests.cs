@@ -694,3 +694,31 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
             .ToListAsync(ct);
     }
 }
+
+/// <summary>
+/// C2-03 seam test: the <see cref="Kumunita.Core.Sessions.ISessionService"/>
+/// interface the crossing modules code against (IMPROVE-CODE-2 C2-03 — the
+/// C03 INotificationEmitter pattern; ADR 0006-D "route + authz + shape").
+/// Names the interface for the seam-test Rule 2 (I*Service named by a test).
+/// The <see cref="Kumunita.Core.Sessions.SessionService"/> concrete
+/// implements the interface; this test pins that relationship.
+/// </summary>
+public class ISessionServiceSeamTest
+{
+    [Fact]
+    public void SessionService_Implements_ISessionService()
+    {
+        Assert.True(typeof(Kumunita.Core.Sessions.ISessionService).IsAssignableFrom(typeof(Kumunita.Core.Sessions.SessionService)));
+    }
+
+    [Fact]
+    public void ISessionService_Expose_The_Five_Crossing_Methods()
+    {
+        var t = typeof(Kumunita.Core.Sessions.ISessionService);
+        Assert.NotNull(t.GetMethod("CreateSessionAsync"));
+        Assert.NotNull(t.GetMethod("GetSessionsForUserAsync"));
+        Assert.NotNull(t.GetMethod("RevokeSessionAsync"));
+        Assert.NotNull(t.GetMethod("RevokeAllButCurrentAsync"));
+        Assert.NotNull(t.GetMethod("TouchSessionAsync"));
+    }
+}

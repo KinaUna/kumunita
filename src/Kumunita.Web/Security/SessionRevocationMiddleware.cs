@@ -151,7 +151,7 @@ public sealed class SessionRevocationMiddleware
             try
             {
                 await requestServices
-                    .GetRequiredService<SessionService>()
+                    .GetRequiredService<Kumunita.Core.Sessions.ISessionService>()
                     .TouchSessionAsync(sessionId);
             }
             catch (Exception ex)
