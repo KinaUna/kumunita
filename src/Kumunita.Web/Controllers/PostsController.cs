@@ -1565,7 +1565,7 @@ public sealed class PostsController(
     /// <paramref name="languageCode"/> (ADR 0022):
     /// <c>POST /posts/{id}/translations</c>. A thin Web lane (ADR 0006-D:
     /// routes + shape) that delegates the write + standing decision to
-    /// <see cref="PostService.AddPostTranslationAsync"/> (the standing
+    /// <see cref="PostService.PostTranslationLane"/> (the standing
     /// — author / community moderator / GlobalAdmin — is re-pinned
     /// server-side; the detail page's <see cref="PostDetailViewModel
     /// .CanTranslate"/> is only the display affordance).
@@ -1621,14 +1621,14 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.AddPostTranslationAsync(
+            await posts.PostTranslationLane.AddAsync(
+                session,
                 id,
                 languageCode,
                 string.IsNullOrWhiteSpace(title) ? null : title,
                 body,
                 actor,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1689,13 +1689,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.AddReplyTranslationAsync(
-                replyId,
-                languageCode,
-                body,
-                actor,
-                actorRoles,
-                session);
+            await posts.ReplyTranslationLane.AddAsync(session, replyId, languageCode, null, body, actor, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1720,7 +1714,7 @@ public sealed class PostsController(
     /// **Updates** the existing user-added translation of the post in
     /// <paramref name="languageCode"/> (ADR 0048):
     /// <c>POST /posts/{id}/translations/update</c>. Thin Web lane; delegates
-    /// to <see cref="PostService.UpdatePostTranslationAsync"/>. Precondition +
+    /// to <see cref="PostService.PostTranslationLane"/>. Precondition +
     /// failure shapes mirror <see cref="AddTranslation"/> (denied standing →
     /// 403 <c>Forbid</c>; missing post/row → 404 <c>NotFound</c>).
     /// </summary>
@@ -1758,14 +1752,14 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.UpdatePostTranslationAsync(
+            await posts.PostTranslationLane.UpdateAsync(
+                session,
                 id,
                 languageCode,
                 string.IsNullOrWhiteSpace(title) ? null : title,
                 body,
                 actor,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1785,7 +1779,7 @@ public sealed class PostsController(
     /// **Removes** the existing user-added translation of the post in
     /// <paramref name="languageCode"/> (ADR 0048):
     /// <c>POST /posts/{id}/translations/remove</c>. Thin Web lane; delegates
-    /// to <see cref="PostService.RemovePostTranslationAsync"/>. Failure
+    /// to <see cref="PostService.PostTranslationLane"/>. Failure
     /// shapes mirror <see cref="AddTranslation"/> (denied standing → 403
     /// <c>Forbid</c>; missing post/row → 404 <c>NotFound</c>).
     /// </summary>
@@ -1816,7 +1810,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.RemovePostTranslationAsync(id, languageCode, actor, actorRoles, session);
+            await posts.PostTranslationLane.RemoveAsync(session, id, languageCode, actor, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1836,7 +1830,7 @@ public sealed class PostsController(
     /// **Updates** the existing user-added translation of a reply in
     /// <paramref name="languageCode"/> (ADR 0048):
     /// <c>POST /posts/{id}/replies/{replyId}/translations/update</c>. Thin Web
-    /// lane; delegates to <see cref="PostService.UpdateReplyTranslationAsync"/>.
+    /// lane; delegates to <see cref="PostService.ReplyTranslationLane"/>.
     /// Failure shapes mirror <see cref="AddReplyTranslation"/>.
     /// </summary>
     [HttpPost("/posts/{id}/replies/{replyId}/translations/update")]
@@ -1873,7 +1867,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.UpdateReplyTranslationAsync(replyId, languageCode, body, actor, actorRoles, session);
+            await posts.ReplyTranslationLane.UpdateAsync(session, replyId, languageCode, null, body, actor, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1893,7 +1887,7 @@ public sealed class PostsController(
     /// **Removes** the existing user-added translation of a reply in
     /// <paramref name="languageCode"/> (ADR 0048):
     /// <c>POST /posts/{id}/replies/{replyId}/translations/remove</c>. Thin Web
-    /// lane; delegates to <see cref="PostService.RemoveReplyTranslationAsync"/>.
+    /// lane; delegates to <see cref="PostService.ReplyTranslationLane"/>.
     /// Failure shapes mirror <see cref="AddReplyTranslation"/>.
     /// </summary>
     [HttpPost("/posts/{id}/replies/{replyId}/translations/remove")]
@@ -1924,7 +1918,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.RemoveReplyTranslationAsync(replyId, languageCode, actor, actorRoles, session);
+            await posts.ReplyTranslationLane.RemoveAsync(session, replyId, languageCode, actor, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {

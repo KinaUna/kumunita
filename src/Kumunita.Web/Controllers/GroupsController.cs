@@ -2666,7 +2666,7 @@ public sealed class GroupsController(
     /// <paramref name="languageCode"/> (ADR 0022, group lane):
     /// <c>POST /groups/{id}/posts/{postId}/translations</c>. A thin Web lane
     /// (ADR 0006-D) delegating the write + standing decision to
-    /// <see cref="PostService.AddPostTranslationAsync"/>. On the group lane the
+    /// <see cref="PostService.PostTranslationLane"/>. On the group lane the
     /// standing is **author ∪ GlobalAdmin only** (the component-moderator
     /// branch is excluded by the service's <c>isGroupLane</c> flag — ADR 0007:
     /// a group has no component-moderator scope). A denied standing actor is a
@@ -2706,14 +2706,14 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.AddPostTranslationAsync(
+            await posts.PostTranslationLane.AddAsync(
+                session,
                 postId,
                 languageCode,
                 string.IsNullOrWhiteSpace(title) ? null : title,
                 body,
                 actor,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (KeyNotFoundException)
         {
@@ -2772,13 +2772,7 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.AddReplyTranslationAsync(
-                replyId,
-                languageCode,
-                body,
-                actor,
-                actorRoles,
-                session);
+            await posts.ReplyTranslationLane.AddAsync(session, replyId, languageCode, null, body, actor, actorRoles);
         }
         catch (KeyNotFoundException)
         {
@@ -2836,10 +2830,10 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.UpdatePostTranslationAsync(
-                postId, languageCode,
+            await posts.PostTranslationLane.UpdateAsync(
+                session, postId, languageCode,
                 string.IsNullOrWhiteSpace(title) ? null : title,
-                body, actor, actorRoles, session);
+                body, actor, actorRoles);
         }
         catch (KeyNotFoundException)
         {
@@ -2886,7 +2880,7 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.RemovePostTranslationAsync(postId, languageCode, actor, actorRoles, session);
+            await posts.PostTranslationLane.RemoveAsync(session, postId, languageCode, actor, actorRoles);
         }
         catch (KeyNotFoundException)
         {
@@ -2940,7 +2934,7 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.UpdateReplyTranslationAsync(replyId, languageCode, body, actor, actorRoles, session);
+            await posts.ReplyTranslationLane.UpdateAsync(session, replyId, languageCode, null, body, actor, actorRoles);
         }
         catch (KeyNotFoundException)
         {
@@ -2989,7 +2983,7 @@ public sealed class GroupsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.RemoveReplyTranslationAsync(replyId, languageCode, actor, actorRoles, session);
+            await posts.ReplyTranslationLane.RemoveAsync(session, replyId, languageCode, actor, actorRoles);
         }
         catch (KeyNotFoundException)
         {

@@ -20,7 +20,7 @@ namespace Kumunita.Core.Posts;
 /// GlobalAdmin); on the group lane, only the <b>author</b> or a GlobalAdmin
 /// (the group lane has no component-moderator standing, ADR 0007). The
 /// decision + its <see cref="Kumunita.Core.Authorization.AccessAudit"/> row are
-/// written by <see cref="PostService.AddPostTranslationAsync"/> in the
+/// written by <see cref="PostService.PostTranslationLane"/> in the
 /// caller's transaction (C3).
 /// <para>
 /// **Not an authorization surface (C-M3·1 carried over):** like its parent

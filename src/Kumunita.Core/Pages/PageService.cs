@@ -741,7 +741,7 @@ public sealed class PageService : IPageService
 
         // TG (ADR 0044, U8b) — the tag attach lane on the create path (C3
         // single-transaction idiom, same session as the page write — the
-        // <c>PostService.AddPostTranslationAsync</c> precedent). Only if the
+        // <c>PostService.PostTranslationLane.AddAsync</c> precedent). Only if the
         // form gave slugs (null/empty ⇒ no tags, the U4 additive
         // default-empty pin) **and** the page is a <c>PageKind.User</c>
         // (blog) page — the <c>System</c>-page refusal already fired above

@@ -14,8 +14,8 @@ namespace Kumunita.Core.Posts;
 /// <see cref="CanAddTranslation"/>: the public ADR 0022 standing probe the Web
 /// layer calls to decide whether to render the "add a translation" affordance
 /// (a <b>display</b> pin, not a gate — the real deny is the
-/// <see cref="PostService.AddPostTranslationAsync"/> /
-/// <see cref="PostService.AddReplyTranslationAsync"/> standing check, which
+/// <see cref="PostService.PostTranslationLane"/> /
+/// <see cref="PostService.ReplyTranslationLane"/> standing check, which
 /// re-runs the same rule server-side). Keeping this in Core — not duplicated in
 /// the two detail controllers — is the ADR 0006-D "the service owns the
 /// decision, not the Web" shape; it delegates to the same
@@ -31,8 +31,8 @@ public static class PostTranslationPolicy
     /// <summary>
     /// The public ADR 0022 standing probe the Web layer calls to decide whether
     /// to render the "add a translation" affordance (a <b>display</b> pin, not a
-    /// gate — the real deny is the <see cref="PostService.AddPostTranslationAsync"/> /
-    /// <see cref="PostService.AddReplyTranslationAsync"/> standing check, which re-runs the
+    /// gate — the real deny is the <see cref="PostService.PostTranslationLane"/> /
+    /// <see cref="PostService.ReplyTranslationLane"/> standing check, which re-runs the
     /// same rule server-side). ADR 0048: the edit / remove lanes (the same
     /// standing matrix, re-derived from the parent) reuse this exact display
     /// pin, so the "add a …" / "edit …" / "remove …" affordances render under
@@ -44,8 +44,8 @@ public static class PostTranslationPolicy
 
     /// <summary>
     /// The ADR 0022 translation standing resolver (shared by the
-    /// <see cref="PostService.AddPostTranslationAsync"/> /
-    /// <see cref="PostService.AddReplyTranslationAsync"/> write lanes and the
+    /// <see cref="PostService.PostTranslationLane"/> /
+    /// <see cref="PostService.ReplyTranslationLane"/> write lanes and the
     /// <see cref="CanAddTranslation"/> display pin). Returns the
     /// <see cref="AccessVia"/> the actor qualifies under, or <c>null</c> to
     /// deny. Precedence (most specific standing first, so the audit row records

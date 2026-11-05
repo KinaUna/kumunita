@@ -75,8 +75,8 @@ public sealed class PostService
     // title/body shape, the reply's parent-post standing re-check) lives in the descriptor's
     // functions, verbatim from the pre-C06 bodies. The read seams (Get*TranslationsAsync) stay
     // here — their shape is surface-specific (the reply read is batched); the lane is the write seam.
-    private readonly TranslationLane<Post, PostTranslation> _postTranslationLane;
-    private readonly TranslationLane<PostReply, ReplyTranslation> _replyTranslationLane;
+    public TranslationLane<Post, PostTranslation> PostTranslationLane { get; }
+    public TranslationLane<PostReply, ReplyTranslation> ReplyTranslationLane { get; }
 
     public PostService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store,
         ITagService? tags = null,
@@ -90,7 +90,7 @@ public sealed class PostService
         _notifications = notifications;
         _mentions = mentions;
 
-        _postTranslationLane = new TranslationLane<Post, PostTranslation>(new TranslationDescriptor<Post, PostTranslation>
+        PostTranslationLane = new TranslationLane<Post, PostTranslation>(new TranslationDescriptor<Post, PostTranslation>
         {
             TargetKind = "post",
             ActionPrefix = "posttranslation",
@@ -112,7 +112,7 @@ public sealed class PostService
             },
         });
 
-        _replyTranslationLane = new TranslationLane<PostReply, ReplyTranslation>(new TranslationDescriptor<PostReply, ReplyTranslation>
+        ReplyTranslationLane = new TranslationLane<PostReply, ReplyTranslation>(new TranslationDescriptor<PostReply, ReplyTranslation>
         {
             TargetKind = "reply",
             ActionPrefix = "replytranslation",
@@ -563,7 +563,7 @@ public sealed class PostService
 
         // TG (ADR 0044, U8b) — the tag attach lane (C3 single-transaction
         // idiom: the write + the audit row commit atomically on the **same**
-        // <c>IDocumentSession</c> — the <c>AddPostTranslationAsync</c>
+        // <c>IDocumentSession</c> — the <c>PostTranslationLane.AddAsync</c>
         // precedent). Only if the form gave slugs (null/empty ⇒ no tags, the
         // U4 additive default-empty pin). The <c>AttachToPostAsync</c> lane
         // re-checks the standing (author ∪ GlobalAdmin, C-TG·5) and
@@ -1754,191 +1754,33 @@ public sealed class PostService
             .ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Adds a **user-added translation** of a post in the **caller's** in-flight
-    /// session (invariant C3 — the same-transaction lane; the
-    /// <see cref="IDocumentSession"/> is the caller's, so the write and the
-    /// in-session <c>AccessAudit</c> row commit or roll back atomically).
-    /// <para>
-    /// <b>Standing (ADR 0022, the approved default):</b> the post's
-    /// <b>author</b> (<see cref="AccessVia.Owner"/>); a
-    /// <see cref="Identity.Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>);
-    /// and — on the **community** lane only — a
-    /// <c>Moderator</c> scoped to the post's component
-    /// (<see cref="AccessVia.Moderator"/>). On the **group** lane (
-    /// <see cref="Post.GroupId"/> non-empty, ADR 0013) the component-moderator
-    /// standing does **not** apply (ADR 0007 — no component-moderator scope
-    /// exists for a group; GlobalAdmin is the only non-author standing). A
-    /// denied actor throws <see cref="UnauthorizedAccessException"/> **before**
-    /// anything is stored.
-    /// </para>
-    /// <para>
-    /// <paramref name="languageCode"/> is the **target** language (a
-    /// <see cref="Kumunita.Core.Localization.LanguageCatalog.Id"/> the Web offers
-    /// from the enabled catalog); it is written **verbatim** (never floored to
-    /// the instance default — a blank target is a caller error). One
-    /// <c>SaveChangesAsync</c>.
-    /// </para>
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// author / GlobalAdmin / (community) component-moderator standings.</exception>
-    public Task<PostTranslation> AddPostTranslationAsync(
-        string postId,
-        string languageCode,
-        string? title,
-        string body,
-        string actorId,
-        IReadOnlySet<string> actorRoles,
-        IDocumentSession session)
-        => _postTranslationLane.AddAsync(session, postId, languageCode, title, body, actorId, actorRoles);
-
-    /// <summary>
-    /// Adds a **user-added translation** of a reply in the **caller's** in-flight
-    /// session (invariant C3; the <see cref="IDocumentSession"/> is the caller's).
-    /// <para>
-    /// <b>Standing (ADR 0022, mirroring the parent post's):</b> the reply's
-    /// <b>author</b> (<see cref="AccessVia.Owner"/>); a
-    /// <see cref="Identity.Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>);
-    /// and — on the **community** lane only — a <c>Moderator</c> scoped to the
-    /// parent post's component (<see cref="AccessVia.Moderator"/>). On the
-    /// **group** lane the component-moderator standing does not apply (ADR 0007).
-    /// A denied actor throws <see cref="UnauthorizedAccessException"/> before
-    /// anything is stored.
-    /// </para>
-    /// <para>
-    /// <paramref name="languageCode"/> is the target language (written verbatim;
-    /// a blank target is a caller error); the translation is body-only (a reply
-    /// has no title — C-M3·1). One <c>SaveChangesAsync</c>.
-    /// </para>
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The reply id (or its parent post)
-    /// is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// author / GlobalAdmin / (community) component-moderator standings.</exception>
-    public Task<ReplyTranslation> AddReplyTranslationAsync(
-        string replyId,
-        string languageCode,
-        string body,
-        string actorId,
-        IReadOnlySet<string> actorRoles,
-        IDocumentSession session)
-        => _replyTranslationLane.AddAsync(session, replyId, languageCode, null, body, actorId, actorRoles);
-
-    // ─── ADR 0048 — edit + delete lane for post/reply translations ───────
-    // The ADR 0022 write lane was add-only (one row per (parent, language)
-    // pair, enforced by the unique index in PostDocTypes). ADR 0048 lifts the
-    // "add-only" pin: a standing-holder (the same matrix as the add lane —
-    // author / GlobalAdmin / (community-lane) component-moderator) may now
-    // **update** the existing (parent, language) row in place, or **remove**
-    // it. Update is a field-write on the existing row (same Title/Body
-    // shape as the add, the parent re-validated by load); Remove is a hard
-    // `session.Delete` of the row (the trail is preserved by the
-    // <c>AccessAudit</c> row written in the same session — ADR 0024's
-    // soft-delete rationale does not apply to a translation: it has no
-    // children to keep visible, and a soft-delete would block re-adding the
-    // same language via the unique index). Standing is re-derived from the
-    // **parent** (the row's own <c>AuthorId</c> is the adder, which may be a
-    // different standing-holder — the post's author, a GlobalAdmin, or a
-    // community moderator). Both lanes write a hand-written
-    // <c>AccessAudit</c> row in the caller's session (C3) and commit
-    // atomically (one <c>SaveChangesAsync</c>).
-
-    /// <summary>
-    /// **Updates** the existing <see cref="PostTranslation"/> row for
-    /// (<paramref name="postId"/>, <paramref name="languageCode"/>) in the
-    /// <b>caller's</b> in-flight session (C3). Standing (ADR 0048, same as
-    /// the ADR 0022 add lane): the post's **author**
-    /// (<see cref="AccessVia.Owner"/>), a <see cref="Identity
-    /// .Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>), and — on the
-    /// community lane only — a <c>Moderator</c> scoped to the post's
-    /// component (<see cref="AccessVia.Moderator"/>). The group lane has no
-    /// component-moderator standing (ADR 0007). A denied actor throws
-    /// <see cref="UnauthorizedAccessException"/> before anything is written.
-    /// <para>
-    /// The row's <see cref="PostTranslation.Title"/> /
-    /// <see cref="PostTranslation.Body"/> are replaced verbatim (a blank
-    /// <paramref name="title"/> clears the title, matching the add lane's
-    /// null-coalescing; a blank <paramref name="body"/> is a caller error —
-    /// a translation with no body is not a translation). The parent
-    /// <see cref="Post"/> and the <c>(PostId, LanguageCode)</c> row are both
-    /// loaded in the same session: a missing parent is a
-    /// <see cref="KeyNotFoundException"/> (the parent was deleted after the
-    /// translation was added, or the id is a hallucination), a missing row
-    /// is a <see cref="KeyNotFoundException"/> (a shape error for this
-    /// route — the Web layer offers this route only for languages that
-    /// already have a row). One <c>SaveChangesAsync</c>.
-    /// </para>
-    /// </summary>
-    public Task<PostTranslation> UpdatePostTranslationAsync(
-        string postId, string languageCode, string? title, string body,
-        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-        => _postTranslationLane.UpdateAsync(session, postId, languageCode, title, body, actorId, actorRoles);
-
-    /// <summary>
-    /// **Removes** the existing <see cref="PostTranslation"/> row for
-    /// (<paramref name="postId"/>, <paramref name="languageCode"/>) in the
-    /// <b>caller's</b> in-flight session (C3). Standing is the same matrix
-    /// as <see cref="UpdatePostTranslationAsync"/> — the ADR 0048
-    /// author / GlobalAdmin / (community) component-moderator rule,
-    /// re-derived from the parent post. A hard <c>session.Delete</c> of the
-    /// row; the trail is preserved by the <see cref="Authorization
-    /// .AccessAudit"/> row written in the same session (action
-    /// <c>posttranslation.remove</c>). A missing parent or a missing row is
-    /// a <see cref="KeyNotFoundException"/> (a double-remove is a shape
-    /// error for this route — the Web layer offers the delete affordance
-    /// only for languages that have a row). One <c>SaveChangesAsync</c>.
-    /// </summary>
-    public Task RemovePostTranslationAsync(
-        string postId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-        => _postTranslationLane.RemoveAsync(session, postId, languageCode, actorId, actorRoles);
-
-    /// <summary>
-    /// **Updates** the existing <see cref="ReplyTranslation"/> row for
-    /// (<paramref name="replyId"/>, <paramref name="languageCode"/>) in the
-    /// <b>caller's</b> in-flight session (C3). Standing mirrors the parent
-    /// post's lane (community vs group) and the parent's component scope —
-    /// the reply itself has no component (C-M3·1), so the scope comes from
-    /// the parent. A denied actor throws
-    /// <see cref="UnauthorizedAccessException"/> before anything is
-    /// written. A missing parent post, a missing reply, or a missing
-    /// (ReplyId, LanguageCode) row is a
-    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
-    /// </summary>
-    public Task<ReplyTranslation> UpdateReplyTranslationAsync(
-        string replyId, string languageCode, string body,
-        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-        => _replyTranslationLane.UpdateAsync(session, replyId, languageCode, null, body, actorId, actorRoles);
-
-    /// <summary>
-    /// **Removes** the existing <see cref="ReplyTranslation"/> row for
-    /// (<paramref name="replyId"/>, <paramref name="languageCode"/>) in the
-    /// <b>caller's</b> in-flight session (C3). Standing mirrors the parent
-    /// post's lane and component scope (the ADR 0048 author / GlobalAdmin /
-    /// (community) component-moderator rule). A hard
-    /// <c>session.Delete</c>; the trail is preserved by the
-    /// <see cref="Authorization.AccessAudit"/> row (action
-    /// <c>replytranslation.remove</c>). A missing parent post, reply, or
-    /// row is a <see cref="KeyNotFoundException"/>. One
-    /// <c>SaveChangesAsync</c>.
-    /// </summary>
-    public Task RemoveReplyTranslationAsync(
-        string replyId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-        => _replyTranslationLane.RemoveAsync(session, replyId, languageCode, actorId, actorRoles);
+    // ─── ADR 0022 + 0048 — post / reply translation write lanes ─────────────
+    // C2-01 (IMPROVE-CODE-2): the six per-surface `*Translation*` write methods
+    // (add / update / remove × post / reply) are retired. Their body was a one-
+    // line forwarder into the shared <see cref="TranslationLane{TParent,TVar}"/>
+    // (ADR 0288); the Web layer now codes against <see cref="PostTranslationLane"/>
+    // and <see cref="ReplyTranslationLane"/> directly (a D6-legal `record` in the
+    // Translations module, so pointing the controller at it adds no boundary edge).
+    // The standing matrix, the audit-row shape, the (parent, language) row shape,
+    // and the caller-supplied session are all defined once in the descriptor —
+    // byte-identical to the retired forwarders. The read seams
+    // (<see cref="GetPostTranslationsAsync"/> / <see cref="GetReplyTranslationsAsync"/>)
+    // and the <see cref="CanAddTranslation"/> display pin stay on this service:
+    // their shape is surface-specific (the reply read is batched; the display pin
+    // is the C04 seam the Web calls), which the write lane intentionally does not own.
 
     /// <summary>
     /// The public ADR 0022 standing probe the Web layer calls to decide whether
     /// to render the "add a translation" affordance (a <b>display</b> pin, not a
-    /// gate — the real deny is the <see cref="AddPostTranslationAsync"/> /
-    /// <see cref="AddReplyTranslationAsync"/> standing check, which re-runs the
+    /// gate — the real deny is the <see cref="PostTranslationLane"/> /
+    /// <see cref="ReplyTranslationLane"/> standing re-check, which re-runs the
     /// same rule server-side). C04: the rule moved to
     /// <see cref="PostTranslationPolicy.CanAddTranslation"/> — a thin forwarder
     /// here keeps the call surface unchanged; the Web no longer reaches the
     /// concrete service for the decision. ADR 0048: the edit / remove lanes
-    /// reuse this exact display pin, so the "add a …" / "edit …" / "remove …"
-    /// affordances render under the same standing.
+    /// (the two lanes' <c>UpdateAsync</c> / <c>RemoveAsync</c>) reuse this exact
+    /// display pin, so the "add a …" / "edit …" / "remove …" affordances render
+    /// under the same standing.
     /// </summary>
     public static bool CanAddTranslation(
         bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)

@@ -23,7 +23,7 @@ namespace Kumunita.Core.Tags;
 /// **C3 idiom:** every write takes the **caller's**
 /// <see cref="IDocumentSession"/> (the write and the in-session
 /// <c>AccessAudit</c> row commit or roll back atomically — the
-/// <see cref="PostService.AddPostTranslationAsync"/> shape). One
+/// <see cref="Posts.PostService.PostTranslationLane"/> shape). One
 /// <c>SaveChangesAsync</c> per write.
 /// </para>
 /// <para>

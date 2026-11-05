@@ -14,12 +14,15 @@ updated: 2026-11-05
 ---
 
 > **Abstract:** the running handoff log for the IMPROVE-CODE-2 lane.
-> C2-00 (this unit) recorded the CI-shaped failing and passing gate runs,
-> resolved the 30 unjustified raises (the `adr: 0290` named exception record),
-> and confirmed all verification gates green. **Who is it for:** the
-> successor units C2-01…C2-08, and the reviewer of C2-08's close.
-> **When to read the rest:** before starting any C2-unit, or before deciding
-> whether a DoD line that "looks done" actually is.
+> C2-00 recorded the CI-shaped failing and passing gate runs, resolved the
+> 30 unjustified raises (the `adr: 0290` named exception record), and confirmed
+> all verification gates green. C2-01 collapsed the **Posts** surface (the M3
+> reference surface) onto the `TranslationLane` — the six per-surface write
+> forwarders retired, the `PostService` class baseline entry gone (31 → 25,
+> at the ceiling), and the `*Translation*` method count down by 6. **Who is
+> it for:** the successor units C2-02…C2-08, and the reviewer of C2-08's
+> close. **When to read the rest:** before starting any C2-unit, or before
+> deciding whether a DoD line that "looks done" actually is.
 
 # IMPROVE-CODE-2 — handoff notes
 
@@ -128,3 +131,200 @@ No raise is silent. The 3 flagged-accidental edges (#7, #9, #19) are named for C
 - [x] Handoff note written with before → after for all 30
 
 **C2-00 is complete.** The next unit is **C2-01 — Translation lane, first surface**.
+
+## C2-01 — Translation lane, first surface: **Posts** (2026-11-05)
+
+### Why Posts is the first surface
+
+The prompt suggested `PostService` (the C06 reference surface) or `EventService`
+(the cleanest forwarder set). I picked **Posts** — but for a reason the plan
+doesn't state, which I want to name so C2-02 can pick with the same information.
+
+The lane (`TranslationLane<TParent, TVar>`) is a *write* lane that operates on
+the caller-supplied `IDocumentSession` — it never opens a session itself
+(`TranslationLane.cs` "Session ownership"). That means the surface that owns
+the session is the one that can code against the lane directly. Two conventions
+coexist in the tree:
+
+- **M3 (Posts):** the controller owns the session (`store.LightweightSession()`)
+  and passes it in. `PostsController` and `GroupsController` both have an
+  `IDocumentStore`; the forwarder is a one-line `=> lane.XAsync(session, …)`.
+  Retiring the forwarder is a *pure move* — the session is already at the call
+  site, so the controller codes against the lane. No topology change.
+- **M4 (Events / Announcements / Pages / Boards / Todos / Projects):** the
+  service opens its own session (`_store.OpenSession(…)` inside the forwarder).
+  The controllers have **no** store (verified: `EventController.cs` has zero
+  `IDocumentStore` references). Retiring those forwarders would force the
+  session ownership to move to the controller — a *change*, not a move, and it
+  entangles with C2-03 (module surface) and C2-04 (Marten allowlist), both of
+  which are later units. Not the right first surface.
+
+So Posts is the only wired surface where the collapse is a pure move. It is
+also the C06 reference surface, which is why the prompt listed it first.
+
+### What changed
+
+- **`PostService`:** the two private `_postTranslationLane` /
+  `_replyTranslationLane` fields became the two public read-only properties
+  `PostTranslationLane` / `ReplyTranslationLane`. The six per-surface write
+  methods (`AddPostTranslationAsync` / `UpdatePostTranslationAsync` /
+  `RemovePostTranslationAsync` / `AddReplyTranslationAsync` /
+  `UpdateReplyTranslationAsync` / `RemoveReplyTranslationAsync`) — each a
+  one-line forwarder into the lane — are **retired (deleted)**. The two read
+  seams (`GetPostTranslationsAsync` / `GetReplyTranslationsAsync`) and the
+  `CanAddTranslation` display pin stay on the service: their shape is
+  surface-specific (the reply read is batched over `replyIds`; the display pin
+  is the C04 seam the Web calls), which the write lane intentionally does not
+  own.
+- **Call sites re-pointed at the lane:** `PostsController` (6 actions) and
+  `GroupsController` (6 actions) now call
+  `posts.PostTranslationLane.{Add,Update,Remove}Async(session, …)` /
+  `posts.ReplyTranslationLane.{Add,Update,Remove}Async(session, …)` directly.
+  The reply-lane calls pass `null` for the title (a reply has no title — C-M3·1),
+  which the forwarder was doing internally; that is now explicit at the call
+  site.
+- **Cref / doc references** that named the retired forwarders now point at the
+  lane properties (or the lane's `AddAsync` precedent). No rendered HTML, route,
+  or document-schema change.
+- **`PostTranslationTests`** (the seam test): all 20 write-lane call sites
+  re-pointed to the lane. **All 22 tests pass** (`dotnet exec
+  tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll -class
+  "Kumunita.Core.Tests.PostTranslationTests"` → `Total: 22, Errors: 0,
+  Failed: 0`). The seam is still covered at the lane.
+
+### The numbers (DoD #5)
+
+Counted on the C06/ADR 0288 basis — public `(Get|Add|Update|Remove)*Translation*Async`
+declarations on the 13 named Core services (the per-surface 4-verb lane methods;
+the `CanAddTranslation` display probes, the `*TranslationPolicy` files, and the
+seeders are excluded, matching the prompt's own per-surface per-method column):
+
+| surface | before (`8218f3fc`) | after | Δ |
+|---|---:|---:|---:|
+| `Posts/PostService` | 8 | **2** | **−6** |
+| `Events/EventService` | 4 | 4 | 0 |
+| `Announcements/AnnouncementService` | 4 | 4 | 0 |
+| `Pages/PageService` | 4 | 4 | 0 |
+| `Projects/ProjectService` | 12 | 12 | 0 |
+| `Projects/BoardService` | 4 | 4 | 0 |
+| `Projects/TodoService` | 4 | 4 | 0 |
+| `UserInfo/GroupService` | 4 | 4 | 0 |
+| `UserInfo/CommunityMembershipService` | 4 | 4 | 0 |
+| `SurfaceLabels/SurfaceLabelsService` | 4 | 4 | 0 |
+| `SiteContent/SiteContentService` | 4 | 4 | 0 |
+| `Localization/LocalizationService` | 3 | 3 | 0 |
+| `Tags/TagService` | 1 | 1 | 0 |
+| **total** | **60** | **54** | **−6** |
+
+- **The six retired Posts forwarders are the only change: 60 → 54.** The
+  `PostService` per-surface count is **8 → 2** (the two read seams —
+  `GetPostTranslationsAsync` / `GetReplyTranslationsAsync` — stay; the
+  `CanAddTranslation` display probe stays on the service but is not a 4-verb
+  lane method).
+- **⚠️ DoD line #5's stated target is not met by this unit's measurement.** The
+  DoD line reads *"the `*Translation*` method total is **< 46**"* and the
+  prompt's starting numbers state *"**46** public `*Translation*` methods across
+  Core services (the DoD #5 count to drive **down**)."* Re-derived from the
+  code at `8218f3fc`, the same basis (the 13 named services, 4-verb lane
+  methods) totals **60**, not 46. The plan's own DoD #5 reads *"≤40 (from
+  ~132–195)"* — and the predecessor's C06 prompt states *"~133 `*Translation*`
+  methods over ~5 290 lines across 8+ surfaces."* The "46" in the prompt's
+  starting numbers appears to be a conflation with the plan's *"132–195 across
+  **46 files**"* figure (the number of *files*, not methods). Per the doctrine
+  (*"trust the code, not the plan's counts"* and *"if a DoD line fails, say
+  which one and why — do not fix it silently"*), this entry is recorded with
+  the true numbers (60 → 54) rather than a fabricated "< 46". The reduction is
+  real and strictly downward (−6), but the *absolute* "≤ 40" target is a
+  C2-02 concern (the remaining 54 methods are the six M4 wired surfaces — 44
+  methods — plus the six never-wired surfaces — 24 methods — minus the two
+  Posts reads that already retired). C2-02 must land the remaining reduction to
+  ≤ 40; this unit's "one surface per commit" scope (the D3 rule) is met.
+- **Baseline retired:** the `PostService` **class** entry (`max: 31`) is
+  removed — its public method count is now 25 (= the `class_public_methods`
+  ceiling), so the gate's "stale class baseline (now under ceiling)" rule
+  demands the entry go. This is the clean-resolution shrink for one of the four
+  A0290 named seams (the other three — `EventService` class, `IEventService`
+  interface, the `cc_max`-22 method — remain, per ADR 0290's scope note).
+- **No new baseline entry, no raise, no new boundary edge.** The lane and the
+  descriptor are `record`s in the `Translations` module (D6-legal targets), so
+  the controllers pointing at them adds no `Web→*` violation edge. The measured
+  `Web→Posts` edge set is unchanged (`Post` / `PostReply` / `PostService` /
+  `PostToAuditableResource` / `PostTranslation` / `ReplyTranslation` /
+  `Report` — 7 edges, all already baselined).
+
+### Files changed by C2-01
+
+| File | Change |
+|---|---|
+| `src/Kumunita.Core/Posts/PostService.cs` | two private lane fields → two public properties; six write forwarders deleted; a section note records the retirement; crefs updated |
+| `src/Kumunita.Web/Controllers/PostsController.cs` | 6 actions re-pointed to the lane; crefs updated |
+| `src/Kumunita.Web/Controllers/GroupsController.cs` | 6 actions re-pointed to the lane; cref updated |
+| `src/Kumunita.Core/Posts/PostTranslation.cs` / `ReplyTranslation.cs` / `PostTranslationPolicy.cs` | crefs to the retired forwarders → the lane properties |
+| `src/Kumunita.Core/SiteContent/ISiteContentService.cs` / `Tags/TagService.cs` / `Pages/PageService.cs` / `Web/Models/PostDetailViewModel.cs` | cross-file crefs / `<c>` literals updated |
+| `tests/Kumunita.Core.Tests/PostTranslationTests.cs` | 20 write-lane call sites re-pointed to the lane; doc crefs updated |
+| `tests/Kumunita.Web.Tests/GroupsControllerTranslationTests.cs` | `<c>` literals updated (the test body itself is unchanged — it exercises `GroupService`, not `PostService`) |
+| `tools/code/code-baseline.json` | the `PostService` class entry retired (the surgical text edit — a `json.load`/`dump` round-trip churned the `\u003C` escapes, so it was reverted and re-done textually, per the C06 practical note) |
+
+### What C2-01 did NOT do (C2-02's scope)
+
+- **Did not collapse the other six wired surfaces** (`EventService` 5,
+  `AnnouncementService` 4, `PageService` 4, `BoardService` 5, `TodoService` 5,
+  `ProjectService` 13) — those are the M4 session-ownership case: the service
+  opens its own session and the controller has no store, so retiring their
+  forwarders is a session-topology change that entangles with C2-03/C2-04.
+  C2-02 needs a decision first: move the session ownership to the controller
+  (the M3 shape, a real change that also shrinks the controller-Marten surface)
+  or leave the forwarders and accept the count. **Name it.**
+- **Did not collapse the never-wired surfaces** (`GroupService` 4,
+  `CommunityMembershipService` 4, `SurfaceLabelsService` 4,
+  `SiteContentService` 4, `LocalizationService` 7, `TagService` 1) — the lane
+  isn't there yet; a larger unit (wire the lane, then collapse).
+- **Did not touch** the module surface (#6), the Marten allowlist (#6), the
+  still-large files (#3/#4), the two untested services (#7), or the SEC pointer
+  (#8).
+- **Did not shrink** the other three A0290 named seams (`EventService` class
+  `max: 31`, `IEventService` interface `max: 28`, `BuildPostRowsAsync`
+  `cc_max: 22`) — the Posts one (`PostService` class) retired under the ceiling
+  as a side effect of the forwarder retirement, but the other three are the
+  explicit 4-shrink scope the successor must adopt (ADR 0290's scope note).
+
+### DoD check (C2-01)
+
+- [x] **One surface** chosen (named above: **Posts**, the M3 reference surface)
+  and its `*Translation*` write methods collapsed onto the `TranslationLane`
+  + descriptor; the per-surface forwarders **retired** (deleted, not wrapped).
+- [x] **The count is down per surface (the D3 rule this unit implements):**
+  `PostService` `*Translation*` methods **8 → 2** (the six write forwarders
+  retired as they move onto the lane). No new `*Translation*` method added to
+  a service to compensate.
+- [ ] **The absolute DoD target "< 46" is NOT met by this unit** — and is not
+  expected to be, because the unit is *one surface* (the D3 rule: "one surface
+  per commit, the method retires as it moves, the count goes down per
+  surface"). On the prompt's own counting basis the true total is **60 → 54**
+  (not "46 → …" — the "46" in the prompt's starting numbers is a conflation
+  with the plan's "~132–195 across **46 files**"). The absolute "≤ 40" target
+  (the plan's DoD #5) is **C2-02's** scope: it requires collapsing the six
+  remaining M4 wired surfaces (44 methods) plus wiring + collapsing the six
+  never-wired surfaces (24 methods). Recorded here per the doctrine: *say which
+  line fails and why — do not fix it silently.* The reduction this unit makes
+  is real and strictly downward (−6); it is the first step of the
+  60 → ≤ 40 reduction, not the completion of it.
+- [x] **Behaviour unchanged:** the migration is a move — the same descriptor,
+  the same standing matrix, the same audit rows, the same stored variant
+  documents, the same caller-supplied session. All 22 seam tests pass
+  unmodified in their assertions (only the call target changed: the
+  `PostService` forwarder → the `TranslationLane`). No route or rendered-HTML
+  change.
+- [x] **Part-vs-whole passes:** the seam moved onto is the shared
+  `TranslationLane` (the C06 C13 cold read verified it); the per-surface
+  difference is the descriptor. No ceremony type introduced.
+- [x] `dotnet build Kumunita.slnx -c Debug` — **0 errors**.
+- [x] `tools/code/code-baseline.json` — the `PostService` class entry retired
+  (shrink-only; no entry raised; no new entry).
+- [x] `tools/code/code-check.ps1` — **OK (0 violations)**.
+- [x] `tools/docs/improve-check.ps1` — **ALL GATES PASS**.
+- [x] The `PostTranslationTests` seam suite **runs and passes** (22/22).
+
+**C2-01 is complete.** The next unit is **C2-02 — Translation lane, the rest of
+the surfaces** (the six M4 wired surfaces + the six never-wired surfaces, each
+with the session-ownership decision named first).

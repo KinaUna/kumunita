@@ -36,8 +36,8 @@ namespace Kumunita.Web.Tests;
 /// <para>
 /// The group post / reply translation edit/delete Web lanes (which delegate
 /// to <see cref="Kumunita.Core.Posts.PostService"/>'s
-/// <c>UpdatePostTranslationAsync</c> / <c>UpdateReplyTranslationAsync</c> /
-/// <c>RemovePostTranslationAsync</c> / <c>RemoveReplyTranslationAsync</c> —
+/// <c>PostService.PostTranslationLane</c> /
+/// <c>PostService.ReplyTranslationLane</c> —
 /// the same Core seams as the community-lane
 /// <see cref="PostsController"/> shapes) aren't isolated-tested here:
 /// <see cref="Kumunita.Core.Posts.PostService"/> is a sealed concrete class

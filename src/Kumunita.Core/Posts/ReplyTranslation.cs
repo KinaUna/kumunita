@@ -17,7 +17,7 @@ namespace Kumunita.Core.Posts;
 /// <b>author</b> or, on the community lane, a <b>component moderator</b> (or a
 /// GlobalAdmin); on the group lane, only the <b>author</b> or a GlobalAdmin.
 /// The decision + <see cref="Kumunita.Core.Authorization.AccessAudit"/> row are
-/// written by <see cref="PostService.AddReplyTranslationAsync"/> in the
+/// written by <see cref="PostService.ReplyTranslationLane"/> in the
 /// caller's transaction (C3).
 /// <para>
 /// **Not an authorization surface (C-M3·1):** no own audience — the reply

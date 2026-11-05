@@ -589,10 +589,6 @@
       "adr": "0290"
     },
     {
-      "id": "src/Kumunita.Core/Posts/PostService.cs::Kumunita.Core.Posts.PostService",
-      "max": 31
-    },
-    {
       "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService",
       "max": 59
     },

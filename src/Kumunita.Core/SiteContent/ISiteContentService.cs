@@ -56,7 +56,7 @@ public interface ISiteContentService
     /// <summary>
     /// Adds a **user-added translation** of the singleton's hero text into
     /// <paramref name="languageCode"/> (ADR 0157; the ADR 0022
-    /// <see cref="Posts.PostService.AddPostTranslationAsync"/> shape, minus
+    /// <see cref="Posts.PostService.PostTranslationLane"/> shape, minus
     /// the parent standing — the site has no per-resident owner, so the
     /// standing is a GlobalAdmin only, enforced by the Web gate, ADR 0150
     /// D8). **At least one** of the six hero fields (the two heroes'
@@ -86,7 +86,7 @@ public interface ISiteContentService
     /// <summary>
     /// **Updates** the existing <see cref="SiteContentTranslation"/> row for
     /// <paramref name="languageCode"/> (ADR 0157; the ADR 0048
-    /// <see cref="Posts.PostService.UpdatePostTranslationAsync"/> shape). The
+    /// <see cref="Posts.PostService.PostTranslationLane"/> shape). The
     /// six hero fields (the two heroes' eyebrow + lead + the home hero's two
     /// sub lines) are replaced verbatim (a blank field clears that field's
     /// override → the singleton's value is the fallback again); **at least
@@ -108,7 +108,7 @@ public interface ISiteContentService
     /// <summary>
     /// **Removes** the existing <see cref="SiteContentTranslation"/> row for
     /// <paramref name="languageCode"/> (ADR 0157; the ADR 0048
-    /// <see cref="Posts.PostService.RemovePostTranslationAsync"/> shape). A
+    /// <see cref="Posts.PostService.PostTranslationLane"/> shape). A
     /// hard delete of the row — the trail is preserved by the
     /// <c>AccessAudit</c> row written in the same session (action
     /// <c>sitetranslation.remove</c>, <c>Via = Admin</c>); the hero reverts to

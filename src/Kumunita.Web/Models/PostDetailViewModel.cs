@@ -111,7 +111,7 @@ public sealed class PostDetailViewModel
     /// <summary>Whether the signed-in actor holds standing to
     /// <b>add</b> a translation of this post (ADR 0022 — the author, a
     /// community moderator, or a GlobalAdmin). A display pin, not a gate: the
-    /// real deny is the <c>PostService.AddPostTranslationAsync</c> standing
+    /// real deny is the <c>PostService.PostTranslationLane</c> standing
     /// check. When false, no "add a translation" affordance renders.</summary>
     public bool CanTranslate { get; set; }
     // ── TD lane (ADR 0027) — the authored-in language as a first-class variant ──
@@ -170,7 +170,7 @@ public sealed record ReplyItem(
     /// <summary>Whether the signed-in actor holds standing to
     /// <b>add</b> a translation of this reply (ADR 0022 — the author, a
     /// community moderator, or a GlobalAdmin). A display pin, not a gate; the
-    /// real deny is <c>PostService.AddReplyTranslationAsync</c>.</summary>
+    /// real deny is <c>PostService.ReplyTranslationLane</c>.</summary>
     bool CanTranslate,
     /// <summary>When the author soft-deleted this reply (ADR 0024); <c>null</c>
     /// while it is live. A display pin: the detail view renders a placeholder
