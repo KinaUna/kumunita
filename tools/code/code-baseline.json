@@ -3566,79 +3566,79 @@
   "controllers_marten_allowlist": [
     {
       "file": "src/Kumunita.Web/Controllers/AccountController.cs",
-      "reason": "C09 survivor: the 2FA \u0027authenticator setup\u0027 lane reads the actor\u0027s IdentityToken for a one-time QR payload (Identity-module read); needs a committed IIdentityService read overload, tracked C10\u002B"
+      "reason": "the 2FA 'authenticator setup' lane reads the actor's IdentityToken for a one-time QR payload (an Identity-module read). The owning IdentityService (src/Kumunita.Core/Identity/IdentityService.cs, 1608 lines) is a god-file at its ratchet ceiling (cs_file 600) - adding the read overload would raise the ratchet, which is C2-05's scope, not C2-04's. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/AdminAnalyticsController.cs",
-      "reason": "C09 survivor: the audit-log export writes an AccessAudit row (Authorization-module write); routing it through a Usage-module service would mint a new Usage-\u003EAuthorization boundary edge, so it stays on the store"
+      "reason": "the audit-log export writes an AccessAudit row (an Authorization-module concrete type). No Usage-module write service owns it; routing it through one would mint a new Usage->Authorization boundary edge (a cross-module reference to the AccessAudit class = a gate edge). Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/AdminController.cs",
-      "reason": "C09 survivor: first-run setup \u002B seed-user creation are multi-document writes across Identity/UserInfo/Authorization; needs committed IAdminService overloads, tracked C10\u002B"
+      "reason": "first-run setup + seed-user creation are multi-document writes spanning Identity + UserInfo + Authorization. There is NO Admin module in Core (src/Kumunita.Core/Admin/ is empty) and no IAdminService - minting one to carry a 3-module aggregate write is a ceremony type, and the writes span modules no single service owns. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
-      "reason": "C09 survivor: the announcement create/edit/delete lanes write the Post \u002B its Translation \u002B moderation side-rows in one aggregate (Post/Moderation split); C10\u002B scope"
+      "reason": "the announcement create/edit/delete lanes write the Post + its Translation + moderation side-rows in one aggregate. The owning PostService (src/Kumunita.Core/Posts/PostService.cs, 1722 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/AttachmentController.cs",
-      "reason": "C09 survivor: the attach/retrieve/delete lanes span the Posts (parent Post read) \u002B Media (MediaObject quarantine) modules; needs a Media-module committed service, tracked C10\u002B"
+      "reason": "the attach/retrieve/delete lanes span the Posts module (the parent Post read) + the Media module (the MediaObject quarantine write) - a 2-module aggregate no single owning service owns (MediaLifecycleService is the lifecycle tick, not an attachment write-service). Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/ContentImageController.cs",
-      "reason": "C09 survivor: same shape as AttachmentController \u2014 Posts (parent read) \u002B Media (MediaObject quarantine) span; needs a Media-module committed service, tracked C10\u002B"
+      "reason": "same shape as AttachmentController - the lanes span Posts (the parent Post read) + Media (the MediaObject quarantine write); a 2-module aggregate no single owning service owns. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/DirectoryController.cs",
-      "reason": "C09 survivor: the directory read resolves each member\u0027s display tag via a Tags-module (Tag \u002B TagTranslation) read; needs a Tags-module committed read overload, tracked C10\u002B"
+      "reason": "the only store op (ResolveTagDisplayNamesAsync) resolves the profile's TagIds to Tag + TagTranslation docs. The read is already a gate-passing UserInfo->Tags edge (Profile/ProfileFindService reference Tags), but the display-name resolution needs the viewer's effective language from HttpContext.Request (a Web-layer request context) - moving it to DirectoryService would require reshaping the seam to pass the effective language in. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/DocumentController.cs",
-      "reason": "C09 survivor: uses the concrete DocumentService (no interface) \u002B cross-context Tag/DocumentFolder reads \u002B a Media quarantine write; out of C09\u0027s single-owner scope, C10\u002B"
+      "reason": "uses the concrete DocumentService (no IDocumentService interface) + cross-context Tag/DocumentFolder reads + a Media quarantine write. Moving the tag/quarantine lanes into DocumentService (a Core type) would mint NEW Documents->Tags (the Tag class) and Documents->Media (the MediaObject class) boundary edges - DocumentService already references the Tags/Authorization interfaces (no edge) but not the concrete Tag/MediaObject classes. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/GroupsController.cs",
-      "reason": "C09 survivor: the group create/edit/leave lanes write the Group \u002B Translations \u002B membership in one aggregate; C10\u002B scope"
+      "reason": "the group create/edit/leave lanes write the Group + its Translations + membership in one aggregate. Group is a UserInfo document (src/Kumunita.Core/UserInfo/Group.cs) but there is NO Groups module in Core (src/Kumunita.Core/Groups/ is empty) and no IGroupService - minting one for a UserInfo-doc aggregate write is a ceremony type. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/GuardianController.cs",
-      "reason": "C09 survivor: the guardian bind/consent lanes write the GuardianConsent \u002B a UserInfo side-row in one aggregate; needs a committed IGuardianService surface, C10\u002B"
+      "reason": "the guardian bind/consent lanes write the GuardianConsent + a UserInfo side-row in one aggregate. The owning GuardianService (src/Kumunita.Core/UserInfo/GuardianService.cs, 974 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/HealthController.cs",
-      "reason": "pure diagnostics: the only store op is the readiness connectivity probe (Storage.Database.AssertConnectivityAsync) \u2014 the plan\u0027s named diagnostics example; no owning service to route it through"
+      "reason": "pure diagnostics: the only store op is the readiness connectivity probe (Storage.Database.AssertConnectivityAsync) - the plan's named diagnostics example; there is no owning service to route a health probe through. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/PageController.cs",
-      "reason": "C09 survivor: the page create/edit lanes are the multi-session aggregate writes (page \u002B block \u002B translation \u002B moderation rows); long-method reshaping \u002B a committed IPageService surface is C10\u0027s entry"
+      "reason": "the page create/edit lanes are multi-session aggregate writes (page + block + translation + moderation rows). The owning PageService (src/Kumunita.Core/Pages/PageService.cs, 1569 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/PostsController.cs",
-      "reason": "C09 survivor: the post/reply create/edit/delete lanes write the Post \u002B Translation \u002B moderation rows in one aggregate across Posts/Moderation; C10\u002B scope"
+      "reason": "the post/reply create/edit/delete lanes write the Post + its Translation + moderation rows in one aggregate across Posts + Moderation. The owning PostService (src/Kumunita.Core/Posts/PostService.cs, 1722 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope (C2-04's own constraint: do not pre-empt C2-05's god-surface shrink of PostService). Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsController.cs",
-      "reason": "C08 Projects cluster: the BoardDetail/TodoDetail builders \u002B the ProjectsBase store reads are C08\u0027s frozen surface; C09 does not reshape it (the builder extraction is C08\u0027s exit)"
+      "reason": "C08 Projects cluster: the BoardDetail/TodoDetail builders + the ProjectsBase store reads are C08's frozen surface - the builder extraction was deferred as C08's exit, not C2-04's scope. ProjectService (src/Kumunita.Core/Projects/ProjectService.cs, 579 lines) does not own these builder reads. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/ReportTargetsController.cs",
-      "reason": "C09 survivor: the report-target lanes read the Post/Reply \u002B its Translations across Posts \u002B Moderation; needs a committed IReportTargetsService surface, C10\u002B"
+      "reason": "the report-target lanes read the Post/Reply + its Translations across Posts + Moderation. The owning ModerationService (src/Kumunita.Core/Moderation/ModerationService.cs, 1281 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the read lane in would raise the ratchet, which is C2-05's scope. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/TagController.cs",
-      "reason": "C09 survivor: the tag create/rename lanes write the Tag \u002B its Translation \u002B a side-row; needs a committed ITagsService surface, C10\u002B"
+      "reason": "the tag create/rename lanes write the Tag + its Translation + a side-row. The owning TagService (src/Kumunita.Core/Tags/TagService.cs, 976 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/BoardsController.cs",
-      "reason": "C08 Projects cluster: the board lanes read the Board \u002B BoardItemPlacement \u002B membership (C08\u0027s frozen surface); C09 does not reshape it"
+      "reason": "C08 Projects cluster: the board lanes read the Board + BoardItemPlacement + membership (C08's frozen surface - the builder extraction was deferred as C08's exit, not C2-04's scope). BoardService does not own these builder reads. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsBaseController.cs",
-      "reason": "C08 Projects cluster: the shared base\u0027s tag-read \u002B project-list reads are C08\u0027s frozen surface; C09 does not reshape it"
+      "reason": "C08 Projects cluster: the shared base's tag-read + project-list reads are C08's frozen surface (the builder extraction was deferred as C08's exit, not C2-04's scope). ProjectService (src/Kumunita.Core/Projects/ProjectService.cs, 579 lines) does not own these shared base reads. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/TodosController.cs",
-      "reason": "C08 Projects cluster: the todo lanes read the Todo \u002B BoardItemPlacement \u002B membership (C08\u0027s frozen surface); C09 does not reshape it"
+      "reason": "C08 Projects cluster: the todo lanes read the Todo + BoardItemPlacement + membership (C08's frozen surface - the builder extraction was deferred as C08's exit). TodosService (src/Kumunita.Core/Todos/TodosService.cs) does not own these cross-module builder reads. Kept on the store."
     }
   ],
   "seam_test": {
