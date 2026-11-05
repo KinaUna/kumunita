@@ -723,3 +723,119 @@ and **C2-06** (the seam-test floor: the 7 static-utility services, including
 the `controllers_marten_allowlist` ≤ 5 (the 2 `DocumentController` /
 `DocumentFolderController` reason texts are now stale — "needs an
 IDocumentService committed surface" is landed — C2-04 revisits them).
+
+## C2-04 — Marten allowlist: 2 moves + 19 honest keeps (2026-11-05)
+
+### The scope (per the plan's D5)
+
+D5: *"The allowlist reduced to ≤ 5: the 21 entries are either **retired**
+(the controller now moves its document access to the owning service) or
+**kept with an honest, code-verified reason** (diagnostics / no owning
+service / a C08 surface the service does not own) — not 'C09 survivor'. The
+count is ≤ 5; record before → after (21 → N)."*
+
+**The ≤ 5 target is not reachable within C2-04's scope, and this entry says
+why rather than hiding it.** The honest disposition of all 21: **2 retired
+(2 clean moves) + 19 kept** (each with a code-verified reason). **21 → 19.**
+The 19 keeps are not "C09 survivor" — every one is one of: (a) its owning
+service is a **god-file at the ratchet ceiling** (moving the lanes in would
+raise the ceiling = C2-05's scope, which C2-04's own constraint forbids
+pre-empting); (b) **no owning service exists** (minting one is a ceremony
+type, or the writes span modules no single service owns); or (c) the move
+would **mint a new boundary edge** (the controller reads a concrete cross-
+module type; routing it through a Core service = a gate edge). The doctrine
+"say which line fails and why — do not fix it silently" applies: the ≤ 5 line
+fails because the god-file shrinks (C2-05) have not yet run.
+
+### The 2 retirements (one controller per commit, gate green after each)
+
+| # | Commit | Controller | Owning service | Shape |
+|---|---|---|---|---|
+| 1 | `e71d5b2b` | `CommunityController` | `CommunityMembershipService` (UserInfo) | 3 write lanes re-pointed to new session-owning overloads; the service (which owns `IDocumentStore`) opens the `LightweightSession` internally; the controller's `IDocumentStore store` param + `using Marten` dropped; 8 `Arg.Any<IDocumentSession>()` test fakes dropped |
+| 2 | `d0a8b211` | `DocumentFolderController` | `DocumentFolderService` (Documents) | 5 write lanes (Create/MoveDocument/Rename/Move/Delete) re-pointed to new session-owning overloads on `IDocumentFolderService`; the controller's `IDocumentStore store` param + `using Marten` dropped; the test's `store: store` ctor arg dropped (the service keeps its own store) |
+
+**21 → 19.** Each move kept the single `SaveChangesAsync` (C3), the `AccessAudit`
+row, and the same documents written — only the session-owner moved from Web to
+Core. `CommunityMembershipService` + `DocumentFolderService` both have headroom
+and own the write's module — the clean shape the DoD describes.
+
+### The 19 keeps (honest, code-verified reasons — none "C09 survivor")
+
+**(a) Owning service is a god-file at the ratchet ceiling → moving in raises
+the ceiling = C2-05's scope (6):**
+- `PostsController` — `PostService` (1722 lines; the plan's named C2-05 god-
+  surface; C2-04's own constraint forbids pre-empting its shrink).
+- `AnnouncementController` — same `PostService` aggregate.
+- `PageController` — `PageService` (1569 lines).
+- `GuardianController` — `GuardianService` (974 lines).
+- `ReportTargetsController` — `ModerationService` (1281 lines).
+- `TagController` — `TagService` (976 lines).
+
+**(b) No owning service exists (minting one = ceremony type, or a multi-module
+aggregate no single service owns) (5):**
+- `AdminController` — no Admin module in Core (`src/Kumunita.Core/Admin/` is
+  empty); 3-module aggregate write (Identity + UserInfo + Authorization).
+- `GroupsController` — `Group` is a UserInfo doc, but no Groups module and no
+  `IGroupService` exist.
+- `AttachmentController` — Posts (parent read) + Media (quarantine write)
+  2-module aggregate; `MediaLifecycleService` is the tick, not a write-service.
+- `ContentImageController` — same shape as AttachmentController.
+- `AdminAnalyticsController` — writes an `AccessAudit` (Authorization concrete
+  type); no Usage write-service owns it, and one would mint a new
+  Usage→Authorization edge.
+
+**(c) The move would mint a new boundary edge (the controller reads a concrete
+cross-module type) (4):**
+- `DocumentController` — moving the tag/quarantine lanes into `DocumentService`
+  mints new Documents→Tags (`Tag`) + Documents→Media (`MediaObject`) edges
+  (it already references the Tags/Authorization *interfaces* = no edge, but not
+  the concrete *classes*).
+- `DirectoryController` — `ResolveTagDisplayNamesAsync` needs the viewer's
+  effective language from `HttpContext.Request` (a Web-layer request context);
+  moving it to `DirectoryService` would require reshaping the seam.
+- `ProjectsController` — C08 Projects cluster builder reads (BoardDetail/
+  TodoDetail); `ProjectService` (579) does not own them.
+- `ProjectsBaseController` — the shared base's tag-read + project-list reads
+  (C08 frozen surface); `ProjectService` does not own them.
+
+**(d) Pure diagnostics / C08 frozen surface (no owning service for the op) (3):**
+- `HealthController` — the only store op is the readiness connectivity probe
+  (`AssertConnectivityAsync`); the plan's named diagnostics example.
+- `BoardsController` — C08 Projects cluster board-lane reads (Board +
+  BoardItemPlacement + membership); `BoardService` does not own them.
+- `TodosController` — C08 Projects cluster todo-lane reads (Todo +
+  BoardItemPlacement + membership); `TodosService` does not own them.
+
+**Why the ≤ 5 line is not met (the honest gap).** The 6 god-file keeps (a)
+are exactly C2-05's resolving unit (the god-surface shrink). The 5 no-service
+keeps (b) would need a *new* service that does not yet exist — the plan
+explicitly forbids minting ceremony types in C2-04. The 4 edge-minting keeps
+(c) would add gate edges (the plan's "not the answer" case). C2-04 retires
+what it can retire cleanly (the 2) and names the rest with their code-verified
+reasons — 0 silent, 0 ceremony, 0 new edges. **Before → after: 21 → 19.**
+The remaining path to ≤ 5 is: run C2-05 (shrink the 6 god-files → 13), then
+the 6 no-service / edge-minting keeps each need their own unit (a new service
+or an edge decision) — that is future work, not a C2-04 silence.
+
+### Verification
+
+- [x] **`dotnet build Kumunita.slnx` — 0 errors, 0 warnings.** (Community
+  `e71d5b2b`, DocumentFolder `d0a8b211`, reason-correct `93bd1d4d`)
+- [x] **Affected test suites green:** `CommunityControllerTranslationTests` +
+  `CommunityControllerTests` (Community move); `DocumentFolderControllerTests`
+  (DocumentFolder move).
+- [x] **`tools/code/code-check.ps1` — OK (0 violations)** (the allowlist has
+  no stale entries after the 2 retirements; all 19 keeps still match their
+  controllers).
+- [x] **The handoff note gets a C2-04 entry** (this section): the 2 moves, the
+  19 honest keeps grouped (a)/(b)/(c)/(d), the before → after (21 → 19), and
+  why the ≤ 5 line is not met (the god-file shrinks are C2-05's scope).
+
+**C2-04 is complete to the honest limit of its scope (2 clean moves, 19
+reasoned keeps, 0 "C09 survivor").** The ≤ 5 DoD line is **not** met — the
+remaining 13 of the 19 keeps (groups a/b/c) resolve in C2-05 (the god-surface
+shrink) + new units for the no-service / edge-minting keeps, which the plan
+deliberately scoped out of C2-04 ("do not force; record the reason"). The
+DoD's "say which line fails and why — do not fix it silently" is honored:
+this entry names each kept controller, its owning service (or its absence),
+the exact ceiling/edge reason, and the C2-05 / future resolving unit.
