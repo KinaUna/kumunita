@@ -3677,7 +3677,7 @@
     }
   ],
   "seam_test": {
-    "mode": "report"
+    "mode": "gate"
   },
   "tightened": "2026-11-03T09:30:25Z"
 }

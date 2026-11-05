@@ -631,6 +631,12 @@ public static class Program
 
         // rule 4: max must not be higher than on origin/main without adr:
         failures.AddRange(CheckOriginMain(bs, root));
+
+        // seam-test gate (C12 — promoted from report to gate)
+        if (bs.SeamTestMode == "gate")
+        {
+            failures.AddRange(CheckSeamTest(data, root, bs.ServicesUnitFloor));
+        }
         return failures;
     }
 
@@ -850,6 +856,8 @@ public static class Program
         public List<JsonNode?> TsFunctions = new();
         public List<JsonNode?> BoundaryViolations = new();
         public List<JsonNode?> ControllersAllowlist = new();
+        public string? SeamTestMode;   // "report" or "gate"
+        public int ServicesUnitFloor;  // minimum services-with-unit-tested-part (default 10)
     }
 
     private static ParsedBaseline ParseBaseline(string json)
@@ -869,6 +877,11 @@ public static class Program
         Fill("ts_functions", p.TsFunctions);
         Fill("boundary_violations", p.BoundaryViolations);
         Fill("controllers_marten_allowlist", p.ControllersAllowlist);
+        if (root["seam_test"] is JsonObject st)
+        {
+            p.SeamTestMode = st["mode"]?.ToString() ?? "report";
+            p.ServicesUnitFloor = st["services_unit_floor"] is not null ? JsonInt(st["services_unit_floor"]) : 10;
+        }
         return p;
     }
 
@@ -911,33 +924,140 @@ public static class Program
         PrintSeamTest(data, root);
     }
 
+    /// <summary>
+    /// C12 seam-test gate: fails when any public *Policy/*Resolver/*Evaluator/*Builder
+    /// is not named by a non-Testcontainers test, or when the count of
+    /// services-with-unit-tested-part is below the floor.
+    /// A "service with a unit-tested part" is a *Service class whose own name or
+    /// I-name appears in the unit (non-Testcontainers) test corpus.
+    /// </summary>
+    private static List<string> CheckSeamTest(CSharpData data, string root, int servicesUnitFloor)
+    {
+        var failures = new List<string>();
+        string testsDir = Path.Combine(root, "tests");
+        var allTestFiles = Directory.Exists(testsDir)
+            ? Directory.EnumerateFiles(testsDir, "*.cs", SearchOption.AllDirectories).Where(p => !p.Contains("/bin/") && !p.Contains("/obj/")).ToList()
+            : new List<string>();
+        string fullCorpus = string.Join("\n", allTestFiles.Select(p => { try { return File.ReadAllText(p); } catch { return ""; } }));
+
+        // Unit corpus: exclude files that use IClassFixture<PostgresFixture>
+        var nonTcFiles = allTestFiles.Where(p =>
+        {
+            try { return !File.ReadAllText(p).Contains("IClassFixture<PostgresFixture>"); }
+            catch { return true; }
+        }).ToList();
+        string unitCorpus = string.Join("\n", nonTcFiles.Select(p => { try { return File.ReadAllText(p); } catch { return ""; } }));
+
+        // Rule 1: every *Policy/*Resolver/*Evaluator/*Builder must be named by a unit test
+        string[] suffixes = { "Policy", "Resolver", "Evaluator", "Builder" };
+        var policyTypes = data.Types
+            .Where(t => t.Kind == "class" && suffixes.Any(s => t.Type.Split('.').Last().EndsWith(s, StringComparison.Ordinal)))
+            .ToList();
+        foreach (var t in policyTypes)
+        {
+            string name = t.Type.Split('.').Last();
+            if (!unitCorpus.Contains(name))
+                failures.Add("seam-test: *Policy/Resolver/Evaluator/Builder not named by a unit test: " + name);
+        }
+
+        // Rule 2: every I*Service must be named by any test file
+        var ifaces = data.Types
+            .Where(t => t.Kind == "interface")
+            .Select(t => t.Type.Split('.').Last())
+            .Where(n => n.StartsWith("I", StringComparison.Ordinal) && n.EndsWith("Service", StringComparison.Ordinal))
+            .Distinct()
+            .ToList();
+        foreach (string name in ifaces)
+        {
+            if (!fullCorpus.Contains(name))
+                failures.Add("seam-test: I*Service not named by any test: " + name);
+        }
+
+        // Rule 3: services with a unit-tested part >= floor
+        var serviceClasses = data.Types
+            .Where(t => t.Kind == "class")
+            .Select(t => t.Type.Split('.').Last())
+            .Where(n => n.EndsWith("Service", StringComparison.Ordinal) && !n.StartsWith("I", StringComparison.Ordinal))
+            .Distinct()
+            .ToList();
+        int svcCovered = serviceClasses.Count(n => unitCorpus.Contains(n) || unitCorpus.Contains("I" + n));
+        if (svcCovered < servicesUnitFloor)
+            failures.Add($"seam-test: services-with-unit-tested-part {svcCovered} is below floor {servicesUnitFloor}");
+
+        // Rule 4: every public *Controller must be named by at least one test file
+        var controllers = data.Types
+            .Where(t => t.Kind == "class")
+            .Select(t => t.Type.Split('.').Last())
+            .Where(n => n.EndsWith("Controller", StringComparison.Ordinal))
+            .Distinct()
+            .ToList();
+        foreach (string name in controllers.Where(n => !fullCorpus.Contains(n)))
+            failures.Add("seam-test: controller not named by any test: " + name);
+
+        return failures;
+    }
+
     private static void PrintSeamTest(CSharpData data, string root)
     {
         string testsDir = Path.Combine(root, "tests");
-        var testFiles = Directory.Exists(testsDir)
+        var allTestFiles = Directory.Exists(testsDir)
             ? Directory.EnumerateFiles(testsDir, "*.cs", SearchOption.AllDirectories).Where(p => !p.Contains("/bin/") && !p.Contains("/obj/")).ToList()
             : new List<string>();
-        string testCorpus = string.Join("\n", testFiles.Select(p => { try { return File.ReadAllText(p); } catch { return ""; } }));
+        string fullCorpus = string.Join("\n", allTestFiles.Select(p => { try { return File.ReadAllText(p); } catch { return ""; } }));
 
-        string[] suffixes = { "Policy", "Resolver", "Evaluator", "Builder" };
-        int policyTypes = 0, policyCovered = 0;
-        foreach (var t in data.Types.Where(t => t.Kind == "class"))
+        // Unit corpus: exclude files that use IClassFixture<PostgresFixture>
+        var nonTcFiles = allTestFiles.Where(p =>
         {
-            string name = t.Type.Split('.').Last();
-            if (suffixes.Any(s => name.EndsWith(s, StringComparison.Ordinal)))
-            {
-                policyTypes++;
-                if (testCorpus.Contains(name)) { policyCovered++; }
-            }
-        }
-        Console.WriteLine("## seam-test (report-only): *Policy/Resolver/Evaluator/Builder named by a test: " + policyCovered + "/" + policyTypes);
+            try { return !File.ReadAllText(p).Contains("IClassFixture<PostgresFixture>"); }
+            catch { return true; }
+        }).ToList();
+        string unitCorpus = string.Join("\n", nonTcFiles.Select(p => { try { return File.ReadAllText(p); } catch { return ""; } }));
 
-        var services = data.Types.Where(t => t.Kind == "class")
+        // Rule 1: *Policy/Resolver/Evaluator/Builder in unit corpus
+        string[] suffixes = { "Policy", "Resolver", "Evaluator", "Builder" };
+        var policyTypes = data.Types
+            .Where(t => t.Kind == "class" && suffixes.Any(s => t.Type.Split('.').Last().EndsWith(s, StringComparison.Ordinal)))
+            .ToList();
+        int polCovered = policyTypes.Count(t => unitCorpus.Contains(t.Type.Split('.').Last()));
+        Console.WriteLine("## seam-test: *Policy/Resolver/Evaluator/Builder named by a unit test: " + polCovered + "/" + policyTypes.Count);
+        foreach (var t in policyTypes.Where(t => !unitCorpus.Contains(t.Type.Split('.').Last())))
+            Console.WriteLine("  RED  " + t.Type.Split('.').Last());
+
+        // Rule 2: I*Service in full test corpus (interface kind — C12 fix)
+        var ifaces = data.Types
+            .Where(t => t.Kind == "interface")
             .Select(t => t.Type.Split('.').Last())
             .Where(n => n.StartsWith("I", StringComparison.Ordinal) && n.EndsWith("Service", StringComparison.Ordinal))
-            .Distinct().ToList();
-        int svcCovered = services.Count(name => testCorpus.Contains(name));
-        Console.WriteLine("## seam-test (report-only): I*Service named by a test: " + svcCovered + "/" + services.Count);
+            .Distinct()
+            .ToList();
+        int svcCovered = ifaces.Count(name => fullCorpus.Contains(name));
+        Console.WriteLine("## seam-test: I*Service named by a test: " + svcCovered + "/" + ifaces.Count);
+        foreach (string name in ifaces.Where(n => !fullCorpus.Contains(n)))
+            Console.WriteLine("  RED  " + name);
+
+        // Rule 3: services-with-unit-tested-part
+        var serviceClasses = data.Types
+            .Where(t => t.Kind == "class")
+            .Select(t => t.Type.Split('.').Last())
+            .Where(n => n.EndsWith("Service", StringComparison.Ordinal) && !n.StartsWith("I", StringComparison.Ordinal))
+            .Distinct()
+            .ToList();
+        int svcUnitCovered = serviceClasses.Count(n => unitCorpus.Contains(n) || unitCorpus.Contains("I" + n));
+        Console.WriteLine("## seam-test: services-with-unit-tested-part: " + svcUnitCovered + "/" + serviceClasses.Count + " (floor 10)");
+        foreach (string n in serviceClasses.Where(n => !unitCorpus.Contains(n) && !unitCorpus.Contains("I" + n)))
+            Console.WriteLine("  RED  " + n);
+
+        // Rule 4: every public *Controller named by at least one test file
+        var controllers = data.Types
+            .Where(t => t.Kind == "class")
+            .Select(t => t.Type.Split('.').Last())
+            .Where(n => n.EndsWith("Controller", StringComparison.Ordinal))
+            .Distinct()
+            .ToList();
+        int ctrlCovered = controllers.Count(name => fullCorpus.Contains(name));
+        Console.WriteLine("## seam-test: *Controller named by a test: " + ctrlCovered + "/" + controllers.Count);
+        foreach (string name in controllers.Where(n => !fullCorpus.Contains(n)))
+            Console.WriteLine("  RED  " + name);
     }
 
     // ============================ csv writers ===============================
