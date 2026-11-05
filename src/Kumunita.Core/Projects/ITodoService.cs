@@ -2,6 +2,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
+using Kumunita.Core.Translations;
 
 namespace Kumunita.Core.Projects;
 
@@ -285,60 +286,25 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     Task<IReadOnlyList<TodoTranslation>> GetTodoTranslationsAsync(string todoItemId);
 
     /// <summary>
-    /// Add a **user-added translation** of a to-do into a language other than
-    /// the one it was authored in (ADR 0088). One row per
-    /// <c>(todoItemId, languageCode)</c> pair (the
+    /// The **shared translation-variant write lane** (ADR 0288) for a to-do —
+    /// <see cref="TranslationLane{TParent,TVar}.AddAsync"/> /
+    /// <see cref="TranslationLane{TParent,TVar}.UpdateAsync"/> /
+    /// <see cref="TranslationLane{TParent,TVar}.RemoveAsync"/> over the
+    /// <c>(todoItemId, languageCode)</c> pair the
     /// <see cref="ProjectDocTypes.Configure"/>'s <c>(TodoItemId, LanguageCode)</c>
-    /// unique index). <b>Standing (ADR 0088 D3):</b> the to-do's
-    /// <b>creator</b> (<see cref="AccessVia.Owner"/>), the to-do's
-    /// <b>assignee</b> (the ADR 0067 assignee branch, <see cref="AccessVia.Admin"/>),
-    /// a <b>Translator</b> (ADR 0021, <see cref="AccessVia.Admin"/>), or a
-    /// <b>GlobalAdmin</b> (ADR 0030, <see cref="AccessVia.Admin"/>). A denied
-    /// actor throws <see cref="UnauthorizedAccessException"/> before anything is
-    /// stored. The <c>AccessAudit</c> row (<c>todotranslation.add</c>,
-    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3).
+    /// unique index enforces. C2-02 (IMPROVE-CODE-2 DoD #5) retired the three
+    /// per-surface <c>Add/Update/Remove*TodoTranslationAsync</c> forwarders in
+    /// favour of this lane + the to-do's
+    /// <see cref="TranslationDescriptor{TParent,TVar}"/> (the C06/C2-01
+    /// <c>PostService.PostTranslationLane</c> shape). The standing (the to-do's
+    /// <b>creator</b> <see cref="AccessVia.Owner"/>, its
+    /// <b>assignee</b> (ADR 0067) or <b>Translator</b> / <b>GlobalAdmin</b>
+    /// (ADR 0021/0030), ADR 0088 D3), the hand-written <c>AccessAudit</c> row,
+    /// and the single atomic <c>SaveChangesAsync</c> (C3) all live on the lane;
+    /// the caller supplies the <c>IDocumentSession</c>. A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing to-do or row throws
+    /// <see cref="KeyNotFoundException"/>.
     /// </summary>
-    /// <exception cref="KeyNotFoundException">The to-do id is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / assignee / Translator / GlobalAdmin standings.</exception>
-    Task<TodoTranslation> AddTodoTranslationAsync(
-        string todoItemId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
-
-    /// <summary>
-    /// Edit an existing to-do translation (ADR 0088, the ADR 0048 edit-lane
-    /// shape): updates the <see cref="TodoTranslation.Title"/> /
-    /// <see cref="TodoTranslation.Body"/> for the
-    /// <c>(todoItemId, languageCode)</c> pair, stamps
-    /// <see cref="TodoTranslation.Created"/> and re-records
-    /// <see cref="TodoTranslation.AuthorId"/>. Same standing as
-    /// <see cref="AddTodoTranslationAsync"/>. A missing row is a
-    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
-    /// (<c>todotranslation.update</c>, <c>TargetKind = "todo"</c>) commits
-    /// atomically with the write (C3).
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The to-do or the (to-do, language)
-    /// row is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / assignee / Translator / GlobalAdmin standings.</exception>
-    Task<TodoTranslation> UpdateTodoTranslationAsync(
-        string todoItemId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
-
-    /// <summary>
-    /// Remove a to-do translation (ADR 0088, the ADR 0048 remove-lane shape):
-    /// deletes the <c>(todoItemId, languageCode)</c> row. Same standing as
-    /// <see cref="AddTodoTranslationAsync"/>. A missing row is a
-    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
-    /// (<c>todotranslation.remove</c>, <c>TargetKind = "todo"</c>) commits
-    /// atomically with the write (C3).
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The to-do or the (to-do, language)
-    /// row is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// creator / assignee / Translator / GlobalAdmin standings.</exception>
-    Task RemoveTodoTranslationAsync(
-        string todoItemId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+    TranslationLane<TodoItem, TodoTranslation> TodoTranslationLane { get; }
 
 }

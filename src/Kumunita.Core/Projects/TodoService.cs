@@ -20,7 +20,14 @@ namespace Kumunita.Core.Projects;
 /// </summary>
 public sealed class TodoService : ProjectsStore, ITodoService
 {
-    private readonly TranslationLane<TodoItem, TodoTranslation> _todoTranslationLane;
+    // C2-02 (ADR 0288, IMPROVE-CODE-2 DoD #5) — the shared translation-variant
+    // write lane (the C06/C2-01 `PostService.PostTranslationLane` shape). Exposed
+    // as a public property (a D6-legal `record` cross-module target) so the Web
+    // layer codes against the lane directly; the per-surface `Add/Update/Remove`
+    // *TodoTranslation* forwarders are retired — the lane + descriptor own the
+    // standing / audit / atomic-commit shape once. The caller supplies the
+    // `IDocumentSession` (M3 shape).
+    public TranslationLane<TodoItem, TodoTranslation> TodoTranslationLane { get; }
 
     public TodoService(
         IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
@@ -28,7 +35,7 @@ public sealed class TodoService : ProjectsStore, ITodoService
         ILocalizationService? localization = null, ITagService? tags = null,
         Kumunita.Core.Mentions.IMentionService? mentions = null) : base(store, authorization, userInfo, notifications, translator, localization, tags, mentions)
     {
-        _todoTranslationLane = new TranslationLane<TodoItem, TodoTranslation>(new TranslationDescriptor<TodoItem, TodoTranslation>
+        TodoTranslationLane = new TranslationLane<TodoItem, TodoTranslation>(new TranslationDescriptor<TodoItem, TodoTranslation>
         {
             TargetKind = TargetKindTodo,
             ActionPrefix = "todotranslation",
@@ -1298,29 +1305,15 @@ public sealed class TodoService : ProjectsStore, ITodoService
             .ConfigureAwait(false);
     }
 
-    public async Task<TodoTranslation> AddTodoTranslationAsync(
-        string todoItemId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        return await _todoTranslationLane.AddAsync(session, todoItemId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
-    }
-
-    public async Task<TodoTranslation> UpdateTodoTranslationAsync(
-        string todoItemId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        return await _todoTranslationLane.UpdateAsync(session, todoItemId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
-    }
-
-    public async Task RemoveTodoTranslationAsync(
-        string todoItemId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
-    {
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        await _todoTranslationLane.RemoveAsync(session, todoItemId, languageCode, actorId, actorRoles).ConfigureAwait(false);
-    }
+    // C2-02 (ADR 0288, IMPROVE-CODE-2 DoD #5) — the three per-surface write
+    // forwarders (Add/Update/Remove *TodoTranslation*Async) are retired; the
+    // shared <see cref="TodoTranslationLane"/> (this surface's descriptor) owns
+    // the standing / audit / atomic-commit shape once, and the Web layer codes
+    // against it directly (the C06/C2-01 `PostService.PostTranslationLane`
+    // shape). The read seam <see cref="GetTodoTranslationsAsync"/> stays on the
+    // service — its shape is surface-specific (a single-parent
+    // self-`QuerySession`), which the write lane intentionally does not own
+    // (ADR 0288 "What the lane does NOT own").
 
     /// <summary>
     /// The **to-do translation** display pin (ADR 0088, the
@@ -1328,13 +1321,11 @@ public sealed class TodoService : ProjectsStore, ITodoService
     /// when <paramref name="actorId"/> may add / edit / remove a translation
     /// of the to-do authored by <paramref name="todoAuthorId"/>
     /// (assigned-to <paramref name="todoAssigneeId"/>). A <b>display</b> pin,
-    /// not a gate — the real deny is the
-    /// <see cref="AddTodoTranslationAsync"/> /
-    /// <see cref="UpdateTodoTranslationAsync"/> /
-    /// <see cref="RemoveTodoTranslationAsync"/> standing check, which re-runs
+    /// not a gate — the real deny is the <see cref="TodoTranslationLane"/>
+    /// standing check (its <c>ResolveStanding</c> descriptor), which re-runs
     /// the same rule server-side. Delegates to the same
-    /// <see cref="ResolveTodoTranslationStanding"/> the write lanes use, so the
-    /// display and the three gates can never drift apart.
+    /// <see cref="ResolveTodoTranslationStanding"/> the write lane uses, so the
+    /// display and the gate can never drift apart.
     /// </summary>
     public static bool CanAddTodoTranslation(
         string todoAuthorId, string? todoAssigneeId, string actorId, IReadOnlySet<string> actorRoles)

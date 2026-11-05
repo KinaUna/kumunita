@@ -1675,7 +1675,7 @@ public sealed class TodosController : ProjectsBaseController
     /// Adds a **user-added translation** of the to-do into
     /// <paramref name="languageCode"/> (ADR 0088):
     /// <c>POST /projects/todos/{id}/translations</c>. A thin Web lane (ADR
-    /// 0006-D) delegating to <see cref="IProjectService.AddTodoTranslationAsync"/>.
+    /// 0006-D) delegating to <see cref="ITodoService.TodoTranslationLane"/> (ADR 0288).
     /// <para>
     /// <b>Precondition (C-M3·1):</b> the viewer must be able to see the to-do
     /// (re-run the parent's single <c>Read</c> decision via
@@ -1723,13 +1723,12 @@ public sealed class TodosController : ProjectsBaseController
             return new ForbidResult();
         }
 
+        // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
+        // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
+        await using var session = store.LightweightSession();
         try
         {
-            await this.todos.AddTodoTranslationAsync(
-                id, languageCode,
-                string.IsNullOrWhiteSpace(title) ? null : title,
-                string.IsNullOrWhiteSpace(body) ? null : body,
-                actorId, RoleSet(User), HttpContext.RequestAborted);
+            await this.todos.TodoTranslationLane.AddAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {
@@ -1750,7 +1749,7 @@ public sealed class TodosController : ProjectsBaseController
     /// **Updates** the existing user-added translation of the to-do in
     /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 edit-lane
     /// shape): <c>POST /projects/todos/{id}/translations/update</c>. Thin Web
-    /// lane; delegates to <see cref="IProjectService.UpdateTodoTranslationAsync"/>.
+    /// lane; delegates to <see cref="ITodoService.TodoTranslationLane"/> (ADR 0288).
     /// Precondition + failure shapes mirror <see cref="AddTodoTranslation"/>.
     /// </summary>
     [HttpPost("/projects/todos/{id}/translations/update")]
@@ -1792,13 +1791,12 @@ public sealed class TodosController : ProjectsBaseController
             return new ForbidResult();
         }
 
+        // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
+        // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
+        await using var session = store.LightweightSession();
         try
         {
-            await this.todos.UpdateTodoTranslationAsync(
-                id, languageCode,
-                string.IsNullOrWhiteSpace(title) ? null : title,
-                string.IsNullOrWhiteSpace(body) ? null : body,
-                actorId, RoleSet(User), HttpContext.RequestAborted);
+            await this.todos.TodoTranslationLane.UpdateAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {
@@ -1820,7 +1818,7 @@ public sealed class TodosController : ProjectsBaseController
     /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 remove-lane
     /// shape): <c>POST /projects/todos/{id}/translations/remove</c>. Thin Web
     /// lane; delegates to
-    /// <see cref="IProjectService.RemoveTodoTranslationAsync"/>. Failure shapes
+    /// <see cref="ITodoService.TodoTranslationLane"/> (ADR 0288). Failure shapes
     /// mirror <see cref="AddTodoTranslation"/>.
     /// </summary>
     [HttpPost("/projects/todos/{id}/translations/remove")]
@@ -1855,9 +1853,12 @@ public sealed class TodosController : ProjectsBaseController
             return new ForbidResult();
         }
 
+        // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
+        // session, C3 one SaveChangesAsync).
+        await using var session = store.LightweightSession();
         try
         {
-            await this.todos.RemoveTodoTranslationAsync(id, languageCode, actorId, RoleSet(User), HttpContext.RequestAborted);
+            await this.todos.TodoTranslationLane.RemoveAsync(session, id, languageCode, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
         {

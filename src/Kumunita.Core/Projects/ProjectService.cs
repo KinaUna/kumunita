@@ -663,16 +663,12 @@ public sealed class ProjectService : ProjectsStore, IProjectService, ITodoServic
     public Task<TodoItem> AddSubtaskAsync(string parentTodoItemId, string actorId, IReadOnlySet<string> actorRoles, CreateTodoRequest request, CancellationToken ct = default) => Todos.AddSubtaskAsync(parentTodoItemId,actorId,actorRoles,request,ct);
     public Task<TodoItem> SetTodoProjectAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default) => Todos.SetTodoProjectAsync(todoItemId,actorId,actorRoles,projectId,ct);
     public Task<TodoItem> SetTodoEventAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? eventId, CancellationToken ct = default) => Todos.SetTodoEventAsync(todoItemId,actorId,actorRoles,eventId,ct);
-    public Task<TodoTranslation> AddTodoTranslationAsync(
-        string todoItemId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Todos.AddTodoTranslationAsync(todoItemId,languageCode,title,body,actorId,actorRoles,ct);
-    public Task<TodoTranslation> UpdateTodoTranslationAsync(
-        string todoItemId, string languageCode, string? title, string? body,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Todos.UpdateTodoTranslationAsync(todoItemId,languageCode,title,body,actorId,actorRoles,ct);
+    // C2-02 (ADR 0288) — the to-do translation write seam is the shared
+    // <see cref="TodoTranslationLane"/> (delegates to the <see cref="TodoService"/>
+    // 's lane); the per-surface Add/Update/Remove*TodoTranslationAsync forwarders
+    // are retired.
+    public TranslationLane<TodoItem, TodoTranslation> TodoTranslationLane => Todos.TodoTranslationLane;
     public Task DeleteTodoAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Todos.DeleteTodoAsync(todoItemId,actorId,actorRoles,ct);
-    public Task RemoveTodoTranslationAsync(
-        string todoItemId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default) => Todos.RemoveTodoTranslationAsync(todoItemId,languageCode,actorId,actorRoles,ct);
     public Task<BoardPage> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null) => Boards.ListBoardsAsync(componentId,actorId,page,projectId,ct,sort,pageSize);
     public Task<BoardPage> ListBoardsForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default, int? pageSize = null) => Boards.ListBoardsForEventAsync(eventId,actorId,page,ct,pageSize);
     public Task<BoardDetailResult> GetBoardAsync(string boardId, string actorId, CancellationToken ct = default) => Boards.GetBoardAsync(boardId,actorId,ct);
