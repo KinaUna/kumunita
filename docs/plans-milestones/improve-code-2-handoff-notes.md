@@ -1046,3 +1046,70 @@ ceremony shape.
 - [x] **The handoff note gets a C2-06 entry** (this section): the 2 decision
   extractions (service → policy → unit test, one per commit), the one
   code-verified Marten-queryable constraint, and the DoD #7 named line met.
+
+## C2-07 — the missing SEC pointer on `ClaimTodoAsync` (2026-11-05)
+
+### The scope (per D7 + the DoD #8 "the missing SEC pointer added")
+
+D7: *"`TodoService.ClaimTodoAsync` gets the `// TODO ❓ SEC` pointer — the
+claim-to-do standing is an access decision outside `IAuthorizationService`
+that E11 flagged. The Moderation half is already done
+(`IModerationService.cs`). Behaviour unchanged; this is the pointer only."*
+DoD #8 names **both** E11 items: the predecessor's C13 cold read found the
+Moderation half done (`IsInActorScopeAsync` → `IModerationService.cs:97`
+carries `TODO ❓ SEC (E11)`) and the claim-to-do half **missing**. This unit
+adds only the missing half — one comment on `ClaimTodoAsync`'s standing
+decision, in the shape of the Moderation twin. It does **not** resolve the
+SEC question (routing the standing through `IAuthorizationService` is the
+`SEC` lane's call, the E11 handoff), and does **not** change who may do what.
+
+### The pointer (the one diff)
+
+`src/Kumunita.Core/Projects/TodoService.cs`, `ClaimTodoAsync` — the pointer
+sits on the **standing call itself** (`var via = await
+ClaimStandingAsync(todo, actorId, ct)`), which is the access decision the
+pointer names (the "unassigned + a group or community membership standing,
+ADR 0073" gate), not on the method summary:
+
+```
+// TODO ❓ SEC (E11): this is an access decision outside
+// IAuthorizationService — routing it through the authorization seam is
+// the SEC lane's decision (the IMPROVE-CODE plan's E11 handoff, "the
+// authorization path is unique" ADR 0006 §D). This pointer marks the
+// decision and does **not** change who may do what.
+```
+
+Same marker + refs as the Moderation twin (`IModerationService.cs:98`):
+the `TODO ❓ SEC (E11):` marker, the `IAuthorizationService` / E11 / ADR
+0006 §D refs, the "SEC lane's decision" attribution, and the "does **not**
+change who may do what" close.
+
+### Before → after (the DoD #8 named line)
+
+**Both E11 items now carry the pointer.**
+
+| E11 item | Before (this unit) | After (this unit) |
+|---|---|---|
+| Moderation: `IsInActorScopeAsync` | `IModerationService.cs:98` carries `TODO ❓ SEC (E11)` (pre-existing, C09) | unchanged (verified present; not re-edited) |
+| claim-to-do: `ClaimTodoAsync` standing (`ClaimStandingAsync`) | **missing** — no SEC pointer on the standing decision in `TodoService.cs` | `// TODO ❓ SEC (E11):` on the standing call in `ClaimTodoAsync` (above) |
+
+### Verification
+
+- [x] **The pointer is present on `ClaimTodoAsync`** — `// TODO ❓ SEC
+  (E11):` on the standing call, carrying the `IAuthorizationService` / E11 /
+  ADR 0006 §D refs + the "does **not** change who may do what" close, in the
+  shape of the Moderation twin.
+- [x] **Both E11 items carry the pointer** — the Moderation twin
+  (`IModerationService.cs:98`, pre-existing) **and** the new `ClaimTodoAsync`
+  pointer.
+- [x] **Comment-only, behaviour unchanged** — the only diff in `src/` is the
+  5-line pointer (no type / method / signature / logic / test change);
+  `dotnet build Kumunita.slnx` — **0 errors**.
+- [x] **No gate number moved** — `tools/code/code-check.ps1` —
+  **OK (0 violations)** (no new `*Policy`/`I*Service`, so seam-test is
+  untouched; no baseline entry raised, so the ratchet is untouched; no file
+  over the `cs_file` ceiling, so the files list is untouched).
+- [x] **The handoff note gets a C2-07 entry** (this section): the two E11
+  items (Moderation = pre-existing, unchanged; `ClaimTodoAsync` = added
+  here, at the standing call), the exact wording/refs used, and why DoD #8
+  is now met.
