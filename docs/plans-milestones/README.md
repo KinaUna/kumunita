@@ -8,7 +8,8 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/archive/README.md
   - docs/DOCS-CONVENTIONS.md
-updated: 2026-11-02
+  - docs/plans-milestones/plan-improve-code-2.md
+updated: 2026-11-05
 ---
 
 > **Abstract:** where the *current* lane's register and in-progress unit plans
@@ -37,10 +38,17 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
-There is **no in-flight lane at this moment** — the `IMPROVE-DOCS` lane
-(the last shipped) moved to
-[`archive/lanes/improve-docs/`](../archive/lanes/improve-docs/) at its close
-(2026-11-02), so the only entry in this folder is this `README.md`.
+The in-flight lane is **`IMPROVE-CODE-2`** — the successor to
+`IMPROVE-CODE`, which closed on 2026-11-05 **with unmet DoD** (DoD #1/#3/#4/#5/#6/#8
+fail, #7 partial) and moved to
+[`archive/lanes/improve-code/`](../archive/lanes/improve-code/) at that close. Its
+register is
+[plan-improve-code-2](plan-improve-code-2.md) and the first unit plan is
+[c2-00-prompt](c2-00-prompt.md); the running log (the scratch tier, `handoff-notes.md`)
+is written as the lane's units land. Its whole reason to exist is to land the
+reduction the predecessor promised — starting with DoD #1, making the ratchet
+honest (the `CODE_BASELINE_BASE` check that was dead in CI is now fixed, commit
+`ebf5b3b5`), and resolving the 30 unjustified baseline raises it now surfaces.
 
 ## The three-tier contract (per lane)
 
