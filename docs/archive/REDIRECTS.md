@@ -36,6 +36,7 @@ folder (no per-file rows are needed).
 | docs/plans-milestones/done/guardian-assignment-second-audit-row/… | [docs/archive/lanes/guardian-assignment-second-audit-row/…](lanes/guardian-assignment-second-audit-row/) |
 | docs/plans-milestones/done/guardian-controls/… | [docs/archive/lanes/guardian-controls/…](lanes/guardian-controls/) |
 | docs/plans-milestones/done/improve/… | [docs/archive/lanes/improve/…](lanes/improve/) |
+| docs/plans-milestones/plan-improve-code.md (+ the c00–c13 prompts + handoff-notes.md) | [docs/archive/lanes/improve-code/…](lanes/improve-code/) |
 | docs/plans-milestones/done/inline-editor/… | [docs/archive/lanes/inline-editor/…](lanes/inline-editor/) |
 | docs/plans-milestones/done/ip/… | [docs/archive/lanes/ip/…](lanes/ip/) |
 | docs/plans-milestones/done/languages-seeded/… | [docs/archive/lanes/languages-seeded/…](lanes/languages-seeded/) |

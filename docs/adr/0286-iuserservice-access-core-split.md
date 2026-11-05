@@ -7,7 +7,7 @@ status: accepted
 audiences: [developer, agent, platform-maintainer]
 related:
   - docs/adr/0006-module-boundary-contracts.md
-  - docs/plans-milestones/plan-improve-code.md
+  - docs/archive/lanes/improve-code/plan-improve-code.md
 supersedes: []
 superseded_by: []
 updated: 2026-11-03

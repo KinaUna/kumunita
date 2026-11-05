@@ -9,7 +9,7 @@ related:
   - docs/adr/0006-module-boundary-contracts.md
   - docs/adr/0067-m5-projects-todos-and-kanban.md
   - docs/adr/0088-projects-todos-boards-translations.md
-  - docs/plans-milestones/plan-improve-code.md
+  - docs/archive/lanes/improve-code/plan-improve-code.md
 supersedes: []
 superseded_by: []
 updated: 2026-11-03
