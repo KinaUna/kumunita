@@ -974,3 +974,75 @@ decompositions, each a real part-vs-whole split with its own test.
   splits (before→after 25→23), the SampleDataSeeder verified honest-keep, the
   7 god-services named-keeps with their ADR 0290 de-scope, and why the ≤ 8
   line is not met.
+
+## C2-06 — the two untested services get a unit-tested decision part (2026-11-05)
+
+### The scope (per D6 + the DoD #7 "the two untested services covered")
+
+D6: *"The two untested services (`MailAlarms` and `UsagePurge`) each get a
+**unit-tested decision part** — a `*Policy` or pure helper with a test, per
+the C04/C12 pattern. This is the part-vs-whole rule applied to the *test*
+requirement, not a new type for ceremony."* The anti-pattern D6 names is a
+test that **just calls the service** (no decision extracted) — that leaves
+the seam-test rule *unmet* for them, so it does not count. The two services
+each had exactly one I/O method whose decision (the "should this fire / which
+rows qualify" check) was tangled into the `IDocumentStore` I/O, so the only
+test that could exercise it was a Testcontainers test — there was no **unit**
+that named the decision. The fix per D6 / the C04 reference shape: pull the
+pure decision out into a **static `*Policy`** (plain in/out values, no
+`IDocumentStore`, no async I/O), re-point the service to delegate the decision
+to it, and give the policy a **plain unit test** (no `PostgresFixture`) —
+that unit test is what seam-test Rule 1 needs (it *names* the decision
+surface). One service (its decision surface + its unit test) per commit.
+
+### The 2 decision extractions (one per commit, gate green after each)
+
+| # | Commit | Service | Decision surface extracted | Shape | Unit test |
+|---|---|---|---|---|---|
+| 1 | `246c6d6c` | `MailAlarmsService` (146 → ~120) | the **T4 threshold breach + the pin §3 `AlertEvent` payload mapping** (given the 3 window counts — `bounce` / `complaint` / `EmailDeadLetter` — decide the `bounces + complaints ≥ AlertThreshold` breach and build the exactly-one `AlertEvent`, no PII) | a **static `MailAlarmThresholdPolicy`** (`Build(bounces, complaints, deadLetters, windowHours = WindowHours, alertThreshold = AlertThreshold) → AlertEvent?`), pure over the 3 counts; the `AlertThreshold` / `WindowHours` / `AlertKind` constants stay the single source on the service, the policy reads them by default | `MailAlarmThresholdPolicyTests` (6 facts — one under / at / over the threshold, the pin §3 exact payload text, the no-PII shape) |
+| 2 | `23181100` | `UsagePurgeService` (61 → ~70) | the **retention cutoff + the row-qualifies predicate** (given `now` + the `RetentionDays` constant → the `cutoff = now − RetentionDays` instant; a row is purged iff `At < cutoff`) | a **static `UsagePurgePolicy`** (`ComputeCutoff(now, retentionDays = RetentionDays) → DateTimeOffset` + `ShouldPurge(rowAt, cutoff) → bool`), pure over plain `DateTimeOffset`s (the `RollingFileSink.Retain` cutoff precedent); the `RetentionDays` constant stays the single source on the service | `UsagePurgePolicyTests` (6 facts — the cutoff computation, the keep/purge boundary: one older purges / exactly-at keeps / one newer keeps) |
+
+Both are **real part-vs-whole seams** (a C13 cold read of each policy passes
+on its own — pure methods over plain values, no I/O, no ceremony), neither
+mints an `I*Service`, and neither raises a ceiling (both services are already
+well under the 600 `cs_file` ceiling — there is no `files` entry to retire
+here; the extraction is the *test-coverage* seam D6 names, not a size seam).
+
+### The one code-verified constraint (the I/O query stays inline)
+
+`UsagePurgePolicy.ShouldPurge` is the pure predicate for the unit test + the
+reader, but `UsagePurgeService.PurgeAsync`'s **queryable** `Where` must stay
+the inline `e.At < cutoff` — Marten translates that to SQL server-side; it
+cannot call an arbitrary C# method. The two are the *same rule* (`rowAt <
+cutoff`), and the service's comment pins them together so they never drift —
+the policy is the single source of the *cutoff* (the I/O method now calls
+`UsagePurgePolicy.ComputeCutoff(now)`), and the predicate is named for the
+unit test. This is the one place D6's "delegate the decision" shape bends to
+the Marten queryable constraint, and it is recorded rather than forced into a
+ceremony shape.
+
+### Before → after (the DoD #7 named line)
+
+**Both named services now have a unit-tested decision part.**
+
+| Service | Before (this unit) | After (this unit) |
+|---|---|---|
+| `MailAlarmsService` | decision (threshold + payload) in `EvaluateAsync`; only a Testcontainers test named it (`MailAlarmsServiceTests`) | decision delegated to the pure `MailAlarmThresholdPolicy`; `MailAlarmThresholdPolicyTests` (plain unit) names it; the Testcontainers leg still pins the I/O |
+| `UsagePurgeService` | decision (cutoff + predicate) in `PurgeAsync`; only a Testcontainers test named it (`UsagePurgeServiceTests`) | decision delegated to the pure `UsagePurgePolicy`; `UsagePurgePolicyTests` (plain unit) names it; the Testcontainers leg still pins the I/O |
+
+### Verification
+
+- [x] **`dotnet build Kumunita.slnx` — 0 errors** (both extractions).
+- [x] **The two new plain unit tests green:** `MailAlarmThresholdPolicyTests`
+  **6/6** · `UsagePurgePolicyTests` **6/6** (both **no** `IClassFixture<PostgresFixture>`
+  — pure units, which is exactly what seam-test Rule 1 requires).
+- [x] **The existing Testcontainers legs still pin the re-pointed I/O**
+  (`MailAlarmsServiceTests` / `UsagePurgeServiceTests` — unchanged, still
+  exercise `EvaluateAsync` / `PurgeAsync` against Postgres).
+- [x] **`tools/code/code-check.ps1` — OK (0 violations)** (both extractions;
+  each new `*Policy` is named by a unit test — seam-test **Rule 1 satisfied**;
+  no new `I*Service`; the services-with-unit-tested-part floor is unchanged
+  and still met; no baseline entry raised).
+- [x] **The handoff note gets a C2-06 entry** (this section): the 2 decision
+  extractions (service → policy → unit test, one per commit), the one
+  code-verified Marten-queryable constraint, and the DoD #7 named line met.
