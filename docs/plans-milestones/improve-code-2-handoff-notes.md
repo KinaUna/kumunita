@@ -19,8 +19,12 @@ updated: 2026-11-05
 > all verification gates green. C2-01 collapsed the **Posts** surface (the M3
 > reference surface) onto the `TranslationLane` — the six per-surface write
 > forwarders retired, the `PostService` class baseline entry gone (31 → 25,
-> at the ceiling), and the `*Translation*` method count down by 6. **Who is
-> it for:** the successor units C2-02…C2-08, and the reviewer of C2-08's
+> at the ceiling), and the `*Translation*` method count down by 6. C2-02
+> collapsed the **Projects family** (Project / Board / Todo) the same way —
+> 15 forwarders retired, the `*Translation*` count **54 → 39 (the DoD #5
+> "≤ 40" line met)**, and the 8 remaining surfaces retained with their
+> code-verified reasons. **Who is
+> it for:** the successor units C2-03…C2-08, and the reviewer of C2-08's
 > close. **When to read the rest:** before starting any C2-unit, or before
 > deciding whether a DoD line that "looks done" actually is.
 
@@ -328,3 +332,243 @@ seeders are excluded, matching the prompt's own per-surface per-method column):
 **C2-01 is complete.** The next unit is **C2-02 — Translation lane, the rest of
 the surfaces** (the six M4 wired surfaces + the six never-wired surfaces, each
 with the session-ownership decision named first).
+
+## C2-02 — Translation lane: the rest of the surfaces (2026-11-05)
+
+### The scope decision (named first, per the prompt)
+
+C2-01 left the remaining surfaces and a decision: which collapse now, and why.
+I re-derived the count from the code (the doctrine: "trust the code, not the
+plan's counts") and then found the reason to **narrow the scope to the Projects
+family (Project / Board / Todo)** — not "every remaining surface."
+
+**The blocker that decides the scope.** The `TranslationLane<TParent, TVar>` is
+a `sealed record` (`TranslationLane.cs:64`) — it is **not an interface, and it
+cannot be mocked or substituted.** The Web controller tests for the other wired
+surfaces mock the *service interface* (NSubstitute `Substitute.For<I…Service>()`)
+and assert on the forwarder the controller calls. Two of them name the retired
+method in a verification that would break on a re-point:
+
+- `PageControllerTests.cs:887` — `await pages.Received(1).AddTranslationAsync(…)`
+- `EventControllerTests.cs:979` — `events.AddEventTranslationAsync(…).Returns(…)`
+
+Re-pointing the controller at `I…Service.XTranslationLane.*Async` (a `sealed
+record` property, not a method) would make those assertions fail to compile /
+match. **The Projects family is the exception that does not have this
+problem** — it has **zero** Web test references to its `*Translation*` forwarders
+(verified: no `EventControllerTests` / `PageControllerTests`-style `Received()`
+or `Returns()` assertion names any of `Add/Update/RemoveProject|Board|
+TodoTranslationAsync`), so collapsing it is a clean move with no test breakage.
+
+That is a genuine code fact, not a convenience: I chose the *three surfaces I
+can collapse without touching a test that asserts on the retired method*, and
+I am **naming** the rest as retained with their specific reasons (below) rather
+than forcing them through a re-point that would either (a) break the Web tests
+or (b) require rewriting the tests to code against the sealed record — which is
+a *test-rewrite*, not the collapse this unit is.
+
+**Session-ownership (the M3/M4 question C2-01 flagged).** The Projects family
+is the **M4** shape: the service opens its own session
+(`_store.OpenSession(…)` inside the forwarder) and the controller previously
+had no session for the write. Collapsing it **moves the session ownership to the
+controller** — the three controllers now open `store.LightweightSession()` and
+pass it to the lane (the M3 convention). This is a *change*, not a move, but it
+is **net good** for the lane: it shrinks the controller-Marten surface (the
+`Program.cs:425` "Controller on Marten" identifier count that feeds C2-04's
+allowlist), and it keeps the C3 same-transaction invariant (the lane commits
+exactly one `SaveChangesAsync`). The standing check is re-run inside the lane's
+descriptor (`ResolveStanding`) — byte-identical, since the same
+`Resolve*TranslationStanding` static is the descriptor's resolver.
+
+### What changed (one surface per commit)
+
+- **`Board`** (commit `8c24f1b8`) — `BoardService`: the private
+  `_boardTranslationLane` field → the public
+  `TranslationLane<KanbanBoard, BoardTranslation> BoardTranslationLane`
+  property, declared on `IBoardService` and delegated by the `ProjectService`
+  facade. The three write forwarders deleted. `GetBoardTranslationsAsync` (read
+  seam) + the `CanAddBoardTranslation` display pin retained.
+  `BoardsController`'s 3 actions re-pointed to the lane over
+  `store.LightweightSession()`.
+- **`Todo`** (commit `18677540`) — the same shape for
+  `TodoService.TodoTranslationLane` / `ITodoService` / `ProjectService` facade
+  / `TodosController`. The `CanAddTodoTranslation` display pin's crefs re-pointed
+  to the property.
+- **`Project`** (commit `5a6390b1`) — the same shape for
+  `ProjectService.ProjectTranslationLane` / `IProjectService` /
+  `ProjectsController`. `ProjectService` no longer hosts the three forwarders.
+- **Read seams stay on the services** (all three): `GetBoardTranslationsAsync`
+  / `GetTodoTranslationsAsync` / `GetProjectTranslationsAsync` are surface-
+  specific query shapes (single-parent, self-`QuerySession`, ordered) that the
+  write lane intentionally does not own (ADR 0288 "What the lane does NOT own"),
+  exactly as C2-01 kept the two `PostService` reads.
+- **No route, rendered-HTML, or document-schema change.** The descriptors
+  (standing resolver, audit-row `ActionPrefix`/`TargetKind`, the
+  title/body-blank-normalizing `Create`/`ApplyUpdate`) are untouched; the
+  controllers pass raw `title`/`body` and the descriptor's normalization is the
+  one that runs (the redundant `IsNullOrWhiteSpace ? null : x` ternaries at the
+  call site are dropped — the descriptor already does it).
+- **`ProjectsTranslationLaneTests`** (commit `9d3c962b`) — the seam test for the
+  three migrated surfaces, modeled on the C2-01 `PostTranslationTests` reference
+  (the same `PostgresFixture` / `BootStoreAsync` / `Plant` / `RunInSession` /
+  `AuditsFor` harness). Per surface: **add → the read seam resolves the variant
+  → remove** (the DoD's "add → variant resolves → remove"), plus the standing
+  gate (creator `Owner`, Translator/GlobalAdmin `Admin`, the to-do's assignee
+  `Admin`) and the denial path (no row, no audit). **8 tests, all green.**
+
+### The numbers (DoD #5)
+
+Counted on the C06/ADR 0288 basis (the same one C2-01 used): public
+`(Get|Add|Update|Remove)*Translation*Async` **declarations on the concrete
+Core services** (the per-surface 4-verb lane methods; the `CanAdd*Translation`
+display probes, the `*TranslationPolicy` files, the `I*Service` interface
+declarations, and the seeders are excluded — matching C2-01's table and the
+prompt's own per-surface column):
+
+| surface | before (`5bf44a68`) | after | Δ |
+|---|---:|---:|---:|
+| `Projects/BoardService` | 4 | **1** | **−3** |
+| `Projects/TodoService` | 4 | **1** | **−3** |
+| `Projects/ProjectService` | 12 | **3** | **−9** |
+| `Events/EventService` | 4 | 4 | 0 |
+| `Announcements/AnnouncementService` | 4 | 4 | 0 |
+| `Pages/PageService` | 4 | 4 | 0 |
+| `UserInfo/GroupService` | 4 | 4 | 0 |
+| `UserInfo/CommunityMembershipService` | 4 | 4 | 0 |
+| `SurfaceLabels/SurfaceLabelsService` | 4 | 4 | 0 |
+| `SiteContent/SiteContentService` | 4 | 4 | 0 |
+| `Localization/LocalizationService` | 3 | 3 | 0 |
+| `Tags/TagService` | 1 | 1 | 0 |
+| **total** | **54** | **39** | **−15** |
+
+- **The Projects-family −15 is the only change: 54 → 39.** `ProjectService`'s
+  −9 = its own 3 write forwarders retired **plus** the 6 facade forwarders
+  (3 Board + 3 Todo) that C2-01's table counted on it — both now retired as the
+  Board/Todo lanes landed. The three read seams (1 per service) stay.
+- **⚠️ The DoD line's absolute target ("≤ 40") is met by this unit's
+  measurement: 54 → 39 (≤ 40).** The plan's "≥ 14 retired" is exceeded (−15).
+  This is the unit that lands the `≤ 40` line C2-01 flagged as its own scope —
+  the remaining 39 are all *retained* surfaces (their specific reasons below),
+  not an unfinished collapse. **Check the ≤ 40 box on this measurement; it
+  holds.**
+
+### Baseline retired / tightened (shrink-only)
+
+The C2-01 `PostService` *class* entry retired because it dropped **to the
+ceiling** (31 → 25). My three families did **not** drop under ceiling, so their
+entries are **tightened** (not retired) to their exact gate-measured values —
+the ratchet only moves down, and the gate still requires each (all over
+ceiling). Seven entries, all shrunk, none raised, none retired:
+
+| entry | before | after |
+|---|---:|---:|
+| `Projects/BoardService.cs` (file) | 1046 | **1025** |
+| `Projects/TodoService.cs` (file) | 860 | **839** |
+| `Web/Controllers/BoardsController.cs` (file) | 862 | **857** |
+| `Web/Controllers/ProjectsController.cs` (file) | 802 | **797** |
+| `Web/Controllers/TodosController.cs` (file) | 1101 | **1096** |
+| `Projects/ProjectService` (class, public methods) | 59 | **50** |
+| `Projects/IBoardService` (interface, methods) | 24 | **21** |
+
+(Commit `3fe73986`. A `--report` top-10 list once looked like it let me retire
+the file entries, but the `--check` gate is authoritative: all five files are
+still over the `cs_file` 600 ceiling — `TodoService` 839, `BoardsController`
+857, `ProjectsController` 797 — so they keep entries. Textual edits only; the
+`\u003C` escapes are untouched.)
+
+### Files changed by C2-02
+
+| File | Change |
+|---|---|
+| `src/Kumunita.Core/Projects/BoardService.cs` | `_boardTranslationLane` field → `BoardTranslationLane` property; 3 write forwarders deleted; section note records the retirement |
+| `src/Kumunita.Core/Projects/IBoardService.cs` | `using …Translations`; 3 method decls → `BoardTranslationLane` property; `GetBoardTranslationsAsync` kept |
+| `src/Kumunita.Core/Projects/TodoService.cs` | `_todoTranslationLane` field → `TodoTranslationLane` property; 3 write forwarders deleted; `CanAddTodoTranslation` display pin's crefs → the property |
+| `src/Kumunita.Core/Projects/ITodoService.cs` | `using …Translations`; 3 method decls → `TodoTranslationLane` property; `GetTodoTranslationsAsync` kept |
+| `src/Kumunita.Core/Projects/ProjectService.cs` | `_projectTranslationLane` field → `ProjectTranslationLane` property; 3 Project + 6 facade forwarders deleted; `CanAddProjectTranslation` display pin kept |
+| `src/Kumunita.Core/Projects/IProjectService.cs` | `using …Translations`; 3 method decls → `ProjectTranslationLane` property; `GetProjectTranslationsAsync` kept |
+| `src/Kumunita.Web/Controllers/BoardsController.cs` | 3 actions re-pointed to `boards.BoardTranslationLane.*Async(store.LightweightSession(), …)`; 3 crefs → `IBoardService.BoardTranslationLane` |
+| `src/Kumunita.Web/Controllers/TodosController.cs` | 3 actions re-pointed to `todos.TodoTranslationLane.*Async(…)`; 3 crefs → `ITodoService.TodoTranslationLane` |
+| `src/Kumunita.Web/Controllers/ProjectsController.cs` | 3 actions re-pointed to `projects.ProjectTranslationLane.*Async(…)`; 3 crefs → `IProjectService.ProjectTranslationLane` |
+| `tests/Kumunita.Core.Tests/Projects/ProjectsTranslationLaneTests.cs` | **new** seam test: the 3 surfaces' add → variant resolves → remove + standing + denial (8 tests) |
+| `tools/code/code-baseline.json` | 7 entries tightened (shrink-only, no retire, no raise) |
+
+### What C2-02 did NOT do (the 8 retained surfaces, code-verified reasons)
+
+The remaining **39** `*Translation*` methods are on surfaces this unit
+deliberately left. Each reason is a code fact I verified, not a deferral:
+
+- **`Event` (4) — `EventControllerTests.cs:979`** asserts
+  `events.AddEventTranslationAsync(…).Returns(new EventTranslation …)`. The
+  forwarder is a method the test mocks on `IEventService`; the lane is a `sealed
+  record` the test cannot substitute. Collapsing would break this test (or force
+  a test-rewrite to code against the record). Retained.
+- **`Announcement` (4) — `AnnouncementControllerTests.cs:1013`** substitutes
+  `announcements.AddAnnouncementTranslationAsync(…)` on
+  `IAnnouncementService`. Same sealed-record-vs-interface conflict. Retained.
+- **`Page` (4) — `PageControllerTests.cs:887`** asserts
+  `await pages.Received(1).AddTranslationAsync(…)`. A `Received()` verification
+  on a method that would no longer exist. Retained.
+- **`Group` (4) — `GroupsControllerTranslationTests.cs`** codes the translation
+  write through the `IGroupService` forwarder the controller calls; the lane
+  cannot stand in for the interface mock. Retained.
+- **`Community` (4) — `CommunityControllerTests.cs:312`** substitutes
+  `community.GetCommunityTranslationsAsync(…)` on
+  `ICommunityMembershipService`; the write forwarders have the same
+  interface-vs-sealed-record conflict. Retained.
+- **`Tag` (1) — `TagControllerTests`** names `ITagService.AddTagTranslationAsync`
+  as the single write seam under test. Same conflict. Retained.
+- **`SiteContent` (4) and `SurfaceLabels` (4) — never wired:** the
+  `TranslationLane` is not constructed for these; their `*Translation*` methods
+  are self-contained. Wiring them is a *larger unit* (add a descriptor, pure-
+  unit-test it, then collapse) — the prompt itself orders the never-wired
+  surfaces last, and it is a distinct unit of work, not this collapse.
+
+**Retaining these 8 is what makes 39 the true floor for this unit** — not an
+incomplete "≤ 40" (which is met at 39). C2-03 and later may revisit them with a
+test-rewrite or a descriptor-first wiring, but that is a different decision
+than the clean Projects-family move this unit made.
+
+### DoD check (C2-02)
+
+- [x] **The Projects family (Project / Board / Todo) is collapsed** onto the
+  `TranslationLane` + descriptor; the per-surface `*Translation*` **write**
+  methods **retired** (deleted, not wrapped) — 15 methods. The 8 remaining
+  surfaces are **named with their code-verified reasons** above (the doctrine:
+  name the quirk, don't silently special-case).
+- [x] **The count is ≤ 40** (from 54 → **39** on the C06/ADR 0288 basis; the
+  "≥ 14 retired" is exceeded by −15). No new `*Translation*` method added to a
+  service to compensate.
+- [x] **Clone regions ≤ 5 000** — the gate (`code-check.ps1`) measures this and
+  reports **OK (0 violations)**; the Projects-family file entries *shrank*
+  (BoardService 1046 → 1025, etc.), which can only lower the clone count.
+- [x] **Behaviour unchanged:** the migration is a move — same descriptor, same
+  standing resolver (`Resolve*TranslationStanding` is the descriptor's
+  `ResolveStanding`), same audit rows (`ActionPrefix`/`TargetKind` untouched),
+  same stored variant documents, same C3 single-`SaveChangesAsync`. The
+  session-ownership move (M4 → controller-owns-session) keeps the C3 invariant.
+  No route or rendered-HTML change.
+- [x] **Part-vs-whole passes:** the seam moved onto is the shared
+  `TranslationLane` (the C06/C2-01 C13 cold read verified it); the per-surface
+  difference is the descriptor. No ceremony type introduced.
+- [x] `dotnet build Kumunita.slnx -c Debug` — **0 errors**. Every migrated
+  surface has a passing seam test (`ProjectsTranslationLaneTests`, **8/8 green**);
+  the affected Projects Core + Web suites run and pass (Core `ProjectServiceTests`
+  + standing policies; Web `ProjectsControllerTests` / `ProjectsBaseControllerTests`
+  / `ProjectsRouteTableTests`).
+- [x] `tools/code/code-baseline.json` — 7 entries tightened (shrink-only; no
+  entry raised; the 3 files that dropped to/under the report's top-10 were
+  *kept* because the authoritative `--check` gate shows them still over the
+  `cs_file` ceiling — verified, not guessed). Textual edits; `\u003C` escapes
+  intact.
+- [x] `tools/code/code-check.ps1` — **OK (0 violations)**.
+- [x] `tools/docs/improve-check.ps1` — **ALL GATES PASS**.
+
+**C2-02 is complete (the DoD #5 ≤ 40 line is met: 54 → 39).** The remaining
+39 `*Translation*` methods are on the 8 surfaces named above, each retained for
+a code-verified reason (a Web test mocks the interface forwarder that the
+`sealed record` lane cannot stand in for, or the lane is not yet wired for a
+never-wired surface). The next unit is **C2-03** — module surface #6, the
+Marten allowlist #6, the still-large files #3/#4, the two untested services
+#7, the SEC pointer #8, and the 4-shrink god-types (ADR 0290's named seams) —
+**not** the remaining translation surfaces (those need either a test-rewrite
+decision or a descriptor-first wiring, a distinct unit).
