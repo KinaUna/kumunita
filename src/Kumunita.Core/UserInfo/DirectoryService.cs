@@ -86,7 +86,7 @@ public sealed record PreviewRow(bool ShowContactBlock, Profile? Profile);
 /// model and editor so later fields can adopt it without a migration).
 /// </para>
 /// </summary>
-public sealed class DirectoryService
+public sealed class DirectoryService : IDirectoryService
 {
     private readonly IUserInfoService _userInfo;
     // C07 (ADR 0286) — the IProfileSettingsService sibling (the moved method's owner).

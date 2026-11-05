@@ -78,7 +78,7 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class ProfileController(
     IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
-    DirectoryService directory,
+    IDirectoryService directory,
     IMediaStore media,
     IOptions<MediaOptions> mediaOpts,
     // M23 (U04) — the per-request localization read seams for the saved-flash

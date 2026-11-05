@@ -46,7 +46,7 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 [Route("directory")]
 public sealed class DirectoryController(
-    DirectoryService directory,
+    IDirectoryService directory,
     // M23 (ADR 0123 D2/D6/F6) — the bio/tags gate's seams.
     //   • authz — the frozen IAuthorizationService.CanAsync decision path
     //     (C-M23·2: zero new authorization surface — the existing

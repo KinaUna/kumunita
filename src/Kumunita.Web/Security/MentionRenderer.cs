@@ -270,7 +270,7 @@ public static class MentionRenderer
     /// </returns>
     public static async Task<IReadOnlyDictionary<string, string>> BuildMapAsync(
         IMentionService mentions,
-        DirectoryService directory,
+        IDirectoryService directory,
         string? body,
         string authorId,
         CancellationToken ct = default)

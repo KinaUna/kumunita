@@ -1658,13 +1658,6 @@
       "count": 1
     },
     {
-      "from": "Mentions",
-      "to": "UserInfo",
-      "symbol": "DirectoryService",
-      "count": 2,
-      "adr": "0290"
-    },
-    {
       "from": "Messaging",
       "to": "Authorization",
       "symbol": "AccessAudit",
@@ -3550,12 +3543,6 @@
       "from": "Web",
       "to": "UserInfo",
       "symbol": "Component",
-      "count": 3
-    },
-    {
-      "from": "Web",
-      "to": "UserInfo",
-      "symbol": "DirectoryService",
       "count": 3
     },
     {

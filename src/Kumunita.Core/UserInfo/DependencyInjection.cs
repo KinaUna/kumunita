@@ -35,15 +35,18 @@ public static class UserInfoModule
         services.AddTransient<IGuardianService, GuardianService>();
         services.AddTransient<IProfileSettingsService, ProfileSettingsService>();
 
-        // M2 (plan U5): the directory-side composition root — a concrete class
-        // (it composes two *seams*, not itself a seam: no interface, ADR
-        // 0006-D's "single seam" rule applies to the *modules* it calls, not
-        // to the caller).
+        // M2 (plan U5) + IMPROVE-CODE-2 C2-03: the directory-side composition
+        // root. Registered against both the concrete (for the existing
+        // self-composition) and the <see cref="IDirectoryService"/> interface
+        // (the crossing modules — Mentions, the Web controllers, the
+        // MentionRenderer — code against the interface, the C03
+        // INotificationEmitter pattern; ADR 0006-D "route + authz + shape").
         services.AddTransient<DirectoryService>(sp =>
             new DirectoryService(
                 sp.GetRequiredService<IUserInfoService>(),
                 sp.GetRequiredService<IProfileSettingsService>(),
                 sp.GetRequiredService<IAuthorizationService>()));
+        services.AddTransient<IDirectoryService>(sp => sp.GetRequiredService<DirectoryService>());
 
         // M23 (ADR 0123 D4): the find-people composition root — the
         // DirectoryService shape above, extended with the host-registered

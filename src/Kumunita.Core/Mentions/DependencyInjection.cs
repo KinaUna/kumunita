@@ -23,7 +23,7 @@ public static class MentionsModule
     public static IServiceCollection AddMentions(this IServiceCollection services)
     {
         services.AddTransient<IMentionService>(sp => new MentionService(
-            sp.GetRequiredService<DirectoryService>()));
+            sp.GetRequiredService<Kumunita.Core.UserInfo.IDirectoryService>()));
 
         return services;
     }
