@@ -2382,7 +2382,10 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
         groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
-        var controller = new GoalsController(projects, userInfo, groupService, profileSettings, DefaultLocalization(), store ?? Substitute.For<IDocumentStore>(), boards: (IBoardService)projects, todos: (ITodoService)projects);
+        // C3-05 (ADR 0295) — GoalsController no longer takes a store (its goal
+        // actions route through IProjectService); the base's tag-slug helper
+        // gets null + null-guards (the goal actions never call it).
+        var controller = new GoalsController(projects, userInfo, groupService, profileSettings, DefaultLocalization(), boards: (IBoardService)projects, todos: (ITodoService)projects);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

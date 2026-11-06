@@ -9,7 +9,6 @@ using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -34,17 +33,28 @@ public sealed class GoalsController : ProjectsBaseController
     // <see cref="ProjectsBaseController"/> base (the boards / todos sibling
     // seams are supplied by DI; a test site may pass <c>null</c> for a seam it
     // does not exercise).
+    //
+    // C3-05 (ADR 0295) — the document-store ctor param is gone. The
+    // goal actions (GoalDetail / GoalNew / GoalCreate) route entirely through
+    // the frozen <see cref="IProjectService"/> seam (<c>GetGoalAsync</c> /
+    // <c>ListProjectsForGoalAsync</c> / <c>CreateGoalAsync</c>, each opening
+    // its own write session + audit row) — this controller performs no direct
+    // document read/write of its own. It no longer forwards a store to the
+    // base's shared tag-slug prefill helper (<c>SeedExistingTagSlugsAsync</c>,
+    // the one base helper that reads a store) because none of the goal actions
+    // call it. Passing <c>null</c> is safe: that helper null-guards to an
+    // empty chip set, which is the display no-op for a surface that has no
+    // tags to prefill.
     public GoalsController(
         IProjectService projects,
         IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
         ILocalizationService localization,
-        IDocumentStore store,
         IBoardService boards,
         ITodoService todos,
         ITranslationProvider? translationProvider = null,
         EffectiveTimezoneResolver? timezone = null,
         IEventService? events = null,
-        ITagService? tags = null) : base(projects, userInfo, groupService, profileSettings, localization, store, boards, todos, translationProvider, timezone, events, tags)
+        ITagService? tags = null) : base(projects, userInfo, groupService, profileSettings, localization, null, boards, todos, translationProvider, timezone, events, tags)
     {
     }
 

@@ -524,7 +524,8 @@
     },
     {
       "id": "src/Kumunita.Core/Identity/IIdentityService.cs::Kumunita.Core.Identity.IIdentityService",
-      "max": 33
+      "max": 34,
+      "adr": "0295"
     },
     {
       "id": "src/Kumunita.Core/Localization/ILocalizationService.cs::Kumunita.Core.Localization.ILocalizationService",
@@ -3510,10 +3511,6 @@
   ],
   "controllers_marten_allowlist": [
     {
-      "file": "src/Kumunita.Web/Controllers/AccountController.cs",
-      "reason": "the 2FA 'authenticator setup' lane reads the actor's IdentityToken for a one-time QR payload (an Identity-module read). The owning IdentityService (src/Kumunita.Core/Identity/IdentityService.cs, 1608 lines) is a god-file at its ratchet ceiling (cs_file 600) - adding the read overload would raise the ratchet, which is C2-05's scope, not C2-04's. Kept on the store."
-    },
-    {
       "file": "src/Kumunita.Web/Controllers/AdminAnalyticsController.cs",
       "reason": "the audit-log export writes an AccessAudit row (an Authorization-module concrete type). No Usage-module write service owns it; routing it through one would mint a new Usage->Authorization boundary edge (a cross-module reference to the AccessAudit class = a gate edge). Kept on the store."
     },
@@ -3523,7 +3520,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
-      "reason": "the announcement create/edit/delete lanes write the Post + its Translation + moderation side-rows in one aggregate. The owning PostService (src/Kumunita.Core/Posts/PostService.cs, 1722 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope. Kept on the store."
+      "reason": "C3-05 (ADR 0295) — honest keep, a C3-06 item. The create/edit/delete/publish lanes are caller-owns-transaction: the controller opens store.LightweightSession() and passes it to IAnnouncementService.CreateAsync/UpdateAsync/DeleteAsync/PublishAsync (those service methods REQUIRE a passed-in session — the M3 single-write-transaction shape). The announcement write+read lane methods are ~152 code lines; the owning AnnouncementService (src/Kumunita.Core/Announcements/AnnouncementService.cs) is 519 code lines — 519 + 152 = 671 > 600, so moving them in would breach the cs_file ceiling (no headroom). Retiring needs reshaping the frozen IAnnouncementService seam to open its own sessions (a C3-06 seam decision). Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/AttachmentController.cs",
@@ -3539,7 +3536,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/DocumentController.cs",
-      "reason": "uses the concrete DocumentService (no IDocumentService interface) + cross-context Tag/DocumentFolder reads + a Media quarantine write. Moving the tag/quarantine lanes into DocumentService (a Core type) would mint NEW Documents->Tags (the Tag class) and Documents->Media (the MediaObject class) boundary edges - DocumentService already references the Tags/Authorization interfaces (no edge) but not the concrete Tag/MediaObject classes. Kept on the store."
+      "reason": "C3-05 (ADR 0295) — honest keep, a C3-06 edge-decision. The tag-slug read (the SeedExistingTagSlugsAsync-style prefill, a Query<Tag> over the concrete Tag class) + the Media quarantine write (the F16/UPL-02 serve-lane gate that writes MediaObject.Quarantined) would MINT NEW boundary edges: Documents->Tags:Tag + Documents->Media:MediaObject (verified: neither edge exists in this baseline, and DocumentService does not reference the concrete Tag/MediaObject classes — only the Documents-owned Document + DocumentFolder types). DocumentService (src/Kumunita.Core/Documents/DocumentService.cs) is 193 code lines (ample headroom), so this is NOT a headroom keep — it is the C3-06 D3 group-(c) edge-minting decision (keep the controller on the store, name the minted edges, ADR them when landed). Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/GroupsController.cs",
@@ -3547,7 +3544,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/GuardianController.cs",
-      "reason": "the guardian bind/consent lanes write the GuardianConsent + a UserInfo side-row in one aggregate. The owning GuardianService (src/Kumunita.Core/UserInfo/GuardianService.cs, 974 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope. Kept on the store."
+      "reason": "C3-05 (ADR 0295) — honest keep, a C3-06 item. The four GuardianLink read lanes (ActiveChildrenAsync 20 + ActiveGuardiansAsync 20 + ActiveGuardianCountAsync 8 + ActiveLinkAsync, ~48-56 code lines total) read the UserInfo-module GuardianLink rows directly. The owning GuardianService (src/Kumunita.Core/UserInfo/GuardianService.cs) is 555 code lines — 555 + ~50 = ~605 > 600, so absorbing the reads would breach the cs_file ceiling (no headroom; the C3-04 split already landed GuardianService.Approvals.cs, 226 lines). The C3-06 item: a real part-vs-whole read seam on IGuardianService (the link-list reads) that fits, or a documented no-headroom keep. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/HealthController.cs",
@@ -3559,7 +3556,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/PostsController.cs",
-      "reason": "the post/reply create/edit/delete lanes write the Post + its Translation + moderation rows in one aggregate across Posts + Moderation. The owning PostService (src/Kumunita.Core/Posts/PostService.cs) was 821 code lines and dropped to 631 under C3-03's group-post seam extraction (Posts/GroupPostService.cs), still over the 600 cs_file ceiling - moving these lanes in would raise the ratchet, which is C3-04's tail scope. Kept on the store."
+      "reason": "C3-05 (ADR 0295) — honest keep, a C3-06 item (the prompt's own named example). The post/reply create/edit/delete/publish lanes are caller-owns-transaction: the controller opens store.LightweightSession() and passes it to IPostService.CreatePostAsync/DeletePostAsync/PublishPostAsync/DeleteReplyAsync (those methods require a passed-in session) + a SeedExistingTagSlugsAsync-style Tag read. The owning PostService (src/Kumunita.Core/Posts/PostService.cs) is 583 code lines — headroom of only 17, but the lanes it would absorb are ~98+ code lines (Edit 26 + DeletePost 31 + Publish 31 + the component/tag seeders + the reply lanes), i.e. 583 + lanes > 600: no headroom to retire. The C3-04 split (PostService.Media.cs, 62 lines) already extracted the media lane; the remainder is the C3-06 seam-reshape. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsController.cs",
@@ -3571,7 +3568,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/TagController.cs",
-      "reason": "the tag create/rename lanes write the Tag + its Translation + a side-row. The owning TagService (src/Kumunita.Core/Tags/TagService.cs, 976 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope. Kept on the store."
+      "reason": "C3-05 (ADR 0295) — honest keep, a C3-06 item. Two distinct blocks, both non-retire-able this unit: (1) the translation-write lane is caller-owns-transaction (the controller opens store.LightweightSession() and passes it to ITagService.AddTagTranslationAsync — a frozen seam that requires a passed-in session), and (2) the SeedTranslationFormAsync read (Query<TagTranslation>) is register-pinned: the in-code comment states the U8c register's 'no new seam' pin forbids adding an ITagService 'get translations' method (the 11-member frozen surface has none, and the read is a deliberate Web-layer convenience). The owning TagService (src/Kumunita.Core/Tags/TagService.cs) is 529 code lines; the two lanes together exceed the remaining headroom, and the pinned read is a doctrine block (not a headroom one). Retiring needs the C3-06 seam-reshape + a register amendment for the pinned read. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/BoardsController.cs",
@@ -3580,10 +3577,6 @@
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsBaseController.cs",
       "reason": "C08 Projects cluster: the shared base's tag-read + project-list reads are C08's frozen surface (the builder extraction was deferred as C08's exit, not C2-04's scope). ProjectService (src/Kumunita.Core/Projects/ProjectService.cs, 579 lines) does not own these shared base reads. Kept on the store."
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/GoalsController.cs",
-      "reason": "C08 Projects cluster (the C2-05 D5 seam split it off ProjectsController): the goal composer + detail lanes read the ProjectGoal + its Project cards + membership (C08 frozen surface - the builder extraction was deferred as C08 exit). ProjectService (src/Kumunita.Core/Projects/ProjectService.cs) does not own these builder reads. Kept on the store (the IDocumentStore ctor-forward, same as the Boards/Todos twins)."
     },
     {
       "file": "src/Kumunita.Web/Controllers/TodosController.cs",

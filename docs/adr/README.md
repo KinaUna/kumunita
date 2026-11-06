@@ -324,3 +324,4 @@ Decision / Consequences. New decisions take the next number.
 | 0292 | IMPROVE-CODE-3 C3-02: the SampleDataSeeder per-entity decomposition — the 2 god-method retires + the 1 files-entry honest raise (1633 → 2060) | Proposed |
 | 0293 | IMPROVE-CODE-3 C3-03: the god-service seam extractions — the honest boundary-edge count raises (the new named-seam file lands on an already-existing module edge) + the `GroupsController` seam-injection collateral | Proposed |
 | 0294 | IMPROVE-CODE-3 C3-04: the still-large-file tail — 15 partial-class splits (files 23→8) + 31 boundary-edge raises (partial files land on already-existing module edges) | Proposed |
+| 0295 | IMPROVE-CODE-3 C3-05: the two clean Marten-allowlist retirements (Goals, Account) + the `IIdentityService` interface raise (33→34, the `LoadVerifyTokenAsync` seam) + 5 honest keeps (Announcement, Document, Tag, Posts, Guardian) | Proposed |

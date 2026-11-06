@@ -16,14 +16,19 @@ updated: 2026-07-11
 ---
 
 > **Abstract:** the running handoff log for the IMPROVE-CODE-3 lane.
-> **Current state (C3-04 done, 2026-07-11):** C3-00…C3-04 are all done and
-> green. The lane's headline DoD line — the `files` 23 → ≤ 8 tail — is **met:
-> `files` is now 8** (15 of the 23 over-600 files retired via partial-class
-> splits, ADR 0294; the remaining 8 are the DoD's ≤ 8 allowance, the
-> C3-05/C3-06 Marten-allowlist scope + the ADR 0292 honest-keep seeder).
-> `classes` 5 → 3, `interfaces` 8, `boundary` 465 (31 edges raised, ADR 0294),
-> `allowlist` 20. The per-unit honest findings (each split tightens but does
-> not reliably retire a `files` entry) are recorded below, C3-00 first.
+> **Current state (C3-05 done, 2026-11-06):** C3-00…C3-05 are all done and
+> green. The `files` 23 → ≤ 8 line is **met: `files` is 8** (C3-00…C3-04, ADR
+> 0292/0294). **C3-05 retired the two clean `controllers_marten_allowlist`
+> entries — `GoalsController` (0 ops of its own, all via `IProjectService`) +
+> `AccountController` (the 1 verify-token read → the new
+> `IIdentityService.LoadVerifyTokenAsync` seam, ADR 0295) — so `allowlist` is
+> 20 → 18**; the 5 honest keeps (`Announcement`/`Document`/`Tag`/`Posts`/
+> `Guardian`) are recorded with their measured reasons (no headroom or
+> edge-minting) and handed to C3-06, which lands the `18 → ≤ 5` remainder.
+> `classes` 3, `interfaces` 8 (the `IIdentityService` entry raised 33 → 34,
+> `adr: 0295`), `boundary` 465, `files` 8, `allowlist` 18. The six-member
+> flip is **still not landed** (DoD #6's `≤ 5` target is 18 — C3-06/C3-08's).
+> The per-unit honest findings are recorded below, C3-00 first.
 > C3-00 adopted the ADR 0290 named seam `EventRsvpGuardianService` — the
 > 6-method RSVP cluster extracted from `EventService` into a real
 > part-vs-whole surface (`IEventRsvpGuardian` / `EventRsvpGuardianService`),
@@ -717,3 +722,86 @@ ceiling. **15 of the 23 retired; 8 stand over** (the DoD's ≤ 8 allowance).
   CodeMetrics parser chokes on `sealed partial` (parses `sealed` as a type
   name → method count 0) — declare the partial siblings `partial class` (no
   `sealed`).
+
+---
+
+## C3-05 — the Marten-allowlist clean retirements (the `20 → ≤ 5` clean subset) — **DONE**
+
+C3-05 works the 20 `controllers_marten_allowlist` entries and retires the ones
+whose owning service is now ≤ 600 (the C3-04 partial-class splits shrank the
+group-(a) god files, the exact condition their "god-file at the ceiling" keep
+waited for). Per the prompt: *"judged on retiring every genuinely-retire-able
+entry and honestly recording the ones you can't — not on hitting a specific
+number."*
+
+### The result: `allowlist` 20 → 18 (2 clean retirements)
+
+**RETIRE (2) — verified clean, not assumed:**
+
+| Controller | Why clean (measured) |
+|---|---|
+| `GoalsController` | **0 Marten ops of its own.** All goal actions route through `IProjectService` (`GetGoalAsync` / `ListProjectsForGoalAsync` / `CreateGoalAsync`). It held the store only to forward to the base's `SeedExistingTagSlugsAsync` — which no goal action calls. The base's `store` is now `IDocumentStore?` + the helper null-guards; `GoalsController` drops the ctor param (passes `null`); the 3 sibling base call sites (Boards/Todos/Projects) still pass their real store; the 1 test call site drops the arg. |
+| `AccountController` | **1 op** (the verify-link token load, 16 code lines, reads `IdentityToken`). Moved to the new `IIdentityService.LoadVerifyTokenAsync` seam (the `IdentityToken` is the IdentityModule's document). Controller drops the `store` param + `using Marten;`; the method calls the seam. `Web→Identity:IdentityToken` edge **persists** (the controller still references the `IdentityToken` return type) → **no boundary entry changes**. 8 test call sites drop the `store:` arg; the 2 verify-path tests wire `identity.LoadVerifyTokenAsync` to the same real store they seeded (faithful to the old controller read). |
+
+**KEEP (5) — honest findings, each code-verified, handed to C3-06:**
+
+| Controller | Owning service | The measured keep reason |
+|---|---|---|
+| `AnnouncementController` | `AnnouncementService` 519 | caller-owns-transaction write lanes (~152 code lines) → 519 + 152 = 671 > 600, **no headroom**. C3-06: reshape the frozen seam to open its own sessions. |
+| `DocumentController` | `DocumentService` 193 | **edge-minting** (C3-06 D3 group-(c)): the tag read (`Query<Tag>`) + Media quarantine write (`MediaObject.Quarantined`) would MINT NEW `Documents→Tags:Tag` + `Documents→Media:MediaObject` edges (verified absent; `DocumentService` references neither concrete type). Service has headroom (193) — the block is the minted edges, not size. |
+| `TagController` | `TagService` 529 | the write lane is caller-owns-transaction (passes the session to `AddTagTranslationAsync`), **and** the `SeedTranslationFormAsync` read is register-pinned ("no new seam" — the in-code comment names the U8c register pin). C3-06: seam-reshape + register amendment. |
+| `PostsController` | `PostService` 583 | caller-owns-transaction write lanes (~98+ code lines) + the `Tag`-read seeder; headroom only 17 → 583 + lanes > 600, **no headroom** (the prompt's own example). C3-06: the C3-04 `PostService.Media.cs` split retired the media lane; the remainder is the seam-reshape. |
+| `GuardianController` | `GuardianService` 555 | the 4 `GuardianLink` reads (~48–56 code lines) → 555 + ~50 ≈ 605 > 600, **no headroom** (C3-04 already landed `GuardianService.Approvals.cs`, 226 lines). C3-06: a real read seam on `IGuardianService`, or a documented no-headroom keep. |
+
+### The baseline changes (text-only; the 36 `\u003C` escapes survived)
+
+| Entry | Change | Reason |
+|---|---|---|
+| `interfaces` · `IIdentityService` | `max` 33 → **34**, `adr: 0295` **added** | the `LoadVerifyTokenAsync` seam added so `AccountController` retires its last Marten op; the named-exception record (the only raise this unit) |
+| `controllers_marten_allowlist` · `GoalsController` | **removed** | 0 ops of its own; clean retirement |
+| `controllers_marten_allowlist` · `AccountController` | **removed** | 1 op moved to `IIdentityService`; clean retirement |
+| `controllers_marten_allowlist` · the 5 keeps | reason text **updated** | the C3-05 measured rationale (no-headroom / edge-minting / pinned) replaces the now-false "god-file at the ceiling" text |
+
+**Unchanged:** `files` 8 · `classes` 3 · `methods` 89 · `boundary_violations`
+465 (the `Web→Identity:IdentityToken` edge persists → no boundary move) · `views` 3.
+
+### The ADR + index
+
+- **ADR 0295** (`0295-improve-code-3-c3-05-marten-allowlist-clean-retirements.md`)
+  is the named record for the one raise (`IIdentityService` 33 → 34) + the two
+  clean retirements + the 5 honest keeps.
+- **`docs/adr/README.md`** — the `0295` index row added (gate (b): 295 files ==
+  295 rows).
+
+### Verification (all green, 2026-11-06)
+
+- [x] **`dotnet build Kumunita.slnx` — 0 errors.**
+- [x] **Affected tests pass** — the 8 `AccountController` suites (Verify×2 ·
+  Signup×2 · MfaLogin · ResidentUsage · LoginErrorCode · AdminDelete) +
+  `ProjectsControllerTests` 46/46 (the base-class `store` change).
+- [x] **`pwsh tools/code/code-check.ps1` — OK (0 violations).**
+- [x] **`pwsh tools/docs/improve-check.ps1` — ALL GATES PASS** (gate (b): the
+  `0295` index row present; files=295 == index rows=295).
+- [x] **The 36 `\u003C` escapes survived** (the baseline was edited textually).
+- [x] **Pre-existing failures confirmed** — the 9 unrelated Web-suite failures
+  (compiled-JS artifacts, the boards-route snapshot drift, the kiosk/ADRs UI
+  snapshots) are present on a clean `development` (stashed) too; C3-05 adds none
+  of them (the one that was failing before the baseline edit,
+  `ImproveHarnessTests.CodeCheck_Gate_Passes`, is now green).
+
+### Honest notes for C3-06
+
+- **The `allowlist` is now 18** (was 20). C3-06 lands the remainder to `≤ 5`.
+  The 5 group-(a) keeps above are the first 5 to resolve (each needs a
+  seam-reshape / edge-decision / register-amendment — the *no-headroom* and
+  *edge-minting* classes, not the clean-move class this unit did).
+- **The pre-existing group-(b/c/d) entries** (AdminController, AdminAnalytics,
+  Attachment, ContentImage, Boards, Health, Projects, ProjectsBase,
+  ReportTargets, Todos, Directory) stay as-is this unit — they are the C3-06
+  scope (the prompt's explicit leave-list).
+- **The base-class `store` is now `IDocumentStore?`** — a future sibling that
+  needs the tag-slug prefill keeps passing its real store (the 3 existing
+  siblings do); a sibling that doesn't (like `GoalsController`) passes `null`.
+  No behavior change for any existing route (the helper null-guards to an empty
+  chip set only when a child has no store *and* asks for tag slugs — the
+  siblings that ask all supply a store).

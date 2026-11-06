@@ -80,7 +80,14 @@ public abstract class ProjectsBaseController : Controller
     protected readonly IGroupService groupService;
     protected readonly IProfileSettingsService profileSettings;
     protected readonly ILocalizationService localization;
-    protected readonly IDocumentStore store;
+    // C3-05 (ADR 0295) — nullable: the shared tag-slug prefill helper
+    // (<see cref="SeedExistingTagSlugsAsync"/>) is the only consumer, and it
+    // is called only by the boards/todos/projects siblings (who supply it).
+    // The <see cref="GoalsController"/> retires its allowlist entry by
+    // dropping the store from its ctor and passing null here — its goal
+    // actions route entirely through <see cref="IProjectService"/> and never
+    // touch a store.
+    protected readonly IDocumentStore? store;
 
     // ADR 0115 D2 (M14 interlock) — the to-do detail's **event link**
     // (the ADR 0086 D9 `ProjectLink` resolve, carried to the event
@@ -126,7 +133,7 @@ public abstract class ProjectsBaseController : Controller
         IProjectService projects,
         IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings,
         ILocalizationService localization,
-        IDocumentStore store,
+        IDocumentStore? store,
         IBoardService boards,
         ITodoService todos,
         ITranslationProvider? translationProvider = null,
@@ -566,6 +573,8 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
     {
         if (tagIds is not { Count: > 0 })
             return [];
+        if (store is null)
+            return [];   // C3-05 (ADR 0295) — a child that retired its store seam (GoalsController) passes none; the prefill is a display no-op.
 
         await using var session = store.QuerySession();
         var idSet = tagIds.ToHashSet(StringComparer.Ordinal);

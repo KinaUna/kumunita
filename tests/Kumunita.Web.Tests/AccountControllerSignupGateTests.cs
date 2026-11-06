@@ -158,8 +158,9 @@ public class AccountControllerSignupGateTests
             signInManager: null!,
             userManager:   null!,
             identity:      identity,
-            userInfo:      Substitute.For<IUserInfoService>(),
-            store:         Substitute.For<IDocumentStore>());
+            // C3-05 (ADR 0295) — the store arg is gone (the verify-token read
+            // is now the IIdentityService.LoadVerifyTokenAsync seam).
+            userInfo:      Substitute.For<IUserInfoService>());
 
         // The Signup GET path reads `User.Identity?.IsAuthenticated` (the
         // already-signed-in redirect) before the gate, so a controller context

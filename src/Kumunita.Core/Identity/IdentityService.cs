@@ -438,6 +438,19 @@ public partial class IdentityService(
         return admin;
     }
 
+    /// <summary>
+    /// C3-05 (ADR 0295) — by-id read of a single <see cref="IdentityToken"/>
+    /// row (the <c>AccountController</c> verify-link read, moved here so the
+    /// controller retires its own Marten session). Pure read: the caller owns
+    /// the <c>Kind</c> + <c>IsUsableAt</c> usability decision. Returns
+    /// <c>null</c> for a missing id.
+    /// </summary>
+    public async Task<IdentityToken?> LoadVerifyTokenAsync(string tokenId)
+    {
+        await using var session = documentStore.OpenSession(new SessionOptions());
+        return await session.LoadAsync<IdentityToken>(tokenId).ConfigureAwait(false);
+    }
+
     private async Task<IdentityToken?> FindTokenAsync(string tokenValue, string kind, string? subjectId)
     {
         await using var session = documentStore.OpenSession(new SessionOptions());

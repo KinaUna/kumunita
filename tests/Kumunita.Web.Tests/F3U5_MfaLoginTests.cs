@@ -381,8 +381,9 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<
             signInManager: signInManager,
             userManager:   userManager,
             identity:      identity,
-            userInfo:      Substitute.For<IUserInfoService>(),
-            store:         Substitute.For<IDocumentStore>());
+            // C3-05 (ADR 0295) — the store arg is gone (the verify-token read
+            // is now the IIdentityService.LoadVerifyTokenAsync seam).
+            userInfo:      Substitute.For<IUserInfoService>());
 
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
