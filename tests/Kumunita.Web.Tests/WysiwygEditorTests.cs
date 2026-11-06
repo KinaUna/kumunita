@@ -404,7 +404,9 @@ public class WysiwygEditorTests
     [Fact]
     public void CompiledRichEditorJs_ContainsDomSplice()
     {
-        var content = ReadCompiledRichEditor();
+        // C11 split moved the command implementations (the DOM-splice trio) to `rich-editor-commands.ts` —
+        // read that artifact for the splice pins; the `export function {name}` RE surface stays in `rich-editor.js`.
+        var content = ReadCompiledRichEditorCommands();
         // The Selection / Range API splice trio (design doc §2.5e).
         Assert.Contains("surroundContents", content, StringComparison.Ordinal);
         Assert.Contains("extractContents", content, StringComparison.Ordinal);
@@ -504,22 +506,23 @@ public class WysiwygEditorTests
     /// failing loud if it is absent.
     /// </summary>
     private static string ReadCompiledRichEditor()
-    {
-        var candidates = CandidateArtifactPaths();
-        var artifact = candidates.FirstOrDefault(p => File.Exists(p));
-        Assert.True(
-            artifact is not null,
-            $"rich-editor.js build artifact not found; searched:\n{string.Join("\n", candidates)}");
-        return File.ReadAllText(artifact);
-    }
+        => ReadCompiledArtifact("rich-editor.js");
 
     /// <summary>
-    /// Candidate paths to the compiled client artifact (walk up ≤ 8 levels
-    /// from both CWD and <see cref="AppContext.BaseDirectory"/>).
+    /// Resolve the compiled <c>rich-editor-commands.js</c> artifact and read it,
+    /// failing loud if it is absent (C11 split: the command implementations live here).
     /// </summary>
-    private static IReadOnlyList<string> CandidateArtifactPaths()
+    private static string ReadCompiledRichEditorCommands()
+        => ReadCompiledArtifact("rich-editor-commands.js");
+
+    /// <summary>
+    /// Resolve a compiled <c>wwwroot/js/lib/&lt;name&gt;</c> artifact and read it,
+    /// failing loud if it is absent (walk up ≤ 8 levels from both CWD and
+    /// <see cref="AppContext.BaseDirectory"/>).
+    /// </summary>
+    private static string ReadCompiledArtifact(string fileName)
     {
-        const string rel = "src/Kumunita.Web/wwwroot/js/lib/rich-editor.js";
+        var rel = "src/Kumunita.Web/wwwroot/js/lib/" + fileName;
         var candidates = new List<string>();
         foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
         {
@@ -530,7 +533,11 @@ public class WysiwygEditorTests
                 dir = dir.Parent;
             }
         }
-        return candidates.Distinct().ToArray();
+        var artifact = candidates.Distinct().FirstOrDefault(p => File.Exists(p));
+        Assert.True(
+            artifact is not null,
+            $"{fileName} build artifact not found; searched:\n{string.Join("\n", candidates)}");
+        return File.ReadAllText(artifact);
     }
 
     /// <summary>
