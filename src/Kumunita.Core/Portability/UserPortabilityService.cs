@@ -203,6 +203,10 @@ public sealed partial class UserPortabilityService(
     IStorageMetricsService? storageMetrics = null,
     Microsoft.Extensions.Options.IOptions<MediaOptions>? mediaOpts = null) : IUserPortabilityService
 {
+    // C3-03 (ADR 0293) — the ownership-guard seam (the C08 test-compat facade shape: the 3 guard methods are thin
+    // forwarders to it; the ClassifyAsync / ResolveAsync call sites keep compiling unchanged).
+    private readonly ImportOwnershipGuardService _guard = new(documentStore, userManager);
+
     /// <summary>
     /// The U02 resident-scope filter (C-M27·3) — the <em>pure</em>
     /// composition over the U02 <see cref="UserScopeInventory"/>
@@ -484,7 +488,7 @@ public sealed partial class UserPortabilityService(
     /// types are resolved locally, NOT added to the frozen
     /// <see cref="PortabilityDocTypes"/> table (the C-M11·5 closed-set pin).
     /// </summary>
-    private static Dictionary<string, Type> BuildNameToTypeMap()
+    public static Dictionary<string, Type> BuildNameToTypeMap()
     {
         var nameToType = new Dictionary<string, Type>(PortabilityExportDocuments.NameToType, StringComparer.Ordinal);
         nameToType["InventoryItem"]    = typeof(Kumunita.Core.Inventory.InventoryItem);
@@ -770,7 +774,7 @@ public sealed partial class UserPortabilityService(
     /// the rows as a <c>List&lt;object&gt;</c> (the <see
     /// cref="ScopeFilter"/> input shape).
     /// </summary>
-    private static async Task<List<object>> QueryAllRowsAsync(
+    internal static async Task<List<object>> QueryAllRowsAsync(
         Marten.IQuerySession session, Type docType, CancellationToken ct)
     {
         var queryMethod = typeof(Marten.IQuerySession)
@@ -909,70 +913,13 @@ public sealed partial class UserPortabilityService(
     /// <see cref="ClassifyPrepass"/> shape the <see cref="ClassifyEntityRow"/>
     /// leg resolves against.
     /// </summary>
-    private sealed record ClassifyPrepass(
-        Dictionary<string, IReadOnlyList<object>> TargetRowsByType,
-        Dictionary<string, HashSet<string>> TypeSetById,
-        HashSet<string> PrincipalIds,
-        HashSet<string> LanguageCodes);
 
     private async Task<ClassifyPrepass> ClassifyTargetPrepassAsync(
         KumunitaArchiveData data,
         JsonSerializerOptions jsonOpts,
         string residentSubjectId,
         CancellationToken ct)
-    {
-        await using var session = documentStore.QuerySession();
-        var nameToType = BuildNameToTypeMap();
-
-        // The in-scope types' target rows (the <c>duplicate</c> match set) +
-        // their id sets (the <c>conflict</c> reference-resolution target).
-        var targetRowsByType = new Dictionary<string, IReadOnlyList<object>>(StringComparer.Ordinal);
-        var typeSetById = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var (type, _) in UserScopeInventory.Entries)
-        {
-            ct.ThrowIfCancellationRequested();
-            var docType = nameToType[type];
-            var targetRows = await QueryAllRowsAsync(session, docType, ct).ConfigureAwait(false);
-            targetRowsByType[type] = targetRows;
-            var idSet = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var row in targetRows)
-                if (ReadId(row) is string id && id.Length > 0)
-                    idSet.Add(id);
-            typeSetById[type] = idSet;
-        }
-
-        // Referenced doc types that are not in-scope (e.g. <c>Announcement</c>
-        // — the <c>Bookmark.TargetId</c> multi-kind union) — their id sets.
-        foreach (var type in ReferencedDocTypes())
-        {
-            if (typeSetById.ContainsKey(type))
-                continue;
-            var docType = nameToType[type];
-            var idSet = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var row in (await QueryAllRowsAsync(session, docType, ct).ConfigureAwait(false)))
-                if (ReadId(row) is string id && id.Length > 0)
-                    idSet.Add(id);
-            typeSetById[type] = idSet;
-        }
-
-        // The principal set (the target's users — the resident is the anchor,
-        // so their <c>→ principal</c> references always resolve).
-        var principalIds = new HashSet<string>(StringComparer.Ordinal);
-        var userList = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-            .ToListAsync(userManager.Users, ct).ConfigureAwait(false);
-        foreach (var u in userList)
-            if (u.Id is string id && id.Length > 0)
-                principalIds.Add(id);
-
-        // The language set (the <c>→ LanguageCatalog</c> references).
-        var languageCodes = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var row in (await QueryAllRowsAsync(
-                session, typeof(Kumunita.Core.Localization.LanguageCatalog), ct).ConfigureAwait(false)))
-            if (ReadId(row) is string lc && lc.Length > 0)
-                languageCodes.Add(lc);
-
-        return new ClassifyPrepass(targetRowsByType, typeSetById, principalIds, languageCodes);
-    }
+        => await _guard.ClassifyTargetPrepassAsync(data, jsonOpts, residentSubjectId, ct);
 
     /// <summary>
     /// C10-3b (IMPROVE-CODE) — the <b>SEC-lane H1 ownership-guard inputs</b>
@@ -989,50 +936,13 @@ public sealed partial class UserPortabilityService(
     /// actor's own). Fail-closed: an empty union rejects every
     /// <c>Message</c>.
     /// </summary>
-    private sealed record OwnershipGuardInputs(
-        Dictionary<string, Dictionary<string, string>> OwnerByIdByType,
-        HashSet<string> ActorConversationIds);
 
     private OwnershipGuardInputs DeriveOwnershipGuardInputs(
         ClassifyPrepass prepass,
         KumunitaArchiveData data,
         JsonSerializerOptions jsonOpts,
         string residentSubjectId)
-    {
-        var ownerByIdByType = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
-        foreach (var (t, entry) in UserScopeInventory.Entries)
-        {
-            var ownerField = entry.OwnershipFields.Count > 0 ? entry.OwnershipFields[0] : null;
-            var map = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (ownerField is not null)
-            {
-                foreach (var row in prepass.TargetRowsByType.GetValueOrDefault(t) ?? [])
-                {
-                    if (ReadId(row) is string rowId && rowId.Length > 0
-                        && (string?)ReadFieldValue(row.GetType(), ownerField, row) is { Length: > 0 } owner)
-                        map[rowId] = owner;
-                }
-            }
-            ownerByIdByType[t] = map;
-        }
-
-        var actorConversationIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var row in prepass.TargetRowsByType.GetValueOrDefault("Conversation") ?? [])
-            if (IsActorConversation(row, residentSubjectId))
-                if (ReadId(row) is string idT && idT.Length > 0)
-                    actorConversationIds.Add(idT);
-        if (data.Docs.TryGetValue("Conversation", out var convJson))
-        {
-            var convListType = typeof(List<>).MakeGenericType(typeof(Kumunita.Core.Messaging.Conversation));
-            if (JsonSerializer.Deserialize(convJson, convListType, jsonOpts) is System.Collections.IEnumerable archiveConversations)
-                foreach (var row in archiveConversations)
-                    if (row is not null && IsActorConversation(row, residentSubjectId))
-                        if (ReadId(row) is string idA && idA.Length > 0)
-                            actorConversationIds.Add(idA);
-        }
-
-        return new OwnershipGuardInputs(ownerByIdByType, actorConversationIds);
-    }
+        => _guard.DeriveOwnershipGuardInputs(prepass, data, jsonOpts, residentSubjectId);
 
 
     /// <inheritdoc />
@@ -1431,46 +1341,7 @@ public sealed partial class UserPortabilityService(
         Dictionary<string, Type> nameToType,
         string residentSubjectId,
         CancellationToken ct)
-    {
-        var ownerByIdByType = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
-        foreach (var (t, entry) in UserScopeInventory.Entries)
-        {
-            var ownerField = entry.OwnershipFields.Count > 0 ? entry.OwnershipFields[0] : null;
-            var map = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (ownerField is not null)
-            {
-                var targetRows = await QueryAllRowsAsync(
-                    documentStore.QuerySession(), nameToType[t], ct).ConfigureAwait(false);
-                foreach (var row in targetRows)
-                {
-                    if (ReadId(row) is string rowId && rowId.Length > 0
-                        && (string?)ReadFieldValue(row.GetType(), ownerField, row) is { Length: > 0 } owner)
-                        map[rowId] = owner;
-                }
-            }
-            ownerByIdByType[t] = map;
-        }
-
-        var actorConversationIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var row in await QueryAllRowsAsync(
-                documentStore.QuerySession(), nameToType["Conversation"], ct).ConfigureAwait(false))
-            if (IsActorConversation(row, residentSubjectId))
-                if (ReadId(row) is string idT && idT.Length > 0)
-                    actorConversationIds.Add(idT);
-        if (data.Docs.TryGetValue("Conversation", out var convJsonGuard))
-        {
-            var convListType = typeof(List<>).MakeGenericType(nameToType["Conversation"]);
-            var guardJsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            if (JsonSerializer.Deserialize(convJsonGuard, convListType, guardJsonOpts)
-                    is System.Collections.IEnumerable archiveConversations)
-                foreach (var row in archiveConversations)
-                    if (row is not null && IsActorConversation(row, residentSubjectId))
-                        if (ReadId(row) is string idA && idA.Length > 0)
-                            actorConversationIds.Add(idA);
-        }
-
-        return new OwnershipGuardInputs(ownerByIdByType, actorConversationIds);
-    }
+        => await _guard.ResolveGuardInputsAsync(data, nameToType, residentSubjectId, ct);
 
     /// <summary>
     /// C10-3b (IMPROVE-CODE) — the <b>media leg</b> (the M11

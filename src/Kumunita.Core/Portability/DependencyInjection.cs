@@ -38,6 +38,12 @@ public static class PortabilityModule
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<IMediaStore>(),
             sp.GetRequiredService<UserManager<User>>()));
+        // C3-03 (ADR 0293) — the ownership-guard seam (the C08 test-compat
+        // facade shape; the UserPortabilityService guard methods are thin
+        // forwarders to it and keep compiling unchanged).
+        services.AddTransient<IImportOwnershipGuardService>(sp => new ImportOwnershipGuardService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<UserManager<User>>()));
 
         return services;
     }

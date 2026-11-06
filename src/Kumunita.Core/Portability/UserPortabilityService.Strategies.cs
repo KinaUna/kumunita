@@ -101,7 +101,7 @@ public sealed partial class UserPortabilityService
     /// <summary>The doc types referenced by the in-scope types' reference
     /// fields (the M11 reference map + the 4 non-M11 docs' own fields) — the
     /// <c>conflict</c> reference-resolution target set.</summary>
-    private static IEnumerable<string> ReferencedDocTypes()
+    internal static IEnumerable<string> ReferencedDocTypes()
     {
         var set = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (type, _) in UserScopeInventory.Entries)
@@ -127,7 +127,7 @@ public sealed partial class UserPortabilityService
 
     /// <summary>The reference fields for a type (the M11 reference map, or
     /// the 4 non-M11 docs' own fields).</summary>
-    private static IReadOnlyList<PortabilityReferenceField> GetReferenceFields(string type)
+    internal static IReadOnlyList<PortabilityReferenceField> GetReferenceFields(string type)
     {
         if (PortabilityDocTypes.ByType.TryGetValue(type, out var entry))
             return entry.ReferenceFields;
@@ -211,7 +211,7 @@ public sealed partial class UserPortabilityService
     /// <summary>Reads one reference field's value off a row (the M11
     /// <c>ReadFieldValue</c> pattern — reflection on the property name,
     /// not per-type code).</summary>
-    private static object? ReadFieldValue(Type rowType, string fieldName, object row)
+    internal static object? ReadFieldValue(Type rowType, string fieldName, object row)
     {
         var prop = rowType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance);
         if (prop is null)
@@ -222,7 +222,7 @@ public sealed partial class UserPortabilityService
     /// <summary>The row's identity (the <c>Id</c> or <c>SubjectId</c> property,
     /// the M11 validate id-set convention — <c>Profile</c> is keyed by
     /// <c>SubjectId</c>, the rest by <c>Id</c>).</summary>
-    private static string? ReadId(object row)
+    internal static string? ReadId(object row)
     {
         var t = row.GetType();
         var idProp = t.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)
@@ -240,7 +240,7 @@ public sealed partial class UserPortabilityService
     /// seat (<c>ParticipantA</c> or <c>ParticipantB</c>)? (The SEC-lane H1
     /// <c>Message</c> guard input derivation — the U4
     /// <see cref="ImportOwnershipGuard"/> <c>Conversation</c> rule.)</summary>
-    private static bool IsActorConversation(object conversation, string actorSubjectId)
+    internal static bool IsActorConversation(object conversation, string actorSubjectId)
     {
         var t = conversation.GetType();
         var a = (string?)ReadFieldValue(t, "ParticipantA", conversation);

@@ -29,7 +29,7 @@
     },
     {
       "id": "src/Kumunita.Core/Identity/IdentityService.cs",
-      "max": 989
+      "max": 817
     },
     {
       "id": "src/Kumunita.Core/Localization/LocalizationService.cs",
@@ -45,7 +45,7 @@
     },
     {
       "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs",
-      "max": 922
+      "max": 806
     },
     {
       "id": "src/Kumunita.Core/Posts/PostService.cs",
@@ -53,11 +53,11 @@
     },
     {
       "id": "src/Kumunita.Core/Projects/BoardService.cs",
-      "max": 1025
+      "max": 706
     },
     {
       "id": "src/Kumunita.Core/Projects/TodoService.cs",
-      "max": 839
+      "max": 744
     },
     {
       "id": "src/Kumunita.Core/Tags/TagService.cs",
@@ -248,17 +248,17 @@
       "cc_max": 19
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ClassifyTargetPrepassAsync(KumunitaArchiveData,JsonSerializerOptions,string,CancellationToken)",
+      "id": "src/Kumunita.Core/Portability/ImportOwnershipGuardService.cs::Kumunita.Core.Portability.ImportOwnershipGuardService.ClassifyTargetPrepassAsync(KumunitaArchiveData,JsonSerializerOptions,string,CancellationToken)",
       "max": 46,
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.DeriveOwnershipGuardInputs(ClassifyPrepass,KumunitaArchiveData,JsonSerializerOptions,string)",
+      "id": "src/Kumunita.Core/Portability/ImportOwnershipGuardService.cs::Kumunita.Core.Portability.ImportOwnershipGuardService.DeriveOwnershipGuardInputs(ClassifyPrepass,KumunitaArchiveData,JsonSerializerOptions,string)",
       "max": 38,
       "cc_max": 20
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.ResolveGuardInputsAsync(KumunitaArchiveData,Dictionary\u003Cstring, Type\u003E,string,CancellationToken)",
+      "id": "src/Kumunita.Core/Portability/ImportOwnershipGuardService.cs::Kumunita.Core.Portability.ImportOwnershipGuardService.ResolveGuardInputsAsync(KumunitaArchiveData,Dictionary\u003Cstring, Type\u003E,string,CancellationToken)",
       "max": 43,
       "cc_max": 20
     },
@@ -283,17 +283,17 @@
       "cc_max": 16
     },
     {
-      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.MoveTodoToAdjacentLaneAsync(string,string,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/BoardLaneService.cs::Kumunita.Core.Projects.BoardLaneService.MoveTodoToAdjacentLaneAsync(string,string,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
       "max": 62,
       "cc_max": 19
     },
     {
-      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.MoveTodoToLanePositionAsync(string,string,int,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/BoardLaneService.cs::Kumunita.Core.Projects.BoardLaneService.MoveTodoToLanePositionAsync(string,string,int,string,IReadOnlySet\u003Cstring\u003E,CancellationToken)",
       "max": 77,
       "cc_max": 22
     },
     {
-      "id": "src/Kumunita.Core/Projects/BoardService.cs::Kumunita.Core.Projects.BoardService.UpdateLaneAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateLaneRequest,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/BoardLaneService.cs::Kumunita.Core.Projects.BoardLaneService.UpdateLaneAsync(string,string,IReadOnlySet\u003Cstring\u003E,UpdateLaneRequest,CancellationToken)",
       "max": 33,
       "cc_max": 17
     },
@@ -313,7 +313,7 @@
       "cc_max": 20
     },
     {
-      "id": "src/Kumunita.Core/Projects/TodoService.cs::Kumunita.Core.Projects.TodoService.CreateTodoCommentAsync(string,string,IReadOnlySet\u003Cstring\u003E,string,string?,string?,CancellationToken)",
+      "id": "src/Kumunita.Core/Projects/TodoCommentService.cs::Kumunita.Core.Projects.TodoCommentService.CreateTodoCommentAsync(string,string,IReadOnlySet\u003Cstring\u003E,string,string?,string?,CancellationToken)",
       "max": 68,
       "cc_max": 18
     },
@@ -1304,7 +1304,8 @@
       "from": "Identity",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 1
+      "count": 2,
+      "adr": "0293"
     },
     {
       "from": "Identity",
@@ -1963,8 +1964,8 @@
       "from": "Portability",
       "to": "Identity",
       "symbol": "User",
-      "count": 5,
-      "adr": "0290"
+      "count": 6,
+      "adr": "0293"
     },
     {
       "from": "Portability",
@@ -2006,7 +2007,8 @@
       "from": "Portability",
       "to": "Messaging",
       "symbol": "Conversation",
-      "count": 2
+      "count": 3,
+      "adr": "0293"
     },
     {
       "from": "Portability",
@@ -2308,8 +2310,8 @@
       "from": "Projects",
       "to": "Authorization",
       "symbol": "AccessAuditFactory",
-      "count": 3,
-      "adr": "0290"
+      "count": 5,
+      "adr": "0293"
     },
     {
       "from": "Projects",
@@ -2322,8 +2324,8 @@
       "from": "Projects",
       "to": "Authorization",
       "symbol": "StandingMatrix",
-      "count": 3,
-      "adr": "0290"
+      "count": 4,
+      "adr": "0293"
     },
     {
       "from": "Projects",

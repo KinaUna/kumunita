@@ -43,7 +43,28 @@ public static class ProjectsModule
             sp.GetRequiredService<ILocalizationService>(),
             sp.GetRequiredService<ITagService>(),
             sp.GetRequiredService<IMentionService>()));
+        // C3-03 (ADR 0293) — the lane / to-do movement seam (the C3-00 named-seam shape; the C08 test-compat facade on BoardService keeps compiling). Registered alongside IBoardService; the Web movement actions code against it directly.
+        services.AddTransient<Projects.IBoardLaneService>(sp => new Projects.BoardLaneService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<INotificationEmitter>(),
+            sp.GetRequiredService<ITranslationProvider>(),
+            sp.GetRequiredService<ILocalizationService>(),
+            sp.GetRequiredService<ITagService>(),
+            sp.GetRequiredService<IMentionService>()));
         services.AddTransient<Projects.ITodoService>(sp => new Projects.TodoService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<INotificationEmitter>(),
+            sp.GetRequiredService<ITranslationProvider>(),
+            sp.GetRequiredService<ILocalizationService>(),
+            sp.GetRequiredService<ITagService>(),
+            sp.GetRequiredService<IMentionService>()));
+        // C3-03 (ADR 0293) — the to-do comment-lane seam (the C08 test-compat
+        // facade shape; the ITodoService forwarders keep compiling).
+        services.AddTransient<Projects.ITodoCommentService>(sp => new Projects.TodoCommentService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<IUserInfoService>(),

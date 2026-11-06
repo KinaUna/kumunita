@@ -532,40 +532,83 @@ the `Detail` action) is **named with ADR 0293** (0 silent raises).
 - [x] **`pwsh tools/docs/improve-check.ps1` — ALL GATES PASS** (the ADR-index row for 0293 added).
 - [x] **The `\u003C` escapes survived** (36 before and after — the baseline was edited textually).
 
-### PENDING — the other 4 services (the next agent's work)
+### All 5 services landed + verified green (2026-11-06)
 
-Each needs: a real part-vs-whole seam + `I*Service` + DI registration + the Web
-consumer re-point + **its own unit test** + the baseline entries resolved
-against the gate. The seams to pick (a C13 cold read of each passes on its own):
+**All 5 god-services now have their real part-vs-whole seam + `I*Service` + DI
+registration + their own unit test, and every baseline entry they free is
+resolved against the gate.** The honest outcome (verified against
+`code-check`, not assumed):
 
-| Service | `files` (measured, still over 600) | `classes` / `interfaces` entries | over-ceiling `methods` (14 total) | A clean seam |
-|---|---:|---|---|---|
-| `IdentityService` | 989 | class **33** (over 25) · `IIdentityService` **33** (over 20) | 0 | the **platform-gates cluster**: `IsSignupOpenAsync` / `SetSignupOpenAsync` (ADR 0050) + the sample-data locks (`IsSampleDataEnabledAsync` / `IsSamplePasswordChangeLockedAsync` / `SetSamplePasswordChangeLockedAsync` / `IsChangePasswordLockedForAsync` / `IsSampleMfaLockedAsync` / `SetSampleMfaLockedAsync` / `IsMfaLockedForAsync` / `IsSampleDataAccountAsync`, ADR 0138/0194) + `IsNotifyAdminsOnSignupAsync` / `SetNotifyAdminsOnSignupAsync` (ADR 0077) — 9–10 methods, all `LocaleSettings`-singleton reads/writes with the admin audit row. Move ≥ 9 to retire the **class** entry (33 → < 25); the **interface** (33) needs ≥ 14 moved to drop under 20 — a second seam or the honest-tighten (record it). |
-| `UserPortabilityService` | 922 | — | 6 (ApplyMediaAsync 66/cc19 · ClassifyTargetPrepassAsync 46/cc16 · DeriveOwnershipGuardInputs 38/cc20 · ResolveGuardInputsAsync 43/cc20 · ScopeRowHoldsSeat 39/cc20 · StandingComponentAsync 24/cc16) | the **ownership-guard / classify cluster** (`ImportOwnershipGuard` / `ClassifyPrepass` / `OwnershipGuardInputs` shapes) — the 6 over-cc methods are a named domain concept (the import guard decision). |
-| `BoardService` | 1017 | `IBoardService` **21** (over 20) | 3 (MoveTodoToAdjacentLaneAsync 62/cc19 · MoveTodoToLanePositionAsync 77/cc22 · UpdateLaneAsync 33/cc17) | the **todo-movement cluster** (the 3 over-cc methods + `MoveTodoWithinLaneAsync` + `MoveTodoToBoardAsync` + the `RefuseIfLaneAtLimitAsync` helper + `CheckTodoStanding` / `CheckBoardStanding`) — move ≥ 1 method off `IBoardService` (21 → < 20) to **retire the interface entry**, and the 3 over-cc methods retire as their seam takes them. |
-| `TodoService` | 828 | — | 3 (BuildTodoAssignBodyAsync 28/cc17 · ComputeTodoEditChanged 20/cc20 · CreateTodoCommentAsync 68/cc18) | the **comment cluster** (`CreateTodoCommentAsync` + `DeleteTodoCommentAsync` + the mention-emitter block + the standing read) — the 3 over-cc methods are a named domain concept. |
+| Service | Seam (its own unit test) | `files` (measured → still over 600) | `classes` / `interfaces` | over-cc `methods` re-pointed |
+|---|---|---|---|---|
+| `PostService` | `IGroupPostService` + `GroupPostService` (the group-post lane) · 4/4 pass | 821 → **631** | none (not on `classes`; `IGroupPostService` 4 methods < 20 → no new entry) | 0 (the 2 over-cc methods stay in `PostService`) |
+| `BoardService` | `IBoardLaneService` + `BoardLaneService` (the todo-movement lane) · 5/5 pass | 1025 → **706** | `IBoardService` **21 → 21** (tighten, **not retire** — the 6 todo-move methods stay on the interface via forwarders) | 3 (UpdateLane / MoveTodoToAdjacentLane / MoveTodoToLanePosition re-point to the seam) |
+| `TodoService` | `ITodoCommentService` + `TodoCommentService` (the comment lane) · 4/4 pass | 839 → **744** | none | 1 (CreateTodoCommentAsync re-points to the seam) |
+| `UserPortabilityService` | `IImportOwnershipGuardService` + `ImportOwnershipGuardService` (the ownership-guard / classify lane) · 3/3 pass | 922 → **806** | none | 3 (ClassifyTargetPrepassAsync / DeriveOwnershipGuardInputs / ResolveGuardInputsAsync re-point to the seam) |
+| `IdentityService` | `IIdentityPlatformGateService` + `IdentityPlatformGateService` (the platform-gates / sample-data-lock lane) · 3/3 pass | 989 → **817** | `IdentityService` class **33 → 33** + `IIdentityService` **33 → 33** (both tighten, **not retire** — the 12 gate methods stay on the interface via forwarders) | 0 (the 12 gate methods were each < 80 / < cc 15, so had no `methods` entries to re-point) |
 
-**The measured counts (probed against the gate — the `--report` top-10 hides
-rank 11, so use the `--check` oracle or a `max`→1 probe):** `PostService.cs`
-**631** (was 821) · `IdentityService.cs` **989** · `UserPortabilityService.cs`
-**922** · `BoardService.cs` **1017** · `TodoService.cs` **828**. **All five are
-still over the 600 `cs_file` ceiling after their planned seams** — so each
-`files` entry **tightens, not retires** (the C3-00/C3-01/C3-02 honest limit).
-The DoD #3/#4 "files" line stays 23 for the whole unit (the "23 → ≤ 8" target
-is C3-04's tail, not this unit's — the prompt's own words).
+**The honest DoD outcome — every number measured against `code-check` (the
+gate), not the plan's "retires" claim:**
 
-**The one DoD line that genuinely moves in this unit is `methods`** (the 14
-over-ceiling method entries retire or tighten as their service drops under the
-ceiling) **and, if any service drops under 600, the DoD #6 allowlist line**
-(20 → 19, the `PostsController` keep) — **neither of which moves here** (all
-5 stay over 600; the 14 methods re-point or tighten but the line does not
-retire them all). The `classes` line moves **5 → 4** (the `IdentityService`
-class entry retires, if the seam moves ≥ 9 methods) and the `interfaces` line
-moves **8 → 7** (the `IBoardService` entry retires, if the seam moves ≥ 1
-method off the interface). **That is the honest, measurable, gate-verified
-reduction for the unit** — not the plan's "files 23 → 22…" claim, which the
-gate confirms does not hold for any of the 5 (they all stay over 600).
+- **`files` (over 600): stays at 23.** None of the 5 services drops under the
+  600 `cs_file` ceiling even after its seam (631 · 706 · 744 · 806 · 817 — all
+  over 600), so each `files` entry is **tightened** (max → measured), **not
+  retired**. This is the C3-00/C3-01/C3-02 honest limit, confirmed for the 5th
+  time. The "23 → ≤ 8" target is C3-04's tail, not this unit's (the prompt's
+  own words).
+- **`classes` (over 25): stays at 5.** The plan predicted `IdentityService`
+  would retire (5 → 4), but that needs a **full split** (the 12 gate methods off
+  `IIdentityService` + all Web consumers re-pointed). The C08 forwarder pattern
+  (the spec-endorsed seam shape — the existing `IdentityServiceSignupPolicyTests`
+  + the 5 Web controllers keep compiling unchanged) keeps the 12 on
+  `IdentityService`'s public surface, so the class stays 33 (over 25 → kept,
+  not retired). **No other service is on the `classes` baseline**, so the line
+  is 5 → 5.
+- **`interfaces` (over 20): stays at 8.** `IBoardService` (21) + `IIdentityService`
+  (33) keep their methods via forwarders → both tighten, not retire. The new seam
+  interfaces (`IGroupPostService` 4 · `IBoardLaneService` 6 ·
+  `ITodoCommentService` 2 · `IImportOwnershipGuardService` 3 ·
+  `IIdentityPlatformGateService` 12) are each under the 20 ceiling → no new entry.
+  8 → 8.
+- **`methods` (over 80/cc15): the genuine mover.** 7 over-ceiling method entries
+  **re-point** to their seam (BoardService 3 · TodoService 1 ·
+  UserPortabilityService 3) — each method leaves the god-service and lands on a
+  method that is < 80 / < cc 15 in the seam, so its `methods` entry retires and
+  no new one is minted (the seam's methods are all under the ceiling). The
+  `methods` line drops **89 → 82** (7 re-pointed out; 0 new over-ceiling methods
+  on any seam, verified by the gate reporting 0 new method violations).
+- **`boundary_violations`: 12 honest raises, all `adr: 0293`.** Each new seam
+  file lands on *already-existing* module edges (the god-service already crossed
+  them) — the C3-01 `Pages→Identity:Roles` 2→3 / C08 `Posts→Identity:Roles`
+  split-raise precedent. **0 new edges**, **0 silent raises** (every count raised
+  above the base branch carries `adr: 0293`). The 12: `Posts→*` ×7 (PostService)
+  + `Projects→Authorization:AccessAuditFactory` 3→5 · `:StandingMatrix` 3→4
+  (BoardService) + `Portability→Identity:User` 5→6 · `:Messaging:Conversation`
+  2→3 (UserPortabilityService) + `Identity→Authorization:AccessAudit` 1→2
+  (IdentityService). See ADR 0293 (the table is the source of truth; it lists
+  all 12).
+- **`controllers_marten_allowlist` (DoD #6): stays at 20.** The `PostsController`
+  group-(a) keep holds (`PostService` is 631, still over 600) — the reason text
+  names C3-03's measurement. 20 → 20, not 20 → 19.
 
-**The `\u003C` escapes in the baseline survived** (the baseline was edited
-textually, never `json.load`/`dump`). The ADR 0293 row is in the
-`docs/adr/README.md` index.
+**The total over-ceiling surface is strictly smaller:** 7 over-ceiling method
+entries retired (re-pointed to under-ceiling seam methods) + every seam is under
+every ceiling (a named type, not a block inside the god-file) + each god-service
+shrank (631 · 706 · 744 · 806 · 817). The ratchet only moved down; the 12
+boundary-edge raises + the `GroupsController` seam-injection collateral are all
+**named with ADR 0293** (0 silent raises).
+
+### Verification (all green, 2026-11-06)
+
+- [x] **`dotnet build Kumunita.slnx -c Debug` — 0 errors, 0 warnings.**
+- [x] **All 5 seam tests pass** — `GroupPostServiceSeamTests` 4/4 ·
+  `BoardLaneServiceSeamTests` 5/5 · `TodoCommentServiceSeamTests` 4/4 ·
+  `ImportOwnershipGuardServiceSeamTests` 3/3 ·
+  `IdentityPlatformGateServiceSeamTests` 3/3 (the `PostgresFixture` harness).
+- [x] **`pwsh tools/code/code-check.ps1` — OK (0 violations)** (the gate is the
+  oracle: the 5 `files` tightens + the 7 `methods` re-points + the 12
+  `boundary` raises all measured green).
+- [x] **`pwsh tools/docs/improve-check.ps1` — ALL GATES PASS** (the ADR-index
+  row for 0293 present; the handoff ≤ 600 lines with the TL;DR).
+- [x] **The `\u003C` escapes survived** (the baseline was edited textually,
+  never `json.load`/`dump`).

@@ -99,6 +99,11 @@ references the same types its god-service already did).
 | `Posts → Pages : Page` | 2 → **3** | the seam's feed reads the `Page`/`PageSizer`-adjacent feed shape |
 | `Posts → Query : PageSizer` | 1 → **2** | the seam's feed uses `PageSizer` |
 | `Posts → Web : AttachmentIds` | 5 → **6** | the seam's draft carries `AttachmentIds` |
+| `Projects → Authorization : AccessAuditFactory` | 3 → **5** | the `BoardService` lane seam (`BoardLaneService.cs`) + the `TodoService` comment seam (`TodoCommentService.cs`) each write an `AccessAudit` row via `AccessAuditFactory`, as `BoardService.cs` / `TodoService.cs` already did |
+| `Projects → Authorization : StandingMatrix` | 3 → **4** | the `BoardService` lane seam reads `StandingMatrix` (the board move lane), as `BoardService.cs` already did |
+| `Portability → Identity : User` | 5 → **6** | the `UserPortabilityService` ownership-guard seam (`ImportOwnershipGuardService.cs`) reads `User` (the ownership prepass), as `UserPortabilityService.cs` already did |
+| `Portability → Messaging : Conversation` | 2 → **3** | the ownership-guard seam reads `Conversation` (the actor-conversation prepass), as `UserPortabilityService.cs` already did |
+| `Identity → Authorization : AccessAudit` | 1 → **2** | the `IdentityService` platform-gate seam (`IdentityPlatformGateService.cs`) writes an `AccessAudit` row (the sign-up / sample-data gate audit), as `IdentityService.cs` already did |
 
 Each entry gains `adr: 0293` in `tools/code/code-baseline.json` (a textual edit
 — the `\u003C` escapes survive; the baseline is never `json.load`/`dump`-ed).

@@ -29,6 +29,14 @@ public static class IdentityModule
     public static IServiceCollection AddIdentity(this IServiceCollection services)
     {
         services.AddTransient<IIdentityService, IdentityService>();
+        // C3-03 (ADR 0293) — the platform-gate seam (the C08 test-compat facade
+        // shape; the IIdentityService gate methods are thin forwarders to it and
+        // keep compiling unchanged).
+        services.AddTransient<IIdentityPlatformGateService>(sp => new IdentityPlatformGateService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetService<Microsoft.Extensions.Options.IOptions<SampleDataOptions>>(),
+            sp.GetRequiredService<Kumunita.Core.UserInfo.IUserInfoService>(),
+            sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>()));
 
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the
         // durable message envelope via Wolverine IMessageContext (Core's new
