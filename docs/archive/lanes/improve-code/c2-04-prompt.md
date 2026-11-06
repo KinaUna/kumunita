@@ -1,9 +1,18 @@
+---
+id: c2-04-prompt
+title: "C2-04 — Module surface: the Marten allowlist down to ≤ 5"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-04 — Module surface: the Marten allowlist down to ≤ 5
 
 ## What you are doing
 
 You are the **fifth** agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-04**, the
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-04**, the
 second of the two **DoD #6** units (the module-surface lines). C2-00 landed the
 honest ratchet gate; C2-01 + C2-02 finished the translation-lane collapse
 (**54 → 39**, the `≤ 40` line met); **C2-03 just closed DoD #6's first half** —
@@ -78,7 +87,7 @@ the same commit (the ratchet rule).
   per commit** — the gate green after each, the entry retires as the controller
   moves off Marten.
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — the doctrine.
-  Read the plan: `docs/plans-milestones/plan-improve-code-2.md` — the **D4**
+  Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-2.md` — the **D4**
   decision and the **C2-04** row are your spec, and **DoD #6** (the target:
   "Marten allowlist ≤ 5").
 - Read the contract: ADR `docs/adr/0006-module-boundary-contracts.md` — the
@@ -88,7 +97,7 @@ the same commit (the ratchet rule).
   `ProjectService` post-C2-02) is the **reference move** for a controller
   handing its document access to the owning service.
 - Read the **C2-03 handoff note**
-  (`docs/plans-milestones/improve-code-2-handoff-notes.md`) — it names **your**
+  (`docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md`) — it names **your**
   unit as the successor, notes that **`DocumentController` +
   `DocumentFolderController`'s reason text is now stale** (C2-03 minted
   `IDocumentService` / `IDocumentFolderService`), and is where your entry

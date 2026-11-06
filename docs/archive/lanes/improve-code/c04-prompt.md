@@ -1,3 +1,12 @@
+---
+id: c04-prompt
+title: "C04 — Decisions out of services: `*Policy` parts"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C04 — Decisions out of services: `*Policy` parts
 
 ## What you are doing

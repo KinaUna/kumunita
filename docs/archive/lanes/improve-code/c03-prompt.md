@@ -1,3 +1,12 @@
+---
+id: c03-prompt
+title: "C03 — A contract for Notifications"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C03 — A contract for Notifications
 
 ## What you are doing

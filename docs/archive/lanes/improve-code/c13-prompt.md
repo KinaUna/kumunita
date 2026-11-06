@@ -1,3 +1,12 @@
+---
+id: c13-prompt
+title: "C13 — Close + independent verification"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C13 — Close + independent verification
 
 ## What you are doing

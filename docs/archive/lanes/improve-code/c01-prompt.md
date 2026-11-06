@@ -1,3 +1,12 @@
+---
+id: c01-prompt
+title: "C01 — ADRs first: the contracts the splits will need"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C01 — ADRs first: the contracts the splits will need
 
 ## What you are doing

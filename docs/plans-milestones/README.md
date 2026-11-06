@@ -8,9 +8,9 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/archive/README.md
   - docs/DOCS-CONVENTIONS.md
-  - docs/plans-milestones/plan-improve-code-3.md
-  - docs/plans-milestones/plan-improve-code-2.md
-updated: 2026-11-05
+  - docs/archive/lanes/improve-code/plan-improve-code-3.md
+  - docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md
+updated: 2026-11-06
 ---
 
 > **Abstract:** where the *current* lane's register and in-progress unit plans
@@ -39,28 +39,22 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
-The in-flight lane is **`IMPROVE-CODE-3`** — the successor to
-`IMPROVE-CODE-2`, which closed on 2026-11-05 **held** (DoD #3/#4 files `23 > 8`
-and DoD #6 Marten-allowlist `20 > 5` fail; #1, #5, #6-concrete-edges, #7, #8
-hold) and **deliberately did not land the six-member "shipped" flip** — its
-register is
-[plan-improve-code-3](plan-improve-code-3.md) and the running log (the
-scratch tier) is
-[improve-code-2-handoff-notes.md](improve-code-2-handoff-notes.md). Its whole
-reason to exist is to finish the two held lines — the module surface (the
-Marten allowlist `20 → ≤ 5`, unblocked by the god-service shrinks) and the
-still-large files (`23 → ≤ 8`, including the `SampleDataSeeder` decomposition
-and the 7 god-service splits) — and then land the six-member flip the two
-predecessor lanes withheld.
+**The lane register is empty.** The most recent lane, `IMPROVE-CODE-3`
+(`C3-00`–`C3-08`), **shipped on 2026-11-06** — it finished the two lines its
+predecessor held and landed the six-member "shipped" flip — and its register,
+the `C2-00`–`C3-08` unit prompts, and the two handoff notes
+(`improve-code-2-handoff-notes.md`, `improve-code-3-handoff-notes.md`) all now
+live in the archive at
+[`archive/lanes/improve-code/`](../archive/lanes/improve-code/) (register
+[plan-improve-code-3](../archive/lanes/improve-code/plan-improve-code-3.md),
+closing log
+[improve-code-3-handoff-notes.md](../archive/lanes/improve-code/improve-code-3-handoff-notes.md)).
+When a new lane starts, its register + unit prompts land here first and move to
+that archive folder at its close.
 
-The two predecessor lanes are both archived/closed with the gaps intact:
-`IMPROVE-CODE-2` (register
-[plan-improve-code-2](plan-improve-code-2.md), the first unit plan
-[c2-00-prompt](c2-00-prompt.md), the running log
-[improve-code-2-handoff-notes.md](improve-code-2-handoff-notes.md)) and
-`IMPROVE-CODE`, which closed on 2026-11-05 **with unmet DoD** (DoD #1/#3/#4/#5/#6/#8
-fail, #7 partial) and moved to
-[`archive/lanes/improve-code/`](../archive/lanes/improve-code/) at that close.
+The full code-quality history — `IMPROVE-CODE` (round 1), `IMPROVE-CODE-2`
+(round 2), and `IMPROVE-CODE-3` (round 3) — is archived together under
+[`archive/lanes/improve-code/`](../archive/lanes/improve-code/).
 
 ## The three-tier contract (per lane)
 

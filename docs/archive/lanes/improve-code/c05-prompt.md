@@ -1,3 +1,12 @@
+---
+id: c05-prompt
+title: "C05 — One content-target resolver"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C05 — One content-target resolver
 
 ## What you are doing

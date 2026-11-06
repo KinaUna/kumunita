@@ -1,3 +1,12 @@
+---
+id: c06-prompt
+title: "C06 — One translation-variant lane"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C06 — One translation-variant lane
 
 ## What you are doing

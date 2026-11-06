@@ -1,9 +1,18 @@
+---
+id: c3-01-prompt
+title: "C3-01 — the PageService shrink: adopt the ADR 0290 named seam + unblock the PageController allowlist keep"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-01 — the PageService shrink: adopt the ADR 0290 named seam + unblock the PageController allowlist keep
 
 ## What you are doing
 
 You are the **second** agent on the **IMPROVE-CODE-3** lane (plan:
-`docs/plans-milestones/plan-improve-code-3.md`). Your unit is **C3-01**, the
+`docs/archive/lanes/improve-code/plan-improve-code-3.md`). Your unit is **C3-01**, the
 second of 9. C3-00 (the `EventService` shrink) is done — read its handoff +
 honest finding before you start (below). C3-01 is the **second god-service
 shrink**: it adopts the second ADR 0290 named seam — `PageTranslationStandingService`
@@ -68,10 +77,10 @@ over the 25 ceiling). Measure against the gate; do not assume the plan's
   shrinks, so it is `feat`).
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — they are the
   doctrine you are enforcing (the part-vs-whole rule, the ratchet, the comment
-  rule). Read the plan: `docs/plans-milestones/plan-improve-code-3.md` — the
+  rule). Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-3.md` — the
   **Why now**, **D1**, and the **C3-01** row are your spec.
 - Read the predecessor's record:
-  `docs/plans-milestones/improve-code-3-handoff-notes.md` — the **C3-00**
+  `docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md` — the **C3-00**
   entry, especially its **honest finding** (the `EventService` file tightened
   to 709, not retired; the class retired; the interface tightened) and its
   "what C3-00 did NOT do" list.

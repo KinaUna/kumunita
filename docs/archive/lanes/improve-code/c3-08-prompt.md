@@ -1,3 +1,12 @@
+---
+id: c3-08-prompt
+title: "C3-08 — the close: verify every DoD line, then decide the six-member flip"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-08 — the close: verify every DoD line, then decide the six-member flip
 
 You are the **ninth and final** agent on the **IMPROVE-CODE-3** lane in the
@@ -76,13 +85,13 @@ since C2-00). You are **verifying**, then — conditionally — **recording the 
   are docs-only.
 - Read first: `AGENTS.md` + `.github/copilot-instructions.md` (the doctrine — the
   six-member contract is spelled out in `AGENTS.md` § "Keeping the docs in sync
-  with the code"); the plan `docs/plans-milestones/plan-improve-code-3.md` — the
+  with the code"); the plan `docs/archive/lanes/improve-code/plan-improve-code-3.md` — the
   **C3-08** row, the **"The close (the six-member flip…)"** section, and the
   **carried-in DoD table** are your spec; the running record
-  `docs/plans-milestones/improve-code-3-handoff-notes.md` — the per-unit before →
+  `docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md` — the per-unit before →
   after for C3-00…C3-07 (the C3-06 honest-finding on the allowlist is the one to
   read closely); the predecessor's close (the model for the honest flip / honest
-  hold): `docs/plans-milestones/improve-code-2-handoff-notes.md` — the C2-08
+  hold): `docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md` — the C2-08
   section, and `c2-08-prompt.md`.
 
 ### The six-member contract (what "land the flip" concretely means)
@@ -157,7 +166,7 @@ since C2-00). You are **verifying**, then — conditionally — **recording the 
         remainder (most likely the 17 allowlist keeps) is handed to
         `IMPROVE-CODE-4`.
 - [ ] **The C3-08 handoff entry** is written in
-      `docs/plans-milestones/improve-code-3-handoff-notes.md` in the shape of the
+      `docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md` in the shape of the
       C3-07 entry (the scope, the clean-state verification, the before → after, and
       why the lane is closed shipped or closed with unmet DoD), and the file's
       front-matter "Current state" is updated to C3-08's outcome.

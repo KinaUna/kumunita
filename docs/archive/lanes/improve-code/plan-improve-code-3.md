@@ -1,13 +1,13 @@
 ---
 id: plan-improve-code-3
 title: "Plan: IMPROVE-CODE-3 — finish the two held lines, then land the six-member flip"
-tier: living
+tier: archive
 kind: plan
-status: proposed
+status: archived
 audiences: [developer, agent]
 related:
-  - docs/plans-milestones/plan-improve-code-2.md
-  - docs/plans-milestones/improve-code-2-handoff-notes.md
+  - docs/archive/lanes/improve-code/plan-improve-code-2.md
+  - docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md
   - docs/adr/0290-improve-code-2-baseline-raises-and-seams.md
   - docs/adr/0291-improve-code-2-c2-03-carry-the-9-concrete-service-crossings.md
   - docs/philosophy/in-code.md

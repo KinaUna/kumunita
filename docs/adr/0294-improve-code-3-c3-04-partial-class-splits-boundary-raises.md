@@ -8,7 +8,7 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/adr/0290-improve-code-2-baseline-raises-and-seams.md
   - docs/adr/0293-improve-code-3-c3-03-god-service-seam-boundary-edge-raises.md
-  - docs/plans-milestones/plan-improve-code-3.md
+  - docs/archive/lanes/improve-code/plan-improve-code-3.md
   - docs/philosophy/in-code.md
 supersedes: []
 superseded_by: []

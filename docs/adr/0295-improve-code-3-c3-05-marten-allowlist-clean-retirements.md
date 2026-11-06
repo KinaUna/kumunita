@@ -10,7 +10,7 @@ related:
   - docs/adr/0291-improve-code-2-c2-03-carry-the-9-concrete-service-crossings.md
   - docs/adr/0293-improve-code-3-c3-03-god-service-seam-boundary-edge-raises.md
   - docs/adr/0294-improve-code-3-c3-04-partial-class-splits-boundary-raises.md
-  - docs/plans-milestones/plan-improve-code-3.md
+  - docs/archive/lanes/improve-code/plan-improve-code-3.md
   - docs/philosophy/in-code.md
 supersedes: []
 superseded_by: []

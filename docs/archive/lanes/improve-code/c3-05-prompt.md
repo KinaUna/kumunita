@@ -1,3 +1,12 @@
+---
+id: c3-05-prompt
+title: "C3-05 — IMPROVE-CODE-3 unit prompt (the Marten-allowlist clean retirements)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-05 — IMPROVE-CODE-3 unit prompt (the Marten-allowlist clean retirements)
 
 You are the **sixth agent** on the **IMPROVE-CODE-3** lane in the **Kumunita** repo

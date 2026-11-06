@@ -1,15 +1,15 @@
 ---
 id: improve-code-3-handoff-notes
 title: "IMPROVE-CODE-3 — Handoff Notes"
-tier: living
+tier: archive
 kind: handoff
-status: current
+status: archived
 audiences: [developer, agent]
 lane: improve-code-3
 related:
-  - docs/plans-milestones/plan-improve-code-3.md
-  - docs/plans-milestones/plan-improve-code-2.md
-  - docs/plans-milestones/improve-code-2-handoff-notes.md
+  - docs/archive/lanes/improve-code/plan-improve-code-3.md
+  - docs/archive/lanes/improve-code/plan-improve-code-2.md
+  - docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md
   - docs/adr/0290-improve-code-2-baseline-raises-and-seams.md
   - docs/adr/0294-improve-code-3-c3-04-partial-class-splits-boundary-raises.md
   - docs/adr/0297-improve-code-3-c3-07-flagged-accidental-boundary-edges.md
@@ -463,7 +463,7 @@ retire; 0 new entries) — the one real reduction of the unit. The "files" line
 recorded, not papered over). The total over-ceiling surface for this class is
 **strictly smaller** (before: 1 file + 3 methods = 4 entries; after: 1 file
 (raised) + 1 method = 2 entries) and **0 silent raises** (the one raise carries
-[ADR 0292](../../adr/0292-improve-code-3-c3-02-sampledataseeder-decomposition-raise.md);
+[ADR 0292](../../../adr/0292-improve-code-3-c3-02-sampledataseeder-decomposition-raise.md);
 the two retires + the one unchanged entry are the ratchet moving down /
 holding).
 
@@ -715,7 +715,7 @@ ceiling. **15 of the 23 retired; 8 stand over** (the DoD's ≤ 8 allowance).
   **31 `boundary_violations` edge counts raised** with `"adr": "0294"` (each
   partial file lands on an already-existing module edge, so the per-edge file
   count grew by 1–6 — an honest raise, not a new edge).
-- **ADR [0294](../adr/0294-improve-code-3-c3-04-partial-class-splits-boundary-raises.md)** records
+- **ADR [0294](../../../adr/0294-improve-code-3-c3-04-partial-class-splits-boundary-raises.md)** records
   the partial-class-splits mechanic + the 31 boundary raises + the 2 classes
   retirements + the 8 files that stand over (and their C3-05/C3-06 disposition).
 
@@ -1042,7 +1042,7 @@ ship.
 | **#8** | Both E11 SEC pointers present | both present | both present (`IModerationService.cs` + `TodoService.Lifecycle.cs`) | **HOLDS** |
 
 **The one line that does not hold** — DoD #6's `controllers_marten_allowlist`
-`≤ 5` — is at **17**, the **measured honest floor** (ADR [0296](adr/0296-improve-code-3-c3-06-marten-allowlist-remainder-honest-finding.md)).
+`≤ 5` — is at **17**, the **measured honest floor** (ADR [0296](../../../adr/0296-improve-code-3-c3-06-marten-allowlist-remainder-honest-finding.md)).
 The 17 keeps are *exactly* the no-service / edge-minting / diagnostics /
 C08-frozen class the plan expected to be hard (the 5 no-headroom
 caller-owns-transaction keeps, the 1 still-god-file `PageService` 851, the 4

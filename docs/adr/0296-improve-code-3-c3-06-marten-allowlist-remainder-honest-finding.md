@@ -8,8 +8,8 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/adr/0295-improve-code-3-c3-05-marten-allowlist-clean-retirements.md
   - docs/adr/0290-improve-code-2-baseline-raises-and-seams.md
-  - docs/plans-milestones/plan-improve-code-3.md
-  - docs/plans-milestones/improve-code-3-handoff-notes.md
+  - docs/archive/lanes/improve-code/plan-improve-code-3.md
+  - docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md
   - docs/philosophy/in-code.md
 supersedes: []
 superseded_by: []

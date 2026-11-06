@@ -1,9 +1,18 @@
+---
+id: c2-05-prompt
+title: "C2-05 — Module surface: the still-large files under the ceiling"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-05 — Module surface: the still-large files under the ceiling
 
 ## What you are doing
 
 You are the **sixth** agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-05**,
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-05**,
 **DoD #3/#4 — "the still-large files off the list."** C2-00 landed the honest
 ratchet gate; C2-01 + C2-02 finished the translation-lane collapse (the `≤ 40`
 line met); **C2-03 closed DoD #6's first half** (the concrete-`*Service`
@@ -74,7 +83,7 @@ exists to stop). The gate has the same hard checks as every ratchet line:
   coherent family, e.g. a seeder + its fixture together) per commit** — the gate
   green after each, the entry retires as the file drops under the ceiling.
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — the doctrine.
-  Read the plan: `docs/plans-milestones/plan-improve-code-2.md` — the **D5**
+  Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-2.md` — the **D5**
   decision and the **C2-05** row are your spec, and **DoD #3/#4** (the target:
   "files ≤ 8 · the 7 named god-files gone").
 - Read the code-shape doctrine: `docs/philosophy/in-code.md` — the **ratchet**
@@ -82,7 +91,7 @@ exists to stop). The gate has the same hard checks as every ratchet line:
   split must be a real seam a C13 cold read would pass, not a ceremony split),
   and the **comment rule** (what/when/throws + ADR number).
 - Read the **C2-04 handoff note**
-  (`docs/plans-milestones/improve-code-2-handoff-notes.md`) — it names **your**
+  (`docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md`) — it names **your**
   unit as the successor, notes that the **group-(a) Marten keeps** (Posts /
   Announcement / Page / Guardian / ReportTargets / Tag) resolve once you shrink
   their god-service files (`PostService` 821, `PageService` 917, `GuardianService`

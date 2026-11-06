@@ -1,9 +1,18 @@
+---
+id: c2-02-prompt
+title: "C2-02 — Translation lane: the rest of the surfaces (DoD #5 to ≤40)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-02 — Translation lane: the rest of the surfaces (DoD #5 to ≤40)
 
 ## What you are doing
 
 You are the **third** agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-02**.
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-02**.
 C2-00 landed the honest ratchet gate (`adr: 0290` named exceptions); C2-01
 (`5bf44a68`) collapsed the **Posts** surface onto the `TranslationLane` — its six
 write forwarders retired, the `PostService` class baseline entry gone, the
@@ -45,7 +54,7 @@ surface.
   `docs/philosophy/in-code.md` § "The ratchet, the split, the comment".
 - Read the seam: `src/Kumunita.Core/Translations/TranslationLane.cs` + ADR
   `docs/adr/0288-one-translation-variant-lane.md`, and **C2-01's handoff entry**
-  (`docs/plans-milestones/improve-code-2-handoff-notes.md`) — it records the
+  (`docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md`) — it records the
   M3/M4 session-ownership split and the true count basis (60 → 54), which is
   the exact context you need.
 - **Re-derive the count per surface from the code before touching anything** —

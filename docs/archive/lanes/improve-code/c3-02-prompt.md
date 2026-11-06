@@ -1,9 +1,18 @@
+---
+id: c3-02-prompt
+title: "C3-02 — the SampleDataSeeder decomposition: split the two god-methods into per-entity builders"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-02 — the SampleDataSeeder decomposition: split the two god-methods into per-entity builders
 
 ## What you are doing
 
 You are the **third** agent on the **IMPROVE-CODE-3** lane (plan:
-`docs/plans-milestones/plan-improve-code-3.md`). Your unit is **C3-02**, the
+`docs/archive/lanes/improve-code/plan-improve-code-3.md`). Your unit is **C3-02**, the
 third of 9. C3-00 (the `EventService` shrink) and C3-01 (the `PageService`
 shrink) are both done — read their handoff entries before you start (below).
 Both had the same honest finding: the god-service extraction shrank the file
@@ -31,9 +40,9 @@ shrinks — it does not raise anything.
   `f076a0c6` (C3-01 close).
 - Commit style: `feat(improve-code-3): C3-02 — <short description>`
 - Read `AGENTS.md` + `.github/copilot-instructions.md` first (the doctrine).
-- Read the plan: `docs/plans-milestones/plan-improve-code-3.md` — **Why now**,
+- Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-3.md` — **Why now**,
   **D2**, and the **C3-02** row are your spec.
-- Read the handoff: `docs/plans-milestones/improve-code-3-handoff-notes.md` —
+- Read the handoff: `docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md` —
   the **C3-00** and **C3-01** entries (both honest findings: `files` tightened,
   not retired — the C3-01 entry also records the `PageService` interface
   staying at 22 because the 4 methods were `public static`, never on the

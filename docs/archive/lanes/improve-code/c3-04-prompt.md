@@ -1,9 +1,18 @@
+---
+id: c3-04-prompt
+title: "C3-04 — the still-large-file tail: drive `files` from 23 to ≤ 8"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-04 — the still-large-file tail: drive `files` from 23 to ≤ 8
 
 ## What you are doing
 
 You are the **fifth** agent on the **IMPROVE-CODE-3** lane (plan:
-`docs/plans-milestones/plan-improve-code-3.md`). Your unit is **C3-04**, the
+`docs/archive/lanes/improve-code/plan-improve-code-3.md`). Your unit is **C3-04**, the
 fifth of 9. C3-00 (the `EventService` shrink), C3-01 (the `PageService` shrink),
 C3-02 (the `SampleDataSeeder` decomposition), and C3-03 (the 5 god-service
 seams) are all done and green — read their handoff entries before you start
@@ -53,10 +62,10 @@ but it must be named.
   commits, em dash, **no ADR in the subject** — if a raise is needed, the ADR
   goes in the body, as C3-02 did with ADR 0292 and C3-03 with ADR 0293).
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first (the doctrine).
-- Read the plan: `docs/plans-milestones/plan-improve-code-3.md` — **Why now**,
+- Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-3.md` — **Why now**,
   **D4** (the still-large-file tail), the **C3-04** row, and **the close** are
   your spec.
-- Read the handoff: `docs/plans-milestones/improve-code-3-handoff-notes.md` —
+- Read the handoff: `docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md` —
   the **C3-00**, **C3-01**, **C3-02**, and **C3-03** entries (all four honest
   findings: `files` tightened or raised, *never* retired; C3-02 records the
   *grew* pattern; C3-03 records that the `methods`/`classes`/`interfaces`
@@ -209,7 +218,7 @@ probe-restore cycle** so the restore does not undo your own tighten.
 - [ ] **The `\u003C` escapes in the baseline survived** (the baseline was edited
       textually, never `json.load`/`dump`).
 - [ ] **The C3-04 handoff entry is written** in
-      `docs/plans-milestones/improve-code-3-handoff-notes.md` with the honest
+      `docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md` with the honest
       before → after per file (retired / tightened / raised), the DoD line
       movements (files 23 → N; allowlist unblocked but not retired; methods /
       classes / interfaces as measured), and the ADR(s) named for any raise.

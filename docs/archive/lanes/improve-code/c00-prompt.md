@@ -1,3 +1,12 @@
+---
+id: c00-prompt
+title: "C00 — Ratchet gate + baseline (retire IMPROVE a/e/f)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C00 — Ratchet gate + baseline (retire IMPROVE a/e/f)
 
 ## What you are doing

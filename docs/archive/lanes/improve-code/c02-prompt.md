@@ -1,3 +1,12 @@
+---
+id: c02-prompt
+title: "C02 — Data out of code (D5)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C02 — Data out of code (D5)
 
 ## What you are doing

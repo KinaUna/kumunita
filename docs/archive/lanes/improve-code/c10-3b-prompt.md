@@ -1,3 +1,12 @@
+---
+id: c10-3b-prompt
+title: "C10-3b — Portability: ResolveAsync / ClassifyAsync / ExportAsync strategy table"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C10-3b — Portability: ResolveAsync / ClassifyAsync / ExportAsync strategy table
 
 ## What you are doing

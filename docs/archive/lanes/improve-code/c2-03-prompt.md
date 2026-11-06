@@ -1,9 +1,18 @@
+---
+id: c2-03-prompt
+title: "C2-03 — Module surface: concrete `*Service` crossings become contracts"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-03 — Module surface: concrete `*Service` crossings become contracts
 
 ## What you are doing
 
 You are the **fourth** agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-03**, the
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-03**, the
 first of the two **DoD #6** units (the module-surface lines). C2-00 landed the
 honest ratchet gate; C2-01 + C2-02 finished the translation-lane collapse
 (**54 → 39**, the `≤ 40` line met — `701c7a7f`). Your unit is **DoD #6, half
@@ -53,7 +62,7 @@ name it** — an `adr:` entry — rather than minting a ceremony interface to hi
   commits, em dash, no ADR in the subject). **One edge (or one coherent group of
   edges) per commit** — the gate green after each, the entry retires as it moves.
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — the doctrine.
-  Read the plan: `docs/plans-milestones/plan-improve-code-2.md` — the **D4**
+  Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-2.md` — the **D4**
   decision and the **C2-03** row are your spec, and **DoD #6** (the target).
   Read **D2** (part-vs-whole — the interface must be a *real* surface, not a
   ceremony type) and `docs/philosophy/in-code.md` § "The ratchet, the split,
@@ -62,7 +71,7 @@ name it** — an `adr:` entry — rather than minting a ceremony interface to hi
   C03 reference seam `src/Kumunita.Core/Notifications/INotificationEmitter.cs`
   (a narrow interface a *different* module codes against).
 - Read the C2-02 handoff note
-  (`docs/plans-milestones/improve-code-2-handoff-notes.md`) so your entry
+  (`docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md`) so your entry
   continues the running log in the same shape.
 
 ### The concrete starting numbers (measured at `701c7a7f` — trust these + the

@@ -1,9 +1,18 @@
+---
+id: c2-01-prompt
+title: "C2-01 — Translation lane: collapse the first surface onto the `TranslationLane`"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-01 — Translation lane: collapse the first surface onto the `TranslationLane`
 
 ## What you are doing
 
 You are the **second** agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-01**, the
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-01**, the
 second of 9. C2-00 just landed (`8218f3fc`): the ratchet gate is honest and the
 30 predecessor raises are no longer silent (they carry `adr: 0290`). Your unit
 is the **DoD #5** line, first surface only — the **translation-lane collapse**.
@@ -53,7 +62,7 @@ silently special-case it, and don't rewrite the lane to fit one surface.
   do this in more than one commit, each commit is one surface and the gate is
   green after each.
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — the doctrine.
-  Read the plan: `docs/plans-milestones/plan-improve-code-2.md` — the sections
+  Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-2.md` — the sections
   **D3** and **C2-01** are your spec. Read **D2** (part-vs-whole) and
   `docs/philosophy/in-code.md` § "The ratchet, the split, the comment" — the
   method you delete must be a *move onto the seam*, not a ceremony extraction.
@@ -63,7 +72,7 @@ silently special-case it, and don't rewrite the lane to fit one surface.
   (`docs/archive/lanes/improve-code/c06-prompt.md` — the reference-surface
   method, the descriptor options, and the divergence-diff discipline).
 - Read the C2-00 handoff note
-  (`docs/plans-milestones/improve-code-2-handoff-notes.md`) so your entry
+  (`docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md`) so your entry
   continues the running log in the same shape.
 
 ### The concrete starting numbers (measured at `8218f3fc` — trust these + the

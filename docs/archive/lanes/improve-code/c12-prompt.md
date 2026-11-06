@@ -1,3 +1,12 @@
+---
+id: c12-prompt
+title: "C12 — Tests at the seams (turn the seam-test rule on)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C12 — Tests at the seams (turn the seam-test rule on)
 
 ## What you are doing

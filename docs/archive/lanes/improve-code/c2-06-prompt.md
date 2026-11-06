@@ -1,9 +1,18 @@
+---
+id: c2-06-prompt
+title: "C2-06 — the two untested services get a unit-tested decision part"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-06 — the two untested services get a unit-tested decision part
 
 ## What you are doing
 
 You are the **seventh** agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-06, DoD #7 —
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-06, DoD #7 —
 "the two untested services covered."** The lane before you: C2-00 landed the
 honest ratchet gate; C2-01 + C2-02 finished the translation-lane collapse (the
 `≤ 40` line met); C2-03 + C2-04 closed DoD #6 (the concrete-`*Service`
@@ -75,7 +84,7 @@ all — no ceremony type.
   its unit test) per commit** — the gate green after each, the decision surface
   added + the service re-pointed + the test present in the same commit.
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — the doctrine.
-  Read the plan: `docs/plans-milestones/plan-improve-code-2.md` — the **D6**
+  Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-2.md` — the **D6**
   decision and the **C2-06** row are your spec, and **DoD #7** ("the two
   untested services covered").
 - Read the code-shape doctrine: `docs/philosophy/in-code.md` — the **part-vs-
@@ -89,7 +98,7 @@ all — no ceremony type.
   no `IDocumentSession`, no async I/O), with a plain unit test in
   `tests/Kumunita.Core.Tests/` (e.g. `GoalStandingPolicyTests.cs`).
 - Read the **C2-05 handoff note**
-  (`docs/plans-milestones/improve-code-2-handoff-notes.md`) — the last entry
+  (`docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md`) — the last entry
   names **your** unit as the successor, and is where your entry continues the
   running log in the same shape.
 

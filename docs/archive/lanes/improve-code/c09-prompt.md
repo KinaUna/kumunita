@@ -1,3 +1,12 @@
+---
+id: c09-prompt
+title: "C09 — Controllers off Marten"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C09 — Controllers off Marten
 
 ## What you are doing

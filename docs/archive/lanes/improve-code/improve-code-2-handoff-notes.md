@@ -1,13 +1,13 @@
 ---
 id: improve-code-2-handoff-notes
 title: "IMPROVE-CODE-2 — Handoff Notes"
-tier: living
+tier: archive
 kind: handoff
-status: current
+status: archived
 audiences: [developer, agent]
 lane: improve-code-2
 related:
-  - docs/plans-milestones/plan-improve-code-2.md
+  - docs/archive/lanes/improve-code/plan-improve-code-2.md
   - docs/adr/0290-improve-code-2-baseline-raises-and-seams.md
   - docs/archive/lanes/improve-code/handoff-notes.md
 updated: 2026-11-05
@@ -126,7 +126,7 @@ No raise is silent. The 3 flagged-accidental edges (#7, #9, #19) are named for C
 | `docs/adr/0290-improve-code-2-baseline-raises-and-seams.md` | **New** — the ADR (status: Proposed) |
 | `docs/adr/README.md` | ADR 0290 added to the index |
 | `tools/code/code-baseline.json` | 30 entries gained `"adr": "0290"` (4 class/interface/method + 26 boundary) |
-| `docs/plans-milestones/improve-code-2-handoff-notes.md` | **New** — this note |
+| `docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md` | **New** — this note |
 
 ### What C2-00 did NOT do (the plan's scope)
 

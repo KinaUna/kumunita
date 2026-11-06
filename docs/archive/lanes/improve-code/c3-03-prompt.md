@@ -1,9 +1,18 @@
+---
+id: c3-03-prompt
+title: "C3-03 — the 5 god-services: real part-vs-whole splits + the group-(a) allowlist keeps their services unblock"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-03 — the 5 god-services: real part-vs-whole splits + the group-(a) allowlist keeps their services unblock
 
 ## What you are doing
 
 You are the **fourth** agent on the **IMPROVE-CODE-3** lane (plan:
-`docs/plans-milestones/plan-improve-code-3.md`). Your unit is **C3-03**, the
+`docs/archive/lanes/improve-code/plan-improve-code-3.md`). Your unit is **C3-03**, the
 fourth of 9. C3-00 (the `EventService` shrink), C3-01 (the `PageService`
 shrink), and C3-02 (the `SampleDataSeeder` decomposition) are all done — read
 their handoff entries before you start (below). Each had the **same honest
@@ -55,10 +64,10 @@ must be named.
   commits, em dash, **no ADR in the subject** — if a raise is needed, the ADR
   goes in the body, as C3-02 did with ADR 0292).
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first (the doctrine).
-- Read the plan: `docs/plans-milestones/plan-improve-code-3.md` — **Why now**,
+- Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-3.md` — **Why now**,
   **D1** (the god-service shrinks), **D3** (the Marten allowlist, the
   group-(a) half), and the **C3-03** row are your spec.
-- Read the handoff: `docs/plans-milestones/improve-code-3-handoff-notes.md` —
+- Read the handoff: `docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md` —
   the **C3-00**, **C3-01**, and **C3-02** entries (all three honest findings:
   `files` tightened or raised, not retired; the C3-02 entry records the
   `SampleDataSeeder` file *grew* 1633 → 2060 under the per-entity

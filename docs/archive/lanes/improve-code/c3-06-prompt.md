@@ -1,3 +1,12 @@
+---
+id: c3-06-prompt
+title: "C3-06 — IMPROVE-CODE-3 unit prompt (the Marten-allowlist remainder: the no-service + edge-minting keeps)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-06 — IMPROVE-CODE-3 unit prompt (the Marten-allowlist remainder: the no-service + edge-minting keeps)
 
 You are the **seventh agent** on the **IMPROVE-CODE-3** lane in the **Kumunita** repo

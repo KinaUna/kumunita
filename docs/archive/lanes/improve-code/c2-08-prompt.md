@@ -1,9 +1,18 @@
+---
+id: c2-08-prompt
+title: "C2-08 — the close: verify every DoD line, then land the six-member flip"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-08 — the close: verify every DoD line, then land the six-member flip
 
 ## What you are doing
 
 You are the **ninth and final** agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-08, the
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-08, the
 close + independent verification** — the successor to every unit before you.
 The whole lane is done *ahead of you*: C2-00 landed the honest ratchet gate and
 resolved the 30 unjustified raises (`adr: 0290`); C2-01 + C2-02 finished the
@@ -49,10 +58,10 @@ the failures, **do not land the flip**, and hand the remainder to
   fail path), the commits are docs-only.
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — the doctrine
   (the six-member contract is spelled out in `AGENTS.md` § "Keeping the docs in
-  sync with the code"). Read the plan: `docs/plans-milestones/plan-improve-code-2.md`
+  sync with the code"). Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-2.md`
   — the **C2-08** row, the **"The close (the six-member flip…)"** section, and
   the **carried-in DoD table** are your spec. Read the running record:
-  `docs/plans-milestones/improve-code-2-handoff-notes.md` — the per-unit before →
+  `docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md` — the per-unit before →
   after for C2-00…C2-07. Read the predecessor's close (the model for the honest
   flip / honest hold): `docs/archive/lanes/improve-code/handoff-notes.md` — the
   "The close flip — deliberately *not* landed" section.
@@ -115,7 +124,7 @@ the failures, **do not land the flip**, and hand the remainder to
         lines + measured values are recorded, and the remainder is handed to
         `IMPROVE-CODE-3`.
 - [ ] **The C2-08 handoff entry** is written in
-      `docs/plans-milestones/improve-code-2-handoff-notes.md` in the shape of
+      `docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md` in the shape of
       C2-07's (the scope, the clean-state verification, the before → after, and
       why the lane is closed shipped or closed with unmet DoD).
 - [ ] **No DoD line is fixed silently** — a failing line is named, with its

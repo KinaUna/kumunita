@@ -1,3 +1,12 @@
+---
+id: c08-prompt
+title: "C08 — Split the Projects module (ADR B)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C08 — Split the Projects module (ADR B)
 
 ## What you are doing

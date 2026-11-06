@@ -8,7 +8,7 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/adr/0006-module-boundary-contracts.md
   - docs/adr/0290-improve-code-2-baseline-raises-and-seams.md
-  - docs/plans-milestones/plan-improve-code-2.md
+  - docs/archive/lanes/improve-code/plan-improve-code-2.md
   - docs/philosophy/in-code.md
   - docs/adr/0286-iuserservice-access-core-split.md
   - docs/adr/0287-projects-module-split.md

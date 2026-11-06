@@ -1,9 +1,18 @@
+---
+id: c2-07-prompt
+title: "C2-07 — the missing SEC pointer on `ClaimTodoAsync`"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-07 — the missing SEC pointer on `ClaimTodoAsync`
 
 ## What you are doing
 
 You are the **eighth** agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-07, DoD #8 —
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-07, DoD #8 —
 "the missing SEC pointer added."** The lane before you: C2-00 landed the honest
 ratchet gate; C2-01 + C2-02 finished the translation-lane collapse (the `≤ 40`
 line met); C2-03 + C2-04 closed DoD #6; C2-05 landed DoD #3/#4's clean seams
@@ -46,7 +55,7 @@ and find out what.
   second `docs(improve-code-2): C2-07 — handoff entry ...` commit for the note.
   The gate is green after the code commit.
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — the doctrine.
-  Read the plan: `docs/plans-milestones/plan-improve-code-2.md` — the **D7**
+  Read the plan: `docs/archive/lanes/improve-code/plan-improve-code-2.md` — the **D7**
   decision and the **C2-07** row are your spec, and **DoD #8** ("the missing SEC
   pointer added").
 - Read the code-shape doctrine: `docs/philosophy/in-code.md` — the **comment rule**
@@ -95,7 +104,7 @@ and find out what.
   it should be untouched; confirm both E11 items now carry the pointer (that is
   the DoD #8 "both E11 items" line).
 - **Record before → after** in the handoff note
-  (`docs/plans-milestones/improve-code-2-handoff-notes.md`) — a C2-07 entry in the
+  (`docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md`) — a C2-07 entry in the
   same shape as C2-06's: the two E11 items (Moderation = pre-existing, unchanged;
   `ClaimTodoAsync` = added here, at the standing call), the exact wording/refs used,
   and why DoD #8 is now met.

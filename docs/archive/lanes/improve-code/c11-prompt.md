@@ -1,3 +1,12 @@
+---
+id: c11-prompt
+title: "C11 — Web: views, TypeScript and the small duplicates"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C11 — Web: views, TypeScript and the small duplicates
 
 ## What you are doing

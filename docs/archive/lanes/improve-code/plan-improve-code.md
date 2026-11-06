@@ -1,9 +1,9 @@
 ---
 id: plan-improve-code
 title: "Plan: IMPROVE-CODE — differentiate the code along real seams"
-tier: living
+tier: archive
 kind: plan
-status: proposed
+status: archived
 audiences: [developer, agent]
 related:
   - docs/archive/lanes/improve/plan-improve.md

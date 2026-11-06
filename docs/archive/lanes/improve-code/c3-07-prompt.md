@@ -1,3 +1,12 @@
+---
+id: c3-07-prompt
+title: "C3-07 — IMPROVE-CODE-3 unit prompt (the 3 flagged-accidental boundary edges)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-07 — IMPROVE-CODE-3 unit prompt (the 3 flagged-accidental boundary edges)
 
 You are the **eighth agent** on the **IMPROVE-CODE-3** lane in the **Kumunita**

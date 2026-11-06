@@ -1,9 +1,9 @@
 ---
 id: plan-improve-code-2
 title: "Plan: IMPROVE-CODE-2 — make the ratchet honest, then land the unmet DoD"
-tier: living
+tier: archive
 kind: plan
-status: proposed
+status: archived
 audiences: [developer, agent]
 related:
   - docs/archive/lanes/improve-code/plan-improve-code.md

@@ -1,3 +1,12 @@
+---
+id: c07-prompt
+title: "C07 — Split the UserInfo module (ADR A)"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C07 — Split the UserInfo module (ADR A)
 
 ## What you are doing

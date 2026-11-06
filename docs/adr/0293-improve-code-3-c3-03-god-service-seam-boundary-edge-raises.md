@@ -9,7 +9,7 @@ related:
   - docs/adr/0290-improve-code-2-baseline-raises-and-seams.md
   - docs/adr/0291-improve-code-2-c2-03-carry-the-9-concrete-service-crossings.md
   - docs/adr/0292-improve-code-3-c3-02-sampledataseeder-decomposition-raise.md
-  - docs/plans-milestones/plan-improve-code-3.md
+  - docs/archive/lanes/improve-code/plan-improve-code-3.md
   - docs/philosophy/in-code.md
 supersedes: []
 superseded_by: []

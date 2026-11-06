@@ -1,9 +1,18 @@
+---
+id: c2-00-prompt
+title: "C2-00 — Ratchet honesty: prove the fixed gate runs on a real PR, then resolve the 30 raises"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C2-00 — Ratchet honesty: prove the fixed gate runs on a real PR, then resolve the 30 raises
 
 ## What you are doing
 
 You are the first agent on the **IMPROVE-CODE-2** lane (plan:
-`docs/plans-milestones/plan-improve-code-2.md`). Your unit is **C2-00**, the
+`docs/archive/lanes/improve-code/plan-improve-code-2.md`). Your unit is **C2-00**, the
 first of 9. It is the **gate unit** — the predecessor's DoD #1, and the unit
 that makes every later unit honest. It has exactly two parts:
 
@@ -44,7 +53,7 @@ silently patch it; that would change the very thing this lane inherits.
   the `adr:` field points at).
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — they are the
   doctrine you are enforcing. Read the plan:
-  `docs/plans-milestones/plan-improve-code-2.md` — the sections **Why now**,
+  `docs/archive/lanes/improve-code/plan-improve-code-2.md` — the sections **Why now**,
   **D1**, **D2**, and **C2-00** are your spec. Everything else is context for
   later units.
 - Read the predecessor's record: `docs/archive/lanes/improve-code/`

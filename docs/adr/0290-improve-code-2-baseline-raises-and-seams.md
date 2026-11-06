@@ -10,7 +10,7 @@ related:
   - docs/adr/0286-iuserservice-access-core-split.md
   - docs/adr/0287-projects-module-split.md
   - docs/adr/0288-one-translation-variant-lane.md
-  - docs/plans-milestones/plan-improve-code-2.md
+  - docs/archive/lanes/improve-code/plan-improve-code-2.md
   - docs/philosophy/in-code.md
 supersedes: []
 superseded_by: []

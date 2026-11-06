@@ -1,9 +1,18 @@
+---
+id: c3-00-prompt
+title: "C3-00 — the EventService shrink: retire the ADR 0290 named seam"
+tier: archive
+kind: prompt
+status: archived
+audiences: [developer, agent]
+lane: improve-code
+---
 # C3-00 — the EventService shrink: retire the ADR 0290 named seam
 
 ## What you are doing
 
 You are the **first** agent on the **IMPROVE-CODE-3** lane (plan:
-`docs/plans-milestones/plan-improve-code-3.md`). Your unit is **C3-00**, the
+`docs/archive/lanes/improve-code/plan-improve-code-3.md`). Your unit is **C3-00**, the
 first of 9. It is the **first god-service shrink** — the unit that turns
 `EventService` from a god-file into a part-vs-whole pair, and retires the
 baseline entries that shrink frees. It has exactly two parts:
@@ -63,11 +72,11 @@ expect an allowlist retirement from this unit.
 - Read `AGENTS.md` and `.github/copilot-instructions.md` first — they are the
   doctrine you are enforcing (the part-vs-whole rule, the ratchet, the
   comment rule). Read the plan:
-  `docs/plans-milestones/plan-improve-code-3.md` — the sections **Why now**,
+  `docs/archive/lanes/improve-code/plan-improve-code-3.md` — the sections **Why now**,
   **D1**, and the **C3-00** row are your spec. Everything else is context for
   later units.
 - Read the predecessor's record:
-  `docs/plans-milestones/improve-code-2-handoff-notes.md` — the C2-05 entry
+  `docs/archive/lanes/improve-code/improve-code-2-handoff-notes.md` — the C2-05 entry
   (the god-service named-keeps + the ADR 0290 de-scope note) and the C2-04
   entry (the allowlist group-(a) keeps + the move pattern).
 - Read the ADR: `docs/adr/0290-improve-code-2-baseline-raises-and-seams.md` —
