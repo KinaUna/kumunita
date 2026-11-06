@@ -39,7 +39,11 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
-**The lane register is empty.** The most recent lane, `IMPROVE-CODE-3`
+**Current lane: `IMPROVE-SEC`** — [plan-improve-sec](plan-improve-sec.md)
+(units `IS00`…`IS45`, proposed 2026-11-06; the close unit, `IS45`, moves this
+register to [`archive/lanes/improve-sec/`](../archive/lanes/improve-sec/)).
+
+The lane before it, `IMPROVE-CODE-3`
 (`C3-00`–`C3-08`), **shipped on 2026-11-06** — it finished the two lines its
 predecessor held and landed the six-member "shipped" flip — and its register,
 the `C2-00`–`C3-08` unit prompts, and the two handoff notes
