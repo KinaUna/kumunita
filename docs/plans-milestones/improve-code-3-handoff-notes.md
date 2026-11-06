@@ -368,3 +368,91 @@ effort** (the remaining 5 god-services + the tail), not a single-unit
 reduction. The next unit (C3-02, the `SampleDataSeeder` decomposition) is a
 different class of work — a per-entity builder decomposition of the two
 god-methods.
+
+## C3-02 — the SampleDataSeeder decomposition: the 2 god-method retires + the 1 files-entry honest raise (2026-11-06)
+
+### The scope (per D2 + the C3-02 row)
+
+D2: *"Per-entity builders. Decompose `SeedAsync` (615/cc83) and
+`BackfillSampleCorpusAsync` (782/cc128) into named per-entity builders
+(accounts / groups / posts / events / tags / pages), each a separate,
+unit-testable surface."* C3-02 is that decomposition of the two largest
+methods in the repo — the only unit where decomposing the *methods themselves*
+( rather than the class) is the only path to the two `methods` entries, because
+a single 782-line method forces any *file* over the 600 ceiling (D2's own
+caveat).
+
+### The shape (34 `private static` per-entity builders, the 2 parents → thin orchestrators)
+
+The two god-methods now each call their per-entity seams in order (accounts →
+groups → posts → events → tags → pages → goals → projects → boards → inventory
+→ translations → guardian-links), each seam a `private static` helper on
+`SampleDataSeeder` (the plan's explicit *"not separate `*Builder` classes"*
+instruction — so they do **not** trip the gate's seam-test Rule 1, which
+applies to class types only, and they do **not** count toward the class
+public-methods ceiling, which counts public methods only). Shared mutable
+state (the `usersByEmail` map, the cross-entity id maps, the
+`postTransLangsThisRun` dedupe map) is created in the orchestrator and passed
+by reference. The 5 helpers that first measured over the 80/15 ceiling were
+each further decomposed into per-entity *content* builders, all now under the
+ceiling: `SeedBoardsAsync` 85→63 (→ `SeedBoardCardsAsync`),
+`BackfillPostsAsync` 115/cc22→56/cc14 (→ `BackfillPostRepliesAsync` +
+`BackfillPostTranslationsAsync`), `BackfillEventsAsync` 82→65 (→
+`BackfillEventRsvpsAsync`), `BackfillProjectsAsync` 103/cc20→53/cc13 (→
+`BackfillProjectContentAsync`), `BackfillBoardsAsync` 108/cc18→43/cc8 (→
+`BackfillBoardContentAsync`). Bodies are extracted verbatim (the helpers take
+the locals their block already references as parameters) — no body line is
+rewritten, so the behaviour is preserved. No new boundary edge is minted (the
+helpers live in `Bootstrap` and reference the same cross-module types the
+god-methods already referenced; the 3 inbound `Identity`/`Notifications`/`Web`
+→ `Bootstrap` edges named `SampleDataSeeder` are keyed by symbol, not file).
+
+### The before → after (measured against the gate, not intended)
+
+| Baseline entry | Before (C2-08) | After (C3-02) | Why |
+|---|---|---|---|
+| **files** · `SampleDataSeeder.cs` | **1633** | **2060** (raised, `adr: 0292`) | the 34 per-entity signatures + shared-state parameters are **net-positive** on code lines over the two method bodies they replace; the file is **still over the 600 ceiling** → the entry is **raised with this `adr:`, not retired**. The DoD #3/#4 "files" line **stays 23** — the plan's "files 23 → 22" **does not hold** (the same honest-finding class as C3-00/C3-01: a class-level split cannot get this file under 600). |
+| **methods** · `SeedAsync` | 615 / cc83 | **retired** | the orchestrator is now **54 / cc9** (under the 80/15 ceiling) → the entry is stale → gone. |
+| **methods** · `BackfillSampleCorpusAsync` | 782 / cc128 | **retired** | the orchestrator is now **78 / cc6** (under the ceiling) → the entry is stale → gone. |
+| **methods** · `EnsureUserAsync` | 69 / cc23 | **unchanged** (69 / cc23) | the decomposition does not touch it; it is **still over the cc-15 ceiling** at its baseline max → the entry **stays** (the ratchet holds it, does not move it). |
+| the 5 first-over helpers + 6 content builders | — (not on baseline) | **none on baseline** (all under 80/15) | the goal is met: each sits **under the ceiling**, so **no new `methods` entries are minted** — the DoD #3/#4 "methods" line moves **91 → 89**. Carrying the 5 would have *raised* the methods surface (91 → 94+) — the anti-pattern the DoD's *"total over-ceiling surface strictly smaller, 0 raises"* forbids. |
+
+**The DoD #3/#4 "methods" line genuinely improves 91 → 89** (the two god-methods
+retire; 0 new entries) — the one real reduction of the unit. The "files" line
+**stays 23** (the plan's "files 23 → 22" does not hold — an honest finding,
+recorded, not papered over). The total over-ceiling surface for this class is
+**strictly smaller** (before: 1 file + 3 methods = 4 entries; after: 1 file
+(raised) + 1 method = 2 entries) and **0 silent raises** (the one raise carries
+[ADR 0292](../../adr/0292-improve-code-3-c3-02-sampledataseeder-decomposition-raise.md);
+the two retires + the one unchanged entry are the ratchet moving down /
+holding).
+
+### The verification (all green)
+
+- **`dotnet build Kumunita.slnx -c Debug` — 0 errors.**
+- **Behaviour preservation (the seeder suites, `PostgresFixture`):**
+  `SampleDataCorpusBackfillTests` + `SampleDataEventTranslationBackfillTests`
+  + `IdentityServiceSamplePasswordLockTests` + `IdentityServiceSampleMfaLockTests`
+  + `LS_U04_SeederTests` — **41/41 pass** (the per-entity helpers are exercised
+  through the parent orchestrators' existing harness; no new test file needed,
+  no new pure-logic seam to unit-test in isolation).
+- **`pwsh tools/code/code-check.ps1` — OK (0 violations).** The 4 baseline
+  entries resolved against the measurement (the 2 god-methods retired; the
+  `files` entry raised 1633 → 2060 with `adr: 0292`; `EnsureUserAsync`
+  unchanged); the 5 over-ceiling helpers split under the ceiling; the `\u003C`
+  escapes survived (textual edit, no `json.load`/`dump` round-trip).
+- **`pwsh tools/docs/improve-check.ps1` — ALL GATES PASS** (the ADR-index
+  drift gate (b) needed the 0292 row added to `docs/adr/README.md`; added).
+
+### For the reviewer of the close (C3-08)
+
+C3-02 is the same honest class as C3-00/C3-01: the *method* surface is
+genuinely reduced (91 → 89, the two god-methods now thin orchestrators under
+the ceiling), but the *file* does not drop under 600 (it grew 1633 → 2060 as
+the 34 signatures are net-positive), so its `files` entry is a **honest-keep
+raised with ADR 0292, not retired** — the DoD #3/#4 "files" line **stays 23**.
+This is the plan's D2 as predicted (*"a single 782-line method forces any file
+over the ceiling; a class-level split cannot get a file under 600"*), not a
+failure of the unit. The 0292 entry is the one carry in the baseline the close
+must account for when it re-verifies every carried-in DoD line from a clean
+state.

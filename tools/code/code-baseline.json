@@ -20,7 +20,8 @@
     },
     {
       "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs",
-      "max": 1633
+      "max": 2060,
+      "adr": "0292"
     },
     {
       "id": "src/Kumunita.Core/Events/EventService.cs",
@@ -141,19 +142,9 @@
       "cc_max": 11
     },
     {
-      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.BackfillSampleCorpusAsync(AppDbContext,IDocumentStore,UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
-      "max": 782,
-      "cc_max": 128
-    },
-    {
       "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.EnsureUserAsync(UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IDocumentStore,string,string?,string,bool,string?,string?,string?,bool,ILogger,CancellationToken)",
       "max": 69,
       "cc_max": 23
-    },
-    {
-      "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs::Kumunita.Core.Bootstrap.SampleDataSeeder.SeedAsync(AppDbContext,IDocumentStore,UserManager\u003CUser\u003E,RoleManager\u003CIdentityRole\u003E,IUserInfoService,IMailerStage?,string?,ILogger,CancellationToken)",
-      "max": 615,
-      "cc_max": 83
     },
     {
       "id": "src/Kumunita.Core/Events/EventReminderService.cs::Kumunita.Core.Events.EventReminderService.SendRemindersAsync(IDocumentStore,EventReminderOptions,DateTimeOffset,IMailerStage,ILocalizationService,ITranslationProvider?,CancellationToken,Notifications.INotificationEmitter?)",

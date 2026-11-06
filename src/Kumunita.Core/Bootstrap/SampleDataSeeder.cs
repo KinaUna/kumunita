@@ -205,6 +205,70 @@ public static class SampleDataSeeder
                 ? "Sample data: seeding the mock neighborhood (deploy posture, pristine DB)."
                 : "Development sample data: seeding the mock neighborhood (Development-only, pristine DB).");
 
+        // Shared state for the per-entity seams (C3-02 decomposition): the accounts map,
+        // the deploy-credentials accumulator, and the cross-entity id maps are created
+        // here and threaded into each seam, which stores its rows in this one session
+        // (invariant C3 — a single commit covers the whole corpus).
+        var usersByEmail = new Dictionary<string, User>(StringComparer.OrdinalIgnoreCase);
+        var deployCredentials = new List<(string Email, string Password)>();
+
+        // 1. Accounts (the EF / identity side + the base mt Profile).
+        await SeedAccountsAsync(doc, deployPosture, adminAccountEmail, userManager, roleManager, mt,
+            usersByEmail, deployCredentials, logger, ct);
+        var admin = usersByEmail[doc.Accounts.Single(a => a.Role == Roles.GlobalAdmin).Email];
+        // The established translation-lane author (default author for every translation).
+        var translator = doc.Accounts.FirstOrDefault(a => a.Role == Roles.Translator);
+        string translationAuthorId = translator is not null ? usersByEmail[translator.Email].Id : string.Empty;
+        Func<string?, string> TranslateAuthorId =
+            authorEmail => authorEmail is not null ? usersByEmail[authorEmail].Id : translationAuthorId;
+
+        // 2. Components are mandatory (ADR 0012) — the sanctioned write lane.
+        await SeedMandatoryComponentsAsync(doc, admin, userInfo);
+
+        // 3. All `mt`-side sample content — one session, one commit (invariant C3).
+        var now = DateTimeOffset.UtcNow;
+        await using var session = mt.OpenSession(new SessionOptions());
+        var tagsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var groupsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var goalsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var projectsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var todosByKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        await SeedTagsAsync(session, now, doc, usersByEmail, tagsBySlug, TranslateAuthorId);
+        await SeedGroupsAsync(session, now, doc, usersByEmail, groupsBySlug, TranslateAuthorId);
+        await SeedModeratorAssignmentsAsync(session, now, doc, usersByEmail, admin);
+        await SeedExtendedProfilesAsync(session, doc, usersByEmail, tagsBySlug, ct);
+        await SeedAnnouncementsAsync(session, now, doc, usersByEmail, TranslateAuthorId);
+        await SeedPostsAsync(session, now, doc, usersByEmail, tagsBySlug, groupsBySlug, TranslateAuthorId);
+        await SeedEventsAsync(session, now, doc, usersByEmail, tagsBySlug, TranslateAuthorId);
+        await SeedPagesAsync(session, now, doc, usersByEmail, tagsBySlug, TranslateAuthorId);
+        await SeedGoalsAsync(session, now, doc, usersByEmail, goalsByTitle);
+        await SeedProjectsAsync(session, now, doc, usersByEmail, goalsByTitle, projectsByTitle, todosByKey, TranslateAuthorId);
+        await SeedBoardsAsync(session, now, doc, usersByEmail, projectsByTitle, todosByKey, TranslateAuthorId);
+        await SeedInventoryAsync(session, now, doc, usersByEmail);
+        await SeedCommunityTranslationsAsync(session, now, doc, translationAuthorId);
+        await EnableDanishAsync(session, doc, ct);
+        await EnableMessagingAsync(session, doc, ct);
+        await SeedGuardianLinksAsync(session, now, doc, usersByEmail);
+
+        await session.SaveChangesAsync();
+        await FinalizeSeedAsync(deployPosture, mailer, mt, admin, adminAccountEmail, deployCredentials, logger, ct);
+    }
+
+
+    /// <summary>SeedAccountsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedAccountsAsync(
+        SampleDataDocument doc,
+        bool deployPosture,
+        string adminAccountEmail,
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        IDocumentStore mt,
+        Dictionary<string, User> usersByEmail,
+        List<(string Email, string Password)> deployCredentials,
+        ILogger logger,
+        CancellationToken ct)
+    {
         // ── 1. Accounts (the EF / identity side + the base mt Profile) ──────────────────
         // The seeded admin (FirstBootSeeder) already exists with a setup token but no
         // password — in Development EnsureUserAsync adds the demo password; in the deploy
@@ -213,8 +277,6 @@ public static class SampleDataSeeder
         // residents (Member standing is implicit). Cross-references throughout the rest
         // of the seed key off the document's e-mail (stable business key), so the admin is
         // keyed by its *document* e-mail even when its real e-mail differs (deploy).
-        var usersByEmail = new Dictionary<string, User>(StringComparer.OrdinalIgnoreCase);
-        var deployCredentials = new List<(string Email, string Password)>();
         foreach (var account in doc.Accounts)
         {
             bool isAdmin = account.Role == Roles.GlobalAdmin;
@@ -241,11 +303,14 @@ public static class SampleDataSeeder
             usersByEmail[account.Email] = user;
         }
 
-        var admin = usersByEmail[doc.Accounts.Single(a => a.Role == Roles.GlobalAdmin).Email];
-        // The established translation-lane author (default author for every translation).
-        var translator = doc.Accounts.FirstOrDefault(a => a.Role == Roles.Translator);
-        string translationAuthorId = translator is not null ? usersByEmail[translator.Email].Id : string.Empty;
+    }
 
+    /// <summary>SeedMandatoryComponentsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedMandatoryComponentsAsync(
+        SampleDataDocument doc,
+        User admin,
+        IUserInfoService userInfo)
+    {
         // ── 2. Components are mandatory (ADR 0012) — every verified resident is a member
         //    of every board, so the flat `Community = true` posts are visible to all.
         //    Rides the sanctioned write lane (own session + audit row). ───────────────
@@ -254,16 +319,19 @@ public static class SampleDataSeeder
             await userInfo.SetCommunityMandatoryAsync(componentId, true, admin.Id, GlobalAdminRoles);
         }
 
-        // ── 3. All `mt`-side sample content — one session, one commit (invariant C3). ──
-        var now = DateTimeOffset.UtcNow;
-        string TranslateAuthorId(string? authorEmail)
-            => authorEmail is not null ? usersByEmail[authorEmail].Id : translationAuthorId;
+    }
 
-        await using var session = mt.OpenSession(new SessionOptions());
-
+    /// <summary>SeedTagsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedTagsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        Func<string?, string> TranslateAuthorId)
+    {
         // ── Tags (+ per-language display names) — labels, never gates (C-TG·1). ─────────
         // Tags come first: posts, profiles, and events all reference them by slug.
-        var tagsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var tag in doc.Tags)
         {
             var id = Id();
@@ -291,8 +359,18 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>SeedGroupsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedGroupsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> groupsBySlug,
+        Func<string?, string> TranslateAuthorId)
+    {
         // ── Groups (+ memberships + name/description translations) ──────────────────────
-        var groupsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var group in doc.Groups)
         {
             var id = Id();
@@ -335,6 +413,16 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>SeedModeratorAssignmentsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedModeratorAssignmentsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        User admin)
+    {
         // ── The scoped moderator's governing scope (ADR 0003) — the rows that mint the
         //    `moderator:{id}` claims at sign-in (bootstrap writer posture). ─────────────
         foreach (var assignment in doc.ModeratorAssignments)
@@ -353,6 +441,16 @@ public static class SampleDataSeeder
             });
         }
 
+    }
+
+    /// <summary>SeedExtendedProfilesAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedExtendedProfilesAsync(
+        IDocumentSession session,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        CancellationToken ct)
+    {
         // ── Extended profiles (bio + author-set tags + resident-visible audience, ADR
         //    0123) — loaded in this session over the base profile EnsureUserAsync stored.
         foreach (var account in doc.Accounts)
@@ -372,6 +470,16 @@ public static class SampleDataSeeder
             session.Store(profile);
         }
 
+    }
+
+    /// <summary>SeedAnnouncementsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedAnnouncementsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Func<string?, string> TranslateAuthorId)
+    {
         // ── Announcements (+ translations) ───────────────────────────────────────────────
         foreach (var announcement in doc.Announcements)
         {
@@ -403,6 +511,18 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>SeedPostsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedPostsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        Dictionary<string, string> groupsBySlug,
+        Func<string?, string> TranslateAuthorId)
+    {
         // ── Community + group posts (+ replies + translations) ──────────────────────────
         foreach (var samplePost in doc.Posts)
         {
@@ -462,6 +582,17 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>SeedEventsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedEventsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        Func<string?, string> TranslateAuthorId)
+    {
         // ── Published events (+ RSVPs + the ADR 0060 de/fr/da baselines) ─────────────────
         foreach (var sampleEvent in doc.Events)
         {
@@ -514,6 +645,17 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>SeedPagesAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedPagesAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        Func<string?, string> TranslateAuthorId)
+    {
         // ── A resident blog (PageKind.User) — the /blog feed surface (ADR 0040) ──────────
         var pagesBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var page in doc.Pages)
@@ -555,13 +697,22 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>SeedGoalsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedGoalsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> goalsByTitle)
+    {
         // ── Goals → Projects → To-dos (the `PL` lane, ADR 0086; to-dos ADR 0067) ─────────
         // Materialized in this same session (invariant C3) so a single commit covers the
         // whole corpus. Cross-references resolve by the entities' stable keys — a goal is
         // keyed by its <c>Title</c> (the "events keyed by English title" precedent); a
         // project references its goal by <c>goalTitle</c>; to-dos are nested under their
         // project, so there is no cross-document id to resolve beyond goal → project.
-        var goalsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var goal in doc.Goals)
         {
             var id = Id();
@@ -580,10 +731,21 @@ public static class SampleDataSeeder
             goalsByTitle[goal.Title] = id;
         }
 
+    }
+
+    /// <summary>SeedProjectsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedProjectsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> goalsByTitle,
+        Dictionary<string, string> projectsByTitle,
+        Dictionary<string, string> todosByKey,
+        Func<string?, string> TranslateAuthorId)
+    {
         // Project / to-do id maps for the board placements below (the boards key their
         // cards by (projectTitle, todoTitle) — resolved against these).
-        var projectsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var todosByKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var sampleProject in doc.Projects)
         {
             var id = Id();
@@ -654,6 +816,18 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>SeedBoardsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedBoardsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> projectsByTitle,
+        Dictionary<string, string> todosByKey,
+        Func<string?, string> TranslateAuthorId)
+    {
         // ── Kanban boards (ADR 0067 D1) + lanes + to-do placements ──────────────────────
         // Boards are a container with their own standing owner + feed filter; their lanes
         // (columns) impart a status, and their cards are the BoardItemPlacement rows that
@@ -716,31 +890,53 @@ public static class SampleDataSeeder
                 });
             }
             // Cards — the to-do → lane placements (the BoardItemPlacement rows).
-            foreach (var card in sampleBoard.Cards)
-            {
-                var cardKey = card.ProjectTitle + "|" + card.TodoTitle;
-                if (!todosByKey.TryGetValue(cardKey, out var todoItemId))
-                    throw new InvalidOperationException(
-                        $"sample-data.json: board '{sampleBoard.Title}' card " +
-                        $"({cardKey}) names a to-do that is not seeded under the project " +
-                        $"'{card.ProjectTitle}'.");
-                if (!lanesByTitle.TryGetValue(card.LaneTitle, out var laneId))
-                    throw new InvalidOperationException(
-                        $"sample-data.json: board '{sampleBoard.Title}' card " +
-                        $"({cardKey}) names an unknown lane '{card.LaneTitle}'.");
-                session.Store(new BoardItemPlacement
-                {
-                    Id = Id(),
-                    TodoItemId = todoItemId,
-                    BoardId = boardId,
-                    LaneId = laneId,
-                    Order = card.Order,
-                    Created = boardCreated,
-                    Modified = boardCreated,
-                });
-            }
+            await SeedBoardCardsAsync(session, boardId, sampleBoard, todosByKey, lanesByTitle, boardCreated);
         }
 
+    }
+
+    /// <summary>SeedBoardCardsAsync — the to-do → lane placement rows for one sample board (C3-02: extracted from SeedBoardsAsync so the per-entity seam sits under the 80-line/15-cc ceiling). A card naming an unknown to-do or lane is a loud error (the D3 fail-fast), never a silently-orphaned placement.</summary>
+    private static Task SeedBoardCardsAsync(
+        IDocumentSession session,
+        string boardId,
+        SampleKanbanBoard sampleBoard,
+        Dictionary<string, string> todosByKey,
+        Dictionary<string, string> lanesByTitle,
+        DateTimeOffset boardCreated)
+    {
+        foreach (var card in sampleBoard.Cards)
+        {
+            var cardKey = card.ProjectTitle + "|" + card.TodoTitle;
+            if (!todosByKey.TryGetValue(cardKey, out var todoItemId))
+                throw new InvalidOperationException(
+                    $"sample-data.json: board '{sampleBoard.Title}' card " +
+                    $"({cardKey}) names a to-do that is not seeded under the project " +
+                    $"'{card.ProjectTitle}'.");
+            if (!lanesByTitle.TryGetValue(card.LaneTitle, out var laneId))
+                throw new InvalidOperationException(
+                    $"sample-data.json: board '{sampleBoard.Title}' card " +
+                    $"({cardKey}) names an unknown lane '{card.LaneTitle}'.");
+            session.Store(new BoardItemPlacement
+            {
+                Id = Id(),
+                TodoItemId = todoItemId,
+                BoardId = boardId,
+                LaneId = laneId,
+                Order = card.Order,
+                Created = boardCreated,
+                Modified = boardCreated,
+            });
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>SeedInventoryAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedInventoryAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail)
+    {
         // ── Inventory (ADR 0117) + check-out / check-in usage records ───────────────────
         // An item is the check-out-able thing (name + ownership kind + standing owner); its
         // usage history is the append-only InventoryCheckout record set (never a field on the
@@ -791,6 +987,15 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>SeedCommunityTranslationsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedCommunityTranslationsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        string translationAuthorId)
+    {
         // ── Community (board) name/description translations (ADR 0026) ──────────────────
         foreach (var community in doc.CommunityTranslations)
         {
@@ -805,6 +1010,14 @@ public static class SampleDataSeeder
             });
         }
 
+    }
+
+    /// <summary>EnableDanishAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task EnableDanishAsync(
+        IDocumentSession session,
+        SampleDataDocument doc,
+        CancellationToken ct)
+    {
         // ── Enable every catalog language for the demo (ADR 0005) ────────────────────────
         // Danish ships DISABLED (FirstBootSeeder seeds it awaiting an admin's enable);
         // the sample wants the full selector, so flip it on here. Dev-only: this session
@@ -819,6 +1032,14 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>EnableMessagingAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task EnableMessagingAsync(
+        IDocumentSession session,
+        SampleDataDocument doc,
+        CancellationToken ct)
+    {
         // ── Enable 1:1 resident messaging for the demo (ADR 0139, the M9 amendment) ─────
         // The gate is two-sided (the ADR 0139 composition table): the instance MASTER gate
         // (LocaleSettings.MessagingEnabled, shipped OFF by default) AND each resident's own
@@ -838,6 +1059,15 @@ public static class SampleDataSeeder
             session.Store(settings);
         }
 
+    }
+
+    /// <summary>SeedGuardianLinksAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task SeedGuardianLinksAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail)
+    {
         // ── Guardian links (ADR 0028 §B) — a guardian account supervising a child ────
         // One `Active` row per (guardian, child) pair + its `guardian.create` audit (the
         // CreateGuardianLinkAsync formation shape, G·4): the guardian acts under their own
@@ -872,8 +1102,19 @@ public static class SampleDataSeeder
             });
         }
 
-        await session.SaveChangesAsync();
+    }
 
+    /// <summary>FinalizeSeedAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task FinalizeSeedAsync(
+        bool deployPosture,
+        IMailerStage? mailer,
+        IDocumentStore mt,
+        User admin,
+        string adminAccountEmail,
+        List<(string Email, string Password)> deployCredentials,
+        ILogger logger,
+        CancellationToken ct)
+    {
         // Deploy posture (ADR 0056): hand the demo credentials to the instance's admin
         // through the durable outbox (one OutboxEmail, idempotency-keyed) — the only place
         // they exist beyond the hashed EF store. No-op in Development (mailer is null).
@@ -909,7 +1150,6 @@ public static class SampleDataSeeder
         }
     }
 
-    // ── Shape parsers (string → domain enum / audience) ─────────────────────────────────
     private static AnnouncementScope ParseScope(string scope)
         => scope.Equals("public", StringComparison.OrdinalIgnoreCase)
             ? AnnouncementScope.Public
@@ -1058,56 +1298,26 @@ public static class SampleDataSeeder
         var doc = LoadDocument();
         var now = DateTimeOffset.UtcNow;
 
-        // ── 1. Accounts (create-if-missing, keyed by e-mail) ──────────────────────────
-        // EnsureUserAsync is idempotent (FindByEmailAsync) and only adds a password to
-        // an account that has none — so a warm re-run never overwrites an existing
-        // credential, and it creates a *new* account only if the corpus grew past first
-        // boot. The two postures (ADR 0056) mirror SeedAsync exactly: in Development a
-        // newly-added account gets the documented weak demo password; in the deploy
-        // posture the seed admin stays on its setup-token lane (a null password is a
-        // no-op, so NO weak credential is ever written) and a newly-added non-admin
-        // account gets a random high-entropy password.
+        // Warm re-run (create-if-missing): EnsureUserAsync is idempotent (FindByEmailAsync)
+        // and only adds a password to an account that has none, so a warm boot never
+        // overwrites an existing credential and only creates a *new* account if the corpus
+        // grew past first boot (the two postures of ADR 0056, mirrored from SeedAsync).
         bool deployPosture = mailer is not null;
         var usersByEmail = new Dictionary<string, User>(StringComparer.OrdinalIgnoreCase);
-        foreach (var account in doc.Accounts)
-        {
-            bool isAdmin = account.Role == Roles.GlobalAdmin;
-            string email = (isAdmin && deployPosture && adminEmail is not null) ? adminEmail : account.Email;
-            string? password =
-                deployPosture
-                    ? (isAdmin ? null : RandomPassword())
-                    : (isAdmin ? AdminPassword
-                      : account.Role == Roles.Moderator ? ModeratorPassword
-                      : account.Role == Roles.Translator ? TranslatorPassword
-                      : ResidentPassword);
-            var user = await EnsureUserAsync(
-                userManager, roleManager, mt,
-                email, password, account.Name,
-                contactVisibility: account.ContactVisibility,
-                timeZone: account.TimeZone,
-                dateFormat: account.DateFormat,
-                elevatedRole: account.Role,
-                messagingOptIn: doc.EnableMessaging,
-                logger: logger, ct: ct);
-            usersByEmail[account.Email] = user;
-        }
+
+        // 1. Accounts (create-if-missing, keyed by e-mail).
+        await BackfillAccountsAsync(doc, deployPosture, adminEmail, userManager, roleManager, mt,
+            usersByEmail, logger, ct);
         var admin = usersByEmail[doc.Accounts.Single(a => a.Role == Roles.GlobalAdmin).Email];
         var translator = doc.Accounts.FirstOrDefault(a => a.Role == Roles.Translator);
         string translationAuthorId = translator is not null ? usersByEmail[translator.Email].Id : string.Empty;
-        string TranslateAuthorId(string? authorEmail)
-            => authorEmail is not null ? usersByEmail[authorEmail].Id : translationAuthorId;
+        Func<string?, string> TranslateAuthorId =
+            authorEmail => authorEmail is not null ? usersByEmail[authorEmail].Id : translationAuthorId;
 
-        // ── 2. Components mandatory (idempotent write lane; load-then-store) ───────────
-        // SetCommunityMandatoryAsync is the sanctioned writer and is itself
-        // create-if-missing / no-op-on-no-change, so re-asserting it on a warm boot is
-        // safe (the pristine gate normally keeps SeedAsync off a warm DB; here we want
-        // the warm path to be self-sufficient).
-        foreach (var componentId in doc.MandatoryComponents)
-        {
-            await userInfo.SetCommunityMandatoryAsync(componentId, true, admin.Id, GlobalAdminRoles);
-        }
+        // 2. Components mandatory (idempotent write lane; load-then-store).
+        await BackfillMandatoryComponentsAsync(doc, admin, userInfo);
 
-        // ── 3. All `mt`-side sample content — one session, one commit (invariant C3) ───
+        // 3. All `mt`-side sample content — one session, one commit (invariant C3).
         await using var session = mt.OpenSession(new SessionOptions());
 
         // Preload the current corpus once per type (the create-if-missing match set).
@@ -1140,8 +1350,113 @@ public static class SampleDataSeeder
         var existingCheckouts = await session.Query<InventoryCheckout>().ToListAsync(ct);
         var existingGuardianLinks = await session.Query<GuardianLink>().ToListAsync(ct);
 
-        // ── Tags (by slug) + per-language display names ────────────────────────────────
+        // Cross-entity id maps created in one seam and read by later seams (shared, C3-02).
         var tagsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var groupsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var goalsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var projectsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var todosByKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        await BackfillTagsAsync(session, now, doc, usersByEmail, tagsBySlug, TranslateAuthorId, existingTags, existingTagTrans);
+        await BackfillGroupsAsync(session, now, doc, usersByEmail, groupsByTitle, TranslateAuthorId, existingGroups, existingGroupsBy, existingGrpTrans);
+        await BackfillModeratorAssignmentsAsync(session, now, doc, usersByEmail, admin, ct);
+        await BackfillAnnouncementsAsync(session, now, doc, usersByEmail, TranslateAuthorId, existingAnn, existingAnnTrans);
+        await BackfillPostsAsync(session, now, doc, usersByEmail, tagsBySlug, groupsByTitle, TranslateAuthorId, existingPosts, existingReplies, existingPostTrans, existingReplTrans);
+        await BackfillEventsAsync(session, now, doc, usersByEmail, tagsBySlug, TranslateAuthorId, existingEvents, existingRsvps, existingEvtTrans);
+        await BackfillPagesAsync(session, now, doc, usersByEmail, tagsBySlug, TranslateAuthorId, existingPages, existingPageTrans);
+        await BackfillGoalsAsync(session, now, doc, usersByEmail, goalsByTitle, existingGoals);
+        await BackfillProjectsAsync(session, now, doc, usersByEmail, goalsByTitle, projectsByTitle, todosByKey, TranslateAuthorId, existingProjects, existingTodos, existingPrjTrans);
+        await BackfillBoardsAsync(session, now, doc, usersByEmail, projectsByTitle, todosByKey, TranslateAuthorId, existingBoards, existingLanes, existingPlacements, existingBoardTrans);
+        await BackfillInventoryAsync(session, now, doc, usersByEmail, existingInventory, existingCheckouts);
+        await BackfillCommunityTranslationsAsync(session, now, doc, translationAuthorId, existingCommTrans);
+        await BackfillGuardianLinksAsync(session, now, doc, usersByEmail, existingGuardianLinks);
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        logger.LogInformation(
+            "Warm-boot: backfilled the sample corpus (create-if-missing, idempotent). " +
+            "Accounts: {Accounts}, Tags: {Tags}, Groups: {Groups}, Announcements: {Ann}, " +
+            "Posts: {Posts}, Events: {Events}, Pages: {Pages}, Goals: {Goals}, Projects: {Projects}.",
+            doc.Accounts.Count, doc.Tags.Count, doc.Groups.Count, doc.Announcements.Count,
+            doc.Posts.Count, doc.Events.Count, doc.Pages.Count, doc.Goals.Count, doc.Projects.Count);
+    }
+
+
+    /// <summary>BackfillAccountsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillAccountsAsync(
+        SampleDataDocument doc,
+        bool deployPosture,
+        string? adminEmail,
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        IDocumentStore mt,
+        Dictionary<string, User> usersByEmail,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        // ── 1. Accounts (create-if-missing, keyed by e-mail) ──────────────────────────
+        // EnsureUserAsync is idempotent (FindByEmailAsync) and only adds a password to
+        // an account that has none — so a warm re-run never overwrites an existing
+        // credential, and it creates a *new* account only if the corpus grew past first
+        // boot. The two postures (ADR 0056) mirror SeedAsync exactly: in Development a
+        // newly-added account gets the documented weak demo password; in the deploy
+        // posture the seed admin stays on its setup-token lane (a null password is a
+        // no-op, so NO weak credential is ever written) and a newly-added non-admin
+        // account gets a random high-entropy password.
+        foreach (var account in doc.Accounts)
+        {
+            bool isAdmin = account.Role == Roles.GlobalAdmin;
+            string email = (isAdmin && deployPosture && adminEmail is not null) ? adminEmail : account.Email;
+            string? password =
+                deployPosture
+                    ? (isAdmin ? null : RandomPassword())
+                    : (isAdmin ? AdminPassword
+                      : account.Role == Roles.Moderator ? ModeratorPassword
+                      : account.Role == Roles.Translator ? TranslatorPassword
+                      : ResidentPassword);
+            var user = await EnsureUserAsync(
+                userManager, roleManager, mt,
+                email, password, account.Name,
+                contactVisibility: account.ContactVisibility,
+                timeZone: account.TimeZone,
+                dateFormat: account.DateFormat,
+                elevatedRole: account.Role,
+                messagingOptIn: doc.EnableMessaging,
+                logger: logger, ct: ct);
+            usersByEmail[account.Email] = user;
+        }
+    }
+
+    /// <summary>BackfillMandatoryComponentsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillMandatoryComponentsAsync(
+        SampleDataDocument doc,
+        User admin,
+        IUserInfoService userInfo)
+    {
+        // ── 2. Components mandatory (idempotent write lane; load-then-store) ───────────
+        // SetCommunityMandatoryAsync is the sanctioned writer and is itself
+        // create-if-missing / no-op-on-no-change, so re-asserting it on a warm boot is
+        // safe (the pristine gate normally keeps SeedAsync off a warm DB; here we want
+        // the warm path to be self-sufficient).
+        foreach (var componentId in doc.MandatoryComponents)
+        {
+            await userInfo.SetCommunityMandatoryAsync(componentId, true, admin.Id, GlobalAdminRoles);
+        }
+
+    }
+
+    /// <summary>BackfillTagsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillTagsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<Tag> existingTags,
+        IReadOnlyList<TagTranslation> existingTagTrans)
+    {
+        // ── Tags (by slug) + per-language display names ────────────────────────────────
         foreach (var existing in existingTags) tagsBySlug[existing.Slug] = existing.Id;
         foreach (var tag in doc.Tags)
         {
@@ -1181,8 +1496,21 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>BackfillGroupsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillGroupsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> groupsByTitle,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<Group> existingGroups,
+        IReadOnlyList<GroupMembership> existingGroupsBy,
+        IReadOnlyList<GroupTranslation> existingGrpTrans)
+    {
         // ── Groups (by title) + memberships + name/description translations ────────────
-        var groupsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var existing in existingGroups) groupsByTitle[existing.Name] = existing.Id;
         foreach (var group in doc.Groups)
         {
@@ -1247,6 +1575,17 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>BackfillModeratorAssignmentsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillModeratorAssignmentsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        User admin,
+        CancellationToken ct)
+    {
         // ── Moderator assignments (ADR 0003) — the rows that mint `moderator:{id}` ─────
         // There is no natural-key unique index on (UserId, ComponentId); match the pair
         // in memory. A missing pair is created; an existing one is skipped.
@@ -1270,6 +1609,18 @@ public static class SampleDataSeeder
             });
         }
 
+    }
+
+    /// <summary>BackfillAnnouncementsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillAnnouncementsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<Announcement> existingAnn,
+        IReadOnlyList<AnnouncementTranslation> existingAnnTrans)
+    {
         // ── Announcements (by title, component-scoped) + translations ──────────────────
         var announcementsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var existing in existingAnn)
@@ -1321,6 +1672,22 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>BackfillPostsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillPostsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        Dictionary<string, string> groupsByTitle,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<Post> existingPosts,
+        IReadOnlyList<PostReply> existingReplies,
+        IReadOnlyList<PostTranslation> existingPostTrans,
+        IReadOnlyList<ReplyTranslation> existingReplTrans)
+    {
         // ── Posts (by title + lane) + replies + translations ───────────────────────────
         // The lane is `GroupId` for a group-lane post, `ComponentId` for a community
         // post (the ADR 0013 lane exclusivity). The composite key encodes which lane.
@@ -1375,73 +1742,119 @@ public static class SampleDataSeeder
             }
             // Replies — there is no natural-key unique index on (PostId, Body); match
             // in-memory by (PostId, Body) and skip an existing one (create-if-missing).
-            var haveReplies = existingReplies
-                .Where(r => r.PostId == id)
-                .Select(r => r.Body)
-                .ToHashSet();
-            foreach (var reply in samplePost.Replies)
+            await BackfillPostRepliesAsync(session, now, id, samplePost, usersByEmail, TranslateAuthorId, existingReplies, existingReplTrans);
+            // Top-up the post's translation rows (the same-title-duplicate aware
+            // version — extracted so the per-entity seam sits under the 80-line/15-cc
+            // ceiling, C3-02).
+            await BackfillPostTranslationsAsync(session, now, id, samplePost, TranslateAuthorId, existingPostTrans, postTransLangsThisRun);
+        }
+
+    }
+
+    /// <summary>BackfillPostTranslationsAsync — the translation rows for one sample post (C3-02: extracted from BackfillPostsAsync so the per-entity seam sits under the 80-line/15-cc ceiling). Top-up'd by (PostId, LanguageCode); a same-title duplicate stored translations for this PostId earlier in this run (not in the pre-run snapshot), so those are folded in via the shared `postTransLangsThisRun` map to avoid re-storing the same (PostId, LanguageCode) and tripping the PostTranslation unique constraint.</summary>
+    private static async Task BackfillPostTranslationsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        string postId,
+        SamplePost samplePost,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<PostTranslation> existingPostTrans,
+        Dictionary<string, HashSet<string>> postTransLangsThisRun)
+    {
+        // Top-up the post's translation rows.
+        var havePostTrans = existingPostTrans
+            .Where(t => t.PostId == postId)
+            .Select(t => t.LanguageCode)
+            .ToHashSet();
+        // A same-title duplicate stored translations for this PostId earlier in
+        // this run; those aren't in the pre-run snapshot, so fold them in.
+        if (postTransLangsThisRun.TryGetValue(postId, out var alreadyAdded))
+            havePostTrans.UnionWith(alreadyAdded);
+        if (!postTransLangsThisRun.TryGetValue(postId, out var addedThisRun))
+            postTransLangsThisRun[postId] = addedThisRun = new HashSet<string>();
+        foreach (var tr in samplePost.Translations)
+        {
+            if (havePostTrans.Contains(tr.LanguageCode)) continue;
+            session.Store(new PostTranslation
             {
-                if (haveReplies.Contains(reply.Body)) continue;
-                var replyId = Id();
-                session.Store(new PostReply
-                {
-                    Id = replyId,
-                    PostId = id,
-                    AuthorId = usersByEmail[reply.AuthorEmail].Id,
-                    Body = reply.Body,
-                    Created = now.AddDays(-(reply.DaysAgo ?? 0)).AddHours(reply.HoursAfter ?? 0),
-                    LanguageCode = "en",
-                });
-                haveReplies.Add(reply.Body);
-                // Top-up the reply's translation rows.
-                var haveReplTrans = existingReplTrans
-                    .Where(t => t.ReplyId == replyId)
-                    .Select(t => t.LanguageCode)
-                    .ToHashSet();
-                foreach (var tr in reply.Translations)
-                {
-                    if (haveReplTrans.Contains(tr.LanguageCode)) continue;
-                    session.Store(new ReplyTranslation
-                    {
-                        Id = Id(),
-                        ReplyId = replyId,
-                        LanguageCode = tr.LanguageCode,
-                        Body = tr.Body,
-                        AuthorId = TranslateAuthorId(tr.AuthorEmail),
-                        Created = now.AddDays(-(tr.DaysAgo ?? 0)),
-                    });
-                    haveReplTrans.Add(tr.LanguageCode);
-                }
-            }
-            // Top-up the post's translation rows.
-            var havePostTrans = existingPostTrans
-                .Where(t => t.PostId == id)
+                Id = Id(),
+                PostId = postId,
+                LanguageCode = tr.LanguageCode,
+                Title = tr.Title ?? string.Empty,
+                Body = tr.Body,
+                AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+            });
+            havePostTrans.Add(tr.LanguageCode);
+            addedThisRun.Add(tr.LanguageCode);
+        }
+    }
+
+    /// <summary>BackfillPostRepliesAsync — the replies + their translation rows for one sample post (C3-02: extracted from BackfillPostsAsync so the per-entity seam sits under the 80-line/15-cc ceiling). There is no natural-key unique index on (PostId, Body), so an existing reply is matched in-memory by (PostId, Body) and skipped (create-if-missing); the reply's translation rows are top-up'd by (ReplyId, LanguageCode).</summary>
+    private static async Task BackfillPostRepliesAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        string postTitleId,
+        SamplePost samplePost,
+        Dictionary<string, User> usersByEmail,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<PostReply> existingReplies,
+        IReadOnlyList<ReplyTranslation> existingReplTrans)
+    {
+        // Replies — there is no natural-key unique index on (PostId, Body); match
+        // in-memory by (PostId, Body) and skip an existing one (create-if-missing).
+        var haveReplies = existingReplies
+            .Where(r => r.PostId == postTitleId)
+            .Select(r => r.Body)
+            .ToHashSet();
+        foreach (var reply in samplePost.Replies)
+        {
+            if (haveReplies.Contains(reply.Body)) continue;
+            var replyId = Id();
+            session.Store(new PostReply
+            {
+                Id = replyId,
+                PostId = postTitleId,
+                AuthorId = usersByEmail[reply.AuthorEmail].Id,
+                Body = reply.Body,
+                Created = now.AddDays(-(reply.DaysAgo ?? 0)).AddHours(reply.HoursAfter ?? 0),
+                LanguageCode = "en",
+            });
+            haveReplies.Add(reply.Body);
+            // Top-up the reply's translation rows.
+            var haveReplTrans = existingReplTrans
+                .Where(t => t.ReplyId == replyId)
                 .Select(t => t.LanguageCode)
                 .ToHashSet();
-            // A same-title duplicate stored translations for this PostId earlier in
-            // this run; those aren't in the pre-run snapshot, so fold them in.
-            if (postTransLangsThisRun.TryGetValue(id, out var alreadyAdded))
-                havePostTrans.UnionWith(alreadyAdded);
-            if (!postTransLangsThisRun.TryGetValue(id, out var addedThisRun))
-                postTransLangsThisRun[id] = addedThisRun = new HashSet<string>();
-            foreach (var tr in samplePost.Translations)
+            foreach (var tr in reply.Translations)
             {
-                if (havePostTrans.Contains(tr.LanguageCode)) continue;
-                session.Store(new PostTranslation
+                if (haveReplTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new ReplyTranslation
                 {
                     Id = Id(),
-                    PostId = id,
+                    ReplyId = replyId,
                     LanguageCode = tr.LanguageCode,
-                    Title = tr.Title ?? string.Empty,
                     Body = tr.Body,
                     AuthorId = TranslateAuthorId(tr.AuthorEmail),
                     Created = now.AddDays(-(tr.DaysAgo ?? 0)),
                 });
-                havePostTrans.Add(tr.LanguageCode);
-                addedThisRun.Add(tr.LanguageCode);
+                haveReplTrans.Add(tr.LanguageCode);
             }
         }
+    }
 
+    /// <summary>BackfillEventsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillEventsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<Event> existingEvents,
+        IReadOnlyList<EventRsvp> existingRsvps,
+        IReadOnlyList<EventTranslation> existingEvtTrans)
+    {
         // ── Events (by title) + RSVPs + translations ───────────────────────────────────
         var eventsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var existing in existingEvents) eventsByTitle[existing.Title] = existing.Id;
@@ -1476,24 +1889,7 @@ public static class SampleDataSeeder
                 eventsByTitle[sampleEvent.Title] = id;
             }
             // RSVPs — (EventId, UserId) unique index; skip existing.
-            var haveRsvps = existingRsvps
-                .Where(r => r.EventId == id)
-                .Select(r => r.UserId)
-                .ToHashSet();
-            foreach (var rsvp in sampleEvent.Rsvps)
-            {
-                var userId = usersByEmail[rsvp.UserEmail].Id;
-                if (haveRsvps.Contains(userId)) continue;
-                session.Store(new EventRsvp
-                {
-                    Id = Id(),
-                    EventId = id,
-                    UserId = userId,
-                    Status = ParseRsvpStatus(rsvp.Status),
-                    At = now.AddDays(-(rsvp.DaysAgo ?? 0)).AddHours(rsvp.HoursAfter ?? 0),
-                });
-                haveRsvps.Add(userId);
-            }
+            await BackfillEventRsvpsAsync(session, now, id, sampleEvent, usersByEmail, existingRsvps);
             // Top-up the event's translation rows.
             var haveEvtTrans = existingEvtTrans
                 .Where(t => t.EventId == id)
@@ -1516,6 +1912,49 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>BackfillEventRsvpsAsync — the RSVP rows for one sample event (C3-02: extracted from BackfillEventsAsync so the per-entity seam sits under the 80-line/15-cc ceiling). (EventId, UserId) is a unique index, so an existing RSVP for the same user is skipped (create-if-missing).</summary>
+    private static async Task BackfillEventRsvpsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        string eventId,
+        SampleEvent sampleEvent,
+        Dictionary<string, User> usersByEmail,
+        IReadOnlyList<EventRsvp> existingRsvps)
+    {
+        // RSVPs — (EventId, UserId) unique index; skip existing.
+        var haveRsvps = existingRsvps
+            .Where(r => r.EventId == eventId)
+            .Select(r => r.UserId)
+            .ToHashSet();
+        foreach (var rsvp in sampleEvent.Rsvps)
+        {
+            var userId = usersByEmail[rsvp.UserEmail].Id;
+            if (haveRsvps.Contains(userId)) continue;
+            session.Store(new EventRsvp
+            {
+                Id = Id(),
+                EventId = eventId,
+                UserId = userId,
+                Status = ParseRsvpStatus(rsvp.Status),
+                At = now.AddDays(-(rsvp.DaysAgo ?? 0)).AddHours(rsvp.HoursAfter ?? 0),
+            });
+            haveRsvps.Add(userId);
+        }
+    }
+
+    /// <summary>BackfillPagesAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillPagesAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> tagsBySlug,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<Page> existingPages,
+        IReadOnlyList<PageTranslation> existingPageTrans)
+    {
         // ── Pages (by slug — globally unique in the sample corpus) + translations ──────
         // The ADR 0040 blog lane: parents are always listed before their sub-pages, and
         // the slug is the stable cross-reference key (SeedAsync keys off it the same way).
@@ -1572,8 +2011,18 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>BackfillGoalsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillGoalsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> goalsByTitle,
+        IReadOnlyList<ProjectGoal> existingGoals)
+    {
         // ── Goals (by title) — the PL lane, ADR 0086 D2 ────────────────────────────────
-        var goalsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var existing in existingGoals) goalsByTitle[existing.Title] = existing.Id;
         foreach (var goal in doc.Goals)
         {
@@ -1598,15 +2047,29 @@ public static class SampleDataSeeder
             goalsByTitle[goal.Title] = id;
         }
 
+    }
+
+    /// <summary>BackfillProjectsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillProjectsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> goalsByTitle,
+        Dictionary<string, string> projectsByTitle,
+        Dictionary<string, string> todosByKey,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<Project> existingProjects,
+        IReadOnlyList<TodoItem> existingTodos,
+        IReadOnlyList<ProjectTranslation> existingPrjTrans)
+    {
         // ── Projects (by title) + translations + nested to-dos ─────────────────────────
         // Board-card resolution maps (the boards key their cards by (projectTitle,
         // todoTitle)): project title → id, and (projectTitle|todoTitle) → to-do id, both
         // seeded from the existing corpus; to-dos newly created in this run register their
         // id as the loop runs so the boards loop (below) can resolve them.
-        var projectsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in existingProjects) projectsByTitle[p.Title] = p.Id;
         var projIdToTitle = existingProjects.ToDictionary(p => p.Id, p => p.Title);
-        var todosByKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var t in existingTodos)
             if (t.ProjectId is not null && !t.IsDeleted && projIdToTitle.TryGetValue(t.ProjectId, out var pt))
                 todosByKey[pt + "|" + t.Title] = t.Id;
@@ -1648,63 +2111,96 @@ public static class SampleDataSeeder
                 // production on exactly this.
                 id = existingProjects.First(p => p.Title == sampleProject.Title).Id;
             }
-            // Top-up the project's translation rows.
-            var havePrjTrans = existingPrjTrans
-                .Where(t => t.ProjectId == id)
-                .Select(t => t.LanguageCode)
-                .ToHashSet();
-            foreach (var tr in sampleProject.Translations)
-            {
-                if (havePrjTrans.Contains(tr.LanguageCode)) continue;
-                session.Store(new ProjectTranslation
-                {
-                    Id = Id(),
-                    ProjectId = id,
-                    LanguageCode = tr.LanguageCode,
-                    Title = tr.Title,
-                    Body = tr.Body,
-                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
-                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
-                });
-                havePrjTrans.Add(tr.LanguageCode);
-            }
-            // Nested to-dos — match by (ProjectId, Title); create if missing.
-            var haveTodos = existingTodos
-                .Where(t => t.ProjectId == id && !t.IsDeleted)
-                .Select(t => t.Title)
-                .ToHashSet();
-            foreach (var todo in sampleProject.Todos)
-            {
-                if (haveTodos.Contains(todo.Title)) continue;
-                var todoId = Id();
-                session.Store(new TodoItem
-                {
-                    Id = todoId,
-                    Title = todo.Title,
-                    Body = todo.Body,
-                    ComponentId = sampleProject.ComponentId,
-                    ProjectId = id,
-                    AuthorId = usersByEmail[sampleProject.AuthorEmail].Id,
-                    AssigneeId = todo.AssigneeEmail is not null ? usersByEmail[todo.AssigneeEmail].Id : null,
-                    Status = todo.Status,
-                    StartAt = null,
-                    DueAt = todo.DueInDays.HasValue ? now.AddDays(todo.DueInDays.Value) : null,
-                    Audience = null,
-                    IsDeleted = false,
-                    LanguageCode = "en",
-                    TagIds = [],
-                    ImageIds = [],
-                    AttachmentIds = [],
-                    Created = now.AddDays(-todo.DaysAgo),
-                    Modified = null,
-                });
-                haveTodos.Add(todo.Title);
-                // Register for the board-card resolution below (boards key cards by
-                // (projectTitle, todoTitle)).
-                todosByKey[sampleProject.Title + "|" + todo.Title] = todoId;
-            }
+            // Per-project content (translations + nested to-dos) — extracted so the
+            // per-entity seam sits under the 80-line/15-cc ceiling (C3-02).
+            await BackfillProjectContentAsync(session, now, id, sampleProject, usersByEmail, TranslateAuthorId, existingPrjTrans, existingTodos, todosByKey);
         }
 
+    }
+
+    /// <summary>BackfillProjectContentAsync — the translation rows + nested to-dos for one sample project (C3-02: extracted from BackfillProjectsAsync so the per-entity seam sits under the 80-line/15-cc ceiling). Translations are top-up'd by (ProjectId, LanguageCode); to-dos matched by (ProjectId, Title) are created if missing and registered in the board-card resolution map (boards key cards by (projectTitle, todoTitle)).</summary>
+    private static async Task BackfillProjectContentAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        string projectId,
+        SampleProject sampleProject,
+        Dictionary<string, User> usersByEmail,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<ProjectTranslation> existingPrjTrans,
+        IReadOnlyList<TodoItem> existingTodos,
+        Dictionary<string, string> todosByKey)
+    {
+        // Top-up the project's translation rows.
+        var havePrjTrans = existingPrjTrans
+            .Where(t => t.ProjectId == projectId)
+            .Select(t => t.LanguageCode)
+            .ToHashSet();
+        foreach (var tr in sampleProject.Translations)
+        {
+            if (havePrjTrans.Contains(tr.LanguageCode)) continue;
+            session.Store(new ProjectTranslation
+            {
+                Id = Id(),
+                ProjectId = projectId,
+                LanguageCode = tr.LanguageCode,
+                Title = tr.Title,
+                Body = tr.Body,
+                AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+            });
+            havePrjTrans.Add(tr.LanguageCode);
+        }
+        // Nested to-dos — match by (ProjectId, Title); create if missing.
+        var haveTodos = existingTodos
+            .Where(t => t.ProjectId == projectId && !t.IsDeleted)
+            .Select(t => t.Title)
+            .ToHashSet();
+        foreach (var todo in sampleProject.Todos)
+        {
+            if (haveTodos.Contains(todo.Title)) continue;
+            var todoId = Id();
+            session.Store(new TodoItem
+            {
+                Id = todoId,
+                Title = todo.Title,
+                Body = todo.Body,
+                ComponentId = sampleProject.ComponentId,
+                ProjectId = projectId,
+                AuthorId = usersByEmail[sampleProject.AuthorEmail].Id,
+                AssigneeId = todo.AssigneeEmail is not null ? usersByEmail[todo.AssigneeEmail].Id : null,
+                Status = todo.Status,
+                StartAt = null,
+                DueAt = todo.DueInDays.HasValue ? now.AddDays(todo.DueInDays.Value) : null,
+                Audience = null,
+                IsDeleted = false,
+                LanguageCode = "en",
+                TagIds = [],
+                ImageIds = [],
+                AttachmentIds = [],
+                Created = now.AddDays(-todo.DaysAgo),
+                Modified = null,
+            });
+            haveTodos.Add(todo.Title);
+            // Register for the board-card resolution below (boards key cards by
+            // (projectTitle, todoTitle)).
+            todosByKey[sampleProject.Title + "|" + todo.Title] = todoId;
+        }
+    }
+
+    /// <summary>BackfillBoardsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillBoardsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        Dictionary<string, string> projectsByTitle,
+        Dictionary<string, string> todosByKey,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<KanbanBoard> existingBoards,
+        IReadOnlyList<KanbanLane> existingLanes,
+        IReadOnlyList<BoardItemPlacement> existingPlacements,
+        IReadOnlyList<BoardTranslation> existingBoardTrans)
+    {
         // ── Kanban boards (ADR 0067 D1) + lanes + placements (create-if-missing) ────────
         // A board is matched by title (the closed sample corpus — the ADR 0130 D3 caveat
         // about display-string keys applies); its lanes by (boardId, order) and its card
@@ -1738,77 +2234,105 @@ public static class SampleDataSeeder
                 });
                 boardsByTitle[sampleBoard.Title] = boardId;
             }
-            // Lanes — (boardId, order) unique; skip an existing one by (boardId, order).
-            var existingLaneOrders = existingLanes.Where(l => l.BoardId == boardId).Select(l => l.Order).ToHashSet();
-            var lanesByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var existingLane in existingLanes.Where(l => l.BoardId == boardId))
-                lanesByTitle[existingLane.Title] = existingLane.Id;
-            foreach (var lane in sampleBoard.Lanes)
+            // Per-board content (lanes + translations + cards) — extracted so the
+            // per-entity seam sits under the 80-line/15-cc ceiling (C3-02).
+            await BackfillBoardContentAsync(session, now, boardId, sampleBoard, todosByKey, TranslateAuthorId, existingLanes, existingBoardTrans, existingPlacements);
+        }
+
+    }
+
+    /// <summary>BackfillBoardContentAsync — the lanes + translations + card placements for one sample board (C3-02: extracted from BackfillBoardsAsync so the per-entity seam sits under the 80-line/15-cc ceiling). Lanes are matched by (boardId, order); translations top-up'd by (boardId, language); cards by (todoId, boardId) — a card naming a to-do or lane absent on a warm DB is skipped (create-if-missing; the D3 fail-fast is the pristine SeedAsync path only).</summary>
+    private static async Task BackfillBoardContentAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        string boardId,
+        SampleKanbanBoard sampleBoard,
+        Dictionary<string, string> todosByKey,
+        Func<string?, string> TranslateAuthorId,
+        IReadOnlyList<KanbanLane> existingLanes,
+        IReadOnlyList<BoardTranslation> existingBoardTrans,
+        IReadOnlyList<BoardItemPlacement> existingPlacements)
+    {
+        // Lanes — (boardId, order) unique; skip an existing one by (boardId, order).
+        var existingLaneOrders = existingLanes.Where(l => l.BoardId == boardId).Select(l => l.Order).ToHashSet();
+        var lanesByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existingLane in existingLanes.Where(l => l.BoardId == boardId))
+            lanesByTitle[existingLane.Title] = existingLane.Id;
+        foreach (var lane in sampleBoard.Lanes)
+        {
+            string laneId;
+            if (existingLaneOrders.Contains(lane.Order))
+                laneId = existingLanes.Single(l => l.BoardId == boardId && l.Order == lane.Order).Id;
+            else
             {
-                string laneId;
-                if (existingLaneOrders.Contains(lane.Order))
-                    laneId = existingLanes.Single(l => l.BoardId == boardId && l.Order == lane.Order).Id;
-                else
-                {
-                    laneId = Id();
-                    var boardCreated = now.AddDays(-sampleBoard.DaysAgo);
-                    session.Store(new KanbanLane
-                    {
-                        Id = laneId,
-                        BoardId = boardId,
-                        Title = lane.Title,
-                        Status = lane.Status,
-                        MaxItems = lane.MaxItems,
-                        Order = lane.Order,
-                        Created = boardCreated,
-                        Modified = boardCreated,
-                    });
-                    existingLaneOrders.Add(lane.Order);
-                }
-                lanesByTitle[lane.Title] = laneId;
-            }
-            // Board title/description translations (ADR 0088) — top-up by (boardId, lang).
-            var haveBoardTrans = existingBoardTrans.Where(t => t.BoardId == boardId)
-                .Select(t => t.LanguageCode).ToHashSet();
-            foreach (var tr in sampleBoard.Translations)
-            {
-                if (haveBoardTrans.Contains(tr.LanguageCode)) continue;
-                session.Store(new BoardTranslation
-                {
-                    Id = Id(),
-                    BoardId = boardId,
-                    LanguageCode = tr.LanguageCode,
-                    Title = tr.Title,
-                    Body = tr.Body,
-                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
-                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
-                });
-                haveBoardTrans.Add(tr.LanguageCode);
-            }
-            // Cards — (todoId, boardId) unique; skip an existing one by todo id.
-            var existingCardTodoIds = existingPlacements.Where(pl => pl.BoardId == boardId)
-                .Select(pl => pl.TodoItemId).ToHashSet();
-            foreach (var card in sampleBoard.Cards)
-            {
-                var cardKey = card.ProjectTitle + "|" + card.TodoTitle;
-                if (!todosByKey.TryGetValue(cardKey, out var todoItemId)) continue; // to-do absent — skip.
-                if (existingCardTodoIds.Contains(todoItemId)) continue;            // already placed.
-                if (!lanesByTitle.TryGetValue(card.LaneTitle, out var laneId)) continue; // lane absent — skip.
+                laneId = Id();
                 var boardCreated = now.AddDays(-sampleBoard.DaysAgo);
-                session.Store(new BoardItemPlacement
+                session.Store(new KanbanLane
                 {
-                    Id = Id(),
-                    TodoItemId = todoItemId,
+                    Id = laneId,
                     BoardId = boardId,
-                    LaneId = laneId,
-                    Order = card.Order,
+                    Title = lane.Title,
+                    Status = lane.Status,
+                    MaxItems = lane.MaxItems,
+                    Order = lane.Order,
                     Created = boardCreated,
                     Modified = boardCreated,
                 });
-                existingCardTodoIds.Add(todoItemId);
+                existingLaneOrders.Add(lane.Order);
             }
+            lanesByTitle[lane.Title] = laneId;
         }
+        // Board title/description translations (ADR 0088) — top-up by (boardId, lang).
+        var haveBoardTrans = existingBoardTrans.Where(t => t.BoardId == boardId)
+            .Select(t => t.LanguageCode).ToHashSet();
+        foreach (var tr in sampleBoard.Translations)
+        {
+            if (haveBoardTrans.Contains(tr.LanguageCode)) continue;
+            session.Store(new BoardTranslation
+            {
+                Id = Id(),
+                BoardId = boardId,
+                LanguageCode = tr.LanguageCode,
+                Title = tr.Title,
+                Body = tr.Body,
+                AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+            });
+            haveBoardTrans.Add(tr.LanguageCode);
+        }
+        // Cards — (todoId, boardId) unique; skip an existing one by todo id.
+        var existingCardTodoIds = existingPlacements.Where(pl => pl.BoardId == boardId)
+            .Select(pl => pl.TodoItemId).ToHashSet();
+        foreach (var card in sampleBoard.Cards)
+        {
+            var cardKey = card.ProjectTitle + "|" + card.TodoTitle;
+            if (!todosByKey.TryGetValue(cardKey, out var todoItemId)) continue; // to-do absent — skip.
+            if (existingCardTodoIds.Contains(todoItemId)) continue;            // already placed.
+            if (!lanesByTitle.TryGetValue(card.LaneTitle, out var laneId)) continue; // lane absent — skip.
+            var boardCreated = now.AddDays(-sampleBoard.DaysAgo);
+            session.Store(new BoardItemPlacement
+            {
+                Id = Id(),
+                TodoItemId = todoItemId,
+                BoardId = boardId,
+                LaneId = laneId,
+                Order = card.Order,
+                Created = boardCreated,
+                Modified = boardCreated,
+            });
+            existingCardTodoIds.Add(todoItemId);
+        }
+    }
 
+    /// <summary>BackfillInventoryAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillInventoryAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        IReadOnlyList<InventoryItem> existingInventory,
+        IReadOnlyList<InventoryCheckout> existingCheckouts)
+    {
         // ── Inventory (ADR 0117) + usage records (create-if-missing) ────────────────────
         // An item is matched by name (the closed sample corpus); its usage records by
         // (itemId, borrowerId, note). A record naming an unknown borrower is impossible on a
@@ -1868,6 +2392,16 @@ public static class SampleDataSeeder
             }
         }
 
+    }
+
+    /// <summary>BackfillCommunityTranslationsAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillCommunityTranslationsAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        string translationAuthorId,
+        IReadOnlyList<CommunityTranslation> existingCommTrans)
+    {
         // ── Community (board) name/description translations (ADR 0026) ─────────────────
         // Match by (ComponentId, LanguageCode).
         var haveCommTrans = existingCommTrans
@@ -1890,6 +2424,16 @@ public static class SampleDataSeeder
             haveCommTrans.Add(key);
         }
 
+    }
+
+    /// <summary>BackfillGuardianLinksAsync — one per-entity seam of the sample corpus (C3-02: the god-method decomposition). Stores its entity's rows in the shared session (invariant C3); cross-entity ids come from the shared maps passed in.</summary>
+    private static async Task BackfillGuardianLinksAsync(
+        IDocumentSession session,
+        DateTimeOffset now,
+        SampleDataDocument doc,
+        Dictionary<string, User> usersByEmail,
+        IReadOnlyList<GuardianLink> existingGuardianLinks)
+    {
         // ── Guardian links (ADR 0028 §B) — create-if-missing by (GuardianId, ChildId) ─
         // A row for a pair already present (any status) is a no-op (the
         // CreateGuardianLinkAsync idempotent-formation precedent). The `guardian.create`
@@ -1927,18 +2471,8 @@ public static class SampleDataSeeder
             });
             haveGuardianLinks.Add(key);
         }
-
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-
-        logger.LogInformation(
-            "Warm-boot: backfilled the sample corpus (create-if-missing, idempotent). " +
-            "Accounts: {Accounts}, Tags: {Tags}, Groups: {Groups}, Announcements: {Ann}, " +
-            "Posts: {Posts}, Events: {Events}, Pages: {Pages}, Goals: {Goals}, Projects: {Projects}.",
-            doc.Accounts.Count, doc.Tags.Count, doc.Groups.Count, doc.Announcements.Count,
-            doc.Posts.Count, doc.Events.Count, doc.Pages.Count, doc.Goals.Count, doc.Projects.Count);
     }
 
-    /// <summary>
     /// Find-or-create a verified-resident account: the EF/<c>identity</c>-side write
     /// (account + password + roles) commits per <see cref="UserManager"/> call; the
     /// <c>mt</c>-side <see cref="Profile"/> is stored in its own session. Idempotent —
