@@ -50,8 +50,8 @@ namespace Kumunita.Core.Tests;
 ///       <c>CanAsync</c> call, no audit row. Feeds exclude drafts
 ///       unconditionally.</item>
 /// <item><b>The standing matrix is a pure role-claim check</b> (ADR 0054
-///       §3.4, the <see cref="PageService.CheckCreateStanding"/> /
-///       <see cref="PageService.CheckEditStanding"/> shape): create = any
+///       §3.4, the <see cref="PageStandingPolicy.CheckCreateStanding"/> /
+///       <see cref="PageStandingPolicy.CheckEditStanding"/> shape): create = any
 ///       signed-in resident (they become the author); edit = author ∪
 ///       GlobalAdmin. A null event is a 404; a denied actor is a 403. No new
 ///       <c>AccessAction</c>, no new <c>AccessVia</c>, no branch in the frozen
@@ -489,7 +489,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     // ════════════════════════════════════════════════════════════════════════
     // Standing-matrix gate helpers (pure — no store, no async).
     // ADR 0054 §3.4: create = any signed-in resident; edit = author ∪
-    // GlobalAdmin. The PageService.CheckCreateStanding / CheckEditStanding
+    // GlobalAdmin. The PageStandingPolicy.CheckCreateStanding / CheckEditStanding
     // shape; the ADR 0014 / 0016 / 0017 precedent.
     // ════════════════════════════════════════════════════════════════════════
 

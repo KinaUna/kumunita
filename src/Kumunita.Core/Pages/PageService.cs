@@ -102,7 +102,7 @@ public sealed class PageService : IPageService
                 // (UnauthorizedAccessException) and ResolveTranslationStandingVia
                 // records the narrowest right that applied (Owner for a blog
                 // author, Admin for GlobalAdmin / Translator).
-                CheckTranslateStanding(actorId, actorRoles, page);
+                PageStandingPolicy.CheckTranslateStanding(actorId, actorRoles, page);
                 return ResolveTranslationStandingVia(page, actorId, actorRoles);
             },
             LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Page>(id),
@@ -256,154 +256,18 @@ public sealed class PageService : IPageService
             .ConfigureAwait(false);
     }
 
-    // ─── Standing-matrix gate helpers (ADR 0039 §3.7 — pure, no store) ────
+    // ─── Standing-matrix gates (ADR 0039 §3.7 / ADR 0040 / ADR 0161) ──────
     //
-    // The C3 server-side re-check pattern (the AnnouncementService
-    // EnsureCreatePermissionAsync / EnsureEditPermissionAsync shape): a Web
-    // [Authorize(Roles=…)] is a convenience pre-gate, not the source of
-    // truth. Each helper is a **pure** role-claim check (no DB access), so
-    // it is directly testable and callable from any of U03's write lanes.
-    // A null page is a KeyNotFoundException (the Web layer's 404); a denied
-    // actor is an UnauthorizedAccessException (the Web layer's 403). The
-    // existing role claims (Roles.GlobalAdmin / Roles.Translator) are
-    // consulted — no new AccessAction, no new AccessVia, no branch in the
-    // frozen IAuthorizationService (ADR 0039). ADR 0040 removes the community
-    // Moderator lane from pages (a system page has no community to moderate; a
-    // blog page is personal content), so Roles.ModeratorComponent grants no
-    // page standing.
-
-    /// <summary>
-    /// The **create** standing (ADR 0040, amending ADR 0039 §3.7): a
-    /// <see cref="PageKind.System"/> page is <b>GlobalAdmin only</b> (a
-    /// community Moderator has <i>no</i> standing on a system page — the ADR
-    /// 0040 amendment, user sign-off 2026-09-17); a <see cref
-    /// "PageKind.User"/> (blog) page may be created by <b>any signed-in
-    /// actor</b> (they become the author). The "only the user themselves"
-    /// constraint is enforced by the <b>ownership</b> guard in
-    /// <see cref="EnsureBlogOwnershipAsync"/> (a blog page must nest under the
-    /// actor's own <c>blog/{uid}</c> root), <b>not</b> here.
-    /// </summary>
-    public static void CheckCreateStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (page is null)
-            throw new KeyNotFoundException("A page is required for the create standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required.");
-
-        if (page.Kind == PageKind.System)
-        {
-            if (actorRoles.Contains(Roles.GlobalAdmin))
-                return;
-            throw new UnauthorizedAccessException("Only a GlobalAdmin may create a system page.");
-        }
-
-        // PageKind.User (a blog page): any signed-in actor — they become the
-        // author. The ownership guard ensures it is under their own blog root.
-    }
-
-    /// <summary>
-    /// The **edit** standing (ADR 0040, amending ADR 0039 §3.7): a
-    /// <see cref="PageKind.System"/> page is <b>GlobalAdmin only</b> (the
-    /// author branch is disabled for a system page — a community Moderator
-    /// has no standing on it); a <see cref="PageKind.User"/> (blog) page is
-    /// the <b>author ∪ GlobalAdmin</b> (the ADR 0040 amendment: a community
-    /// Moderator has no standing on a resident's personal blog — it is
-    /// personal content, not community content).
-    /// </summary>
-    public static void CheckEditStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (page is null)
-            throw new KeyNotFoundException("A page is required for the edit standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required.");
-
-        if (page.Kind == PageKind.System)
-        {
-            if (actorRoles.Contains(Roles.GlobalAdmin))
-                return;
-            throw new UnauthorizedAccessException("Only a GlobalAdmin may edit a system page.");
-        }
-
-        // PageKind.User (a blog page): the author (the resident) ∪ GlobalAdmin
-        // (platform override). A community Moderator has no standing on a
-        // resident's personal blog (ADR 0040 — a blog page is personal
-        // content, not community content).
-        if (string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
-            return;
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;
-
-        throw new UnauthorizedAccessException(
-            "Only the author or a GlobalAdmin may edit this blog page.");
-    }
-
-    /// <summary>
-    /// The **translation** standing (ADR 0040, amending ADR 0039 §3.7 /
-    /// ADR 0029 carried over, and further amended by ADR 0161 to close the
-    /// "an editor cannot translate their own page" gap): a
-    /// <see cref="PageKind.System"/> page may be translated by a
-    /// <b>GlobalAdmin or a Translator</b> (a platform page has no community to
-    /// moderate; its author is an audit identity, not a standing branch); a
-    /// <see cref="PageKind.User"/> (blog) page is <b>the page's author ∪
-    /// GlobalAdmin ∪ Translator</b> — the author branch is the ADR 0161
-    /// symmetry with the edit standing (a blog page's edit standing is the
-    /// author ∪ GlobalAdmin, ADR 0040), so a resident who can edit their own
-    /// page can also translate it. A community Moderator has <b>no</b>
-    /// translation standing on either kind (a blog is personal content, not
-    /// community content).
-    /// </summary>
-    public static void CheckTranslateStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (page is null)
-            throw new KeyNotFoundException("A page is required for the translation standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required.");
-
-        if (!CanTranslatePage(actorId, actorRoles, page))
-            throw new UnauthorizedAccessException(
-                "Only the page's author, a GlobalAdmin, or a Translator may add a translation.");
-    }
-
-    /// <summary>
-    /// The public ADR 0029 standing probe the Web layer calls to decide
-    /// whether to render the "add a translation" affordance on a page (a
-    /// <b>display</b> pin, not a gate — the real deny is the
-    /// <see cref="AddTranslationAsync"/> standing re-check, which re-runs this
-    /// same rule server-side via <see cref="CheckTranslateStanding"/>). It
-    /// delegates to the single shared decision body
-    /// (<see cref="CanTranslatePageCore"/>), so the display and the gate can
-    /// never drift apart (the
-    /// <see cref="Kumunita.Core.Posts.PostService.CanAddTranslation"/> /
-    /// <see cref="Kumunita.Core.Announcements.AnnouncementService
-    /// .CanTranslateAnnouncement"/> shape).
-    /// </summary>
-    public static bool CanTranslatePage(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-        => PageTranslationPolicy.CanTranslatePage(actorId, actorRoles, page);
-
-    /// <summary>
-    /// The single shared translation-standing decision (ADR 0040, amending
-    /// ADR 0039 §3.7 / ADR 0029 carried over, and further amended by ADR 0161
-    /// to close the "an editor cannot translate their own page" gap): a
-    /// GlobalAdmin or a Translator qualifies on **any** page (system or user).
-    /// Additionally (ADR 0161) the **author** of a <see cref="PageKind.User"/>
-    /// (blog) page qualifies — the same branch the edit standing uses (a blog
-    /// page's edit standing is the author ∪ GlobalAdmin, ADR 0040), so a
-    /// resident who can edit their own page can also translate it. A system
-    /// page's author is an audit identity, not a standing branch (a system
-    /// page is GlobalAdmin-only), so the author branch is scoped to
-    /// <see cref="PageKind.User"/> only — mirroring <see
-    /// cref="CheckEditStanding"/>. A community Moderator has **no** translation
-    /// standing on either kind (the ADR 0040 amendment: a system page has no
-    /// community to moderate; a blog page is personal content). Called by both
-    /// <see cref="CanTranslatePage"/> (the display probe) and <see
-    /// cref="CheckTranslateStanding"/> (the write-lane gate), so the two can
-    /// never disagree.
-    /// </summary>
-    private static bool CanTranslatePageCore(string actorId, IReadOnlySet<string> actorRoles, Page page)
-        => PageTranslationPolicy.ResolveStanding(actorId, actorRoles, page);
+    // The create / edit / translate standing re-checks + the translate
+    // display probe were extracted from this service into
+    // <see cref="PageStandingPolicy"/> (the C3-01 ADR 0290 named-seam
+    // shrink — the pure, session-free <c>*Policy</c> shape, mirroring
+    // <see cref="Events.EventStandingPolicy"/>). The C3 server-side
+    // re-check pattern is unchanged: a Web [Authorize(Roles=…)] is a
+    // convenience pre-gate, not the source of truth; the write lanes below
+    // still call the same three gates (now on the policy static) before
+    // committing. A null page is a KeyNotFoundException (404); a denied
+    // actor is an UnauthorizedAccessException (403).
 
     // ─── Hierarchy guards (ADR 0039 §3.3 — cycle-guard + depth-cap) ───────
     //
@@ -630,7 +494,7 @@ public sealed class PageService : IPageService
         // Standing re-check (server-side, C3 single-source pin, ADR 0040
         // kind-aware): a system page is GlobalAdmin-only; a blog page is
         // any signed-in actor (they become the author).
-        CheckCreateStanding(actorId, actorRoles, page);
+        PageStandingPolicy.CheckCreateStanding(actorId, actorRoles, page);
 
         // TG (C-TG·6, D6, F5): a PageKind.System page's TagIds is **always
         // empty** — the write lane is the guard (the shape permits the field,
@@ -858,7 +722,7 @@ public sealed class PageService : IPageService
             throw new KeyNotFoundException($"Page '{updated.Id}' was not found in the session; nothing to edit.");
 
         // Standing re-check (server-side, C3 single-source pin).
-        CheckEditStanding(actorId, actorRoles, existing);
+        PageStandingPolicy.CheckEditStanding(actorId, actorRoles, existing);
 
         // TG (C-TG·6, D6, F5): a PageKind.System page's TagIds is **always
         // empty** — the write lane is the guard (the shape permits the field,
@@ -1243,7 +1107,7 @@ public sealed class PageService : IPageService
         // gate, per ADR 0058: a system page is GlobalAdmin-only; a blog page
         // is the author ∪ GlobalAdmin. A community Moderator has no reset
         // standing on either kind (reset is a platform-level operation).
-        CheckEditStanding(actorId, actorRoles, page);
+        PageStandingPolicy.CheckEditStanding(actorId, actorRoles, page);
 
         // The actual overwrite (the en body + the de/fr/da translation rows)
         // is delegated to the seeder's reset applier — it owns the seeded

@@ -17,8 +17,8 @@ public static class PageTranslationPolicy
     /// The public ADR 0040/0161 standing probe the Web layer calls to decide
     /// whether to render the "translate" affordance on a page (a <b>display</b>
     /// pin, not a gate — the real deny is the
-    /// <see cref="PageService.CheckTranslateStanding"/> write-lane gate, which
-    /// re-runs the same rule server-side).
+    /// <see cref="PageStandingPolicy.CheckTranslateStanding"/> write-lane gate,
+    /// which re-runs the same rule server-side).
     /// </summary>
     public static bool CanTranslatePage(string actorId, IReadOnlySet<string> actorRoles, Page? page)
     {

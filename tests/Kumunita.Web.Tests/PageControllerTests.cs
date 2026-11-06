@@ -1036,7 +1036,7 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
     /// <summary>
     /// (e) The <see cref="PageShowViewModel.CanTranslate"/> affordance flag:
     /// <b>set</b> for a <b>Translator</b> on a public page (the display pin —
-    /// <see cref="PageService.CanTranslatePage"/>), so the "add a
+    /// <see cref="PageStandingPolicy.CanTranslatePage"/>), so the "add a
     /// translation" form renders. The real gate is the service (C3); the flag
     /// is the button's visibility.
     /// </summary>
@@ -1071,7 +1071,7 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
     /// <summary>
     /// (e) The <see cref="PageShowViewModel.CanTranslate"/> affordance flag:
     /// <b>unset</b> for a <b>plain Member</b> on a public page (the display
-    /// pin — <see cref="PageService.CanTranslatePage"/> is false for a
+    /// pin — <see cref="PageStandingPolicy.CanTranslatePage"/> is false for a
     /// resident with no standing), so the "add a translation" form does not
     /// render.
     /// </summary>

@@ -250,7 +250,7 @@ public interface IEventService
     /// The <c>actorRoles</c> parameter carries the principal's real role set (the Web
     /// layer passes <c>RoleSet(User)</c>) so the GlobalAdmin override branch of
     /// <see cref="EventService.CheckEditStanding"/> is exercised in this service —
-    /// the <c>AnnouncementService.UpdateAsync</c> / <c>PageService.CheckEditStanding</c>
+    /// the <c>AnnouncementService.UpdateAsync</c> / <c>PageStandingPolicy.CheckEditStanding</c>
     /// precedent (the Web hands in real roles; Core enforces the matrix).
     /// The <c>AccessAudit</c> row (<c>event.update</c>) is stored in the caller's
     /// session (C3).

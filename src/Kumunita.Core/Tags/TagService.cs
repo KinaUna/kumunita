@@ -951,7 +951,7 @@ public sealed class TagService : ITagService
 
     // ── Standing probes (C-TG·5; a display pin, not a gate — the real deny
     //    is the write-lane re-check, the PostService.CanAddTranslation /
-    //    PageService.CanTranslatePage idiom) ──
+    //    PageStandingPolicy.CanTranslatePage idiom) ──
 
     /// <inheritdoc />
     public bool CanAttachToPost(Post post, string actorId, IReadOnlySet<string> roles)

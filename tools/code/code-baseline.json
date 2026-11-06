@@ -40,7 +40,7 @@
     },
     {
       "id": "src/Kumunita.Core/Pages/PageService.cs",
-      "max": 917
+      "max": 852
     },
     {
       "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs",
@@ -574,8 +574,7 @@
     },
     {
       "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService",
-      "max": 30,
-      "adr": "0290"
+      "max": 26
     },
     {
       "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService",
@@ -1854,7 +1853,7 @@
       "from": "Pages",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 2,
+      "count": 3,
       "adr": "0291"
     },
     {
@@ -3603,7 +3602,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/PageController.cs",
-      "reason": "the page create/edit lanes are multi-session aggregate writes (page + block + translation + moderation rows). The owning PageService (src/Kumunita.Core/Pages/PageService.cs, 1569 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope. Kept on the store."
+      "reason": "the page create/edit lanes are multi-session aggregate writes (page + block + translation + moderation rows). The owning PageService (src/Kumunita.Core/Pages/PageService.cs) is a god-file over the cs_file ceiling - C3-01 extracted the ADR 0290 named-seam standing cluster (PageStandingPolicy) and shrank it (917 -> 852 code lines) but it is still over the 600 ceiling, so moving the lanes in would still raise the ratchet. Kept on the store; the entry retires only when PageService drops under 600 (a later C3 unit)."
     },
     {
       "file": "src/Kumunita.Web/Controllers/PostsController.cs",
