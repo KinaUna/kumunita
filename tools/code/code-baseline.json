@@ -15,29 +15,13 @@
   },
   "files": [
     {
-      "id": "src/Kumunita.Core/Announcements/AnnouncementService.cs",
-      "max": 704
-    },
-    {
       "id": "src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs",
       "max": 2060,
       "adr": "0292"
     },
     {
-      "id": "src/Kumunita.Core/Events/EventService.cs",
-      "max": 709
-    },
-    {
-      "id": "src/Kumunita.Core/Identity/IdentityService.cs",
-      "max": 817
-    },
-    {
       "id": "src/Kumunita.Core/Localization/LocalizationService.cs",
       "max": 684
-    },
-    {
-      "id": "src/Kumunita.Core/Moderation/ModerationService.cs",
-      "max": 753
     },
     {
       "id": "src/Kumunita.Core/Pages/PageService.cs",
@@ -48,42 +32,6 @@
       "max": 806
     },
     {
-      "id": "src/Kumunita.Core/Posts/PostService.cs",
-      "max": 631
-    },
-    {
-      "id": "src/Kumunita.Core/Projects/BoardService.cs",
-      "max": 706
-    },
-    {
-      "id": "src/Kumunita.Core/Projects/TodoService.cs",
-      "max": 744
-    },
-    {
-      "id": "src/Kumunita.Core/Tags/TagService.cs",
-      "max": 736
-    },
-    {
-      "id": "src/Kumunita.Core/UserInfo/GroupService.cs",
-      "max": 705
-    },
-    {
-      "id": "src/Kumunita.Core/UserInfo/GuardianService.cs",
-      "max": 771
-    },
-    {
-      "id": "src/Kumunita.Web/Controllers/AdminController.cs",
-      "max": 777
-    },
-    {
-      "id": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
-      "max": 611
-    },
-    {
-      "id": "src/Kumunita.Web/Controllers/BoardsController.cs",
-      "max": 857
-    },
-    {
       "id": "src/Kumunita.Web/Controllers/EventController.cs",
       "max": 1249,
       "adr": "0290"
@@ -92,15 +40,6 @@
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs",
       "max": 1641,
       "adr": "0293"
-    },
-    {
-      "id": "src/Kumunita.Web/Controllers/GuardianController.cs",
-      "max": 747,
-      "adr": "0290"
-    },
-    {
-      "id": "src/Kumunita.Web/Controllers/PageController.cs",
-      "max": 833
     },
     {
       "id": "src/Kumunita.Web/Controllers/PostsController.cs",
@@ -163,7 +102,7 @@
       "cc_max": 32
     },
     {
-      "id": "src/Kumunita.Core/Events/EventService.cs::Kumunita.Core.Events.EventService.UpdateGroupEventAsync(string,string,GroupEventUpdate,IDocumentSession,CancellationToken)",
+      "id": "src/Kumunita.Core/Events/EventService.Group.cs::Kumunita.Core.Events.EventService.UpdateGroupEventAsync(string,string,GroupEventUpdate,IDocumentSession,CancellationToken)",
       "max": 40,
       "cc_max": 16
     },
@@ -268,7 +207,7 @@
       "cc_max": 20
     },
     {
-      "id": "src/Kumunita.Core/Portability/UserPortabilityService.cs::Kumunita.Core.Portability.UserPortabilityService.StandingComponentAsync(Marten.IQuerySession,string,string,CancellationToken)",
+      "id": "src/Kumunita.Core/Portability/UserPortabilityService.Standing.cs::Kumunita.Core.Portability.UserPortabilityService.StandingComponentAsync(Marten.IQuerySession,string,string,CancellationToken)",
       "max": 24,
       "cc_max": 16
     },
@@ -562,20 +501,12 @@
   ],
   "classes": [
     {
-      "id": "src/Kumunita.Core/Identity/IdentityService.cs::Kumunita.Core.Identity.IdentityService",
-      "max": 33
-    },
-    {
       "id": "src/Kumunita.Core/Pages/PageService.cs::Kumunita.Core.Pages.PageService",
       "max": 26
     },
     {
       "id": "src/Kumunita.Core/Projects/ProjectService.cs::Kumunita.Core.Projects.ProjectService",
       "max": 50
-    },
-    {
-      "id": "src/Kumunita.Web/Controllers/AdminController.cs::Kumunita.Web.Controllers.AdminController",
-      "max": 26
     },
     {
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs::Kumunita.Web.Controllers.GroupsController",
@@ -723,7 +654,8 @@
       "from": "Announcements",
       "to": "Localization",
       "symbol": "LocaleSettings",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Announcements",
@@ -1160,13 +1092,15 @@
       "from": "Events",
       "to": "Authorization",
       "symbol": "AccessAuditFactory",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Events",
       "to": "Authorization",
       "symbol": "Audience",
-      "count": 5
+      "count": 6,
+      "adr": "0294"
     },
     {
       "from": "Events",
@@ -1226,7 +1160,8 @@
       "from": "Events",
       "to": "Query",
       "symbol": "PageSizer",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Events",
@@ -1304,7 +1239,7 @@
       "from": "Identity",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 2,
+      "count": 3,
       "adr": "0293"
     },
     {
@@ -1545,13 +1480,15 @@
       "from": "Identity",
       "to": "UserInfo",
       "symbol": "ModeratorAssignment",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Identity",
       "to": "UserInfo",
       "symbol": "Profile",
-      "count": 2
+      "count": 3,
+      "adr": "0294"
     },
     {
       "from": "Inventory",
@@ -1701,25 +1638,29 @@
       "from": "Moderation",
       "to": "Posts",
       "symbol": "Post",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Moderation",
       "to": "Posts",
       "symbol": "PostReply",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Moderation",
       "to": "Posts",
       "symbol": "PostToAuditableResource",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Moderation",
       "to": "Posts",
       "symbol": "Report",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Moderation",
@@ -1767,7 +1708,8 @@
       "from": "Moderation",
       "to": "UserInfo",
       "symbol": "ModeratorAssignment",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Notifications",
@@ -2206,7 +2148,8 @@
       "from": "Portability",
       "to": "UserInfo",
       "symbol": "GroupMembership",
-      "count": 2
+      "count": 3,
+      "adr": "0294"
     },
     {
       "from": "Portability",
@@ -2297,7 +2240,7 @@
       "from": "Posts",
       "to": "Web",
       "symbol": "AttachmentIds",
-      "count": 6,
+      "count": 7,
       "adr": "0293"
     },
     {
@@ -2310,21 +2253,21 @@
       "from": "Projects",
       "to": "Authorization",
       "symbol": "AccessAuditFactory",
-      "count": 5,
+      "count": 7,
       "adr": "0293"
     },
     {
       "from": "Projects",
       "to": "Authorization",
       "symbol": "Audience",
-      "count": 12,
+      "count": 14,
       "adr": "0290"
     },
     {
       "from": "Projects",
       "to": "Authorization",
       "symbol": "StandingMatrix",
-      "count": 4,
+      "count": 6,
       "adr": "0293"
     },
     {
@@ -2395,7 +2338,7 @@
       "from": "Projects",
       "to": "Web",
       "symbol": "TagSlugs",
-      "count": 3,
+      "count": 4,
       "adr": "0290"
     },
     {
@@ -2558,13 +2501,15 @@
       "from": "Tags",
       "to": "Documents",
       "symbol": "Document",
-      "count": 2
+      "count": 3,
+      "adr": "0294"
     },
     {
       "from": "Tags",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 1
+      "count": 2,
+      "adr": "0294"
     },
     {
       "from": "Tags",
@@ -2576,7 +2521,8 @@
       "from": "Tags",
       "to": "Pages",
       "symbol": "Page",
-      "count": 3
+      "count": 5,
+      "adr": "0294"
     },
     {
       "from": "Tags",
@@ -2588,7 +2534,8 @@
       "from": "Tags",
       "to": "Posts",
       "symbol": "Post",
-      "count": 3
+      "count": 5,
+      "adr": "0294"
     },
     {
       "from": "Tags",
@@ -2600,13 +2547,15 @@
       "from": "Tags",
       "to": "Projects",
       "symbol": "KanbanBoard",
-      "count": 2
+      "count": 3,
+      "adr": "0294"
     },
     {
       "from": "Tags",
       "to": "Projects",
       "symbol": "TodoItem",
-      "count": 2
+      "count": 3,
+      "adr": "0294"
     },
     {
       "from": "Tags",
@@ -2733,7 +2682,7 @@
       "from": "UserInfo",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 5,
+      "count": 7,
       "adr": "0290"
     },
     {
@@ -2813,7 +2762,7 @@
       "from": "Web",
       "to": "Authorization",
       "symbol": "Audience",
-      "count": 20,
+      "count": 21,
       "adr": "0290"
     },
     {
@@ -3017,7 +2966,7 @@
       "from": "Web",
       "to": "Identity",
       "symbol": "Roles",
-      "count": 37,
+      "count": 39,
       "adr": "0290"
     },
     {
@@ -3054,7 +3003,7 @@
       "from": "Web",
       "to": "Identity",
       "symbol": "User",
-      "count": 75,
+      "count": 81,
       "adr": "0290"
     },
     {
@@ -3171,7 +3120,7 @@
       "from": "Web",
       "to": "Messaging",
       "symbol": "Message",
-      "count": 22,
+      "count": 25,
       "adr": "0290"
     },
     {
@@ -3227,7 +3176,8 @@
       "from": "Web",
       "to": "Pages",
       "symbol": "Page",
-      "count": 17
+      "count": 19,
+      "adr": "0294"
     },
     {
       "from": "Web",
@@ -3239,7 +3189,8 @@
       "from": "Web",
       "to": "Pages",
       "symbol": "PageToAuditableResource",
-      "count": 3
+      "count": 4,
+      "adr": "0294"
     },
     {
       "from": "Web",

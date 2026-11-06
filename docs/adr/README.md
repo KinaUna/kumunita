@@ -323,3 +323,4 @@ Decision / Consequences. New decisions take the next number.
 | 0291 | IMPROVE-CODE-2 C2-03: the 9 remaining Web→concrete-*Service crossings — 7 static-utility services (C2-06) + NotificationService (Wolverine binding) + PostService (C2-05 god-surface) | Proposed |
 | 0292 | IMPROVE-CODE-3 C3-02: the SampleDataSeeder per-entity decomposition — the 2 god-method retires + the 1 files-entry honest raise (1633 → 2060) | Proposed |
 | 0293 | IMPROVE-CODE-3 C3-03: the god-service seam extractions — the honest boundary-edge count raises (the new named-seam file lands on an already-existing module edge) + the `GroupsController` seam-injection collateral | Proposed |
+| 0294 | IMPROVE-CODE-3 C3-04: the still-large-file tail — 15 partial-class splits (files 23→8) + 31 boundary-edge raises (partial files land on already-existing module edges) | Proposed |
